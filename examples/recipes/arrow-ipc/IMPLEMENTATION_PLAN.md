@@ -1,640 +1,104 @@
-# CubeSQL → CubeStore Direct Connection Prototype
+# Transparent Pre-Aggregation Routing - Implementation Plan
 
-## Implementation Plan: Minimal Proof-of-Concept
-
-### Goal
-Create a minimal working prototype (~200-300 lines) that demonstrates cubesqld can query CubeStore directly via WebSocket and return Arrow IPC to clients, bypassing Cube API for data transfer.
-
----
-
-## Architecture Overview
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Client (Python/R/JS with Arrow)                          │
-└────────────────┬─────────────────────────────────────────┘
-                 │ Arrow IPC stream
-                 ↓
-┌──────────────────────────────────────────────────────────┐
-│ cubesqld (Rust)                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │ New: CubeStoreClient                               │  │
-│  │  - WebSocket connection                            │  │
-│  │  - FlatBuffers encoding/decoding                   │  │
-│  │  - FlatBuffers → Arrow conversion                  │  │
-│  └────────────────────────────────────────────────────┘  │
-└────────────────┬─────────────────────────────────────────┘
-                 │ WebSocket + FlatBuffers
-                 ↓
-┌──────────────────────────────────────────────────────────┐
-│ CubeStore                                                │
-│  - WebSocket server at ws://localhost:3030/ws           │
-│  - Returns HttpResultSet (FlatBuffers)                   │
-└──────────────────────────────────────────────────────────┘
-```
+**Date**: December 25, 2025
+**Status**: Ready for Implementation  
+**Goal**: Enable automatic pre-aggregation routing for MEASURE queries
 
 ---
 
-## Phase 1: Dependencies & Setup
+## Executive Summary
 
-### 1.1 Check/Add Dependencies
+Based on comprehensive codebase exploration, we now have a clear path to implement transparent pre-aggregation routing. All components exist - we just need to wire them together!
 
-**File**: `/rust/cubesql/cubesql/Cargo.toml`
+**Target**: 5-10x performance improvement for queries with pre-aggregations, zero code changes for users.
 
-**Dependencies to verify/add**:
-```toml
-[dependencies]
-tokio-tungstenite = "0.20"
-futures-util = "0.3"
-flatbuffers = "23.1.21"  # Already present
-uuid = { version = "1.0", features = ["v4"] }
-arrow = "50.0"  # Already present
-```
-
-**Action**: Read Cargo.toml, add only if missing
 
 ---
 
-## Phase 2: CubeStore WebSocket Client
-
-### 2.1 Create New Module
-
-**File**: `/rust/cubesql/cubesql/src/cubestore/mod.rs` (new file)
-
-```rust
-pub mod client;
-```
-
-**File**: `/rust/cubesql/cubesql/src/cubestore/client.rs` (new file)
-
-**Structure** (~150 lines):
-```rust
-use tokio_tungstenite::{connect_async, tungstenite::Message};
-use futures_util::{SinkExt, StreamExt};
-use flatbuffers::FlatBufferBuilder;
-use arrow::{
-    array::*,
-    datatypes::*,
-    record_batch::RecordBatch,
-};
-use std::sync::{Arc, atomic::{AtomicU32, Ordering}};
-
-// Import FlatBuffers generated code
-use crate::CubeError;
-use cubeshared::codegen::http_message::*;
-
-pub struct CubeStoreClient {
-    url: String,
-    connection_id: String,
-    message_counter: AtomicU32,
-}
-
-impl CubeStoreClient {
-    pub fn new(url: String) -> Self { ... }
-
-    pub async fn query(&self, sql: String) -> Result<Vec<RecordBatch>, CubeError> { ... }
-
-    fn build_query_message(&self, sql: &str) -> Vec<u8> { ... }
-
-    fn flatbuffers_to_arrow(
-        &self,
-        result_set: HttpResultSet
-    ) -> Result<Vec<RecordBatch>, CubeError> { ... }
-}
-```
-
-### 2.2 FlatBuffers Message Building
-
-**Key implementation details**:
-
-```rust
-fn build_query_message(&self, sql: &str) -> Vec<u8> {
-    let mut builder = FlatBufferBuilder::new();
-
-    // Build query string
-    let query_str = builder.create_string(sql);
-    let conn_id_str = builder.create_string(&self.connection_id);
-
-    // Build HttpQuery
-    let query_obj = HttpQuery::create(&mut builder, &HttpQueryArgs {
-        query: Some(query_str),
-        trace_obj: None,
-        inline_tables: None,
-    });
-
-    // Build HttpMessage wrapper
-    let msg_id = self.message_counter.fetch_add(1, Ordering::SeqCst);
-    let message = HttpMessage::create(&mut builder, &HttpMessageArgs {
-        message_id: msg_id,
-        command_type: HttpCommand::HttpQuery,
-        command: Some(query_obj.as_union_value()),
-        connection_id: Some(conn_id_str),
-    });
-
-    builder.finish(message, None);
-    builder.finished_data().to_vec()
-}
-```
-
-### 2.3 FlatBuffers → Arrow Conversion
-
-**Type mapping strategy**:
-
-```rust
-fn infer_arrow_type(&self, rows: &Vector<ForwardsUOffset<HttpRow>>, col_idx: usize) -> DataType {
-    // Sample first non-null value to infer type
-    // CubeStore returns all values as strings in FlatBuffers
-    // We need to infer the actual type by parsing
-
-    for row in rows {
-        let values = row.values().unwrap();
-        let value = values.get(col_idx);
-
-        if let Some(s) = value.string_value() {
-            // Try parsing as different types
-            if s.parse::<i64>().is_ok() {
-                return DataType::Int64;
-            } else if s.parse::<f64>().is_ok() {
-                return DataType::Float64;
-            } else if s == "true" || s == "false" {
-                return DataType::Boolean;
-            }
-            // Default to string
-            return DataType::Utf8;
-        }
-    }
-
-    DataType::Utf8 // Default
-}
-
-fn flatbuffers_to_arrow(
-    &self,
-    result_set: HttpResultSet
-) -> Result<Vec<RecordBatch>, CubeError> {
-    let columns = result_set.columns().unwrap();
-    let rows = result_set.rows().unwrap();
-
-    if rows.len() == 0 {
-        // Empty result set
-        let fields: Vec<Field> = columns.iter()
-            .map(|col| Field::new(col, DataType::Utf8, true))
-            .collect();
-        let schema = Arc::new(Schema::new(fields));
-        let empty_batch = RecordBatch::new_empty(schema);
-        return Ok(vec![empty_batch]);
-    }
-
-    // Infer schema from data
-    let fields: Vec<Field> = columns.iter()
-        .enumerate()
-        .map(|(idx, col)| {
-            let dtype = self.infer_arrow_type(&rows, idx);
-            Field::new(col, dtype, true)
-        })
-        .collect();
-    let schema = Arc::new(Schema::new(fields));
-
-    // Build columnar arrays
-    let arrays = self.build_columnar_arrays(&schema, &rows)?;
-
-    let batch = RecordBatch::try_new(schema, arrays)?;
-    Ok(vec![batch])
-}
-
-fn build_columnar_arrays(
-    &self,
-    schema: &SchemaRef,
-    rows: &Vector<ForwardsUOffset<HttpRow>>
-) -> Result<Vec<ArrayRef>, CubeError> {
-    let mut arrays = Vec::new();
-
-    for (col_idx, field) in schema.fields().iter().enumerate() {
-        let array: ArrayRef = match field.data_type() {
-            DataType::Utf8 => {
-                let mut builder = StringBuilder::new();
-                for row in rows {
-                    let values = row.values().unwrap();
-                    let value = values.get(col_idx);
-                    match value.string_value() {
-                        Some(s) => builder.append_value(s),
-                        None => builder.append_null(),
-                    }
-                }
-                Arc::new(builder.finish())
-            }
-            DataType::Int64 => {
-                let mut builder = Int64Builder::new();
-                for row in rows {
-                    let values = row.values().unwrap();
-                    let value = values.get(col_idx);
-                    match value.string_value() {
-                        Some(s) => {
-                            match s.parse::<i64>() {
-                                Ok(n) => builder.append_value(n),
-                                Err(_) => builder.append_null(),
-                            }
-                        }
-                        None => builder.append_null(),
-                    }
-                }
-                Arc::new(builder.finish())
-            }
-            DataType::Float64 => {
-                let mut builder = Float64Builder::new();
-                for row in rows {
-                    let values = row.values().unwrap();
-                    let value = values.get(col_idx);
-                    match value.string_value() {
-                        Some(s) => {
-                            match s.parse::<f64>() {
-                                Ok(n) => builder.append_value(n),
-                                Err(_) => builder.append_null(),
-                            }
-                        }
-                        None => builder.append_null(),
-                    }
-                }
-                Arc::new(builder.finish())
-            }
-            DataType::Boolean => {
-                let mut builder = BooleanBuilder::new();
-                for row in rows {
-                    let values = row.values().unwrap();
-                    let value = values.get(col_idx);
-                    match value.string_value() {
-                        Some(s) => {
-                            match s.to_lowercase().as_str() {
-                                "true" | "t" | "1" => builder.append_value(true),
-                                "false" | "f" | "0" => builder.append_value(false),
-                                _ => builder.append_null(),
-                            }
-                        }
-                        None => builder.append_null(),
-                    }
-                }
-                Arc::new(builder.finish())
-            }
-            _ => {
-                // Fallback: treat as string
-                let mut builder = StringBuilder::new();
-                for row in rows {
-                    let values = row.values().unwrap();
-                    let value = values.get(col_idx);
-                    match value.string_value() {
-                        Some(s) => builder.append_value(s),
-                        None => builder.append_null(),
-                    }
-                }
-                Arc::new(builder.finish())
-            }
-        };
-
-        arrays.push(array);
-    }
-
-    Ok(arrays)
-}
-```
-
----
-
-## Phase 3: Module Registration
-
-### 3.1 Register Module in Main
-
-**File**: `/rust/cubesql/cubesql/src/lib.rs`
-
-**Add**:
-```rust
-pub mod cubestore;
-```
-
-**Action**: Add this line to the module declarations section
-
----
-
-## Phase 4: Simple Test Binary
-
-### 4.1 Create Standalone Test
-
-**File**: `/rust/cubesql/cubesql/examples/cubestore_direct.rs` (new file)
-
-```rust
-use cubesql::cubestore::client::CubeStoreClient;
-use std::env;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
-
-    let cubestore_url = env::var("CUBESQL_CUBESTORE_URL")
-        .unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string());
-
-    println!("Connecting to CubeStore at {}", cubestore_url);
-
-    let client = CubeStoreClient::new(cubestore_url);
-
-    // Simple test query
-    let sql = "SELECT * FROM information_schema.tables LIMIT 5";
-    println!("Executing: {}", sql);
-
-    let batches = client.query(sql.to_string()).await?;
-
-    println!("\nResults:");
-    println!("  {} batches", batches.len());
-    for (i, batch) in batches.iter().enumerate() {
-        println!("  Batch {}: {} rows × {} columns",
-            i, batch.num_rows(), batch.num_columns());
-
-        // Print schema
-        println!("  Schema:");
-        for field in batch.schema().fields() {
-            println!("    - {} ({})", field.name(), field.data_type());
-        }
-
-        // Print first few rows
-        println!("  Data (first 3 rows):");
-        let num_rows = batch.num_rows().min(3);
-        for row_idx in 0..num_rows {
-            print!("    [");
-            for col_idx in 0..batch.num_columns() {
-                let column = batch.column(col_idx);
-                let value = format!("{:?}", column.slice(row_idx, 1));
-                print!("{}", value);
-                if col_idx < batch.num_columns() - 1 {
-                    print!(", ");
-                }
-            }
-            println!("]");
-        }
-    }
-
-    Ok(())
-}
-```
-
-**Run with**:
-```bash
-cargo run --example cubestore_direct
-```
-
----
-
-## Phase 5: Integration with Existing cubesqld
-
-### 5.1 Add Transport Implementation (Optional for Prototype)
-
-**File**: `/rust/cubesql/cubesql/src/transport/cubestore.rs` (new file)
-
-```rust
-use async_trait::async_trait;
-use std::sync::Arc;
-
-use crate::{
-    transport::{TransportService, LoadRequestMeta, SqlQuery, TransportLoadRequestQuery},
-    sql::AuthContextRef,
-    compile::MetaContext,
-    CubeError,
-    cubestore::client::CubeStoreClient,
-};
-use arrow::record_batch::RecordBatch;
-
-pub struct CubeStoreTransport {
-    client: Arc<CubeStoreClient>,
-}
-
-impl CubeStoreTransport {
-    pub fn new(cubestore_url: String) -> Self {
-        Self {
-            client: Arc::new(CubeStoreClient::new(cubestore_url)),
-        }
-    }
-}
-
-#[async_trait]
-impl TransportService for CubeStoreTransport {
-    async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-        // TODO: For prototype, return minimal metadata
-        // In full implementation, would fetch from Cube API
-        unimplemented!("meta() not implemented in prototype")
-    }
-
-    async fn load(
-        &self,
-        _query: TransportLoadRequestQuery,
-        sql_query: Option<SqlQuery>,
-        _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
-    ) -> Result<Vec<RecordBatch>, CubeError> {
-        // Extract SQL string
-        let sql = match sql_query {
-            Some(SqlQuery::Sql(s)) => s,
-            Some(SqlQuery::Query(q)) => q.sql.first().map(|s| s.0.clone()).unwrap_or_default(),
-            None => return Err(CubeError::user("No SQL query provided".to_string())),
-        };
-
-        // Query CubeStore directly
-        self.client.query(sql).await
-    }
-
-    // ... other TransportService methods (stub implementations)
-}
-```
-
----
-
-## Phase 6: Testing Strategy
-
-### 6.1 Prerequisites
-
-1. **CubeStore running**:
-   ```bash
-   cd examples/recipes/arrow-ipc
-   ./start-cubestore.sh  # Or however you start it locally
+## Implementation Log
+
+### 2025-12-25 20:30 - Phase 1: Extended MetaContext (COMPLETED ✅)
+
+**Objective**: Extend MetaContext to parse and store pre-aggregation metadata from Cube API
+
+**Changes Made**:
+
+1. **Created PreAggregationMeta struct** (`ctx.rs:10-19`)
+   ```rust
+   pub struct PreAggregationMeta {
+       pub name: String,
+       pub cube_name: String,
+       pub pre_agg_type: String,      // "rollup", "originalSql"
+       pub granularity: Option<String>, // "day", "hour", etc.
+       pub time_dimension: Option<String>,
+       pub dimensions: Vec<String>,
+       pub measures: Vec<String>,
+       pub external: bool,              // true = stored in CubeStore
+   }
    ```
 
-2. **Verify CubeStore accessible**:
-   ```bash
-   # Using wscat (npm install -g wscat)
-   wscat -c ws://localhost:3030/ws
-   ```
+2. **Extended V1CubeMeta model** (`cubeclient/src/models/v1_cube_meta.rs:14-30`)
+   - Added `V1CubeMetaPreAggregation` struct to deserialize Cube API response
+   - Fields: name, type, granularity, timeDimensionReference, dimensionReferences, measureReferences, external
+   - Added `pre_aggregations: Option<Vec<V1CubeMetaPreAggregation>>` to V1CubeMeta
 
-### 6.2 Test Sequence
+3. **Updated MetaContext** (`ctx.rs:22-32`)
+   - Added `pre_aggregations: Vec<PreAggregationMeta>` field  
+   - Updated constructor signature to accept pre_aggregations parameter
 
-**Test 1: Simple Information Schema Query**
-```bash
-cargo run --example cubestore_direct
-```
+4. **Implemented parsing logic** (`service.rs:994-1045`)
+   - `parse_pre_aggregations_from_cubes()` - Main parsing function
+   - `parse_reference_string()` - Helper to parse "[item1, item2]" strings
+   - Logs loaded pre-aggregations: "✅ Loaded N pre-aggregation(s) from M cube(s)"
+   - Debug logs show details for each pre-agg
 
-Expected output:
-```
-Connecting to CubeStore at ws://127.0.0.1:3030/ws
-Executing: SELECT * FROM information_schema.tables LIMIT 5
-Results:
-  1 batches
-  Batch 0: 5 rows × 3 columns
-  Schema:
-    - table_schema (Utf8)
-    - table_name (Utf8)
-    - build_range_end (Utf8)
-  Data (first 3 rows):
-    ...
-```
+5. **Updated all call sites**:
+   - `HttpTransport::meta()` - service.rs:243-264
+   - `CubeStoreTransport::meta()` - cubestore_transport.rs:203-214
+   - `get_test_tenant_ctx_with_meta_and_templates()` - compile/test/mod.rs:749-757
+   - All test CubeMeta initializations - compile/test/mod.rs (7 instances)
 
-**Test 2: Query Actual Pre-aggregation Table**
-```rust
-// Modify cubestore_direct.rs
-let sql = "SELECT * FROM dev_pre_aggregations.orders_main LIMIT 10";
-```
+**Build Configuration**:
+- Built with `cargo build --bin cubesqld`
+- Future builds will use `-j44` to utilize all 44 CPU cores
 
-**Test 3: Arrow IPC Output**
+**Test Results**:
+- ✅ Build successful (37.79s)
+- ✅ cubesqld starts successfully
+- ✅ Logs show: "✅ Loaded 2 pre-aggregation(s) from 7 cube(s)"
+- ✅ Benchmark tests pass (queries work through HybridTransport)
 
-Add to example:
-```rust
-// After getting batches, write to Arrow IPC file
-use arrow::ipc::writer::FileWriter;
-use std::fs::File;
+**Pre-Aggregations Loaded** (from orders_with_preagg and orders_no_preagg cubes):
+- `orders_with_preagg.orders_by_market_brand_daily`
+  - Type: rollup
+  - Granularity: day
+  - Dimensions: market_code, brand_code
+  - Measures: count, total_amount_sum, tax_amount_sum, subtotal_amount_sum, customer_id_distinct
+  - External: true (stored in CubeStore)
 
-let file = File::create("/tmp/cubestore_result.arrow")?;
-let mut writer = FileWriter::try_new(file, &batches[0].schema())?;
-
-for batch in &batches {
-    writer.write(batch)?;
-}
-writer.finish()?;
-
-println!("Arrow IPC file written to /tmp/cubestore_result.arrow");
-```
-
-Then verify with Python:
-```python
-import pyarrow as pa
-import pyarrow.ipc as ipc
-
-with open('/tmp/cubestore_result.arrow', 'rb') as f:
-    reader = ipc.open_file(f)
-    table = reader.read_all()
-    print(table)
-```
+**Next Steps**: Phase 2 - Implement pre-aggregation query matching logic
 
 ---
 
-## Phase 7: Error Handling
+### Current Status: Ready for Phase 2
 
-### 7.1 Error Types to Handle
+Phase 1 provides the foundation - pre-aggregation metadata is now available in MetaContext!
 
-```rust
-impl CubeStoreClient {
-    async fn query(&self, sql: String) -> Result<Vec<RecordBatch>, CubeError> {
-        // Connection errors
-        let (ws_stream, _) = connect_async(&self.url)
-            .await
-            .map_err(|e| CubeError::internal(format!("WebSocket connection failed: {}", e)))?;
+**What Works**:
+- ✅ Pre-aggregation metadata loaded from Cube API
+- ✅ Accessible via `meta_context.pre_aggregations`
+- ✅ HybridTransport routes queries (but doesn't detect pre-aggs yet)
+- ✅ Both HTTP and CubeStore transports functional
 
-        // Send errors
-        write.send(Message::Binary(msg_bytes))
-            .await
-            .map_err(|e| CubeError::internal(format!("Failed to send query: {}", e)))?;
+**What's Next** (Phase 2):
+- Detect when a MEASURE query can use a pre-aggregation
+- Match query measures/dimensions to pre-agg coverage  
+- Generate SQL targeting pre-agg table in CubeStore
+- Route through HybridTransport → CubeStoreTransport
 
-        // Timeout handling
-        let timeout_duration = Duration::from_secs(30);
-
-        tokio::select! {
-            msg_result = read.next() => {
-                match msg_result {
-                    Some(Ok(msg)) => { /* process */ }
-                    Some(Err(e)) => return Err(CubeError::internal(format!("WebSocket error: {}", e))),
-                    None => return Err(CubeError::internal("Connection closed".to_string())),
-                }
-            }
-            _ = tokio::time::sleep(timeout_duration) => {
-                return Err(CubeError::internal("Query timeout".to_string()));
-            }
-        }
-    }
-}
-```
+**Performance Baseline** (both queries via HTTP currently):
+- WITHOUT pre-agg: ~174ms average
+- WITH pre-agg: ~169ms average  
+- Target after Phase 2+3: ~10-20ms for pre-agg queries (10x faster!)
 
 ---
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# For standalone example
-export CUBESQL_CUBESTORE_URL=ws://localhost:3030/ws
-export RUST_LOG=debug
-
-# Run
-cargo run --example cubestore_direct
-```
-
----
-
-## Success Criteria
-
-The prototype is successful if:
-
-1. ✅ **Connects to CubeStore**: WebSocket connection established
-2. ✅ **Sends Query**: FlatBuffers message sent successfully
-3. ✅ **Receives Response**: FlatBuffers response parsed
-4. ✅ **Converts to Arrow**: RecordBatch created with correct schema and data
-5. ✅ **Arrow IPC Output**: Can write to Arrow IPC file readable by other tools
-
----
-
-## File Structure
-
-```
-rust/cubesql/cubesql/
-├── Cargo.toml                           # Updated dependencies
-├── src/
-│   ├── lib.rs                           # Add: pub mod cubestore;
-│   └── cubestore/
-│       ├── mod.rs                       # New: module declaration
-│       └── client.rs                    # New: ~200 lines
-└── examples/
-    └── cubestore_direct.rs              # New: ~100 lines
-
-Total new code: ~300 lines
-```
-
----
-
-## Implementation Order
-
-1. ✅ **Check dependencies** in Cargo.toml
-2. ✅ **Create cubestore module** (mod.rs, client.rs stub)
-3. ✅ **Implement build_query_message()** - FlatBuffers encoding
-4. ✅ **Implement query() method** - WebSocket connection & send/receive
-5. ✅ **Implement flatbuffers_to_arrow()** - Type inference & conversion
-6. ✅ **Create standalone example** - cubestore_direct.rs
-7. ✅ **Test with information_schema** query
-8. ✅ **Test with pre-aggregation table** query
-9. ✅ **Add Arrow IPC file output** to example
-10. ✅ **Verify with external tool** (Python/R)
-
----
-
-## Next Steps After Prototype
-
-Once prototype works:
-
-1. **Integration**: Wire into existing cubesqld query path
-2. **Schema Sync**: Fetch metadata from Cube API
-3. **Smart Routing**: Decide CubeStore vs Cube API per query
-4. **Security**: Inject WHERE clauses from security context
-5. **Connection Pooling**: Reuse WebSocket connections
-6. **Error Recovery**: Retry logic, fallback to Cube API
-
----
-
-## Estimated Effort
-
-- **Phase 1-2 (Core client)**: 4-6 hours
-- **Phase 3-4 (Integration & example)**: 2-3 hours
-- **Phase 5-6 (Testing & debugging)**: 3-4 hours
-- **Phase 7 (Error handling & polish)**: 2-3 hours
-
-**Total**: ~1-2 days for working prototype

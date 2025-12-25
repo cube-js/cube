@@ -6,10 +6,23 @@ use crate::{sql::ColumnType, transport::SqlGenerator};
 
 use super::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, V1CubeMetaExt};
 
+#[derive(Debug, Clone)]
+pub struct PreAggregationMeta {
+    pub name: String,
+    pub cube_name: String,
+    pub pre_agg_type: String, // "rollup", "originalSql"
+    pub granularity: Option<String>, // "day", "hour", etc.
+    pub time_dimension: Option<String>,
+    pub dimensions: Vec<String>,
+    pub measures: Vec<String>,
+    pub external: bool, // true = stored in CubeStore
+}
+
 #[derive(Debug)]
 pub struct MetaContext {
     pub cubes: Vec<CubeMeta>,
     pub tables: Vec<CubeMetaTable>,
+    pub pre_aggregations: Vec<PreAggregationMeta>,
     pub member_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
     pub compiler_id: Uuid,
@@ -76,6 +89,7 @@ impl<'meta> DataSource<'meta> {
 impl MetaContext {
     pub fn new(
         cubes: Vec<CubeMeta>,
+        pre_aggregations: Vec<PreAggregationMeta>,
         member_to_data_source: HashMap<String, String>,
         data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
         compiler_id: Uuid,
@@ -107,6 +121,7 @@ impl MetaContext {
         Self {
             cubes,
             tables,
+            pre_aggregations,
             member_to_data_source,
             data_source_to_sql_generator,
             compiler_id,
@@ -298,7 +313,7 @@ mod tests {
 
         // TODO
         let test_context =
-            MetaContext::new(test_cubes, HashMap::new(), HashMap::new(), Uuid::new_v4());
+            MetaContext::new(test_cubes, vec![], HashMap::new(), HashMap::new(), Uuid::new_v4());
 
         match test_context.find_cube_table_with_oid(18000) {
             Some(table) => assert_eq!(18000, table.oid),

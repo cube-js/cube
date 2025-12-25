@@ -200,9 +200,14 @@ impl TransportService for CubeStoreTransport {
             }
         }
 
+        // Parse pre-aggregations from cubes
+        let cubes = response.cubes.unwrap_or_else(Vec::new);
+        let pre_aggregations = crate::transport::service::parse_pre_aggregations_from_cubes(&cubes);
+
         // Create MetaContext from response
         let value = Arc::new(MetaContext::new(
-            response.cubes.unwrap_or_else(Vec::new),
+            cubes,
+            pre_aggregations,
             HashMap::new(), // member_to_data_source not used in standalone mode
             HashMap::new(), // data_source_to_sql_generator not used in standalone mode
             Uuid::new_v4(),

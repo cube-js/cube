@@ -1,5 +1,5 @@
 pub mod v1_cube_meta;
-pub use self::v1_cube_meta::V1CubeMeta;
+pub use self::v1_cube_meta::{V1CubeMeta, V1CubeMetaPreAggregation};
 pub mod v1_cube_meta_custom_numeric_format;
 pub use self::v1_cube_meta_custom_numeric_format::V1CubeMetaCustomNumericFormat;
 // problem with code-gen, let's rename it as re-export
