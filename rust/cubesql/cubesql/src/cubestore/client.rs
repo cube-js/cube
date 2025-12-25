@@ -12,6 +12,7 @@ use std::time::Duration;
 use crate::CubeError;
 use cubeshared::codegen::*;
 
+#[derive(Debug)]
 pub struct CubeStoreClient {
     url: String,
     connection_id: String,

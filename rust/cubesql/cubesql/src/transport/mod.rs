@@ -1,4 +1,5 @@
 pub(crate) mod ctx;
+pub(crate) mod cubestore_transport;
 pub(crate) mod ext;
 pub(crate) mod service;
 
@@ -33,5 +34,6 @@ pub type TransportMetaResponse = cubeclient::models::V1MetaResponse;
 pub type TransportError = cubeclient::models::V1Error;
 
 pub use ctx::*;
+pub use cubestore_transport::*;
 pub use ext::*;
 pub use service::*;
