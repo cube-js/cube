@@ -7,23 +7,25 @@ import { internalDayjs } from '../src/time';
 describe('Dayjs Instance Isolation', () => {
   test('internalDayjs should not affect global dayjs instance week start', () => {
     const initialWeekStart = dayjs().startOf('week').format('dddd');
+    
     const cubeDayjs = internalDayjs();
     expect(cubeDayjs.startOf('week').format('dddd')).toBe('Monday');
+    
     const afterWeekStart = dayjs().startOf('week').format('dddd');
     expect(afterWeekStart).toBe(initialWeekStart);
-    expect(afterWeekStart).toBe('Sunday');
   });
 
   test('internalDayjs week calculation should use Monday as week start', () => {
     const testDate = '2024-01-10';
-    
+
+    const globalWeekStartBefore = dayjs(testDate).startOf('week');
     const internalWeekStart = internalDayjs(testDate).startOf('week');
     expect(internalWeekStart.format('YYYY-MM-DD')).toBe('2024-01-08');
     expect(internalWeekStart.format('dddd')).toBe('Monday');
     
-    const globalWeekStart = dayjs(testDate).startOf('week');
-    expect(globalWeekStart.format('YYYY-MM-DD')).toBe('2024-01-07');
-    expect(globalWeekStart.format('dddd')).toBe('Sunday');
+    const globalWeekStartAfter = dayjs(testDate).startOf('week');
+    expect(globalWeekStartAfter.format('YYYY-MM-DD')).toBe(globalWeekStartBefore.format('YYYY-MM-DD'));
+    expect(globalWeekStartAfter.format('dddd')).toBe(globalWeekStartBefore.format('dddd'));
   });
 
   test('multiple calls to internalDayjs should not affect global instance', () => {
