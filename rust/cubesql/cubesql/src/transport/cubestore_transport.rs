@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, time::{Duration, Instant}};
+use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use crate::{
     compile::engine::df::scan::CacheMode,
@@ -14,13 +16,23 @@ use crate::{
 };
 use crate::compile::engine::df::scan::MemberField;
 use crate::compile::engine::df::wrapper::SqlQuery;
+use cubeclient::apis::{configuration::Configuration as CubeApiConfig, default_api as cube_api};
 use std::collections::HashMap;
+
+/// Metadata cache bucket with TTL
+struct MetaCacheBucket {
+    lifetime: Instant,
+    value: Arc<MetaContext>,
+}
 
 /// Configuration for CubeStore direct connection
 #[derive(Debug, Clone)]
 pub struct CubeStoreTransportConfig {
     /// Enable direct CubeStore queries
     pub enabled: bool,
+
+    /// Cube API URL for metadata fetching
+    pub cube_api_url: String,
 
     /// CubeStore WebSocket URL
     pub cubestore_url: String,
@@ -33,6 +45,7 @@ impl Default for CubeStoreTransportConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            cube_api_url: "http://localhost:4000/cubejs-api".to_string(),
             cubestore_url: "ws://127.0.0.1:3030/ws".to_string(),
             metadata_cache_ttl: 300,
         }
@@ -46,6 +59,8 @@ impl CubeStoreTransportConfig {
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
                 .unwrap_or(false),
+            cube_api_url: std::env::var("CUBESQL_CUBE_URL")
+                .unwrap_or_else(|_| "http://localhost:4000/cubejs-api".to_string()),
             cubestore_url: std::env::var("CUBESQL_CUBESTORE_URL")
                 .unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string()),
             metadata_cache_ttl: std::env::var("CUBESQL_METADATA_CACHE_TTL")
@@ -58,24 +73,33 @@ impl CubeStoreTransportConfig {
 
 /// Transport implementation that connects directly to CubeStore
 /// This bypasses the Cube API HTTP/JSON layer for data transfer
-#[derive(Debug)]
 pub struct CubeStoreTransport {
     /// Direct WebSocket client to CubeStore
     cubestore_client: Arc<CubeStoreClient>,
 
-    /// HTTP transport for Cube API (metadata fallback)
-    /// TODO: Add HTTP transport for metadata fetching
-    /// cube_api_client: Arc<dyn TransportService>,
-
     /// Configuration
     config: CubeStoreTransportConfig,
+
+    /// Metadata cache with TTL
+    meta_cache: RwLock<Option<MetaCacheBucket>>,
+}
+
+impl std::fmt::Debug for CubeStoreTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CubeStoreTransport")
+            .field("cubestore_client", &self.cubestore_client)
+            .field("config", &self.config)
+            .field("meta_cache", &"<RwLock>")
+            .finish()
+    }
 }
 
 impl CubeStoreTransport {
     pub fn new(config: CubeStoreTransportConfig) -> Result<Self, CubeError> {
         log::info!(
-            "Initializing CubeStoreTransport (enabled: {}, url: {})",
+            "Initializing CubeStoreTransport (enabled: {}, cube_api: {}, cubestore: {})",
             config.enabled,
+            config.cube_api_url,
             config.cubestore_url
         );
 
@@ -84,7 +108,15 @@ impl CubeStoreTransport {
         Ok(Self {
             cubestore_client,
             config,
+            meta_cache: RwLock::new(None),
         })
+    }
+
+    /// Get Cube API client configuration
+    fn get_cube_api_config(&self) -> CubeApiConfig {
+        let mut config = CubeApiConfig::default();
+        config.base_path = self.config.cube_api_url.clone();
+        config
     }
 
     /// Check if we should use direct CubeStore connection for this query
@@ -132,11 +164,59 @@ impl CubeStoreTransport {
 #[async_trait]
 impl TransportService for CubeStoreTransport {
     async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-        // TODO: Fetch metadata from Cube API
-        // For now, return error to use fallback transport
-        Err(CubeError::internal(
-            "CubeStoreTransport.meta() not implemented yet - use fallback transport".to_string(),
-        ))
+        let cache_lifetime = Duration::from_secs(self.config.metadata_cache_ttl);
+
+        // Check cache first (read lock)
+        {
+            let store = self.meta_cache.read().await;
+            if let Some(cache_bucket) = &*store {
+                if cache_bucket.lifetime.elapsed() < cache_lifetime {
+                    log::debug!("Returning cached metadata (age: {:?})", cache_bucket.lifetime.elapsed());
+                    return Ok(cache_bucket.value.clone());
+                } else {
+                    log::debug!("Metadata cache expired (age: {:?})", cache_bucket.lifetime.elapsed());
+                }
+            }
+        }
+
+        log::info!("Fetching metadata from Cube API: {}", self.config.cube_api_url);
+
+        // Fetch metadata from Cube API
+        let config = self.get_cube_api_config();
+        let response = cube_api::meta_v1(&config, true).await.map_err(|e| {
+            CubeError::internal(format!("Failed to fetch metadata from Cube API: {}", e))
+        })?;
+
+        log::info!("Successfully fetched metadata from Cube API");
+
+        // Acquire write lock
+        let mut store = self.meta_cache.write().await;
+
+        // Double-check cache (another thread might have updated it)
+        if let Some(cache_bucket) = &*store {
+            if cache_bucket.lifetime.elapsed() < cache_lifetime {
+                log::debug!("Cache was updated by another thread, using that");
+                return Ok(cache_bucket.value.clone());
+            }
+        }
+
+        // Create MetaContext from response
+        let value = Arc::new(MetaContext::new(
+            response.cubes.unwrap_or_else(Vec::new),
+            HashMap::new(), // member_to_data_source not used in standalone mode
+            HashMap::new(), // data_source_to_sql_generator not used in standalone mode
+            Uuid::new_v4(),
+        ));
+
+        log::debug!("Cached metadata with {} cubes", value.cubes.len());
+
+        // Store in cache
+        *store = Some(MetaCacheBucket {
+            lifetime: Instant::now(),
+            value: value.clone(),
+        });
+
+        Ok(value)
     }
 
     async fn sql(
@@ -244,6 +324,7 @@ mod tests {
     fn test_config_default() {
         let config = CubeStoreTransportConfig::default();
         assert!(!config.enabled);
+        assert_eq!(config.cube_api_url, "http://localhost:4000/cubejs-api");
         assert_eq!(config.cubestore_url, "ws://127.0.0.1:3030/ws");
         assert_eq!(config.metadata_cache_ttl, 300);
     }
@@ -251,15 +332,18 @@ mod tests {
     #[test]
     fn test_config_from_env() {
         std::env::set_var("CUBESQL_CUBESTORE_DIRECT", "true");
+        std::env::set_var("CUBESQL_CUBE_URL", "http://localhost:4008/cubejs-api");
         std::env::set_var("CUBESQL_CUBESTORE_URL", "ws://localhost:3030/ws");
         std::env::set_var("CUBESQL_METADATA_CACHE_TTL", "600");
 
         let config = CubeStoreTransportConfig::from_env().unwrap();
         assert!(config.enabled);
+        assert_eq!(config.cube_api_url, "http://localhost:4008/cubejs-api");
         assert_eq!(config.cubestore_url, "ws://localhost:3030/ws");
         assert_eq!(config.metadata_cache_ttl, 600);
 
         std::env::remove_var("CUBESQL_CUBESTORE_DIRECT");
+        std::env::remove_var("CUBESQL_CUBE_URL");
         std::env::remove_var("CUBESQL_CUBESTORE_URL");
         std::env::remove_var("CUBESQL_METADATA_CACHE_TTL");
     }
