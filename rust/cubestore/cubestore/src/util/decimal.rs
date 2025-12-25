@@ -13,14 +13,14 @@ pub struct Decimal {
 }
 
 impl Decimal {
-    pub fn new(raw_value: i64) -> Decimal {
+    pub fn new(raw_value: i128) -> Decimal {
         Decimal {
-            raw_value: raw_value as i128,
+            raw_value: raw_value,
         }
     }
 
-    pub fn raw_value(&self) -> i64 {
-        self.raw_value as i64
+    pub fn raw_value(&self) -> i128 {
+        self.raw_value
     }
 
     pub fn negate(&self) -> Decimal {

@@ -35,6 +35,9 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  order?: 'asc' | 'desc';
+  key?: (...args: any[]) => ToString;
+  keyReference?: string;
 };
 
 export type HierarchyDefinition = {
@@ -274,9 +277,16 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const sortedByDependency = R.pipe(
       R.sortBy((c: CubeDefinition) => !!c.isView),
     )(cubes);
+
     for (const cube of sortedByDependency) {
       const splitViews: SplitViews = {};
+
       this.symbols[cube.name] = this.transform(cube.name, errorReporter.inContext(`${cube.name} cube`), splitViews);
+
+      if (!cube.isView) {
+        this.evaluateDimensionKeys(this.getCubeDefinition(cube.name), errorReporter.inContext(`${cube.name} cube`));
+      }
+
       for (const viewName of Object.keys(splitViews)) {
         // TODO can we define it when cubeList is defined?
         this.cubeList.push(splitViews[viewName]);
@@ -539,6 +549,45 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         member.relationship = camelize(member.relationship, true);
       }
     });
+  }
+
+  private evaluateDimensionKeys(cube: CubeDefinition, errorReporter: ErrorReporter) {
+    const dimensions = cube.dimensions || {};
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [dimensionName, dimension] of Object.entries(dimensions)) {
+      if (dimension.key) {
+        const keyReference = this.evaluateReference(
+          cube.name,
+          dimension.key,
+          `Dimension '${cube.name}.${dimensionName}' key`
+        );
+
+        const [refCubeName, refDimensionName] = keyReference.split('.');
+
+        if (refCubeName !== cube.name) {
+          errorReporter.error(
+            `Dimension '${cube.name}.${dimensionName}' has a key that references dimension '${keyReference}' ` +
+            'from a different cube. Key must reference a dimension within the same cube.'
+          );
+        } else if (!dimensions[refDimensionName]) {
+          errorReporter.error(
+            `Dimension '${cube.name}.${dimensionName}' references key dimension '${refDimensionName}' ` +
+            `which does not exist in cube '${cube.name}'.`
+          );
+        } else {
+          const referencedDimension = dimensions[refDimensionName];
+          if (referencedDimension.key) {
+            errorReporter.error(
+              `Dimension '${cube.name}.${dimensionName}' references '${keyReference}' as its key, ` +
+              `but '${keyReference}' already defines its own key. Nested keys are not allowed.`
+            );
+          } else {
+            dimension.keyReference = keyReference;
+          }
+        }
+      }
+    }
   }
 
   protected transformPreAggregations(preAggregations: Object) {
@@ -835,6 +884,23 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
+  protected processKeyReferenceForView(
+    keyReference: string,
+    viewName: string,
+    viewAllMembers: ViewResolvedMember[],
+    dimensionName: string
+  ): { keyReference: string } {
+    const viewKeyMember = viewAllMembers.find(v => v.member === keyReference);
+
+    if (!viewKeyMember) {
+      throw new UserError(
+        `Dimension '${dimensionName}' has key '${keyReference}' but the key dimension is not included in view '${viewName}'`
+      );
+    }
+
+    return { keyReference: `${viewName}.${viewKeyMember.name}` };
+  }
+
   protected generateIncludeMembers(members: any[], type: string, targetCube: CubeDefinitionExtended, viewAllMembers: ViewResolvedMember[]) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
@@ -899,6 +965,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           format: memberRef.override?.format || resolvedMember.format,
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
+          ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
         };
       } else if (type === 'segments') {
         memberDefinition = {
@@ -991,6 +1058,19 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     // Which means that both `T` and result must be arrays
     // For any branch of return type that can contain array it's OK to return array
     return options.originalSorting ? references : R.sortBy(R.identity, references) as any;
+  }
+
+  public evaluateReference(
+    cube: string,
+    referencesFn: (...args: Array<unknown>) => ToString,
+    context: string
+  ): string {
+    const result = this.evaluateReferences(cube, referencesFn);
+    if (Array.isArray(result)) {
+      throw new UserError(`${context} must be a single reference, not an array`);
+    }
+
+    return result;
   }
 
   public pathFromArray(array: string[]): string {

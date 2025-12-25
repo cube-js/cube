@@ -198,7 +198,8 @@ export class CubeStoreQuery extends BaseQuery {
     cumulativeMeasures: Array<[boolean, BaseMeasure]>,
     preAggregationForQuery: any
   ) {
-    if (this.cubeStoreRollingWindowJoin || !cumulativeMeasures.length) {
+    const hasDateRange = this.timeDimensions.filter(d => !d.dateRange && d.granularity).length === 0;
+    if ((this.cubeStoreRollingWindowJoin && hasDateRange) || !cumulativeMeasures.length) {
       return super.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
     }
     const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([_, measure]) => measure);

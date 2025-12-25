@@ -39,6 +39,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   drillMemberReferences?: any;
   cumulative?: boolean;
   aggType?: string;
+  keyReference?: string;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -97,6 +98,8 @@ export type DimensionConfig = {
   primaryKey: boolean;
   aliasMember?: string;
   granularities?: GranularityDefinition[];
+  order?: 'asc' | 'desc';
+  key?: string;
 };
 
 export type SegmentConfig = {
@@ -274,6 +277,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
                   origin: gDef.origin,
                 }))
                 : undefined,
+            order: extendedDimDef.order,
+            key: extendedDimDef.keyReference,
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {

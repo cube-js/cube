@@ -30,21 +30,21 @@ impl Display for DataSketchesError {
 
 impl DataSketchesError {
     pub fn new<Str: ToString>(message: Str) -> Self {
-        return Self {
+        Self {
             message: message.to_string(),
-        };
+        }
     }
 }
 
 impl From<std::io::Error> for DataSketchesError {
     fn from(err: std::io::Error) -> Self {
-        return DataSketchesError::new(err);
+        DataSketchesError::new(err)
     }
 }
 
 #[cfg(not(target_os = "windows"))]
 impl From<dsrs::DataSketchesError> for DataSketchesError {
     fn from(err: dsrs::DataSketchesError) -> Self {
-        return DataSketchesError::new(err);
+        DataSketchesError::new(err)
     }
 }

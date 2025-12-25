@@ -626,6 +626,7 @@ pub fn sql_generator(
                     ),
                     ("functions/AVG".to_string(), "AVG({{ args_concat }})".to_string()),
                     ("functions/APPROXDISTINCT".to_string(), "COUNTDISTINCTAPPROX({{ args_concat }})".to_string()),
+                    ("functions/STRING_AGG".to_string(), "STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})".to_string()),
                     ("functions/DATETRUNC".to_string(), "DATE_TRUNC({{ args_concat }})".to_string()),
                     ("functions/DATEPART".to_string(), "DATE_PART({{ args_concat }})".to_string()),
                     ("functions/FLOOR".to_string(), "FLOOR({{ args_concat }})".to_string()),

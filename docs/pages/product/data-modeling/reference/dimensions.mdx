@@ -330,6 +330,58 @@ cubes:
 
 </CodeTabs>
 
+### `order`
+
+The `order` parameter specifies the default sort order for a dimension. Valid
+values are `asc` (ascending) and `desc` (descending). This parameter is optional.
+
+When set, the dimension's default sort order is exposed via
+[APIs and integrations][ref-apis]. Consuming applications, such as BI tools
+and custom frontends, can use this metadata to apply consistent default sorting
+when displaying dimension values, ensuring a uniform user experience across
+different tools connected to the semantic layer.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+      order: `asc`
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      order: `desc`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+        order: asc
+
+      - name: created_at
+        sql: created_at
+        type: time
+        order: desc
+```
+
+</CodeTabs>
+
 ### `primary_key`
 
 Specify if a dimension is a primary key for a cube. The default value is

@@ -1,0 +1,841 @@
+# Chat API
+
+The Chat API enables real-time conversations with AI agents for analytics and data exploration.
+
+<InfoBox>
+
+The Chat API is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+
+</InfoBox>
+
+## Endpoint
+
+
+The endpoint has the following structure:
+
+```
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state
+```
+
+Copy the exact Chat API URL from your agent settings (**Chat API URL** field) in <Btn>Admin → Agents</Btn>.
+
+
+## Overview
+
+The Chat API enables real-time streaming conversations with Cube's AI agents. This endpoint allows applications to integrate AI-powered analytics conversations directly into their user interfaces.
+
+## Authentication
+
+<WarningBox>
+Accounts are limited to 10,000 external users. To increase this limit, please contact support.
+</WarningBox>
+
+Pass your [API key][ref-api-keys] directly to the Chat API endpoint. The session will be created automatically based on the `externalId` provided:
+
+```javascript
+// Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+const CHAT_API_URL = 'YOUR_CHAT_API_URL';
+
+const response = await fetch(
+  CHAT_API_URL,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Api-Key ${API_KEY}',
+    },
+    body: JSON.stringify({
+      input: 'What were the total sales last month?',
+      sessionSettings: {
+        externalId: 'user@example.com',
+        email: 'user@example.com', // optional
+        userAttributes: [ // optional
+          {
+            name: 'city',
+            value: 'San Francisco'
+          }
+        ]
+      }
+    }),
+  }
+);
+
+// Handle streaming response
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  console.log(decoder.decode(value));
+}
+```
+
+**Request Body Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `input` | string | No | The user's message or question. If omitted returns current state of thread with provided chatId. |
+| `chatId` | string | No | Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__` sent as the `state.chatId` field. |
+| `sessionSettings.externalId` | string | Yes | Unique identifier for the user, lowercase and without spaces |
+| `sessionSettings.email` | string | No | User's email address |
+| `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security |
+| `sessionSettings.groups` | string[] | No | Array of group names the user belongs to |
+| `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries |
+
+### User Attributes
+
+User attributes allow you to pass contextual information about the user to the AI agent. This enables personalized responses and automatic data filtering based on user permissions through row-level security policies.
+
+<InfoBox>
+User attributes must first be configured in your Cube admin panel before they can be used. See the [User Attributes documentation](/product/administration/users-and-permissions/user-attributes) for setup instructions.
+</InfoBox>
+
+**Supported Fields:**
+- `externalId` (required): Unique identifier for the user
+- `email` (optional): User's email address  
+- `userAttributes` (optional): Array of key-value pairs containing user metadata
+
+**User Attribute Structure:**
+```javascript
+{
+  name: 'string',    // Must match an attribute name configured in admin panel
+  value: 'string'    // Attribute value (e.g., 'San Francisco', 'Engineering')
+}
+```
+
+**How User Attributes Work:**
+1. **Row-Level Security**: Automatically filter data based on user attributes through access policies
+2. **Personalized Responses**: AI agent can tailor responses based on user context
+3. **Access Control**: Restrict data access to only what the user should see
+
+**Example Use Cases:**
+- Filter sales data by user's assigned territory
+- Show only customers from user's city
+- Limit financial data based on user's department
+- Personalize dashboards by user role
+
+The attributes passed during session generation become available as `userAttributes.{attributeName}` for use in access policies.
+
+## Endpoint Reference
+
+**POST**
+
+```
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state
+```
+
+<InfoBox>
+
+Copy the complete Chat API URL from your agent settings (**Chat API URL** field) in <Btn>Admin → Agents</Btn>.
+
+</InfoBox>
+
+### Path Parameters
+
+- **`cloudRegion`** (string): The cloud region identifier (e.g., "gcp-us-central1")
+- **`accountName`** (string, required): The account identifier (e.g., "acme"). It is in your account URL, e.g. https://acme.cubecloud.dev
+- **`agentId`** (string, required): The AI agent identifier (e.g., "1"). You can find it in <Btn>Admin → Agents → Click on Agent row in the table</Btn>.
+
+### Request Body
+
+- **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?". If omitted, returns current state of thread with provided `chatId`.
+- **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
+- **`sessionSettings`** (object, required): Session configuration for the user
+  - **`externalId`** (string, required): Unique identifier for the user
+  - **`email`** (string): User's email address
+  - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security
+  - **`groups`** (string[]): Array of group names for user
+  - **`securityContext`** (object): Custom security context object passed to Cube queries
+
+## Response Format
+
+<InfoBox>
+The API returns streaming JSON responses. Each line contains a separate JSON object representing a chat message or state update.
+</InfoBox>
+
+### Response Fields
+
+- **`id`** (string): Unique message identifier
+- **`role`** (string): Message sender: `"user"` or `"assistant"`
+- **`content`** (string): Message content (streamed incrementally for assistant messages)
+- **`thinking`** (string): Agent's internal reasoning process (visible in development mode)
+- **`toolCall`** (object): Information about tool calls made by the agent during processing
+  - **`name`** (string): Name of the tool being called
+  - **`input`** (string): JSON string containing the input parameters for the tool
+  - **`result`** (string): JSON string containing the tool's response (only present when tool call is complete)
+- **`isDelta`** (boolean): Whether this is an incremental content update
+- **`isInProcess`** (boolean): Whether the message is still being generated
+- **`sort`** (number): Message ordering sequence number
+- **`state`** (object): Current streaming state information
+
+
+
+### Response Examples
+
+The API returns a series of JSON objects, each on a separate line. Here's what a typical conversation looks like:
+
+**Initial State Message:**
+```json
+{
+  "id": "__cutoff__",
+  "role": "assistant",
+  "state": {
+    "isStreaming": false
+  },
+  "sort": 0
+}
+```
+
+**User Message Echo:**
+```json
+{
+  "id": "1732512345678-message",
+  "role": "user",
+  "content": "Show me revenue trends for the last 6 months",
+  "isDelta": false,
+  "sort": 1
+}
+```
+
+**Assistant Response Start:**
+```json
+{
+  "id": "cdfe1a84-08d7-40b9-8b1c-e7e3a698647e",
+  "role": "assistant",
+  "content": "",
+  "thinking": "",
+  "graphPath": ["cube_data_analyst_agent"],
+  "isStructuredResponse": false,
+  "isInProcess": true,
+  "isDelta": true,
+  "sort": 2
+}
+```
+
+**Thinking Process:**
+```json
+{
+  "id": "cdfe1a84-08d7-40b9-8b1c-e7e3a698647e",
+  "role": "assistant",
+  "content": "",
+  "thinking": "The user wants to see revenue trends for the last 6 months. I need to query the revenue data and create a visualization.",
+  "graphPath": ["cube_data_analyst_agent"],
+  "isStructuredResponse": false,
+  "isInProcess": true,
+  "isDelta": true,
+  "sort": 3
+}
+```
+
+**Content Streaming:**
+```json
+{
+  "id": "cdfe1a84-08d7-40b9-8b1c-e7e3a698647e",
+  "role": "assistant",
+  "content": "I'll help you analyze revenue trends for the last 6 months. Let me query the data and create a visualization.",
+  "thinking": "",
+  "graphPath": ["cube_data_analyst_agent"],
+  "isStructuredResponse": false,
+  "isInProcess": true,
+  "isDelta": true,
+  "sort": 4
+}
+```
+
+**Tool Call Initiated:**
+```json
+{
+  "id": "4849adb2-b55d-4afe-946b-fc117bcadaf5",
+  "role": "assistant",
+  "toolCall": {
+    "name": "cubeMeta",
+    "input": "{\"searchQuery\":\"revenue trends\"}"
+  },
+  "isInProcess": true,
+  "graphPath": ["cube_data_analyst_agent", "tools"],
+  "isStructuredResponse": false,
+  "isDelta": false,
+  "sort": 5
+}
+```
+
+**Tool Call Result:**
+```json
+{
+  "id": "4849adb2-b55d-4afe-946b-fc117bcadaf5",
+  "role": "assistant",
+  "toolCall": {
+    "name": "cubeMeta",
+    "input": "{\"searchQuery\":\"revenue trends\"}",
+    "result": "{\"cubes\":[{\"name\":\"Revenue\",\"measures\":[\"Revenue.totalRevenue\",\"Revenue.monthlyGrowth\"]}]}"
+  },
+  "isInProcess": false,
+  "graphPath": ["cube_data_analyst_agent", "tools"],
+  "isStructuredResponse": false,
+  "isDelta": false,
+  "sort": 6
+}
+```
+
+**SQL Query Tool Call:**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-ab12-cd34ef567890",
+  "role": "assistant",
+  "toolCall": {
+    "name": "cubeSqlApi",
+    "input": "{\"query\":\"SELECT Revenue.totalRevenue, Revenue.month FROM Revenue WHERE Revenue.dateRange BETWEEN '2024-01-01' AND '2024-06-30' ORDER BY Revenue.month\"}"
+  },
+  "isInProcess": true,
+  "graphPath": ["cube_data_analyst_agent", "tools"],
+  "isStructuredResponse": false,
+  "isDelta": false,
+  "sort": 7
+}
+```
+
+**SQL Query Result:**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-ab12-cd34ef567890",
+  "role": "assistant",
+  "toolCall": {
+    "name": "cubeSqlApi",
+    "input": "{\"query\":\"SELECT Revenue.totalRevenue, Revenue.month FROM Revenue WHERE Revenue.dateRange BETWEEN '2024-01-01' AND '2024-06-30' ORDER BY Revenue.month\"}",
+    "result": "{\"data\":[{\"Revenue.totalRevenue\":1800000,\"Revenue.month\":\"2024-01\"},{\"Revenue.totalRevenue\":1950000,\"Revenue.month\":\"2024-02\"},{\"Revenue.totalRevenue\":2300000,\"Revenue.month\":\"2024-03\"},{\"Revenue.totalRevenue\":2100000,\"Revenue.month\":\"2024-04\"},{\"Revenue.totalRevenue\":2250000,\"Revenue.month\":\"2024-05\"},{\"Revenue.totalRevenue\":2400000,\"Revenue.month\":\"2024-06\"}],\"annotation\":{\"measures\":{\"Revenue.totalRevenue\":{\"title\":\"Total Revenue\",\"type\":\"number\"}},\"dimensions\":{\"Revenue.month\":{\"title\":\"Month\",\"type\":\"time\"}}}}"
+  },
+  "isInProcess": false,
+  "graphPath": ["cube_data_analyst_agent", "tools"],
+  "isStructuredResponse": false,
+  "isDelta": false,
+  "sort": 8
+}
+```
+
+**Final Complete Message:**
+```json
+{
+  "id": "cdfe1a84-08d7-40b9-8b1c-e7e3a698647e",
+  "role": "assistant",
+  "content": "I'll help you analyze revenue trends for the last 6 months. Let me query the data and create a visualization.\n\nBased on your revenue data, here are the key trends:\n\n📈 **Overall Growth**: 15% increase over the 6-month period\n💰 **Peak Month**: March 2024 with $2.3M revenue\n📊 **Steady Growth**: Consistent month-over-month growth of 2-3%\n\nWould you like me to break this down by product category or region?",
+  "thinking": "",
+  "graphPath": ["cube_data_analyst_agent"],
+  "isStructuredResponse": false,
+  "isInProcess": false,
+  "isDelta": false,
+  "sort": 9
+}
+```
+
+**Final State Update:**
+```json
+{
+  "id": "__state__",
+  "role": "assistant",
+  "state": {
+    "messages": [{
+      "lc": 1,
+      "type": "constructor",
+      "id": ["langchain_core", "messages", "HumanMessage"],
+      "kwargs": {
+        "content": "Show me revenue trends for the last 6 months"
+      }
+    }]
+  },
+  "isDelta": false,
+  "sort": 10
+}
+```
+
+### Tool Calls
+
+When the AI agent performs actions like querying data or searching metadata, tool calls are included in the response stream. These provide transparency into the agent's reasoning and data retrieval process.
+
+<InfoBox>
+All tool results are returned as **JSON strings** within the `toolCall.result` field, not as parsed JSON objects. You must parse these strings to access the structured data.
+</InfoBox>
+
+**Key Points:**
+- `toolCall.input` - JSON string containing tool parameters
+- `toolCall.result` - JSON string containing tool response (only present when `isInProcess: false`)
+- Both input and result contain escaped JSON that requires parsing
+- Results may contain nested JSON structures, especially for complex data queries
+- Error responses are also JSON strings with consistent error formatting
+
+**Parsing Example:**
+```javascript
+// Parse the tool result JSON string
+const toolResult = JSON.parse(message.toolCall.result);
+
+if (toolResult.error) {
+  console.error('Tool error:', toolResult.error);
+} else {
+  // Handle successful result based on tool type
+  if (message.toolCall.name === 'cubeSqlApi') {
+    const data = toolResult.data;
+    const annotation = toolResult.annotation;
+    // Process query results...
+  }
+}
+```
+
+#### cubeMeta
+
+Searches cube metadata and schema information
+
+The `cubeMeta` tool returns cube schema information as a JSON string. When successful, the result contains:
+
+```json
+{
+  "toolCall": {
+    "name": "cubeMeta",
+    "input": "...",
+    "result": "..."
+  }
+}
+```
+
+**Input Structure:**
+```json
+{
+  "searchQuery": "sales pipeline revenue"
+}
+```
+
+**Input Fields:**
+- `searchQuery` (string): Search query for data model
+
+**Result Structure:**
+```json
+{
+  "cubes": [
+    {
+      "name": "sales_pipeline_view",
+      "type": "view",
+      "title": "Sales Pipeline View",
+      "members": [
+        {
+          "name": "sales_pipeline_view.company_name",
+          "title": "Company Name",
+          "description": "Name of the company/prospect",
+          "type": "string"
+        },
+        {
+          "name": "sales_pipeline_view.deal_amount",
+          "title": "Deal Amount",
+          "description": "Total deal value",
+          "type": "number"
+        },
+        {
+          "name": "sales_pipeline_view.stage",
+          "title": "Sales Stage",
+          "description": "Current stage of the deal (Lead, Demo, Negotiation, Won, Lost, etc.)",
+          "type": "string"
+        },
+        {
+          "name": "sales_pipeline_view.count",
+          "title": "Deal Count",
+          "description": "Total number of deals",
+          "type": "number",
+          "aggType": "count"
+        }
+      ]
+    },
+    {
+      "name": "revenue_view",
+      "type": "view",
+      "title": "Revenue View",
+      "members": [
+        {
+          "name": "revenue_view.total_amount",
+          "title": "Total Revenue",
+          "description": "Sum of all revenue",
+          "type": "number",
+          "aggType": "sum"
+        },
+        {
+          "name": "revenue_view.month",
+          "title": "Revenue Month",
+          "description": "Month of revenue recognition",
+          "type": "time"
+        },
+        {
+          "name": "revenue_view.is_recurring",
+          "title": "Is Recurring Revenue",
+          "description": "Whether this is recurring or one-time revenue",
+          "type": "boolean"
+        }
+      ]
+    }
+  ],
+  "searchQuery": "sales pipeline revenue"
+}
+```
+
+**Result Fields:**
+- `cubes` (array): Available cube/view definitions with members
+- `searchQuery` (string): The original search query used
+
+#### cubeSqlApi
+
+Executes SQL queries against cube data
+
+The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The input typically includes additional context fields:
+
+
+```json
+{
+  "toolCall": {
+    "name": "cubeSqlApi",
+    "input": "...",
+    "result": "..."
+  }
+}
+```
+
+**Input Structure:**
+```json
+{
+  "sqlQuery": "SELECT deals_view.company_name, deals_view.deal_name FROM deals_view WHERE deals_view.stage = 'Negotiation' LIMIT 10",
+  "queryTitle": "Sales Pipeline Overview",
+  "description": "Retrieving deal information from the deals view for current negotiations",
+  "userRequest": "show me current deals in negotiation",
+  "memoryId": "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+  "vegaSpec": "vega lite v5 visualization spec as JSON string"
+}
+```
+
+
+**Input Fields:**
+- `sqlQuery` (string): The SQL query to execute
+- `queryTitle` (string): Human-readable title for the query
+- `description` (string): Detailed description of what the query does
+- `userRequest` (string): Original user request that triggered this query
+- `memoryId` (string): Reference to previous analysis or context
+- `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
+
+**Result Structure:**
+```json
+{
+  "sqlQuery": "SELECT deals_view.company_name, deals_view.name AS deal_name...",
+  "queryTitle": "Current Deals Overview",
+  "description": "Retrieving deals showing company names, deal names, stages...",
+  "userRequest": "show me deals",
+  "schema": [
+    {
+      "name": "company_name",
+      "column_type": "String"
+    },
+    {
+      "name": "deal_name", 
+      "column_type": "String"
+    },
+    {
+      "name": "stage",
+      "column_type": "String"
+    },
+    {
+      "name": "tenant_name",
+      "column_type": "String"
+    },
+    {
+      "name": "activity_score",
+      "column_type": "Double"
+    },
+    {
+      "name": "deal_count",
+      "column_type": "Int64"
+    }
+  ],
+  "data": [
+    ["Acme Corp", "Enterprise Solution", "Negotiation", "acme-workspace", "245", "1"],
+    ["Beta Industries", "Analytics Platform", "Testing", "beta-analytics", "189", "1"],
+    ["Gamma LLC", "Data Pipeline", "Demo", "gamma-data", "156", "1"]
+  ],
+  "totalRows": 25,
+  "uuid": "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+  "vegaSpec": "vega lite v5 visualization spec as JSON string"
+}
+```
+
+**Result Fields:**
+- `sqlQuery` (string): The executed SQL query
+- `queryTitle` (string): Human-readable title for the query
+- `description` (string): Detailed description of what the query does
+- `userRequest` (string): Original user request that triggered this query
+- `schema` (array): Column definitions with `name` and `column_type` for each field
+- `data` (array): Query result rows as arrays of values
+- `totalRows` (number): Total number of rows returned
+- `uuid` (string): Unique identifier for this query result
+- `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
+
+#### Loading all Results
+
+<WarningBox>
+Query results in cubeSqlApi `toolCall.result.data` are limited to **100 rows** by default. Use `totalRows` to check if more data is available.
+</WarningBox>
+
+If you need to load all the data, you need to use `sqlQuery` from the results to make a call to the Cube API.
+
+#### Displaying charts
+
+The `cubeSqlApi` tool call returns `vegaSpec` that can be used to display data.
+
+Note that it doesn't contain data. You need to use the data from `toolCall.result.data`.
+
+#### Styling charts
+
+When rendering Vega charts, you can apply custom styling to match the look and feel of your application.
+This includes adjusting colors, fonts, and other visual elements.
+
+Here's a configuration example that mimics Cube's default styling: 
+
+```json
+{
+  // Your Vega configuration
+
+  "config": {
+    "background": "#ffffff",
+    "padding": 16,
+    "view": {
+      "stroke": "transparent"
+    },
+    "axis": {
+      "domainColor": "#E0E0E0",
+      "gridColor": "#F5F5F5",
+      "grid": true,
+      "labelFont": "Inter, sans-serif",
+      "labelFontSize": 12,
+      "labelColor": "#43436B",
+      "titleFont": "Inter, sans-serif",
+      "titleFontSize": 12,
+      "titleColor": "#43436B",
+      "titlePadding": 8
+    },
+    "numberFormat": "s",
+    "timeFormat": "%Y-%m",
+    "format": {
+      "number": {
+        "format": "s",
+        "formatType": "number"
+      },
+      "time": {
+        "format": "%Y-%m",
+        "formatType": "time"
+      }
+    },
+    "legend": {
+      "labelFont": "Inter, sans-serif",
+      "titleFont": "Inter, sans-serif",
+      "labelColor": "#43436B",
+      "titleColor": "#43436B",
+      "labelFontSize": 12,
+      "titleFontSize": 12,
+      "titlePadding": 8,
+      "padding": 8
+    },
+    "line": {
+      "strokeWidth": 3,
+      "strokeCap": "round",
+      "point": true
+    },
+    "text": {
+      "color": "#43436B"
+    },
+    "point": {
+      "filled": true,
+      "size": 60
+    },
+    "range": {
+      "category": [
+        "#4E79A7",
+        "#F28E2B",
+        "#E15759",
+        "#76B7B2",
+        "#59A14F",
+        "#EDC948",
+        "#B07AA1",
+        "#FF9DA7",
+        "#9C755F",
+        "#BAB0AC"
+      ],
+      "heatmap": [
+        "#eff6ff",
+        "#1e40af"
+      ]
+    },
+    "scale": {
+      "band": {
+        "padding": 0.1,
+        "round": true
+      },
+      "linear": {
+        "nice": true,
+        "zero": true
+      },
+      "ordinal": {
+        "type": "band",
+        "padding": 0.1
+      },
+      "time": {
+        "type": "utc",
+        "nice": true
+      },
+      "log": {
+        "base": 10,
+        "domain": {
+          "data": "table",
+          "field": "x"
+        },
+        "range": {
+          "data": "table",
+          "field": "y"
+        }
+      },
+      "range": [
+        "#4E79A7",
+        "#F28E2B"
+      ]
+    }
+  }
+}
+```
+
+
+#### Error Handling
+
+When a tool encounters an error, the result field contains structured error information as a JSON string:
+
+**Standard Error Format:**
+
+When an error occurs, the `result` property of the toolCall will contain an `error` property.
+
+```json
+{
+  "toolCall": {
+    "name": "cubeMeta",
+    "input": "{\"searchQuery\":\"opportunities deals\"}",
+    "result": "{\n  \"error\": \"Error: BadRequestError: Bad branch\"\n}"
+  },
+  "isInProcess": false
+}
+```
+
+## Code Examples
+
+<CodeTabs>
+
+```bash cURL
+# Copy YOUR_CHAT_API_URL from your agent settings (Admin → Agents → Chat API URL field)
+curl -X POST "YOUR_CHAT_API_URL" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -d '{
+    "input": "Show me revenue trends for the last 6 months",
+    "sessionSettings": {
+      "externalId": "user@example.com"
+    }
+  }'
+```
+
+```javascript JavaScript
+// Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+const CHAT_API_URL = 'YOUR_CHAT_API_URL';
+const API_KEY = 'YOUR_API_KEY';
+
+const response = await fetch(
+  CHAT_API_URL,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Api-Key ${API_KEY}`
+    },
+    body: JSON.stringify({
+      input: 'Hello, how can you help me analyze our data?',
+      sessionSettings: {
+        externalId: 'user@example.com',
+        email: 'user@example.com', // optional
+        userAttributes: [ // optional
+          {
+            name: 'city',
+            value: 'San Francisco'
+          }
+        ]
+      }
+    })
+  }
+);
+
+// Handle streaming response
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  const lines = chunk.trim().split('\n');
+  
+  lines.forEach(line => {
+    if (line) {
+      const message = JSON.parse(line);
+      console.log('Received:', message);
+      
+      // Handle different message types
+      if (message.role === 'assistant' && message.content) {
+        updateChatUI(message);
+      }
+    }
+  });
+}
+```
+
+```python Python
+import requests
+import json
+
+# Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+CHAT_API_URL = "YOUR_CHAT_API_URL"
+API_KEY = "YOUR_API_KEY"
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Api-Key {API_KEY}"
+}
+
+data = {
+    "input": "What are our top performing products?",
+    "sessionSettings": {
+        "externalId": "user@example.com",
+        "email": "user@example.com",  # optional
+        "userAttributes": [  # optional
+            {
+                "name": "city",
+                "value": "San Francisco"
+            }
+        ]
+    }
+}
+
+response = requests.post(CHAT_API_URL, headers=headers, json=data, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line.decode('utf-8'))
+        print("Received:", message)
+```
+
+</CodeTabs>
+
+## Error Handling
+
+- **401 Unauthorized**: Invalid or missing API key. Verify your API key is correct and has the necessary permissions.
+- **400 Bad Request**: Invalid request body or parameters. Check required fields and data types.
+- **404 Not Found**: Agent or tenant not found. Verify the Chat API URL from your agent settings.
+- **500 Internal Server Error**: Server processing error. Contact support if the issue persists.
+
+
+[ref-api-keys]: /product/workspace/api-keys

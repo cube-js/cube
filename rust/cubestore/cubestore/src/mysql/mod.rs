@@ -2,7 +2,7 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::{InlineTables, SqlQueryContext, SqlService};
 use crate::table::TableValue;
 use crate::util::time_span::warn_long;
-use crate::{metastore, CubeError};
+use crate::{app_metrics, metastore, CubeError};
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use hex::ToHex;
@@ -78,6 +78,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
         }
         let _s = warn_long("sending query results", Duration::from_millis(100));
         let data_frame = res.unwrap();
+
+        let data_frame_serialization_start_time = SystemTime::now();
+
         let columns = data_frame
             .get_columns()
             .iter()
@@ -133,7 +136,20 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             rw.end_row()?;
         }
         rw.finish()?;
-        if start.elapsed().unwrap().as_millis() > 200 && query.to_lowercase().starts_with("select")
+
+        let end_time = SystemTime::now();
+        app_metrics::SQL_DATA_FRAME_SERIALIZATION_TIME_US.report(
+            end_time
+                .duration_since(data_frame_serialization_start_time)
+                .unwrap_or_default()
+                .as_micros() as i64,
+        );
+        if end_time
+            .duration_since(start)
+            .unwrap_or_default()
+            .as_millis()
+            > 200
+            && query.to_lowercase().starts_with("select")
         {
             warn!(
                 "Slow Query SQL ({:?}):\n{}",

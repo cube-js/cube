@@ -100,6 +100,9 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // It's a limitation for now, because anyway we don't work with JSON objects in Cube Store.
   object: 'HLL_SNOWFLAKE',
   number: 'decimal',
+  // For some reason, snowflake SDK returns `fixed` type for DWH types like NUMBER(38, 15)
+  // @see https://docs.snowflake.com/en/sql-reference/data-types-numeric for more info on types
+  fixed: 'decimal',
   timestamp_ntz: 'timestamp'
 };
 
@@ -950,8 +953,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
         if (scale === 0) {
           type.type = 'int';
-        } else if (precision && scale && scale <= 10) {
-          type.type = 'decimal';
         } else {
           type.type = this.toGenericType(column.getType(), precision, scale);
         }

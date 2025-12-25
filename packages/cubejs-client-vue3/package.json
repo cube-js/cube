@@ -1,10 +1,10 @@
 {
   "name": "@cubejs-client/vue3",
-  "version": "1.5.12",
+  "version": "1.6.1",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-vue3"
   },
   "description": "Vue.js 3 components for cube.js",
@@ -28,7 +28,7 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "1.5.12",
+    "@cubejs-client/core": "1.6.1",
     "ramda": "^0.27.0"
   },
   "devDependencies": {

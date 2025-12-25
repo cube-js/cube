@@ -1,0 +1,134 @@
+# Generate Session
+
+The Generate Session API provides secure, session-based authentication for [signed embedding][ref-signed-embedding]. This API creates temporary sessions that allow external users to access embedded dashboards and visualizations without exposing your API keys.
+
+<InfoBox>
+
+The Generate Session API is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+
+</InfoBox>
+
+## Authentication
+
+The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication.
+
+## Endpoint
+
+```
+POST https://{accountName}.cubecloud.dev/api/v1/embed/generate-session
+```
+
+### Request Headers
+
+| Header | Value | Required |
+|--------|-------|----------|
+| `Content-Type` | `application/json` | Yes |
+| `Authorization` | `Api-Key YOUR_API_KEY` | Yes |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `externalId` | string | Yes | Unique identifier for the external user |
+| `email` | string | No | User's email address |
+| `userAttributes` | array | No | Array of `{name, value}` pairs for row-level security |
+| `groups` | string[] | No | Array of group names for user |
+| `securityContext` | object | No | Custom security context object passed to Cube queries |
+
+<WarningBox>
+
+Accounts are limited to 10,000 external users. To increase this limit, please contact support.
+
+</WarningBox>
+
+### Response
+
+The API returns a session object:
+
+```json
+{
+  "sessionId": "abc123def456..."
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sessionId` | string | Unique session identifier to use for embedding content |
+
+Use the `sessionId` directly in your embed URL to authenticate and load content securely.
+
+## Code Example
+
+<CodeTabs>
+
+```javascript JavaScript
+const API_KEY = 'YOUR_API_KEY';
+const ACCOUNT_NAME = 'your-account';
+
+// Generate a session on your server
+const response = await fetch(
+  `https://${ACCOUNT_NAME}.cubecloud.dev/api/v1/embed/generate-session`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Api-Key ${API_KEY}`
+    },
+    body: JSON.stringify({
+      externalId: 'user@example.com',
+      email: 'user@example.com',
+      userAttributes: [
+        { name: 'department', value: 'Sales' }
+      ]
+    })
+  }
+);
+
+const { sessionId } = await response.json();
+```
+
+```python Python
+import requests
+
+API_KEY = 'YOUR_API_KEY'
+ACCOUNT_NAME = 'your-account'
+
+# Generate a session on your server
+response = requests.post(
+    f'https://{ACCOUNT_NAME}.cubecloud.dev/api/v1/embed/generate-session',
+    headers={
+        'Content-Type': 'application/json',
+        'Authorization': f'Api-Key {API_KEY}'
+    },
+    json={
+        'externalId': 'user@example.com',
+        'email': 'user@example.com',
+        'userAttributes': [
+            {'name': 'department', 'value': 'Sales'}
+        ]
+    }
+)
+
+session_id = response.json()['sessionId']
+```
+
+```bash cURL
+curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/generate-session" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -d '{
+    "externalId": "user@example.com",
+    "email": "user@example.com",
+    "userAttributes": [
+      {"name": "department", "value": "Sales"}
+    ]
+  }'
+```
+
+</CodeTabs>
+
+Use session ID in [signed embedding][ref-signed-embedding].
+
+[ref-api-keys]: /product/administration/workspace/api-keys
+[ref-signed-embedding]: /product/presentation/embedding/signed-embedding
+

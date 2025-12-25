@@ -1,4 +1,5 @@
 use crate::metastore::table::TablePath;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -45,15 +46,15 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
             Field::new(
                 "build_range_end",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new(
                 "seal_at",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new("sealed", DataType::Boolean, false),
-            Field::new("select_statement", DataType::Utf8, false),
+            Field::new("select_statement", DataType::Utf8, true),
             Field::new("extension", DataType::Utf8, true),
         ]
     }
@@ -164,7 +165,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .get_row()
                             .created_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -175,7 +176,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .get_row()
                             .build_range_end()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -186,7 +187,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .get_row()
                             .seal_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -205,11 +206,9 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 })))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from_iter(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_row().extension().as_deref()),
-                ))
+                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
+                    row.table.get_row().extension().as_ref().map(|t| t.as_str())
+                })))
             }),
         ]
     }

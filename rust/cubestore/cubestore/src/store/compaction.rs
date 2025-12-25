@@ -9,7 +9,11 @@ use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
     Partition, PartitionData,
 };
+use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::query_executor::regroup_batch_onto;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
+use crate::queryplanner::{try_make_memory_data_source, QueryPlannerImpl};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
@@ -21,25 +25,29 @@ use crate::CubeError;
 use async_trait::async_trait;
 use chrono::Utc;
 use datafusion::arrow::array::{ArrayRef, UInt64Array};
-use datafusion::arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
-use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
+use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::config::TableParquetOptions;
 use datafusion::cube_ext;
+use datafusion::datasource::listing::PartitionedFile;
+use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
+use datafusion::datasource::physical_plan::{FileScanConfig, ParquetSource};
+use datafusion::execution::object_store::ObjectStoreUrl;
+use datafusion::execution::TaskContext;
+use datafusion::functions_aggregate::count::count_udaf;
 use datafusion::parquet::arrow::ArrowWriter;
+use datafusion::physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
+use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
+use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::{Column, Count, Literal};
-use datafusion::physical_plan::hash_aggregate::{
-    AggregateMode, AggregateStrategy, HashAggregateExec,
-};
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::{MetadataCacheFactory, ParquetExec};
+use datafusion::physical_plan::expressions::{Column, Literal};
+use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
-use datafusion::physical_plan::{
-    AggregateExpr, ExecutionPlan, PhysicalExpr, SendableRecordBatchStream,
-};
+use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, SendableRecordBatchStream};
 use datafusion::scalar::ScalarValue;
+use datafusion_datasource::source::DataSourceExec;
 use futures::StreamExt;
 use futures_util::future::join_all;
 use itertools::{EitherOrBoth, Itertools};
@@ -181,11 +189,25 @@ impl CompactionServiceImpl {
         let deactivate_res = self
             .deactivate_and_mark_failed_chunks_for_replay(failed)
             .await;
+
+        let task_context = QueryPlannerImpl::make_execution_context(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
+
         let in_memory_res = self
-            .compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
+            .compact_chunks_to_memory(mem_chunks, &partition, &index, &table, task_context.clone())
             .await;
         let persistent_res = self
-            .compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
+            .compact_chunks_to_persistent(
+                persistent_chunks,
+                &partition,
+                &index,
+                &table,
+                task_context,
+            )
             .await;
         deactivate_res?;
         in_memory_res?;
@@ -200,6 +222,7 @@ impl CompactionServiceImpl {
         partition: &IdRow<Partition>,
         index: &IdRow<Index>,
         table: &IdRow<Table>,
+        task_context: Arc<TaskContext>,
     ) -> Result<(), CubeError> {
         if chunks.is_empty() {
             return Ok(());
@@ -248,7 +271,7 @@ impl CompactionServiceImpl {
         let key_size = index.get_row().sort_key_size() as usize;
         let schema = Arc::new(arrow_schema(index.get_row()));
         // Use empty execution plan for main_table, read only from memory chunks
-        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
 
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
@@ -281,10 +304,11 @@ impl CompactionServiceImpl {
                 in_memory_columns,
                 unique_key.clone(),
                 aggregate_columns.clone(),
+                task_context.clone(),
             )
             .await?;
             let batches = collect(batches_stream).await?;
-            let batch = RecordBatch::concat(&schema, &batches).unwrap();
+            let batch = concat_batches(&schema, &batches).unwrap();
 
             let oldest_insert_at = group_chunks
                 .iter()
@@ -328,6 +352,7 @@ impl CompactionServiceImpl {
         partition: &IdRow<Partition>,
         index: &IdRow<Index>,
         table: &IdRow<Table>,
+        task_context: Arc<TaskContext>,
     ) -> Result<(), CubeError> {
         if chunks.is_empty() {
             return Ok(());
@@ -338,7 +363,7 @@ impl CompactionServiceImpl {
         let key_size = index.get_row().sort_key_size() as usize;
         let schema = Arc::new(arrow_schema(index.get_row()));
         // Use empty execution plan for main_table, read only from memory chunks
-        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
 
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
@@ -372,6 +397,7 @@ impl CompactionServiceImpl {
             in_memory_columns,
             unique_key.clone(),
             aggregate_columns.clone(),
+            task_context,
         )
         .await?;
 
@@ -380,7 +406,7 @@ impl CompactionServiceImpl {
             self.meta_store.deactivate_chunks(old_chunk_ids).await?;
             return Ok(());
         }
-        let batch = RecordBatch::concat(&schema, &batches).unwrap();
+        let batch = concat_batches(&schema, &batches).unwrap();
 
         let (chunk, file_size) = self
             .chunk_store
@@ -421,6 +447,7 @@ impl CompactionServiceImpl {
         Ok(())
     }
 }
+
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(
@@ -643,32 +670,45 @@ impl CompactionService for CompactionServiceImpl {
                     None,
                 )?)
             }
+
             Ok((store, new))
         })
         .await??;
+
+        let session_config = self
+            .metadata_cache_factory
+            .cache_factory()
+            .make_session_config();
 
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
             Some(file) => {
-                let parquet_exec = Arc::new(ParquetExec::try_from_path_with_cache(
-                    file.as_str(),
-                    None,
-                    None,
-                    ROW_GROUP_SIZE,
-                    1,
-                    None,
+                let parquet_source = ParquetSource::new(
+                    TableParquetOptions::default(),
+                    get_reader_options_customizer(&session_config),
+                )
+                .with_parquet_file_reader_factory(
                     self.metadata_cache_factory
                         .cache_factory()
                         .make_noop_cache(),
-                )?);
+                );
+
+                let file_scan = FileScanConfig::new(
+                    ObjectStoreUrl::local_filesystem(),
+                    schema,
+                    Arc::new(parquet_source),
+                )
+                .with_file(PartitionedFile::from_path(file.to_string())?);
+
+                let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
 
                 Arc::new(TraceDataLoadedExec::new(
-                    parquet_exec,
+                    Arc::new(data_source_exec),
                     data_loaded_size.clone(),
                 ))
             }
-            None => Arc::new(EmptyExec::new(false, schema.clone())),
+            None => Arc::new(EmptyExec::new(schema.clone())),
         };
 
         let table = self
@@ -680,8 +720,16 @@ impl CompactionService for CompactionServiceImpl {
             IndexType::Regular => None,
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
-        let records =
-            merge_chunks(key_size, main_table, new, unique_key, aggregate_columns).await?;
+        let task_context = QueryPlannerImpl::make_execution_context(session_config).task_ctx();
+        let records = merge_chunks(
+            key_size,
+            main_table,
+            new,
+            unique_key,
+            aggregate_columns,
+            task_context,
+        )
+        .await?;
         let count_and_min = write_to_files(
             records,
             total_rows as usize,
@@ -874,11 +922,21 @@ impl CompactionService for CompactionServiceImpl {
                 &files,
                 self.metadata_cache_factory.cache_factory().as_ref(),
                 key_len,
+                // TODO
+                Arc::new(arrow_schema(
+                    partitions.iter().next().unwrap().index.get_row(),
+                )),
             )
             .await?,
             key_len,
             // TODO should it respect table partition_split_threshold?
             self.config.partition_split_threshold() as usize,
+            QueryPlannerImpl::make_execution_context(
+                self.metadata_cache_factory
+                    .cache_factory()
+                    .make_session_config(),
+            )
+            .task_ctx(),
         )
         .await?;
         // There is no point if we cannot split the partition.
@@ -974,11 +1032,12 @@ impl CompactionService for CompactionServiceImpl {
 
 /// Compute keys that partitions must be split by.
 async fn find_partition_keys(
-    p: HashAggregateExec,
+    p: AggregateExec,
     key_len: usize,
     rows_per_partition: usize,
+    context: Arc<TaskContext>,
 ) -> Result<Vec<Row>, CubeError> {
-    let mut s = p.execute(0).await?;
+    let mut s = p.execute(0, context)?;
     let mut points = Vec::new();
     let mut row_count = 0;
     while let Some(b) = s.next().await.transpose()? {
@@ -1009,28 +1068,58 @@ async fn read_files(
     metadata_cache_factory: &dyn MetadataCacheFactory,
     key_len: usize,
     projection: Option<Vec<usize>>,
+    schema: Arc<Schema>,
 ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
     assert!(!files.is_empty());
-    let mut inputs = Vec::<Arc<dyn ExecutionPlan>>::with_capacity(files.len());
-    for f in files {
-        inputs.push(Arc::new(ParquetExec::try_from_files_with_cache(
-            &[f.as_str()],
-            projection.clone(),
-            None,
-            ROW_GROUP_SIZE,
-            1,
-            None,
-            metadata_cache_factory.make_noop_cache(),
-        )?));
-    }
-    let plan = Arc::new(UnionExec::new(inputs));
+    // let mut inputs = Vec::<Arc<dyn ExecutionPlan>>::with_capacity(files.len());
+    let session_config = metadata_cache_factory.make_session_config();
+    let parquet_source = ParquetSource::new(
+        TableParquetOptions::default(),
+        get_reader_options_customizer(&session_config),
+    )
+    .with_parquet_file_reader_factory(metadata_cache_factory.make_noop_cache());
+
+    let file_scan = FileScanConfig::new(
+        ObjectStoreUrl::local_filesystem(),
+        schema,
+        Arc::new(parquet_source),
+    )
+    .with_file_group(
+        files
+            .iter()
+            .map(|f| PartitionedFile::from_path(f.to_string()))
+            .collect::<Result<Vec<_>, _>>()?,
+    )
+    .with_projection(projection);
+
+    let plan = DataSourceExec::new(Arc::new(file_scan));
+
+    // TODO upgrade DF
+    // for f in files {
+    //     inputs.push(Arc::new(ParquetExec::try_from_files_with_cache(
+    //         &[f.as_str()],
+    //         projection.clone(),
+    //         None,
+    //         ROW_GROUP_SIZE,
+    //         1,
+    //         None,
+    //         metadata_cache_factory.make_noop_cache(),
+    //     )?));
+    // }
+    // let plan = Arc::new(UnionExec::new(inputs));
     let fields = plan.schema();
     let fields = fields.fields();
     let mut columns = Vec::with_capacity(fields.len());
     for i in 0..key_len {
-        columns.push(Column::new(fields[i].name().as_str(), i));
+        columns.push(PhysicalSortExpr::new(
+            Arc::new(Column::new(fields[i].name().as_str(), i)),
+            SortOptions::default(),
+        ));
     }
-    Ok(Arc::new(MergeSortExec::try_new(plan, columns.clone())?))
+    Ok(Arc::new(SortPreservingMergeExec::new(
+        LexOrdering::new(columns.clone()),
+        Arc::new(plan),
+    )))
 }
 
 /// The returned execution plan computes all keys in sorted order and the count of rows that have
@@ -1039,13 +1128,15 @@ async fn keys_with_counts(
     files: &[String],
     metadata_cache_factory: &dyn MetadataCacheFactory,
     key_len: usize,
-) -> Result<HashAggregateExec, CubeError> {
+    schema: Arc<Schema>,
+) -> Result<AggregateExec, CubeError> {
     let projection = (0..key_len).collect_vec();
     let plan = read_files(
         files,
         metadata_cache_factory,
         key_len,
         Some(projection.clone()),
+        schema,
     )
     .await?;
 
@@ -1057,18 +1148,19 @@ async fn keys_with_counts(
         let col = Column::new(fields[i].name().as_str(), i);
         key.push((Arc::new(col), name));
     }
-    let agg: Vec<Arc<dyn AggregateExpr>> = vec![Arc::new(Count::new(
-        Arc::new(Literal::new(ScalarValue::Int64(Some(1)))),
-        "#mi_row_count",
-        DataType::UInt64,
-    ))];
+    let agg: Vec<Arc<AggregateFunctionExpr>> = vec![Arc::new(
+        AggregateExprBuilder::new(
+            count_udaf(),
+            vec![Arc::new(Literal::new(ScalarValue::Int64(Some(1))))],
+        )
+        .build()?,
+    )];
     let plan_schema = plan.schema();
-    let plan = HashAggregateExec::try_new(
-        AggregateStrategy::InplaceSorted,
-        Some(projection),
-        AggregateMode::Full,
-        key,
+    let plan = AggregateExec::try_new(
+        AggregateMode::Single,
+        PhysicalGroupBy::new_single(key),
         agg,
+        Vec::new(),
         plan,
         plan_schema,
     )?;
@@ -1204,15 +1296,18 @@ async fn write_to_files_impl(
 ) -> Result<(), CubeError> {
     let schema = Arc::new(store.arrow_schema());
     let writer_props = store.writer_props(table).await?;
-    let mut writers = files.into_iter().map(move |f| -> Result<_, CubeError> {
-        Ok(ArrowWriter::try_new(
-            File::create(f)?,
-            schema.clone(),
-            Some(writer_props.clone()),
-        )?)
-    });
+    let mut writers = files
+        .clone()
+        .into_iter()
+        .map(move |f| -> Result<_, CubeError> {
+            Ok(ArrowWriter::try_new(
+                File::create(f)?,
+                schema.clone(),
+                Some(writer_props.clone()),
+            )?)
+        });
 
-    let (write_tx, mut write_rx) = tokio::sync::mpsc::channel(1);
+    let (write_tx, mut write_rx) = tokio::sync::mpsc::channel::<(usize, RecordBatch)>(1);
     let io_job = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
         let mut writer = writers.next().transpose()?.unwrap();
         let mut current_writer_i = 0;
@@ -1232,27 +1327,58 @@ async fn write_to_files_impl(
         Ok(())
     });
 
-    let mut writer_i = 0;
-    let mut process_row_group = move |b: RecordBatch| -> Result<_, CubeError> {
-        match pick_writer(&b) {
-            WriteBatchTo::Current => Ok(((writer_i, b), None)),
-            WriteBatchTo::Next {
-                rows_for_current: n,
-            } => {
-                let current_writer = writer_i;
-                writer_i += 1; // Next iteration will write into the next file.
-                Ok((
-                    (current_writer, b.slice(0, n)),
-                    Some(b.slice(n, b.num_rows() - n)),
-                ))
+    let mut writer_i: usize = 0;
+    let mut process_row_group =
+        move |b: RecordBatch| -> ((usize, RecordBatch), Option<RecordBatch>) {
+            match pick_writer(&b) {
+                WriteBatchTo::Current => ((writer_i, b), None),
+                WriteBatchTo::Next {
+                    rows_for_current: n,
+                } => {
+                    let current_writer = writer_i;
+                    writer_i += 1; // Next iteration will write into the next file.
+                    (
+                        (current_writer, b.slice(0, n)),
+                        Some(b.slice(n, b.num_rows() - n)),
+                    )
+                }
+            }
+        };
+    let err = redistribute(records, store.row_group_size(), move |b| {
+        // See if we get an array using more than 512 MB and log it.  This means a default batch
+        // size of 8192 might, or our row group size of 16384 really might, get i32 offset overflow
+        // when used in an Arrow array with a Utf8 column.
+
+        // First figure out what to log.  (Normally we don't allocate or log anything.)
+        let mut loggable_overlongs = Vec::new();
+        {
+            for (column, field) in b.columns().iter().zip(b.schema_ref().fields().iter()) {
+                let memory_size = column.get_buffer_memory_size();
+                if memory_size > 512 * 1024 * 1024 {
+                    loggable_overlongs.push((field.name().clone(), memory_size, column.len()))
+                }
             }
         }
-    };
-    let err = redistribute(records, ROW_GROUP_SIZE, move |b| {
+
         let r = process_row_group(b);
+
+        // Then, now that we know what file names the rows would be written into, log anything we need to log.
+        for (column_name, memory_size, length) in loggable_overlongs {
+            // *out of bounds write index* provably can't happen (if pick_writer has nothing wrong with it) but let's not make logging break things.
+            let oob = "*out of bounds write index*";
+            match r {
+                ((write_i, _), None) => {
+                    log::warn!("Column {} has large memory size {} with length = {}, writing to file '#{}'", column_name, memory_size, length, files.get(write_i).map(String::as_str).unwrap_or(oob));
+                },
+                ((write_i, _), Some(_)) => {
+                    log::warn!("Column {} has large memory size {} with length = {}, writing across file '#{}' and '#{}'", column_name, memory_size, length, files.get(write_i).map(String::as_str).unwrap_or(oob), files.get(write_i + 1).map(String::as_str).unwrap_or(oob));
+                }
+            }
+        }
+
         let write_tx = write_tx.clone();
         async move {
-            let (to_write, to_return) = r?;
+            let (to_write, to_return) = r;
             write_tx.send(to_write).await?;
             return Ok(to_return);
         }
@@ -1333,21 +1459,29 @@ pub async fn merge_chunks(
     r: Vec<ArrayRef>,
     unique_key_columns: Option<Vec<&crate::metastore::Column>>,
     aggregate_columns: Option<Vec<AggregateColumn>>,
+    task_context: Arc<TaskContext>,
 ) -> Result<SendableRecordBatchStream, CubeError> {
     let schema = l.schema();
-    let r = RecordBatch::try_new(schema.clone(), r)?;
+    let r_batch = RecordBatch::try_new(schema.clone(), r)?;
+    let mut r = Vec::<RecordBatch>::new();
+    // Regroup batches -- which had been concatenated and sorted -- so that SortPreservingMergeExec
+    // doesn't overflow i32 in interleaving or building a Utf8Array.
+    regroup_batch_onto(r_batch, 8192, &mut r)?;
 
     let mut key = Vec::with_capacity(key_size);
     for i in 0..key_size {
         let f = schema.field(i);
-        key.push(Column::new(f.name().as_str(), i));
+        key.push(PhysicalSortExpr::new(
+            Arc::new(Column::new(f.name().as_str(), i)),
+            SortOptions::default(),
+        ));
     }
 
-    let inputs = UnionExec::new(vec![
-        l,
-        Arc::new(MemoryExec::try_new(&[vec![r]], schema, None)?),
-    ]);
-    let mut res: Arc<dyn ExecutionPlan> = Arc::new(MergeSortExec::try_new(Arc::new(inputs), key)?);
+    let inputs = UnionExec::new(vec![l, try_make_memory_data_source(&[r], schema, None)?]);
+    let mut res: Arc<dyn ExecutionPlan> = Arc::new(SortPreservingMergeExec::new(
+        LexOrdering::new(key),
+        Arc::new(inputs),
+    ));
 
     if let Some(aggregate_columns) = aggregate_columns {
         let mut groups = Vec::with_capacity(key_size);
@@ -1359,17 +1493,15 @@ pub async fn merge_chunks(
         }
         let aggregates = aggregate_columns
             .iter()
-            .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()))
+            .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()).map(Arc::new))
             .collect::<Result<Vec<_>, _>>()?;
+        let aggregates_len = aggregates.len();
 
-        let output_sort_order = (0..key_size).map(|x| x as usize).collect();
-
-        res = Arc::new(HashAggregateExec::try_new(
-            AggregateStrategy::InplaceSorted,
-            Some(output_sort_order),
+        res = Arc::new(AggregateExec::try_new(
             AggregateMode::Final,
-            groups,
+            PhysicalGroupBy::new_single(groups),
             aggregates,
+            vec![None; aggregates_len],
             res.clone(),
             schema,
         )?);
@@ -1388,7 +1520,7 @@ pub async fn merge_chunks(
         )?);
     }
 
-    Ok(res.execute(0).await?)
+    Ok(res.execute(0, task_context)?)
 }
 
 pub async fn merge_replay_handles(
@@ -1431,6 +1563,7 @@ mod tests {
     use crate::metastore::{
         BaseRocksStoreFs, Column, ColumnType, IndexDef, IndexType, RocksMetaStore,
     };
+    use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;
@@ -1438,11 +1571,9 @@ mod tests {
     use crate::table::{cmp_same_types, Row, TableValue};
     use cuberockstore::rocksdb::{Options, DB};
     use datafusion::arrow::array::{Int64Array, StringArray};
-    use datafusion::arrow::datatypes::Schema;
+    use datafusion::arrow::datatypes::{Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::collect;
-    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -1511,7 +1642,9 @@ mod tests {
             for i in 0..limit {
                 strings.push(format!("foo{}", i));
             }
-            let schema = Arc::new(Schema::new(vec![(&cols_to_move[0]).into()]));
+            let schema = Arc::new(Schema::new(vec![<&Column as Into<Field>>::into(
+                &cols_to_move[0],
+            )]));
             Ok(vec![RecordBatch::try_new(
                 schema,
                 vec![Arc::new(StringArray::from(strings))],
@@ -1532,7 +1665,9 @@ mod tests {
                 for i in 0..limit {
                     strings.push(format!("foo{}", i));
                 }
-                let schema = Arc::new(Schema::new(vec![(&cols_to_move[0]).into()]));
+                let schema = Arc::new(Schema::new(vec![<&Column as Into<Field>>::into(
+                    &cols_to_move[0],
+                )]));
                 Ok(vec![RecordBatch::try_new(
                     schema,
                     vec![Arc::new(StringArray::from(strings))],
@@ -1999,19 +2134,24 @@ mod tests {
             .download_file(remote.clone(), partition.get_row().file_size())
             .await
             .unwrap();
-        let reader = Arc::new(
-            ParquetExec::try_from_path_with_cache(
-                local.as_str(),
-                None,
-                None,
-                ROW_GROUP_SIZE,
-                1,
-                None,
-                NoopParquetMetadataCache::new(),
-            )
-            .unwrap(),
+
+        let task_ctx = Arc::new(TaskContext::default());
+
+        let parquet_source = ParquetSource::new(
+            TableParquetOptions::default(),
+            get_reader_options_customizer(task_ctx.session_config()),
         );
-        let res_data = &collect(reader).await.unwrap()[0];
+
+        let file_scan = FileScanConfig::new(
+            ObjectStoreUrl::local_filesystem(),
+            Arc::new(arrow_schema(aggr_index.get_row())),
+            Arc::new(parquet_source),
+        )
+        .with_file(PartitionedFile::from_path(local.to_string()).unwrap());
+        let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
+
+        let reader = Arc::new(data_source_exec);
+        let res_data = &collect(reader, task_ctx).await.unwrap()[0];
 
         let foos = Arc::new(StringArray::from(vec![
             "a".to_string(),
@@ -2296,20 +2436,24 @@ impl MultiSplit {
             ROW_GROUP_SIZE,
             self.metadata_cache_factory.clone(),
         );
+        let task_context = QueryPlannerImpl::make_execution_context(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
         let records = if !in_files.is_empty() {
             read_files(
                 &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
                 self.metadata_cache_factory.cache_factory().as_ref(),
                 self.key_len,
                 None,
+                Arc::new(store.arrow_schema()),
             )
             .await?
-            .execute(0)
-            .await?
+            .execute(0, task_context)?
         } else {
-            EmptyExec::new(false, Arc::new(store.arrow_schema()))
-                .execute(0)
-                .await?
+            EmptyExec::new(Arc::new(store.arrow_schema())).execute(0, task_context)?
         };
         let row_counts = write_to_files_by_keys(
             records,

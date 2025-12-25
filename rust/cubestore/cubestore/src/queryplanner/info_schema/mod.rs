@@ -13,6 +13,7 @@ mod system_replay_handles;
 mod system_snapshots;
 mod system_tables;
 
+use chrono::{DateTime, Utc};
 pub use info_schema_columns::*;
 pub use info_schema_schemata::*;
 pub use info_schema_tables::*;
@@ -27,3 +28,10 @@ pub use system_queue_results::*;
 pub use system_replay_handles::*;
 pub use system_snapshots::*;
 pub use system_tables::*;
+
+// This is a fairly arbitrary place to put this; maybe put it somewhere else (or pass up the error).
+pub fn timestamp_nanos_or_panic(date_time: &DateTime<Utc>) -> i64 {
+    date_time
+        .timestamp_nanos_opt()
+        .expect("value can not be represented in a timestamp with nanosecond precision.")
+}

@@ -6,7 +6,7 @@ Cubes are typically declared in separate files with one cube per file.
 Within each cube are definitions of [measures][ref-ref-measures],
 [dimensions][ref-ref-dimensions], [hierarchies][ref-ref-hierarchies],
 [segments][ref-ref-segments], [joins][ref-ref-joins] between cubes,
-[pre-aggregations][ref-ref-pre-aggs], and [data access policies][ref-ref-dap].
+[pre-aggregations][ref-ref-pre-aggs], and [access policies][ref-ref-dap].
 
 <CodeTabs>
 
@@ -474,6 +474,21 @@ cubes:
 
 </CodeTabs>
 
+<WarningBox>
+
+The `every` parameter guarantees that the refresh key will be executed **at
+least** once during the specified interval. However, it does **not** guarantee
+that it will be executed **at most** once. The refresh key may be checked more
+frequently.
+
+When using `every` with `sql`, the purpose is to reduce the load from running
+the refresh key query itself, not to minimize the number of cache
+refreshes. The refresh key SQL should be designed to return consistent results
+and only change when the underlying data needs to be updated, ensuring minimal
+refreshes even if the query is executed multiple times.
+
+</WarningBox>
+
 `every` - can be set as an interval with granularities `second`, `minute`,
 `hour`, `day`, and `week` or accept CRON string with some limitations. If you
 set `every` as CRON string, you can use the `timezone` parameter. It takes
@@ -629,7 +644,7 @@ The `measures` parameter is used to configure [measures][ref-ref-measures].
 
 ### `access_policy`
 
-The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].
+The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
 
 
 [ref-config-driverfactory]: /product/configuration/reference/config#driverfactory
