@@ -51,6 +51,7 @@ cubes:
     pre_aggregations:
       - name: orders_by_market_brand_daily
         type: rollup
+        external: true
         measures:
           - count
           - total_amount_sum
