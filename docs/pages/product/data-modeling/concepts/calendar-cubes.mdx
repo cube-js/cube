@@ -21,6 +21,16 @@ Calendar cubes are [cubes][ref-cubes] where the [`calendar` parameter][ref-cubes
 is set to `true`. This indicates that the cube is a calendar cube and allow the use of
 custom time shifts and granularities.
 
+### Requirements
+
+When joining a calendar cube to other cubes, the following requirements must be met:
+
+- **Both join dimensions must be of type `time` (timestamp).** The dimension on the
+  calendar cube side and the dimension on the other cube side must both be timestamp
+  dimensions.
+- **The calendar cube's join dimension must be the `primary_key`.** The dimension used
+  in the join condition on the calendar cube side must have `primary_key: true` set.
+
 <CodeTabs>
 
 ```yaml
