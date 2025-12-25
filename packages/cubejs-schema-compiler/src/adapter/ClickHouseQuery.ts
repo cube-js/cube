@@ -3,6 +3,7 @@ import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { ParamAllocator } from './ParamAllocator';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
@@ -30,7 +31,17 @@ class ClickHouseFilter extends BaseFilter {
   }
 }
 
+class ClickHouseParamAllocator extends ParamAllocator {
+  public paramPlaceHolder(paramIndex) {
+    return `___ClickHouseParam_${paramIndex}___`;
+  }
+}
+
 export class ClickHouseQuery extends BaseQuery {
+  public newParamAllocator(expressionParams) {
+    return new ClickHouseParamAllocator(expressionParams);
+  }
+
   public newFilter(filter) {
     return new ClickHouseFilter(this, filter);
   }
