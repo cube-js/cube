@@ -23,10 +23,12 @@ What this PR adds:
                  │    └─> JSON over HTTP
                  │         └─> Cube API → CubeStore
                  │
-                 └─── Option B: CubeSQL Arrow Native (Port 4444) ⭐ NEW
+                 └─── Option B: CubeSQL Server
                       ├─> PostgreSQL Wire Protocol (Port 4444)
-                      └─> Arrow IPC Native (Port 4445)
-                           └─> Optional Query Cache
+                      │    └─> Cube API → CubeStore
+                      │
+                      └─> Arrow IPC Native (Port 4445) ⭐ NEW
+                           └─> Optional Query Cache ⭐ NEW
                                 └─> Cube API → CubeStore
 ```
 

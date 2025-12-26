@@ -37,9 +37,12 @@ Client Application (Python/R/JS)
          ├─── REST HTTP API (Port 4008)
          │    └─> JSON over HTTP
          │
-         └─── CubeSQL Arrow Native Server (Port 4444) ⭐ NEW
-              └─> PostgreSQL Wire Protocol
-                   └─> Query Result Cache (Optional)
+         └─── CubeSQL Server
+              ├─> PostgreSQL Wire Protocol (Port 4444)
+              │    └─> Cube API → CubeStore
+              │
+              └─> Arrow IPC Native (Port 4445) ⭐ NEW
+                   └─> Query Result Cache (Optional) ⭐ NEW
                         └─> Cube API → CubeStore
 ```
 
