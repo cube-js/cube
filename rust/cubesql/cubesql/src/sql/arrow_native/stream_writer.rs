@@ -91,6 +91,49 @@ impl StreamWriter {
         Ok(())
     }
 
+    /// Stream cached batches (already materialized)
+    pub async fn stream_cached_batches<W: AsyncWriteExt + Unpin>(
+        writer: &mut W,
+        batches: &[RecordBatch],
+    ) -> Result<(), CubeError> {
+        if batches.is_empty() {
+            return Err(CubeError::internal("Cannot stream empty batch list".to_string()));
+        }
+
+        // Get schema from first batch
+        let schema = batches[0].schema();
+        let arrow_ipc_schema = Self::serialize_schema(&schema)?;
+
+        // Send schema message
+        let msg = Message::QueryResponseSchema { arrow_ipc_schema };
+        write_message(writer, &msg).await?;
+
+        // Stream all cached batches
+        let mut total_rows = 0i64;
+        for (idx, batch) in batches.iter().enumerate() {
+            let batch_rows = batch.num_rows() as i64;
+            total_rows += batch_rows;
+
+            log::debug!("📦 Cached batch #{}: {} rows, {} columns (total so far: {} rows)",
+                idx + 1, batch_rows, batch.num_columns(), total_rows);
+
+            // Serialize batch to Arrow IPC format
+            let arrow_ipc_batch = Self::serialize_batch(batch)?;
+
+            // Send batch message
+            let msg = Message::QueryResponseBatch { arrow_ipc_batch };
+            write_message(writer, &msg).await?;
+        }
+
+        log::info!("✅ Streamed {} cached batches with {} total rows",
+            batches.len(), total_rows);
+
+        // Write completion
+        Self::write_complete(writer, total_rows).await?;
+
+        Ok(())
+    }
+
     /// Serialize Arrow schema to IPC format
     fn serialize_schema(
         schema: &Arc<datafusion::arrow::datatypes::Schema>,

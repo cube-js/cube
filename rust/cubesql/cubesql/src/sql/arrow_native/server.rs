@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, RwLock};
 
+use super::cache::QueryResultCache;
 use super::protocol::{read_message, write_message, Message, PROTOCOL_VERSION};
 use super::stream_writer::StreamWriter;
 
@@ -18,6 +19,7 @@ pub struct ArrowNativeServer {
     address: String,
     session_manager: Arc<SessionManager>,
     auth_service: Arc<dyn SqlAuthService>,
+    query_cache: Arc<QueryResultCache>,
     close_socket_rx: RwLock<watch::Receiver<Option<ShutdownMode>>>,
     close_socket_tx: watch::Sender<Option<ShutdownMode>>,
 }
@@ -80,6 +82,7 @@ impl ProcessingLoop for ArrowNativeServer {
 
                 let session_manager = self.session_manager.clone();
                 let auth_service = self.auth_service.clone();
+                let query_cache = self.query_cache.clone();
 
                 let session = match session_manager
                     .create_session(
@@ -104,6 +107,7 @@ impl ProcessingLoop for ArrowNativeServer {
                         socket,
                         session_manager.clone(),
                         auth_service,
+                        query_cache,
                         session,
                     )
                     .await
@@ -159,10 +163,13 @@ impl ArrowNativeServer {
         auth_service: Arc<dyn SqlAuthService>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(None::<ShutdownMode>);
+        let query_cache = Arc::new(QueryResultCache::from_env());
+
         Arc::new(Self {
             address,
             session_manager,
             auth_service,
+            query_cache,
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })
@@ -172,6 +179,7 @@ impl ArrowNativeServer {
         mut socket: TcpStream,
         _session_manager: Arc<SessionManager>,
         auth_service: Arc<dyn SqlAuthService>,
+        query_cache: Arc<QueryResultCache>,
         session: Arc<Session>,
     ) -> Result<(), CubeError> {
         // Handshake phase
@@ -252,6 +260,7 @@ impl ArrowNativeServer {
 
                         if let Err(e) = Self::execute_query(
                             &mut socket,
+                            query_cache.clone(),
                             session.clone(),
                             &sql,
                             database.as_deref(),
@@ -298,10 +307,20 @@ impl ArrowNativeServer {
 
     async fn execute_query(
         socket: &mut TcpStream,
+        query_cache: Arc<QueryResultCache>,
         session: Arc<Session>,
         sql: &str,
-        _database: Option<&str>,
+        database: Option<&str>,
     ) -> Result<(), CubeError> {
+        // Try to get cached result first
+        if let Some(cached_batches) = query_cache.get(sql, database).await {
+            debug!("Cache HIT - streaming {} cached batches", cached_batches.len());
+            StreamWriter::stream_cached_batches(socket, &cached_batches).await?;
+            return Ok(());
+        }
+
+        debug!("Cache MISS - executing query");
+
         // Get auth context - for now we'll use what's in the session
         let auth_context = session
             .state
@@ -332,14 +351,16 @@ impl ArrowNativeServer {
                 // Create DataFusion DataFrame from logical plan
                 let df = DataFusionDataFrame::new(ctx.state.clone(), &plan);
 
-                // Execute to get SendableRecordBatchStream
-                let stream = df
-                    .execute_stream()
-                    .await
-                    .map_err(|e| CubeError::internal(format!("Failed to execute stream: {}", e)))?;
+                // Collect results for caching
+                let batches = df.collect().await.map_err(|e| {
+                    CubeError::internal(format!("Failed to collect batches: {}", e))
+                })?;
 
-                // Stream results directly using StreamWriter
-                StreamWriter::stream_query_results(socket, stream).await?;
+                // Cache the results
+                query_cache.insert(sql, database, batches.clone()).await;
+
+                // Stream cached results
+                StreamWriter::stream_cached_batches(socket, &batches).await?;
             }
             QueryPlan::MetaOk(_, _) => {
                 // Meta commands (e.g., SET, BEGIN, COMMIT)
