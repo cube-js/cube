@@ -48,14 +48,18 @@ class Colors:
 @dataclass
 class QueryResult:
     """Results from a single query execution"""
-    api: str  # "arrow" or "http"
+    api: str  # "cubesql" or "http"
     query_time_ms: int
+    materialize_time_ms: int
+    total_time_ms: int
     row_count: int
     column_count: int
     label: str = ""
 
     def __str__(self):
-        return f"{self.api.upper():6} | {self.query_time_ms:4}ms | {self.row_count:6} rows | {self.column_count} cols"
+        return (f"{self.api.upper():7} | Query: {self.query_time_ms:4}ms | "
+                f"Materialize: {self.materialize_time_ms:3}ms | "
+                f"Total: {self.total_time_ms:4}ms | {self.row_count:6} rows")
 
 
 class CachePerformanceTester:
@@ -68,44 +72,61 @@ class CachePerformanceTester:
         self.http_token = "test"  # Default token
 
     def run_arrow_query(self, sql: str, label: str = "") -> QueryResult:
-        """Execute query via CubeSQL and measure time"""
+        """Execute query via CubeSQL and measure time with full materialization"""
         # Connect using psycopg2
         conn = psycopg2.connect(self.arrow_uri)
         cursor = conn.cursor()
 
-        start = time.perf_counter()
+        # Measure query execution + initial fetch
+        query_start = time.perf_counter()
         cursor.execute(sql)
         result = cursor.fetchall()
-        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        query_time_ms = int((time.perf_counter() - query_start) * 1000)
 
-        row_count = len(result)
-        col_count = len(cursor.description) if cursor.description else 0
+        # Measure full materialization (convert to list of dicts - simulates DataFrame creation)
+        materialize_start = time.perf_counter()
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        materialized_data = [dict(zip(columns, row)) for row in result]
+        materialize_time_ms = int((time.perf_counter() - materialize_start) * 1000)
+
+        total_time_ms = query_time_ms + materialize_time_ms
+        row_count = len(materialized_data)
+        col_count = len(columns)
 
         cursor.close()
         conn.close()
 
-        return QueryResult("cubesql", elapsed_ms, row_count, col_count, label)
+        return QueryResult("cubesql", query_time_ms, materialize_time_ms,
+                          total_time_ms, row_count, col_count, label)
 
     def run_http_query(self, query_dict: Dict[str, Any], label: str = "") -> QueryResult:
-        """Execute query via HTTP API and measure time"""
+        """Execute query via HTTP API and measure time with full materialization"""
         headers = {
             "Authorization": self.http_token,
             "Content-Type": "application/json"
         }
 
-        start = time.perf_counter()
+        # Measure HTTP request + JSON parsing
+        query_start = time.perf_counter()
         response = requests.post(self.http_url,
                                 headers=headers,
                                 json={"query": query_dict})
+        query_time_ms = int((time.perf_counter() - query_start) * 1000)
+
+        # Measure full materialization (JSON parse + data extraction)
+        materialize_start = time.perf_counter()
         data = response.json()
-        elapsed_ms = int((time.perf_counter() - start) * 1000)
-
-        # Count rows and columns from response
         dataset = data.get("data", [])
-        row_count = len(dataset)
-        col_count = len(dataset[0].keys()) if dataset else 0
+        # Simulate same materialization as CubeSQL (list of dicts)
+        materialized_data = [dict(row) for row in dataset]
+        materialize_time_ms = int((time.perf_counter() - materialize_start) * 1000)
 
-        return QueryResult("http", elapsed_ms, row_count, col_count, label)
+        total_time_ms = query_time_ms + materialize_time_ms
+        row_count = len(materialized_data)
+        col_count = len(materialized_data[0].keys()) if materialized_data else 0
+
+        return QueryResult("http", query_time_ms, materialize_time_ms,
+                          total_time_ms, row_count, col_count, label)
 
     def print_header(self, test_name: str, description: str):
         """Print formatted test header"""
@@ -121,20 +142,26 @@ class CachePerformanceTester:
 
     def print_comparison(self, cubesql: QueryResult, http: QueryResult):
         """Print performance comparison"""
-        if cubesql.query_time_ms == 0:
+        if cubesql.total_time_ms == 0:
             speedup_text = "∞"
         else:
-            speedup = http.query_time_ms / cubesql.query_time_ms
+            speedup = http.total_time_ms / cubesql.total_time_ms
             speedup_text = f"{speedup:.1f}x"
 
-        time_saved = http.query_time_ms - cubesql.query_time_ms
+        time_saved = http.total_time_ms - cubesql.total_time_ms
 
         print(f"\n{Colors.BOLD}{'─' * 80}{Colors.END}")
-        print(f"{Colors.BOLD}CUBESQL vs REST HTTP API:{Colors.END}")
-        print(f"  CubeSQL (cached):  {cubesql.query_time_ms}ms")
-        print(f"  REST HTTP API:     {http.query_time_ms}ms")
-        print(f"  {Colors.GREEN}{Colors.BOLD}Speedup:           {speedup_text} faster{Colors.END}")
-        print(f"  Time saved:        {time_saved}ms")
+        print(f"{Colors.BOLD}CUBESQL vs REST HTTP API (Full Materialization):{Colors.END}")
+        print(f"  CubeSQL:")
+        print(f"    Query:        {cubesql.query_time_ms:4}ms")
+        print(f"    Materialize:  {cubesql.materialize_time_ms:4}ms")
+        print(f"    TOTAL:        {cubesql.total_time_ms:4}ms")
+        print(f"  REST HTTP API:")
+        print(f"    Query:        {http.query_time_ms:4}ms")
+        print(f"    Materialize:  {http.materialize_time_ms:4}ms")
+        print(f"    TOTAL:        {http.total_time_ms:4}ms")
+        print(f"  {Colors.GREEN}{Colors.BOLD}Speedup:        {speedup_text} faster{Colors.END}")
+        print(f"  Time saved:     {time_saved}ms")
         print(f"{Colors.BOLD}{'─' * 80}{Colors.END}\n")
 
     def test_cache_warmup_and_hit(self):
@@ -162,13 +189,19 @@ class CachePerformanceTester:
         result2 = self.run_arrow_query(sql, "Second run (cache hit)")
         self.print_result(result2, "  ")
 
-        speedup = result1.query_time_ms / result2.query_time_ms if result2.query_time_ms > 0 else float('inf')
-        time_saved = result1.query_time_ms - result2.query_time_ms
+        speedup = result1.total_time_ms / result2.total_time_ms if result2.total_time_ms > 0 else float('inf')
+        time_saved = result1.total_time_ms - result2.total_time_ms
 
         print(f"\n{Colors.BOLD}{'─' * 80}{Colors.END}")
-        print(f"{Colors.BOLD}CACHE PERFORMANCE:{Colors.END}")
-        print(f"  First query (miss):  {result1.query_time_ms}ms")
-        print(f"  Second query (hit):  {result2.query_time_ms}ms")
+        print(f"{Colors.BOLD}CACHE PERFORMANCE (Full Materialization):{Colors.END}")
+        print(f"  First query (miss):")
+        print(f"    Query:        {result1.query_time_ms:4}ms")
+        print(f"    Materialize:  {result1.materialize_time_ms:4}ms")
+        print(f"    TOTAL:        {result1.total_time_ms:4}ms")
+        print(f"  Second query (hit):")
+        print(f"    Query:        {result2.query_time_ms:4}ms")
+        print(f"    Materialize:  {result2.materialize_time_ms:4}ms")
+        print(f"    TOTAL:        {result2.total_time_ms:4}ms")
         print(f"  {Colors.GREEN}{Colors.BOLD}Cache speedup:       {speedup:.1f}x faster{Colors.END}")
         print(f"  Time saved:          {time_saved}ms")
         print(f"{Colors.BOLD}{'─' * 80}{Colors.END}\n")
@@ -213,7 +246,7 @@ class CachePerformanceTester:
         self.print_result(http_result, "  ")
         self.print_comparison(cubesql_result, http_result)
 
-        return http_result.query_time_ms / cubesql_result.query_time_ms if cubesql_result.query_time_ms > 0 else float('inf')
+        return http_result.total_time_ms / cubesql_result.total_time_ms if cubesql_result.total_time_ms > 0 else float('inf')
 
     def test_arrow_vs_http_medium(self):
         """Test 3: Medium query (1-2K rows) - CubeSQL vs REST HTTP API"""
@@ -263,7 +296,7 @@ class CachePerformanceTester:
         self.print_result(http_result, "  ")
         self.print_comparison(cubesql_result, http_result)
 
-        return http_result.query_time_ms / cubesql_result.query_time_ms if cubesql_result.query_time_ms > 0 else float('inf')
+        return http_result.total_time_ms / cubesql_result.total_time_ms if cubesql_result.total_time_ms > 0 else float('inf')
 
     def test_arrow_vs_http_large(self):
         """Test 4: Large query (10K+ rows) - CubeSQL vs REST HTTP API"""
@@ -312,7 +345,7 @@ class CachePerformanceTester:
         self.print_result(http_result, "  ")
         self.print_comparison(cubesql_result, http_result)
 
-        return http_result.query_time_ms / cubesql_result.query_time_ms if cubesql_result.query_time_ms > 0 else float('inf')
+        return http_result.total_time_ms / cubesql_result.total_time_ms if cubesql_result.total_time_ms > 0 else float('inf')
 
     def run_all_tests(self):
         """Run complete test suite"""
