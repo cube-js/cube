@@ -1,6 +1,6 @@
 # Local PR Verification Guide
 
-This guide explains how to verify the Arrow IPC query cache PR locally, reproducing all the results and testing the implementation.
+This guide explains how to verify the **CubeSQL Arrow Native Server** PR locally, including the optional query cache feature.
 
 ## Complete Verification Checklist
 
@@ -53,27 +53,30 @@ Next steps:
   3. Run Python tests: python test_arrow_cache_performance.py
 ```
 
-### ✅ Step 3: Verify Cache Configuration
+### ✅ Step 3: Verify Arrow Native Server
 
 **Start Cube API** (Terminal 1):
 ```bash
 ./start-cube-api.sh
 ```
 
-**Start CubeSQL with cache** (Terminal 2):
+**Start CubeSQL Arrow Native Server** (Terminal 2):
 ```bash
 ./start-cubesqld.sh
 ```
 
 **Look for in logs**:
 ```
-Query result cache initialized: enabled=true, max_entries=1000, ttl=3600s
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
+🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
+Query result cache initialized: enabled=true, max_entries=1000, ttl=3600s
 ```
 
-**Verify cache is enabled**:
+**Verify server is running**:
 ```bash
-grep "Query result cache initialized" cubesqld.log
+lsof -i:4444  # PostgreSQL protocol
+lsof -i:4445  # Arrow IPC native
+grep "Query result cache initialized" cubesqld.log  # Optional cache
 ```
 
 ### ✅ Step 4: Run Python Performance Tests
@@ -90,13 +93,13 @@ python test_arrow_cache_performance.py
 
 **Expected results**:
 ```
-CUBESQL QUERY CACHE PERFORMANCE TEST SUITE
-==========================================
+CUBESQL ARROW NATIVE SERVER PERFORMANCE TEST SUITE
+==================================================
 
-TEST: Cache Miss → Cache Hit
-----------------------------
-First query:  1200-2500ms
-Second query:  200-500ms
+TEST: Query Cache (Optional Feature)
+-------------------------------------
+First query:  1200-2500ms  (cache miss)
+Second query:  200-500ms   (cache hit)
 Speedup:      3-10x faster ✓
 
 TEST: CubeSQL vs REST HTTP API

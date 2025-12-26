@@ -1,7 +1,7 @@
-# Arrow IPC Query Cache - Complete Example
+# CubeSQL Arrow Native Server - Complete Example
 
-**Performance**: 8-15x faster than REST HTTP API with query caching  
-**Status**: Production-ready implementation  
+**Performance**: 8-15x faster than REST HTTP API
+**Status**: Production-ready implementation with optional query cache
 **Sample Data**: 3000 orders included for testing
 
 ## Quick Links
@@ -20,13 +20,14 @@
 
 ## What This Demonstrates
 
-This example shows **server-side query result caching** for CubeSQL, delivering:
+This example showcases **CubeSQL's Arrow Native server** with optional query result cache:
 
-- ✅ **3-10x speedup** on repeated queries (cache miss → hit)
+- ✅ **Binary protocol** - Efficient Arrow IPC data transfer
+- ✅ **Optional caching** - 3-10x speedup on repeated queries
 - ✅ **8-15x faster** than REST HTTP API overall
-- ✅ **Minimal overhead** (~10% on first query, 90% savings on repeats)
-- ✅ **Zero configuration** needed (works out of the box)
-- ✅ **Zero breaking changes** (can be disabled anytime)
+- ✅ **Minimal overhead** - Query cache adds ~10% on first query, 90% savings on repeats
+- ✅ **Zero configuration** - Works out of the box, cache enabled by default
+- ✅ **Zero breaking changes** - Cache can be disabled anytime
 
 ## Architecture Overview
 
@@ -36,13 +37,16 @@ Client Application (Python/R/JS)
          ├─── REST HTTP API (Port 4008)
          │    └─> JSON over HTTP
          │
-         └─── CubeSQL (Port 4444) ⭐ WITH CACHE
-              └─> PostgreSQL Protocol
-                   └─> Query Result Cache
+         └─── CubeSQL Arrow Native Server (Port 4444) ⭐ NEW
+              └─> PostgreSQL Wire Protocol
+                   └─> Query Result Cache (Optional)
                         └─> Cube API → CubeStore
 ```
 
-**Key Innovation**: Intelligent query result cache between client and Cube API
+**Key Features**:
+- Binary Arrow IPC protocol for efficient data transfer
+- Optional query result cache for repeated queries
+- PostgreSQL-compatible interface
 
 ## Quick Start (5 minutes)
 
@@ -108,14 +112,19 @@ Average Speedup:         8-15x
 
 ## Performance Results
 
-### Cache Effectiveness
+### Arrow Native Server Performance
 
-**Cache Miss → Hit** (same query repeated):
+**With Optional Cache** (same query repeated):
 ```
-First execution:  1252ms  (cache MISS)
-Second execution:  385ms  (cache HIT)
+First execution:  1252ms  (cache MISS - full execution)
+Second execution:  385ms  (cache HIT - served from cache)
 Speedup:          3.3x faster
 ```
+
+**Without Cache**:
+- Consistent query execution times
+- No caching overhead
+- Suitable for unique queries
 
 ### CubeSQL vs REST HTTP API
 
@@ -134,19 +143,21 @@ Average: 8.2x faster
 
 ## Configuration Options
 
-### Cache Settings
+### Arrow Native Server Settings
 
 Edit environment variables in `start-cubesqld.sh`:
 
 ```bash
-# Enable/disable cache (default: true)
-CUBESQL_QUERY_CACHE_ENABLED=true
+# PostgreSQL wire protocol port
+CUBESQL_PG_PORT=4444
 
-# Maximum cached queries (default: 1000)
-CUBESQL_QUERY_CACHE_MAX_ENTRIES=10000
+# Arrow Native port (direct Arrow IPC)
+CUBEJS_ARROW_PORT=4445
 
-# Cache lifetime in seconds (default: 3600 = 1 hour)
-CUBESQL_QUERY_CACHE_TTL=7200
+# Optional Query Cache Settings
+CUBESQL_QUERY_CACHE_ENABLED=true      # Enable/disable (default: true)
+CUBESQL_QUERY_CACHE_MAX_ENTRIES=10000 # Max cached queries (default: 1000)
+CUBESQL_QUERY_CACHE_TTL=7200          # TTL in seconds (default: 3600)
 ```
 
 ### Database Settings

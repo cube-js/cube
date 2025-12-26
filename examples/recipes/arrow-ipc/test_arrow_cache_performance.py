@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-CubeSQL Query Cache Performance Tests
+CubeSQL Arrow Native Server Performance Tests
 
-Demonstrates performance improvements from server-side query result caching
-in CubeSQL compared to the standard REST HTTP API.
+Demonstrates performance improvements from CubeSQL's Arrow Native server
+with optional query result caching, compared to the standard REST HTTP API.
 
 This test suite measures:
-1. Cache effectiveness (miss → hit speedup)
-2. CubeSQL performance vs REST HTTP API across query sizes
-3. Overall impact of query result caching
+1. Arrow Native server baseline performance
+2. Optional cache effectiveness (miss → hit speedup)
+3. CubeSQL vs REST HTTP API across query sizes
+4. Full materialization timing (complete client experience)
 
 Requirements:
     pip install psycopg2-binary requests
@@ -63,7 +64,7 @@ class QueryResult:
 
 
 class CachePerformanceTester:
-    """Tests CubeSQL query cache performance vs REST HTTP API"""
+    """Tests CubeSQL Arrow Native server performance (with optional cache) vs REST HTTP API"""
 
     def __init__(self, arrow_uri: str = "postgresql://username:password@localhost:4444/db",
                  http_url: str = "http://localhost:4008/cubejs-api/v1/load"):
@@ -165,10 +166,10 @@ class CachePerformanceTester:
         print(f"{Colors.BOLD}{'─' * 80}{Colors.END}\n")
 
     def test_cache_warmup_and_hit(self):
-        """Test 1: Demonstrate cache miss → cache hit speedup"""
+        """Test 1: Demonstrate optional cache effectiveness (miss → hit)"""
         self.print_header(
-            "Cache Miss → Cache Hit",
-            "Running same query twice to show cache warming and speedup"
+            "Optional Query Cache: Miss → Hit",
+            "Running same query twice to show cache effectiveness (optional feature)"
         )
 
         sql = """
@@ -193,7 +194,8 @@ class CachePerformanceTester:
         time_saved = result1.total_time_ms - result2.total_time_ms
 
         print(f"\n{Colors.BOLD}{'─' * 80}{Colors.END}")
-        print(f"{Colors.BOLD}CACHE PERFORMANCE (Full Materialization):{Colors.END}")
+        print(f"{Colors.BOLD}OPTIONAL CACHE PERFORMANCE (Full Materialization):{Colors.END}")
+        print(f"{Colors.CYAN}Note: Cache is optional and can be disabled{Colors.END}")
         print(f"  First query (miss):")
         print(f"    Query:        {result1.query_time_ms:4}ms")
         print(f"    Materialize:  {result1.materialize_time_ms:4}ms")
@@ -351,8 +353,8 @@ class CachePerformanceTester:
         """Run complete test suite"""
         print(f"\n{Colors.BOLD}{Colors.HEADER}")
         print("=" * 80)
-        print("  CUBESQL QUERY CACHE PERFORMANCE TEST SUITE")
-        print("  CubeSQL (with cache) vs REST HTTP API")
+        print("  CUBESQL ARROW NATIVE SERVER PERFORMANCE TEST SUITE")
+        print("  Arrow Native Server (with optional cache) vs REST HTTP API")
         print("=" * 80)
         print(f"{Colors.END}\n")
 

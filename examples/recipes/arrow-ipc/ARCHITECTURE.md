@@ -1,8 +1,14 @@
-# Arrow IPC Query Cache - Architecture & Approach
+# CubeSQL Arrow Native Server - Architecture & Approach
 
 ## Overview
 
-This PR implements **server-side query result caching** for CubeSQL's Arrow Native server, delivering significant performance improvements over the standard REST HTTP API.
+This PR enhances **CubeSQL's Arrow Native server** with an optional query result cache, delivering significant performance improvements over the standard REST HTTP API.
+
+The Arrow Native server provides:
+1. **Efficient binary protocol** - Arrow IPC for zero-copy data transfer
+2. **PostgreSQL compatibility** - Standard psql/JDBC/ODBC clients work
+3. **Optional query cache** - Transparent performance boost for repeated queries
+4. **Production-ready** - Minimal overhead, zero breaking changes
 
 ## The Complete Approach
 
@@ -16,15 +22,29 @@ This PR implements **server-side query result caching** for CubeSQL's Arrow Nati
                  │
                  ├─── Option A: REST HTTP API (Port 4008)
                  │    └─> JSON over HTTP
+                 │         └─> Cube API → CubeStore
                  │
-                 └─── Option B: CubeSQL (Port 4444) ⭐ NEW
-                      └─> PostgreSQL Wire Protocol
-                           └─> Query Result Cache ⭐
-                                └─> Cube API
-                                    └─> CubeStore
+                 └─── Option B: CubeSQL Arrow Native (Port 4444) ⭐ NEW
+                      ├─> PostgreSQL Wire Protocol (Port 4444)
+                      └─> Arrow IPC Native (Port 4445)
+                           └─> Optional Query Cache
+                                └─> Cube API → CubeStore
 ```
 
-### 2. Query Result Cache Architecture
+### 2. Arrow Native Server Components
+
+**Core Server**:
+- PostgreSQL wire protocol compatibility (port 4444)
+- Arrow IPC native protocol (port 4445)
+- SQL parsing and query planning
+- Result streaming
+
+**Optional Query Cache** ⭐:
+- Transparent caching layer
+- Can be disabled without breaking changes
+- Enabled by default for better out-of-box performance
+
+### 3. Query Cache Architecture (Optional Component)
 
 **Location**: `rust/cubesql/cubesql/src/sql/arrow_native/cache.rs`
 
@@ -49,23 +69,26 @@ struct QueryCacheKey {
 - **Arc-wrapped results** for zero-copy sharing
 - **Database-scoped** for multi-tenancy
 
-### 3. Query Execution Flow
+### 4. Query Execution Flow
 
-#### Without Cache (Before)
+#### Option 1: Cache Disabled
 ```
 Client → CubeSQL → Parse SQL → Plan Query → Execute → Stream Results → Client
-         (2000ms for repeated queries)
+         (Consistent performance, no caching overhead)
 ```
 
-#### With Cache (After)
+#### Option 2: Cache Enabled (Default)
+
+**Cache Miss** (first execution):
 ```
-Cache Miss:
 Client → CubeSQL → Parse SQL → Plan Query → Execute → Cache → Stream → Client
-         (2000ms first time)
+         (~10% overhead for materialization)
+```
 
-Cache Hit:
+**Cache Hit** (subsequent executions):
+```
 Client → CubeSQL → Check Cache → Stream Cached Results → Client
-         (200ms - 10x faster!)
+         (3-10x faster - bypasses all query execution)
 ```
 
 ### 4. Implementation Details

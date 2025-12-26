@@ -1,6 +1,8 @@
-# Getting Started with Arrow IPC Query Cache
+# Getting Started with CubeSQL Arrow Native Server
 
 ## Quick Start (5 minutes)
+
+This guide shows you how to use **CubeSQL's Arrow Native server** with optional query caching.
 
 ### Prerequisites
 
@@ -28,7 +30,7 @@ cargo build --release
 ### Step 2: Set Up Test Environment
 
 ```bash
-# Navigate to the example
+# Navigate to the Arrow Native server example
 cd ../../examples/recipes/arrow-ipc
 
 # Start PostgreSQL database
@@ -40,7 +42,7 @@ docker-compose up -d postgres
 
 **Expected output**:
 ```
-Setting up test data for Arrow IPC performance tests...
+Setting up test data for CubeSQL Arrow Native server...
 Database connection:
   Host: localhost
   Port: 7432
@@ -60,16 +62,19 @@ Wait for:
 🚀 Cube API server is listening on port 4008
 ```
 
-**Terminal 2 - Start CubeSQL** (with cache enabled):
+**Terminal 2 - Start CubeSQL Arrow Native Server**:
 ```bash
 ./start-cubesqld.sh
 ```
 
 Wait for:
 ```
-Query result cache initialized: enabled=true, max_entries=1000, ttl=3600s
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
+🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
+Query result cache initialized: enabled=true, max_entries=1000, ttl=3600s
 ```
+
+**Note**: Query cache is **optional** and enabled by default. It can be disabled without breaking changes.
 
 ### Step 4: Run Performance Tests
 
@@ -129,19 +134,24 @@ TOTAL:         385ms    ← 3.3x faster!
 
 ## Configuration Options
 
-### Cache Settings
+### Arrow Native Server Settings
 
 Edit `start-cubesqld.sh` or set environment variables:
 
 ```bash
-# Maximum queries to cache
-export CUBESQL_QUERY_CACHE_MAX_ENTRIES=10000
+# Server ports
+export CUBESQL_PG_PORT=4444        # PostgreSQL protocol
+export CUBEJS_ARROW_PORT=4445      # Arrow IPC native
 
-# Cache entry lifetime (seconds)
-export CUBESQL_QUERY_CACHE_TTL=7200  # 2 hours
+# Optional Query Cache (enabled by default)
+export CUBESQL_QUERY_CACHE_ENABLED=true        # Enable/disable
+export CUBESQL_QUERY_CACHE_MAX_ENTRIES=10000   # Max queries
+export CUBESQL_QUERY_CACHE_TTL=7200            # TTL (2 hours)
+```
 
-# Enable/disable cache
-export CUBESQL_QUERY_CACHE_ENABLED=true
+**Disable cache** if you only want the Arrow Native server without caching:
+```bash
+export CUBESQL_QUERY_CACHE_ENABLED=false
 ```
 
 ### Database Connection
