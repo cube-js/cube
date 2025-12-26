@@ -337,6 +337,9 @@ impl CubeStoreTransport {
         log::debug!("Known cube names from API: {:?}", cube_names);
 
         // Query system.tables directly from CubeStore (not through CubeSQL)
+        // IMPORTANT: ORDER BY created_at DESC ensures we get the MOST RECENT version
+        // of each pre-aggregation table first. Pre-agg tables can have multiple versions
+        // with different hash suffixes (e.g., _abc123, _xyz789), and we want the latest.
         let sql = r#"
             SELECT
                 table_schema,
@@ -346,7 +349,7 @@ impl CubeStoreTransport {
                 table_schema NOT IN ('information_schema', 'system', 'mysql')
                 AND is_ready = true
                 AND has_data = true
-            ORDER BY table_name
+            ORDER BY created_at DESC
         "#;
 
         let batches = self.cubestore_client.query(sql.to_string()).await?;

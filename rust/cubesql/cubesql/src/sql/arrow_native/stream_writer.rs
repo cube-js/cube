@@ -34,21 +34,32 @@ impl StreamWriter {
         stream: &mut SendableRecordBatchStream,
     ) -> Result<i64, CubeError> {
         let mut total_rows = 0i64;
+        let mut batch_count = 0;
 
         while let Some(batch_result) = stream.next().await {
             let batch = batch_result.map_err(|e| {
                 CubeError::internal(format!("Error reading batch from stream: {}", e))
             })?;
 
-            total_rows += batch.num_rows() as i64;
+            batch_count += 1;
+            let batch_rows = batch.num_rows() as i64;
+            total_rows += batch_rows;
+
+            log::info!("📦 Arrow Flight batch #{}: {} rows, {} columns (total so far: {} rows)",
+                batch_count, batch_rows, batch.num_columns(), total_rows);
 
             // Serialize batch to Arrow IPC format
             let arrow_ipc_batch = Self::serialize_batch(&batch)?;
+
+            log::info!("📨 Serialized to {} bytes of Arrow IPC data", arrow_ipc_batch.len());
 
             // Send batch message
             let msg = Message::QueryResponseBatch { arrow_ipc_batch };
             write_message(writer, &msg).await?;
         }
+
+        log::info!("✅ Arrow Flight streamed {} batches with {} total rows",
+            batch_count, total_rows);
 
         Ok(total_rows)
     }
