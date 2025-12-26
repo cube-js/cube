@@ -43,10 +43,9 @@ Client Application (Python/R/JS)
                         └─> Cube API → CubeStore
 ```
 
-**Key Features**:
-- Binary Arrow IPC protocol for efficient data transfer
+**What this PR adds**:
+- Arrow IPC native protocol (port 4445) for efficient binary data transfer
 - Optional query result cache for repeated queries
-- PostgreSQL-compatible interface
 
 ## Quick Start (5 minutes)
 

@@ -4,11 +4,10 @@
 
 This PR introduces **CubeSQL's Arrow Native server** with an optional query result cache, delivering significant performance improvements over the standard REST HTTP API.
 
-The Arrow Native server provides:
-1. **Efficient binary protocol** - Arrow IPC for zero-copy data transfer
-2. **PostgreSQL compatibility** - Standard psql/JDBC/ODBC clients work
-3. **Optional query cache** - Transparent performance boost for repeated queries
-4. **Production-ready** - Minimal overhead, zero breaking changes
+What this PR adds:
+1. **Arrow IPC native protocol** - Binary protocol for zero-copy data transfer (port 4445)
+2. **Optional query result cache** - Transparent performance boost for repeated queries
+3. **Production-ready implementation** - Minimal overhead, zero breaking changes
 
 ## The Complete Approach
 
@@ -31,15 +30,14 @@ The Arrow Native server provides:
                                 └─> Cube API → CubeStore
 ```
 
-### 2. Arrow Native Server Components
+### 2. New Components Added by This PR
 
-**Core Server**:
-- PostgreSQL wire protocol compatibility (port 4444)
-- Arrow IPC native protocol (port 4445)
-- SQL parsing and query planning
-- Result streaming
+**Arrow IPC Native Protocol** ⭐ NEW:
+- Direct Arrow IPC communication (port 4445)
+- Binary protocol for efficient data transfer
+- Zero-copy RecordBatch streaming
 
-**Optional Query Cache** ⭐:
+**Optional Query Result Cache** ⭐ NEW:
 - Transparent caching layer
 - Can be disabled without breaking changes
 - Enabled by default for better out-of-box performance
