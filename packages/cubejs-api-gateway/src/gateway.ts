@@ -336,24 +336,6 @@ class ApiGateway {
       });
     }));
 
-    // TODO arrowParser: {feathurs: "->>", stem: "------", head: ">-"}
-    const arrowParser = bodyParser.json({ limit: getEnv('maxRequestSize') });
-
-    app.post(`${this.basePath}/v1/arrow`, arrowParser, userMiddlewares, userAsyncHandler(async (req, res) => {
-      // TODO
-      // const arrowBuffer = convertToArrow(result);
-      // res.set('Content-Type', 'application/vnd.apache.arrow.stream');
-      // res.send(arrowBuffer);
-
-      await this.arrow({
-        query: req.body.query,
-        context: req.context,
-        res: this.resToResultFn(res),
-        queryType: req.body.queryType,
-        cacheMode: req.body.cache,
-      });
-    }));
-
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
       await this.load({
         query: req.query.query,
@@ -1792,7 +1774,7 @@ class ApiGateway {
       };
     },
     response: any,
-    responseType?: ResultType, // #TODO arrow
+    responseType?: ResultType,
   ): ResultWrapper {
     const resultWrapper = response.data;
 
@@ -2005,130 +1987,6 @@ class ApiGateway {
       });
     }
   }
-
-    /**
-   * Data queries APIs (`/arrow`) entry point. Used by
-   * `CubejsApi#arrow`  methods to fetch the
-   * data.
-   */
-  public async arrow(request: QueryRequest) {
-    let query: Query | Query[] | undefined;
-    const {
-      context,
-      res,
-      apiType = 'arrow',
-      cacheMode,
-      ...props
-    } = request;
-    const requestStarted = new Date();
-
-    try {
-      await this.assertApiScope('data', context.securityContext);
-
-      query = this.parseQueryParam(request.query);
-      let resType: ResultType = ResultType.DEFAULT;
-
-      if (!Array.isArray(query) && query.responseFormat) {
-        resType = query.responseFormat;
-      }
-
-      this.log({
-        type: 'Arrow Request',
-        apiType,
-        query
-      }, context);
-
-      const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context, false, false, cacheMode);
-
-      if (
-        queryType !== QueryTypeEnum.REGULAR_QUERY &&
-        props.queryType == null
-      ) {
-        throw new UserError(
-          `'${queryType
-          }' query type is not supported by the client.` +
-          'Please update the client.'
-        );
-      }
-
-      let metaConfigResult = await (await this
-        .getCompilerApi(context)).metaConfig(request.context, {
-        requestId: context.requestId
-      });
-
-      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
-
-      const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
-
-      let slowQuery = false;
-
-      const results = await Promise.all(
-        normalizedQueries.map(async (normalizedQuery, index) => {
-          slowQuery = slowQuery ||
-            Boolean(sqlQueries[index].slowQuery);
-
-          // TODO flat buffers -> ARROW =>>----> here perhaps
-          const response__ = await this.getSqlResponseInternal(
-            context,
-            normalizedQuery,
-            sqlQueries[index],
-          );
-
-          const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
-          );
-          // TODO ARROW =>>----> here perhaps
-          return this.prepareResultTransformData(
-            context,
-            queryType,
-            normalizedQuery,
-            sqlQueries[index],
-            annotation,
-            response__,
-            resType,
-          );
-        })
-      );
-
-      this.log(
-        {
-          type: 'Load Request Success',
-          query,
-          duration: this.duration(requestStarted),
-          apiType,
-          isPlayground: Boolean(
-            context.signedWithPlaygroundAuthSecret
-          ),
-          queries: results.length,
-          queriesWithPreAggregations:
-            results.filter(
-              (r: any) => Object.keys(r.getRootResultObject()[0].usedPreAggregations || {}).length
-            ).length,
-          // Have to omit because data could be processed natively
-          // so it is not known at this point
-          // queriesWithData:
-          //   results.filter((r: any) => r.data?.length).length,
-          dbType: results.map(r => r.getRootResultObject()[0].dbType),
-        },
-        context,
-      );
-
-      if (props.queryType === 'multi') {
-        // We prepare the final JSON result on the native side
-        const resultMulti = new ResultMultiWrapper(results, { queryType, slowQuery });
-        await res(resultMulti);
-      } else {
-        // We prepare the full final JSON result on the native side
-        await res(results[0]);
-      }
-    } catch (e: any) {
-      this.handleError({
-        e, context, query, res, requestStarted
-      });
-    }
-  }
-
 
   public async sqlApiLoad(request: SqlApiRequest) {
     let query: Query | Query[] | null = null;
