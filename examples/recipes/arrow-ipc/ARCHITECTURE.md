@@ -2,7 +2,7 @@
 
 ## Overview
 
-This PR enhances **CubeSQL's Arrow Native server** with an optional query result cache, delivering significant performance improvements over the standard REST HTTP API.
+This PR introduces **CubeSQL's Arrow Native server** with an optional query result cache, delivering significant performance improvements over the standard REST HTTP API.
 
 The Arrow Native server provides:
 1. **Efficient binary protocol** - Arrow IPC for zero-copy data transfer
