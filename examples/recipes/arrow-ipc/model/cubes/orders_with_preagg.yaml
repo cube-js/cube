@@ -6,6 +6,12 @@ cubes:
     sql_table: public.order
 
     dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+
       - name: market_code
         type: string
         sql: market_code
