@@ -432,6 +432,78 @@ impl CubeStoreTransport {
         Ok(Some(selected))
     }
 
+    /// Rewrite SQL to use discovered pre-aggregation table names
+    async fn rewrite_sql_for_preagg(&self, original_sql: String) -> Result<String, CubeError> {
+        log::debug!("Rewriting SQL for pre-aggregation routing: {}", original_sql);
+
+        // Extract cube name from SQL
+        // Simple heuristic: look for "FROM {cube_name}" pattern
+        let cube_name = self.extract_cube_name_from_sql(&original_sql)?;
+
+        log::debug!("Extracted cube name from SQL: {}", cube_name);
+
+        // Find matching pre-aggregation table
+        let preagg_table = self.find_matching_preagg(&cube_name, &[], &[]).await?;
+
+        match preagg_table {
+            Some(table) => {
+                log::info!(
+                    "Routing query to pre-aggregation table: {} (cube: {}, preagg: {})",
+                    table.full_name(),
+                    table.cube_name,
+                    table.preagg_name
+                );
+
+                // Replace cube name with actual table name in SQL
+                // Handle both quoted and unquoted cube names
+                let rewritten = original_sql
+                    .replace(&format!("FROM {}", cube_name), &format!("FROM {}", table.full_name()))
+                    .replace(&format!("FROM \"{}\"", cube_name), &format!("FROM {}", table.full_name()))
+                    .replace(&format!("from {}", cube_name), &format!("FROM {}", table.full_name()))
+                    .replace(&format!("from \"{}\"", cube_name), &format!("FROM {}", table.full_name()));
+
+                log::debug!("Rewritten SQL: {}", rewritten);
+
+                Ok(rewritten)
+            }
+            None => {
+                log::warn!(
+                    "No pre-aggregation table found for cube '{}', using original SQL",
+                    cube_name
+                );
+                Ok(original_sql)
+            }
+        }
+    }
+
+    /// Extract cube name from SQL query
+    fn extract_cube_name_from_sql(&self, sql: &str) -> Result<String, CubeError> {
+        // Simple regex-like extraction for "FROM {cube_name}"
+        // This is a basic implementation - production would use proper SQL parsing
+
+        let sql_upper = sql.to_uppercase();
+
+        // Find "FROM" keyword
+        if let Some(from_pos) = sql_upper.find("FROM") {
+            let after_from = &sql[from_pos + 4..].trim_start();
+
+            // Extract table name (until whitespace, comma, or end)
+            let table_name = after_from
+                .split_whitespace()
+                .next()
+                .ok_or_else(|| CubeError::internal("Could not extract table name from SQL".to_string()))?
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
+
+            Ok(table_name)
+        } else {
+            Err(CubeError::internal(
+                "Could not find FROM clause in SQL".to_string(),
+            ))
+        }
+    }
+
     /// Execute query directly against CubeStore
     async fn load_direct(
         &self,
@@ -446,22 +518,24 @@ impl CubeStoreTransport {
     ) -> Result<Vec<RecordBatch>, CubeError> {
         log::debug!("Executing query directly against CubeStore: {:?}", query);
 
-        // For now, use the SQL query if provided
-        // TODO: Use cubesqlplanner to generate optimized SQL with pre-aggregation selection
-        let sql = if let Some(sql_query) = sql_query {
+        // Get SQL query
+        let original_sql = if let Some(sql_query) = sql_query {
             sql_query.sql
         } else {
-            // Fallback: construct a simple SQL from query parts
-            // This is a placeholder - in production we'll use cubesqlplanner
             return Err(CubeError::internal(
                 "Direct CubeStore queries require SQL query".to_string(),
             ));
         };
 
-        log::info!("Executing SQL on CubeStore: {}", sql);
+        log::info!("Original SQL: {}", original_sql);
+
+        // Rewrite SQL to use pre-aggregation table
+        let rewritten_sql = self.rewrite_sql_for_preagg(original_sql).await?;
+
+        log::info!("Executing rewritten SQL on CubeStore: {}", rewritten_sql);
 
         // Execute query on CubeStore
-        let batches = self.cubestore_client.query(sql).await?;
+        let batches = self.cubestore_client.query(rewritten_sql).await?;
 
         log::debug!("Query returned {} batches", batches.len());
 
