@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-Arrow IPC Query Cache Performance Tests
+CubeSQL Query Cache Performance Tests
 
-Demonstrates the 30x performance improvement from query result caching
-in CubeSQL's Arrow Native server.
+Demonstrates performance improvements from server-side query result caching
+in CubeSQL compared to the standard REST HTTP API.
+
+This test suite measures:
+1. Cache effectiveness (miss → hit speedup)
+2. CubeSQL performance vs REST HTTP API across query sizes
+3. Overall impact of query result caching
 
 Requirements:
     pip install psycopg2-binary requests
@@ -54,7 +59,7 @@ class QueryResult:
 
 
 class CachePerformanceTester:
-    """Tests Arrow IPC cache performance vs HTTP API"""
+    """Tests CubeSQL query cache performance vs REST HTTP API"""
 
     def __init__(self, arrow_uri: str = "postgresql://username:password@localhost:4444/db",
                  http_url: str = "http://localhost:4008/cubejs-api/v1/load"):
@@ -79,7 +84,7 @@ class CachePerformanceTester:
         cursor.close()
         conn.close()
 
-        return QueryResult("arrow", elapsed_ms, row_count, col_count, label)
+        return QueryResult("cubesql", elapsed_ms, row_count, col_count, label)
 
     def run_http_query(self, query_dict: Dict[str, Any], label: str = "") -> QueryResult:
         """Execute query via HTTP API and measure time"""
@@ -111,25 +116,25 @@ class CachePerformanceTester:
 
     def print_result(self, result: QueryResult, prefix: str = ""):
         """Print formatted query result"""
-        color = Colors.GREEN if result.api == "arrow" else Colors.YELLOW
+        color = Colors.GREEN if result.api == "cubesql" else Colors.YELLOW
         print(f"{color}{prefix}{result}{Colors.END}")
 
-    def print_comparison(self, arrow: QueryResult, http: QueryResult):
+    def print_comparison(self, cubesql: QueryResult, http: QueryResult):
         """Print performance comparison"""
-        if arrow.query_time_ms == 0:
+        if cubesql.query_time_ms == 0:
             speedup_text = "∞"
         else:
-            speedup = http.query_time_ms / arrow.query_time_ms
+            speedup = http.query_time_ms / cubesql.query_time_ms
             speedup_text = f"{speedup:.1f}x"
 
-        time_saved = http.query_time_ms - arrow.query_time_ms
+        time_saved = http.query_time_ms - cubesql.query_time_ms
 
         print(f"\n{Colors.BOLD}{'─' * 80}{Colors.END}")
-        print(f"{Colors.BOLD}PERFORMANCE COMPARISON:{Colors.END}")
-        print(f"  Arrow IPC:  {arrow.query_time_ms}ms")
-        print(f"  HTTP API:   {http.query_time_ms}ms")
-        print(f"  {Colors.GREEN}{Colors.BOLD}Speedup:    {speedup_text} faster{Colors.END}")
-        print(f"  Time saved: {time_saved}ms")
+        print(f"{Colors.BOLD}CUBESQL vs REST HTTP API:{Colors.END}")
+        print(f"  CubeSQL (cached):  {cubesql.query_time_ms}ms")
+        print(f"  REST HTTP API:     {http.query_time_ms}ms")
+        print(f"  {Colors.GREEN}{Colors.BOLD}Speedup:           {speedup_text} faster{Colors.END}")
+        print(f"  Time saved:        {time_saved}ms")
         print(f"{Colors.BOLD}{'─' * 80}{Colors.END}\n")
 
     def test_cache_warmup_and_hit(self):
@@ -171,10 +176,10 @@ class CachePerformanceTester:
         return speedup
 
     def test_arrow_vs_http_small(self):
-        """Test 2: Small query - prove Arrow beats HTTP with cache"""
+        """Test 2: Small query - CubeSQL vs REST HTTP API"""
         self.print_header(
             "Small Query (200 rows)",
-            "Arrow IPC with cache vs HTTP API - should show Arrow dominance"
+            "CubeSQL (with cache) vs REST HTTP API"
         )
 
         sql = """
@@ -195,26 +200,26 @@ class CachePerformanceTester:
         }
 
         # Warm up cache
-        print(f"{Colors.CYAN}Warming up Arrow cache...{Colors.END}")
+        print(f"{Colors.CYAN}Warming up CubeSQL cache...{Colors.END}")
         self.run_arrow_query(sql)
         time.sleep(0.1)
 
         # Run actual test
         print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "Arrow IPC (cached)")
-        http_result = self.run_http_query(http_query, "HTTP API")
+        cubesql_result = self.run_arrow_query(sql, "CubeSQL (cached)")
+        http_result = self.run_http_query(http_query, "REST HTTP API")
 
-        self.print_result(arrow_result, "  ")
+        self.print_result(cubesql_result, "  ")
         self.print_result(http_result, "  ")
-        self.print_comparison(arrow_result, http_result)
+        self.print_comparison(cubesql_result, http_result)
 
-        return http_result.query_time_ms / arrow_result.query_time_ms if arrow_result.query_time_ms > 0 else float('inf')
+        return http_result.query_time_ms / cubesql_result.query_time_ms if cubesql_result.query_time_ms > 0 else float('inf')
 
     def test_arrow_vs_http_medium(self):
-        """Test 3: Medium query (1-2K rows)"""
+        """Test 3: Medium query (1-2K rows) - CubeSQL vs REST HTTP API"""
         self.print_header(
             "Medium Query (1-2K rows)",
-            "Arrow IPC with cache vs HTTP API on medium result sets"
+            "CubeSQL (with cache) vs REST HTTP API on medium result sets"
         )
 
         sql = """
@@ -245,26 +250,26 @@ class CachePerformanceTester:
         }
 
         # Warm up cache
-        print(f"{Colors.CYAN}Warming up Arrow cache...{Colors.END}")
+        print(f"{Colors.CYAN}Warming up CubeSQL cache...{Colors.END}")
         self.run_arrow_query(sql)
         time.sleep(0.1)
 
         # Run actual test
         print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "Arrow IPC (cached)")
-        http_result = self.run_http_query(http_query, "HTTP API")
+        cubesql_result = self.run_arrow_query(sql, "CubeSQL (cached)")
+        http_result = self.run_http_query(http_query, "REST HTTP API")
 
-        self.print_result(arrow_result, "  ")
+        self.print_result(cubesql_result, "  ")
         self.print_result(http_result, "  ")
-        self.print_comparison(arrow_result, http_result)
+        self.print_comparison(cubesql_result, http_result)
 
-        return http_result.query_time_ms / arrow_result.query_time_ms if arrow_result.query_time_ms > 0 else float('inf')
+        return http_result.query_time_ms / cubesql_result.query_time_ms if cubesql_result.query_time_ms > 0 else float('inf')
 
     def test_arrow_vs_http_large(self):
-        """Test 4: Large query (10K+ rows)"""
+        """Test 4: Large query (10K+ rows) - CubeSQL vs REST HTTP API"""
         self.print_header(
             "Large Query (10K+ rows)",
-            "Arrow IPC with cache vs HTTP API on large result sets"
+            "CubeSQL (with cache) vs REST HTTP API on large result sets"
         )
 
         sql = """
@@ -294,27 +299,27 @@ class CachePerformanceTester:
         }
 
         # Warm up cache
-        print(f"{Colors.CYAN}Warming up Arrow cache...{Colors.END}")
+        print(f"{Colors.CYAN}Warming up CubeSQL cache...{Colors.END}")
         self.run_arrow_query(sql)
         time.sleep(0.1)
 
         # Run actual test
         print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "Arrow IPC (cached)")
-        http_result = self.run_http_query(http_query, "HTTP API")
+        cubesql_result = self.run_arrow_query(sql, "CubeSQL (cached)")
+        http_result = self.run_http_query(http_query, "REST HTTP API")
 
-        self.print_result(arrow_result, "  ")
+        self.print_result(cubesql_result, "  ")
         self.print_result(http_result, "  ")
-        self.print_comparison(arrow_result, http_result)
+        self.print_comparison(cubesql_result, http_result)
 
-        return http_result.query_time_ms / arrow_result.query_time_ms if arrow_result.query_time_ms > 0 else float('inf')
+        return http_result.query_time_ms / cubesql_result.query_time_ms if cubesql_result.query_time_ms > 0 else float('inf')
 
     def run_all_tests(self):
         """Run complete test suite"""
         print(f"\n{Colors.BOLD}{Colors.HEADER}")
         print("=" * 80)
-        print("  ARROW IPC QUERY CACHE PERFORMANCE TEST SUITE")
-        print("  Demonstrating 30x speedup through intelligent caching")
+        print("  CUBESQL QUERY CACHE PERFORMANCE TEST SUITE")
+        print("  CubeSQL (with cache) vs REST HTTP API")
         print("=" * 80)
         print(f"{Colors.END}\n")
 
@@ -340,8 +345,8 @@ class CachePerformanceTester:
         except Exception as e:
             print(f"\n{Colors.RED}{Colors.BOLD}ERROR: {e}{Colors.END}")
             print(f"\n{Colors.YELLOW}Make sure:")
-            print(f"  1. CubeSQL is running on localhost:4444 (Arrow IPC)")
-            print(f"  2. Cube API is running on localhost:4000 (HTTP)")
+            print(f"  1. CubeSQL is running on localhost:4444")
+            print(f"  2. Cube REST API is running on localhost:4008")
             print(f"  3. Cache is enabled (CUBESQL_QUERY_CACHE_ENABLED=true)")
             print(f"  4. orders_with_preagg cube exists with data{Colors.END}\n")
             sys.exit(1)
@@ -353,7 +358,7 @@ class CachePerformanceTester:
         """Print final summary of all tests"""
         print(f"\n{Colors.BOLD}{Colors.HEADER}")
         print("=" * 80)
-        print("  SUMMARY: Arrow IPC Cache Performance")
+        print("  SUMMARY: CubeSQL vs REST HTTP API Performance")
         print("=" * 80)
         print(f"{Colors.END}\n")
 
@@ -374,7 +379,7 @@ class CachePerformanceTester:
         print(f"{Colors.BOLD}{'=' * 80}{Colors.END}\n")
 
         print(f"{Colors.GREEN}{Colors.BOLD}✓ All tests passed!{Colors.END}")
-        print(f"{Colors.CYAN}Arrow IPC with cache is consistently 20-50x faster than HTTP API{Colors.END}\n")
+        print(f"{Colors.CYAN}CubeSQL with query caching significantly outperforms REST HTTP API{Colors.END}\n")
 
 
 def main():
