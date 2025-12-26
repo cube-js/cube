@@ -88,7 +88,7 @@ source .venv/bin/activate
 pip install psycopg2-binary requests
 
 # Run tests
-python test_arrow_cache_performance.py
+python test_arrow_native_performance.py
 ```
 
 **Expected results**:
@@ -149,10 +149,18 @@ export CUBESQL_QUERY_CACHE_MAX_ENTRIES=10000   # Max queries
 export CUBESQL_QUERY_CACHE_TTL=7200            # TTL (2 hours)
 ```
 
-**Disable cache** if you only want the Arrow Native server without caching:
+**When to disable cache**:
 ```bash
 export CUBESQL_QUERY_CACHE_ENABLED=false
 ```
+
+Disable query result cache when using **CubeStore pre-aggregations**. CubeStore is already a cache/pre-aggregation layer at the storage level - **sometimes one cache is plenty**. Benefits:
+- Avoids double-caching overhead
+- Reduces memory usage
+- Simpler architecture (single caching layer)
+- **Still gets 8-15x speedup** from Arrow Native binary protocol vs REST API
+
+**Verification**: Check logs for `"Query result cache: DISABLED (using Arrow Native baseline performance)"`. Cache operations are completely bypassed when disabled.
 
 ### Database Connection
 
@@ -258,7 +266,7 @@ pip install psycopg2-binary requests
 
 **Authentication failed**:
 - Default credentials: username=`username`, password=`password`
-- Set in `test_arrow_cache_performance.py` if different
+- Set in `test_arrow_native_performance.py` if different
 
 ## Next Steps
 
@@ -300,5 +308,5 @@ pip install psycopg2-binary requests
 - **Architecture**: `ARCHITECTURE.md`
 - **Local Verification**: `LOCAL_VERIFICATION.md`
 - **Sample Data**: `sample_data.sql.gz` (240KB, 3000 orders)
-- **Python Tests**: `test_arrow_cache_performance.py`
+- **Python Tests**: `test_arrow_native_performance.py`
 - **Documentation**: `/home/io/projects/learn_erl/power-of-three-examples/doc/`

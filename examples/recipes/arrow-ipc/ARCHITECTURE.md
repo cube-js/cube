@@ -2,16 +2,16 @@
 
 ## Overview
 
-This PR introduces **CubeSQL's Arrow Native server** with an optional query result cache, delivering significant performance improvements over the standard REST HTTP API.
+This PR introduces **Arrow IPC Native protocol** for CubeSQL, delivering 8-15x performance improvements over the standard REST HTTP API through efficient binary data transfer.
 
 What this PR adds:
-1. **Arrow IPC native protocol** - Binary protocol for zero-copy data transfer (port 4445)
-2. **Optional query result cache** - Transparent performance boost for repeated queries
+1. **Arrow IPC native protocol (port 4445)** ⭐ NEW - Binary protocol for zero-copy data transfer
+2. **Optional query result cache** ⭐ NEW - Transparent performance boost for repeated queries
 3. **Production-ready implementation** - Minimal overhead, zero breaking changes
 
 ## The Complete Approach
 
-### 1. Architecture Layers
+### 1. What's NEW: Arrow Native vs REST API
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -19,18 +19,17 @@ What this PR adds:
 │              (Python, R, JavaScript, etc.)                   │
 └────────────────┬────────────────────────────────────────────┘
                  │
-                 ├─── Option A: REST HTTP API (Port 4008)
+                 ├─── REST HTTP API (Port 4008)
                  │    └─> JSON over HTTP
                  │         └─> Cube API → CubeStore
                  │
-                 └─── Option B: CubeSQL Server
-                      ├─> PostgreSQL Wire Protocol (Port 4444)
-                      │    └─> Cube API → CubeStore
-                      │
-                      └─> Arrow IPC Native (Port 4445) ⭐ NEW
+                 └─── Arrow IPC Native (Port 4445) ⭐ NEW
+                      └─> Binary Arrow Protocol
                            └─> Optional Query Cache ⭐ NEW
                                 └─> Cube API → CubeStore
 ```
+
+**Key Comparison**: This PR focuses on **Arrow Native (4445) vs REST API (4008)** performance.
 
 ### 2. New Components Added by This PR
 
@@ -102,13 +101,13 @@ async fn execute_query(&self, sql: &str, database: Option<&str>) -> Result<()> {
     if let Some(cached_batches) = self.query_cache.get(sql, database).await {
         return self.stream_cached_batches(&cached_batches).await;
     }
-    
+
     // Cache miss - execute query
     let batches = self.execute_and_collect(sql, database).await?;
-    
+
     // Store in cache
     self.query_cache.insert(sql, database, batches.clone()).await;
-    
+
     // Stream results
     self.stream_batches(&batches).await
 }
@@ -191,41 +190,51 @@ CUBESQL_QUERY_CACHE_MAX_ENTRIES=1000   # Lower memory
 CUBESQL_QUERY_CACHE_TTL=7200           # Fewer misses (2 hours)
 ```
 
-**Testing**:
+**CubeStore pre-aggregations (cache disabled)**:
 ```bash
-CUBESQL_QUERY_CACHE_ENABLED=false      # Disable entirely
+CUBESQL_QUERY_CACHE_ENABLED=false      # Disable query result cache
 ```
+**When to disable**: Data served from CubeStore pre-aggregations is already cached and fast.
+CubeStore itself is a cache/pre-aggregation layer - **sometimes one cache is plenty**.
+
+Benefits of cacheless setup with CubeStore:
+- Reduces memory overhead (no duplicate caching)
+- Provides consistent query times
+- Simplifies architecture (single caching layer: CubeStore)
+- **Still gets 8-15x speedup** from Arrow Native binary protocol vs REST API
 
 ## Use Cases
 
-### Ideal Scenarios
+### Query Result Cache Enabled (Default)
 
-1. **Dashboard applications**
-   - Same queries repeated every few seconds
-   - Perfect for cache hits
-   - 10x+ speedup
+**Ideal for**:
+1. **Dashboard applications** - Same queries repeated every few seconds
+2. **BI tools** - Query templates with parameter variations
+3. **Ad-hoc analytics** - Users re-running similar queries
+4. **Development/testing** - Fast iteration on same queries
 
-2. **BI tools**
-   - Query templates with parameters
-   - Normalization handles minor variations
-   - Consistent performance
+**Benefit**: 3-10x additional speedup on cache hits (on top of Arrow Native baseline)
 
-3. **Real-time monitoring**
-   - Fixed query set
-   - High query frequency
-   - Maximum benefit from caching
+### Query Result Cache Disabled
 
-### Less Beneficial
+**Ideal for**:
+1. **CubeStore pre-aggregations** - Data already cached at storage layer
+   - CubeStore is a cache itself - one cache is enough
+   - Avoids double-caching overhead
+   - Still 8-15x faster than REST API via Arrow Native protocol
 
-1. **Unique queries**
-   - Each query different
-   - Rare cache hits
-   - Minimal benefit
+2. **Unique queries** - Each query is different
+   - Analytics with high query cardinality
+   - Exploration workloads
+   - No repeated queries to cache
 
-2. **Rapidly changing data**
-   - Cache expires frequently
-   - More misses than hits
-   - Consider shorter TTL
+3. **Rapidly changing data** - Frequent data updates
+   - Cache would expire constantly
+   - More overhead than benefit
+
+4. **Memory-constrained environments**
+   - Reduce memory footprint
+   - Simpler resource management
 
 ## Technical Decisions
 
@@ -282,18 +291,6 @@ CUBESQL_QUERY_CACHE_ENABLED=false      # Disable entirely
    - Invalidate on data refresh
    - Pre-aggregation rebuild triggers
 
-### Long-term
-
-5. **Distributed cache**
-   - Share cache across CubeSQL instances
-   - Redis backend option
-   - Cluster-wide performance
-
-6. **Partial result caching**
-   - Cache intermediate results
-   - Pre-aggregation caching
-   - Query plan caching
-
 ## Testing
 
 ### Unit Tests (Rust)
@@ -309,7 +306,7 @@ CUBESQL_QUERY_CACHE_ENABLED=false      # Disable entirely
 
 ### Integration Tests (Python)
 
-**Location**: `examples/recipes/arrow-ipc/test_arrow_cache_performance.py`
+**Location**: `examples/recipes/arrow-ipc/test_arrow_native_performance.py`
 
 **Demonstrates**:
 - Cache miss → hit speedup

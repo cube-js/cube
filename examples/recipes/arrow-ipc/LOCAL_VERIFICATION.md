@@ -50,7 +50,7 @@ sleep 5
 Next steps:
   1. Start Cube API: ./start-cube-api.sh
   2. Start CubeSQL: ./start-cubesqld.sh
-  3. Run Python tests: python test_arrow_cache_performance.py
+  3. Run Python tests: python test_arrow_native_performance.py
 ```
 
 ### ✅ Step 3: Verify Arrow Native Server
@@ -69,14 +69,14 @@ Next steps:
 ```
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
 🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
-Query result cache initialized: enabled=true, max_entries=1000, ttl=3600s
+Query result cache: ENABLED (max_entries=1000, ttl=3600s)
 ```
 
 **Verify server is running**:
 ```bash
 lsof -i:4444  # PostgreSQL protocol
 lsof -i:4445  # Arrow IPC native
-grep "Query result cache initialized" cubesqld.log  # Optional cache
+grep "Query result cache:" cubesqld.log  # Optional cache
 ```
 
 ### ✅ Step 4: Run Python Performance Tests
@@ -88,7 +88,7 @@ source .venv/bin/activate
 pip install psycopg2-binary requests
 
 # Run tests
-python test_arrow_cache_performance.py
+python test_arrow_native_performance.py
 ```
 
 **Expected results**:
@@ -294,7 +294,7 @@ real    0m0.210s  (cached!)
 | Code formatting | All files pass `cargo fmt --check` | Run in rust/cubesql |
 | Linting | Zero clippy warnings | Run `cargo clippy -D warnings` |
 | Unit tests | 5/5 passing | Run `cargo test arrow_native::cache` |
-| Python tests | 4/4 passing, 8-15x speedup | Run test_arrow_cache_performance.py |
+| Python tests | 4/4 passing, 8-15x speedup | Run test_arrow_native_performance.py |
 | Cache hit | 3-10x faster on repeat query | Manual psql test |
 | Query normalization | Whitespace/case ignored | Run similar queries |
 | TTL expiration | Cache clears after TTL | Set short TTL, wait, test |
@@ -378,13 +378,13 @@ sleep 5
 sleep 3
 
 # 5. Verify cache is enabled
-grep "Query result cache initialized: enabled=true" cubesqld.log
+grep "Query result cache: ENABLED" cubesqld.log
 
 # 6. Run Python tests
 python3 -m venv .venv
 source .venv/bin/activate
 pip install psycopg2-binary requests
-python test_arrow_cache_performance.py
+python test_arrow_native_performance.py
 
 # 7. Manual verification
 psql -h 127.0.0.1 -p 4444 -U username << SQL

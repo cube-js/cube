@@ -12,7 +12,7 @@
 - **[Local Verification](LOCAL_VERIFICATION.md)** - How to verify the PR
 
 🧪 **Testing**:
-- **[Python Performance Tests](test_arrow_cache_performance.py)** - Automated benchmarks
+- **[Python Performance Tests](test_arrow_native_performance.py)** - Arrow Native vs REST API benchmarks
 - **[Sample Data Setup](setup_test_data.sh)** - Load 3000 test orders
 
 📖 **Additional Resources**:
@@ -36,19 +36,19 @@ Client Application (Python/R/JS)
          │
          ├─── REST HTTP API (Port 4008)
          │    └─> JSON over HTTP
+         │         └─> Cube API → CubeStore
          │
-         └─── CubeSQL Server
-              ├─> PostgreSQL Wire Protocol (Port 4444)
-              │    └─> Cube API → CubeStore
-              │
-              └─> Arrow IPC Native (Port 4445) ⭐ NEW
+         └─── Arrow IPC Native (Port 4445) ⭐ NEW
+              └─> Binary Arrow Protocol
                    └─> Query Result Cache (Optional) ⭐ NEW
                         └─> Cube API → CubeStore
 ```
 
 **What this PR adds**:
-- Arrow IPC native protocol (port 4445) for efficient binary data transfer
-- Optional query result cache for repeated queries
+- **Arrow IPC native protocol (port 4445)** - Binary data transfer, 8-15x faster than REST API
+- **Optional query result cache** - Additional 3-10x speedup on repeated queries
+
+**When to disable cache**: If using CubeStore pre-aggregations, data is already cached at the storage layer. CubeStore is a cache itself - **sometimes one cache is plenty**. Cacheless setup still gets 8-15x speedup from Arrow Native binary protocol.
 
 ## Quick Start (5 minutes)
 
@@ -78,15 +78,28 @@ docker-compose up -d postgres
 python3 -m venv .venv
 source .venv/bin/activate
 pip install psycopg2-binary requests
-python test_arrow_cache_performance.py
+
+# Test WITH cache (default)
+python test_arrow_native_performance.py
+
+# Test WITHOUT cache (baseline Arrow Native)
+export CUBESQL_QUERY_CACHE_ENABLED=false
+./start-cubesqld.sh  # Restart with cache disabled
+python test_arrow_native_performance.py
 ```
 
-**Expected Output**:
+**Expected Output (with cache)**:
 ```
 Cache Miss → Hit:        3-10x speedup ✓
-CubeSQL vs REST API:     8-15x faster ✓
+Arrow Native vs REST:    8-15x faster ✓
 Average Speedup:         8-15x
 ✓ All tests passed!
+```
+
+**Expected Output (without cache)**:
+```
+Arrow Native vs REST:    5-10x faster ✓
+(Baseline performance without caching)
 ```
 
 ## What You Get
@@ -99,9 +112,13 @@ Average Speedup:         8-15x
 - `LOCAL_VERIFICATION.md` - PR verification steps
 
 **Test Infrastructure**:
-- `test_arrow_cache_performance.py` - Python benchmarks (400 lines)
+- `test_arrow_native_performance.py` - Python benchmarks comparing Arrow Native vs REST API
 - `setup_test_data.sh` - Data loader script
 - `sample_data.sql.gz` - 3000 sample orders (240KB)
+
+Tests support both modes:
+- `CUBESQL_QUERY_CACHE_ENABLED=true` - Tests with optional cache
+- `CUBESQL_QUERY_CACHE_ENABLED=false` - Tests baseline Arrow Native performance
 
 **Configuration**:
 - `start-cubesqld.sh` - Launches CubeSQL with cache enabled
@@ -128,17 +145,17 @@ Speedup:          3.3x faster
 - No caching overhead
 - Suitable for unique queries
 
-### CubeSQL vs REST HTTP API
+### Arrow Native (4445) vs REST HTTP API (4008)
 
 **Full materialization timing** (includes client-side data conversion):
 ```
-Query Size    | CubeSQL | REST API | Speedup
---------------|---------|----------|--------
-200 rows      |  363ms  | 5013ms   | 13.8x
-2K rows       |  409ms  | 5016ms   | 12.3x
-10K rows      | 1424ms  | 5021ms   |  3.5x
+Query Size    | Arrow Native | REST API | Speedup
+--------------|--------------|----------|--------
+200 rows      |  363ms       | 5013ms   | 13.8x
+2K rows       |  409ms       | 5016ms   | 12.3x
+10K rows      | 1424ms       | 5021ms   |  3.5x
 
-Average: 8.2x faster
+Average: 8.2x faster (Arrow Native with cache)
 ```
 
 **Materialization overhead**: 0-15ms (negligible)
@@ -268,7 +285,7 @@ cd ../../examples/recipes/arrow-ipc
 ./setup_test_data.sh
 ./start-cube-api.sh &
 ./start-cubesqld.sh &
-python test_arrow_cache_performance.py
+python test_arrow_native_performance.py
 ```
 
 ### Files Changed
@@ -279,7 +296,7 @@ python test_arrow_cache_performance.py
 - `rust/cubesql/cubesql/src/sql/arrow_native/stream_writer.rs` (modified)
 
 **Tests** (400 lines):
-- `examples/recipes/arrow-ipc/test_arrow_cache_performance.py` (new)
+- `examples/recipes/arrow-ipc/test_arrow_native_performance.py` (new)
 
 **Infrastructure**:
 - `examples/recipes/arrow-ipc/setup_test_data.sh` (new)

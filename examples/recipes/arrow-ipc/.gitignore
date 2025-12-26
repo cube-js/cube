@@ -19,3 +19,4 @@ bin/
 # CubeStore data
 .cubestore/
 .venv/
+/__pycache__*

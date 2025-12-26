@@ -58,10 +58,14 @@ impl QueryResultCache {
             .time_to_live(Duration::from_secs(ttl_seconds))
             .build();
 
-        info!(
-            "Query result cache initialized: enabled={}, max_entries={}, ttl={}s",
-            enabled, max_entries, ttl_seconds
-        );
+        if enabled {
+            info!(
+                "Query result cache: ENABLED (max_entries={}, ttl={}s)",
+                max_entries, ttl_seconds
+            );
+        } else {
+            info!("Query result cache: DISABLED! Serving directly from CubeStore");
+        }
 
         Self {
             cache,
