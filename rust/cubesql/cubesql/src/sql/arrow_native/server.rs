@@ -318,7 +318,7 @@ impl ArrowNativeServer {
                 "Cache HIT - streaming {} cached batches",
                 cached_batches.len()
             );
-            StreamWriter::stream_cached_batches(socket, &cached_batches).await?;
+            StreamWriter::stream_cached_batches(socket, &cached_batches, true).await?;
             return Ok(());
         }
 
@@ -362,8 +362,8 @@ impl ArrowNativeServer {
                 // Cache the results
                 query_cache.insert(sql, database, batches.clone()).await;
 
-                // Stream cached results
-                StreamWriter::stream_cached_batches(socket, &batches).await?;
+                // Stream results (from fresh execution)
+                StreamWriter::stream_cached_batches(socket, &batches, false).await?;
             }
             QueryPlan::MetaOk(_, _) => {
                 // Meta commands (e.g., SET, BEGIN, COMMIT)

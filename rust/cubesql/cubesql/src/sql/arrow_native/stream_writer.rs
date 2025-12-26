@@ -103,9 +103,15 @@ impl StreamWriter {
     }
 
     /// Stream cached batches (already materialized)
+    ///
+    /// # Arguments
+    /// * `writer` - Output stream
+    /// * `batches` - Record batches to stream
+    /// * `from_cache` - True if serving from cache, false if serving fresh query results
     pub async fn stream_cached_batches<W: AsyncWriteExt + Unpin>(
         writer: &mut W,
         batches: &[RecordBatch],
+        from_cache: bool,
     ) -> Result<(), CubeError> {
         if batches.is_empty() {
             return Err(CubeError::internal(
@@ -121,19 +127,29 @@ impl StreamWriter {
         let msg = Message::QueryResponseSchema { arrow_ipc_schema };
         write_message(writer, &msg).await?;
 
-        // Stream all cached batches
+        // Stream all batches
         let mut total_rows = 0i64;
         for (idx, batch) in batches.iter().enumerate() {
             let batch_rows = batch.num_rows() as i64;
             total_rows += batch_rows;
 
-            log::debug!(
-                "📦 Cached batch #{}: {} rows, {} columns (total so far: {} rows)",
-                idx + 1,
-                batch_rows,
-                batch.num_columns(),
-                total_rows
-            );
+            if from_cache {
+                log::debug!(
+                    "📦 Cached batch #{}: {} rows, {} columns (total so far: {} rows)",
+                    idx + 1,
+                    batch_rows,
+                    batch.num_columns(),
+                    total_rows
+                );
+            } else {
+                log::debug!(
+                    "📦 Serving batch #{} from CubeStore: {} rows, {} columns (total so far: {} rows)",
+                    idx + 1,
+                    batch_rows,
+                    batch.num_columns(),
+                    total_rows
+                );
+            }
 
             // Serialize batch to Arrow IPC format
             let arrow_ipc_batch = Self::serialize_batch(batch)?;
@@ -143,11 +159,19 @@ impl StreamWriter {
             write_message(writer, &msg).await?;
         }
 
-        log::info!(
-            "✅ Streamed {} cached batches with {} total rows",
-            batches.len(),
-            total_rows
-        );
+        if from_cache {
+            log::info!(
+                "✅ Streamed {} cached batches with {} total rows",
+                batches.len(),
+                total_rows
+            );
+        } else {
+            log::info!(
+                "✅ Served {} batches from CubeStore with {} total rows",
+                batches.len(),
+                total_rows
+            );
+        }
 
         // Write completion
         Self::write_complete(writer, total_rows).await?;

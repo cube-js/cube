@@ -11,8 +11,8 @@ This test suite measures:
 3. Full materialization timing (complete client experience)
 
 Test Modes:
-    - CUBESQL_QUERY_CACHE_ENABLED=true:  Tests with optional cache (shows cache speedup)
-    - CUBESQL_QUERY_CACHE_ENABLED=false: Tests baseline Arrow Native vs REST API
+    - CUBESQL_ARROW_RESULTS_CACHE_ENABLED=true:  Tests with optional cache (shows cache speedup)
+    - CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false: Tests baseline Arrow Native vs REST API
 
     Note: When using CubeStore pre-aggregations, data is already cached at the storage
     layer. CubeStore is a cache itself - sometimes one cache is plenty. Cacheless setup
@@ -25,12 +25,12 @@ Usage:
     # From examples/recipes/arrow-ipc directory:
 
     # Test WITH cache enabled (default)
-    export CUBESQL_QUERY_CACHE_ENABLED=true
+    export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=true
     ./start-cubesqld.sh &
     python test_arrow_native_performance.py
 
     # Test WITHOUT cache (baseline Arrow Native)
-    export CUBESQL_QUERY_CACHE_ENABLED=false
+    export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false
     ./start-cubesqld.sh &
     python test_arrow_native_performance.py
 """
@@ -85,7 +85,7 @@ class ArrowNativePerformanceTester:
         self.http_token = "test"  # Default token
 
         # Detect cache mode from environment
-        cache_env = os.getenv("CUBESQL_QUERY_CACHE_ENABLED", "true").lower()
+        cache_env = os.getenv("CUBESQL_ARROW_RESULTS_CACHE_ENABLED", "true").lower()
         self.cache_enabled = cache_env in ("true", "1", "yes")
 
     def run_arrow_query(self, sql: str, label: str = "") -> QueryResult:
@@ -159,13 +159,13 @@ class ArrowNativePerformanceTester:
         return 1.0
 
     def test_cache_effectiveness(self):
-        """Test 1: Cache miss → hit (only when cache is enabled)"""
+        """Test 1: Arrow Results Cache miss → hit (only when cache is enabled)"""
         if not self.cache_enabled:
-            print(f"{Colors.YELLOW}Skipping cache test - cache is disabled{Colors.END}\n")
+            print(f"{Colors.YELLOW}Skipping cache test - Arrow Results Cache is disabled{Colors.END}\n")
             return None
 
         self.print_header(
-            "Optional Query Cache: Miss → Hit",
+            "Optional Arrow Results Cache: Miss → Hit",
             "Demonstrates cache speedup on repeated queries"
         )
 
@@ -350,9 +350,10 @@ class ArrowNativePerformanceTester:
         print("=" * 80)
         print("  CUBESQL ARROW NATIVE SERVER PERFORMANCE TEST SUITE")
         print(f"  Arrow Native (port 4445) vs REST HTTP API (port 4008)")
-        cache_status = "ENABLED" if self.cache_enabled else "DISABLED"
+        cache_status = "expected" if self.cache_enabled else "not expected"
         cache_color = Colors.GREEN if self.cache_enabled else Colors.YELLOW
-        print(f"  Query Cache: {cache_color}{cache_status}{Colors.END}")
+        print(f"  Arrow Results Cache behavior: {cache_color}{cache_status}{Colors.END}")
+        print(f"  Note: REST HTTP API has caching always enabled")
         print("=" * 80)
         print(f"{Colors.END}\n")
 
@@ -383,7 +384,7 @@ class ArrowNativePerformanceTester:
             print(f"  1. Arrow Native server is running on localhost:4445")
             print(f"  2. Cube REST API is running on localhost:4008")
             print(f"  3. orders_with_preagg cube exists with data")
-            print(f"  4. CUBESQL_QUERY_CACHE_ENABLED is set correctly{Colors.END}\n")
+            print(f"  4. CUBESQL_ARROW_RESULTS_CACHE_ENABLED is set correctly{Colors.END}\n")
             sys.exit(1)
 
         # Print summary
@@ -413,11 +414,13 @@ class ArrowNativePerformanceTester:
 
         print(f"{Colors.BOLD}{'=' * 80}{Colors.END}\n")
 
-        print(f"{Colors.GREEN}{Colors.BOLD}✓ All tests passed!{Colors.END}")
+        print(f"{Colors.GREEN}{Colors.BOLD}✓ All tests completed{Colors.END}")
         if self.cache_enabled:
-            print(f"{Colors.CYAN}Arrow Native server with cache significantly outperforms REST HTTP API{Colors.END}\n")
+            print(f"{Colors.CYAN}Results show Arrow Native performance with cache behavior expected.{Colors.END}")
+            print(f"{Colors.CYAN}Note: REST HTTP API has caching always enabled.{Colors.END}\n")
         else:
-            print(f"{Colors.CYAN}Arrow Native server (baseline, no cache) outperforms REST HTTP API{Colors.END}\n")
+            print(f"{Colors.CYAN}Results show Arrow Native baseline performance (cache behavior not expected).{Colors.END}")
+            print(f"{Colors.CYAN}Note: REST HTTP API has caching always enabled.{Colors.END}\n")
 
 
 def main():

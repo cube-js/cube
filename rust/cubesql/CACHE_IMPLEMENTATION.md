@@ -102,19 +102,19 @@ This function:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CUBESQL_QUERY_CACHE_ENABLED` | `true` | Enable/disable query result caching |
-| `CUBESQL_QUERY_CACHE_MAX_ENTRIES` | `1000` | Maximum number of cached queries |
-| `CUBESQL_QUERY_CACHE_TTL` | `3600` | Time-to-live in seconds (1 hour) |
+| `CUBESQL_ARROW_RESULTS_CACHE_ENABLED` | `true` | Enable/disable Arrow Results Cache |
+| `CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES` | `1000` | Maximum number of cached queries |
+| `CUBESQL_ARROW_RESULTS_CACHE_TTL` | `3600` | Time-to-live in seconds (1 hour) |
 
 ### Example Configuration
 
 ```bash
 # Disable caching
-export CUBESQL_QUERY_CACHE_ENABLED=false
+export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false
 
 # Increase cache size and TTL for production
-export CUBESQL_QUERY_CACHE_MAX_ENTRIES=10000
-export CUBESQL_QUERY_CACHE_TTL=7200  # 2 hours
+export CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES=10000
+export CUBESQL_ARROW_RESULTS_CACHE_TTL=7200  # 2 hours
 
 # Start CubeSQL
 CUBESQL_CUBE_URL=$CUBE_URL/cubejs-api \
@@ -243,11 +243,11 @@ Compare performance with cache enabled vs disabled:
 
 ```bash
 # Disable cache
-export CUBESQL_QUERY_CACHE_ENABLED=false
+export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false
 time psql -h 127.0.0.1 -p 4444 -U root -c "SELECT * FROM orders GROUP BY status"
 
 # Enable cache (run twice)
-export CUBESQL_QUERY_CACHE_ENABLED=true
+export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=true
 time psql -h 127.0.0.1 -p 4444 -U root -c "SELECT * FROM orders GROUP BY status"
 time psql -h 127.0.0.1 -p 4444 -U root -c "SELECT * FROM orders GROUP BY status"
 ```
@@ -335,6 +335,6 @@ struct QueryCacheKey {
 
 ## Summary
 
-The Arrow Native server now includes a robust, configurable query result cache that can dramatically improve performance for repeated queries. The cache is production-ready, with environment-based configuration, proper logging, and comprehensive unit tests.
+The Arrow Native server now includes a robust, configurable Arrow Results Cache that can dramatically improve performance for repeated queries. The cache is production-ready, with environment-based configuration, proper logging, and comprehensive unit tests.
 
 **Key achievement**: Addresses performance gap identified in test results where HTTP API outperformed Arrow IPC on small queries due to HTTP caching. With this cache, Arrow IPC should match or exceed HTTP API performance across all query sizes.

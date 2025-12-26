@@ -1,6 +1,6 @@
 # Local PR Verification Guide
 
-This guide explains how to verify the **CubeSQL Arrow Native Server** PR locally, including the optional query cache feature.
+This guide explains how to verify the **CubeSQL Arrow Native Server** PR locally, including the optional Arrow Results Cache feature.
 
 ## Complete Verification Checklist
 
@@ -69,14 +69,14 @@ Next steps:
 ```
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
 🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
-Query result cache: ENABLED (max_entries=1000, ttl=3600s)
+Arrow Results Cache: ENABLED (max_entries=1000, ttl=3600s)
 ```
 
 **Verify server is running**:
 ```bash
 lsof -i:4444  # PostgreSQL protocol
 lsof -i:4445  # Arrow IPC native
-grep "Query result cache:" cubesqld.log  # Optional cache
+grep "Arrow Results Cache:" cubesqld.log  # Optional cache
 ```
 
 ### ✅ Step 4: Run Python Performance Tests
@@ -96,7 +96,7 @@ python test_arrow_native_performance.py
 CUBESQL ARROW NATIVE SERVER PERFORMANCE TEST SUITE
 ==================================================
 
-TEST: Query Cache (Optional Feature)
+TEST: Arrow Results Cache (Optional Feature)
 -------------------------------------
 First query:  1200-2500ms  (cache miss)
 Second query:  200-500ms   (cache hit)

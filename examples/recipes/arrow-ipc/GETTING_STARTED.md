@@ -2,7 +2,7 @@
 
 ## Quick Start (5 minutes)
 
-This guide shows you how to use **CubeSQL's Arrow Native server** with optional query caching.
+This guide shows you how to use **CubeSQL's Arrow Native server** with optional Arrow Results Cache.
 
 ### Prerequisites
 
@@ -71,10 +71,10 @@ Wait for:
 ```
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
 🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
-Query result cache initialized: enabled=true, max_entries=1000, ttl=3600s
+Arrow Results Cache initialized: enabled=true, max_entries=1000, ttl=3600s
 ```
 
-**Note**: Query cache is **optional** and enabled by default. It can be disabled without breaking changes.
+**Note**: Arrow Results Cache is **optional** and enabled by default. It can be disabled without breaking changes.
 
 ### Step 4: Run Performance Tests
 

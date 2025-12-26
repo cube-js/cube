@@ -6,7 +6,7 @@ This PR introduces **Arrow IPC Native protocol** for CubeSQL, delivering 8-15x p
 
 What this PR adds:
 1. **Arrow IPC native protocol (port 4445)** ⭐ NEW - Binary protocol for zero-copy data transfer
-2. **Optional query result cache** ⭐ NEW - Transparent performance boost for repeated queries
+2. **Optional Arrow Results Cache** ⭐ NEW - Transparent performance boost for repeated queries
 3. **Production-ready implementation** - Minimal overhead, zero breaking changes
 
 ## The Complete Approach
@@ -25,7 +25,7 @@ What this PR adds:
                  │
                  └─── Arrow IPC Native (Port 4445) ⭐ NEW
                       └─> Binary Arrow Protocol
-                           └─> Optional Query Cache ⭐ NEW
+                           └─> Optional Arrow Results Cache ⭐ NEW
                                 └─> Cube API → CubeStore
 ```
 
@@ -38,12 +38,12 @@ What this PR adds:
 - Binary protocol for efficient data transfer
 - Zero-copy RecordBatch streaming
 
-**Optional Query Result Cache** ⭐ NEW:
+**Optional Arrow Results Cache** ⭐ NEW:
 - Transparent caching layer
 - Can be disabled without breaking changes
 - Enabled by default for better out-of-box performance
 
-### 3. Query Cache Architecture (Optional Component)
+### 3. Arrow Results Cache Architecture (Optional Component)
 
 **Location**: `rust/cubesql/cubesql/src/sql/arrow_native/cache.rs`
 

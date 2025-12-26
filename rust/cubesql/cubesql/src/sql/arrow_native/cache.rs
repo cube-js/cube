@@ -31,7 +31,7 @@ fn normalize_query(sql: &str) -> String {
         .to_lowercase()
 }
 
-/// Cache for Arrow query results
+/// Arrow Results Cache
 ///
 /// This cache stores RecordBatch results from Arrow Native queries to improve
 /// performance for repeated queries. The cache uses:
@@ -46,7 +46,7 @@ pub struct QueryResultCache {
 }
 
 impl QueryResultCache {
-    /// Create a new query result cache
+    /// Create a new Arrow Results Cache
     ///
     /// # Arguments
     /// * `enabled` - Whether caching is enabled
@@ -60,11 +60,11 @@ impl QueryResultCache {
 
         if enabled {
             info!(
-                "Query result cache: ENABLED (max_entries={}, ttl={}s)",
+                "Arrow Results Cache: ENABLED (max_entries={}, ttl={}s)",
                 max_entries, ttl_seconds
             );
         } else {
-            info!("Query result cache: DISABLED! Serving directly from CubeStore");
+            info!("Arrow Results Cache: DISABLED! Serving directly from CubeStore");
         }
 
         Self {
@@ -78,21 +78,21 @@ impl QueryResultCache {
     /// Create cache from environment variables
     ///
     /// Environment variables:
-    /// - CUBESQL_QUERY_CACHE_ENABLED: "true" or "false" (default: true)
-    /// - CUBESQL_QUERY_CACHE_MAX_ENTRIES: max number of queries (default: 1000)
-    /// - CUBESQL_QUERY_CACHE_TTL: TTL in seconds (default: 3600)
+    /// - CUBESQL_ARROW_RESULTS_CACHE_ENABLED: "true" or "false" (default: true)
+    /// - CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES: max number of queries (default: 1000)
+    /// - CUBESQL_ARROW_RESULTS_CACHE_TTL: TTL in seconds (default: 3600)
     pub fn from_env() -> Self {
-        let enabled = std::env::var("CUBESQL_QUERY_CACHE_ENABLED")
+        let enabled = std::env::var("CUBESQL_ARROW_RESULTS_CACHE_ENABLED")
             .unwrap_or_else(|_| "true".to_string())
             .parse()
             .unwrap_or(true);
 
-        let max_entries = std::env::var("CUBESQL_QUERY_CACHE_MAX_ENTRIES")
+        let max_entries = std::env::var("CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES")
             .unwrap_or_else(|_| "1000".to_string())
             .parse()
             .unwrap_or(1000);
 
-        let ttl_seconds = std::env::var("CUBESQL_QUERY_CACHE_TTL")
+        let ttl_seconds = std::env::var("CUBESQL_ARROW_RESULTS_CACHE_TTL")
             .unwrap_or_else(|_| "3600".to_string())
             .parse()
             .unwrap_or(3600);
@@ -172,7 +172,7 @@ impl QueryResultCache {
     /// Clear all cached entries
     pub async fn clear(&self) {
         if self.enabled {
-            info!("Clearing query result cache");
+            info!("Clearing Arrow Results Cache");
             self.cache.invalidate_all();
             // Optionally wait for invalidation to complete
             self.cache.run_pending_tasks().await;
