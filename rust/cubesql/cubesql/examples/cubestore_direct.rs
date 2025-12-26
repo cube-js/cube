@@ -4,9 +4,8 @@ use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-
-    let cubestore_url = env::var("CUBESQL_CUBESTORE_URL")
-        .unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string());
+    let cubestore_url =
+        env::var("CUBESQL_CUBESTORE_URL").unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string());
 
     println!("==========================================");
     println!("CubeStore Direct Connection Test");
@@ -30,8 +29,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             println!();
 
             for (batch_idx, batch) in batches.iter().enumerate() {
-                println!("  Batch {}: {} rows × {} columns",
-                    batch_idx, batch.num_rows(), batch.num_columns());
+                println!(
+                    "  Batch {}: {} rows × {} columns",
+                    batch_idx,
+                    batch.num_rows(),
+                    batch.num_columns()
+                );
 
                 // Print schema
                 println!("  Schema:");
@@ -118,8 +121,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             println!();
 
             for (batch_idx, batch) in batches.iter().enumerate() {
-                println!("  Batch {}: {} rows × {} columns",
-                    batch_idx, batch.num_rows(), batch.num_columns());
+                println!(
+                    "  Batch {}: {} rows × {} columns",
+                    batch_idx,
+                    batch.num_rows(),
+                    batch.num_columns()
+                );
 
                 println!("  Schema:");
                 for field in batch.schema().fields() {

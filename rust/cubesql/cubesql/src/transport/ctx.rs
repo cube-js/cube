@@ -10,7 +10,7 @@ use super::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, V1CubeMetaExt};
 pub struct PreAggregationMeta {
     pub name: String,
     pub cube_name: String,
-    pub pre_agg_type: String, // "rollup", "originalSql"
+    pub pre_agg_type: String,        // "rollup", "originalSql"
     pub granularity: Option<String>, // "day", "hour", etc.
     pub time_dimension: Option<String>,
     pub dimensions: Vec<String>,
@@ -294,6 +294,7 @@ mod tests {
                 nested_folders: None,
                 hierarchies: None,
                 meta: None,
+                pre_aggregations: None,
             },
             CubeMeta {
                 name: "test2".to_string(),
@@ -308,12 +309,18 @@ mod tests {
                 nested_folders: None,
                 hierarchies: None,
                 meta: None,
+                pre_aggregations: None,
             },
         ];
 
         // TODO
-        let test_context =
-            MetaContext::new(test_cubes, vec![], HashMap::new(), HashMap::new(), Uuid::new_v4());
+        let test_context = MetaContext::new(
+            test_cubes,
+            vec![],
+            HashMap::new(),
+            HashMap::new(),
+            Uuid::new_v4(),
+        );
 
         match test_context.find_cube_table_with_oid(18000) {
             Some(table) => assert_eq!(18000, table.oid),

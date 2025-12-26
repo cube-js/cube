@@ -14,7 +14,10 @@ use async_trait::async_trait;
 use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
 use std::{collections::HashMap, sync::Arc};
 
-use super::{ctx::MetaContext, service::{CubeStreamReceiver, SpanId, SqlResponse}};
+use super::{
+    ctx::MetaContext,
+    service::{CubeStreamReceiver, SpanId, SqlResponse},
+};
 
 /// Hybrid transport that combines HttpTransport and CubeStoreTransport
 ///
@@ -83,7 +86,14 @@ impl TransportService for HybridTransport {
         // SQL endpoint always goes through HTTP transport
         // This is used for query compilation, not execution
         self.http_transport
-            .sql(span_id, query, ctx, meta_fields, member_to_alias, expression_params)
+            .sql(
+                span_id,
+                query,
+                ctx,
+                meta_fields,
+                member_to_alias,
+                expression_params,
+            )
             .await
     }
 
@@ -162,7 +172,15 @@ impl TransportService for HybridTransport {
         // For now, always use HTTP transport for streaming
         // TODO: Implement streaming for CubeStore direct
         self.http_transport
-            .load_stream(span_id, query, sql_query, ctx, meta_fields, schema, member_fields)
+            .load_stream(
+                span_id,
+                query,
+                sql_query,
+                ctx,
+                meta_fields,
+                schema,
+                member_fields,
+            )
             .await
     }
 

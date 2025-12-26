@@ -1,13 +1,15 @@
 use async_trait::async_trait;
-use datafusion::arrow::{
-    array::StringArray,
-    datatypes::SchemaRef,
-    record_batch::RecordBatch,
+use datafusion::arrow::{array::StringArray, datatypes::SchemaRef, record_batch::RecordBatch};
+use std::{
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, Instant},
 };
-use std::{fmt::Debug, sync::Arc, time::{Duration, Instant}};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use crate::compile::engine::df::scan::MemberField;
+use crate::compile::engine::df::wrapper::SqlQuery;
 use crate::{
     compile::engine::df::scan::CacheMode,
     cubestore::client::CubeStoreClient,
@@ -18,8 +20,6 @@ use crate::{
     },
     CubeError,
 };
-use crate::compile::engine::df::scan::MemberField;
-use crate::compile::engine::df::wrapper::SqlQuery;
 use cubeclient::apis::{configuration::Configuration as CubeApiConfig, default_api as cube_api};
 use std::collections::HashMap;
 
@@ -141,10 +141,16 @@ impl PreAggTable {
         // Strategy: Look for common pre-agg name patterns
         let (cube_name, preagg_name) = if let Some(pos) = full_name.find("_sums_") {
             // Pattern: {cube}_sums_and_count_daily
-            (full_name[..pos].to_string(), full_name[pos + 1..].to_string())
+            (
+                full_name[..pos].to_string(),
+                full_name[pos + 1..].to_string(),
+            )
         } else if let Some(pos) = full_name.find("_rollup") {
             // Pattern: {cube}_rollup_{granularity}
-            (full_name[..pos].to_string(), full_name[pos + 1..].to_string())
+            (
+                full_name[..pos].to_string(),
+                full_name[pos + 1..].to_string(),
+            )
         } else if let Some(pos) = full_name.rfind("_by_") {
             // Pattern: {cube}_{aggregation}_by_{dimensions}_{granularity}
             // Find the start of the pre-agg name by looking backwards for cube boundary
@@ -154,7 +160,10 @@ impl PreAggTable {
             // Try to find common cube name endings
             let before_by = &full_name[..pos];
             if let Some(cube_end) = before_by.rfind('_') {
-                (before_by[..cube_end].to_string(), full_name[cube_end + 1..].to_string())
+                (
+                    before_by[..cube_end].to_string(),
+                    full_name[cube_end + 1..].to_string(),
+                )
             } else {
                 // Can't parse, use fallback
                 let mut name_parts = full_name.split('_').collect::<Vec<_>>();
@@ -329,10 +338,7 @@ impl CubeStoreTransport {
         })?;
 
         let cubes = meta_response.cubes.unwrap_or_else(Vec::new);
-        let cube_names: Vec<String> = cubes
-            .iter()
-            .map(|cube| cube.name.clone())
-            .collect();
+        let cube_names: Vec<String> = cubes.iter().map(|cube| cube.name.clone()).collect();
 
         log::debug!("Known cube names from API: {:?}", cube_names);
 
@@ -383,7 +389,10 @@ impl CubeStoreTransport {
             }
         }
 
-        log::info!("Discovered {} pre-aggregation tables in CubeStore", tables.len());
+        log::info!(
+            "Discovered {} pre-aggregation tables in CubeStore",
+            tables.len()
+        );
         for table in &tables {
             log::debug!(
                 "  - {} (cube: {}, preagg: {})",
@@ -474,7 +483,10 @@ impl CubeStoreTransport {
         // Simple heuristic: look for "FROM {cube_name}" pattern
         let cube_name = self.extract_cube_name_from_sql(&original_sql)?;
 
-        log::info!("📝 Extracted table name (after schema strip): '{}'", cube_name);
+        log::info!(
+            "📝 Extracted table name (after schema strip): '{}'",
+            cube_name
+        );
 
         // Find matching pre-aggregation table
         let preagg_table = self.find_matching_preagg(&cube_name, &[], &[]).await?;
@@ -501,9 +513,9 @@ impl CubeStoreTransport {
                 // Patterns to replace (with and without schema prefix)
                 // Try in order of specificity: most specific first
                 let patterns = vec![
-                    format!("{}.{}", table.schema, cube_name),  // schema.incomplete_name
-                    format!("\"{}\".\"{}\"", table.schema, cube_name),  // "schema"."incomplete_name"
-                    cube_name.to_string(),  // incomplete_name (without schema)
+                    format!("{}.{}", table.schema, cube_name), // schema.incomplete_name
+                    format!("\"{}\".\"{}\"", table.schema, cube_name), // "schema"."incomplete_name"
+                    cube_name.to_string(),                     // incomplete_name (without schema)
                 ];
 
                 log::debug!("DEBUG: Looking for patterns to replace: {:?}", patterns);
@@ -515,10 +527,14 @@ impl CubeStoreTransport {
                 // Try each pattern, but stop after the first successful replacement
                 for pattern in &patterns {
                     if rewritten.contains(pattern) {
-                        log::debug!("DEBUG: Found pattern '{}', replacing with '{}'", pattern, full_name);
+                        log::debug!(
+                            "DEBUG: Found pattern '{}', replacing with '{}'",
+                            pattern,
+                            full_name
+                        );
                         rewritten = rewritten.replace(pattern, &full_name);
                         replaced = true;
-                        break;  // Stop after first successful replacement
+                        break; // Stop after first successful replacement
                     }
                 }
 
@@ -553,7 +569,9 @@ impl CubeStoreTransport {
             let table_name = after_from
                 .split_whitespace()
                 .next()
-                .ok_or_else(|| CubeError::internal("Could not extract table name from SQL".to_string()))?
+                .ok_or_else(|| {
+                    CubeError::internal("Could not extract table name from SQL".to_string())
+                })?
                 .trim_matches('"')
                 .trim_matches('\'')
                 .to_string();
@@ -623,15 +641,24 @@ impl TransportService for CubeStoreTransport {
             let store = self.meta_cache.read().await;
             if let Some(cache_bucket) = &*store {
                 if cache_bucket.lifetime.elapsed() < cache_lifetime {
-                    log::debug!("Returning cached metadata (age: {:?})", cache_bucket.lifetime.elapsed());
+                    log::debug!(
+                        "Returning cached metadata (age: {:?})",
+                        cache_bucket.lifetime.elapsed()
+                    );
                     return Ok(cache_bucket.value.clone());
                 } else {
-                    log::debug!("Metadata cache expired (age: {:?})", cache_bucket.lifetime.elapsed());
+                    log::debug!(
+                        "Metadata cache expired (age: {:?})",
+                        cache_bucket.lifetime.elapsed()
+                    );
                 }
             }
         }
 
-        log::info!("Fetching metadata from Cube API: {}", self.config.cube_api_url);
+        log::info!(
+            "Fetching metadata from Cube API: {}",
+            self.config.cube_api_url
+        );
 
         // Fetch metadata from Cube API
         let config = self.get_cube_api_config();

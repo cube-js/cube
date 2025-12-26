@@ -19,9 +19,15 @@ pub struct V1CubeMetaPreAggregation {
     pub pre_agg_type: String,
     #[serde(rename = "granularity", skip_serializing_if = "Option::is_none")]
     pub granularity: Option<String>,
-    #[serde(rename = "timeDimensionReference", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "timeDimensionReference",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub time_dimension_reference: Option<String>,
-    #[serde(rename = "dimensionReferences", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "dimensionReferences",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub dimension_references: Option<String>, // JSON string like "[dim1, dim2]"
     #[serde(rename = "measureReferences", skip_serializing_if = "Option::is_none")]
     pub measure_references: Option<String>, // JSON string like "[measure1, measure2]"

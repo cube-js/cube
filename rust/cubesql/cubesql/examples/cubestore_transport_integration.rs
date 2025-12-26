@@ -1,9 +1,8 @@
 use cubesql::{
-    compile::engine::df::scan::MemberField,
     sql::{AuthContextRef, HttpAuthContext},
     transport::{
-        CubeStoreTransport, CubeStoreTransportConfig,
-        LoadRequestMeta, TransportLoadRequestQuery, TransportService,
+        CubeStoreTransport, CubeStoreTransportConfig, LoadRequestMeta, TransportLoadRequestQuery,
+        TransportService,
     },
     CubeError,
 };
@@ -111,7 +110,11 @@ async fn main() -> Result<(), CubeError> {
     simple_query.limit = Some(1);
 
     // Create minimal schema for SELECT 1
-    let schema = Arc::new(Schema::new(vec![Field::new("test", DataType::Int32, false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "test",
+        DataType::Int32,
+        false,
+    )]));
 
     let sql_query = cubesql::compile::engine::df::wrapper::SqlQuery {
         sql: "SELECT 1 as test".to_string(),
@@ -149,8 +152,11 @@ async fn main() -> Result<(), CubeError> {
         }
         Err(e) => {
             println!("✗ Query failed: {}", e);
-            println!("\nThis is expected if CubeStore is not running on {}",
-                env::var("CUBESQL_CUBESTORE_URL").unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string()));
+            println!(
+                "\nThis is expected if CubeStore is not running on {}",
+                env::var("CUBESQL_CUBESTORE_URL")
+                    .unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string())
+            );
         }
     }
     println!();
@@ -159,8 +165,8 @@ async fn main() -> Result<(), CubeError> {
     println!("Step 5: Discover Pre-Aggregation Tables");
     println!("────────────────────────────────────────");
 
-    let pre_agg_schema = env::var("CUBESQL_PRE_AGG_SCHEMA")
-        .unwrap_or_else(|_| "dev_pre_aggregations".to_string());
+    let pre_agg_schema =
+        env::var("CUBESQL_PRE_AGG_SCHEMA").unwrap_or_else(|_| "dev_pre_aggregations".to_string());
 
     let discover_sql = format!(
         "SELECT table_schema, table_name FROM information_schema.tables \

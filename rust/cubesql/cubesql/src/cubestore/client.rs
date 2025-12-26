@@ -1,13 +1,12 @@
-use tokio_tungstenite::{connect_async, tungstenite::Message};
-use futures_util::{SinkExt, StreamExt};
+use datafusion::arrow::{array::*, datatypes::*, record_batch::RecordBatch};
 use flatbuffers::FlatBufferBuilder;
-use datafusion::arrow::{
-    array::*,
-    datatypes::*,
-    record_batch::RecordBatch,
+use futures_util::{SinkExt, StreamExt};
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
 };
-use std::sync::{Arc, atomic::{AtomicU32, Ordering}};
 use std::time::Duration;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::CubeError;
 use cubeshared::codegen::*;

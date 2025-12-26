@@ -19,13 +19,12 @@
 /// RUST_LOG=info \
 /// cargo run --example cubestore_transport_preagg_test
 /// ```
-
 use cubesql::{
     compile::engine::df::wrapper::SqlQuery,
     sql::{AuthContextRef, HttpAuthContext},
     transport::{
-        CubeStoreTransport, CubeStoreTransportConfig, LoadRequestMeta,
-        TransportLoadRequestQuery, TransportService,
+        CubeStoreTransport, CubeStoreTransportConfig, LoadRequestMeta, TransportLoadRequestQuery,
+        TransportService,
     },
     CubeError,
 };
@@ -91,8 +90,8 @@ async fn main() -> Result<(), CubeError> {
     println!("Step 2: Query Pre-Aggregation Table on CubeStore");
     println!("──────────────────────────────────────────────────");
 
-    let pre_agg_schema = env::var("CUBESQL_PRE_AGG_SCHEMA")
-        .unwrap_or_else(|_| "dev_pre_aggregations".to_string());
+    let pre_agg_schema =
+        env::var("CUBESQL_PRE_AGG_SCHEMA").unwrap_or_else(|_| "dev_pre_aggregations".to_string());
 
     // This SQL would normally come from upstream (Cube API or query planner)
     // For this test, we're simulating what a pre-aggregation query looks like

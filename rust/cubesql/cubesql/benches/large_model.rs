@@ -100,6 +100,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
         nested_folders: None,
         hierarchies: None,
         meta: None,
+        pre_aggregations: None,
     }]
 }
 

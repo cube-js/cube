@@ -247,7 +247,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
-        pre_aggregations: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "NumberCube".to_string(),
@@ -272,7 +272,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
-        pre_aggregations: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "WideCube".to_string(),
@@ -365,7 +365,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
-        pre_aggregations: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "MultiTypeCube".to_string(),
@@ -501,7 +501,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
-        pre_aggregations: None,
+            pre_aggregations: None,
         },
     ]
 }
@@ -530,7 +530,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
         nested_folders: None,
         hierarchies: None,
         meta: None,
-    pre_aggregations: None,
+        pre_aggregations: None,
     }]
 }
 
@@ -582,7 +582,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
         nested_folders: None,
         hierarchies: None,
         meta: None,
-    pre_aggregations: None,
+        pre_aggregations: None,
     }]
 }
 

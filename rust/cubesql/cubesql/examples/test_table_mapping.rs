@@ -11,9 +11,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test table names we discovered
     let test_tables = vec![
-        ("dev_pre_aggregations", "mandata_captate_sums_and_count_daily_nllka3yv_vuf4jehe_1kkrgiv"),
-        ("dev_pre_aggregations", "mandata_captate_sums_and_count_daily_vnzdjgwf_vuf4jehe_1kkrd1h"),
-        ("dev_pre_aggregations", "orders_with_preagg_orders_by_market_brand_daily_a3q0pfwr_535ph4ux_1kkrgiv"),
+        (
+            "dev_pre_aggregations",
+            "mandata_captate_sums_and_count_daily_nllka3yv_vuf4jehe_1kkrgiv",
+        ),
+        (
+            "dev_pre_aggregations",
+            "mandata_captate_sums_and_count_daily_vnzdjgwf_vuf4jehe_1kkrd1h",
+        ),
+        (
+            "dev_pre_aggregations",
+            "orders_with_preagg_orders_by_market_brand_daily_a3q0pfwr_535ph4ux_1kkrgiv",
+        ),
     ];
 
     println!("Testing table name parsing:\n");
@@ -31,7 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Parts: {:?}", parts);
 
         // Find where hashes start (8+ char alphanumeric)
-        let hash_start = parts.iter()
+        let hash_start = parts
+            .iter()
             .position(|p| p.len() >= 8 && p.chars().all(|c| c.is_alphanumeric()))
             .unwrap_or(parts.len() - 3);
 

@@ -71,11 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sql_upper = original_sql.to_uppercase();
         let from_pos = sql_upper.find("FROM").unwrap();
         let after_from = original_sql[from_pos + 4..].trim_start();
-        let extracted_cube = after_from
-            .split_whitespace()
-            .next()
-            .unwrap()
-            .trim();
+        let extracted_cube = after_from.split_whitespace().next().unwrap().trim();
 
         println!("   ✓ Extracted cube name: '{}'", extracted_cube);
 

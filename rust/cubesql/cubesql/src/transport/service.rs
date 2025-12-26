@@ -992,7 +992,9 @@ impl SqlTemplates {
 }
 
 /// Parse pre-aggregation metadata from cube definitions
-pub fn parse_pre_aggregations_from_cubes(cubes: &[crate::transport::CubeMeta]) -> Vec<crate::transport::PreAggregationMeta> {
+pub fn parse_pre_aggregations_from_cubes(
+    cubes: &[crate::transport::CubeMeta],
+) -> Vec<crate::transport::PreAggregationMeta> {
     let mut pre_aggregations = Vec::new();
 
     for cube in cubes {
@@ -1019,12 +1021,21 @@ pub fn parse_pre_aggregations_from_cubes(cubes: &[crate::transport::CubeMeta]) -
     }
 
     if !pre_aggregations.is_empty() {
-        log::info!("✅ Loaded {} pre-aggregation(s) from {} cube(s)",
-                   pre_aggregations.len(), cubes.len());
+        log::info!(
+            "✅ Loaded {} pre-aggregation(s) from {} cube(s)",
+            pre_aggregations.len(),
+            cubes.len()
+        );
         for pa in &pre_aggregations {
-            log::debug!("  Pre-agg: {}.{} (type: {}, external: {}, measures: {}, dimensions: {})",
-                       pa.cube_name, pa.name, pa.pre_agg_type, pa.external,
-                       pa.measures.len(), pa.dimensions.len());
+            log::debug!(
+                "  Pre-agg: {}.{} (type: {}, external: {}, measures: {}, dimensions: {})",
+                pa.cube_name,
+                pa.name,
+                pa.pre_agg_type,
+                pa.external,
+                pa.measures.len(),
+                pa.dimensions.len()
+            );
         }
     }
 

@@ -25,8 +25,7 @@ impl QueryCacheKey {
 /// Normalize SQL query for caching
 /// Removes extra whitespace and converts to lowercase for consistent cache keys
 fn normalize_query(sql: &str) -> String {
-    sql.trim()
-        .split_whitespace()
+    sql.split_whitespace()
         .collect::<Vec<&str>>()
         .join(" ")
         .to_lowercase()
@@ -112,9 +111,15 @@ impl QueryResultCache {
         let result = self.cache.get(&key).await;
 
         if result.is_some() {
-            debug!("Cache HIT for query: {}", &key.sql[..std::cmp::min(key.sql.len(), 100)]);
+            debug!(
+                "Cache HIT for query: {}",
+                &key.sql[..std::cmp::min(key.sql.len(), 100)]
+            );
         } else {
-            debug!("Cache MISS for query: {}", &key.sql[..std::cmp::min(key.sql.len(), 100)]);
+            debug!(
+                "Cache MISS for query: {}",
+                &key.sql[..std::cmp::min(key.sql.len(), 100)]
+            );
         }
 
         result
@@ -218,7 +223,9 @@ mod tests {
         assert!(cache.get("SELECT * FROM test", None).await.is_none());
 
         // Insert
-        cache.insert("SELECT * FROM test", None, vec![batch.clone()]).await;
+        cache
+            .insert("SELECT * FROM test", None, vec![batch.clone()])
+            .await;
 
         // Cache hit
         let cached = cache.get("SELECT * FROM test", None).await;
@@ -232,7 +239,9 @@ mod tests {
         let batch = create_test_batch(10);
 
         // Insert with extra whitespace
-        cache.insert("  SELECT   *   FROM   test  ", None, vec![batch.clone()]).await;
+        cache
+            .insert("  SELECT   *   FROM   test  ", None, vec![batch.clone()])
+            .await;
 
         // Should hit cache with different whitespace
         assert!(cache.get("SELECT * FROM test", None).await.is_some());
@@ -259,7 +268,9 @@ mod tests {
 
         // Insert same query for different databases
         cache.insert("SELECT * FROM test", None, vec![batch1]).await;
-        cache.insert("SELECT * FROM test", Some("db1"), vec![batch2]).await;
+        cache
+            .insert("SELECT * FROM test", Some("db1"), vec![batch2])
+            .await;
 
         // Should have separate cache entries
         let result1 = cache.get("SELECT * FROM test", None).await;

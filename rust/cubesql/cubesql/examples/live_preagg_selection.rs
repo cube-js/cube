@@ -12,10 +12,8 @@
 /// Usage:
 ///   CUBESQL_CUBE_URL=http://localhost:4000/cubejs-api \
 ///   cargo run --example live_preagg_selection
-
 use cubesql::cubestore::client::CubeStoreClient;
 use datafusion::arrow;
-use reqwest;
 use serde_json::Value;
 use std::env;
 use std::sync::Arc;
@@ -75,9 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!();
 
     // Parse cubes array
-    let cubes = meta_json["cubes"]
-        .as_array()
-        .ok_or("Missing cubes array")?;
+    let cubes = meta_json["cubes"].as_array().ok_or("Missing cubes array")?;
 
     println!("  Total cubes: {}", cubes.len());
     println!();
@@ -217,7 +213,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                     for (i, m) in measures.iter().enumerate() {
                         let comma = if i < measures.len() - 1 { "," } else { "" };
-                        println!("    \"{}\"{}",m, comma);
+                        println!("    \"{}\"{}", m, comma);
                     }
                 }
                 println!("  ],");
@@ -234,7 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                     for (i, d) in dimensions.iter().enumerate() {
                         let comma = if i < dimensions.len() - 1 { "," } else { "" };
-                        println!("    \"{}\"{}",d, comma);
+                        println!("    \"{}\"{}", d, comma);
                     }
                 }
                 println!("  ],");
@@ -291,7 +287,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 /// Demonstrates how pre-aggregation selection works
-fn demonstrate_preagg_selection(cube: &Value) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn demonstrate_preagg_selection(
+    cube: &Value,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Step 5: Pre-Aggregation Selection Demonstration");
     println!("==========================================");
     println!();
@@ -380,7 +378,10 @@ fn demonstrate_preagg_selection(cube: &Value) -> Result<(), Box<dyn std::error::
     println!("    time_dimension as day,");
     println!("    mandata_captate__total_amount_sum as total,");
     println!("    mandata_captate__count as order_count");
-    println!("  FROM prod_pre_aggregations.mandata_captate_{}_20240125_abcd1234_d7kwjvzn_tztb8hap", pa_name);
+    println!(
+        "  FROM prod_pre_aggregations.mandata_captate_{}_20240125_abcd1234_d7kwjvzn_tztb8hap",
+        pa_name
+    );
     println!("  WHERE time_dimension >= '2024-01-01'");
     println!();
 
@@ -414,7 +415,10 @@ fn demonstrate_preagg_selection(cube: &Value) -> Result<(), Box<dyn std::error::
     println!("  └─ ✓ Can aggregate further (brand_code will be ignored)");
     println!();
 
-    println!("Decision: USE PRE-AGGREGATION '{}' (with additional GROUP BY)", pa_name);
+    println!(
+        "Decision: USE PRE-AGGREGATION '{}' (with additional GROUP BY)",
+        pa_name
+    );
     println!();
 
     // Example Query 3: No Match
@@ -488,19 +492,21 @@ fn demonstrate_preagg_selection(cube: &Value) -> Result<(), Box<dyn std::error::
 }
 
 /// Executes a query directly against CubeStore via WebSocket
-async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn execute_cubestore_query(
+    cube: &Value,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Step 6: Execute Query on CubeStore");
     println!("==========================================");
     println!();
 
     // Get CubeStore URL from environment
-    let cubestore_url = env::var("CUBESQL_CUBESTORE_URL")
-        .unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string());
+    let cubestore_url =
+        env::var("CUBESQL_CUBESTORE_URL").unwrap_or_else(|_| "ws://127.0.0.1:3030/ws".to_string());
 
     // In DEV mode, Cube uses 'dev_pre_aggregations' schema
     // In production, it uses 'prod_pre_aggregations'
-    let pre_agg_schema = env::var("CUBESQL_PRE_AGG_SCHEMA")
-        .unwrap_or_else(|_| "dev_pre_aggregations".to_string());
+    let pre_agg_schema =
+        env::var("CUBESQL_PRE_AGG_SCHEMA").unwrap_or_else(|_| "dev_pre_aggregations".to_string());
 
     println!("Configuration:");
     println!("  CubeStore WebSocket URL: {}", cubestore_url);
@@ -566,7 +572,10 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
                 match client.query(system_query.to_string()).await {
                     Ok(test_batches) => {
                         println!("✓ CubeStore is responding");
-                        println!("  Result: {} row(s)", test_batches.iter().map(|b| b.num_rows()).sum::<usize>());
+                        println!(
+                            "  Result: {} row(s)",
+                            test_batches.iter().map(|b| b.num_rows()).sum::<usize>()
+                        );
                         println!();
                     }
                     Err(e) => {
@@ -610,9 +619,14 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
 
                                 match client.query(demo_query).await {
                                     Ok(data_batches) => {
-                                        let total_rows: usize = data_batches.iter().map(|b| b.num_rows()).sum();
+                                        let total_rows: usize =
+                                            data_batches.iter().map(|b| b.num_rows()).sum();
                                         println!("✓ Query executed successfully!");
-                                        println!("  Received {} row(s) in {} batch(es)", total_rows, data_batches.len());
+                                        println!(
+                                            "  Received {} row(s) in {} batch(es)",
+                                            total_rows,
+                                            data_batches.len()
+                                        );
                                         println!();
 
                                         if total_rows > 0 {
@@ -622,8 +636,12 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
                                             println!();
 
                                             println!("🎯 Success! This demonstrates:");
-                                            println!("  ✓ Direct WebSocket connection to CubeStore");
-                                            println!("  ✓ FlatBuffers binary protocol communication");
+                                            println!(
+                                                "  ✓ Direct WebSocket connection to CubeStore"
+                                            );
+                                            println!(
+                                                "  ✓ FlatBuffers binary protocol communication"
+                                            );
                                             println!("  ✓ Arrow columnar data format");
                                             println!("  ✓ Zero-copy data transfer");
                                             println!();
@@ -646,7 +664,10 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
                     }
                 }
             } else {
-                println!("✓ Found {} pre-aggregation table(s):", batches[0].num_rows());
+                println!(
+                    "✓ Found {} pre-aggregation table(s):",
+                    batches[0].num_rows()
+                );
                 println!();
 
                 display_arrow_results(&batches)?;
@@ -659,10 +680,8 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
                     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                     println!();
 
-                    let data_query = format!(
-                        "SELECT * FROM {}.{} LIMIT 10",
-                        pre_agg_schema, table_name
-                    );
+                    let data_query =
+                        format!("SELECT * FROM {}.{} LIMIT 10", pre_agg_schema, table_name);
 
                     println!("Query:");
                     println!("  {}", data_query);
@@ -672,7 +691,11 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
                         Ok(data_batches) => {
                             let total_rows: usize = data_batches.iter().map(|b| b.num_rows()).sum();
                             println!("✓ Query executed successfully");
-                            println!("  Received {} row(s) in {} batch(es)", total_rows, data_batches.len());
+                            println!(
+                                "  Received {} row(s) in {} batch(es)",
+                                total_rows,
+                                data_batches.len()
+                            );
                             println!();
 
                             if total_rows > 0 {
@@ -737,7 +760,9 @@ async fn execute_cubestore_query(cube: &Value) -> Result<(), Box<dyn std::error:
 }
 
 /// Display Arrow RecordBatch results in a readable format
-fn display_arrow_results(batches: &[arrow::record_batch::RecordBatch]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn display_arrow_results(
+    batches: &[arrow::record_batch::RecordBatch],
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use arrow::util::pretty::print_batches;
 
     if batches.is_empty() {
@@ -762,7 +787,11 @@ fn extract_first_table_name(batches: &[arrow::record_batch::RecordBatch]) -> Opt
     let batch = &batches[0];
 
     // Find the table_name column (should be index 1)
-    if let Some(column) = batch.column(1).as_any().downcast_ref::<arrow::array::StringArray>() {
+    if let Some(column) = batch
+        .column(1)
+        .as_any()
+        .downcast_ref::<arrow::array::StringArray>()
+    {
         if column.len() > 0 {
             return column.value(0).to_string().into();
         }

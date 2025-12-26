@@ -45,21 +45,32 @@ impl StreamWriter {
             let batch_rows = batch.num_rows() as i64;
             total_rows += batch_rows;
 
-            log::info!("📦 Arrow Flight batch #{}: {} rows, {} columns (total so far: {} rows)",
-                batch_count, batch_rows, batch.num_columns(), total_rows);
+            log::info!(
+                "📦 Arrow Flight batch #{}: {} rows, {} columns (total so far: {} rows)",
+                batch_count,
+                batch_rows,
+                batch.num_columns(),
+                total_rows
+            );
 
             // Serialize batch to Arrow IPC format
             let arrow_ipc_batch = Self::serialize_batch(&batch)?;
 
-            log::info!("📨 Serialized to {} bytes of Arrow IPC data", arrow_ipc_batch.len());
+            log::info!(
+                "📨 Serialized to {} bytes of Arrow IPC data",
+                arrow_ipc_batch.len()
+            );
 
             // Send batch message
             let msg = Message::QueryResponseBatch { arrow_ipc_batch };
             write_message(writer, &msg).await?;
         }
 
-        log::info!("✅ Arrow Flight streamed {} batches with {} total rows",
-            batch_count, total_rows);
+        log::info!(
+            "✅ Arrow Flight streamed {} batches with {} total rows",
+            batch_count,
+            total_rows
+        );
 
         Ok(total_rows)
     }
@@ -97,7 +108,9 @@ impl StreamWriter {
         batches: &[RecordBatch],
     ) -> Result<(), CubeError> {
         if batches.is_empty() {
-            return Err(CubeError::internal("Cannot stream empty batch list".to_string()));
+            return Err(CubeError::internal(
+                "Cannot stream empty batch list".to_string(),
+            ));
         }
 
         // Get schema from first batch
@@ -114,8 +127,13 @@ impl StreamWriter {
             let batch_rows = batch.num_rows() as i64;
             total_rows += batch_rows;
 
-            log::debug!("📦 Cached batch #{}: {} rows, {} columns (total so far: {} rows)",
-                idx + 1, batch_rows, batch.num_columns(), total_rows);
+            log::debug!(
+                "📦 Cached batch #{}: {} rows, {} columns (total so far: {} rows)",
+                idx + 1,
+                batch_rows,
+                batch.num_columns(),
+                total_rows
+            );
 
             // Serialize batch to Arrow IPC format
             let arrow_ipc_batch = Self::serialize_batch(batch)?;
@@ -125,8 +143,11 @@ impl StreamWriter {
             write_message(writer, &msg).await?;
         }
 
-        log::info!("✅ Streamed {} cached batches with {} total rows",
-            batches.len(), total_rows);
+        log::info!(
+            "✅ Streamed {} cached batches with {} total rows",
+            batches.len(),
+            total_rows
+        );
 
         // Write completion
         Self::write_complete(writer, total_rows).await?;

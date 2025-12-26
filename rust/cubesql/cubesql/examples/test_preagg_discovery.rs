@@ -9,7 +9,6 @@
 /// Run with:
 ///   cd ~/projects/learn_erl/cube/rust/cubesql
 ///   cargo run --example test_preagg_discovery
-
 use cubesql::cubestore::client::CubeStoreClient;
 use datafusion::arrow::array::StringArray;
 
@@ -49,8 +48,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 total_rows += batch.num_rows();
 
                 if batch.num_rows() > 0 {
-                    let schema_col = batch.column(0).as_any().downcast_ref::<StringArray>().unwrap();
-                    let table_col = batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+                    let schema_col = batch
+                        .column(0)
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap();
+                    let table_col = batch
+                        .column(1)
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap();
 
                     println!("\nPre-aggregation tables found:");
                     println!("{:-<60}", "");

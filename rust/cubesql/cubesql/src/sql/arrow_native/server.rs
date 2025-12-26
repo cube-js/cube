@@ -314,7 +314,10 @@ impl ArrowNativeServer {
     ) -> Result<(), CubeError> {
         // Try to get cached result first
         if let Some(cached_batches) = query_cache.get(sql, database).await {
-            debug!("Cache HIT - streaming {} cached batches", cached_batches.len());
+            debug!(
+                "Cache HIT - streaming {} cached batches",
+                cached_batches.len()
+            );
             StreamWriter::stream_cached_batches(socket, &cached_batches).await?;
             return Ok(());
         }

@@ -1,3 +1,4 @@
+use cubeclient::apis::{configuration::Configuration, default_api as cube_api};
 /// Test enhanced pre-aggregation matching with Cube API metadata
 ///
 /// This demonstrates how we use Cube API metadata to accurately parse
@@ -9,9 +10,7 @@
 ///   CUBESQL_CUBE_URL=http://localhost:4008/cubejs-api \
 ///   CUBESQL_CUBESTORE_URL=ws://127.0.0.1:3030/ws \
 ///   cargo run --example test_enhanced_matching
-
 use cubesql::cubestore::client::CubeStoreClient;
-use cubeclient::apis::{configuration::Configuration, default_api as cube_api};
 use datafusion::arrow::array::StringArray;
 
 #[tokio::main]
@@ -66,8 +65,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut parsed_count = 0;
 
     for batch in batches {
-        let schema_col = batch.column(0).as_any().downcast_ref::<StringArray>().unwrap();
-        let table_col = batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let _schema_col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let table_col = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
 
         for i in 0..batch.num_rows() {
             total_tables += 1;
@@ -77,7 +84,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let parts: Vec<&str> = table_name.split('_').collect();
 
             // Find hash start
-            let hash_start = parts.iter()
+            let hash_start = parts
+                .iter()
                 .position(|p| p.len() >= 8 && p.chars().all(|c| c.is_alphanumeric()))
                 .unwrap_or(parts.len() - 3);
 
@@ -102,7 +110,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if !matched {
-                println!("{:<60} {:<30} {:<30}", table_name, "⚠️ UNKNOWN", "⚠️ FAILED");
+                println!(
+                    "{:<60} {:<30} {:<30}",
+                    table_name, "⚠️ UNKNOWN", "⚠️ FAILED"
+                );
             }
         }
     }

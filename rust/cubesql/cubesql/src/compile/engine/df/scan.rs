@@ -1229,7 +1229,8 @@ async fn try_match_pre_aggregation(
     let cube_name = extract_cube_name_from_request(request)?;
 
     // Find pre-aggregations for this cube
-    let pre_aggs: Vec<_> = meta.pre_aggregations
+    let pre_aggs: Vec<_> = meta
+        .pre_aggregations
         .iter()
         .filter(|pa| pa.cube_name == cube_name && pa.external)
         .collect();
@@ -1242,7 +1243,11 @@ async fn try_match_pre_aggregation(
     // Try to find a matching pre-aggregation
     for pre_agg in pre_aggs {
         if query_matches_pre_agg(request, pre_agg) {
-            log::info!("✅ Pre-agg match found: {}.{}", pre_agg.cube_name, pre_agg.name);
+            log::info!(
+                "✅ Pre-agg match found: {}.{}",
+                pre_agg.cube_name,
+                pre_agg.name
+            );
 
             // Find the actual pre-agg table name pattern
             let schema = std::env::var("CUBESQL_PRE_AGG_SCHEMA")
@@ -1250,7 +1255,9 @@ async fn try_match_pre_aggregation(
             let table_pattern = format!("{}_{}", cube_name, pre_agg.name);
 
             // Generate SQL for this pre-aggregation
-            if let Some(sql) = generate_pre_agg_sql(request, pre_agg, &cube_name, &schema, &table_pattern) {
+            if let Some(sql) =
+                generate_pre_agg_sql(request, pre_agg, &cube_name, &schema, &table_pattern)
+            {
                 log::info!("🚀 Generated SQL for pre-agg (length: {} chars)", sql.len());
                 return Some(SqlQuery {
                     sql,
@@ -1301,7 +1308,7 @@ fn query_matches_pre_agg(
     // Check if all requested measures are covered by pre-agg
     if let Some(measures) = &request.measures {
         for measure in measures {
-            let measure_name = measure.split('.').last().unwrap_or(measure);
+            let measure_name = measure.split('.').next_back().unwrap_or(measure);
             if !pre_agg.measures.iter().any(|m| m == measure_name) {
                 log::debug!("Measure {} not in pre-agg {}", measure_name, pre_agg.name);
                 return false;
@@ -1312,7 +1319,7 @@ fn query_matches_pre_agg(
     // Check if all requested dimensions are covered by pre-agg
     if let Some(dimensions) = &request.dimensions {
         for dimension in dimensions {
-            let dim_name = dimension.split('.').last().unwrap_or(dimension);
+            let dim_name = dimension.split('.').next_back().unwrap_or(dimension);
             if !pre_agg.dimensions.iter().any(|d| d == dim_name) {
                 log::debug!("Dimension {} not in pre-agg {}", dim_name, pre_agg.name);
                 return false;
@@ -1324,7 +1331,10 @@ fn query_matches_pre_agg(
     if let Some(time_dims) = &request.time_dimensions {
         if !time_dims.is_empty() {
             if pre_agg.time_dimension.is_none() {
-                log::debug!("Query has time dimension but pre-agg {} doesn't", pre_agg.name);
+                log::debug!(
+                    "Query has time dimension but pre-agg {} doesn't",
+                    pre_agg.name
+                );
                 return false;
             }
             // TODO: Check granularity compatibility
@@ -1375,9 +1385,21 @@ fn generate_pre_agg_sql(
     //
     // SIMPLIFIED: If we have measures AND (dimensions OR time dims), we ALWAYS need SUM
     // because we're always using GROUP BY in those cases.
-    let has_dimensions = request.dimensions.as_ref().map(|d| !d.is_empty()).unwrap_or(false);
-    let has_time_dims = request.time_dimensions.as_ref().map(|td| !td.is_empty()).unwrap_or(false);
-    let has_measures = request.measures.as_ref().map(|m| !m.is_empty()).unwrap_or(false);
+    let has_dimensions = request
+        .dimensions
+        .as_ref()
+        .map(|d| !d.is_empty())
+        .unwrap_or(false);
+    let has_time_dims = request
+        .time_dimensions
+        .as_ref()
+        .map(|td| !td.is_empty())
+        .unwrap_or(false);
+    let has_measures = request
+        .measures
+        .as_ref()
+        .map(|m| !m.is_empty())
+        .unwrap_or(false);
 
     // We need aggregation when we have measures and we're grouping (which means GROUP BY)
     let needs_aggregation = has_measures && (has_dimensions || has_time_dims);
@@ -1386,47 +1408,52 @@ fn generate_pre_agg_sql(
         pre_agg.time_dimension.is_some(), has_dimensions, has_time_dims, has_measures, needs_aggregation);
 
     // Add time dimension first (if requested with granularity)
-    let mut time_field_added = false;
+    let mut _time_field_added = false;
     if let Some(time_dims) = &request.time_dimensions {
         for time_dim in time_dims {
             if let Some(granularity) = &time_dim.granularity {
-                let time_field = time_dim.dimension.split('.').last()
+                let time_field = time_dim
+                    .dimension
+                    .split('.')
+                    .next_back()
                     .unwrap_or(&time_dim.dimension);
 
                 // CRITICAL: Pre-agg tables store time dimensions with granularity suffix!
                 // E.g., "updated_at_day" not "updated_at" for daily pre-aggs
                 let qualified_time = if let Some(pre_agg_granularity) = &pre_agg.granularity {
-                    format!("{}.{}.{}__{}_{}",
-                        schema, "{TABLE}", cube_name, time_field, pre_agg_granularity)
+                    format!(
+                        "{}.{}.{}__{}_{}",
+                        schema, "{TABLE}", cube_name, time_field, pre_agg_granularity
+                    )
                 } else {
-                    format!("{}.{}.{}__{}",
-                        schema, "{TABLE}", cube_name, time_field)
+                    format!("{}.{}.{}__{}", schema, "{TABLE}", cube_name, time_field)
                 };
 
                 // Add DATE_TRUNC with granularity
-                select_fields.push(format!("DATE_TRUNC('{}', {}) as {}",
-                    granularity, qualified_time, time_field));
+                select_fields.push(format!(
+                    "DATE_TRUNC('{}', {}) as {}",
+                    granularity, qualified_time, time_field
+                ));
                 group_by_fields.push((select_fields.len()).to_string());
-                time_field_added = true;
+                _time_field_added = true;
             }
         }
     }
 
     // Add dimensions (also prefixed with cube name in pre-agg tables!)
     if let Some(dimensions) = &request.dimensions {
-        for (idx, dim) in dimensions.iter().enumerate() {
-            let dim_name = dim.split('.').last().unwrap_or(dim);
-            let qualified_field = format!("{}.{}.{}__{}",
-                schema, "{TABLE}", cube_name, dim_name);
+        for dim in dimensions.iter() {
+            let dim_name = dim.split('.').next_back().unwrap_or(dim);
+            let qualified_field = format!("{}.{}.{}__{}", schema, "{TABLE}", cube_name, dim_name);
 
             if needs_aggregation {
                 // When aggregating, dimensions go in SELECT and GROUP BY
                 select_fields.push(format!("{} as {}", qualified_field, dim_name));
-                group_by_fields.push((select_fields.len()).to_string());  // GROUP BY by position
+                group_by_fields.push((select_fields.len()).to_string()); // GROUP BY by position
             } else {
                 // No aggregation needed, just select
                 select_fields.push(format!("{} as {}", qualified_field, dim_name));
-                group_by_fields.push((select_fields.len()).to_string());  // GROUP BY by position
+                group_by_fields.push((select_fields.len()).to_string()); // GROUP BY by position
             }
         }
     }
@@ -1434,9 +1461,9 @@ fn generate_pre_agg_sql(
     // Add measures (also prefixed with cube name)
     if let Some(measures) = &request.measures {
         for measure in measures {
-            let measure_name = measure.split('.').last().unwrap_or(measure);
-            let qualified_field = format!("{}.{}.{}__{}",
-                schema, "{TABLE}", cube_name, measure_name);
+            let measure_name = measure.split('.').next_back().unwrap_or(measure);
+            let qualified_field =
+                format!("{}.{}.{}__{}", schema, "{TABLE}", cube_name, measure_name);
 
             if needs_aggregation {
                 // When aggregating across time, we need to SUM additive measures
@@ -1444,7 +1471,10 @@ fn generate_pre_agg_sql(
                 if measure_name.ends_with("_distinct") || measure_name.contains("distinct") {
                     // count_distinct: can't aggregate further, use MAX (assumes pre-agg already distinct)
                     select_fields.push(format!("MAX({}) as {}", qualified_field, measure_name));
-                } else if measure_name == "count" || measure_name.ends_with("_sum") || measure_name.ends_with("_count") {
+                } else if measure_name == "count"
+                    || measure_name.ends_with("_sum")
+                    || measure_name.ends_with("_count")
+                {
                     // Additive measures: SUM them
                     select_fields.push(format!("SUM({}) as {}", qualified_field, measure_name));
                 } else {
@@ -1481,17 +1511,29 @@ fn generate_pre_agg_sql(
                 if let Some(arr) = date_range.as_array() {
                     if arr.len() >= 2 {
                         if let (Some(start), Some(end)) = (arr[0].as_str(), arr[1].as_str()) {
-                            let time_field = time_dim.dimension.split('.').last()
+                            let time_field = time_dim
+                                .dimension
+                                .split('.')
+                                .next_back()
                                 .unwrap_or(&time_dim.dimension);
 
                             // CRITICAL: Use the pre-agg granularity suffix for the field name
-                            let qualified_time = if let Some(pre_agg_granularity) = &pre_agg.granularity {
-                                format!("{}.{}.{}__{}_{}",
-                                    schema, full_table_name, cube_name, time_field, pre_agg_granularity)
-                            } else {
-                                format!("{}.{}.{}__{}",
-                                    schema, full_table_name, cube_name, time_field)
-                            };
+                            let qualified_time =
+                                if let Some(pre_agg_granularity) = &pre_agg.granularity {
+                                    format!(
+                                        "{}.{}.{}__{}_{}",
+                                        schema,
+                                        full_table_name,
+                                        cube_name,
+                                        time_field,
+                                        pre_agg_granularity
+                                    )
+                                } else {
+                                    format!(
+                                        "{}.{}.{}__{}",
+                                        schema, full_table_name, cube_name, time_field
+                                    )
+                                };
 
                             where_clauses.push(format!(
                                 "{} >= '{}' AND {} < '{}'",
@@ -1520,14 +1562,15 @@ fn generate_pre_agg_sql(
     // Build ORDER BY clause from request
     let order_by_clause = if let Some(order) = &request.order {
         if !order.is_empty() {
-            let order_items: Vec<String> = order.iter()
+            let order_items: Vec<String> = order
+                .iter()
                 .filter_map(|o| {
                     if o.len() >= 2 {
-                        let field = o[0].split('.').last().unwrap_or(&o[0]);
+                        let field = o[0].split('.').next_back().unwrap_or(&o[0]);
                         let direction = &o[1];
                         Some(format!("{} {}", field, direction.to_uppercase()))
                     } else if o.len() == 1 {
-                        let field = o[0].split('.').last().unwrap_or(&o[0]);
+                        let field = o[0].split('.').next_back().unwrap_or(&o[0]);
                         Some(format!("{} ASC", field))
                     } else {
                         None
@@ -1551,14 +1594,14 @@ fn generate_pre_agg_sql(
     let limit = request.limit.unwrap_or(100);
 
     let sql = format!(
-        "SELECT {} FROM {}.{}{}{}{}{}",
+        "SELECT {} FROM {}.{}{}{}{} LIMIT {}",
         select_clause,
         schema,
         full_table_name,
         where_clause,
         group_by_clause,
         order_by_clause,
-        format!(" LIMIT {}", limit)
+        limit
     );
 
     log::info!("Generated pre-agg SQL with {} fields (aggregation: {}, group_by: {}, order_by: {}, where: {})",
