@@ -400,6 +400,8 @@ impl CubeStoreTransport {
     }
 
     /// Find the best matching pre-aggregation table for a given cube and measures/dimensions
+    /// Handles both cube names (e.g., "mandata_captate") and incomplete pre-agg table names
+    /// (e.g., "mandata_captate_sums_and_count_daily")
     async fn find_matching_preagg(
         &self,
         cube_name: &str,
@@ -408,15 +410,44 @@ impl CubeStoreTransport {
     ) -> Result<Option<PreAggTable>, CubeError> {
         let tables = self.discover_preagg_tables().await?;
 
-        // For now, simple matching by cube name
-        // TODO: Match based on measures and dimensions
-        let matching = tables
-            .into_iter()
+        // First, try to match by exact cube name
+        let mut matching: Vec<PreAggTable> = tables
+            .iter()
             .filter(|t| t.cube_name == cube_name)
-            .collect::<Vec<_>>();
+            .cloned()
+            .collect();
+
+        // If no exact match, try to match by {cube_name}_{preagg_name} pattern
+        // This handles the case where Cube.js generates SQL with incomplete pre-agg table names
+        if matching.is_empty() {
+            log::info!(
+                "🔍 No exact cube name match for '{}', trying pre-agg pattern matching",
+                cube_name
+            );
+
+            for t in &tables {
+                let expected_prefix = format!("{}_{}", t.cube_name, t.preagg_name);
+                log::info!(
+                    "   Checking: input='{}' vs pattern='{}'",
+                    cube_name,
+                    expected_prefix
+                );
+            }
+
+            matching = tables
+                .iter()
+                .filter(|t| {
+                    let expected_prefix = format!("{}_{}", t.cube_name, t.preagg_name);
+                    cube_name.starts_with(&expected_prefix) || cube_name == expected_prefix
+                })
+                .cloned()
+                .collect();
+
+            log::info!("✅ Pattern matching found {} table(s)", matching.len());
+        }
 
         if matching.is_empty() {
-            log::debug!("No pre-aggregation table found for cube: {}", cube_name);
+            log::debug!("No pre-aggregation table found for: {}", cube_name);
             return Ok(None);
         }
 
@@ -424,7 +455,7 @@ impl CubeStoreTransport {
         // TODO: Implement smarter selection based on query requirements
         let selected = matching.into_iter().next().unwrap();
         log::info!(
-            "Selected pre-agg table: {} for cube: {}",
+            "Selected pre-agg table: {} for input: {}",
             selected.full_name(),
             cube_name
         );
@@ -434,19 +465,25 @@ impl CubeStoreTransport {
 
     /// Rewrite SQL to use discovered pre-aggregation table names
     async fn rewrite_sql_for_preagg(&self, original_sql: String) -> Result<String, CubeError> {
-        log::debug!("Rewriting SQL for pre-aggregation routing: {}", original_sql);
+        log::info!("🔄 Rewriting SQL for pre-aggregation routing");
 
         // Extract cube name from SQL
         // Simple heuristic: look for "FROM {cube_name}" pattern
         let cube_name = self.extract_cube_name_from_sql(&original_sql)?;
 
-        log::debug!("Extracted cube name from SQL: {}", cube_name);
+        log::info!("📝 Extracted table name (after schema strip): '{}'", cube_name);
 
         // Find matching pre-aggregation table
         let preagg_table = self.find_matching_preagg(&cube_name, &[], &[]).await?;
 
         match preagg_table {
             Some(table) => {
+                log::debug!("DEBUG: table.schema = {}", table.schema);
+                log::debug!("DEBUG: table.table_name = {}", table.table_name);
+                log::debug!("DEBUG: table.cube_name = {}", table.cube_name);
+                log::debug!("DEBUG: table.preagg_name = {}", table.preagg_name);
+                log::debug!("DEBUG: table.full_name() = {}", table.full_name());
+
                 log::info!(
                     "Routing query to pre-aggregation table: {} (cube: {}, preagg: {})",
                     table.full_name(),
@@ -454,15 +491,39 @@ impl CubeStoreTransport {
                     table.preagg_name
                 );
 
-                // Replace cube name with actual table name in SQL
-                // Handle both quoted and unquoted cube names
-                let rewritten = original_sql
-                    .replace(&format!("FROM {}", cube_name), &format!("FROM {}", table.full_name()))
-                    .replace(&format!("FROM \"{}\"", cube_name), &format!("FROM {}", table.full_name()))
-                    .replace(&format!("from {}", cube_name), &format!("FROM {}", table.full_name()))
-                    .replace(&format!("from \"{}\"", cube_name), &format!("FROM {}", table.full_name()));
+                // Replace incomplete table name with full table name (with hashes)
+                // Handle schema-qualified names and various patterns
+                let full_name = table.full_name();
 
-                log::debug!("Rewritten SQL: {}", rewritten);
+                // Patterns to replace (with and without schema prefix)
+                // Try in order of specificity: most specific first
+                let patterns = vec![
+                    format!("{}.{}", table.schema, cube_name),  // schema.incomplete_name
+                    format!("\"{}\".\"{}\"", table.schema, cube_name),  // "schema"."incomplete_name"
+                    cube_name.to_string(),  // incomplete_name (without schema)
+                ];
+
+                log::debug!("DEBUG: Looking for patterns to replace: {:?}", patterns);
+                log::debug!("DEBUG: Will replace with: {}", full_name);
+
+                let mut rewritten = original_sql.clone();
+                let mut replaced = false;
+
+                // Try each pattern, but stop after the first successful replacement
+                for pattern in &patterns {
+                    if rewritten.contains(pattern) {
+                        log::debug!("DEBUG: Found pattern '{}', replacing with '{}'", pattern, full_name);
+                        rewritten = rewritten.replace(pattern, &full_name);
+                        replaced = true;
+                        break;  // Stop after first successful replacement
+                    }
+                }
+
+                if !replaced {
+                    log::warn!("⚠️  No pattern matched in SQL, using original");
+                }
+
+                log::debug!("DEBUG: Rewritten SQL = {}", rewritten);
 
                 Ok(rewritten)
             }
@@ -476,11 +537,9 @@ impl CubeStoreTransport {
         }
     }
 
-    /// Extract cube name from SQL query
+    /// Extract cube and pre-agg names from SQL query
+    /// Handles both regular cube names and pre-agg table names with schema
     fn extract_cube_name_from_sql(&self, sql: &str) -> Result<String, CubeError> {
-        // Simple regex-like extraction for "FROM {cube_name}"
-        // This is a basic implementation - production would use proper SQL parsing
-
         let sql_upper = sql.to_uppercase();
 
         // Find "FROM" keyword
@@ -496,7 +555,15 @@ impl CubeStoreTransport {
                 .trim_matches('\'')
                 .to_string();
 
-            Ok(table_name)
+            // If table name contains schema prefix, strip it
+            // Example: dev_pre_aggregations.mandata_captate_sums_and_count_daily -> mandata_captate_sums_and_count_daily
+            let table_name_without_schema = if let Some(dot_pos) = table_name.rfind('.') {
+                table_name[dot_pos + 1..].to_string()
+            } else {
+                table_name
+            };
+
+            Ok(table_name_without_schema)
         } else {
             Err(CubeError::internal(
                 "Could not find FROM clause in SQL".to_string(),
