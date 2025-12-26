@@ -1,5 +1,9 @@
 use async_trait::async_trait;
-use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
+use datafusion::arrow::{
+    array::StringArray,
+    datatypes::SchemaRef,
+    record_batch::RecordBatch,
+};
 use std::{fmt::Debug, sync::Arc, time::{Duration, Instant}};
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -23,6 +27,174 @@ use std::collections::HashMap;
 struct MetaCacheBucket {
     lifetime: Instant,
     value: Arc<MetaContext>,
+}
+
+/// Pre-aggregation table information from CubeStore
+#[derive(Debug, Clone)]
+struct PreAggTable {
+    schema: String,
+    table_name: String,
+    cube_name: String,
+    preagg_name: String,
+}
+
+impl PreAggTable {
+    /// Parse table name using known cube names from Cube API metadata
+    /// Format: {cube_name}_{preagg_name}_{content_hash}_{version_hash}_{timestamp}
+    fn from_table_name_with_cubes(
+        schema: String,
+        table_name: String,
+        known_cube_names: &[String],
+    ) -> Option<Self> {
+        // Split by underscore to find cube and preagg names
+        let parts: Vec<&str> = table_name.split('_').collect();
+
+        if parts.len() < 3 {
+            return None;
+        }
+
+        // Find where hashes start (8+ char alphanumeric)
+        let mut hash_start_idx = parts.len() - 3;
+        for (idx, part) in parts.iter().enumerate() {
+            if part.len() >= 8 && part.chars().all(|c| c.is_alphanumeric()) {
+                hash_start_idx = idx;
+                break;
+            }
+        }
+
+        if hash_start_idx < 2 {
+            return None;
+        }
+
+        // Try to match against known cube names
+        // Start with longest cube names first for better matching
+        let mut sorted_cubes = known_cube_names.to_vec();
+        sorted_cubes.sort_by_key(|c| std::cmp::Reverse(c.len()));
+
+        for cube_name in &sorted_cubes {
+            let cube_parts: Vec<&str> = cube_name.split('_').collect();
+
+            // Check if table name starts with this cube name
+            if parts.len() >= cube_parts.len() && parts[..cube_parts.len()] == cube_parts[..] {
+                // Extract pre-agg name (everything between cube name and hashes)
+                let preagg_parts = &parts[cube_parts.len()..hash_start_idx];
+
+                if preagg_parts.is_empty() {
+                    continue; // Not a valid match
+                }
+
+                let preagg_name = preagg_parts.join("_");
+
+                return Some(PreAggTable {
+                    schema,
+                    table_name,
+                    cube_name: cube_name.clone(),
+                    preagg_name,
+                });
+            }
+        }
+
+        // Fallback to heuristic parsing if no cube name matches
+        log::warn!(
+            "Could not match table '{}' to any known cube, using heuristic parsing",
+            table_name
+        );
+        Self::from_table_name_heuristic(schema, table_name)
+    }
+
+    /// Heuristic parsing when cube names are not available
+    /// Format: {cube_name}_{preagg_name}_{content_hash}_{version_hash}_{timestamp}
+    fn from_table_name_heuristic(schema: String, table_name: String) -> Option<Self> {
+        // Split by underscore to find cube and preagg names
+        let parts: Vec<&str> = table_name.split('_').collect();
+
+        if parts.len() < 3 {
+            return None;
+        }
+
+        // Try to find the separator between cube_preagg and hashes
+        // Hashes are typically 8 characters, timestamps are numeric
+        // We need to work backwards to find where the preagg name ends
+
+        // Find the first part that looks like a hash (8+ alphanumeric chars)
+        let mut preagg_end_idx = parts.len() - 3; // Start from before the last 3 parts (likely hashes)
+
+        for (idx, part) in parts.iter().enumerate() {
+            if part.len() >= 8 && part.chars().all(|c| c.is_alphanumeric()) {
+                preagg_end_idx = idx;
+                break;
+            }
+        }
+
+        if preagg_end_idx < 2 {
+            return None;
+        }
+
+        // Reconstruct cube and preagg names
+        let full_name = parts[..preagg_end_idx].join("_");
+
+        // Common patterns: {cube}_{preagg}
+        // Examples:
+        //   mandata_captate_sums_and_count_daily -> cube=mandata_captate, preagg=sums_and_count_daily
+        //   orders_with_preagg_orders_by_market_brand_daily -> cube=orders_with_preagg, preagg=orders_by_market_brand_daily
+
+        // Strategy: Look for common pre-agg name patterns
+        let (cube_name, preagg_name) = if let Some(pos) = full_name.find("_sums_") {
+            // Pattern: {cube}_sums_and_count_daily
+            (full_name[..pos].to_string(), full_name[pos + 1..].to_string())
+        } else if let Some(pos) = full_name.find("_rollup") {
+            // Pattern: {cube}_rollup_{granularity}
+            (full_name[..pos].to_string(), full_name[pos + 1..].to_string())
+        } else if let Some(pos) = full_name.rfind("_by_") {
+            // Pattern: {cube}_{aggregation}_by_{dimensions}_{granularity}
+            // Find the start of the pre-agg name by looking backwards for cube boundary
+            // This is tricky - we need to find where the cube name ends
+
+            // Heuristic: If we have "_by_", the pre-agg probably starts before it
+            // Try to find common cube name endings
+            let before_by = &full_name[..pos];
+            if let Some(cube_end) = before_by.rfind('_') {
+                (before_by[..cube_end].to_string(), full_name[cube_end + 1..].to_string())
+            } else {
+                // Can't parse, use fallback
+                let mut name_parts = full_name.split('_').collect::<Vec<_>>();
+                if name_parts.len() < 2 {
+                    return None;
+                }
+                let preagg = name_parts.pop()?;
+                let cube = name_parts.join("_");
+                (cube, preagg.to_string())
+            }
+        } else {
+            // Fallback: assume last 2-3 parts are preagg name
+            let mut name_parts = full_name.split('_').collect::<Vec<_>>();
+            if name_parts.len() < 2 {
+                return None;
+            }
+
+            // Take last few parts as preagg name
+            let preagg_parts = if name_parts.len() >= 4 {
+                name_parts.split_off(name_parts.len() - 3)
+            } else {
+                vec![name_parts.pop()?]
+            };
+
+            let cube = name_parts.join("_");
+            let preagg = preagg_parts.join("_");
+            (cube, preagg)
+        };
+
+        Some(PreAggTable {
+            schema,
+            table_name,
+            cube_name,
+            preagg_name,
+        })
+    }
+
+    fn full_name(&self) -> String {
+        format!("{}.{}", self.schema, self.table_name)
+    }
 }
 
 /// Configuration for CubeStore direct connection
@@ -82,6 +254,9 @@ pub struct CubeStoreTransport {
 
     /// Metadata cache with TTL
     meta_cache: RwLock<Option<MetaCacheBucket>>,
+
+    /// Pre-aggregation table cache
+    preagg_table_cache: RwLock<Option<(Instant, Vec<PreAggTable>)>>,
 }
 
 impl std::fmt::Debug for CubeStoreTransport {
@@ -109,6 +284,7 @@ impl CubeStoreTransport {
             cubestore_client,
             config,
             meta_cache: RwLock::new(None),
+            preagg_table_cache: RwLock::new(None),
         })
     }
 
@@ -122,6 +298,138 @@ impl CubeStoreTransport {
     /// Check if we should use direct CubeStore connection for this query
     fn should_use_direct(&self) -> bool {
         self.config.enabled
+    }
+
+    /// Query CubeStore metastore to discover pre-aggregation table names
+    /// Results are cached with TTL
+    async fn discover_preagg_tables(&self) -> Result<Vec<PreAggTable>, CubeError> {
+        let cache_lifetime = Duration::from_secs(self.config.metadata_cache_ttl);
+
+        // Check cache first
+        {
+            let cache = self.preagg_table_cache.read().await;
+            if let Some((timestamp, tables)) = &*cache {
+                if timestamp.elapsed() < cache_lifetime {
+                    log::debug!(
+                        "Returning cached pre-agg tables (age: {:?}, count: {})",
+                        timestamp.elapsed(),
+                        tables.len()
+                    );
+                    return Ok(tables.clone());
+                }
+            }
+        }
+
+        log::debug!("Querying CubeStore metastore for pre-aggregation tables");
+
+        // First, get cube names from Cube API metadata
+        let config = self.get_cube_api_config();
+        let meta_response = cube_api::meta_v1(&config, true).await.map_err(|e| {
+            CubeError::internal(format!("Failed to fetch metadata from Cube API: {}", e))
+        })?;
+
+        let cubes = meta_response.cubes.unwrap_or_else(Vec::new);
+        let cube_names: Vec<String> = cubes
+            .iter()
+            .map(|cube| cube.name.clone())
+            .collect();
+
+        log::debug!("Known cube names from API: {:?}", cube_names);
+
+        // Query system.tables directly from CubeStore (not through CubeSQL)
+        let sql = r#"
+            SELECT
+                table_schema,
+                table_name
+            FROM system.tables
+            WHERE
+                table_schema NOT IN ('information_schema', 'system', 'mysql')
+                AND is_ready = true
+                AND has_data = true
+            ORDER BY table_name
+        "#;
+
+        let batches = self.cubestore_client.query(sql.to_string()).await?;
+
+        let mut tables = Vec::new();
+        for batch in batches {
+            let schema_col = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| CubeError::internal("Invalid schema column type".to_string()))?;
+
+            let table_col = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| CubeError::internal("Invalid table column type".to_string()))?;
+
+            for i in 0..batch.num_rows() {
+                let schema = schema_col.value(i).to_string();
+                let table_name = table_col.value(i).to_string();
+
+                // Parse table name using known cube names
+                if let Some(preagg_table) =
+                    PreAggTable::from_table_name_with_cubes(schema, table_name, &cube_names)
+                {
+                    tables.push(preagg_table);
+                } else {
+                    log::warn!("Failed to parse pre-agg table name: {}", table_col.value(i));
+                }
+            }
+        }
+
+        log::info!("Discovered {} pre-aggregation tables in CubeStore", tables.len());
+        for table in &tables {
+            log::debug!(
+                "  - {} (cube: {}, preagg: {})",
+                table.full_name(),
+                table.cube_name,
+                table.preagg_name
+            );
+        }
+
+        // Update cache
+        {
+            let mut cache = self.preagg_table_cache.write().await;
+            *cache = Some((Instant::now(), tables.clone()));
+        }
+
+        Ok(tables)
+    }
+
+    /// Find the best matching pre-aggregation table for a given cube and measures/dimensions
+    async fn find_matching_preagg(
+        &self,
+        cube_name: &str,
+        _measures: &[String],
+        _dimensions: &[String],
+    ) -> Result<Option<PreAggTable>, CubeError> {
+        let tables = self.discover_preagg_tables().await?;
+
+        // For now, simple matching by cube name
+        // TODO: Match based on measures and dimensions
+        let matching = tables
+            .into_iter()
+            .filter(|t| t.cube_name == cube_name)
+            .collect::<Vec<_>>();
+
+        if matching.is_empty() {
+            log::debug!("No pre-aggregation table found for cube: {}", cube_name);
+            return Ok(None);
+        }
+
+        // Return the first match (most recent by naming convention)
+        // TODO: Implement smarter selection based on query requirements
+        let selected = matching.into_iter().next().unwrap();
+        log::info!(
+            "Selected pre-agg table: {} for cube: {}",
+            selected.full_name(),
+            cube_name
+        );
+
+        Ok(Some(selected))
     }
 
     /// Execute query directly against CubeStore
