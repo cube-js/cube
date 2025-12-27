@@ -113,7 +113,7 @@ values from the Cube query during SQL generation.
 
 This is useful for hinting your database optimizer to use a specific index
 or filter out partitions or shards in your cloud data warehouse so you won't
-be billed for scanning those.
+be billed for scanning those. It can also be useful for constructing [links][ref-links].
 
 <WarningBox>
 
@@ -817,3 +817,4 @@ cube(`orders`, {
 [ref-query-filter]: /product/apis-integrations/rest-api/query-format#query-properties
 [ref-dynamic-jinja]: /product/data-modeling/dynamic/jinja
 [ref-filter-boolean]: /product/apis-integrations/rest-api/query-format#boolean-logical-operators
+[ref-links]: /product/data-modeling/reference/dimensions#links
