@@ -1652,7 +1652,23 @@ mod tests {
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
             async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-                panic!("It's a fake transport");
+                // Return minimal meta context for testing (no pre-aggregations)
+                use crate::transport::{parse_pre_aggregations_from_cubes, MetaContext};
+                use uuid::Uuid;
+
+                let cubes = vec![]; // No cubes
+                let pre_aggregations = parse_pre_aggregations_from_cubes(&cubes);
+                let member_to_data_source = std::collections::HashMap::new();
+                let data_source_to_sql_generator = std::collections::HashMap::new();
+                let compiler_id = Uuid::new_v4();
+
+                Ok(Arc::new(MetaContext::new(
+                    cubes,
+                    pre_aggregations,
+                    member_to_data_source,
+                    data_source_to_sql_generator,
+                    compiler_id,
+                )))
             }
 
             async fn sql(
