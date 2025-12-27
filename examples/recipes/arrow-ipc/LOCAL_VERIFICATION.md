@@ -1,6 +1,6 @@
 # Local PR Verification Guide
 
-This guide explains how to verify the **CubeSQL Arrow Native Server** PR locally, including the optional Arrow Results Cache feature.
+This guide explains how to verify the **CubeSQL ADBC(Arrow Native) Server** PR locally, including the optional Arrow Results Cache feature.
 
 ## Complete Verification Checklist
 
@@ -53,14 +53,14 @@ Next steps:
   3. Run Python tests: python test_arrow_native_performance.py
 ```
 
-### ✅ Step 3: Verify Arrow Native Server
+### ✅ Step 3: Verify ADBC(Arrow Native) Server
 
 **Start Cube API** (Terminal 1):
 ```bash
 ./start-cube-api.sh
 ```
 
-**Start CubeSQL Arrow Native Server** (Terminal 2):
+**Start CubeSQL ADBC(Arrow Native) Server** (Terminal 2):
 ```bash
 ./start-cubesqld.sh
 ```
@@ -68,14 +68,14 @@ Next steps:
 **Look for in logs**:
 ```
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
-🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
+🔗 Cube SQL (arrow) is listening on 0.0.0.0:8120
 Arrow Results Cache: ENABLED (max_entries=1000, ttl=3600s)
 ```
 
 **Verify server is running**:
 ```bash
 lsof -i:4444  # PostgreSQL protocol
-lsof -i:4445  # Arrow IPC native
+lsof -i:8120  # ADBC(Arrow Native) native
 grep "Arrow Results Cache:" cubesqld.log  # Optional cache
 ```
 

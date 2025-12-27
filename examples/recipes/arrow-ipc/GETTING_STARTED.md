@@ -1,8 +1,8 @@
-# Getting Started with CubeSQL Arrow Native Server
+# Getting Started with CubeSQL ADBC(Arrow Native) Server
 
 ## Quick Start (5 minutes)
 
-This guide shows you how to use **CubeSQL's Arrow Native server** with optional Arrow Results Cache.
+This guide shows you how to use **CubeSQL's ADBC(Arrow Native) server** with optional Arrow Results Cache.
 
 ### Prerequisites
 
@@ -30,7 +30,7 @@ cargo build --release
 ### Step 2: Set Up Test Environment
 
 ```bash
-# Navigate to the Arrow Native server example
+# Navigate to the ADBC(Arrow Native) server example
 cd ../../examples/recipes/arrow-ipc
 
 # Start PostgreSQL database
@@ -42,7 +42,7 @@ docker-compose up -d postgres
 
 **Expected output**:
 ```
-Setting up test data for CubeSQL Arrow Native server...
+Setting up test data for CubeSQL ADBC(Arrow Native) server...
 Database connection:
   Host: localhost
   Port: 7432
@@ -62,7 +62,7 @@ Wait for:
 🚀 Cube API server is listening on port 4008
 ```
 
-**Terminal 2 - Start CubeSQL Arrow Native Server**:
+**Terminal 2 - Start CubeSQL ADBC(Arrow Native) Server**:
 ```bash
 ./start-cubesqld.sh
 ```
@@ -70,7 +70,7 @@ Wait for:
 Wait for:
 ```
 🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
-🔗 Cube SQL (arrow) is listening on 0.0.0.0:4445
+🔗 Cube SQL (arrow) is listening on 0.0.0.0:8120
 Arrow Results Cache initialized: enabled=true, max_entries=1000, ttl=3600s
 ```
 
@@ -134,14 +134,14 @@ TOTAL:         385ms    ← 3.3x faster!
 
 ## Configuration Options
 
-### Arrow Native Server Settings
+### ADBC(Arrow Native) Server Settings
 
 Edit `start-cubesqld.sh` or set environment variables:
 
 ```bash
 # Server ports
 export CUBESQL_PG_PORT=4444        # PostgreSQL protocol
-export CUBEJS_ARROW_PORT=4445      # Arrow IPC native
+export CUBEJS_ADBC_PORT=8120      # ADBC(Arrow Native) native
 
 # Optional Query Cache (enabled by default)
 export CUBESQL_QUERY_CACHE_ENABLED=true        # Enable/disable
@@ -158,9 +158,9 @@ Disable query result cache when using **CubeStore pre-aggregations**. CubeStore 
 - Avoids double-caching overhead
 - Reduces memory usage
 - Simpler architecture (single caching layer)
-- **Still gets 8-15x speedup** from Arrow Native binary protocol vs REST API
+- **Still gets 8-15x speedup** from ADBC(Arrow Native) binary protocol vs REST API
 
-**Verification**: Check logs for `"Query result cache: DISABLED (using Arrow Native baseline performance)"`. Cache operations are completely bypassed when disabled.
+**Verification**: Check logs for `"Query result cache: DISABLED (using ADBC(Arrow Native) baseline performance)"`. Cache operations are completely bypassed when disabled.
 
 ### Database Connection
 

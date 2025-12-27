@@ -1,11 +1,11 @@
-# Power-of-Three Integration with Arrow IPC
+# Power-of-Three Integration with ADBC(Arrow Native)
 
 **Date:** 2025-12-26
 **Status:** ✅ INTEGRATED
 
 ## Summary
 
-Successfully integrated power-of-three cube models into the Arrow IPC test environment. All cube models are now served by the live Cube API and accessible via Arrow Native protocol.
+Successfully integrated power-of-three cube models into the ADBC(Arrow Native) test environment. All cube models are now served by the live Cube API and accessible via ADBC(Arrow Native) protocol.
 
 ## Cube Models Location
 
@@ -16,7 +16,7 @@ The Cube API server watches this directory for changes and automatically reloads
 
 ## Available Cubes
 
-### Test Cubes (Arrow Native Testing)
+### Test Cubes (ADBC(Arrow Native) Testing)
 1. **orders_no_preagg** - Orders without pre-aggregations (for performance comparison)
 2. **orders_with_preagg** - Orders with pre-aggregations (for performance comparison)
 
@@ -36,11 +36,11 @@ The Cube API server watches this directory for changes and automatically reloads
 **Model Directory:** `~/projects/learn_erl/cube/examples/recipes/arrow-ipc/model/`
 **Auto-reload:** Enabled (watches for file changes)
 
-## Arrow Native Access
+## ADBC(Arrow Native) Access
 
-**Server:** CubeSQL Arrow Native
-**Port:** 4445
-**Protocol:** Arrow IPC over TCP
+**Server:** CubeSQL ADBC(Arrow Native)
+**Port:** 8120
+**Protocol:** ADBC(Arrow Native) over TCP
 **Connection Mode:** native
 **Cache:** Arrow Results Cache enabled
 
@@ -50,7 +50,7 @@ The Cube API server watches this directory for changes and automatically reloads
 {Adbc.Database,
  driver: "/path/to/libadbc_driver_cube.so",
  "adbc.cube.host": "localhost",
- "adbc.cube.port": "4445",
+ "adbc.cube.port": "8120",
  "adbc.cube.connection_mode": "native",
  "adbc.cube.token": "test"}
 ```
@@ -95,13 +95,13 @@ power_customers.yaml
 
 ## Power-of-Three Python Tests
 
-**Note:** The power-of-three Python integration tests use PostgreSQL wire protocol (port 4444), not Arrow Native protocol (port 4445).
+**Note:** The power-of-three Python integration tests use PostgreSQL wire protocol (port 4444), not ADBC(Arrow Native) protocol (port 8120).
 
 Files using PostgreSQL protocol:
 - `~/projects/learn_erl/power-of-three-examples/python/test_arrow_cache_performance.py`
 - `~/projects/learn_erl/power-of-three-examples/integration_test.py`
 
-These tests are **NOT** relevant for Arrow Native testing and are excluded from our test suite.
+These tests are **NOT** relevant for ADBC(Arrow Native) testing and are excluded from our test suite.
 
 ## Testing with Power-of-Three Cubes
 
@@ -110,11 +110,11 @@ These tests are **NOT** relevant for Arrow Native testing and are excluded from 
 **Important:** Use MEASURE syntax for Cube queries!
 
 ```elixir
-# Connect to Arrow Native server
+# Connect to ADBC(Arrow Native) server
 {:ok, db} = Adbc.Database.start_link(
   driver: "/path/to/libadbc_driver_cube.so",
   "adbc.cube.host": "localhost",
-  "adbc.cube.port": "4445",
+  "adbc.cube.port": "8120",
   "adbc.cube.connection_mode": "native",
   "adbc.cube.token": "test"
 )
@@ -137,12 +137,12 @@ These tests are **NOT** relevant for Arrow Native testing and are excluded from 
 materialized = Adbc.Result.materialize(results)
 ```
 
-### Query via Arrow Native (C++)
+### Query via ADBC(Arrow Native) (C++)
 
 ```cpp
 // Configure connection
 driver.DatabaseSetOption(&database, "adbc.cube.host", "localhost", &error);
-driver.DatabaseSetOption(&database, "adbc.cube.port", "4445", &error);
+driver.DatabaseSetOption(&database, "adbc.cube.port", "8120", &error);
 driver.DatabaseSetOption(&database, "adbc.cube.connection_mode", "native", &error);
 driver.DatabaseSetOption(&database, "adbc.cube.token", "test", &error);
 
@@ -163,7 +163,7 @@ driver.StatementExecuteQuery(&statement, &stream, &rows_affected, &error);
 
 1. Create cube YAML file in `~/projects/learn_erl/cube/examples/recipes/arrow-ipc/model/cubes/`
 2. Cube API automatically detects and reloads (no restart needed)
-3. Query immediately available via Arrow Native (port 4445)
+3. Query immediately available via ADBC(Arrow Native) (port 8120)
 
 ### Modifying Existing Cubes
 
@@ -193,7 +193,7 @@ driver.StatementExecuteQuery(&statement, &stream, &rows_affected, &error);
 │   │   └── power_customers.yaml      # Power-of-three
 │   └── cube.js                        # Cube configuration
 ├── start-cube-api.sh                  # Start Cube API server
-└── start-cubesqld.sh                  # Start Arrow Native server
+└── start-cubesqld.sh                  # Start ADBC(Arrow Native) server
 ```
 
 ## Benefits
@@ -209,7 +209,7 @@ driver.StatementExecuteQuery(&statement, &stream, &rows_affected, &error);
 - Fast iteration on cube definitions
 
 ✅ **Multi-Protocol Access**
-- Arrow Native (port 4445) - Binary protocol, high performance
+- ADBC(Arrow Native) (port 8120) - Binary protocol, high performance
 - HTTP API (port 4008) - REST API for web applications
 - PostgreSQL wire protocol (port 4444) - Optional, not tested
 
@@ -224,7 +224,7 @@ driver.StatementExecuteQuery(&statement, &stream, &rows_affected, &error);
 |-----------|--------|-------|
 | Cube Models | ✅ Copied | 5 power-of-three + 2 test cubes |
 | Cube API | ✅ Running | Auto-detects model changes |
-| Arrow Native Server | ✅ Running | Port 4445, cache enabled |
+| ADBC(Arrow Native) Server | ✅ Running | Port 8120, cache enabled |
 | ADBC Tests | ✅ Passing | All 11 tests pass |
 | Power-of-Three Cubes | ✅ Queryable | All 7 cubes work with MEASURE syntax |
 | Query Performance | ✅ Cached | Arrow Results Cache working |
@@ -234,8 +234,8 @@ driver.StatementExecuteQuery(&statement, &stream, &rows_affected, &error);
 ✅ **Power-of-three cube models are FULLY WORKING!**
 
 All cubes are:
-- Properly integrated with Arrow IPC test environment
-- Accessible via Arrow Native protocol on port 4445
+- Properly integrated with ADBC(Arrow Native) test environment
+- Accessible via ADBC(Arrow Native) protocol on port 8120
 - Queryable using MEASURE syntax with GROUP BY
 - Benefiting from Arrow Results Cache (20-30x speedup on repeat queries)
 - Available in Cube Dev Console at http://localhost:4008/#/build

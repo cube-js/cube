@@ -2,7 +2,7 @@
 
 ## Summary
 
-`CUBEJS_ADBC_PORT` is a **new** environment variable introduced to control the Arrow IPC protocol port for high-performance SQL queries via the C++/Elixir ADBC driver. This is unrelated to the old `CUBEJS_SQL_PORT` which was removed in v0.35.0 with the MySQL-based SQL API.
+`CUBEJS_ADBC_PORT` is a **new** environment variable introduced to control the ADBC(Arrow Native) protocol port for high-performance SQL queries via the C++/Elixir ADBC driver. This is unrelated to the old `CUBEJS_SQL_PORT` which was removed in v0.35.0 with the MySQL-based SQL API.
 
 ## What is CUBEJS_ADBC_PORT?
 
@@ -17,7 +17,7 @@
 ## Key Points
 
 ✅ **NEW variable** - Not a replacement for anything
-✅ **Arrow IPC protocol** - High-performance binary protocol
+✅ **ADBC(Arrow Native) protocol** - High-performance binary protocol
 ✅ **Default port: 8120** (if enabled)
 ✅ **Optional** - Only enable if using the ADBC driver
 ✅ **Separate from PostgreSQL wire protocol** (`CUBEJS_PG_SQL_PORT`)
@@ -26,17 +26,17 @@
 
 **Important:** `CUBEJS_SQL_PORT` was a **completely different variable** used for:
 - Old MySQL-based SQL API (removed in v0.35.0)
-- Had nothing to do with Arrow IPC
+- Had nothing to do with ADBC(Arrow Native)
 - Is no longer in use
 
 `CUBEJS_ADBC_PORT` does NOT replace `CUBEJS_SQL_PORT` - they served different purposes.
 
 ## Usage
 
-### Enable Arrow IPC Protocol
+### Enable ADBC(Arrow Native) Protocol
 
 ```bash
-# Set the Arrow IPC port
+# Set the ADBC(Arrow Native) port
 export CUBEJS_ADBC_PORT=8120
 
 # Start Cube.js
@@ -78,7 +78,7 @@ children = [
 ### Basic Setup
 
 ```bash
-# Arrow IPC port (optional, default: disabled)
+# ADBC(Arrow Native) port (optional, default: disabled)
 export CUBEJS_ADBC_PORT=8120
 
 # PostgreSQL wire protocol port (optional, default: disabled)
@@ -98,9 +98,9 @@ services:
     ports:
       - "4000:4000"  # HTTP REST API
       - "5432:5432"  # PostgreSQL wire protocol
-      - "8120:8120"  # Arrow IPC protocol (NEW)
+      - "8120:8120"  # ADBC(Arrow Native) protocol (NEW)
     environment:
-      # Enable Arrow IPC
+      # Enable ADBC(Arrow Native)
       - CUBEJS_ADBC_PORT=8120
 
       # PostgreSQL protocol
@@ -146,12 +146,12 @@ spec:
 |------|----------|----------|---------|--------|
 | 4000 | `CUBEJS_API_URL` | HTTP/REST | REST API, GraphQL | Required |
 | 5432 | `CUBEJS_PG_SQL_PORT` | PostgreSQL Wire | SQL via PostgreSQL protocol | Optional |
-| 8120 | `CUBEJS_ADBC_PORT` | Arrow IPC | SQL via ADBC (high perf) | **NEW** (Optional) |
+| 8120 | `CUBEJS_ADBC_PORT` | ADBC(Arrow Native) | SQL via ADBC (high perf) | **NEW** (Optional) |
 | 3030 | `CUBEJS_CUBESTORE_PORT` | WebSocket | CubeStore connection | Optional |
 
-## When to Use Arrow IPC
+## When to Use ADBC(Arrow Native)
 
-### ✅ Use Arrow IPC When:
+### ✅ Use ADBC(Arrow Native) When:
 
 - **Large result sets** (>10K rows)
 - **Analytics workloads** with columnar data
@@ -160,7 +160,7 @@ spec:
 - **Data science workflows**
 - **Applications using Arrow-based data transfer**
 
-### ❌ Don't Use Arrow IPC When:
+### ❌ Don't Use ADBC(Arrow Native) When:
 
 - **Small queries** (<1K rows) - HTTP is fine
 - **Simple REST API** - Use HTTP endpoint
@@ -175,14 +175,14 @@ Based on real-world testing with 5,000 row queries:
 |----------|------|----------------|
 | HTTP REST API | 6,500ms | 1x (baseline) |
 | PostgreSQL Wire | 4,000ms | 1.6x faster |
-| **Arrow IPC** | **100-250ms** | **25-66x faster** |
+| **ADBC(Arrow Native)** | **100-250ms** | **25-66x faster** |
 
 ## Code Changes
 
 ### Added to `packages/cubejs-backend-shared/src/env.ts`
 
 ```typescript
-// Arrow IPC Interface
+// ADBC(Arrow Native) Interface
 sqlPort: () => {
   const port = asFalseOrPort(process.env.CUBEJS_ADBC_PORT || 'false', 'CUBEJS_ADBC_PORT');
   if (port) {
@@ -196,7 +196,7 @@ sqlPort: () => {
 
 ```typescript
 type OptionalEnv = {
-  // SQL API (Arrow IPC and PostgreSQL wire protocol)
+  // SQL API (ADBC(Arrow Native) and PostgreSQL wire protocol)
   CUBEJS_ADBC_PORT?: string,
   CUBEJS_SQL_USER?: string,
   CUBEJS_PG_SQL_PORT?: string,
@@ -220,7 +220,7 @@ export CUBEJS_ADBC_PORT=0.0.0.0:8120
 
 ### Authentication
 
-Arrow IPC uses the same authentication as other Cube.js APIs:
+ADBC(Arrow Native) uses the same authentication as other Cube.js APIs:
 
 ```bash
 # JWT token authentication
@@ -233,7 +233,7 @@ export CUBEJS_API_SECRET=your-secret-key
 ### Firewall Rules
 
 ```bash
-# Allow Arrow IPC only from specific IPs
+# Allow ADBC(Arrow Native) only from specific IPs
 iptables -A INPUT -p tcp --dport 8120 -s 10.0.0.0/24 -j ACCEPT
 iptables -A INPUT -p tcp --dport 8120 -j DROP
 ```
@@ -256,7 +256,7 @@ export CUBEJS_ADBC_PORT=18120
 ### Connection Refused
 
 ```bash
-# Verify Arrow IPC is enabled
+# Verify ADBC(Arrow Native) is enabled
 echo $CUBEJS_ADBC_PORT
 # Should output: 8120
 
@@ -314,7 +314,7 @@ df |> Explorer.DataFrame.head()
 
 ## Related Documentation
 
-- [Arrow IPC Architecture](./CUBE_ARCHITECTURE.md)
+- [ADBC(Arrow Native) Architecture](./CUBE_ARCHITECTURE.md)
 - [Apache ADBC Specification](https://arrow.apache.org/docs/format/ADBC.html)
 - [Custom C++/Elixir ADBC Driver](https://github.com/borodark/adbc)
 

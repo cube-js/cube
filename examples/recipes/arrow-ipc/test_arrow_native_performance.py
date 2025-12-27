@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-CubeSQL Arrow Native Server Performance Tests
+CubeSQL ADBC(Arrow Native) Server Performance Tests
 
-Demonstrates performance improvements from CubeSQL's NEW Arrow Native server
+Demonstrates performance improvements from CubeSQL's NEW ADBC(Arrow Native) server
 compared to the standard REST HTTP API.
 
 This test suite measures:
@@ -12,11 +12,11 @@ This test suite measures:
 
 Test Modes:
     - CUBESQL_ARROW_RESULTS_CACHE_ENABLED=true:  Tests with optional cache (shows cache speedup)
-    - CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false: Tests baseline Arrow Native vs REST API
+    - CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false: Tests baseline ADBC(Arrow Native) vs REST API
 
     Note: When using CubeStore pre-aggregations, data is already cached at the storage
     layer. CubeStore is a cache itself - sometimes one cache is plenty. Cacheless setup
-    avoids double-caching and still gets 8-15x speedup from Arrow Native binary protocol.
+    avoids double-caching and still gets 8-15x speedup from ADBC(Arrow Native) binary protocol.
 
 Requirements:
     pip install psycopg2-binary requests
@@ -29,7 +29,7 @@ Usage:
     ./start-cubesqld.sh &
     python test_arrow_native_performance.py
 
-    # Test WITHOUT cache (baseline Arrow Native)
+    # Test WITHOUT cache (baseline ADBC(Arrow Native))
     export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false
     ./start-cubesqld.sh &
     python test_arrow_native_performance.py
@@ -90,7 +90,7 @@ class ArrowNativePerformanceTester:
 
     def run_arrow_query(self, sql: str, label: str = "") -> QueryResult:
         """Execute query via ADBC server (port 8120) with full materialization"""
-        # Connect using Arrow Native client
+        # Connect using ADBC(Arrow Native) client
         with ArrowNativeClient(host=self.arrow_host, port=self.arrow_port, token=self.http_token) as client:
             # Measure query execution
             query_start = time.perf_counter()
@@ -148,12 +148,12 @@ class ArrowNativePerformanceTester:
         print(f"{indent}{result}")
 
     def print_comparison(self, arrow_result: QueryResult, http_result: QueryResult):
-        """Print comparison between Arrow Native and REST HTTP"""
+        """Print comparison between ADBC(Arrow Native) and REST HTTP"""
         if arrow_result.total_time_ms > 0:
             speedup = http_result.total_time_ms / arrow_result.total_time_ms
             time_saved = http_result.total_time_ms - arrow_result.total_time_ms
             color = Colors.GREEN if speedup > 5 else Colors.YELLOW
-            print(f"\n  {color}{Colors.BOLD}Arrow Native is {speedup:.1f}x faster{Colors.END}")
+            print(f"\n  {color}{Colors.BOLD}ADBC(Arrow Native) is {speedup:.1f}x faster{Colors.END}")
             print(f"  Time saved: {time_saved}ms\n")
             return speedup
         return 1.0
@@ -203,10 +203,10 @@ class ArrowNativePerformanceTester:
         return speedup
 
     def test_arrow_vs_rest_small(self):
-        """Test: Small query - Arrow Native vs REST HTTP API"""
+        """Test: Small query - ADBC(Arrow Native) vs REST HTTP API"""
         self.print_header(
             "Small Query (200 rows)",
-            f"Arrow Native (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
+            f"ADBC(Arrow Native) (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
@@ -234,7 +234,7 @@ class ArrowNativePerformanceTester:
 
         # Run comparison
         print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "Arrow Native")
+        arrow_result = self.run_arrow_query(sql, "ADBC(Arrow Native)")
         rest_result = self.run_http_query(http_query, "REST HTTP")
 
         self.print_result(arrow_result, "  ")
@@ -244,10 +244,10 @@ class ArrowNativePerformanceTester:
         return speedup
 
     def test_arrow_vs_rest_medium(self):
-        """Test: Medium query (1-2K rows) - Arrow Native vs REST HTTP API"""
+        """Test: Medium query (1-2K rows) - ADBC(Arrow Native) vs REST HTTP API"""
         self.print_header(
             "Medium Query (1-2K rows)",
-            f"Arrow Native (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
+            f"ADBC(Arrow Native) (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
@@ -285,7 +285,7 @@ class ArrowNativePerformanceTester:
 
         # Run comparison
         print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "Arrow Native")
+        arrow_result = self.run_arrow_query(sql, "ADBC(Arrow Native)")
         rest_result = self.run_http_query(http_query, "REST HTTP")
 
         self.print_result(arrow_result, "  ")
@@ -295,10 +295,10 @@ class ArrowNativePerformanceTester:
         return speedup
 
     def test_arrow_vs_rest_large(self):
-        """Test: Large query (10K+ rows) - Arrow Native vs REST HTTP API"""
+        """Test: Large query (10K+ rows) - ADBC(Arrow Native) vs REST HTTP API"""
         self.print_header(
             "Large Query (10K+ rows)",
-            f"Arrow Native (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
+            f"ADBC(Arrow Native) (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
@@ -335,7 +335,7 @@ class ArrowNativePerformanceTester:
 
         # Run comparison
         print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "Arrow Native")
+        arrow_result = self.run_arrow_query(sql, "ADBC(Arrow Native)")
         rest_result = self.run_http_query(http_query, "REST HTTP")
 
         self.print_result(arrow_result, "  ")
@@ -349,7 +349,7 @@ class ArrowNativePerformanceTester:
         print(f"\n{Colors.BOLD}{Colors.HEADER}")
         print("=" * 80)
         print("  CUBESQL ARROW NATIVE SERVER PERFORMANCE TEST SUITE")
-        print(f"  Arrow Native (port 8120) vs REST HTTP API (port 4008)")
+        print(f"  ADBC(Arrow Native) (port 8120) vs REST HTTP API (port 4008)")
         cache_status = "expected" if self.cache_enabled else "not expected"
         cache_color = Colors.GREEN if self.cache_enabled else Colors.YELLOW
         print(f"  Arrow Results Cache behavior: {cache_color}{cache_status}{Colors.END}")
@@ -394,7 +394,7 @@ class ArrowNativePerformanceTester:
         """Print final summary of all tests"""
         print(f"\n{Colors.BOLD}{Colors.HEADER}")
         print("=" * 80)
-        print("  SUMMARY: Arrow Native vs REST HTTP API Performance")
+        print("  SUMMARY: ADBC(Arrow Native) vs REST HTTP API Performance")
         print("=" * 80)
         print(f"{Colors.END}\n")
 
@@ -416,10 +416,10 @@ class ArrowNativePerformanceTester:
 
         print(f"{Colors.GREEN}{Colors.BOLD}✓ All tests completed{Colors.END}")
         if self.cache_enabled:
-            print(f"{Colors.CYAN}Results show Arrow Native performance with cache behavior expected.{Colors.END}")
+            print(f"{Colors.CYAN}Results show ADBC(Arrow Native) performance with cache behavior expected.{Colors.END}")
             print(f"{Colors.CYAN}Note: REST HTTP API has caching always enabled.{Colors.END}\n")
         else:
-            print(f"{Colors.CYAN}Results show Arrow Native baseline performance (cache behavior not expected).{Colors.END}")
+            print(f"{Colors.CYAN}Results show ADBC(Arrow Native) baseline performance (cache behavior not expected).{Colors.END}")
             print(f"{Colors.CYAN}Note: REST HTTP API has caching always enabled.{Colors.END}\n")
 
 

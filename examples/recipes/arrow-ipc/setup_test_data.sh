@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup test data for Arrow IPC cache performance testing
+# Setup test data for ADBC(Arrow Native) cache performance testing
 
 set -e
 
@@ -10,7 +10,7 @@ DB_NAME=${DB_NAME:-pot_examples_dev}
 DB_USER=${DB_USER:-postgres}
 DB_PASS=${DB_PASS:-postgres}
 
-echo "Setting up test data for Arrow IPC performance tests..."
+echo "Setting up test data for ADBC(Arrow Native) performance tests..."
 echo ""
 echo "Database connection:"
 echo "  Host: $DB_HOST"

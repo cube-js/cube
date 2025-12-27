@@ -18,7 +18,7 @@ if [ ! -z "$PROCS" ]; then
 fi
 
 # Check for processes using our ports
-for port in 3030 4008 4444 4445 7432; do
+for port in 3030 4008 4444 8120 7432; do
     PID=$(lsof -ti :$port 2>/dev/null)
     if [ ! -z "$PID" ]; then
         echo -e "${YELLOW}Killing process using port $port (PID: $PID)${NC}"

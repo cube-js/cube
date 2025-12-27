@@ -1,4 +1,4 @@
-# CubeSQL Arrow Native Server - Complete Example
+# CubeSQL ADBC(Arrow Native) Server - Complete Example
 
 **Performance**: 8-15x faster than REST HTTP API
 **Status**: Production-ready implementation with optional Arrow Results Cache
@@ -12,7 +12,7 @@
 - **[Local Verification](LOCAL_VERIFICATION.md)** - How to verify the PR
 
 🧪 **Testing**:
-- **[Python Performance Tests](test_arrow_native_performance.py)** - Arrow Native vs REST API benchmarks
+- **[Python Performance Tests](test_arrow_native_performance.py)** - ADBC(Arrow Native) vs REST API benchmarks
 - **[Sample Data Setup](setup_test_data.sh)** - Load 3000 test orders
 
 📖 **Additional Resources**:
@@ -20,9 +20,9 @@
 
 ## What This Demonstrates
 
-This example showcases **CubeSQL's Arrow Native server** with optional Arrow Results Cache:
+This example showcases **CubeSQL's ADBC(Arrow Native) server** with optional Arrow Results Cache:
 
-- ✅ **Binary protocol** - Efficient Arrow IPC data transfer
+- ✅ **Binary protocol** - Efficient ADBC(Arrow Native) data transfer
 - ✅ **Optional caching** - 3-10x speedup on repeated queries
 - ✅ **8-15x faster** than REST HTTP API overall
 - ✅ **Minimal overhead** - Arrow Results Cache adds ~10% on first query, 90% savings on repeats
@@ -38,17 +38,17 @@ Client Application (Python/R/JS)
          │    └─> JSON over HTTP
          │         └─> Cube API → CubeStore
          │
-         └─── Arrow IPC Native (Port 4445) ⭐ NEW
+         └─── ADBC(Arrow Native) Native (Port 8120) ⭐ NEW
               └─> Binary Arrow Protocol
                    └─> Arrow Results Cache (Optional) ⭐ NEW
                         └─> Cube API → CubeStore
 ```
 
 **What this PR adds**:
-- **Arrow IPC native protocol (port 4445)** - Binary data transfer, 8-15x faster than REST API
+- **ADBC(Arrow Native) native protocol (port 8120)** - Binary data transfer, 8-15x faster than REST API
 - **Optional Arrow Results Cache** - Additional 3-10x speedup on repeated queries
 
-**When to disable cache**: If using CubeStore pre-aggregations, data is already cached at the storage layer. CubeStore is a cache itself - **sometimes one cache is plenty**. Cacheless setup still gets 8-15x speedup from Arrow Native binary protocol.
+**When to disable cache**: If using CubeStore pre-aggregations, data is already cached at the storage layer. CubeStore is a cache itself - **sometimes one cache is plenty**. Cacheless setup still gets 8-15x speedup from ADBC(Arrow Native) binary protocol.
 
 ## Quick Start (5 minutes)
 
@@ -82,7 +82,7 @@ pip install psycopg2-binary requests
 # Test WITH cache (default)
 python test_arrow_native_performance.py
 
-# Test WITHOUT cache (baseline Arrow Native)
+# Test WITHOUT cache (baseline ADBC(Arrow Native))
 export CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false
 ./start-cubesqld.sh  # Restart with cache disabled
 python test_arrow_native_performance.py
@@ -91,14 +91,14 @@ python test_arrow_native_performance.py
 **Expected Output (with cache)**:
 ```
 Cache Miss → Hit:        3-10x speedup ✓
-Arrow Native vs REST:    8-15x faster ✓
+ADBC(Arrow Native) vs REST:    8-15x faster ✓
 Average Speedup:         8-15x
 ✓ All tests passed!
 ```
 
 **Expected Output (without cache)**:
 ```
-Arrow Native vs REST:    5-10x faster ✓
+ADBC(Arrow Native) vs REST:    5-10x faster ✓
 (Baseline performance without caching)
 ```
 
@@ -112,13 +112,13 @@ Arrow Native vs REST:    5-10x faster ✓
 - `LOCAL_VERIFICATION.md` - PR verification steps
 
 **Test Infrastructure**:
-- `test_arrow_native_performance.py` - Python benchmarks comparing Arrow Native vs REST API
+- `test_arrow_native_performance.py` - Python benchmarks comparing ADBC(Arrow Native) vs REST API
 - `setup_test_data.sh` - Data loader script
 - `sample_data.sql.gz` - 3000 sample orders (240KB)
 
 Tests support both modes:
 - `CUBESQL_ARROW_RESULTS_CACHE_ENABLED=true` - Tests with optional cache
-- `CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false` - Tests baseline Arrow Native performance
+- `CUBESQL_ARROW_RESULTS_CACHE_ENABLED=false` - Tests baseline ADBC(Arrow Native) performance
 
 **Configuration**:
 - `start-cubesqld.sh` - Launches CubeSQL with cache enabled
@@ -131,7 +131,7 @@ Tests support both modes:
 
 ## Performance Results
 
-### Arrow Native Server Performance
+### ADBC(Arrow Native) Server Performance
 
 **With Optional Cache** (same query repeated):
 ```
@@ -145,24 +145,24 @@ Speedup:          3.3x faster
 - No caching overhead
 - Suitable for unique queries
 
-### Arrow Native (4445) vs REST HTTP API (4008)
+### ADBC(Arrow Native) (8120) vs REST HTTP API (4008)
 
 **Full materialization timing** (includes client-side data conversion):
 ```
-Query Size    | Arrow Native | REST API | Speedup
+Query Size    | ADBC(Arrow Native) | REST API | Speedup
 --------------|--------------|----------|--------
 200 rows      |  363ms       | 5013ms   | 13.8x
 2K rows       |  409ms       | 5016ms   | 12.3x
 10K rows      | 1424ms       | 5021ms   |  3.5x
 
-Average: 8.2x faster (Arrow Native with cache)
+Average: 8.2x faster (ADBC(Arrow Native) with cache)
 ```
 
 **Materialization overhead**: 0-15ms (negligible)
 
 ## Configuration Options
 
-### Arrow Native Server Settings
+### ADBC(Arrow Native) Server Settings
 
 Edit environment variables in `start-cubesqld.sh`:
 
@@ -170,8 +170,8 @@ Edit environment variables in `start-cubesqld.sh`:
 # PostgreSQL wire protocol port
 CUBESQL_PG_PORT=4444
 
-# Arrow Native port (direct Arrow IPC)
-CUBEJS_ARROW_PORT=4445
+# ADBC(Arrow Native) port (direct ADBC(Arrow Native))
+CUBEJS_ADBC_PORT=8120
 
 # Optional Arrow Results Cache Settings
 CUBESQL_ARROW_RESULTS_CACHE_ENABLED=true      # Enable/disable (default: true)

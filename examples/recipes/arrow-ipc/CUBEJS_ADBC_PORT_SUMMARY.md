@@ -58,7 +58,7 @@ type OptionalEnv = {
 ### Environment Variable Flow
 
 ```
-CUBEJS_ADBC_PORT=4445
+CUBEJS_ADBC_PORT=8120
     ↓
 getEnv('sqlPort') in server.ts
     ↓
@@ -68,7 +68,7 @@ sqlServer.init(config)
     ↓
 registerInterface({...})
     ↓
-Rust: CubeSQL starts ADBC server on port 4445
+Rust: CubeSQL starts ADBC server on port 8120
 ```
 
 ### Server Startup Code Path
@@ -109,7 +109,7 @@ Rust: CubeSQL starts ADBC server on port 4445
 ### Basic Setup
 
 ```bash
-export CUBEJS_ADBC_PORT=4445
+export CUBEJS_ADBC_PORT=8120
 export CUBEJS_PG_SQL_PORT=5432
 npm start
 ```
@@ -118,7 +118,7 @@ npm start
 
 ```yaml
 environment:
-  - CUBEJS_ADBC_PORT=4445
+  - CUBEJS_ADBC_PORT=8120
   - CUBEJS_PG_SQL_PORT=5432
 ```
 
@@ -126,7 +126,7 @@ environment:
 
 ```bash
 # Check if ADBC port is listening
-lsof -i :4445
+lsof -i :8120
 
 # Test connection
 python3 test_cube_integration.py
@@ -138,7 +138,7 @@ python3 test_cube_integration.py
 |------|----------|----------|---------|
 | 4000 | - | HTTP/REST | REST API |
 | 5432 | `CUBEJS_PG_SQL_PORT` | PostgreSQL Wire | SQL via psql |
-| 4445 | `CUBEJS_ADBC_PORT` | Arrow IPC/ADBC | SQL via ADBC (high perf) |
+| 8120 | `CUBEJS_ADBC_PORT` | ADBC(Arrow Native)/ADBC | SQL via ADBC (high perf) |
 | 3030 | `CUBEJS_CUBESTORE_PORT` | WebSocket | CubeStore |
 
 ## Performance
@@ -151,7 +151,7 @@ Based on power-of-three benchmarks with 5,000 rows:
 |----------|------|----------------|
 | HTTP REST API | 6,500ms | 1x (baseline) |
 | PostgreSQL Wire | 4,000ms | 1.6x faster |
-| **ADBC (Arrow IPC)** | **100-250ms** | **25-66x faster** |
+| **ADBC (ADBC(Arrow Native))** | **100-250ms** | **25-66x faster** |
 
 ## Testing
 
@@ -159,13 +159,13 @@ Based on power-of-three benchmarks with 5,000 rows:
 
 ```bash
 # 1. Set environment variable
-export CUBEJS_ADBC_PORT=4445
+export CUBEJS_ADBC_PORT=8120
 
 # 2. Start Cube.js
 npm start
 
 # 3. In another terminal, check port
-lsof -i :4445
+lsof -i :8120
 # Should show: node ... (LISTEN)
 
 # 4. Test with ADBC client (requires ADBC driver setup)

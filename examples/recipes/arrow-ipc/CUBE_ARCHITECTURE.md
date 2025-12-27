@@ -26,9 +26,9 @@ This document explains how Cube.js orchestrates CubeStore and CubeSQL when start
 │  │                        │  │                      │          │
 │  │  • CubeSQL Engine      │  │  Host: 127.0.0.1    │          │
 │  │  • PostgreSQL Wire     │  │  Port: 3030         │          │
-│  │  • Arrow IPC Protocol  │  │  Protocol: WS       │          │
+│  │  • ADBC(Arrow Native) Protocol  │  │  Protocol: WS       │          │
 │  │  • Port: 5432 (pg)     │  │                      │          │
-│  │  • Port: 4445 (arrow)  │  │                      │          │
+│  │  • Port: 8120 (arrow)  │  │                      │          │
 │  └────────────┬───────────┘  └──────────┬───────────┘          │
 │               │                          │                        │
 └───────────────┼──────────────────────────┼────────────────────────┘
@@ -56,7 +56,7 @@ This document explains how Cube.js orchestrates CubeStore and CubeSQL when start
 
 **Protocols Supported:**
 - PostgreSQL wire protocol (port 5432 by default)
-- Arrow IPC protocol (port 4445)
+- ADBC(Arrow Native) protocol (port 8120)
 
 **Code Reference:**
 
@@ -69,7 +69,7 @@ export const registerInterface = async (
   const native = loadNative(); // Load Rust binary (index.node)
   return native.registerInterface({
     pgPort: options.pgSqlPort,        // PostgreSQL wire protocol port
-    gatewayPort: options.gatewayPort, // Arrow IPC port
+    gatewayPort: options.gatewayPort, // ADBC(Arrow Native) port
     contextToApiScopes: ...,
     checkAuth: ...,
     checkSqlAuth: ...,
@@ -217,7 +217,7 @@ cargo run --release -- --port 3030
 export CUBEJS_CUBESTORE_HOST=127.0.0.1
 export CUBEJS_CUBESTORE_PORT=3030
 export CUBEJS_PG_SQL_PORT=5432
-export CUBEJS_ADBC_PORT=4445
+export CUBEJS_ADBC_PORT=8120
 npm start
 ```
 
@@ -250,7 +250,7 @@ services:
     ports:
       - "4000:4000"  # HTTP API
       - "5432:5432"  # PostgreSQL wire protocol (CubeSQL)
-      - "4445:4445"  # Arrow IPC (CubeSQL)
+      - "8120:8120"  # ADBC(Arrow Native) (CubeSQL)
     environment:
       # CubeStore connection
       - CUBEJS_CUBESTORE_HOST=cubestore
@@ -258,7 +258,7 @@ services:
 
       # CubeSQL ports
       - CUBEJS_PG_SQL_PORT=5432
-      - CUBEJS_ADBC_PORT=4445
+      - CUBEJS_ADBC_PORT=8120
 
       # Use CubeStore for cache/queue
       - CUBEJS_CACHE_AND_QUEUE_DRIVER=cubestore
@@ -296,8 +296,8 @@ CUBEJS_CUBESTORE_PASS=
 # PostgreSQL wire protocol port (default: 5432)
 CUBEJS_PG_SQL_PORT=5432
 
-# Arrow IPC protocol port (default: 4445)
-CUBEJS_ADBC_PORT=4445
+# ADBC(Arrow Native) protocol port (default: 8120)
+CUBEJS_ADBC_PORT=8120
 
 # Legacy variable (deprecated, use CUBEJS_ADBC_PORT)
 # CUBEJS_SQL_PORT=4445
@@ -323,7 +323,7 @@ CUBEJS_EXTERNAL_DEFAULT=cubestore
 |------|---------|----------|---------|
 | 4000 | Cube.js | HTTP/REST | REST API, GraphQL |
 | 5432 | CubeSQL | PostgreSQL Wire | SQL queries via PostgreSQL protocol |
-| 4445 | CubeSQL | Arrow IPC/ADBC | ADBC access - Cube.js as ADBC data source (like SQLite, DuckDB, PostgreSQL, Snowflake) |
+| 8120 | CubeSQL | ADBC(Arrow Native)/ADBC | ADBC access - Cube.js as ADBC data source (like SQLite, DuckDB, PostgreSQL, Snowflake) |
 | 3030 | CubeStore | WebSocket | Pre-aggregation storage, cache, queue |
 
 ## Process Architecture
@@ -338,7 +338,7 @@ CUBEJS_EXTERNAL_DEFAULT=cubestore
 │  │  Process 1: Node.js           │ │
 │  │  ├─ Cube.js Server            │ │
 │  │  ├─ CubeSQL (embedded Rust)   │ │
-│  │  └─ Ports: 4000, 5432, 4445   │ │
+│  │  └─ Ports: 4000, 5432, 8120   │ │
 │  └───────────────┬───────────────┘ │
 │                  │ WebSocket        │
 │                  ▼                  │
@@ -363,7 +363,7 @@ CUBEJS_EXTERNAL_DEFAULT=cubestore
 
 3. **Connection Flow**
    ```
-   Client → CubeSQL (port 5432/4445) → Node.js → CubeStore (port 3030) → Data
+   Client → CubeSQL (port 5432/8120) → Node.js → CubeStore (port 3030) → Data
    ```
 
 4. **Binary Locations**
@@ -427,8 +427,8 @@ export CUBESTORE_LOG_LEVEL=trace
    **Solution**: Change port or kill existing process:
    ```bash
    export CUBEJS_PG_SQL_PORT=15432
-   # Or for Arrow IPC port:
-   export CUBEJS_ADBC_PORT=14445
+   # Or for ADBC(Arrow Native) port:
+   export CUBEJS_ADBC_PORT=18120
    ```
 
 3. **Native module not found**
@@ -473,8 +473,8 @@ export CUBEJS_CUBESTORE_HOST=cubestore-host
 
 **High Performance:**
 ```bash
-# Enable Arrow IPC for better performance
-export CUBEJS_ADBC_PORT=4445
+# Enable ADBC(Arrow Native) for better performance
+export CUBEJS_ADBC_PORT=8120
 
 # Connect using ADBC (Arrow Database Connectivity) instead of PostgreSQL wire
 # ~25-66x faster than HTTP API for large result sets
@@ -484,7 +484,7 @@ export CUBEJS_ADBC_PORT=4445
 
 - [CubeSQL Architecture](../../../rust/cubesql/README.md)
 - [CubeStore Architecture](../../../rust/cubestore/README.md)
-- [Arrow IPC Protocol](./ARROW_IPC_PROTOCOL.md)
+- [ADBC(Arrow Native) Protocol](./ARROW_IPC_PROTOCOL.md)
 - [Deployment Guide](https://cube.dev/docs/deployment)
 
 ## References

@@ -12,7 +12,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}Cube Arrow Native Development Setup${NC}"
+echo -e "${BLUE}Cube ADBC(Arrow Native) Development Setup${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 
@@ -46,9 +46,9 @@ else
     sleep 3
 fi
 
-# Step 2: Build cubesql with Arrow Native support
+# Step 2: Build cubesql with ADBC(Arrow Native) support
 echo ""
-echo -e "${GREEN}Step 2: Building cubesqld with Arrow Native support...${NC}"
+echo -e "${GREEN}Step 2: Building cubesqld with ADBC(Arrow Native) support...${NC}"
 CUBE_ROOT="$SCRIPT_DIR/../../.."
 cd "$CUBE_ROOT/rust/cubesql"
 cargo build --release --bin cubesqld
@@ -86,9 +86,9 @@ fi
 # For dev mode, Cube.js typically uses 'test' or generates one
 CUBE_TOKEN="${CUBESQL_CUBE_TOKEN:-test}"
 
-# Step 4: Start cubesql with both PostgreSQL and Arrow Native protocols
+# Step 4: Start cubesql with both PostgreSQL and ADBC(Arrow Native) protocols
 echo ""
-echo -e "${GREEN}Step 4: Starting cubesqld with Arrow Native support...${NC}"
+echo -e "${GREEN}Step 4: Starting cubesqld with ADBC(Arrow Native) support...${NC}"
 echo ""
 echo -e "${BLUE}Configuration:${NC}"
 echo -e "  Cube.js API: ${CUBE_API_URL}/cubejs-api/v1"

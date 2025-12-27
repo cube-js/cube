@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Arrow Native Protocol Client for CubeSQL
+ADBC(Arrow Native) Protocol Client for CubeSQL
 
-Implements the custom Arrow Native protocol (port 4445) for CubeSQL.
-This protocol wraps Arrow IPC data in a custom message format.
+Implements the custom ADBC protocol (default port 8120) for CubeSQL.
+This protocol wraps ADBC(Arrow Native) data in a custom message format.
 
 Protocol Messages:
 - HandshakeRequest/Response: Protocol version negotiation
 - AuthRequest/Response: Authentication with token
 - QueryRequest: SQL query execution
-- QueryResponseSchema: Arrow IPC schema bytes
-- QueryResponseBatch: Arrow IPC batch bytes (can be multiple)
+- QueryResponseSchema: ADBC(Arrow Native) schema bytes
+- QueryResponseBatch: ADBC(Arrow Native) batch bytes (can be multiple)
 - QueryComplete: Query finished
 
 Message Format:
 - All messages start with: u8 message_type
 - Strings encoded as: u32 length + utf-8 bytes
-- Arrow IPC data: raw bytes (schema or batch)
+- ADBC(Arrow Native) data: raw bytes (schema or batch)
 """
 
 import socket
@@ -43,7 +43,7 @@ class MessageType:
 
 @dataclass
 class QueryResult:
-    """Result from Arrow Native query execution"""
+    """Result from ADBC(Arrow Native) query execution"""
     schema: pa.Schema
     batches: List[pa.RecordBatch]
     rows_affected: int
@@ -74,7 +74,7 @@ class ArrowNativeClient:
         self.session_id: Optional[str] = None
 
     def connect(self):
-        """Connect and authenticate to Arrow Native server"""
+        """Connect and authenticate to ADBC(Arrow Native) server"""
         # Create socket connection
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((self.host, self.port))
@@ -226,21 +226,21 @@ class ArrowNativeClient:
         if payload[0] != MessageType.QUERY_RESPONSE_SCHEMA:
             raise RuntimeError(f"Expected QueryResponseSchema, got 0x{payload[0]:02x}")
 
-        # Extract Arrow IPC schema bytes (after message type and length prefix)
+        # Extract ADBC(Arrow Native) schema bytes (after message type and length prefix)
         schema_len = struct.unpack('>I', payload[1:5])[0]
         schema_bytes = payload[5:5+schema_len]
 
-        # Decode Arrow IPC schema
+        # Decode ADBC(Arrow Native) schema
         reader = ipc.open_stream(io.BytesIO(schema_bytes))
         return reader.schema
 
     def _receive_batch(self, schema: pa.Schema, payload: bytes) -> pa.RecordBatch:
         """Receive QueryResponseBatch (payload already read)"""
-        # Extract Arrow IPC batch bytes (after message type and length prefix)
+        # Extract ADBC(Arrow Native) batch bytes (after message type and length prefix)
         batch_len = struct.unpack('>I', payload[1:5])[0]
         batch_bytes = payload[5:5+batch_len]
 
-        # Decode Arrow IPC batch
+        # Decode ADBC(Arrow Native) batch
         reader = ipc.open_stream(io.BytesIO(batch_bytes))
         batch = reader.read_next_batch()
         return batch
@@ -311,7 +311,7 @@ class ArrowNativeClient:
 if __name__ == "__main__":
     import time
 
-    print("Testing Arrow Native Client")
+    print("Testing ADBC(Arrow Native) Client")
     print("=" * 60)
 
     with ArrowNativeClient(host="localhost", port=8120, token="test") as client:

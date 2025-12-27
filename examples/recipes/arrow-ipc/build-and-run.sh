@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}Building Cube with Arrow Native Support${NC}"
+echo -e "${BLUE}Building Cube with ADBC(Arrow Native) Support${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 

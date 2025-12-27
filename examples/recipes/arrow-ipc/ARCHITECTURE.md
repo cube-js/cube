@@ -1,17 +1,17 @@
-# CubeSQL Arrow Native Server - Architecture & Approach
+# CubeSQL ADBC(Arrow Native) Server - Architecture & Approach
 
 ## Overview
 
-This PR introduces **Arrow IPC Native protocol** for CubeSQL, delivering 8-15x performance improvements over the standard REST HTTP API through efficient binary data transfer.
+This PR introduces **ADBC(Arrow Native) Native protocol** for CubeSQL, delivering 8-15x performance improvements over the standard REST HTTP API through efficient binary data transfer.
 
 What this PR adds:
-1. **Arrow IPC native protocol (port 8120)** ⭐ NEW - Binary protocol for zero-copy data transfer
+1. **ADBC(Arrow Native) native protocol (port 8120)** ⭐ NEW - Binary protocol for zero-copy data transfer
 2. **Optional Arrow Results Cache** ⭐ NEW - Transparent performance boost for repeated queries
 3. **Production-ready implementation** - Minimal overhead, zero breaking changes
 
 ## The Complete Approach
 
-### 1. What's NEW: Arrow Native vs REST API
+### 1. What's NEW: ADBC(Arrow Native) vs REST API
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,18 +23,18 @@ What this PR adds:
                  │    └─> JSON over HTTP
                  │         └─> Cube API → CubeStore
                  │
-                 └─── Arrow IPC Native (Port 8120) ⭐ NEW
+                 └─── ADBC(Arrow Native) Native (Port 8120) ⭐ NEW
                       └─> Binary Arrow Protocol
                            └─> Optional Arrow Results Cache ⭐ NEW
                                 └─> Cube API → CubeStore
 ```
 
-**Key Comparison**: This PR focuses on **Arrow Native (8120) vs REST API (4008)** performance.
+**Key Comparison**: This PR focuses on **ADBC(Arrow Native) (8120) vs REST API (4008)** performance.
 
 ### 2. New Components Added by This PR
 
-**Arrow IPC Native Protocol** ⭐ NEW:
-- Direct Arrow IPC communication (port 8120)
+**ADBC(Arrow Native) Native Protocol** ⭐ NEW:
+- Direct ADBC(Arrow Native) communication (port 8120)
 - Binary protocol for efficient data transfer
 - Zero-copy RecordBatch streaming
 
@@ -201,7 +201,7 @@ Benefits of cacheless setup with CubeStore:
 - Reduces memory overhead (no duplicate caching)
 - Provides consistent query times
 - Simplifies architecture (single caching layer: CubeStore)
-- **Still gets 8-15x speedup** from Arrow Native binary protocol vs REST API
+- **Still gets 8-15x speedup** from ADBC(Arrow Native) binary protocol vs REST API
 
 ## Use Cases
 
@@ -213,7 +213,7 @@ Benefits of cacheless setup with CubeStore:
 3. **Ad-hoc analytics** - Users re-running similar queries
 4. **Development/testing** - Fast iteration on same queries
 
-**Benefit**: 3-10x additional speedup on cache hits (on top of Arrow Native baseline)
+**Benefit**: 3-10x additional speedup on cache hits (on top of ADBC(Arrow Native) baseline)
 
 ### Query Result Cache Disabled
 
@@ -221,7 +221,7 @@ Benefits of cacheless setup with CubeStore:
 1. **CubeStore pre-aggregations** - Data already cached at storage layer
    - CubeStore is a cache itself - one cache is enough
    - Avoids double-caching overhead
-   - Still 8-15x faster than REST API via Arrow Native protocol
+   - Still 8-15x faster than REST API via ADBC(Arrow Native) protocol
 
 2. **Unique queries** - Each query is different
    - Analytics with high query cardinality

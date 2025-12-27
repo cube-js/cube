@@ -5,7 +5,7 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo "Verifying Cube Arrow Native Build"
+echo "Verifying Cube ADBC(Arrow Native) Build"
 echo "=================================="
 echo ""
 
@@ -18,7 +18,7 @@ fi
 
 echo -e "${GREEN}✓ cubesqld binary found ($(ls -lh bin/cubesqld | awk '{print $5}'))${NC}"
 
-# Check for Arrow Native symbols
+# Check for ADBC(Arrow Native) symbols
 if nm bin/cubesqld 2>/dev/null | grep -q "ArrowNativeServer"; then
     echo -e "${GREEN}✓ ArrowNativeServer symbol found in binary${NC}"
 else
@@ -38,11 +38,11 @@ CUBESQL_PID=$!
 sleep 2
 
 # Check if it's listening on the Arrow port
-if lsof -Pi :4445 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-    echo -e "${GREEN}✓ Arrow Native server listening on port 4445${NC}"
+if lsof -Pi :8120 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+    echo -e "${GREEN}✓ ADBC(Arrow Native) server listening on port 8120${NC}"
     ARROW_OK=1
 else
-    echo -e "${RED}✗ Arrow Native server NOT listening on port 4445${NC}"
+    echo -e "${RED}✗ ADBC(Arrow Native) server NOT listening on port 8120${NC}"
     ARROW_OK=0
 fi
 

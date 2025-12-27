@@ -1,11 +1,11 @@
-# Power-of-Three Query Examples - Arrow Native
+# Power-of-Three Query Examples - ADBC(Arrow Native)
 
 **Date:** 2025-12-26
 **Status:** ✅ WORKING
 
 ## Important: Use MEASURE Syntax
 
-Power-of-three cubes work perfectly via Arrow Native when using proper Cube SQL syntax:
+Power-of-three cubes work perfectly via ADBC(Arrow Native) when using proper Cube SQL syntax:
 - ✅ Use `MEASURE(cube.measure_name)` for measures
 - ✅ Use `GROUP BY` with dimensions
 - ❌ Don't query measures as raw columns
@@ -54,7 +54,7 @@ driver_path = Path.join(:code.priv_dir(:adbc), "lib/libadbc_driver_cube.so")
 {:ok, db} = Database.start_link(
   driver: driver_path,
   "adbc.cube.host": "localhost",
-  "adbc.cube.port": "4445",
+  "adbc.cube.port": "8120",
   "adbc.cube.connection_mode": "native",
   "adbc.cube.token": "test"
 )
@@ -264,7 +264,7 @@ When using MEASURE syntax with GROUP BY:
 
 ## Conclusion
 
-**All power-of-three cubes work perfectly with Arrow Native!** 🎉
+**All power-of-three cubes work perfectly with ADBC(Arrow Native)!** 🎉
 
 The only requirement is using proper Cube SQL syntax:
 - Use `MEASURE()` for measures
