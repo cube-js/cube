@@ -20,6 +20,7 @@ export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
   canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
+  adbcPort?: number,
   pgSqlPort?: number,
   sqlUser?: string,
   sqlSuperUser?: string,
@@ -116,6 +117,7 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
+      adbcPort: options.adbcPort,
       contextToApiScopes: async ({ securityContext }) => this.apiGateway.contextToApiScopesFn(
         securityContext,
         getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()

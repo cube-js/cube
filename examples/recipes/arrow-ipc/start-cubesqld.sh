@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start only the Rust cubesqld server with Arrow Native and PostgreSQL protocols
+# Start only the Rust cubesqld server with ADBC Server and PostgreSQL protocols
 # Requires Cube.js API server to be running (see start-cube-api.sh)
 
 set -e
@@ -54,7 +54,7 @@ echo -e "${YELLOW}Cube.js API is running on port ${CUBE_API_PORT}${NC}"
 
 # Check if cubesqld ports are free
 #PG_PORT=${CUBEJS_PG_SQL_PORT:-4444}
-ARROW_PORT=${CUBEJS_ARROW_PORT:-4445}
+ADBC_PORT=${CUBEJS_ADBC_PORT:-8120}
 
 echo ""
 echo -e "${GREEN}Checking port availability...${NC}"
@@ -64,12 +64,12 @@ if check_port ${PG_PORT}; then
     exit 1
 fi
 
-if check_port ${ARROW_PORT}; then
-    echo -e "${RED}Error: Port ${ARROW_PORT} is already in use${NC}"
-    echo "Kill the process with: kill \$(lsof -ti:${ARROW_PORT})"
+if check_port ${ADBC_PORT}; then
+    echo -e "${RED}Error: Port ${ADBC_PORT} is already in use${NC}"
+    echo "Kill the process with: kill \$(lsof -ti:${ADBC_PORT})"
     exit 1
 fi
-echo -e "${YELLOW}Ports ${PG_PORT} and ${ARROW_PORT} are available${NC}"
+echo -e "${YELLOW}Ports ${PG_PORT} and ${ADBC_PORT} are available${NC}"
 
 # Determine cubesqld binary location
 CUBE_ROOT="$SCRIPT_DIR/../../.."
@@ -110,7 +110,7 @@ CUBE_TOKEN="${CUBESQL_CUBE_TOKEN:-test}"
 export CUBESQL_CUBE_URL="${CUBE_API_URL}"
 export CUBESQL_CUBE_TOKEN="${CUBE_TOKEN}"
 # export CUBESQL_PG_PORT="4444"
-export CUBEJS_ARROW_PORT="${ARROW_PORT}"
+export CUBEJS_ADBC_PORT="${ADBC_PORT}"
 export CUBESQL_LOG_LEVEL="${CUBESQL_LOG_LEVEL:-trace}"
 export CUBESTORE_LOG_LEVEL="error"
 
@@ -124,7 +124,7 @@ echo -e "${BLUE}Configuration:${NC}"
 echo -e "  Cube API URL: ${CUBESQL_CUBE_URL}"
 echo -e "  Cube Token: ${CUBESQL_CUBE_TOKEN}"
 echo -e "  PostgreSQL Port: ${CUBESQL_PG_PORT}"
-echo -e "  Arrow Native Port: ${CUBEJS_ARROW_PORT}"
+echo -e "  ADBC Port: ${CUBEJS_ADBC_PORT}"
 echo -e "  Log Level: ${CUBESQL_LOG_LEVEL}"
 echo -e "  Arrow Results Cache: ${CUBESQL_ARROW_RESULTS_CACHE_ENABLED} (max: ${CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES}, ttl: ${CUBESQL_ARROW_RESULTS_CACHE_TTL}s)"
 echo ""

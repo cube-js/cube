@@ -5,7 +5,7 @@
 This PR introduces **Arrow IPC Native protocol** for CubeSQL, delivering 8-15x performance improvements over the standard REST HTTP API through efficient binary data transfer.
 
 What this PR adds:
-1. **Arrow IPC native protocol (port 4445)** ⭐ NEW - Binary protocol for zero-copy data transfer
+1. **Arrow IPC native protocol (port 8120)** ⭐ NEW - Binary protocol for zero-copy data transfer
 2. **Optional Arrow Results Cache** ⭐ NEW - Transparent performance boost for repeated queries
 3. **Production-ready implementation** - Minimal overhead, zero breaking changes
 
@@ -23,18 +23,18 @@ What this PR adds:
                  │    └─> JSON over HTTP
                  │         └─> Cube API → CubeStore
                  │
-                 └─── Arrow IPC Native (Port 4445) ⭐ NEW
+                 └─── Arrow IPC Native (Port 8120) ⭐ NEW
                       └─> Binary Arrow Protocol
                            └─> Optional Arrow Results Cache ⭐ NEW
                                 └─> Cube API → CubeStore
 ```
 
-**Key Comparison**: This PR focuses on **Arrow Native (4445) vs REST API (4008)** performance.
+**Key Comparison**: This PR focuses on **Arrow Native (8120) vs REST API (4008)** performance.
 
 ### 2. New Components Added by This PR
 
 **Arrow IPC Native Protocol** ⭐ NEW:
-- Direct Arrow IPC communication (port 4445)
+- Direct Arrow IPC communication (port 8120)
 - Binary protocol for efficient data transfer
 - Zero-copy RecordBatch streaming
 

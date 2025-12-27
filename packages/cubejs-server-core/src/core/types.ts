@@ -219,6 +219,8 @@ export interface CreateOptions {
   canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
   gatewayPort?: number;
+  sqlPort?: number;
+  adbcPort?: number;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;

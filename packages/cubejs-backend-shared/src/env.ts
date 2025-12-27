@@ -2123,9 +2123,18 @@ const variables: Record<string, (...args: any) => any> = {
   telemetry: () => get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),
-  // SQL Interface
+  // Legacy SQL port (kept for compatibility)
   sqlPort: () => {
     const port = asFalseOrPort(process.env.CUBEJS_SQL_PORT || 'false', 'CUBEJS_SQL_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
+  // ADBC (Arrow Database Connectivity) Interface
+  adbcPort: () => {
+    const port = asFalseOrPort(process.env.CUBEJS_ADBC_PORT || 'false', 'CUBEJS_ADBC_PORT');
     if (port) {
       return port;
     }

@@ -32,7 +32,9 @@ source .env
 # Override to disable built-in protocol servers
 # (cubesqld will provide these instead)
 unset CUBEJS_PG_SQL_PORT
-unset CUBEJS_ARROW_PORT
+export CUBEJS_PG_SQL_PORT=false
+unset CUBEJS_ADBC_PORT
+unset CUBEJS_SQL_PORT
 
 export PORT=${PORT:-4008}
 export CUBEJS_DB_TYPE=${CUBEJS_DB_TYPE:-postgres}

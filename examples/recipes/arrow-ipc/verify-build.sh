@@ -28,7 +28,7 @@ fi
 # Test environment variable parsing
 echo ""
 echo "Testing configuration parsing..."
-export CUBEJS_ARROW_PORT=4445
+export CUBEJS_ADBC_PORT=8120
 export CUBESQL_PG_PORT=4444
 export CUBESQL_LOG_LEVEL=error
 
@@ -68,7 +68,7 @@ if [ $ARROW_OK -eq 1 ] && [ $PG_OK -eq 1 ]; then
     echo ""
     echo "You can now:"
     echo "  - Connect via PostgreSQL: psql -h 127.0.0.1 -p 4444 -U root"
-    echo "  - Connect via Arrow Native: Use ADBC driver with connection_mode=native"
+    echo "  - Connect via ADBC: Use ADBC driver on port 8120"
     echo ""
     echo "To start the full dev environment:"
     echo "  ./dev-start.sh"

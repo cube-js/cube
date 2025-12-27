@@ -179,7 +179,7 @@ impl ConfigObjImpl {
             postgres_bind_address: env::var("CUBESQL_PG_PORT")
                 .ok()
                 .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
-            arrow_native_bind_address: env::var("CUBEJS_ARROW_PORT")
+            arrow_native_bind_address: env::var("CUBEJS_ADBC_PORT")
                 .ok()
                 .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
             nonce: None,

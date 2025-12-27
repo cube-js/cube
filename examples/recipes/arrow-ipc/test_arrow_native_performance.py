@@ -6,7 +6,7 @@ Demonstrates performance improvements from CubeSQL's NEW Arrow Native server
 compared to the standard REST HTTP API.
 
 This test suite measures:
-1. Arrow Native server (port 4445) vs REST HTTP API (port 4008)
+1. ADBC server (port 8120) vs REST HTTP API (port 4008)
 2. Optional cache effectiveness when enabled (miss → hit speedup)
 3. Full materialization timing (complete client experience)
 
@@ -73,11 +73,11 @@ class QueryResult:
 
 
 class ArrowNativePerformanceTester:
-    """Tests Arrow Native server (port 4445) vs REST HTTP API (port 4008)"""
+    """Tests ADBC server (port 8120) vs REST HTTP API (port 4008)"""
 
     def __init__(self,
                  arrow_host: str = "localhost",
-                 arrow_port: int = 4445,
+                 arrow_port: int = 8120,
                  http_url: str = "http://localhost:4008/cubejs-api/v1/load"):
         self.arrow_host = arrow_host
         self.arrow_port = arrow_port
@@ -89,7 +89,7 @@ class ArrowNativePerformanceTester:
         self.cache_enabled = cache_env in ("true", "1", "yes")
 
     def run_arrow_query(self, sql: str, label: str = "") -> QueryResult:
-        """Execute query via Arrow Native server (port 4445) with full materialization"""
+        """Execute query via ADBC server (port 8120) with full materialization"""
         # Connect using Arrow Native client
         with ArrowNativeClient(host=self.arrow_host, port=self.arrow_port, token=self.http_token) as client:
             # Measure query execution
@@ -206,7 +206,7 @@ class ArrowNativePerformanceTester:
         """Test: Small query - Arrow Native vs REST HTTP API"""
         self.print_header(
             "Small Query (200 rows)",
-            f"Arrow Native (4445) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
+            f"Arrow Native (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
@@ -247,7 +247,7 @@ class ArrowNativePerformanceTester:
         """Test: Medium query (1-2K rows) - Arrow Native vs REST HTTP API"""
         self.print_header(
             "Medium Query (1-2K rows)",
-            f"Arrow Native (4445) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
+            f"Arrow Native (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
@@ -298,7 +298,7 @@ class ArrowNativePerformanceTester:
         """Test: Large query (10K+ rows) - Arrow Native vs REST HTTP API"""
         self.print_header(
             "Large Query (10K+ rows)",
-            f"Arrow Native (4445) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
+            f"Arrow Native (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
@@ -349,7 +349,7 @@ class ArrowNativePerformanceTester:
         print(f"\n{Colors.BOLD}{Colors.HEADER}")
         print("=" * 80)
         print("  CUBESQL ARROW NATIVE SERVER PERFORMANCE TEST SUITE")
-        print(f"  Arrow Native (port 4445) vs REST HTTP API (port 4008)")
+        print(f"  Arrow Native (port 8120) vs REST HTTP API (port 4008)")
         cache_status = "expected" if self.cache_enabled else "not expected"
         cache_color = Colors.GREEN if self.cache_enabled else Colors.YELLOW
         print(f"  Arrow Results Cache behavior: {cache_color}{cache_status}{Colors.END}")
@@ -381,7 +381,7 @@ class ArrowNativePerformanceTester:
         except Exception as e:
             print(f"\n{Colors.RED}{Colors.BOLD}ERROR: {e}{Colors.END}")
             print(f"\n{Colors.YELLOW}Make sure:")
-            print(f"  1. Arrow Native server is running on localhost:4445")
+            print(f"  1. ADBC server is running on localhost:8120")
             print(f"  2. Cube REST API is running on localhost:4008")
             print(f"  3. orders_with_preagg cube exists with data")
             print(f"  4. CUBESQL_ARROW_RESULTS_CACHE_ENABLED is set correctly{Colors.END}\n")

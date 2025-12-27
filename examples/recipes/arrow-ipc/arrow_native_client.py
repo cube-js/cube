@@ -60,11 +60,11 @@ class QueryResult:
 
 
 class ArrowNativeClient:
-    """Client for CubeSQL Arrow Native protocol (port 4445)"""
+    """Client for CubeSQL ADBC protocol (default port 8120)"""
 
     PROTOCOL_VERSION = 1
 
-    def __init__(self, host: str = "localhost", port: int = 4445,
+    def __init__(self, host: str = "localhost", port: int = 8120,
                  token: str = "test", database: Optional[str] = None):
         self.host = host
         self.port = port
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     print("Testing Arrow Native Client")
     print("=" * 60)
 
-    with ArrowNativeClient(host="localhost", port=4445, token="test") as client:
+    with ArrowNativeClient(host="localhost", port=8120, token="test") as client:
         print(f"✓ Connected (session: {client.session_id})")
 
         # Test query
