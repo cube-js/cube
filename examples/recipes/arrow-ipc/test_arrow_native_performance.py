@@ -158,113 +158,32 @@ class ArrowNativePerformanceTester:
             return speedup
         return 1.0
 
-    def test_cache_effectiveness(self):
-        """Test 1: Arrow Results Cache miss → hit (only when cache is enabled)"""
-        if not self.cache_enabled:
-            print(f"{Colors.YELLOW}Skipping cache test - Arrow Results Cache is disabled{Colors.END}\n")
-            return None
-
+    def test_arrow_vs_rest(self, limit: int):
+        "LIMIT: "+ str(limit) +" rows - ADBC(Arrow Native) vs REST HTTP API"
         self.print_header(
-            "Optional Arrow Results Cache: Miss → Hit",
-            "Demonstrates cache speedup on repeated queries"
-        )
-
-        sql = """
-        SELECT market_code, brand_code, count, total_amount_sum
-        FROM orders_with_preagg
-        WHERE updated_at >= '2024-01-01'
-        LIMIT 500
-        """
-
-        print(f"{Colors.CYAN}Running same query twice to measure cache effectiveness...{Colors.END}\n")
-
-        # First execution (cache MISS)
-        result1 = self.run_arrow_query(sql, "Cache MISS")
-        time.sleep(0.1)  # Brief pause between queries
-
-        # Second execution (cache HIT)
-        result2 = self.run_arrow_query(sql, "Cache HIT")
-
-        speedup = result1.total_time_ms / result2.total_time_ms if result2.total_time_ms > 0 else 1.0
-        time_saved = result1.total_time_ms - result2.total_time_ms
-
-        print(f"  First query (cache MISS):")
-        print(f"    Query:        {result1.query_time_ms:4}ms")
-        print(f"    Materialize:  {result1.materialize_time_ms:4}ms")
-        print(f"    TOTAL:        {result1.total_time_ms:4}ms")
-        print(f"  Second query (cache HIT):")
-        print(f"    Query:        {result2.query_time_ms:4}ms")
-        print(f"    Materialize:  {result2.materialize_time_ms:4}ms")
-        print(f"    TOTAL:        {result2.total_time_ms:4}ms")
-        print(f"  {Colors.GREEN}{Colors.BOLD}Cache speedup:       {speedup:.1f}x faster{Colors.END}")
-        print(f"  Time saved:          {time_saved}ms")
-        print(f"{Colors.BOLD}{'─' * 80}{Colors.END}\n")
-
-        return speedup
-
-    def test_arrow_vs_rest_small(self):
-        """Test: Small query - ADBC(Arrow Native) vs REST HTTP API"""
-        self.print_header(
-            "Small Query (200 rows)",
+            "Query LIMIT: "+ str(limit),
             f"ADBC(Arrow Native) (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
         )
 
         sql = """
-        SELECT market_code, count
-        FROM orders_with_preagg
-        WHERE updated_at >= '2024-06-01'
-        LIMIT 200
-        """
-
-        http_query = {
-            "measures": ["orders_with_preagg.count"],
-            "dimensions": ["orders_with_preagg.market_code"],
-            "timeDimensions": [{
-                "dimension": "orders_with_preagg.updated_at",
-                "dateRange": ["2024-06-01", "2024-12-31"]
-            }],
-            "limit": 200
-        }
-
-        if self.cache_enabled:
-            # Warm up cache first
-            print(f"{Colors.CYAN}Warming up cache...{Colors.END}")
-            self.run_arrow_query(sql)
-            time.sleep(0.1)
-
-        # Run comparison
-        print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "ADBC(Arrow Native)")
-        rest_result = self.run_http_query(http_query, "REST HTTP")
-
-        self.print_result(arrow_result, "  ")
-        self.print_result(rest_result, "  ")
-        speedup = self.print_comparison(arrow_result, rest_result)
-
-        return speedup
-
-    def test_arrow_vs_rest_medium(self):
-        """Test: Medium query (1-2K rows) - ADBC(Arrow Native) vs REST HTTP API"""
-        self.print_header(
-            "Medium Query (1-2K rows)",
-            f"ADBC(Arrow Native) (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
-        )
-
-        sql = """
-        SELECT market_code, brand_code,
-               count,
+        SELECT date_trunc('hour', updated_at),
+               market_code,
+               brand_code,
+               subtotal_amount_sum,
                total_amount_sum,
-               tax_amount_sum
+               tax_amount_sum,
+               count
         FROM orders_with_preagg
-        WHERE updated_at >= '2024-01-01'
-        LIMIT 2000
-        """
+        ORDER BY 1 desc
+        LIMIT
+        """ + str(limit)
 
         http_query = {
             "measures": [
-                "orders_with_preagg.count",
-                "orders_with_preagg.total_amount_sum",
-                "orders_with_preagg.tax_amount_sum"
+                 "orders_with_preagg.subtotal_amount_sum",
+                 "orders_with_preagg.total_amount_sum",
+                 "orders_with_preagg.tax_amount_sum",
+                 "orders_with_preagg.count"
             ],
             "dimensions": [
                 "orders_with_preagg.market_code",
@@ -272,59 +191,11 @@ class ArrowNativePerformanceTester:
             ],
             "timeDimensions": [{
                 "dimension": "orders_with_preagg.updated_at",
-                "dateRange": ["2024-01-01", "2024-12-31"]
+                "granularity": "hour"
             }],
-            "limit": 2000
-        }
-
-        if self.cache_enabled:
-            # Warm up cache
-            print(f"{Colors.CYAN}Warming up cache...{Colors.END}")
-            self.run_arrow_query(sql)
-            time.sleep(0.1)
-
-        # Run comparison
-        print(f"{Colors.CYAN}Running performance comparison...{Colors.END}\n")
-        arrow_result = self.run_arrow_query(sql, "ADBC(Arrow Native)")
-        rest_result = self.run_http_query(http_query, "REST HTTP")
-
-        self.print_result(arrow_result, "  ")
-        self.print_result(rest_result, "  ")
-        speedup = self.print_comparison(arrow_result, rest_result)
-
-        return speedup
-
-    def test_arrow_vs_rest_large(self):
-        """Test: Large query (10K+ rows) - ADBC(Arrow Native) vs REST HTTP API"""
-        self.print_header(
-            "Large Query (10K+ rows)",
-            f"ADBC(Arrow Native) (8120) vs REST HTTP API (4008) {'[Cache enabled]' if self.cache_enabled else '[No cache]'}"
-        )
-
-        sql = """
-        SELECT market_code, brand_code, updated_at,
-               count,
-               total_amount_sum
-        FROM orders_with_preagg
-        WHERE updated_at >= '2024-01-01'
-        LIMIT 10000
-        """
-
-        http_query = {
-            "measures": [
-                "orders_with_preagg.count",
-                "orders_with_preagg.total_amount_sum"
-            ],
-            "dimensions": [
-                "orders_with_preagg.market_code",
-                "orders_with_preagg.brand_code"
-            ],
-            "timeDimensions": [{
-                "dimension": "orders_with_preagg.updated_at",
-                "granularity": "hour",
-                "dateRange": ["2024-01-01", "2024-12-31"]
-            }],
-            "limit": 10000
+            "order": {
+              "orders_with_preagg.updated_at": "desc"},
+            "limit": limit
         }
 
         if self.cache_enabled:
@@ -360,23 +231,21 @@ class ArrowNativePerformanceTester:
         speedups = []
 
         try:
-            # Test 1: Cache effectiveness (only if enabled)
-            if self.cache_enabled:
-                speedup1 = self.test_cache_effectiveness()
-                if speedup1:
-                    speedups.append(("Cache Miss → Hit", speedup1))
-
             # Test 2: Small query
-            speedup2 = self.test_arrow_vs_rest_small()
+            speedup2 = self.test_arrow_vs_rest(200)
             speedups.append(("Small Query (200 rows)", speedup2))
 
             # Test 3: Medium query
-            speedup3 = self.test_arrow_vs_rest_medium()
-            speedups.append(("Medium Query (1-2K rows)", speedup3))
+            speedup3 = self.test_arrow_vs_rest(2000)
+            speedups.append(("Medium Query (2K rows)", speedup3))
 
             # Test 4: Large query
-            speedup4 = self.test_arrow_vs_rest_large()
-            speedups.append(("Large Query (10K+ rows)", speedup4))
+            speedup4 = self.test_arrow_vs_rest(20000)
+            speedups.append(("Large Query (20K rows)", speedup4))
+
+            # Test 5: Largest query
+            speedup5 = self.test_arrow_vs_rest(50000)
+            speedups.append(("Largest Query Allowed 50K rows", speedup5))
 
         except Exception as e:
             print(f"\n{Colors.RED}{Colors.BOLD}ERROR: {e}{Colors.END}")
