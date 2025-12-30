@@ -76,15 +76,18 @@ class ArrowNativePerformanceTester:
     """Tests ADBC server (port 8120) vs REST HTTP API (port 4008)"""
 
     def __init__(self,
-                 arrow_host: str = "localhost",
+                 arrow_host: str = "192.168.0.249",
                  arrow_port: int = 8120,
-                 http_url: str = "http://localhost:4008/cubejs-api/v1/load"):
+                 http_url: str = "http://192.168.0.249:4008/cubejs-api/v1/load"):
         self.arrow_host = arrow_host
         self.arrow_port = arrow_port
         self.http_url = http_url
         self.http_token = "test"  # Default token
 
         # Detect cache mode from environment
+        print(self.arrow_host)
+        print(self.http_url)
+        
         cache_env = os.getenv("CUBESQL_ARROW_RESULTS_CACHE_ENABLED", "true").lower()
         self.cache_enabled = cache_env in ("true", "1", "yes")
 
