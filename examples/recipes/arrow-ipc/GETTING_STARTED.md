@@ -162,72 +162,6 @@ Disable query result cache when using **CubeStore pre-aggregations**. CubeStore 
 
 **Verification**: Check logs for `"Query result cache: DISABLED (using ADBC(Arrow Native) baseline performance)"`. Cache operations are completely bypassed when disabled.
 
-### Database Connection
-
-Edit `.env` file:
-```bash
-PORT=4008                    # Cube API port
-CUBEJS_DB_HOST=localhost
-CUBEJS_DB_PORT=7432
-CUBEJS_DB_NAME=pot_examples_dev
-CUBEJS_DB_USER=postgres
-CUBEJS_DB_PASS=postgres
-```
-
-## Manual Testing
-
-### Using psql
-
-```bash
-# Connect to CubeSQL
-psql -h 127.0.0.1 -p 4444 -U username -d db
-
-# Run a query (cache MISS)
-SELECT market_code, brand_code, count, total_amount_sum
-FROM orders_with_preagg
-WHERE updated_at >= '2024-01-01'
-LIMIT 100;
--- Time: 850ms
-
-# Run same query again (cache HIT)
--- Time: 120ms (7x faster!)
-```
-
-### Using Python REPL
-
-```python
-import psycopg2
-import time
-
-conn = psycopg2.connect("postgresql://username:password@localhost:4444/db")
-cursor = conn.cursor()
-
-# First execution
-start = time.time()
-cursor.execute("SELECT * FROM orders_with_preagg LIMIT 1000")
-results = cursor.fetchall()
-print(f"Cache miss: {(time.time() - start)*1000:.0f}ms")
-
-# Second execution
-start = time.time()
-cursor.execute("SELECT * FROM orders_with_preagg LIMIT 1000")
-results = cursor.fetchall()
-print(f"Cache hit: {(time.time() - start)*1000:.0f}ms")
-```
-
-## Troubleshooting
-
-### Port Already in Use
-
-```bash
-# Kill process on port 4444
-kill $(lsof -ti:4444)
-
-# Kill process on port 4008
-kill $(lsof -ti:4008)
-```
-
-### Database Connection Failed
 
 ```bash
 # Check PostgreSQL is running
@@ -253,21 +187,6 @@ export CUBESQL_QUERY_CACHE_ENABLED=true
 ./start-cubesqld.sh
 ```
 
-### Python Test Failures
-
-**Missing dependencies**:
-```bash
-pip install psycopg2-binary requests
-```
-
-**Connection refused**:
-- Ensure CubeSQL is running on port 4444
-- Check with: `lsof -i:4444`
-
-**Authentication failed**:
-- Default credentials: username=`username`, password=`password`
-- Set in `test_arrow_native_performance.py` if different
-
 ## Next Steps
 
 ### For Developers
@@ -277,7 +196,6 @@ pip install psycopg2-binary requests
    - `rust/cubesql/cubesql/src/sql/arrow_native/server.rs`
 
 2. **Read the architecture**:
-   - `ARCHITECTURE.md` - Complete technical overview
    - `LOCAL_VERIFICATION.md` - How to verify the PR
 
 3. **Run the full test suite**:
@@ -309,4 +227,3 @@ pip install psycopg2-binary requests
 - **Local Verification**: `LOCAL_VERIFICATION.md`
 - **Sample Data**: `sample_data.sql.gz` (240KB, 3000 orders)
 - **Python Tests**: `test_arrow_native_performance.py`
-- **Documentation**: `/home/io/projects/learn_erl/power-of-three-examples/doc/`
