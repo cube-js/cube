@@ -42,7 +42,7 @@ jobs:
           DOCKER_BUILD_RECORD_UPLOAD: false
           DOCKER_BUILD_SUMMARY: true
         with:
-          push: ${{ github.ref == 'refs/heads/gorgias' }}
+          push: true # ${{ github.ref == 'refs/heads/gorgias' }}
           context: rust/cubestore
           file: rust/cubestore/gorgias.Dockerfile
           tags: |
