@@ -6,14 +6,14 @@ The CI will build and push the image for the `gorgisa` branch but only build the
 Locall, build and tag the image with:
 
 ```bash
-docker build -t us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.79-gorgias -f rust/cubestore/gorgias.Dockerfile rust/cubestore
+docker build -t us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.80-gorgias -f rust/cubestore/gorgias.Dockerfile rust/cubestore
 
-docker tag us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.79-gorgias \
-  us-central1-docker.pkg.dev/gorgias-revenue-staging/container-images/cubestore:v0.35.79-gorgias
-docker tag us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.79-gorgias \
-  us-east1-docker.pkg.dev/gorgias-helpdesk-production/container-images/cubestore:v0.35.79-gorgias
-docker tag us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.79-gorgias \
-  us-central1-docker.pkg.dev/gorgias-revenue-production/container-images/cubestore:v0.35.79-gorgias
+docker tag us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.80-gorgias \
+  us-central1-docker.pkg.dev/gorgias-revenue-staging/container-images/cubestore:v0.35.80-gorgias
+docker tag us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.80-gorgias \
+  us-east1-docker.pkg.dev/gorgias-helpdesk-production/container-images/cubestore:v0.35.80-gorgias
+docker tag us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.80-gorgias \
+  us-central1-docker.pkg.dev/gorgias-revenue-production/container-images/cubestore:v0.35.80-gorgias
 ```
 
 Then push the image to the registry with:
@@ -23,10 +23,10 @@ Then push the image to the registry with:
 gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
 gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-docker push us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.79-gorgias
-docker push us-central1-docker.pkg.dev/gorgias-revenue-staging/container-images/cubestore:v0.35.79-gorgias
-docker push us-east1-docker.pkg.dev/gorgias-helpdesk-production/container-images/cubestore:v0.35.79-gorgias
-docker push us-central1-docker.pkg.dev/gorgias-revenue-production/container-images/cubestore:v0.35.79-gorgias
+docker push us-east1-docker.pkg.dev/gorgias-helpdesk-staging/container-images/cubestore:v0.35.80-gorgias
+docker push us-central1-docker.pkg.dev/gorgias-revenue-staging/container-images/cubestore:v0.35.80-gorgias
+docker push us-east1-docker.pkg.dev/gorgias-helpdesk-production/container-images/cubestore:v0.35.80-gorgias
+docker push us-central1-docker.pkg.dev/gorgias-revenue-production/container-images/cubestore:v0.35.80-gorgias
 
 ```
 
