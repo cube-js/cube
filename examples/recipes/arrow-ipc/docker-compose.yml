@@ -2,7 +2,7 @@ services:
   postgres:
     image: docker.io/postgres:14
     restart: always
-    command: -c 'max_connections=1024'
+    command: -c 'max_connections=1024' -c 'shared_buffers=10GB'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
