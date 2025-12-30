@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "execute_query(r#\"\n                WITH\n                    t1 AS (\n                        SELECT 1::int2 AS i1\n                    ),\n                    t2 AS (\n                        SELECT 1::int4 AS i2\n                    )\n                    SELECT\n                        *\n                    FROM\n                        t1 LEFT JOIN t2 ON (t1.i1 = t2.i2)\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL,).await.unwrap()"
+---
++----+----+
+| i1 | i2 |
++----+----+
+| 1  | 1  |
++----+----+

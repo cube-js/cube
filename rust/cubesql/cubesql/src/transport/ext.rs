@@ -199,7 +199,7 @@ impl V1CubeMetaExt for CubeMeta {
             columns.push(CubeColumn {
                 member_name: measure.name.clone(),
                 name: measure.get_real_name(),
-                description: None,
+                description: measure.description.clone(),
                 column_type: measure.get_sql_type(),
                 can_be_null: false,
             });
@@ -209,7 +209,7 @@ impl V1CubeMetaExt for CubeMeta {
             columns.push(CubeColumn {
                 member_name: dimension.name.clone(),
                 name: dimension.get_real_name(),
-                description: None,
+                description: dimension.description.clone(),
                 column_type: dimension.get_sql_type(),
                 can_be_null: dimension.sql_can_be_null(),
             });
@@ -219,7 +219,7 @@ impl V1CubeMetaExt for CubeMeta {
             columns.push(CubeColumn {
                 member_name: segment.name.clone(),
                 name: segment.get_real_name(),
-                description: None,
+                description: segment.description.clone(),
                 column_type: ColumnType::Boolean,
                 can_be_null: false,
             });

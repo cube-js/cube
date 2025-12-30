@@ -688,21 +688,30 @@ describe('SQL Generation', () => {
     /** @type {Compilers} */
     const compilers = prepareYamlCompiler(
       createSchemaYaml({
-        cubes: [
-          {
-            name: 'Order',
-            sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
-            measures: [{
-              name: 'count',
-              type: 'count',
-            }],
-            dimensions: [{
-              name: 'type',
-              sql: 'type',
-              type: 'string'
-            }]
-          },
-        ]
+        cubes: [{
+          name: 'Order',
+          sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
+          measures: [{
+            name: 'count',
+            type: 'count',
+          }],
+          dimensions: [{
+            name: 'type',
+            sql: 'type',
+            type: 'string'
+          }]
+        }],
+        views: [{
+          name: 'orders_view',
+          cubes: [{
+            join_path: 'Order',
+            prefix: true,
+            includes: [
+              'type',
+              'count',
+            ]
+          }]
+        }]
       })
     );
 
@@ -856,6 +865,23 @@ describe('SQL Generation', () => {
       });
       const cubeSQL = query.cubeSql('Order');
       expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
+    });
+
+    it('propagate filter params from view into cube\'s query', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      console.log('TEST: ', cubeSQL);
+      expect(cubeSQL).toContain('select * from order where ((type = $0$))');
     });
   });
 

@@ -59,7 +59,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     ops::Index,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 pub use super::rewriter::CubeRunner;
@@ -170,8 +170,8 @@ macro_rules! add_plan_list_node {
     }};
 }
 
-lazy_static! {
-    static ref EXCLUDED_PARAM_VALUES: HashSet<ScalarValue> = vec![
+static EXCLUDED_PARAM_VALUES: LazyLock<HashSet<ScalarValue>> = LazyLock::new(|| {
+    vec![
         ScalarValue::Utf8(Some("second".to_string())),
         ScalarValue::Utf8(Some("minute".to_string())),
         ScalarValue::Utf8(Some("hour".to_string())),
@@ -182,8 +182,8 @@ lazy_static! {
     ]
     .into_iter()
     .chain((0..50).map(|i| ScalarValue::Int64(Some(i))))
-    .collect();
-}
+    .collect()
+});
 
 pub struct LogicalPlanToLanguageConverter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
