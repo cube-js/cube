@@ -933,14 +933,6 @@ The default [time zone][ref-time-zone] for queries.
 You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
 `America/Los_Angeles`.
 
-<WarningBox>
-
-Increasing the maximum row limit may cause out-of-memory (OOM) crashes and make
-Cube susceptible to denial-of-service (DoS) attacks if it's exposed to
-untrusted environments.
-
-</WarningBox>
-
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
 [API scopes][ref-rest-scopes] used to allow or disallow access to REST API
@@ -1233,6 +1225,15 @@ after it has finished writing the last response, before a socket will be destroy
 | ----------------------------------------- | ------------------------ | ------------------------ |
 | A valid number or string representing one | NodeJS's version default | NodeJS's version default |
 
+## `CUBEJS_MAX_REQUEST_SIZE`
+
+The maximum allowed size for incoming requests. Applies to both HTTP body parser
+and WebSocket message payload limits. Must be between `100kb` and `64mb`.
+
+| Possible Values                                   | Default in Development | Default in Production |
+| ------------------------------------------------- | ---------------------- | --------------------- |
+| A size string between 100kb and 64mb (e.g., 1mb)  | `50mb`                 | `50mb`                |
+
 ## `CUBEJS_SQL_USER`
 
 A username required to access the [SQL API][ref-sql-api].
@@ -1292,14 +1293,7 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                | `true`               |
-
-<InfoBox>
-
-Query pushdown in the SQL API is available in public preview.
-[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
-
-</InfoBox>
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBESQL_STREAM_MODE`
 

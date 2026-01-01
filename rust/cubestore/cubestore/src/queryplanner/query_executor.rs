@@ -1,14 +1,18 @@
-use crate::cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster};
+use crate::cluster::{
+    pick_worker_by_ids, pick_worker_by_partitions, Cluster, WorkerPlanningParams,
+};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::optimizations::CubeQueryPlanner;
+use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
+use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
+use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
 use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, pp_plan, PPOptions};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
@@ -21,35 +25,61 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
-    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array,
-    Int96Decimal10Array, Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array,
-    Int96Decimal4Array, Int96Decimal5Array, MutableArrayData, StringArray,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
+    Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::compute::SortOptions;
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
-use datafusion::arrow::ipc::writer::MemStreamWriter;
+use datafusion::arrow::ipc::writer::StreamWriter;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
-use datafusion::datasource::TableProvider;
+use datafusion::catalog::Session;
+use datafusion::common::ToDFSchema;
+use datafusion::config::TableParquetOptions;
+use datafusion::datasource::listing::PartitionedFile;
+use datafusion::datasource::object_store::ObjectStoreUrl;
+use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
+use datafusion::datasource::physical_plan::{
+    FileScanConfig, ParquetFileReaderFactory, ParquetSource,
+};
+use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
-use datafusion::logical_plan;
-use datafusion::logical_plan::{Expr, LogicalPlan};
+use datafusion::execution::TaskContext;
+use datafusion::logical_expr::{Expr, LogicalPlan};
+use datafusion::physical_expr;
+use datafusion::physical_expr::LexOrdering;
+use datafusion::physical_expr::{
+    Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
+};
+use datafusion::physical_optimizer::aggregate_statistics::AggregateStatistics;
+use datafusion::physical_optimizer::combine_partial_final_agg::CombinePartialFinalAggregate;
+use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
+use datafusion::physical_optimizer::join_selection::JoinSelection;
+use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
+use datafusion::physical_optimizer::limited_distinct_aggregation::LimitedDistinctAggregation;
+use datafusion::physical_optimizer::output_requirements::OutputRequirements;
+use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
+use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
+use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
+use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
+use datafusion::physical_optimizer::PhysicalOptimizerRule;
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::{
-    MetadataCacheFactory, NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
-};
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::sorts::sort::SortExec;
+use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
+use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
+    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
+    PlanProperties, SendableRecordBatchStream,
 };
+use datafusion::prelude::{and, SessionConfig, SessionContext};
+use datafusion_datasource::memory::MemorySourceConfig;
+use datafusion_datasource::source::DataSourceExec;
+use futures_util::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
@@ -64,6 +94,9 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
+use super::serialized_plan::PreSerializedPlan;
+use super::{try_make_memory_data_source, QueryPlannerImpl};
+
 #[automock]
 #[async_trait]
 pub trait QueryExecutor: DIService + Send + Sync {
@@ -76,6 +109,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError>;
@@ -89,6 +123,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
     async fn worker_plan(
         &self,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
@@ -97,6 +132,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
     async fn pp_worker_plan(
         &self,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<String, CubeError>;
@@ -105,13 +141,22 @@ pub trait QueryExecutor: DIService + Send + Sync {
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
 
 pub struct QueryExecutorImpl {
-    // TODO: Why do we need a MetadataCacheFactory when we have a ParquetMetadataCache?
+    // TODO: Why do we need a MetadataCacheFactory when we have a ParquetMetadataCache?  (We use its make_session_config() now, TODO rename stuff)
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
+
+impl QueryExecutorImpl {
+    fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
+        // This is supposed to be identical to QueryImplImpl::execution_context.
+        Ok(Arc::new(QueryPlannerImpl::make_execution_context(
+            self.metadata_cache_factory.make_session_config(),
+        )))
+    }
+}
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
@@ -123,7 +168,10 @@ impl QueryExecutor for QueryExecutorImpl {
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let trace_obj = plan.trace_obj();
+        let create_router_physical_plan_time = SystemTime::now();
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
+        app_metrics::DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_US
+            .report(create_router_physical_plan_time.elapsed()?.as_micros() as i64);
         let split_plan = physical_plan;
 
         trace!(
@@ -140,7 +188,10 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let execution_time = SystemTime::now();
 
-        let results = collect(split_plan.clone()).instrument(collect_span).await;
+        let session_context = self.execution_context()?;
+        let results = collect(split_plan.clone(), session_context.task_ctx())
+            .instrument(collect_span)
+            .await;
         let execution_time = execution_time.elapsed()?;
         debug!("Query data processing time: {:?}", execution_time,);
         app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
@@ -153,7 +204,13 @@ impl QueryExecutor for QueryExecutorImpl {
             debug!(
                 "Slow Query Physical Plan ({:?}): {}",
                 execution_time,
-                pp_phys_plan(split_plan.as_ref())
+                pp_phys_plan_ext(
+                    split_plan.as_ref(),
+                    &PPOptions {
+                        show_metrics: true,
+                        ..PPOptions::none()
+                    }
+                ),
             );
         }
         if results.is_err() {
@@ -175,18 +232,24 @@ impl QueryExecutor for QueryExecutorImpl {
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
         let data_loaded_size = DataLoadedSize::new();
+        let create_worker_physical_plan_time = SystemTime::now();
         let (physical_plan, logical_plan) = self
             .worker_plan(
                 plan,
+                worker_planning_params,
                 remote_to_local_names,
                 chunk_id_to_record_batches,
                 Some(data_loaded_size.clone()),
             )
             .await?;
+        app_metrics::DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_US
+            .report(create_worker_physical_plan_time.elapsed()?.as_micros() as i64);
+
         let worker_plan;
         let max_batch_rows;
         if let Some((p, s)) = get_worker_plan(&physical_plan) {
@@ -205,7 +268,8 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-        let results = collect(worker_plan.clone())
+        let session_context = self.execution_context()?;
+        let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
                 "collect_physical_plan"
@@ -219,12 +283,18 @@ impl QueryExecutor for QueryExecutorImpl {
             warn!(
                 "Slow Partition Query ({:?}):\n{}",
                 execution_time.elapsed()?,
-                pp_plan(&logical_plan)
+                pp_plan(&logical_plan),
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {}",
                 execution_time.elapsed()?,
-                pp_phys_plan(worker_plan.as_ref())
+                pp_phys_plan_ext(
+                    worker_plan.as_ref(),
+                    &PPOptions {
+                        show_metrics: true,
+                        ..PPOptions::none()
+                    }
+                ),
             );
         }
         if results.is_err() {
@@ -249,49 +319,63 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(
+        let pre_serialized_plan = plan.to_pre_serialized(
             HashMap::new(),
             HashMap::new(),
             NoopParquetMetadataCache::new(),
         )?;
-        let serialized_plan = Arc::new(plan);
-        let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
-        Ok((
-            ctx.clone().create_physical_plan(&plan_to_move.clone())?,
-            plan_to_move,
-        ))
+        let pre_serialized_plan = Arc::new(pre_serialized_plan);
+        let ctx = self.router_context(cluster.clone(), pre_serialized_plan.clone())?;
+        // We don't want to use session_state.create_physical_plan(...) because it redundantly
+        // optimizes the logical plan, which has already been optimized before it was put into a
+        // SerializedPlan (and that takes too much time).
+        let session_state = ctx.state();
+        let execution_plan = session_state
+            .query_planner()
+            .create_physical_plan(pre_serialized_plan.logical_plan(), &session_state)
+            .await?;
+        Ok((execution_plan, pre_serialized_plan.logical_plan().clone()))
     }
 
     async fn worker_plan(
         &self,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(
+        let pre_serialized_plan = plan.to_pre_serialized(
             remote_to_local_names,
             chunk_id_to_record_batches,
             self.parquet_metadata_cache.cache().clone(),
         )?;
-        let plan = Arc::new(plan);
-        let ctx = self.worker_context(plan.clone(), data_loaded_size)?;
-        let plan_ctx = ctx.clone();
-        Ok((
-            plan_ctx.create_physical_plan(&plan_to_move.clone())?,
-            plan_to_move,
-        ))
+        let pre_serialized_plan = Arc::new(pre_serialized_plan);
+        let ctx = self.worker_context(
+            pre_serialized_plan.clone(),
+            worker_planning_params,
+            data_loaded_size,
+        )?;
+        // We don't want to use session_state.create_physical_plan(...); see comment in router_plan.
+        let session_state = ctx.state();
+        let execution_plan = session_state
+            .query_planner()
+            .create_physical_plan(pre_serialized_plan.logical_plan(), &session_state)
+            .await?;
+        Ok((execution_plan, pre_serialized_plan.logical_plan().clone()))
     }
 
     async fn pp_worker_plan(
         &self,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
             .worker_plan(
                 plan,
+                worker_planning_params,
                 remote_to_local_names,
                 chunk_id_to_record_batches,
                 None,
@@ -325,40 +409,94 @@ impl QueryExecutorImpl {
         })
     }
 
+    /// Only used for create_physical_plan, not executing the plan.  TODO upgrade DF: Make fewer distinct SessionContexts.
     fn router_context(
         &self,
         cluster: Arc<dyn Cluster>,
-        serialized_plan: Arc<SerializedPlan>,
-    ) -> Result<Arc<ExecutionContext>, CubeError> {
-        Ok(Arc::new(ExecutionContext::with_config(
-            ExecutionConfig::new()
-                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
-                .with_batch_size(4096)
-                .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
-                    cluster,
-                    serialized_plan,
-                    self.memory_handler.clone(),
-                ))),
-        )))
+        serialized_plan: Arc<PreSerializedPlan>,
+    ) -> Result<Arc<SessionContext>, CubeError> {
+        self.make_context(CubeQueryPlanner::new_on_router(
+            cluster,
+            serialized_plan,
+            self.memory_handler.clone(),
+        ))
     }
 
+    /// Only used for create_physical_plan, not executing the plan.  TODO upgrade DF: Make fewer distinct SessionContexts.
     fn worker_context(
         &self,
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
+        worker_planning_params: WorkerPlanningParams,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
-    ) -> Result<Arc<ExecutionContext>, CubeError> {
-        Ok(Arc::new(ExecutionContext::with_config(
-            ExecutionConfig::new()
-                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
-                .with_batch_size(4096)
-                .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
-                    serialized_plan,
-                    self.memory_handler.clone(),
-                    data_loaded_size,
-                ))),
-        )))
+    ) -> Result<Arc<SessionContext>, CubeError> {
+        self.make_context(CubeQueryPlanner::new_on_worker(
+            serialized_plan,
+            worker_planning_params,
+            self.memory_handler.clone(),
+            data_loaded_size.clone(),
+        ))
+    }
+
+    /// Currently, only used for physical planning, not even execution.  TODO upgrade DF: Make fewer distinct SessionContexts.
+    fn make_context(
+        &self,
+        query_planner: CubeQueryPlanner,
+    ) -> Result<Arc<SessionContext>, CubeError> {
+        let config = self.session_config();
+        let session_state = QueryPlannerImpl::minimal_session_state_from_final_config(config)
+            .with_query_planner(Arc::new(query_planner))
+            .with_physical_optimizer_rules(self.physical_optimizer_rules())
+            .build();
+        let ctx = SessionContext::new_with_state(session_state);
+        Ok(Arc::new(ctx))
+    }
+
+    fn physical_optimizer_rules(&self) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
+        vec![
+            // Cube rules
+            Arc::new(PreOptimizeRule::new()),
+            // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
+            Arc::new(OutputRequirements::new_add_mode()),
+            Arc::new(AggregateStatistics::new()),
+            Arc::new(JoinSelection::new()),
+            Arc::new(LimitedDistinctAggregation::new()),
+            // Arc::new(EnforceDistribution::new()),
+            Arc::new(CombinePartialFinalAggregate::new()),
+            Arc::new(EnforceSorting::new()),
+            Arc::new(OptimizeAggregateOrder::new()),
+            Arc::new(ProjectionPushdown::new()),
+            // Also disabled before DF 46 upgrade; re-disabled because it uses too much memory.
+            // Arc::new(CoalesceBatches::new()),
+            Arc::new(OutputRequirements::new_remove_mode()),
+            Arc::new(TopKAggregation::new()),
+            Arc::new(ProjectionPushdown::new()),
+            Arc::new(LimitPushdown::new()),
+            Arc::new(SanityCheckPlan::new()),
+        ]
+    }
+
+    fn session_config(&self) -> SessionConfig {
+        // Currently, only used for physical planning.
+
+        let mut config = self
+            .metadata_cache_factory
+            .make_session_config()
+            .with_batch_size(QueryPlannerImpl::EXECUTION_BATCH_SIZE)
+            // TODO upgrade DF if less than 2 then there will be no MergeJoin. Decide on repartitioning.
+            .with_target_partitions(2)
+            .with_prefer_existing_sort(true)
+            .with_round_robin_repartition(false);
+        config.options_mut().execution.parquet.split_row_group_reads = false;
+        config.options_mut().optimizer.prefer_hash_join = false;
+        // Redundant with the commented CoalesceBatches::new() line in `Self::optimizer_rules`
+        config.options_mut().execution.coalesce_batches = false;
+        // Not used in physical planning... included in QueryPlannerImpl::make_execution_context
+        // too; we should try and dedup these two places.
+        config
+            .options_mut()
+            .execution
+            .dont_parallelize_sort_preserving_merge_exec_inputs = true;
+        config
     }
 }
 
@@ -372,7 +510,7 @@ pub struct CubeTable {
     #[serde(skip, default)]
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     #[serde(skip, default = "NoopParquetMetadataCache::new")]
-    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+    parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
 }
 
 impl Debug for CubeTable {
@@ -390,7 +528,7 @@ impl CubeTable {
         index_snapshot: IndexSnapshot,
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
-        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             // Tables are always exposed only using table columns order instead of index one because
@@ -403,7 +541,7 @@ impl CubeTable {
                 .get_columns()
                 .iter()
                 .map(|c| c.clone().into())
-                .collect(),
+                .collect::<Vec<Field>>(),
         ));
         Ok(Self {
             index_snapshot,
@@ -430,7 +568,7 @@ impl CubeTable {
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
     ) -> CubeTable {
         debug_assert!(worker_partition_ids.iter().is_sorted_by_key(|(id, _)| id));
         let mut t = self.clone();
@@ -447,8 +585,8 @@ impl CubeTable {
 
     fn async_scan(
         &self,
-        table_projection: &Option<Vec<usize>>,
-        batch_size: usize,
+        state: &dyn Session,
+        table_projection: Option<&Vec<usize>>,
         filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
         let partition_snapshots = self.index_snapshot.partitions();
@@ -460,7 +598,7 @@ impl CubeTable {
         // We always introduce projection because index and table columns do not match in general
         // case so we can use simpler code without branching to handle it.
         let table_projection = table_projection
-            .clone()
+            .cloned()
             .unwrap_or((0..self.schema.fields().len()).collect::<Vec<_>>());
 
         // Prepare projection
@@ -523,7 +661,7 @@ impl CubeTable {
                         )
                         .clone()
                 })
-                .collect(),
+                .collect::<Vec<Field>>(),
         ));
 
         let index_projection_schema = {
@@ -531,7 +669,7 @@ impl CubeTable {
                 index_projection
                     .iter()
                     .map(|i| index_schema.field(*i).clone())
-                    .collect(),
+                    .collect::<Vec<Field>>(),
             ))
         };
 
@@ -543,6 +681,14 @@ impl CubeTable {
         };
 
         let predicate = combine_filters(filters);
+        let physical_predicate = if let Some(pred) = &predicate {
+            Some(state.create_physical_expr(
+                pred.clone(),
+                &index_schema.as_ref().clone().to_dfschema()?,
+            )?)
+        } else {
+            None
+        };
         for partition_snapshot in partition_snapshots {
             let partition = partition_snapshot.partition();
             let filter = self
@@ -560,15 +706,45 @@ impl CubeTable {
                     .remote_to_local_names
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
-                let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path_with_cache(
-                    &local_path,
-                    index_projection_or_none_on_schema_match.clone(),
-                    predicate.clone(),
-                    batch_size,
-                    1,
-                    None, // TODO: propagate limit
-                    self.parquet_metadata_cache.clone(),
-                )?);
+
+                let mut options = TableParquetOptions::new();
+                options.global = state.config_options().execution.parquet.clone();
+
+                let parquet_source =
+                    ParquetSource::new(options, get_reader_options_customizer(state.config()))
+                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                let parquet_source = if let Some(phys_pred) = &physical_predicate {
+                    parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
+                } else {
+                    parquet_source
+                };
+
+                let file_scan = FileScanConfig::new(
+                    ObjectStoreUrl::local_filesystem(),
+                    index_schema.clone(),
+                    Arc::new(parquet_source),
+                )
+                .with_file(PartitionedFile::from_path(local_path.to_string())?)
+                .with_projection(index_projection_or_none_on_schema_match.clone())
+                .with_output_ordering(vec![LexOrdering::new(
+                    (0..key_len)
+                        .map(|i| -> Result<_, DataFusionError> {
+                            Ok(PhysicalSortExpr::new(
+                            Arc::new(
+                                datafusion::physical_expr::expressions::Column::new_with_schema(
+                                    index_schema.field(i).name(),
+                                    &index_schema,
+                                )?,
+                            ),
+                            SortOptions::default(),
+                        ))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                )]);
+
+                let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
+
+                let arc: Arc<dyn ExecutionPlan> = Arc::new(data_source_exec);
                 let arc = FilterByKeyRangeExec::issue_filters(arc, filter.clone(), key_len);
                 partition_execs.push(arc);
             }
@@ -592,26 +768,50 @@ impl CubeTable {
                             )));
                         }
                     }
-                    Arc::new(MemoryExec::try_new(
-                        &[record_batches.clone()],
-                        index_projection_schema.clone(),
-                        index_projection_or_none_on_schema_match.clone(),
-                    )?)
+                    Arc::new(DataSourceExec::new(Arc::new(
+                        MemorySourceConfig::try_new(
+                            &[record_batches.clone()],
+                            index_schema.clone(),
+                            index_projection_or_none_on_schema_match.clone(),
+                        )?
+                        .try_with_sort_information(vec![
+                            LexOrdering::new(lex_ordering_for_index(
+                                self.index_snapshot.index.get_row(),
+                                &index_projection_schema,
+                            )?),
+                        ])?,
+                    )))
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
                     let local_path = self
                         .remote_to_local_names
                         .get(&remote_path)
                         .expect(format!("Missing remote path {}", remote_path).as_str());
-                    Arc::new(ParquetExec::try_from_path_with_cache(
-                        local_path,
-                        index_projection_or_none_on_schema_match.clone(),
-                        predicate.clone(),
-                        batch_size,
-                        1,
-                        None, // TODO: propagate limit
-                        self.parquet_metadata_cache.clone(),
-                    )?)
+
+                    let mut options = TableParquetOptions::new();
+                    options.global = state.config_options().execution.parquet.clone();
+                    let parquet_source =
+                        ParquetSource::new(options, get_reader_options_customizer(state.config()))
+                            .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                    let parquet_source = if let Some(phys_pred) = &physical_predicate {
+                        parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
+                    } else {
+                        parquet_source
+                    };
+
+                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone(), Arc::new(parquet_source))
+                        .with_file(PartitionedFile::from_path(local_path.to_string())?)
+                        .with_projection(index_projection_or_none_on_schema_match.clone())
+                        .with_output_ordering(vec![LexOrdering::new((0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
+                            Arc::new(
+                                datafusion::physical_expr::expressions::Column::new_with_schema(index_schema.field(i).name(), &index_schema)?
+                            ),
+                            SortOptions::default(),
+                        ))}).collect::<Result<Vec<_>, _>>()?)])
+                        ;
+
+                    let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
+                    Arc::new(data_source_exec)
                 };
 
                 let node = FilterByKeyRangeExec::issue_filters(node, filter.clone(), key_len);
@@ -662,7 +862,7 @@ impl CubeTable {
                 table_projection_with_seq_column
                     .iter()
                     .map(|i| self.schema.field(*i).clone())
-                    .collect(),
+                    .collect::<Vec<Field>>(),
             ))
         };
         // TODO: 'nullable' modifiers differ, fix this and re-enable assertion.
@@ -671,18 +871,35 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(
-                false,
-                table_projected_schema.clone(),
+            partition_execs.push(Arc::new(SortExec::new(
+                LexOrdering::new(lex_ordering_for_index(
+                    self.index_snapshot.index.get_row(),
+                    &table_projected_schema,
+                )?),
+                Arc::new(EmptyExec::new(table_projected_schema.clone())),
             )));
         }
 
         let schema = table_projected_schema;
-        let read_data = Arc::new(CubeTableExec {
+        let partition_num = partition_execs.len();
+
+        let read_data: Arc<dyn ExecutionPlan> = Arc::new(CubeTableExec {
             schema: schema.clone(),
             partition_execs,
             index_snapshot: self.index_snapshot.clone(),
             filter: predicate,
+            properties: PlanProperties::new(
+                EquivalenceProperties::new_with_orderings(
+                    schema.clone(),
+                    &[LexOrdering::new(lex_ordering_for_index(
+                        self.index_snapshot.index.get_row(),
+                        &schema,
+                    )?)],
+                ),
+                Partitioning::UnknownPartitioning(partition_num),
+                EmissionType::Incremental,
+                Boundedness::Bounded,
+            ),
         });
         let unique_key_columns = self
             .index_snapshot()
@@ -699,15 +916,20 @@ impl CubeTable {
                 .columns()
                 .iter()
                 .take(self.index_snapshot.index.get_row().sort_key_size() as usize)
-                .map(|c| {
-                    datafusion::physical_plan::expressions::Column::new_with_schema(
-                        c.get_name(),
-                        &schema,
-                    )
+                .map(|c| -> Result<_, CubeError> {
+                    Ok(PhysicalSortExpr::new(
+                        Arc::new(
+                            datafusion::physical_plan::expressions::Column::new_with_schema(
+                                c.get_name(),
+                                &schema,
+                            )?,
+                        ),
+                        SortOptions::default(),
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let mut exec: Arc<dyn ExecutionPlan> =
-                Arc::new(MergeSortExec::try_new(read_data, sort_columns)?);
+                Arc::new(SortPreservingMergeExec::new(sort_columns.into(), read_data));
             exec = Arc::new(LastRowByUniqueKeyExec::try_new(
                 exec,
                 key_columns
@@ -752,13 +974,23 @@ impl CubeTable {
 
             let join_columns = join_columns
                 .iter()
-                .map(|c| {
-                    datafusion::physical_plan::expressions::Column::new_with_schema(c, &schema)
+                .map(|c| -> Result<_, CubeError> {
+                    Ok(PhysicalSortExpr::new(
+                        Arc::new(
+                            datafusion::physical_plan::expressions::Column::new_with_schema(
+                                c, &schema,
+                            )?,
+                        ),
+                        SortOptions::default(),
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            Arc::new(MergeSortExec::try_new(read_data, join_columns)?)
+            Arc::new(SortPreservingMergeExec::new(
+                LexOrdering::new(join_columns),
+                read_data,
+            ))
         } else {
-            Arc::new(MergeExec::new(read_data))
+            Arc::new(CoalescePartitionsExec::new(read_data))
         };
 
         Ok(plan)
@@ -793,6 +1025,7 @@ impl CubeTable {
 
 pub struct CubeTableExec {
     schema: SchemaRef,
+    properties: PlanProperties,
     pub(crate) index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
     pub(crate) filter: Option<Expr>,
@@ -807,6 +1040,12 @@ impl Debug for CubeTableExec {
     }
 }
 
+impl DisplayAs for CubeTableExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "CubeTableExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for CubeTableExec {
     fn as_any(&self) -> &dyn Any {
@@ -817,27 +1056,39 @@ impl ExecutionPlan for CubeTableExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.partition_execs.len())
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        self.partition_execs.clone()
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        self.partition_execs.iter().collect()
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        let partition_count = children
+            .iter()
+            .map(|c| c.properties().partitioning.partition_count())
+            .sum();
         Ok(Arc::new(CubeTableExec {
             schema: self.schema.clone(),
             partition_execs: children,
             index_snapshot: self.index_snapshot.clone(),
             filter: self.filter.clone(),
+            properties: PlanProperties::new(
+                EquivalenceProperties::new_with_orderings(
+                    self.schema.clone(),
+                    &[LexOrdering::new(lex_ordering_for_index(
+                        self.index_snapshot.index.get_row(),
+                        &(&self.schema),
+                    )?)],
+                ),
+                Partitioning::UnknownPartitioning(partition_count),
+                EmissionType::Incremental,
+                Boundedness::Bounded,
+            ),
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
         let sort_order;
         if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
             // Note that this returns `None` if any of the columns were not found.
@@ -862,20 +1113,121 @@ impl ExecutionPlan for CubeTableExec {
                 sort_order = None
             }
         }
+        let order = sort_order.map(|order| {
+            order
+                .into_iter()
+                .map(|col_index| {
+                    PhysicalSortRequirement::from(PhysicalSortExpr::new(
+                        // TODO unwrap()
+                        Arc::new(
+                            physical_expr::expressions::Column::new_with_schema(
+                                self.schema.field(col_index).name(),
+                                self.schema.as_ref(),
+                            )
+                            .unwrap(),
+                        ),
+                        SortOptions::default(),
+                    ))
+                })
+                .collect()
+        });
 
-        OptimizerHints {
-            sort_order,
-            single_value_columns: Vec::new(),
-        }
+        (0..self.children().len()).map(|_| order.clone()).collect()
+    }
+
+    // TODO upgrade DF
+    // fn output_hints(&self) -> OptimizerHints {
+    //     let sort_order;
+    //     if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
+    //         // Note that this returns `None` if any of the columns were not found.
+    //         // This only happens on programming errors.
+    //         sort_order = snapshot_sort_on
+    //             .iter()
+    //             .map(|c| self.schema.index_of(&c).ok())
+    //             .collect()
+    //     } else {
+    //         let index = self.index_snapshot.index().get_row();
+    //         let sort_cols = index
+    //             .get_columns()
+    //             .iter()
+    //             .take(index.sort_key_size() as usize)
+    //             .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
+    //             .take_while(|i| i.is_some())
+    //             .map(|i| i.unwrap())
+    //             .collect_vec();
+    //         if !sort_cols.is_empty() {
+    //             sort_order = Some(sort_cols)
+    //         } else {
+    //             sort_order = None
+    //         }
+    //     }
+    //
+    //     OptimizerHints {
+    //         sort_order,
+    //         single_value_columns: Vec::new(),
+    //     }
+    // }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn execute(
+    fn execute(
         &self,
-        partition: usize,
+        mut partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        self.partition_execs[partition].execute(0).await
+        let exec = self
+            .partition_execs
+            .iter()
+            .find(|p| {
+                if partition < p.properties().partitioning.partition_count() {
+                    true
+                } else {
+                    partition -= p.properties().partitioning.partition_count();
+                    false
+                }
+            })
+            .expect(&format!(
+                "CubeTableExec: Partition index is outside of partition range: {}",
+                partition
+            ));
+        exec.execute(partition, context)
     }
+
+    fn name(&self) -> &str {
+        "CubeTableExec"
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        vec![false; self.children().len()]
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
+    }
+}
+
+// TODO upgrade DF: Make this return LexOrdering?
+pub fn lex_ordering_for_index(
+    index: &Index,
+    schema: &SchemaRef,
+) -> Result<Vec<PhysicalSortExpr>, DataFusionError> {
+    (0..(index.sort_key_size() as usize))
+        .map(|i| -> Result<_, _> {
+            Ok(PhysicalSortExpr::new(
+                Arc::new(
+                    datafusion::physical_expr::expressions::Column::new_with_schema(
+                        index.get_columns()[i].get_name(),
+                        &schema,
+                    )?,
+                ),
+                SortOptions::default(),
+            ))
+        })
+        .take_while(|e| e.is_ok())
+        .collect::<Result<Vec<_>, _>>()
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -926,7 +1278,7 @@ impl Debug for InlineTableProvider {
 }
 
 pub struct ClusterSendExec {
-    schema: SchemaRef,
+    properties: PlanProperties,
     pub partitions: Vec<(
         /*node*/ String,
         (Vec<PartitionWithFilters>, Vec<InlineTableId>),
@@ -934,8 +1286,12 @@ pub struct ClusterSendExec {
     /// Never executed, only stored to allow consistent optimization on router and worker.
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
     pub cluster: Arc<dyn Cluster>,
-    pub serialized_plan: Arc<SerializedPlan>,
+    pub serialized_plan: Arc<PreSerializedPlan>,
     pub use_streaming: bool,
+    /// Not used in execution, only stored to allow consistent optimization on router and worker.
+    pub limit_and_reverse: Option<(usize, bool)>,
+    // Used to prevent SortExec on workers (e.g. with ClusterAggregateTopK) from being optimized away.
+    pub required_input_ordering: Option<LexRequirement>,
 }
 
 pub type PartitionWithFilters = (u64, RowRange);
@@ -952,12 +1308,13 @@ pub enum InlineCompoundPartition {
 
 impl ClusterSendExec {
     pub fn new(
-        schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
         union_snapshots: &[Snapshots],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
+        limit_and_reverse: Option<(usize, bool)>,
+        required_input_ordering: Option<LexRequirement>,
     ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
             cluster.config().as_ref(),
@@ -965,13 +1322,44 @@ impl ClusterSendExec {
             &serialized_plan.planning_meta().multi_part_subtree,
         )?;
         Ok(Self {
-            schema,
+            properties: Self::compute_properties(
+                input_for_optimizations.properties(),
+                partitions.len(),
+            ),
             partitions,
             cluster,
             serialized_plan,
             input_for_optimizations,
             use_streaming,
+            limit_and_reverse,
+            required_input_ordering,
         })
+    }
+
+    /// Also used by WorkerExec (to produce the exact same plan properties so we get the same optimizations).
+    pub fn compute_properties(
+        input_properties: &PlanProperties,
+        partitions_num: usize,
+    ) -> PlanProperties {
+        // Coalescing partitions (on the worker side) loses existing orderings:
+        let mut eq_properties = input_properties.eq_properties.clone();
+        if input_properties.output_partitioning().partition_count() > 1 {
+            eq_properties.clear_orderings();
+            eq_properties.clear_per_partition_constants();
+        }
+        PlanProperties::new(
+            eq_properties,
+            Partitioning::UnknownPartitioning(partitions_num),
+            EmissionType::Final, // We should implement streaming.
+            input_properties.boundedness.clone(),
+        )
+    }
+
+    pub fn worker_planning_params(&self) -> WorkerPlanningParams {
+        WorkerPlanningParams {
+            // Or, self.partitions.len().
+            worker_partition_count: self.properties().output_partitioning().partition_count(),
+        }
     }
 
     pub(crate) fn distribute_to_workers(
@@ -1183,34 +1571,42 @@ impl ClusterSendExec {
 
     pub fn with_changed_schema(
         &self,
-        schema: SchemaRef,
         input_for_optimizations: Arc<dyn ExecutionPlan>,
+        new_required_input_ordering: Option<LexRequirement>,
     ) -> Self {
         ClusterSendExec {
-            schema,
+            properties: Self::compute_properties(
+                input_for_optimizations.properties(),
+                self.partitions.len(),
+            ),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
             use_streaming: self.use_streaming,
+            // TODO upgrade DF: limit_and_reverse should be reset to None or taken as a parameter.
+            // This is only set to self.limit_and_reverse to be consistent with WorkerExec having
+            // the bug.
+            limit_and_reverse: self.limit_and_reverse,
+            required_input_ordering: new_required_input_ordering,
         }
     }
 
-    pub fn worker_plans(&self) -> Vec<(String, SerializedPlan)> {
+    pub fn worker_plans(&self) -> Result<Vec<(String, PreSerializedPlan)>, CubeError> {
         let mut res = Vec::new();
         for (node_name, partitions) in self.partitions.iter() {
             res.push((
                 node_name.clone(),
-                self.serialized_plan_for_partitions(partitions),
+                self.serialized_plan_for_partitions(partitions)?,
             ));
         }
-        res
+        Ok(res)
     }
 
     fn serialized_plan_for_partitions(
         &self,
         partitions: &(Vec<(u64, RowRange)>, Vec<InlineTableId>),
-    ) -> SerializedPlan {
+    ) -> Result<PreSerializedPlan, CubeError> {
         let (partitions, inline_table_ids) = partitions;
         let mut ps = HashMap::<_, RowFilter>::new();
         for (id, range) in partitions {
@@ -1224,26 +1620,24 @@ impl ClusterSendExec {
     }
 }
 
+impl DisplayAs for ClusterSendExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "ClusterSendExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for ClusterSendExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.partitions.len())
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input_for_optimizations.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input_for_optimizations]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if children.len() != 1 {
@@ -1251,36 +1645,90 @@ impl ExecutionPlan for ClusterSendExec {
         }
         let input_for_optimizations = children.into_iter().next().unwrap();
         Ok(Arc::new(ClusterSendExec {
-            schema: self.schema.clone(),
+            properties: Self::compute_properties(
+                input_for_optimizations.properties(),
+                self.partitions.len(),
+            ),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
             use_streaming: self.use_streaming,
+            limit_and_reverse: self.limit_and_reverse,
+            required_input_ordering: self.required_input_ordering.clone(),
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        self.input_for_optimizations.output_hints()
-    }
-
     #[instrument(level = "trace", skip(self))]
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let (node_name, partitions) = &self.partitions[partition];
 
-        let plan = self.serialized_plan_for_partitions(partitions);
+        let plan = self.serialized_plan_for_partitions(partitions)?;
 
+        let cluster = self.cluster.clone();
+        let schema = self.properties.eq_properties.schema().clone();
+        let node_name = node_name.to_string();
+        let worker_planning_params = self.worker_planning_params();
         if self.use_streaming {
-            Ok(self.cluster.run_select_stream(node_name, plan).await?)
+            // A future that yields a stream
+            let fut = async move {
+                cluster
+                    .run_select_stream(
+                        &node_name,
+                        plan.to_serialized_plan()?,
+                        worker_planning_params,
+                    )
+                    .await
+            };
+            // Use TryStreamExt::try_flatten to flatten the stream of streams
+            let stream = futures::stream::once(fut).try_flatten();
+
+            Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
         } else {
-            let record_batches = self.cluster.run_select(node_name, plan).await?;
-            // TODO .to_schema_ref()
-            let memory_exec = MemoryExec::try_new(&vec![record_batches], self.schema(), None)?;
-            memory_exec.execute(0).await
+            let record_batches = async move {
+                cluster
+                    .run_select(
+                        &node_name,
+                        plan.to_serialized_plan()?,
+                        worker_planning_params,
+                    )
+                    .await
+            };
+            let stream = futures::stream::once(record_batches).flat_map(|r| match r {
+                Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
+                Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),
+            });
+            Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
         }
+    }
+
+    fn name(&self) -> &str {
+        "ClusterSendExec"
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
+    }
+
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+        vec![self.required_input_ordering.clone()]
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        // TODO upgrade DF: If the WorkerExec has the number of partitions so it can produce the same output, we could occasionally return true.
+        // vec![self.partitions.len() <= 1 && self.input_for_optimizations.output_partitioning().partition_count() <= 1]
+
+        // For now, same as default implementation:
+        vec![false]
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        // TODO:  Ensure this is obeyed... or allow worker partitions to be sent separately.
+        vec![Distribution::SinglePartition; self.children().len()]
     }
 }
 
@@ -1288,11 +1736,28 @@ impl fmt::Debug for ClusterSendExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         f.write_fmt(format_args!(
             "ClusterSendExec: {:?}: {:?}",
-            self.schema, self.partitions
+            self.properties.eq_properties.schema(),
+            self.partitions
         ))
     }
 }
 
+pub fn find_topmost_cluster_send_exec(mut p: &Arc<dyn ExecutionPlan>) -> Option<&ClusterSendExec> {
+    loop {
+        if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
+            return Some(p);
+        } else {
+            let children = p.children();
+            if children.len() != 1 {
+                // There are no tree splits before ClusterSend.  (If there were, we need a new concept for this function.)
+                return None;
+            }
+            p = children[0];
+        }
+    }
+}
+
+#[async_trait]
 impl TableProvider for CubeTable {
     fn as_any(&self) -> &dyn Any {
         self
@@ -1302,34 +1767,22 @@ impl TableProvider for CubeTable {
         self.schema.clone()
     }
 
-    fn scan(
+    async fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
+        state: &dyn Session,
+        projection: Option<&Vec<usize>>,
         filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let res = self.async_scan(projection, batch_size, filters)?;
+        let res = self.async_scan(state, projection, filters)?;
         Ok(res)
     }
-
-    fn statistics(&self) -> Statistics {
-        // TODO
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
-    }
-
-    fn supports_filter_pushdown(
-        &self,
-        _filter: &Expr,
-    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
-        return Ok(TableProviderFilterPushDown::Inexact);
+    fn table_type(&self) -> TableType {
+        TableType::Base
     }
 }
 
+#[async_trait]
 impl TableProvider for InlineTableProvider {
     fn as_any(&self) -> &dyn Any {
         self
@@ -1339,48 +1792,42 @@ impl TableProvider for InlineTableProvider {
         self.data.get_schema()
     }
 
-    fn scan(
+    async fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
+        state: &dyn Session,
+        projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let schema = self.schema();
         let projected_schema = if let Some(p) = projection {
             Arc::new(Schema::new(
-                p.iter().map(|i| schema.field(*i).clone()).collect(),
+                p.iter()
+                    .map(|i| schema.field(*i).clone())
+                    .collect::<Vec<Field>>(),
             ))
         } else {
-            schema
+            schema.clone()
         };
 
         if !self.inline_table_ids.iter().any(|id| id == &self.id) {
-            return Ok(Arc::new(EmptyExec::new(false, projected_schema)));
+            return Ok(Arc::new(EmptyExec::new(projected_schema)));
         }
 
-        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
-        let projection = (*projection).clone();
-        Ok(Arc::new(MemoryExec::try_new(
+        let batches = dataframe_to_batches(
+            self.data.as_ref(),
+            state.config_options().execution.batch_size,
+        )?;
+        let projection = projection.cloned();
+        Ok(try_make_memory_data_source(
             &vec![batches],
-            projected_schema,
+            schema.clone(),
             projection,
-        )?))
+        )?)
     }
 
-    fn statistics(&self) -> Statistics {
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
-    }
-
-    fn supports_filter_pushdown(
-        &self,
-        _filter: &Expr,
-    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
-        return Ok(TableProviderFilterPushDown::Unsupported);
+    fn table_type(&self) -> TableType {
+        TableType::Temporary
     }
 }
 
@@ -1450,9 +1897,6 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                 DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
-                DataType::Int96 => {
-                    convert_array!(array, num_rows, rows, Int96Array, Int96, (Int96))
-                }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -1464,118 +1908,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
-                DataType::Int64Decimal(0) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal0Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(1) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal1Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(2) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal2Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(3) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal3Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(4) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal4Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(5) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal5Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(10) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal10Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int96Decimal(0) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal0Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(1) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal1Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(2) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal2Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(3) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal3Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(4) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal4Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(5) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal5Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(10) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal10Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
+                DataType::Decimal128(_, _) => {
+                    convert_array!(array, num_rows, rows, Decimal128Array, Decimal, (Decimal))
+                }
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
                         .as_any()
@@ -1589,7 +1924,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
-                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, tz)
+                    if tz.is_none() || tz.as_ref().unwrap().as_ref() == "+00:00" =>
+                {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampNanosecondArray>()
@@ -1625,6 +1962,13 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
+                DataType::Null => {
+                    // Force the cast, just because.
+                    let _ = array.as_any().downcast_ref::<NullArray>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::Null);
+                    }
+                }
                 x => panic!("Unsupported data type: {:?}", x),
             }
         }
@@ -1639,24 +1983,30 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Float),
-        DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
+        // TODO upgrade DF
+        // DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
+        //     scale: scale as i32,
+        //     precision: 18,
+        // }),
+        // DataType::Int96Decimal(scale) => Ok(ColumnType::Decimal {
+        //     scale: scale as i32,
+        //     precision: 27,
+        // }),
+        DataType::Decimal128(precision, scale) => Ok(ColumnType::Decimal {
             scale: scale as i32,
-            precision: 18,
-        }),
-        DataType::Int96Decimal(scale) => Ok(ColumnType::Decimal {
-            scale: scale as i32,
-            precision: 27,
+            precision: precision as i32,
         }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
         | DataType::Int64
-        | DataType::Int96
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt32
         | DataType::UInt64 => Ok(ColumnType::Int),
+        // This fn is only used for converting to DataFrame, and cubesql does this (as if that's a reason)
+        DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
 }
@@ -1690,9 +2040,9 @@ impl SerializedRecordBatchStream {
         let mut results = Vec::with_capacity(record_batches.len());
         for batch in record_batches {
             let file = Vec::new();
-            let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
+            let mut writer = StreamWriter::try_new(Cursor::new(file), schema)?;
             writer.write(&batch)?;
-            let cursor = writer.finish()?;
+            let cursor = writer.into_inner()?;
             results.push(Self {
                 record_batch_file: cursor.into_inner(),
             })
@@ -1702,7 +2052,7 @@ impl SerializedRecordBatchStream {
 
     pub fn read(self) -> Result<RecordBatch, CubeError> {
         let cursor = Cursor::new(self.record_batch_file);
-        let mut reader = StreamReader::try_new(cursor)?;
+        let mut reader = StreamReader::try_new(cursor, None)?;
         let batch = reader.next();
         if batch.is_none() {
             return Err(CubeError::internal("zero batches deserialized".to_string()));
@@ -1729,10 +2079,28 @@ fn combine_filters(filters: &[Expr]) -> Option<Expr> {
     let combined_filter = filters
         .iter()
         .skip(1)
-        .fold(filters[0].clone(), |acc, filter| {
-            logical_plan::and(acc, filter.clone())
-        });
+        .fold(filters[0].clone(), |acc, filter| and(acc, filter.clone()));
     Some(combined_filter)
+}
+
+pub fn regroup_batch_onto(
+    b: RecordBatch,
+    max_rows: usize,
+    onto: &mut Vec<RecordBatch>,
+) -> Result<(), CubeError> {
+    let mut row = 0;
+    while row != b.num_rows() {
+        let slice_len = min(b.num_rows() - row, max_rows);
+        onto.push(RecordBatch::try_new(
+            b.schema(),
+            b.columns()
+                .iter()
+                .map(|c| slice_copy(c.as_ref(), row, slice_len))
+                .collect(),
+        )?);
+        row += slice_len;
+    }
+    Ok(())
 }
 
 fn regroup_batches(
@@ -1741,25 +2109,16 @@ fn regroup_batches(
 ) -> Result<Vec<RecordBatch>, CubeError> {
     let mut r = Vec::with_capacity(batches.len());
     for b in batches {
-        let mut row = 0;
-        while row != b.num_rows() {
-            let slice_len = min(b.num_rows() - row, max_rows);
-            r.push(RecordBatch::try_new(
-                b.schema(),
-                b.columns()
-                    .iter()
-                    .map(|c| slice_copy(c.as_ref(), row, slice_len))
-                    .collect(),
-            )?);
-            row += slice_len
-        }
+        regroup_batch_onto(b, max_rows, &mut r)?;
     }
     Ok(r)
 }
 
 fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     // If we use [Array::slice], serialization will still copy the whole contents.
-    let mut a = MutableArrayData::new(vec![a.data()], false, len);
+    let d = a.to_data();
+    let data = vec![&d];
+    let mut a = MutableArrayData::new(data, false, len);
     a.extend(0, start, start + len);
     make_array(a.freeze())
 }

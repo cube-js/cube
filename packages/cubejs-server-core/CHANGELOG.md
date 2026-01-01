@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+# [1.6.0](https://github.com/cube-js/cube/compare/v1.5.16...v1.6.0) (2025-12-18)
+
+### Bug Fixes
+
+- **server-core:** Access policies row filtering should respect member visibility ([#10257](https://github.com/cube-js/cube/issues/10257)) ([cc0e582](https://github.com/cube-js/cube/commit/cc0e5821669d6babe43d52264ebb3708fe8d1c0f))
+
+### BREAKING CHANGES
+
+- **server-core:** Policies not applicable due to member visibility may stop applying changing row level security filters
+
+- Linter
+
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
 ## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

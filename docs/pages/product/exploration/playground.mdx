@@ -6,14 +6,10 @@ by data engineers and developers while building the [data model][ref-data-modeli
 If you'd like to let end users query the data, [connect a BI tool][ref-dataviz-tools]
 or use the [JavaScript SDKs][ref-js-sdk] to build your own query builder.
 
-<SuccessBox>
-
-Playground is available in Cube Cloud on
-[all product tiers](https://cube.dev/pricing).
-
-</SuccessBox>
 
 <InfoBox>
+
+We recommend to migrate over to [Explore](/product/exploration/explore) and [Workbooks](/product/exploration/workbooks) for data analysis in exploration in Cube cloud platform.
 
 Playground is available in Cube Core at [localhost:4000](http://localhost:4000)
 when it's run in the [development mode][ref-dev-mode].
@@ -24,11 +20,6 @@ You can [view](#viewing-the-data-model) the data model entities or [search](#sea
 for them, [compose](#composing-queries) a query from scratch or [paste](#pasting-a-query)
 an exsiting query, view [results](#viewing-results), check a [generated
 query](#viewing-a-generated-query), or copy equivalent [queries for data APIs](#copying-api-queries).
-
-<YouTubeVideo
-  url="https://www.youtube.com/embed/4epojUSQvOU"
-  aspectRatio={4/3}
-/>
 
 ## Viewing the data model
 
@@ -89,7 +80,7 @@ query or all available members. Click <Btn>Reset</Btn> to remove all members fro
 />
 
 Use the <Btn>Order</Btn> drop-down on the right to specify how the
-[results](/product/workspace/playground#viewing-results) shall be sorted.
+[results](#viewing-results) shall be sorted.
 
 <Screenshot
   highlight="inset(35% 9% 15% 64% round 10px)"
@@ -226,3 +217,4 @@ manually.
 [ref-chart-prototyping]: /product/workspace/vizard
 [ref-boolean-filters]: /product/apis-integrations/rest-api/query-format#boolean-logical-operators
 [ref-saved-reports]: /product/workspace/saved-reports
+

@@ -341,7 +341,9 @@ impl DataFrameValue<String> for Option<Vec<AggregateFunction>> {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(
+    Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd, DeepSizeOf,
+)]
 pub enum HllFlavour {
     Airlift,      // Compatible with Presto, Athena, etc.
     Snowflake,    // Same storage as Airlift, imports from Snowflake JSON.
@@ -369,7 +371,7 @@ pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeE
     return Ok(());
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd, DeepSizeOf)]
 pub enum ColumnType {
     String,
     Int,
@@ -458,20 +460,8 @@ impl ColumnType {
 
     pub fn target_scale(&self) -> i32 {
         match self {
-            ColumnType::Decimal { scale, .. } => {
-                if *scale > 5 {
-                    10
-                } else {
-                    *scale
-                }
-            }
-            ColumnType::Decimal96 { scale, .. } => {
-                if *scale > 5 {
-                    10
-                } else {
-                    *scale
-                }
-            }
+            ColumnType::Decimal { scale, .. } => *scale,
+            ColumnType::Decimal96 { scale, .. } => *scale,
             x => panic!("target_scale called on {:?}", x),
         }
     }
@@ -547,7 +537,7 @@ impl From<&Column> for types::Type {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd, DeepSizeOf)]
 pub struct Column {
     name: String,
     column_type: ColumnType,
@@ -567,14 +557,14 @@ impl<'a> Into<Field> for &'a Column {
             match self.column_type {
                 ColumnType::String => DataType::Utf8,
                 ColumnType::Int => DataType::Int64,
-                ColumnType::Int96 => DataType::Int96,
+                ColumnType::Int96 => DataType::Decimal128(38, 0),
                 ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
                 ColumnType::Boolean => DataType::Boolean,
-                ColumnType::Decimal { .. } => {
-                    DataType::Int64Decimal(self.column_type.target_scale() as usize)
+                ColumnType::Decimal { scale, precision } => {
+                    DataType::Decimal128(precision as u8, scale as i8)
                 }
-                ColumnType::Decimal96 { .. } => {
-                    DataType::Int96Decimal(self.column_type.target_scale() as usize)
+                ColumnType::Decimal96 { scale, precision } => {
+                    DataType::Decimal128(precision as u8, scale as i8)
                 }
                 ColumnType::Bytes => DataType::Binary,
                 ColumnType::HyperLogLog(_) => DataType::Binary,
@@ -611,7 +601,7 @@ impl fmt::Display for Column {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum ImportFormat {
     CSV,
     CSVNoHeader,
@@ -624,7 +614,7 @@ pub enum ImportFormat {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Schema {
     name: String
 }
@@ -632,14 +622,14 @@ pub struct Schema {
 
 impl RocksEntity for Schema {}
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum IndexType {
     Regular = 1,
     Aggregate = 2,
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Index {
     name: String,
     table_id: u64,
@@ -656,7 +646,7 @@ pub struct Index {
 
 impl RocksEntity for Index {}
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum AggregateFunction {
     SUM = 1,
     MAX = 2,
@@ -726,7 +716,7 @@ pub struct IndexDef {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Partition {
     index_id: u64,
     parent_partition_id: Option<u64>,
@@ -755,7 +745,7 @@ pub struct Partition {
 impl RocksEntity for Partition {}
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Chunk {
     partition_id: u64,
     row_count: u64,
@@ -1433,7 +1423,7 @@ impl RocksMetaStore {
             .process(
                 self.clone(),
                 move |_| async move { Ok(Delay::new(Duration::from_secs(upload_interval)).await) },
-                move |m, _| async move { m.store.run_upload().await },
+                async move |m, _| m.store.run_upload().await,
             )
             .await;
     }
@@ -2390,7 +2380,7 @@ impl MetaStore for RocksMetaStore {
                 let tables = Arc::new(schemas.build_path_rows(
                     tables,
                     |t| t.get_row().get_schema_id(),
-                    |table, schema| TablePath { table, schema },
+                    |table, schema| TablePath::new(schema, table),
                 )?);
 
                 Ok(tables)
@@ -2423,7 +2413,7 @@ impl MetaStore for RocksMetaStore {
                 let tables = Arc::new(schemas.build_path_rows(
                     tables,
                     |t| t.get_row().get_schema_id(),
-                    |table, schema| TablePath { table, schema },
+                    |table, schema| TablePath::new(schema, table),
                 )?);
 
                 let to_cache = tables.clone();
@@ -4982,7 +4972,7 @@ mod tests {
 
     #[test]
     fn test_structures_size() {
-        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 672);
+        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 640);
     }
 
     #[tokio::test]

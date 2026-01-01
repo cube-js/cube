@@ -1,5 +1,4 @@
 module.exports = {
-  "playground": "Playground",
   "vizard": "Chart Prototyping",
   "data-model": "Data Model",
   "visual-model": "Visual Model",

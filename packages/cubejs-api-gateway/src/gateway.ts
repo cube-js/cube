@@ -325,7 +325,7 @@ class ApiGateway {
       });
     }));
 
-    const jsonParser = bodyParser.json({ limit: '1mb' });
+    const jsonParser = bodyParser.json({ limit: getEnv('maxRequestSize') });
     app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
       await this.load({
         query: req.body.query,
@@ -343,6 +343,16 @@ class ApiGateway {
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
         cacheMode: req.query.cache,
+      });
+    }));
+
+    app.post(`${this.basePath}/v1/subscribe`, jsonParser, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.load({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res),
+        queryType: req.body.queryType,
+        cacheMode: req.body.cache,
       });
     }));
 

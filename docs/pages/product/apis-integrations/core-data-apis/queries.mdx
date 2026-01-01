@@ -263,13 +263,6 @@ with pushdown, Cube will need to transform it and generate the SQL for an
 upstream [data source][ref-data-sources].
 Learn more in the [SQL API documentation][ref-sql-api-qpd].
 
-<InfoBox>
-
-Query pushdown in the SQL API is available in public preview.
-[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
-
-</InfoBox>
-
 Queries with pushdown, since they don't include regular queries, can not
 utilize pre-aggregations; however, they still benefit from [in-memory
 cache][ref-caching]. Queries with pushdown can also be modified before

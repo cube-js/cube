@@ -134,19 +134,9 @@ There are trade-offs associated with each query type:
 
 <InfoBox>
 
-Query pushdown in the SQL API is available in public preview.
-[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) about Query pushdown in the SQL API in the blog.
 
 </InfoBox>
-
-<WarningBox>
-
-**Query pushdown is disabled by default.** You should explicitly [enable
-it](#query-planning). In future versions, it will be enabled by default. Also,
-enabling query pushdown would affect how [ungrouped queries][ref-ungrouped-queries]
-are executed; check [query format][ref-sql-query-format] for details.
-
-</WarningBox>
 
 ## Configuration
 
@@ -214,25 +204,8 @@ variables by navigating to <Btn>Settings → Configration</Btn>.
 
 ### Query planning
 
-**By default, the SQL API executes queries as [regular queries][ref-regular-queries]
-or [queries with post-processing][ref-queries-wpp].** Such queries support only a limited
-set of SQL functions and operators, and sometimes you can get the following error:
-`Error during rewrite: Can't detect Cube query and it may be not supported yet.`
-
-You can use the `CUBESQL_SQL_PUSH_DOWN` environment variable to instruct the SQL API
-to execute such queries as [queries with pushdown][ref-queries-wpd].
-
-<InfoBox>
-
-Query pushdown in the SQL API is available in public preview.
-[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
-
-</InfoBox>
-
-Query planning is a resource-intensive task, and sometimes you can get the following
-error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
-Use the following environment variables to allocate more resources for query planning:
-`CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
+The SQL API executes queries as [regular queries][ref-regular-queries], [queries with
+post-processing][ref-queries-wpp], or [queries with pushdown][ref-queries-wpd].
 
 ### Streaming
 
@@ -253,6 +226,15 @@ Each concurrent connection to the SQL API consumes some resources and attempting
 to establish too many connections at once can lead to an out-of-memory crash.
 You can use the `CUBEJS_MAX_SESSIONS` environment variable to adjust the session
 limit.
+
+## Troubleshooting
+
+### `Can't find rewrite`
+
+[Query planning](#query-planning) is a resource-intensive task, and sometimes you can get the following
+error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+Use the following environment variables to allocate more resources for query planning:
+`CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
 
 
 [link-postgres]: https://www.postgresql.org

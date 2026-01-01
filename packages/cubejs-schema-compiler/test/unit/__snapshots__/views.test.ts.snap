@@ -11,6 +11,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeA.id",
       },
@@ -29,6 +30,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeB.other_id",
       },
@@ -112,6 +114,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeB.other_id",
       },
@@ -195,6 +198,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeA.id",
       },
@@ -213,6 +217,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeB.id",
       },
@@ -231,6 +236,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeB.other_id",
       },
@@ -314,6 +320,7 @@ Object {
       "format": "imageUrl",
       "granularities": undefined,
       "isVisible": true,
+      "key": undefined,
       "meta": Object {
         "key": "Meta.key for CubeB.other_id",
       },

@@ -2920,11 +2920,37 @@ impl WrappedSelectNode {
 
                         Ok((format!("${{{}}}", member.field_name), sql_query))
                     }
-                    // There's no branch for PatchMeasure, because it should generate via different path
-                    _ => Err(DataFusionError::Internal(format!(
-                        "Can't generate SQL for UDAF: {}",
+                    PATCH_MEASURE_UDAF_NAME => Err(DataFusionError::Internal(format!(
+                        "{} UDAF should generate SQL via different path: {expr}",
                         fun.name
                     ))),
+                    _ => {
+                        let mut sql_args = Vec::new();
+                        for arg in args {
+                            let (sql, query) = Self::generate_sql_for_expr_rec(
+                                sql_query,
+                                sql_generator.clone(),
+                                arg.clone(),
+                                push_to_cube_context,
+                                subqueries,
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_args.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .udaf_function(&fun, sql_args, distinct)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for UDAF: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
                 }
             }
             Expr::InList {

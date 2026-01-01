@@ -521,7 +521,26 @@ export class CompilerApi {
       return { query, denied: false };
     }
 
-    const queryCubes = await this.getCubesFromQuery(evaluatedQuery, context);
+    // Get the SQL to extract member names from the query
+    const sql = await this.getSql(evaluatedQuery, { requestId: context?.requestId });
+    const queryMemberNames = new Set(sql.memberNames);
+    const queryCubes = new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
+
+    // Identify cubes that are accessed through views.
+    // Similar to PostgreSQL views: views act as a security boundary for member access.
+    // When a cube is accessed via a view, we skip the cube's member-level restrictions
+    // and only apply row-level filters. The view controls what members are exposed.
+    const cubesAccessedViaView = new Set<string>();
+    for (const cubeName of queryCubes) {
+      const cube = cubeEvaluator.cubeFromPath(cubeName);
+      if (cube.isView) {
+        // Track which underlying cubes are accessed through this view
+        const underlyingCubes = new Set(
+          (cube.includedMembers || []).map((m: any) => m.memberPath.split('.')[0])
+        );
+        underlyingCubes.forEach(c => cubesAccessedViaView.add(c));
+      }
+    }
 
     // We collect Cube and View filters separately because they have to be
     // applied in "two layers": first Cube filters, then View filters on top
@@ -537,7 +556,118 @@ export class CompilerApi {
         let hasAccessPermission = false;
         const userPolicies = await this.getApplicablePolicies(cube, context, compilers);
 
-        for (const policy of userPolicies) {
+        // Filter out policies that don't grant member-level access to query members
+        //
+        // Policies define access in two dimensions: Members (columns) and Rows.
+        // We first filter by member access, then apply row-level filters.
+        //
+        // Example setup:
+        //   - Policy 1 covers members: a, b (with row filter R1)
+        //   - Policy 2 covers members: b, c (with row filter R2)
+        //
+        //   Members
+        //     ^
+        //     |       ┌─────────────────────────────┐
+        //   c |       │          Policy 2           │
+        //     |   ┌───┼─────────────┐               │
+        //   b |   │   │  (overlap)  │               │
+        //     |   │   └─────────────┼───────────────┘
+        //   a |   │    Policy 1     │
+        //     |   └─────────────────┘
+        //     └──────────────────────────────────────────> Rows
+        //              R1 rows        R2 rows
+        //
+        // ═══════════════════════════════════════════════════════════════════
+        // Case 1: Query members (a, b)
+        //         Only Policy 1 covers ALL queried members → R1 rows visible
+        //
+        //   Members
+        //     ^
+        //     |       ┌─────────────────────────────┐
+        //   c |       │          Policy 2           │
+        //     |   ┌───┼─────────────┐               │
+        //   b |   │░░░│░░(query)░░░░│               │
+        //     |   │░░░└─────────────┼───────────────┘
+        //   a |   │░░░░Policy 1░░░░░│
+        //     |   └─────────────────┘
+        //     └──────────────────────────────────────────> Rows
+        //         ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+        //         R1 rows visible
+        //
+        // ═══════════════════════════════════════════════════════════════════
+        // Case 2: Query members (b, c)
+        //         Only Policy 2 covers ALL queried members → R2 rows visible
+        //
+        //   Members
+        //     ^
+        //     |       ┌─────────────────────────────┐
+        //   c |       │░░░░░░░░░░Policy 2░░░░░░░░░░░│
+        //     |   ┌───┼─────────────┐░░░░░░░░░░░░░░░│
+        //   b |   │   │░░(query)░░░░│░░░░░░░░░░░░░░░│
+        //     |   │   └─────────────┼───────────────┘
+        //   a |   │    Policy 1     │
+        //     |   └─────────────────┘
+        //     └──────────────────────────────────────────> Rows
+        //             ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+        //             R2 rows visible
+        //
+        // ═══════════════════════════════════════════════════════════════════
+        // Case 3: Query member (b) only
+        //         Both policies cover member b → Union of R1 ∪ R2 rows visible
+        //
+        //   Members
+        //     ^
+        //     |       ┌─────────────────────────────┐
+        //   c |       │          Policy 2           │
+        //     |   ┌───┼─────────────┐               │
+        //   b |   │░░░│░░(query)░░░░│░░░░░░░░░░░░░░░│
+        //     |   │   └─────────────┼───────────────┘
+        //   a |   │    Policy 1     │
+        //     |   └─────────────────┘
+        //     └──────────────────────────────────────────> Rows
+        //         ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+        //         R1 ∪ R2 rows visible (union)
+        //
+        // ═══════════════════════════════════════════════════════════════════
+        // Case 4: Query members (a, b, c)
+        //         Neither policy covers ALL three → NO rows visible (denied)
+        //
+        //   Members
+        //     ^
+        //     |       ┌─────────────────────────────┐
+        //   c |       │          Policy 2           │
+        //     |   ┌───┼─────────────┐               │
+        //   b |   │   │  (query)    │               │
+        //     |   │   └─────────────┼───────────────┘
+        //   a |   │    Policy 1     │
+        //     |   └─────────────────┘
+        //     └──────────────────────────────────────────> Rows
+        //
+        //         No policy covers {a,b,c} → Access denied, empty result
+        //
+        const policiesWithMemberAccess = userPolicies.filter((policy: any) => {
+          // If there's no memberLevel policy, all members are accessible
+          if (!policy.memberLevel) {
+            return true;
+          }
+
+          // PostgreSQL-style view behavior: if this cube is accessed through a view,
+          // the view grants access to all members it exposes.
+          // We only apply row-level filters from the cube, not member-level restrictions.
+          if (cubesAccessedViaView.has(cubeName)) {
+            return true;
+          }
+
+          const cubeMembersInQuery = Array.from(queryMemberNames).filter(
+            memberName => memberName.startsWith(`${cubeName}.`)
+          );
+
+          // Check if the policy grants access to all members used in the query
+          return [...cubeMembersInQuery].every(memberName => policy.memberLevel.includesMembers.includes(memberName) &&
+            !policy.memberLevel.excludesMembers.includes(memberName));
+        });
+
+        for (const policy of policiesWithMemberAccess) {
           hasAccessPermission = true;
           (policy?.rowLevel?.filters || []).forEach((filter: any) => {
             filtersMap[cubeName] = filtersMap[cubeName] || {};

@@ -3,17 +3,9 @@
 SQL API runs queries in the Postgres dialect that can
 reference those tables and columns.
 
-By default since 1.0, the SQL API executes [regular queries][ref-regular-queries],
-[queries with post-processing][ref-queries-wpp] and [queries with
-pushdown][ref-queries-wpd]. This page explains their format and details if they
-are handled differently by the SQL API.
-
-<InfoBox>
-
-Query pushdown in the SQL API is available in public preview.
-[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
-
-</InfoBox>
+The SQL API is able to execute [regular queries][ref-regular-queries], [queries with
+post-processing][ref-queries-wpp] and [queries with pushdown][ref-queries-wpd]. This page
+explains their format and details if they are handled differently by the SQL API.
 
 ## Data model mapping
 
@@ -201,24 +193,6 @@ The above query works because the `CASE` expression is supported in `SELECT`
 queries **not** querying cube tables.
 
 ### Query pushdown
-
-<WarningBox heading={`🐣  Preview`}>
-
-  Query pushdown is currently in public preview, and the API and behavior may
-  change in future versions.
-  
-  Query pushdown is enabled by default since 1.0 and is controlled by
-  `CUBESQL_SQL_PUSH_DOWN` environment variable.
-
-</WarningBox>
-
-<ReferenceBox>
-
-Query pushdown currently has the following limitations:
-* No support for [joins between cubes](https://github.com/cube-js/cube/issues/8483).
-* No support for [custom aggregations in `number` measures](https://github.com/cube-js/cube/issues/8482).
-
-</ReferenceBox>
 
 Query pushdown provides a safe net for queries that can't be rewritten
 into combination of a [regular query][ref-regular-queries] and post-processing.
