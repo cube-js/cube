@@ -77,8 +77,8 @@ class ArrowNativePerformanceTester:
 
     def __init__(self,
                  arrow_host: str = "localhost", #"192.168.0.249",
-                 arrow_port: int = 9120,
-                 http_url: str = "http://localhost:4012/cubejs-api/v1/load"  # "http://192.168.0.249:4008/cubejs-api/v1/load"
+                 arrow_port: int = 8120,
+                 http_url: str = "http://localhost:4008/cubejs-api/v1/load"  # "http://192.168.0.249:4008/cubejs-api/v1/load"
                  ):
         self.arrow_host = arrow_host
         self.arrow_port = arrow_port
