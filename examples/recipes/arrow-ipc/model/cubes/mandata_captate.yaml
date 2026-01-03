@@ -2,7 +2,55 @@
 cubes:
   - name: mandata_captate
     description: Auto-generated from public.order
-    sql_table: public.order
+    dimensions:
+      - meta:
+          ecto_field: market_code
+          ecto_field_type: string
+        name: market_code
+        type: string
+        sql: market_code
+      - meta:
+          ecto_field: brand_code
+          ecto_field_type: string
+        name: brand_code
+        type: string
+        sql: brand_code
+      - meta:
+          ecto_field: payment_reference
+          ecto_field_type: string
+        name: payment_reference
+        type: string
+        sql: payment_reference
+      - meta:
+          ecto_field: fulfillment_status
+          ecto_field_type: string
+        name: fulfillment_status
+        type: string
+        sql: fulfillment_status
+      - meta:
+          ecto_field: financial_status
+          ecto_field_type: string
+        name: financial_status
+        type: string
+        sql: financial_status
+      - meta:
+          ecto_field: email
+          ecto_field_type: string
+        name: email
+        type: string
+        sql: email
+      - meta:
+          ecto_field: updated_at
+          ecto_field_type: naive_datetime
+        name: updated_at
+        type: time
+        sql: updated_at
+      - meta:
+          ecto_field: inserted_at
+          ecto_field_type: naive_datetime
+        name: inserted_at
+        type: time
+        sql: inserted_at
     measures:
       - name: count
         type: count
@@ -78,58 +126,10 @@ cubes:
         name: delivery_subtotal_amount_distinct
         type: count_distinct
         sql: delivery_subtotal_amount
-    dimensions:
-      - meta:
-          ecto_field: market_code
-          ecto_field_type: string
-        name: market_code
-        type: string
-        sql: market_code
-      - meta:
-          ecto_field: brand_code
-          ecto_field_type: string
-        name: brand_code
-        type: string
-        sql: brand_code
-      - meta:
-          ecto_field: payment_reference
-          ecto_field_type: string
-        name: payment_reference
-        type: string
-        sql: payment_reference
-      - meta:
-          ecto_field: fulfillment_status
-          ecto_field_type: string
-        name: fulfillment_status
-        type: string
-        sql: fulfillment_status
-      - meta:
-          ecto_field: financial_status
-          ecto_field_type: string
-        name: financial_status
-        type: string
-        sql: financial_status
-      - meta:
-          ecto_field: email
-          ecto_field_type: string
-        name: email
-        type: string
-        sql: email
-      - meta:
-          ecto_field: updated_at
-          ecto_field_type: naive_datetime
-        name: updated_at
-        type: time
-        sql: updated_at
-      - meta:
-          ecto_field: inserted_at
-          ecto_field_type: naive_datetime
-        name: inserted_at
-        type: time
-        sql: inserted_at
+    sql_table: public.order
     pre_aggregations:
       - external: true
-        name: automatic4public_order
+        name: automatic_4_the_people
         type: rollup
         measures:
           - count
@@ -157,6 +157,6 @@ cubes:
         time_dimension: updated_at
         granularity: hour
         build_range_start:
-          sql: SELECT  min(inserted_at) FROM public.order # "SELECT NOW() - INTERVAL '1 year'"
+          sql: SELECT  min(inserted_at) FROM public.order
         build_range_end:
           sql: SELECT  MAX(updated_at) FROM public.order
