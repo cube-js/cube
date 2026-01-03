@@ -9,7 +9,8 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     # python3 package is necessary to install `python3` executable for node-gyp
-    && apt-get install -y --no-install-recommends libssl3 curl \
+    # pkg-config and libssl-dev are required for building Rust OpenSSL bindings
+    && apt-get install -y --no-install-recommends libssl3 libssl-dev pkg-config curl \
        cmake python3 python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
@@ -17,8 +18,9 @@ ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 
+# Use Rust 1.90.0 as required by rust/cubesql/rust-toolchain.toml
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y
+    sh -s -- --profile minimal --default-toolchain 1.90.0 -y
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
@@ -109,9 +111,13 @@ FROM base AS build
 
 RUN yarn install
 
-# Backend
+# Backend - Rust components
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
+COPY rust/cubenativeutils/ rust/cubenativeutils/
+COPY rust/cubeorchestrator/ rust/cubeorchestrator/
+COPY rust/cubeshared/ rust/cubeshared/
+COPY rust/cubesqlplanner/ rust/cubesqlplanner/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-base-driver/ packages/cubejs-base-driver/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
@@ -167,7 +173,15 @@ COPY packages/cubejs-playground/ packages/cubejs-playground/
 RUN yarn build
 RUN yarn lerna run build
 
-RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
+# Build native Rust module from source (required for local changes like ADBC support)
+# Skip post-installer download and build from source instead
+# Use -j88 for parallel Rust compilation
+WORKDIR /cubejs/packages/cubejs-backend-native
+RUN CARGO_BUILD_JOBS=88 yarn run native:build-release
+WORKDIR /cubejs
+
+RUN mkdir -p /artifacts \
+    && tar --exclude='*/node_modules' -cf - . | tar -xf - -C /artifacts
 
 FROM base AS final
 
@@ -176,7 +190,7 @@ RUN apt-get update \
     && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
     && apt-get clean
 
-COPY --from=build /cubejs .
+COPY --from=build /artifacts /cubejs
 COPY --from=prod_dependencies /cubejs .
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
@@ -189,6 +203,10 @@ RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 
 WORKDIR /cube/conf
 
-EXPOSE 4000
+# Expose ports:
+# 4000 - Cube API (REST/GraphQL)
+# 15432 - Cube SQL (PostgreSQL protocol)
+# 8120 - Cube SQL ADBC (Arrow Native protocol)
+EXPOSE 4000 15432 8120
 
 CMD ["cubejs", "server"]

@@ -64,7 +64,7 @@ class ArrowNativeClient:
 
     PROTOCOL_VERSION = 1
 
-    def __init__(self, host: str = "localhost", port: int = 8120,
+    def __init__(self, host: str = "localhost", port: int = 9120,
                  token: str = "test", database: Optional[str] = None):
         self.host = host
         self.port = port

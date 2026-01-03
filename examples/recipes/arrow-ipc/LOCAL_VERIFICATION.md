@@ -415,3 +415,4 @@ docker-compose down
 - [x] Cache can be disabled
 
 **If all criteria met**: PR is ready for submission! 🎉
+nerdctl build -t octanix/cube:dev -f dev.Dockerfile ../../

@@ -1,4 +1,4 @@
-FROM cubejs/rust-builder:bookworm-llvm-18 AS builder
+FROM docker.io/cubejs/rust-builder:bookworm-llvm-18 AS builder
 
 WORKDIR /build/cubestore
 

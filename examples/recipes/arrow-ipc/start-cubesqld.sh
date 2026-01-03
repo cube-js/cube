@@ -110,8 +110,8 @@ CUBE_TOKEN="${CUBESQL_CUBE_TOKEN:-test}"
 export CUBESQL_CUBE_URL="${CUBE_API_URL}"
 export CUBESQL_CUBE_TOKEN="${CUBE_TOKEN}"
 export CUBEJS_ADBC_PORT="${ADBC_PORT}"
-export CUBESQL_LOG_LEVEL="${CUBESQL_LOG_LEVEL:-trace}"
-export CUBESTORE_LOG_LEVEL="trace"
+export CUBESQL_LOG_LEVEL="${CUBESQL_LOG_LEVEL:-error}"
+export CUBESTORE_LOG_LEVEL="error"
 
 # Enable Arrow Results Cache (default: true, can be overridden)
 export CUBESQL_ARROW_RESULTS_CACHE_ENABLED="${CUBESQL_ARROW_RESULTS_CACHE_ENABLED:-true}"

@@ -31,12 +31,13 @@ source .env
 
 # Override to disable built-in protocol servers
 # (cubesqld will provide these instead)
-unset CUBEJS_PG_SQL_PORT
-export CUBEJS_PG_SQL_PORT=false
-unset CUBEJS_ADBC_PORT
-unset CUBEJS_SQL_PORT
+#unset CUBEJS_PG_SQL_PORT
+export CUBEJS_PG_SQL_PORT="4444"
+export CUBEJS_ADBC_PORT="8120"
+export CUBEJS_SQL_PORT="4445"
 
 export PORT=${PORT:-4008}
+
 export CUBEJS_DB_TYPE=${CUBEJS_DB_TYPE:-postgres}
 export CUBEJS_DB_PORT=${CUBEJS_DB_PORT:-7432}
 export CUBEJS_DB_NAME=${CUBEJS_DB_NAME:-pot_examples_dev}
@@ -44,7 +45,8 @@ export CUBEJS_DB_USER=${CUBEJS_DB_USER:-postgres}
 export CUBEJS_DB_PASS=${CUBEJS_DB_PASS:-postgres}
 export CUBEJS_DB_HOST=${CUBEJS_DB_HOST:-localhost}
 export CUBEJS_DEV_MODE=${CUBEJS_DEV_MODE:-true}
-export CUBEJS_LOG_LEVEL=${CUBEJS_LOG_LEVEL:-error}
+export CUBEJS_LOG_LEVEL=${CUBEJS_LOG_LEVEL:-trace}
+export CUBESTORE_LOG_LEVEL=${CUBEJS_LOG_LEVEL:-trace}
 export NODE_ENV=${NODE_ENV:-development}
 
 # Function to check if a port is in use
