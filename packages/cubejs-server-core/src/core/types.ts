@@ -129,7 +129,8 @@ export type DatabaseType =
   | 'duckdb'
   | 'ksql'
   | 'vertica'
-  | 'databricks-jdbc';
+  | 'databricks-jdbc'
+  | 'doris';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;

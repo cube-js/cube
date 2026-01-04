@@ -12,3 +12,4 @@ export * from './trino';
 export * from './oracle';
 export * from './kafka';
 export * from './ksql';
+export * from './doris';
