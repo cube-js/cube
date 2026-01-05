@@ -27,8 +27,12 @@ The Chat API enables real-time streaming conversations with Cube's AI agents. Th
 ## Authentication
 
 <WarningBox>
-Accounts are limited to 10,000 external users. To increase this limit, please contact support.
+Accounts are limited to 10,000 non-ephemeral external users. To increase this limit, please contact support.
 </WarningBox>
+
+<InfoBox>
+All users created using this API are ephemeral by default and will be removed after `sessionSettings.ephemeralTtlSeconds` (1 week by default). If users need to be persisted, pass `isEphemeral: false` in `sessionSettings`. Ephemeral users are guaranteed to not live longer than `sessionSettings.ephemeralTtlSeconds`.
+</InfoBox>
 
 Pass your [API key][ref-api-keys] directly to the Chat API endpoint. The session will be created automatically based on the `externalId` provided:
 
