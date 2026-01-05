@@ -1,14 +1,14 @@
 cube(`Orders`, {
   sql: `
-  select 1 as id, 100 as amount, 'new' status
+  select 1 as id, 100 as amount, 'new' status, CAST('2025-01-01' AS DATE) AS createdAt,
   UNION ALL
-  select 2 as id, 200 as amount, 'new' status
+  select 2 as id, 200 as amount, 'new' status, CAST('2025-01-02' AS DATE) AS createdAt,
   UNION ALL
-  select 3 as id, 300 as amount, 'processed' status
+  select 3 as id, 300 as amount, 'processed' status, CAST('2025-01-03' AS DATE) AS createdAt,
   UNION ALL
-  select 4 as id, 500 as amount, 'processed' status
+  select 4 as id, 500 as amount, 'processed' status, CAST('2025-01-04' AS DATE) AS createdAt,
   UNION ALL
-  select 5 as id, 600 as amount, 'shipped' status
+  select 5 as id, 600 as amount, 'shipped' status, CAST('2025-01-05' AS DATE) AS createdAt,
   `,
 
   measures: {
@@ -28,6 +28,10 @@ cube(`Orders`, {
     status: {
       sql: `status`,
       type: `string`,
+    },
+    createdAt: {
+      sql: `createdAt`,
+      type: `time`,
     },
   },
 });

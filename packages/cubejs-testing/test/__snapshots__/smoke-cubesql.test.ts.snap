@@ -1,5 +1,89 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`SQL API Cube SQL over HTTP Query convert API regular query 1`] = `
+Object {
+  "body": Object {
+    "query": Object {
+      "dimensions": Array [],
+      "measures": Array [
+        "Orders.totalAmount",
+      ],
+      "order": Array [],
+      "segments": Array [],
+    },
+    "status": "ok",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP Query convert API regular query with filter 1`] = `
+Object {
+  "body": Object {
+    "query": Object {
+      "dimensions": Array [],
+      "filters": Array [
+        Object {
+          "member": "Orders.status",
+          "operator": "equals",
+          "values": Array [
+            "foo",
+          ],
+        },
+      ],
+      "measures": Array [
+        "Orders.totalAmount",
+      ],
+      "order": Array [],
+      "segments": Array [],
+    },
+    "status": "ok",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP Query convert API regular query with time dimension filter 1`] = `
+Object {
+  "body": Object {
+    "query": Object {
+      "dimensions": Array [
+        "Orders.status",
+      ],
+      "measures": Array [],
+      "order": Array [],
+      "segments": Array [],
+      "timeDimensions": Array [
+        Object {
+          "dateRange": Array [
+            "2024-01-01T00:00:00.001Z",
+            "2025-12-31T23:59:59.999Z",
+          ],
+          "dimension": "Orders.createdAt",
+        },
+      ],
+      "ungrouped": true,
+    },
+    "status": "ok",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP Query convert API wrapper with parameters 1`] = `
+Object {
+  "body": Object {
+    "error": "Provided sql query can not be converted to rest query.",
+    "status": "error",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
 exports[`SQL API Cube SQL over HTTP sql4sql double aggregation post-processing 1`] = `
 Object {
   "body": Object {
