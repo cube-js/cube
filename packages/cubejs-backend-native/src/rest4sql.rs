@@ -54,7 +54,7 @@ fn json_value_to_js<'ctx>(
 enum Rest4SqlResponse {
     Ok {
         status: String,
-        query: TransportLoadRequestQuery,
+        query: Box<TransportLoadRequestQuery>,
     },
     Error {
         status: String,
@@ -109,7 +109,7 @@ async fn handle_rest4sql_query(
                 if let Some(cube_scan) = extension.node.as_any().downcast_ref::<CubeScanNode>() {
                     return Ok(Rest4SqlResponse::Ok {
                         status: "ok".to_string(),
-                        query: cube_scan.request.clone(),
+                        query: Box::new(cube_scan.request.clone()),
                     });
                 }
 
