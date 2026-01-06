@@ -29,6 +29,7 @@ Common uses of multi-stage calculations:
 - [Time-shift](#time-shift) calculations, e.g., year-over-year sales growth.
 - [Period-to-date](#period-to-date) calculations, e.g., year-to-date (YTD) analysis.
 - [Fixed dimension](#fixed-dimension) calculations, e.g., comparing individual items to a broader dataset or calculating percent of total.
+- [Conditional measure](#conditional-measure) calculations, e.g., based on a dimension value.
 - [Ranking](#ranking) calculations.
 
 ## Rolling window
@@ -400,6 +401,132 @@ Query and result:
 
 <Screenshot src="https://ucarecdn.com/0d0b318c-0743-4698-bb05-b9bf6dfeb292/" />
 
+## Conditional measure
+
+Conditional measure calculations can be used to create measures that depend on the value
+of a dimension. Such measures are defined using the [`case` parameter][ref-case-measures]
+and used together with [`switch` dimensions][ref-switch-dimensions].
+
+```yaml
+- name: amount_in_currency
+  multi_stage: true
+  case:
+    switch: "{CUBE.currency}"
+    when:
+      - value: EUR
+        sql: "{CUBE.amount_eur}"
+      - value: GBP
+        sql: "{CUBE.amount_gbp}"
+    else:
+      sql: "{CUBE.amount_usd}"
+  type: number
+```
+
+### Example
+
+Data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: |
+      SELECT 1 AS id, 100 AS amount_usd UNION ALL
+      SELECT 2 AS id, 200 AS amount_usd UNION ALL
+      SELECT 3 AS id, 300 AS amount_usd UNION ALL
+      SELECT 4 AS id, 400 AS amount_usd UNION ALL
+      SELECT 5 AS id, 500 AS amount_usd
+      
+    dimensions:
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+    
+    measures:
+      - name: amount_usd
+        sql: amount_usd
+        type: sum
+
+      - name: amount_eur
+        sql: "{amount_usd} * 0.9"
+        type: number
+ 
+      - name: amount_gbp
+        sql: "{amount_usd} * 0.8"
+        type: number
+
+      - name: amount_in_currency
+        multi_stage: true
+        case:
+          switch: "{currency}"
+          when:
+            - value: EUR
+              sql: "{amount_eur}"
+            - value: GBP
+              sql: "{amount_gbp}"
+          else:
+            sql: "{amount_usd}"
+        type: number
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, 100 AS amount_usd UNION ALL
+    SELECT 2 AS id, 200 AS amount_usd UNION ALL
+    SELECT 3 AS id, 300 AS amount_usd UNION ALL
+    SELECT 4 AS id, 400 AS amount_usd UNION ALL
+    SELECT 5 AS id, 500 AS amount_usd
+  `,
+
+  dimensions: {
+    currency: {
+      type: `switch`,
+      values: [`USD`, `EUR`, `GBP`]
+    }
+  },
+
+  measures: {
+    amount_usd: {
+      sql: `amount_usd`,
+      type: `sum`
+    },
+
+    amount_eur: {
+      sql: `${amount_usd} * 0.9`,
+      type: `number`
+    },
+
+    amount_gbp: {
+      sql: `${amount_usd} * 0.8`,
+      type: `number`
+    },
+
+    amount_in_currency: {
+      multi_stage: true,
+      case: {
+        switch: `${currency}`,
+        when: [
+          { value: `EUR`, sql: `${amount_eur}` },
+          { value: `GBP`, sql: `${amount_gbp}` }
+        ],
+        else: { sql: `${amount_usd}` }
+      },
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+Query and result:
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/43df5a7c-7537-448a-999c-abeed5347519/" />
 
 ## Ranking
 
@@ -471,3 +598,5 @@ Query and result:
 [link-cte]: https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
 [ref-ref-time-shift]: /product/data-modeling/reference/measures#time_shift
 [ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
+[ref-case-measures]: /product/data-modeling/reference/measures#case
+[ref-switch-dimensions]: /product/data-modeling/reference/types-and-formats#switch
