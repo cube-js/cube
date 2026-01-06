@@ -7,6 +7,15 @@ please check the relevant page on [Connecting to Data Sources][ref-config-db].
 
 </InfoBox>
 
+## `CUBEJS_ADBC_PORT`
+
+The port to bind the ADBC (Arrow Native) endpoint for Cube SQL. Set to a port
+number to enable the endpoint.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A valid port number, `false`   | `false`                | `false`               |
+
 ## `CUBEJS_API_SECRET`
 
 The secret key used to sign and verify JWTs. Generated on project scaffold with
@@ -1302,6 +1311,30 @@ If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
+
+## `CUBESQL_ARROW_RESULTS_CACHE_ENABLED`
+
+If `true`, enables the Arrow native results cache for the ADBC endpoint.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES`
+
+The maximum number of Arrow native results to keep in the cache.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `1000`                 | `1000`                |
+
+## `CUBESQL_ARROW_RESULTS_CACHE_TTL`
+
+Time-to-live for Arrow native results cache entries, in seconds.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `3600`                 | `3600`                |
 
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 

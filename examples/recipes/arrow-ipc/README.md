@@ -179,6 +179,9 @@ CUBESQL_ARROW_RESULTS_CACHE_MAX_ENTRIES=10000 # Max cached queries (default: 100
 CUBESQL_ARROW_RESULTS_CACHE_TTL=7200          # TTL in seconds (default: 3600)
 ```
 
+See the full list of environment variables in the
+[Environment Variables reference](/product/configuration/reference/environment-variables).
+
 ### Database Settings
 
 Edit `.env` file:

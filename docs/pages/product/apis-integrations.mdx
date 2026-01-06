@@ -9,9 +9,49 @@ Cube provides three types of APIs:
 - **[Core Data APIs][ref-core-data-apis]** are used to query data from the semantic layer using various protocols
 - **Management APIs** - currently the [Orchestration API][ref-orchestration-api] is available to control pre-aggregation refreshes externally
 
+## ADBC (Arrow Native) server
+
+CubeSQL exposes an ADBC (Arrow Database Connectivity) endpoint that returns
+Apache Arrow record batches over a binary protocol. It is designed for
+low-latency, high-throughput data transfer to data science tools and
+Arrow-native clients.
+
+**Architecture**:
+Client application (ADBC driver) → CubeSQL ADBC endpoint → Cube SQL query engine
+→ Cube Store. It uses the same authentication and security model as the
+[SQL API][ref-sql-api].
+
+To enable the endpoint and configure the optional Arrow results cache, see the
+[Environment Variables reference][ref-env-vars].
+
+**Benefits**:
+- Efficient binary transport with minimal serialization overhead
+- Fast repeated queries with the optional Arrow results cache
+- Compatible with the SQL API security model and Cube semantic layer
+
+If you want receipts, the ADBC Arrow IPC recipe collects them. It includes a
+working example, a 5-minute setup, and performance notes that show where Arrow
+Native wins outright (often 8-15x over REST for larger result sets) and where it
+is merely competitive over the network. It also demonstrates optional caching,
+pre-aggregation access via Arrow IPC, and a no-nonsense verification checklist.
+In short: stop paying the JSON tax unless you enjoy it.
+
+See the [Arrow IPC recipe on GitHub][ref-arrow-ipc-recipe] for the full
+walkthrough, test scripts, and sample data.
+
+The larger point is a symbiosis of three: intent, semantics, and transport.
+Power of Three sketches intent from Ecto into cube definitions, Cube executes
+those semantics, and ADBC/Arrow moves the results in their native, columnar
+state to clients such as Explorer.DataFrame. It is a short, honest pipeline:
+no JSON detours, no decorative middleware, and fewer places to lie to yourself
+about performance.
+
 
 [ref-embed-apis]: /product/apis-integrations/embed-apis
 [ref-core-data-apis]: /product/apis-integrations/core-data-apis
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
 [ref-chat-api]: /product/apis-integrations/embed-apis/chat-api
 [ref-generate-session]: /product/apis-integrations/embed-apis/generate-session
+[ref-sql-api]: /product/apis-integrations/core-data-apis/sql-api
+[ref-env-vars]: /product/configuration/reference/environment-variables
+[ref-arrow-ipc-recipe]: https://github.com/cube-js/cube/tree/master/examples/recipes/arrow-ipc
