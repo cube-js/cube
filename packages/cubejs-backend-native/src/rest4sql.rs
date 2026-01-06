@@ -8,9 +8,9 @@ use crate::config::NodeCubeServices;
 use crate::cubesql_utils::with_session;
 use crate::tokio_runtime_node;
 use crate::utils::NonDebugInRelease;
+use cubesql::compile::convert_sql_to_cube_query;
 use cubesql::compile::datafusion::logical_plan::LogicalPlan;
 use cubesql::compile::engine::df::scan::CubeScanNode;
-use cubesql::compile::convert_sql_to_cube_query;
 use cubesql::transport::TransportLoadRequestQuery;
 use cubesql::CubeError;
 
@@ -123,7 +123,6 @@ async fn handle_rest4sql_query(
                 error: "Provided sql query can not be converted to rest query.".to_string(),
             }),
         }
-
     })
     .await
 }
