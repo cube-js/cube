@@ -238,7 +238,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     ) {
       // Special handling for userAttributes - replace in parameter list with securityContext
       const fullPath = this.fullPath(path);
-      if (path.node.name === 'userAttributes' && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
+      if ((path.node.name === 'userAttributes' || path.node.name === 'user_attributes') && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
         identifiers.push('securityContext');
       } else {
         identifiers.push(path.node.name);
@@ -249,13 +249,32 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   protected static transformUserAttributesMemberExpression(path: NodePath<t.MemberExpression>) {
     // Check if this is userAttributes.someProperty (object should be identifier named 'userAttributes')
     const fullPath = this.fullPath(path);
-    if (t.isIdentifier(path.node.object, { name: 'userAttributes' }) && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
+    if (
+      (t.isIdentifier(path.node.object, { name: 'userAttributes' }) || t.isIdentifier(path.node.object, { name: 'user_attributes' })) &&
+      (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
+    ) {
       // Replace userAttributes with securityContext.cubeCloud.userAttributes
       const securityContext = t.identifier('securityContext');
       const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
       const userAttributes = t.memberExpression(cubeCloud, t.identifier('userAttributes'));
       const newMemberExpression = t.memberExpression(userAttributes, path.node.property, path.node.computed);
 
+      path.replaceWith(newMemberExpression);
+    } else if (
+      t.isMemberExpression(path.node.object) &&
+      t.isIdentifier(path.node.object.property, { name: 'user_attributes' }) &&
+      !path.node.object.computed &&
+      (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
+    ) {
+      // Also handle case where user_attributes appears within a MemberExpression chain like
+      // securityContext.cubeCloud.user_attributes
+      // We need to convert user_attributes to userAttributes in such chains
+      const newObject = t.memberExpression(
+        path.node.object.object,
+        t.identifier('userAttributes'),
+        false
+      );
+      const newMemberExpression = t.memberExpression(newObject, path.node.property, path.node.computed);
       path.replaceWith(newMemberExpression);
     }
   }
