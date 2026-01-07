@@ -67,4 +67,41 @@ describe('BigQueryDriver', () => {
     const result = await streamToArray(tableData.rowStream as any);
     assertHydrationResults(result);
   });
+
+  describe('parseBucketUrl subdirectory support', () => {
+    test('should handle bucket name without path', () => {
+      const driver = new BigQueryDriver({ exportBucket: 'my-bucket' });
+      const parsed = (driver as any).parseBucketUrl('my-bucket');
+      expect(parsed.bucketName).toBe('my-bucket');
+      expect(parsed.path).toBe('');
+    });
+
+    test('should handle GCS URL without path', () => {
+      const driver = new BigQueryDriver({ exportBucket: 'gs://my-bucket' });
+      const parsed = (driver as any).parseBucketUrl('gs://my-bucket');
+      expect(parsed.bucketName).toBe('my-bucket');
+      expect(parsed.path).toBe('');
+    });
+
+    test('should extract path from GCS URL with single-level path', () => {
+      const driver = new BigQueryDriver({ exportBucket: 'gs://my-bucket/tenant-1' });
+      const parsed = (driver as any).parseBucketUrl('gs://my-bucket/tenant-1');
+      expect(parsed.bucketName).toBe('my-bucket');
+      expect(parsed.path).toBe('tenant-1');
+    });
+
+    test('should extract path from GCS URL with multi-level path', () => {
+      const driver = new BigQueryDriver({ exportBucket: 'gs://my-bucket/data/exports/tenant-1' });
+      const parsed = (driver as any).parseBucketUrl('gs://my-bucket/data/exports/tenant-1');
+      expect(parsed.bucketName).toBe('my-bucket');
+      expect(parsed.path).toBe('data/exports/tenant-1');
+    });
+
+    test('should handle bucket name with path (no schema)', () => {
+      const driver = new BigQueryDriver({ exportBucket: 'my-bucket/tenant-1' });
+      const parsed = (driver as any).parseBucketUrl('my-bucket/tenant-1');
+      expect(parsed.bucketName).toBe('my-bucket');
+      expect(parsed.path).toBe('tenant-1');
+    });
+  });
 });
