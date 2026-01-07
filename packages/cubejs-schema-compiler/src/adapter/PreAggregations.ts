@@ -244,7 +244,10 @@ export class PreAggregations {
             count: 'sum',
             countDistinctApprox: 'merge',
             min: 'min',
-            max: 'max'
+            max: 'max',
+            string: 'max',
+            time: 'max',
+            Boolean: 'max'
           }[m.measureDefinition().type];
           return `${fname}(${m.aliasName()})`;
         });
