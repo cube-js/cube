@@ -72,7 +72,7 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | `CUBEJS_DB_BQ_KEY_FILE`        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅    |
 | `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
 | `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |
-| `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage. Can include a path to organize files in subdirectories (e.g., `gs://bucket/path` or `bucket/path`)                                                      | A valid bucket name from cloud storage, optionally with a path          |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
 | `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
 | `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
@@ -135,6 +135,33 @@ When using an export bucket, remember to assign the **BigQuery Data Editor** and
 CUBEJS_DB_EXPORT_BUCKET=export_data_58148478376
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 ```
+
+##### Organizing files in subdirectories
+
+You can organize pre-aggregation files in subdirectories within your export bucket
+by including a path in the `CUBEJS_DB_EXPORT_BUCKET` variable. This is useful for
+multi-tenant scenarios where each tenant needs isolated storage within a shared bucket:
+
+```dotenv
+# Single-level subdirectory
+CUBEJS_DB_EXPORT_BUCKET=gs://my-bucket/tenant-1
+
+# Multi-level subdirectory
+CUBEJS_DB_EXPORT_BUCKET=gs://my-bucket/data/exports/tenant-1
+```
+
+You can also use bucket names without the `gs://` scheme:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET=my-bucket/tenant-1
+```
+
+With subdirectories configured, pre-aggregation files will be created at:
+- `gs://my-bucket/tenant-1/schema.table-*.csv.gz` instead of
+- `gs://my-bucket/schema.table-*.csv.gz`
+
+This allows you to configure IAM permissions at the subdirectory level, granting
+each tenant access only to their specific folder within the shared bucket.
 
 ## SSL
 
