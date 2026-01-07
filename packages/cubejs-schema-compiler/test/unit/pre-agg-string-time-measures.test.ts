@@ -255,7 +255,7 @@ describe('pre-aggregations with string, time, and boolean measures', () => {
       }
     );
 
-    expect(() => query.buildSqlQuery()).not.toThrow();
+    expect(() => query.buildSqlAndParams()).not.toThrow();
   });
 
   it('should generate correct SQL for pre-aggregation with boolean measure', async () => {
@@ -314,6 +314,6 @@ describe('pre-aggregations with string, time, and boolean measures', () => {
       }
     );
 
-    expect(() => query.buildSqlQuery()).not.toThrow();
+    expect(() => query.buildSqlAndParams()).not.toThrow();
   });
 });
