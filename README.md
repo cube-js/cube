@@ -54,7 +54,7 @@ For a step-by-step guide, [see the docs](https://cube.dev/docs/getting-started-d
 
 ### Cube — Complete Modern BI Tool from Cube Core Creators
 
-[Cube](https://cube.dev?ref=github-readme) is a complete modern AI-first business intelligence platform built on Cube Core. It provides a fully integrated solution with a user-friendly interface, advanced analytics capabilities, and managed infrastructure. [Cube Cloud](https://cube.dev/cloud?ref=github-readme) offers the fastest way to get started with instant and free access for development projects and proofs of concept.
+[Cube](https://cube.dev?ref=github-readme) is a complete modern agentic analytics platform built on Cube Core. It provides a fully integrated solution with a user-friendly interface, advanced analytics capabilities, and managed infrastructure.
 
 <a href="https://cubecloud.dev/auth/signup?ref=github-readme"><img src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png" alt="Get started now" width="200px"></a>
 
