@@ -148,6 +148,18 @@ export class PythonParser {
           }
           return t.templateElement({ raw: node.getText(), cooked: node.getText() });
         } else if (node instanceof String_templateContext) {
+          // Handle empty f-strings (e.g., f"F" where F is just a literal with no interpolation)
+          // This can happen when YAML values like "F" get wrapped as f"F" by the schema compiler
+          if (children.length === 0) {
+            const text = node.getText();
+            // Extract the content between the f-string prefix and quotes (e.g., f"content" -> content)
+            const match = text.match(/^[fF]["'](.*)["']$/s);
+            const content = match ? match[1] : text;
+            return t.templateLiteral(
+              [t.templateElement({ raw: content, cooked: content }, true)],
+              []
+            );
+          }
           if (children[children.length - 1].type === 'TemplateElement') {
             children[children.length - 1].tail = true;
           } else {

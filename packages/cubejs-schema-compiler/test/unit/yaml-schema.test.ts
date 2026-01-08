@@ -321,6 +321,36 @@ describe('Yaml Schema Testing', () => {
 
       await compiler.compile();
     });
+
+    it('single letter F in metadata does not crash - issue#XXXX', async () => {
+      // Single letters "F" and "f" look like Python f-string prefixes when YAML values
+      // get wrapped as f"..." during parsing. This test verifies they are handled correctly.
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Products
+      sql: SELECT * FROM products
+      dimensions:
+        - name: id
+          sql: id
+          type: number
+          primaryKey: true
+        - name: status
+          sql: status
+          type: string
+          meta:
+            enumValues:
+              - A
+              - B
+              - C
+              - D
+              - E
+              - F
+              - G
+      `
+      );
+
+      await compiler.compile();
+    });
   });
 
   it('accepts cube meta', async () => {
