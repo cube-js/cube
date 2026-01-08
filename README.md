@@ -10,7 +10,7 @@
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube Core is an open-source semantic layer.__ Cube Core can be used to build embedded analytics in your applications or create your own business intelligence tool. Cube Core is headless and comes with multiple APIs for embedded analytics and BI: REST, GraphQL, and SQL.
+__Cube Core is an open-source semantic layer.__ Cube Core can be used to build embedded analytics in your applications, create your own business intelligence tool or provide context about data to AI agents. Cube Core is headless and comes with multiple APIs for embedded analytics and BI: REST, GraphQL, and SQL.
 
 If you are looking for a fully integrated platform, check out [Cube](https://cube.dev), a modern AI-first business intelligence platform. We use Cube Core to power it.
 
@@ -26,13 +26,11 @@ If you are looking for a fully integrated platform, check out [Cube](https://cub
 
 Cube Core was designed to work with all SQL data sources, including cloud data warehouses like Snowflake, Databricks, and BigQuery; query engines like Presto and Amazon Athena; and application databases like Postgres. Cube Core has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
-For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction?ref=github-readme) page in our documentation.
-
 ## Why Cube Core?
 
 Every business intelligence tool relies on a semantic layer as its core engine—a critical component that defines metrics, dimensions, and business logic while abstracting the complexity of underlying data sources. However, most semantic layers are proprietary, tightly coupled to specific BI platforms, and cannot be reused across different applications.
 
-Cube Core is an open-source project that aims to create an open, modern semantic layer that can be used to power any analytics application, including business intelligence tools and embedded analytics. By decoupling the semantic layer from specific tools and making it accessible through standard APIs, Cube Core enables organizations to define their metrics once and use them everywhere—from custom dashboards to embedded analytics, from data exploration tools to automated reporting systems.
+Cube Core is an open-source project that aims to create an open, modern semantic layer that can be used to power any analytics applications and AI agents. By decoupling the semantic layer from specific tools and making it accessible through standard APIs, Cube Core enables organizations to define their metrics once and use them everywhere—from BI tools to embedded analytics to AI agents.
 
 ## Getting Started 🚀
 
