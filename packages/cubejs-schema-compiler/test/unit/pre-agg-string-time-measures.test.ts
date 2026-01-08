@@ -146,7 +146,6 @@ describe('pre-aggregations with string, time, and boolean measures', () => {
     );
 
     const [sql, params] = query.buildSqlAndParams();
-    console.log('Cumulative string measure SQL:', sql);
     expect(sql.includes('max("orders__cumulative_notes")')).toBe(true);
     expect(sql.includes('sum("orders__cumulative_sum")')).toBe(true);
     expect(sql.includes('max("orders__cumulative_boolean")')).toBe(true);
