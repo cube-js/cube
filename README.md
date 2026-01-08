@@ -15,7 +15,7 @@ __Cube Core is an open-source semantic layer.__ Cube Core can be used to build e
 If you are looking for a fully integrated platform, check out [Cube](https://cube.dev), a modern AI-first business intelligence platform. We use Cube Core to power it.
 
 <img
-  src="https://ucarecdn.com/8d945f29-e9eb-4e7f-9e9e-29ae7074e195/"
+  src="https://lgo0ecceic.ucarecd.net/418db1f9-7597-4e00-8c10-eba19fcac20f/"
   style="border: none"
   width="100%"
 />
