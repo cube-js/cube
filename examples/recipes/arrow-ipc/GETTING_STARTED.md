@@ -195,10 +195,7 @@ export CUBESQL_QUERY_CACHE_ENABLED=true
    - `rust/cubesql/cubesql/src/sql/arrow_native/cache.rs`
    - `rust/cubesql/cubesql/src/sql/arrow_native/server.rs`
 
-2. **Read the architecture**:
-   - `LOCAL_VERIFICATION.md` - How to verify the PR
-
-3. **Run the full test suite**:
+2. **Run the full test suite**:
    ```bash
    cd rust/cubesql
    cargo test arrow_native::cache
@@ -223,7 +220,6 @@ export CUBESQL_QUERY_CACHE_ENABLED=true
 
 ## Resources
 
-- **Architecture**: `ARCHITECTURE.md`
-- **Local Verification**: `LOCAL_VERIFICATION.md`
 - **Sample Data**: `sample_data.sql.gz` (240KB, 3000 orders)
 - **Python Tests**: `test_arrow_native_performance.py`
+- **Cube Schemas**: `model/cubes/`
