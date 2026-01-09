@@ -389,7 +389,7 @@ export class PreAggregations {
   }
 
   public async removePreAggBackoff(tableName: string): Promise<void> {
-    await this.queryCache.getCacheDriver().remove(tableName);
+    await this.queryCache.getCacheDriver().remove(this.preAggBackoffRedisKey(tableName));
   }
 
   public getPreAggBackoffMaxTime(): number {
