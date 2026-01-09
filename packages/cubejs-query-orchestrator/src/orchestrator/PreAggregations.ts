@@ -251,6 +251,8 @@ export class PreAggregations {
 
   private readonly touchTablePersistTime: number;
 
+  private readonly preAggBackoffMaxTime: number;
+
   public readonly dropPreAggregationsWithoutTouch: boolean;
 
   private readonly usedTablePersistTime: number;
@@ -277,6 +279,7 @@ export class PreAggregations {
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
     this.touchTablePersistTime = options.touchTablePersistTime || getEnv('touchPreAggregationTimeout');
+    this.preAggBackoffMaxTime = options.preAggBackoffMaxTime || getEnv('preAggBackoffMaxTime');
     this.dropPreAggregationsWithoutTouch = options.dropPreAggregationsWithoutTouch || getEnv('dropPreAggregationsWithoutTouch');
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
@@ -315,6 +318,11 @@ export class PreAggregations {
   protected tablesTouchRedisKey(tableName: string): string {
     // TODO add dataSource?
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
+  }
+
+  protected preAggBackoffRedisKey(tableName: string): string {
+    // TODO add dataSource?
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_BACKOFF', tableName);
   }
 
   protected refreshEndReachedKey() {
@@ -370,6 +378,36 @@ export class PreAggregations {
   public async tablesTouched() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
       .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
+  }
+
+  public async updatePreAggBackoff(tableName: string, backoffData: { backoffMultiplier: number, nextTimestamp: Date }): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.preAggBackoffRedisKey(tableName),
+      JSON.stringify(backoffData),
+      this.preAggBackoffMaxTime
+    );
+  }
+
+  public async removePreAggBackoff(tableName: string): Promise<void> {
+    await this.queryCache.getCacheDriver().remove(tableName);
+  }
+
+  public getPreAggBackoffMaxTime(): number {
+    return this.preAggBackoffMaxTime;
+  }
+
+  public async getPreAggBackoff(tableName: string): Promise<{ backoffMultiplier: number, nextTimestamp: Date } | null> {
+    const res = await this.queryCache.getCacheDriver().get(this.preAggBackoffRedisKey(tableName));
+
+    if (!res) {
+      return null;
+    }
+
+    const parsed = JSON.parse(res);
+    return {
+      backoffMultiplier: parsed.backoffMultiplier,
+      nextTimestamp: new Date(parsed.nextTimestamp),
+    };
   }
 
   public async updateRefreshEndReached() {
