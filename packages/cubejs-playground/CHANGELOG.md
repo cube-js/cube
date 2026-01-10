@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
+
+### Features
+
+- replace connect to bi page in playground with cube bi page ([#10293](https://github.com/cube-js/cube/issues/10293)) ([258a6d0](https://github.com/cube-js/cube/commit/258a6d032cf68b0eda7fc1fa6cc1cc4a14aab226))
+
 ## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
 
 **Note:** Version bump only for package @cubejs-client/playground

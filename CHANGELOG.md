@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
+
+### Bug Fixes
+
+- **athena-driver:** accept AWS assume role parameters as part of the ([#10300](https://github.com/cube-js/cube/issues/10300)) ([6dfef20](https://github.com/cube-js/cube/commit/6dfef2003f9d782c7bb2bf917dd95c7dce6259bf))
+- **client-core:** Isolate internalDayjs instance to prevent global dayjs pollution ([#10279](https://github.com/cube-js/cube/issues/10279)) ([3cf4f74](https://github.com/cube-js/cube/commit/3cf4f74073c168707a79f60b7bef0a690a0a0e6f))
+- **client-core:** preserve zero values with fillWithValue in pivot ([#10225](https://github.com/cube-js/cube/issues/10225)) ([#10226](https://github.com/cube-js/cube/issues/10226)) ([ee02a4f](https://github.com/cube-js/cube/commit/ee02a4f35f79ffdec1f01febfffee0d50c239a9b))
+
+### Features
+
+- Allow to specify key for dimensions in schema ([#10270](https://github.com/cube-js/cube/issues/10270)) ([df8161c](https://github.com/cube-js/cube/commit/df8161c4c1ad782493e83088c9260043996eb4c0))
+- replace connect to bi page in playground with cube bi page ([#10293](https://github.com/cube-js/cube/issues/10293)) ([258a6d0](https://github.com/cube-js/cube/commit/258a6d032cf68b0eda7fc1fa6cc1cc4a14aab226))
+
 ## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
 
 **Note:** Version bump only for package cubejs
