@@ -616,14 +616,18 @@ export class RefreshScheduler {
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
             const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
             const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
-            const now = new Date();
+
+            console.log(`DBG`);
+            console.log(`DBG: Refreshing pre-agg ${currentQuery.preAggregations[0].tableName}. Now: ${(new Date()).toISOString()}`);
 
             const backoffChecks = await Promise.all(
               currentQuery.preAggregations.map(p => preAggsInstance.getPreAggBackoff(p.tableName))
             );
 
             // Skip execution if any pre-aggregation is still in backoff window
-            const shouldSkip = backoffChecks.some(backoffData => backoffData && now < backoffData.nextTimestamp);
+            const shouldSkip = backoffChecks.some(backoffData => backoffData && (new Date()) < backoffData.nextTimestamp);
+
+            console.log(`DBG: shouldSkip? ${shouldSkip}`);
 
             if (!shouldSkip) {
               try {
@@ -638,6 +642,7 @@ export class RefreshScheduler {
                 // Real datasource error - apply exponential backoff
                 for (const p of currentQuery.preAggregations) {
                   let backoffData = await preAggsInstance.getPreAggBackoff(p.tableName);
+                  const now = new Date();
 
                   if (backoffData && backoffData.backoffMultiplier > 0) {
                     const newMultiplier = backoffData.backoffMultiplier * 2;
@@ -653,6 +658,8 @@ export class RefreshScheduler {
                       nextTimestamp: new Date(now.valueOf() + 1000),
                     };
                   }
+
+                  console.log(`DBG: Refresh failed. Applying backoff: backoffMultiplier: ${backoffData.backoffMultiplier}, nextTimestamp: ${backoffData.nextTimestamp.toISOString()}`);
 
                   await preAggsInstance.updatePreAggBackoff(p.tableName, backoffData);
                 }
