@@ -1,0 +1,78 @@
+{
+  "name": "cubejs",
+  "version": "0.1.0",
+  "description": "",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "rust/*",
+      "packages/*"
+    ],
+    "nohoist": [
+      "packages/cubejs-client-ngx/*",
+      "**/vue/*",
+      "**/inquirer"
+    ]
+  },
+  "scripts": {
+    "build": "yarn lerna run build:client-core && rollup -c",
+    "watch": "rollup -c -w",
+    "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w",
+    "lint:npm": "yarn npmPkgJsonLint packages/*/package.json rust/package.json",
+    "lint": "yarn lint:npm && yarn lerna run lint",
+    "lint:fix": "lerna run lint:fix",
+    "tsc": "tsc --build",
+    "tsc:watch": "tsc --build --watch",
+    "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}"
+  },
+  "author": "Cube Dev, Inc.",
+  "dependencies": {
+    "core-js": "^3.34.0",
+    "lerna": "^9.0.0"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "devDependencies": {
+    "@babel/core": "^7.13.8",
+    "@babel/plugin-transform-runtime": "^7.13.9",
+    "@babel/preset-env": "^7.13.9",
+    "@babel/preset-react": "^7.12.13",
+    "@babel/preset-typescript": "^7.13.0",
+    "@babel/runtime": "^7.13.9",
+    "@rollup/plugin-alias": "^3.1.2",
+    "@rollup/plugin-babel": "^5.3.0",
+    "@rollup/plugin-commonjs": "^17.1.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^11.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@types/fs-extra": "^9.0.1",
+    "@types/jest": "^27",
+    "flush-promises": "^1.0.2",
+    "husky": "^5.0.4",
+    "is-ci": "^2.0.0",
+    "less": "^3.13.1",
+    "npm-package-json-lint": "^5.1.0",
+    "postcss": "^8.2.8",
+    "prettier": "^2.0.5",
+    "rimraf": "^3.0.2",
+    "rollup": "2.53.1",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "rollup-plugin-tsconfig-paths": "^1.5.2",
+    "typescript": "~5.2.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git"
+  },
+  "resolutions": {
+    "es5-ext": "0.10.53",
+    "lodash": "^4.17.0",
+    "@types/node": "^20",
+    "@types/ramda": "0.27.40",
+    "thrift": "0.20.0"
+  },
+  "license": "MIT",
+  "packageManager": "yarn@1.22.19"
+}
