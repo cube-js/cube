@@ -53,8 +53,9 @@ fi
 echo -e "${YELLOW}Cube.js API is running on port ${CUBE_API_PORT}${NC}"
 
 # Check if cubesqld ports are free
-#PG_PORT=${CUBEJS_PG_SQL_PORT:-4444}
-ADBC_PORT=${CUBEJS_ADBC_PORT:-8120}
+PG_PORT=${CUBEJS_PG_SQL_PORT:-9432}
+#export CUBEJS_PG_SQL_PORT="9432"
+#ADBC_PORT=${CUBEJS_ADBC_PORT:-8120}
 
 echo ""
 echo -e "${GREEN}Checking port availability...${NC}"
