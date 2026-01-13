@@ -1139,7 +1139,7 @@ describe('Refresh Scheduler', () => {
   test('Exponential backoff', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
-    process.env.CUBEJS_PRE_AGG_BACKOFF_MAX_TIME = '10'; // 10 seconds max backoff
+    process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME = '10'; // 10 seconds max backoff
 
     const {
       refreshScheduler, mockDriver, serverCore

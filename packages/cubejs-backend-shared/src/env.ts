@@ -754,7 +754,7 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Maximum time for exponential backoff for pre-aggs (in seconds)
    */
-  preAggBackoffMaxTime: (): number => get('CUBEJS_PRE_AGG_BACKOFF_MAX_TIME')
+  preAggBackoffMaxTime: (): number => get('CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME')
     .default(10 * 60)
     .asIntPositive(),
 
