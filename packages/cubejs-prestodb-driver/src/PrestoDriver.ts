@@ -131,12 +131,22 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     */
     const columns = await this.unloadWithSql(tableName, options)
     const files = await this.getCsvFiles(tableName)
+    const unloadSchema = this.config.unloadSchema!;
+    const unloadCatalog = this.config.unloadCatalog!;
+    const trinoTable = `${unloadCatalog}.${unloadSchema}."${tableName}"`;
 
     return {
       csvFile: files,
       types: columns,
       csvNoHeader: true,
-      csvDelimiter: '^A'
+      csvDelimiter: '^A',
+      release: async () => {
+        try {
+          const dropIfExistsSql = `DROP TABLE IF EXISTS ${trinoTable}`;
+          await this.queryPromised(this.prepareQueryWithParams(dropIfExistsSql, []), false);
+        } catch (_e) {
+        }
+      }
     }
   }
 
