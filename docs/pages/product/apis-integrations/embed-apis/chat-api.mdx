@@ -81,16 +81,16 @@ while (true) {
 |-------|------|----------|-------------|
 | `input` | string | No | The user's message or question. If omitted returns current state of thread with provided chatId. |
 | `chatId` | string | No | Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__` sent as the `state.chatId` field. |
-| `sessionSettings.externalId` | string | No | Unique identifier for the external user, lowercase and without spaces. Either `externalId` or `internalUsername` should be provided. |
-| `sessionSettings.internalUsername` | string | No | Username of an internal Cube Cloud user. Either `externalId` or `internalUsername` should be provided. |
+| `sessionSettings.externalId` | string | No | Unique identifier for the external user, lowercase and without spaces. Either `externalId` or `internalId` should be provided. |
+| `sessionSettings.internalId` | string | No | Email of an internal Cube Cloud user. Either `externalId` or `internalId` should be provided. |
 | `sessionSettings.email` | string | No | User's email address |
-| `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalUsername`. |
-| `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalUsername`. |
-| `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalUsername`. |
+| `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
+| `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
+| `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
 
 <InfoBox>
 
-When using `internalUsername`, the user must already exist in Cube Cloud. You cannot specify `roles`, `groups`, `userAttributes`, or `securityContext` with `internalUsername` — the internal user's existing permissions are used instead.
+When using `internalId`, the user must already exist in Cube Cloud. You cannot specify `roles`, `groups`, `userAttributes`, or `securityContext` with `internalId` — the internal user's existing permissions are used instead.
 
 </InfoBox>
 
@@ -103,8 +103,8 @@ User attributes must first be configured in your Cube admin panel before they ca
 </InfoBox>
 
 **Supported Fields:**
-- `externalId` (optional): Unique identifier for the external user. Either `externalId` or `internalUsername` should be provided.
-- `internalUsername` (optional): Username of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalUsername` should be provided.
+- `externalId` (optional): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
+- `internalId` (optional): Email of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
 - `email` (optional): User's email address  
 - `userAttributes` (optional): Array of key-value pairs containing user metadata. Only available with `externalId`.
 
@@ -154,12 +154,12 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
 - **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?". If omitted, returns current state of thread with provided `chatId`.
 - **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
 - **`sessionSettings`** (object, required): Session configuration for the user
-  - **`externalId`** (string): Unique identifier for the external user. Either `externalId` or `internalUsername` should be provided.
-  - **`internalUsername`** (string): Username of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalUsername` should be provided.
+  - **`externalId`** (string): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
+  - **`internalId`** (string): Email of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
   - **`email`** (string): User's email address
-  - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalUsername`.
-  - **`groups`** (string[]): Array of group names for user. Not allowed with `internalUsername`.
-  - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalUsername`.
+  - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`.
+  - **`groups`** (string[]): Array of group names for user. Not allowed with `internalId`.
+  - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
 
 ## Response Format
 
