@@ -866,8 +866,14 @@ impl ImportService for ImportServiceImpl {
     }
 
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
-        let file_size =
-            LocationHelper::location_file_size(location, self.remote_fs.clone()).await?;
+        let file_size = LocationHelper::location_file_size(
+            location,
+            self.remote_fs.clone(),
+            self.config_obj.http_location_size_max_retries(),
+            self.config_obj.http_location_size_initial_sleep_ms(),
+            self.config_obj.http_location_size_sleep_multiplier(),
+        )
+        .await?;
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
     }
 
@@ -923,11 +929,14 @@ impl LocationHelper {
         }
     }
 
-    async fn get_http_location_size(location: &str) -> Result<Option<u64>, CubeError> {
-        let max_retries: i32 = 10;
-        let mut retry_attempts = max_retries;
-        let mut retries_sleep = Duration::from_millis(100);
-        let sleep_multiplier = 2;
+    async fn get_http_location_size(
+        location: &str,
+        max_retries: u64,
+        initial_sleep_ms: u64,
+        sleep_multiplier: u64,
+    ) -> Result<Option<u64>, CubeError> {
+        let mut retry_attempts = max_retries as i32;
+        let mut retries_sleep = Duration::from_millis(initial_sleep_ms);
         loop {
             retry_attempts -= 1;
             let result = Self::try_get_http_location_size(location).await;
@@ -944,11 +953,11 @@ impl LocationHelper {
                         "HEAD {} error: {}. Retrying {}/{}...",
                         location,
                         err,
-                        max_retries - retry_attempts,
+                        max_retries as i32 - retry_attempts,
                         max_retries
                     );
                     sleep(retries_sleep).await;
-                    retries_sleep *= sleep_multiplier;
+                    retries_sleep *= sleep_multiplier as u32;
                 }
             }
         }
@@ -957,9 +966,13 @@ impl LocationHelper {
     pub async fn location_file_size(
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
+        max_retries: u64,
+        initial_sleep_ms: u64,
+        sleep_multiplier: u64,
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
-            Self::get_http_location_size(location).await?
+            Self::get_http_location_size(location, max_retries, initial_sleep_ms, sleep_multiplier)
+                .await?
         } else if location.starts_with("temp://") {
             let remote_path = Self::temp_uploads_path(location);
             match remote_fs.list_with_metadata(remote_path).await {
