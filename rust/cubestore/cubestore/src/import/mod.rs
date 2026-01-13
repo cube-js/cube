@@ -872,6 +872,7 @@ impl ImportService for ImportServiceImpl {
             self.config_obj.http_location_size_max_retries(),
             self.config_obj.http_location_size_initial_sleep_ms(),
             self.config_obj.http_location_size_sleep_multiplier(),
+            self.config_obj.http_location_size_timeout_secs(),
         )
         .await?;
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
@@ -885,8 +886,13 @@ impl ImportService for ImportServiceImpl {
 pub struct LocationHelper;
 
 impl LocationHelper {
-    async fn try_get_http_location_size(location: &str) -> Result<Option<u64>, CubeError> {
-        let client = reqwest::Client::new();
+    async fn try_get_http_location_size(
+        location: &str,
+        timeout_secs: u64,
+    ) -> Result<Option<u64>, CubeError> {
+        let client = reqwest::ClientBuilder::new()
+            .timeout(Duration::from_secs(timeout_secs))
+            .build()?;
         let req = client.head(location).build()?;
 
         // S3 doesn't support HEAD for pre signed urls with GetObject command
@@ -934,12 +940,13 @@ impl LocationHelper {
         max_retries: u64,
         initial_sleep_ms: u64,
         sleep_multiplier: u64,
+        timeout_secs: u64,
     ) -> Result<Option<u64>, CubeError> {
         let mut retry_attempts = max_retries as i32;
         let mut retries_sleep = Duration::from_millis(initial_sleep_ms);
         loop {
             retry_attempts -= 1;
-            let result = Self::try_get_http_location_size(location).await;
+            let result = Self::try_get_http_location_size(location, timeout_secs).await;
 
             if retry_attempts <= 0 {
                 return result;
@@ -969,10 +976,17 @@ impl LocationHelper {
         max_retries: u64,
         initial_sleep_ms: u64,
         sleep_multiplier: u64,
+        timeout_secs: u64,
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
-            Self::get_http_location_size(location, max_retries, initial_sleep_ms, sleep_multiplier)
-                .await?
+            Self::get_http_location_size(
+                location,
+                max_retries,
+                initial_sleep_ms,
+                sleep_multiplier,
+                timeout_secs,
+            )
+            .await?
         } else if location.starts_with("temp://") {
             let remote_path = Self::temp_uploads_path(location);
             match remote_fs.list_with_metadata(remote_path).await {

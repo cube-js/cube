@@ -556,6 +556,8 @@ pub trait ConfigObj: DIService {
     fn http_location_size_initial_sleep_ms(&self) -> u64;
 
     fn http_location_size_sleep_multiplier(&self) -> u64;
+
+    fn http_location_size_timeout_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -661,6 +663,7 @@ pub struct ConfigObjImpl {
     pub http_location_size_max_retries: u64,
     pub http_location_size_initial_sleep_ms: u64,
     pub http_location_size_sleep_multiplier: u64,
+    pub http_location_size_timeout_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -1046,6 +1049,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn http_location_size_sleep_multiplier(&self) -> u64 {
         self.http_location_size_sleep_multiplier
+    }
+
+    fn http_location_size_timeout_secs(&self) -> u64 {
+        self.http_location_size_timeout_secs
     }
 
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
@@ -1602,6 +1609,10 @@ impl Config {
                     "CUBESTORE_HTTP_LOCATION_SIZE_SLEEP_MULTIPLIER",
                     2,
                 ),
+                http_location_size_timeout_secs: env_parse(
+                    "CUBESTORE_HTTP_LOCATION_SIZE_TIMEOUT_SECS",
+                    60,
+                ),
             }),
         }
     }
@@ -1733,6 +1744,7 @@ impl Config {
                 http_location_size_max_retries: 1,
                 http_location_size_initial_sleep_ms: 100,
                 http_location_size_sleep_multiplier: 2,
+                http_location_size_timeout_secs: 60,
             }
         }
     }
