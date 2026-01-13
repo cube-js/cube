@@ -879,33 +879,87 @@ impl ImportService for ImportServiceImpl {
 pub struct LocationHelper;
 
 impl LocationHelper {
+    async fn try_get_http_location_size(location: &str) -> Result<Option<u64>, CubeError> {
+        let client = reqwest::Client::new();
+        let req = client.head(location).build()?;
+
+        // S3 doesn't support HEAD for pre signed urls with GetObject command
+        if req
+            .url()
+            .domain()
+            .map(|v| v.contains("amazonaws.com"))
+            .unwrap_or(false)
+        {
+            return Ok(None);
+        }
+
+        let res = client.execute(req).await.map_err(|e| {
+            let kind = if e.is_timeout() {
+                "timeout"
+            } else if e.is_connect() {
+                "connect"
+            } else if e.is_body() {
+                "body"
+            } else if e.is_decode() {
+                "decode"
+            } else if e.is_redirect() {
+                "redirect"
+            } else if e.is_builder() {
+                "builder"
+            } else if e.is_request() {
+                "request"
+            } else {
+                "unknown"
+            };
+            CubeError::internal(format!("HTTP HEAD error (kind: {}): {}", kind, e))
+        })?;
+
+        let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
+
+        if let Some(length) = length {
+            Ok(Some(length.to_str()?.parse::<u64>()?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn get_http_location_size(location: &str) -> Result<Option<u64>, CubeError> {
+        let max_retries: i32 = 10;
+        let mut retry_attempts = max_retries;
+        let mut retries_sleep = Duration::from_millis(100);
+        let sleep_multiplier = 2;
+        loop {
+            retry_attempts -= 1;
+            let result = Self::try_get_http_location_size(location).await;
+
+            if retry_attempts <= 0 {
+                return result;
+            }
+            match result {
+                Ok(size) => {
+                    return Ok(size);
+                }
+                Err(err) => {
+                    log::error!(
+                        "HEAD {} error: {}. Retrying {}/{}...",
+                        location,
+                        err,
+                        max_retries - retry_attempts,
+                        max_retries
+                    );
+                    sleep(retries_sleep).await;
+                    retries_sleep *= sleep_multiplier;
+                }
+            }
+        }
+    }
+
     pub async fn location_file_size(
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
-            let client = reqwest::Client::new();
-            let req = client.head(location).build()?;
-
-            // S3 doesn't support HEAD for pre signed urls with GetObject command
-            if req
-                .url()
-                .domain()
-                .map(|v| v.contains("amazonaws.com"))
-                .unwrap_or(false)
-            {
-                return Ok(None);
-            }
-
-            let res = client.execute(req).await?;
-
-            let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
-
-            if let Some(length) = length {
-                Some(length.to_str()?.parse::<u64>()?)
-            } else {
-                None
-            }
+            Self::get_http_location_size(location).await?
         } else if location.starts_with("temp://") {
             let remote_path = Self::temp_uploads_path(location);
             match remote_fs.list_with_metadata(remote_path).await {
