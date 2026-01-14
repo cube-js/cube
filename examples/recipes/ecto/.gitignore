@@ -20,3 +20,9 @@ bin/
 .cubestore/
 .venv/
 /__pycache__*
+/fix-formatting.sh
+/run-ci-tests-local.sh
+/rebuild-after-rebase.sh
+/run-clippy.sh
+/run-quick-checks.sh
+/run-tests-only.sh
