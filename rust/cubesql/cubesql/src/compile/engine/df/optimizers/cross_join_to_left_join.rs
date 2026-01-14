@@ -56,16 +56,12 @@ fn cross_join_to_left_join(
                     if let Some((left_cols, right_cols)) =
                         extract_join_columns(predicate, left, right)
                     {
-                        let left =
-                            Arc::new(cross_join_to_left_join(left, optimizer_config)?);
-                        let right =
-                            Arc::new(cross_join_to_left_join(right, optimizer_config)?);
+                        let left = Arc::new(cross_join_to_left_join(left, optimizer_config)?);
+                        let right = Arc::new(cross_join_to_left_join(right, optimizer_config)?);
 
                         // Build the ON clause as pairs of columns
-                        let on: Vec<(Column, Column)> = left_cols
-                            .into_iter()
-                            .zip(right_cols.into_iter())
-                            .collect();
+                        let on: Vec<(Column, Column)> =
+                            left_cols.into_iter().zip(right_cols).collect();
 
                         if on.is_empty() {
                             // Can't convert without join columns - keep as cross join with filter
@@ -157,11 +153,7 @@ fn cross_join_to_left_join(
 /// Check if this CrossJoin should be converted to a LEFT JOIN.
 /// We specifically target pg_catalog queries where we know the original
 /// intent was a LEFT JOIN.
-fn should_convert_to_left_join(
-    left: &LogicalPlan,
-    right: &LogicalPlan,
-    _predicate: &Expr,
-) -> bool {
+fn should_convert_to_left_join(left: &LogicalPlan, right: &LogicalPlan, _predicate: &Expr) -> bool {
     // Check if either side is a pg_catalog table scan
     let left_is_pg_catalog = is_pg_catalog_scan(left);
     let right_is_pg_catalog = is_pg_catalog_scan(right);
@@ -176,9 +168,9 @@ fn should_convert_to_left_join(
 /// characteristic column names.
 fn is_pg_catalog_scan(plan: &LogicalPlan) -> bool {
     match plan {
-        LogicalPlan::TableScan(TableScan { projected_schema, .. }) => {
-            is_pg_catalog_schema(projected_schema)
-        }
+        LogicalPlan::TableScan(TableScan {
+            projected_schema, ..
+        }) => is_pg_catalog_schema(projected_schema),
         LogicalPlan::Projection(proj) => is_pg_catalog_scan(&proj.input),
         LogicalPlan::Filter(filter) => is_pg_catalog_scan(&filter.input),
         LogicalPlan::Join(join) => {
@@ -194,11 +186,7 @@ fn is_pg_catalog_scan(plan: &LogicalPlan) -> bool {
 
 /// Check if a schema has characteristic pg_catalog column names
 fn is_pg_catalog_schema(schema: &datafusion::logical_plan::DFSchemaRef) -> bool {
-    let field_names: Vec<&str> = schema
-        .fields()
-        .iter()
-        .map(|f| f.name().as_str())
-        .collect();
+    let field_names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
 
     // pg_type has columns like: oid, typname, typnamespace, typowner, etc.
     let is_pg_type = field_names.contains(&"oid")
@@ -206,12 +194,10 @@ fn is_pg_catalog_schema(schema: &datafusion::logical_plan::DFSchemaRef) -> bool 
         && field_names.contains(&"typnamespace");
 
     // pg_range has columns like: rngtypid, rngsubtype, rngmultitypid
-    let is_pg_range = field_names.contains(&"rngtypid")
-        && field_names.contains(&"rngsubtype");
+    let is_pg_range = field_names.contains(&"rngtypid") && field_names.contains(&"rngsubtype");
 
     // pg_namespace has columns like: oid, nspname
-    let is_pg_namespace =
-        field_names.contains(&"oid") && field_names.contains(&"nspname");
+    let is_pg_namespace = field_names.contains(&"oid") && field_names.contains(&"nspname");
 
     // pg_class has columns like: oid, relname, relnamespace
     let is_pg_class = field_names.contains(&"oid")
@@ -235,7 +221,13 @@ fn extract_join_columns(
     let mut right_cols = Vec::new();
 
     // Collect all equi-join conditions from the predicate
-    collect_equi_conditions(predicate, left_schema, right_schema, &mut left_cols, &mut right_cols);
+    collect_equi_conditions(
+        predicate,
+        left_schema,
+        right_schema,
+        &mut left_cols,
+        &mut right_cols,
+    );
 
     if left_cols.is_empty() {
         None
@@ -279,7 +271,13 @@ fn collect_equi_conditions(
                 Operator::Or | Operator::And => {
                     // Recurse into OR/AND conditions
                     collect_equi_conditions(left, left_schema, right_schema, left_cols, right_cols);
-                    collect_equi_conditions(right, left_schema, right_schema, left_cols, right_cols);
+                    collect_equi_conditions(
+                        right,
+                        left_schema,
+                        right_schema,
+                        left_cols,
+                        right_cols,
+                    );
                 }
                 _ => {}
             }
