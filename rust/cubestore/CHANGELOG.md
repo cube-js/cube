@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.3](https://github.com/cube-js/cube/compare/v1.6.2...v1.6.3) (2026-01-15)
+
+### Bug Fixes
+
+- **cubestore:** Configure OpenSSL static linking paths for builder ([#10311](https://github.com/cube-js/cube/issues/10311)) ([a672a49](https://github.com/cube-js/cube/commit/a672a498a52afe6ceb50e7ab2803ab1c5be42bed))
+
 ## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
