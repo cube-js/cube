@@ -1,7 +1,7 @@
 ARG RUST_TAG=bookworm-slim
 ARG OS_NAME=bookworm
 
-FROM rust:$RUST_TAG
+FROM rust:$RUST_TAG AS base
 
 ARG OS_NAME=bookworm
 ARG LLVM_VERSION=18
@@ -27,4 +27,15 @@ RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLV
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-$LLVM_VERSION 100;
 
-WORKDIR /usr/src
+# Platform-specific OpenSSL paths for static linking
+FROM base AS final-amd64
+ENV OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
+ENV OPENSSL_INCLUDE_DIR=/usr/include
+
+FROM base AS final-arm64
+ENV OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu
+ENV OPENSSL_INCLUDE_DIR=/usr/include
+
+# Select final stage based on target architecture
+ARG TARGETARCH=amd64
+FROM final-${TARGETARCH}
