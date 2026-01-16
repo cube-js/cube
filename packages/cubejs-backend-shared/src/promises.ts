@@ -1,6 +1,6 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
-import { xxh3 } from '@node-rs/xxhash';
 import { LRUCache } from 'lru-cache';
+import { defaultHasher } from './hasher';
 
 import { Optional } from './type-helpers';
 
@@ -282,7 +282,9 @@ export const asyncDebounceFn = <Ret, Arguments>(
   });
 
   return async (...args: Arguments[]) => {
-    const key = xxh3.xxh64(args.map((v) => JSON.stringify(v)).join(',')).toString(16);
+    const key = defaultHasher()
+      .update(args.map((v) => JSON.stringify(v)).join(','))
+      .digest('hex');
 
     const existing = cache.get(key);
     if (existing) {
