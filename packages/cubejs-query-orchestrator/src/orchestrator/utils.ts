@@ -1,6 +1,4 @@
-import { xxh3 } from '@node-rs/xxhash';
-
-import { getProcessUid } from '@cubejs-backend/shared';
+import { defaultHasher, getProcessUid } from '@cubejs-backend/shared';
 import { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { CacheKey } from './QueryCache';
 
@@ -18,7 +16,7 @@ export function getCacheHash(queryKey: QueryKey | CacheKey, processUid?: string)
     return queryKey as any;
   }
 
-  const hash = xxh3.xxh128(JSON.stringify(queryKey)).toString(16);
+  const hash = defaultHasher().update(JSON.stringify(queryKey)).digest('hex');
 
   if (typeof queryKey === 'object' && 'persistent' in queryKey && queryKey.persistent) {
     return `${hash}@${processUid}` as any;
