@@ -1,5 +1,5 @@
 import { countWithTimedimenionQuery, tableQuery } from "../queries";
-import crypto from "crypto";
+import { defaultHasher } from "@cubejs-backend/shared";
 
 context("Playground: Chart Renderers", () => {
   before(() => {
@@ -18,8 +18,7 @@ context("Playground: Chart Renderers", () => {
     });
 
     chartTypeByQuery.forEach(([query, chartTypes]) => {
-      const queryHash = crypto
-        .createHash("md5")
+      const queryHash = defaultHasher()
         .update(JSON.stringify(query))
         .digest("hex")
         .slice(0, 5);
