@@ -3348,10 +3348,9 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0, 1]\
-        \n  CoalescePartitions, sort_order: [0, 1]\
-        \n    Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
-        \n      Sort, sort_order: [0, 1]\
-        \n        Empty"
+        \n  Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
+        \n    Sort, sort_order: [0, 1]\
+        \n      Empty"
     );
 
     let p = service
@@ -3362,10 +3361,9 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [1, 0]\
         \n  Projection, [id2, id1], sort_order: [1, 0]\
-        \n    CoalescePartitions, sort_order: [0, 1]\
-        \n      Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
-        \n        Sort, sort_order: [0, 1]\
-        \n          Empty"
+        \n    Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
+        \n      Sort, sort_order: [0, 1]\
+        \n        Empty"
     );
 
     // Unsorted when skips columns from sort prefix.
@@ -3390,10 +3388,9 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0]\
-        \n  CoalescePartitions, sort_order: [0]\
-        \n    Scan, index: default:1:[1], fields: [id1, id3], sort_order: [0]\
-        \n      Sort, sort_order: [0]\
-        \n        Empty"
+        \n  Scan, index: default:1:[1], fields: [id1, id3], sort_order: [0]\
+        \n    Sort, sort_order: [0]\
+        \n      Empty"
     );
 
     // Single value hints.
@@ -3433,10 +3430,9 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0, 1]\
         \n  Filter, sort_order: [0, 1]\
-        \n    CoalescePartitions, sort_order: [0, 1, 2]\
-        \n      Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-        \n        Sort, sort_order: [0, 1, 2]\
-        \n          Empty"
+        \n    Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+        \n      Sort, sort_order: [0, 1, 2]\
+        \n        Empty"
     );
 }
 
@@ -3733,10 +3729,9 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Worker\
-        \n  CoalescePartitions\
-        \n    Scan, index: default:1:[1], fields: [id, amount]\
-        \n      Sort\
-        \n        Empty"
+        \n  Scan, index: default:1:[1], fields: [id, amount]\
+        \n    Sort\
+        \n      Empty"
     );
 
     let p = service
@@ -3751,10 +3746,9 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         pp_phys_plan(p.worker.as_ref()),
         "Worker\
         \n  Filter\
-        \n    CoalescePartitions\
-        \n      Scan, index: default:1:[1], fields: [id, amount]\
-        \n        Sort\
-        \n          Empty"
+        \n    Scan, index: default:1:[1], fields: [id, amount]\
+        \n      Sort\
+        \n        Empty"
     );
 
     let p = service
@@ -3776,10 +3770,9 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         "Sort\
         \n  Worker\
         \n    Filter\
-        \n      CoalescePartitions\
-        \n        Scan, index: default:1:[1], fields: [id, amount]\
-        \n          Sort\
-        \n            Empty"
+        \n      Scan, index: default:1:[1], fields: [id, amount]\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
@@ -3801,10 +3794,9 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         "GlobalLimit, n: 10\
         \n  Worker\
         \n    Filter\
-        \n      CoalescePartitions\
-        \n        Scan, index: default:1:[1], fields: [id, amount]\
-        \n          Sort\
-        \n            Empty"
+        \n      Scan, index: default:1:[1], fields: [id, amount]\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
