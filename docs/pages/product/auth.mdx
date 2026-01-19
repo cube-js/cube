@@ -1,15 +1,38 @@
 # Access control
 
+Access control in Cube involves _authentication_ and _authorization_.
 
-Cube has a data access control layer built into the data model. Access control in Cube involves _authentication_ and _authorization_.
+## Authentication
+
+Authentication determines if a user can access Cube.
+
+* **Cube** cloud platform provides built-in authentication mechanisms. Users are assigned
+[roles and permissions][ref-roles-perms] that determine available features of the Cube
+platform.
+* **Cube Core** provides several [authentication methods][ref-auth-methods] for its API
+endpoints.
+
+## Authorization
+
+Authorization determines what data a user can access though Cube.
+
+Authorization is managed declaratively via [access policies][ref-dap], a built-in
+capability of Cube's data modeling layer. There are also programmatic controls for
+advanced use cases, such as the [`query_rewrite`][ref-query-rewrite] configuration
+parameter.
+
+* **Cube** cloud platform applies access policies to users based on their
+[groups][ref-user-groups] and [attributes][ref-user-attributes].
+* **Cube Core** applies access policies to users based on their groups derived from the
+[security context][ref-sec-ctx]. See the [`context_to_groups`][ref-ctx-to-groups]
+configuration parameter for details.
 
 
-**Cube** cloud platform provides built-in authentication abstractions alongside [user attributes][ref-user-attributes] and groups for managing data access. **Cube Core** users can control the [security context][ref-sec-ctx] directly to implement authentication.
-
-
-Authorization is based on [access policies][ref-dap] and dynamic controls for advanced use cases.
-
-
+[ref-roles-perms]: /product/administration/users-and-permissions/roles-and-permissions
+[ref-auth-methods]: /product/auth/methods
+[ref-user-groups]: /product/administration/users-and-permissions/user-groups
 [ref-user-attributes]: /product/administration/users-and-permissions/user-attributes
 [ref-sec-ctx]: /product/auth/context
 [ref-dap]: /product/auth/data-access-policies
+[ref-query-rewrite]: /product/configuration/reference/config#query_rewrite
+[ref-ctx-to-groups]: /product/configuration/reference/config#context_to_groups

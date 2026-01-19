@@ -302,38 +302,6 @@ view(`country_data_view`, {
 
 </CodeTabs>
 
-## Troubleshooting
-
-Be careful with the [_any group_ shorthand][ref-ref-dap-role] (`group: "*"`) in access
-policies that don't restrict access on member __and__ row level. Given that policies for
-multiple groups are [combined together](#policy-evaluation) using the _OR_ semantics,
-a policy that allows access for _any group_ without restrictions on a certain level will
-effectively grant unrestricted access on that level to all users:
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    access_policy:
-        # No access on member level, __full access__ on row level for any group
-      - group: "*"
-        member_level:
-          includes: []
-
-        # Some restrictions on row level for the `restricted` group
-      - group: restricted
-        row_level:
-          filters:
-            - member: country
-              operator: equals
-              values: [ "USA" ]
-```
-
-In the example above, all users will have full access to all members and all rows of the
-`orders` cube, regardless of their groups, because the first policy applies to _any
-group_ and is combined with the second one using the _OR_ semantics.
-
 ## Custom mapping
 
 Cube cloud platform automatically maps authenticated users to groups for access policies.
@@ -406,17 +374,9 @@ cube(`orders`, {
 
 </CodeTabs>
 
-## Using roles
-
-In prior versions of Cube, we were using `roles` instead of `groups`. We have changed that to `groups` to avoid conflict with [Cube roles][ref-cube-roles].
-
-In Cube Core, you can still use roles. You would need to define `context_to_roles` instead of `context_to_groups`.
-
 
 [ref-mls-public]: /product/auth/member-level-security#managing-member-level-access
 [ref-sec-ctx]: /product/auth/context
-[ref-ctx-to-roles]: /product/configuration/reference/config#context_to_roles
 [ref-ref-dap]: /product/data-modeling/reference/data-access-policies
 [ref-ref-dap-role]: /product/data-modeling/reference/data-access-policies#role
 [ref-core-data-apis]: /product/apis-integrations/core-data-apis
-[ref-cube-roles]: /product/administration/users-and-permissions/roles-and-permissions
