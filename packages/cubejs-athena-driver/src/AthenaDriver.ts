@@ -51,6 +51,8 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   exportBucket?: string
   pollTimeout?: number
   pollMaxInterval?: number
+  athenaAwsAssumeRoleArn?: string
+  athenaAwsAssumeRoleExternalId?: string
 
   /**
    * The export bucket CSV file escape symbol.
@@ -125,8 +127,13 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
-    const assumeRoleArn = getEnv('athenaAwsAssumeRoleArn', { dataSource });
-    const assumeRoleExternalId = getEnv('athenaAwsAssumeRoleExternalId', { dataSource });
+    const assumeRoleArn =
+      config.athenaAwsAssumeRoleArn ||
+      getEnv('athenaAwsAssumeRoleArn', { dataSource });
+
+    const assumeRoleExternalId =
+      config.athenaAwsAssumeRoleExternalId ||
+      getEnv('athenaAwsAssumeRoleExternalId', { dataSource });
 
     const { schema, ...restConfig } = config;
 
