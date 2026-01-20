@@ -251,11 +251,10 @@ export class OptsHandler {
         if (!this.driverFactoryType) {
           val = await driverFactory(ctx);
         }
-        if (
-          this.driverFactoryType === 'BaseDriver' &&
-          process.env.CUBEJS_DB_TYPE
-        ) {
-          type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+        if (this.driverFactoryType === 'BaseDriver') {
+          type = <DatabaseType>(process.env.CUBEJS_DB_TYPE || (await driverFactory(ctx)).constructor.name
+            .replace('Driver', '')
+            .toLowerCase());
         } else if (this.driverFactoryType === 'DriverConfig') {
           type = (<DriverConfig>(val || await driverFactory(ctx))).type;
         }
