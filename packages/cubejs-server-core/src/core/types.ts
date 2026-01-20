@@ -178,7 +178,8 @@ export type DialectClassFn = (options: { dataSource: string; dbType: string }) =
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
+export type ExternalDriverFactoryFn = (context: RequestContext) =>
+  Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFnParams = {
