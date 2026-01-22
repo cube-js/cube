@@ -3708,6 +3708,8 @@ export class BaseQuery {
       return topLevelMerge ? this.hllCardinalityMerge(evaluateSql) : this.hllMergeOnly(evaluateSql);
     } else if (symbol.type === 'min' || symbol.type === 'max') {
       return `${symbol.type}(${evaluateSql})`;
+    } else if (symbol.type === 'string' || symbol.type === 'time' || symbol.type === 'boolean') {
+      return `max(${evaluateSql})`;
     }
     return undefined;
   }
