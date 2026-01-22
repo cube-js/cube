@@ -6,6 +6,7 @@ module.exports = {
   "microsoft-excel": "Cube Cloud for Excel",
   "google-sheets": "Cube Cloud for Sheets",
   "semantic-layer-sync": "Semantic Layer Sync",
+  "snowflake-semantic-views": "Snowflake Semantic Views",
   "javascript-sdk": "JavaScript SDK",
   "recipes": "Recipes"
 };
