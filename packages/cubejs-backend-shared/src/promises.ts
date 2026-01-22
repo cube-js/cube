@@ -1,5 +1,5 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
-import crypto from 'crypto';
+import { defaultHasher } from './hasher';
 import { LRUCache } from 'lru-cache';
 
 import { Optional } from './type-helpers';
@@ -282,9 +282,9 @@ export const asyncDebounceFn = <Ret, Arguments>(
   });
 
   return async (...args: Arguments[]) => {
-    const key = crypto.createHash('md5')
-      .update(args.map((v) => JSON.stringify(v)).join(','))
-      .digest('hex');
+    const key = defaultHasher()
+        .update(args.map((v) => JSON.stringify(v)).join(','))
+        .digest('hex');
 
     const existing = cache.get(key);
     if (existing) {
