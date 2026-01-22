@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.5](https://github.com/cube-js/cube/compare/v1.6.4...v1.6.5) (2026-01-22)
+
+### Bug Fixes
+
+- **cubestore:** Fix planning issues with chunks ([#10304](https://github.com/cube-js/cube/issues/10304)) ([f7306d0](https://github.com/cube-js/cube/commit/f7306d0223dfe6bb65bd01c002001e3108b06ec5))
+
+### Features
+
+- **docker:** Security upgrade Node.js from 22.20.0 to 22.22.0 ([#10319](https://github.com/cube-js/cube/issues/10319)) ([4e3fd35](https://github.com/cube-js/cube/commit/4e3fd3550a2d8955e69be4a1abc807726adc2d0e))
+- **schema-compiler:** Support user_attributes in snake_case ([#10287](https://github.com/cube-js/cube/issues/10287)) ([652c7ad](https://github.com/cube-js/cube/commit/652c7ad54e00a9af746fdebe3c7320cceb8b80e0))
+
 ## [1.6.4](https://github.com/cube-js/cube/compare/v1.6.3...v1.6.4) (2026-01-16)
 
 **Note:** Version bump only for package cubejs

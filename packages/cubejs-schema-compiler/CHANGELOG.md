@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.5](https://github.com/cube-js/cube/compare/v1.6.4...v1.6.5) (2026-01-22)
+
+### Features
+
+- **schema-compiler:** Support user_attributes in snake_case ([#10287](https://github.com/cube-js/cube/issues/10287)) ([652c7ad](https://github.com/cube-js/cube/commit/652c7ad54e00a9af746fdebe3c7320cceb8b80e0))
+
 ## [1.6.4](https://github.com/cube-js/cube/compare/v1.6.3...v1.6.4) (2026-01-16)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
