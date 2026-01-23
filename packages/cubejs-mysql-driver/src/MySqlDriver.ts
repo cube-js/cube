@@ -8,7 +8,7 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import mysql, { Connection, ConnectionOptions, FieldPacket, QueryOptions } from 'mysql2';
+import mysql, { ConnectionOptions, QueryOptions } from 'mysql2';
 import genericPool from 'generic-pool';
 import { promisify } from 'util';
 import {
