@@ -8511,7 +8511,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/mysql@^2.15.15", "@types/mysql@^2.15.19", "@types/mysql@^2.15.21":
+"@types/mysql@^2.15.15", "@types/mysql@^2.15.19":
   version "2.15.21"
   resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.21.tgz#7516cba7f9d077f980100c85fd500c8210bd5e45"
   integrity sha512-NPotx5CVful7yB+qZbWtXL2fA4e7aEHkihHLjklc6ID8aq7bhguHgeIoC1EmSNTAuCgI6ZXrjt2ZSaXnYX0EUg==
@@ -10383,7 +10383,7 @@ aws-sign2@~0.7.0:
   resolved "https://registry.yarnpkg.com/aws-sign2/-/aws-sign2-0.7.0.tgz#b46e890934a9591f2d2f6f86d7e6a9f1b3fe76a8"
   integrity sha1-tG6JCTSpWR8tL2+G1+ap8bP+dqg=
 
-aws-ssl-profiles@^1.1.1:
+aws-ssl-profiles@^1.1.1, aws-ssl-profiles@^1.1.2:
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/aws-ssl-profiles/-/aws-ssl-profiles-1.1.2.tgz#157dd77e9f19b1d123678e93f120e6f193022641"
   integrity sha512-NZKeq9AfyQvEeNlN0zSYAaWrmBffJh3IELMZfRpJVWgrpEbtEpnjvzqBPf+mxoI287JohRDoa+/nsfqqiZmF6g==
@@ -16049,7 +16049,7 @@ iconv-lite@0.6.3, iconv-lite@^0.6.2, iconv-lite@^0.6.3:
   dependencies:
     safer-buffer ">= 2.1.2 < 3.0.0"
 
-iconv-lite@^0.7.2:
+iconv-lite@^0.7.2, iconv-lite@^0.7.3:
   version "0.7.3"
   resolved "https://registry.yarnpkg.com/iconv-lite/-/iconv-lite-0.7.3.tgz#84ee12f963e7de50bc01a13e160a078b3b0f415f"
   integrity sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==
@@ -18315,7 +18315,7 @@ logform@^2.7.0:
     safe-stable-stringify "^2.3.1"
     triple-beam "^1.3.0"
 
-long@^5.0.0, long@^5.2.1:
+long@^5.0.0, long@^5.2.1, long@^5.3.2:
   version "5.3.2"
   resolved "https://registry.yarnpkg.com/long/-/long-5.3.2.tgz#1d84463095999262d7d7b7f8bfd4a8cc55167f83"
   integrity sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==
@@ -18380,6 +18380,11 @@ lru.min@^1.0.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/lru.min/-/lru.min-1.1.1.tgz#146e01e3a183fa7ba51049175de04667d5701f0e"
   integrity sha512-FbAj6lXil6t8z4z3j0E5mfRlPzxkySotzUHwRXjlpRh10vc6AI6WN62ehZj82VG7M20rqogJ0GLwar2Xa05a8Q==
+
+lru.min@^1.1.0, lru.min@^1.1.4:
+  version "1.1.5"
+  resolved "https://registry.yarnpkg.com/lru.min/-/lru.min-1.1.5.tgz#bd32483f4e342261d0eb011b06d2219e6b5ef818"
+  integrity sha512-5J9ysMYUpYIg9RF2vJpy9SinEmSviFSe0GyPpCQ4L5QSkLAgeLXlTAOu2ZwWUU5m+0SBl6gUU1R1ZQB3aKypfA==
 
 luxon@^3.2.1:
   version "3.4.4"
@@ -19104,6 +19109,19 @@ mysql2@^3.11.5:
     seq-queue "^0.0.5"
     sqlstring "^2.3.2"
 
+mysql2@^3.16.1:
+  version "3.24.6"
+  resolved "https://registry.yarnpkg.com/mysql2/-/mysql2-3.24.6.tgz#8e9471f0ceca917599ac021356bb24f08f168b3c"
+  integrity sha512-enu73KhbAua2L3dIxjc6qg6ZJ7H3pt1BImZASWNWY5xSsmJ1ZuUPULTDGXgmJbI61vb+nJAG19IZclIq19UidQ==
+  dependencies:
+    aws-ssl-profiles "^1.1.2"
+    generate-function "^2.3.1"
+    iconv-lite "^0.7.3"
+    long "^5.3.2"
+    lru.min "^1.1.4"
+    named-placeholders "^1.1.6"
+    sql-escaper "^1.5.1"
+
 mysql@^2.18.1:
   version "2.18.1"
   resolved "https://registry.yarnpkg.com/mysql/-/mysql-2.18.1.tgz#2254143855c5a8c73825e4522baf2ea021766717"
@@ -19129,6 +19147,13 @@ named-placeholders@^1.1.3:
   integrity sha512-eLoBxg6wE/rZkJPhU/xRX1WTpkFEwDJEN96oxFrTsqBdbT5ec295Q+CoHrL9IT0DipqKhmGcaZmwOt8OON5x1w==
   dependencies:
     lru-cache "^7.14.1"
+
+named-placeholders@^1.1.6:
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/named-placeholders/-/named-placeholders-1.1.6.tgz#c50c6920b43f258f59c16add1e56654f5cc02bb5"
+  integrity sha512-Tz09sEL2EEuv5fFowm419c1+a/jSMiBjI9gHxVLrVdbUkkNUUfjsVYs9pVZu5oCon/kmRh9TfLEObFtkVxmY0w==
+  dependencies:
+    lru.min "^1.1.0"
 
 nan@^2.18.0, nan@^2.19.0, nan@^2.20.0:
   version "2.22.0"
@@ -23693,6 +23718,11 @@ sprintf-js@~1.0.2:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
   integrity sha1-BOaSb2YolTVPPdAVIDYzuFcpfiw=
+
+sql-escaper@^1.5.1:
+  version "1.9.1"
+  resolved "https://registry.yarnpkg.com/sql-escaper/-/sql-escaper-1.9.1.tgz#6b77fd881b6f29c542d432547ebcebb8b8d4cdd5"
+  integrity sha512-4p522TVYaJXTbMlYgAwacjyg3EJyYe9KYWYlYJVwZG1YjtzxU5m5iSzsZoGI69Po7j3i/2tKlpZQi7uvhTL+WA==
 
 sql-formatter@^3.1.0:
   version "3.1.0"
