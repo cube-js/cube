@@ -30,13 +30,12 @@
     "@cubejs-backend/base-driver": "1.6.6",
     "@cubejs-backend/shared": "1.6.6",
     "generic-pool": "^3.9.0",
-    "mysql": "^2.18.1"
+    "mysql2": "^3.16.1"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.6",
     "@cubejs-backend/testing-shared": "1.6.6",
     "@types/jest": "^29",
-    "@types/mysql": "^2.15.21",
     "jest": "^29",
     "stream-to-array": "^2.3.0",
     "testcontainers": "^10.28.0",
