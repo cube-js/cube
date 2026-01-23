@@ -30,7 +30,7 @@ import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
-import { CompilerApi } from './CompilerApi';
+import { CompilerApi, type CompilerApiOptions } from './CompilerApi';
 import { DevServer } from './DevServer';
 import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
@@ -700,31 +700,35 @@ export class CubejsServerCore {
     return new CompilerApi(
       repository,
       options.dbType || this.options.dbType,
-      {
-        schemaVersion: options.schemaVersion || this.options.schemaVersion,
-        contextToRoles: this.options.contextToRoles,
-        contextToGroups: this.options.contextToGroups,
-        devServer: this.options.devServer,
-        logger: this.logger,
-        externalDbType: options.externalDbType,
-        preAggregationsSchema: options.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey:
-            this.options.allowUngroupedWithoutPrimaryKey ||
-            getEnv('allowUngroupedWithoutPrimaryKey'),
-        convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
-        compileContext: options.context,
-        dialectClass: options.dialectClass,
-        externalDialectClass: options.externalDialectClass,
-        allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
-        sqlCache: this.options.sqlCache,
-        standalone: this.standalone,
-        allowNodeRequire: options.allowNodeRequire,
-        fastReload: options.fastReload || getEnv('fastReload'),
-        compilerCacheSize: this.options.compilerCacheSize || 250,
-        maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
-        updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive
-      },
+      this.createCompilerApiOptions(options),
     );
+  }
+
+  protected createCompilerApiOptions(options: Record<string, any> = {}): CompilerApiOptions {
+    return {
+      schemaVersion: options.schemaVersion || this.options.schemaVersion,
+      contextToRoles: this.options.contextToRoles,
+      contextToGroups: this.options.contextToGroups,
+      devServer: this.options.devServer,
+      logger: this.logger,
+      externalDbType: options.externalDbType,
+      preAggregationsSchema: options.preAggregationsSchema,
+      allowUngroupedWithoutPrimaryKey:
+          this.options.allowUngroupedWithoutPrimaryKey ||
+          getEnv('allowUngroupedWithoutPrimaryKey'),
+      convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
+      compileContext: options.context,
+      dialectClass: options.dialectClass,
+      externalDialectClass: options.externalDialectClass,
+      allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
+      sqlCache: this.options.sqlCache,
+      standalone: this.standalone,
+      allowNodeRequire: options.allowNodeRequire,
+      fastReload: options.fastReload || getEnv('fastReload'),
+      compilerCacheSize: this.options.compilerCacheSize || 250,
+      maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
+      updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive,
+    };
   }
 
   protected createOrchestratorApi(
