@@ -1422,6 +1422,16 @@ fn pick_partitions(
             continue;
         }
 
+        //FIXME !!!!! emergency fix for APM, need to be solved on another way
+        let chunks = chunks
+            .into_iter()
+            .map(|c| {
+                let id = c.id;
+                let chunk = c.into_row().unset_min_max();
+                IdRow::new(id, chunk)
+            })
+            .collect::<Vec<_>>();
+
         partition_snapshots.push(PartitionSnapshot { chunks, partition });
     }
     log::trace!(
