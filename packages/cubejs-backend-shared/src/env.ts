@@ -752,6 +752,13 @@ const variables: Record<string, (...args: any) => any> = {
     .asIntPositive(),
 
   /**
+   * Maximum time for exponential backoff for pre-aggs (in seconds)
+   */
+  preAggBackoffMaxTime: (): number => get('CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME')
+    .default(10 * 60)
+    .asIntPositive(),
+
+  /**
    * Expire time for touch records
    */
   dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
