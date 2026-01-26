@@ -13,6 +13,7 @@ import {
   parseUtcIntoLocalDate,
   QueryAlias,
   CacheMode,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import {
   ResultArrayWrapper,
@@ -189,7 +190,7 @@ class ApiGateway {
      * It actually returns a Promise<OrchestratorApi>
      */
     protected readonly adapterApi: (ctx: RequestContext) => Promise<any>,
-    protected readonly logger: any,
+    protected readonly logger: LoggerFn,
     protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;

@@ -10,6 +10,7 @@ import {
   timeSeries,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -64,7 +65,7 @@ export class PreAggregationPartitionRangeLoader {
 
   public constructor(
     private readonly driverFactory: DriverFactory,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,

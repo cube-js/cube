@@ -26,13 +26,18 @@ impl NodeBridgeLogger {
 #[derive(Debug, Serialize)]
 struct EventBox {
     event: HashMap<String, String>,
+    level: String,
 }
 
 impl LogReporter for NodeBridgeLogger {
-    fn log(&self, event: String, properties: HashMap<String, String>, _level: Level) {
+    fn log(&self, event: String, properties: HashMap<String, String>, level: Level) {
         let mut props = properties;
         props.insert("type".to_string(), event);
-        let extra = serde_json::to_string(&EventBox { event: props }).unwrap();
+        let extra = serde_json::to_string(&EventBox {
+            event: props,
+            level: level.to_string(),
+        })
+        .unwrap();
 
         let channel = self.channel.clone();
         // Safety: Safe, because on_track take is used only for dropping

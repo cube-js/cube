@@ -1,4 +1,4 @@
-import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
+import { Required, SchemaFileRepository, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
 import {
   CanSwitchSQLUserFn,
   CheckAuthFn,
@@ -181,12 +181,7 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type LoggerFnParams = {
-  // It's possible to fill timestamp at the place of logging, otherwise, it will be filled in automatically
-  timestamp?: string,
-  [key: string]: any,
-};
-export type LoggerFn = (msg: string, params: LoggerFnParams) => void;
+export { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
 
 export type BiToolSyncConfig = {
   type: string;

@@ -163,6 +163,7 @@ const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
+  logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
