@@ -240,15 +240,15 @@ export const preAggsJobsRequestSchema = Joi.object({
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
-const normalizeQueryFilters = (filter) => (
+const normalizeQueryFilters = (filter, timezone) => (
   filter.map(f => {
     const res = { ...f };
     if (f.or) {
-      res.or = normalizeQueryFilters(f.or);
+      res.or = normalizeQueryFilters(f.or, timezone);
       return res;
     }
     if (f.and) {
-      res.and = normalizeQueryFilters(f.and);
+      res.and = normalizeQueryFilters(f.and, timezone);
       return res;
     }
 
@@ -263,9 +263,20 @@ const normalizeQueryFilters = (filter) => (
     if ((!f.values || f.values.length === 0) && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
       throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
     }
-
     if (f.values) {
-      res.values = f.values.map(v => (v != null ? v.toString() : v));
+      if ([inDateRange, notInDateRange].includes(f.operator)) {
+        const isRelativeDateString =
+          f.values.length === 1 &&
+          typeof f.values[0] === ""string"" &&
+          !DateRegex.test(f.values[0]);
+        if (isRelativeDateString) {
+          res.values = dateParser(f.values[0], timezone);
+        } else {
+          res.values = f.values.map(v => (v != null ? v.toString() : v));
+        }
+      } else {
+        res.values = f.values.map(v => (v != null ? v.toString() : v));
+      }
     }
 
     if (f.dimension) {
@@ -372,7 +383,7 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    filters: normalizeQueryFilters(query.filters || []),
+    filters: normalizeQueryFilters(query.filters || [], timezone),
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
