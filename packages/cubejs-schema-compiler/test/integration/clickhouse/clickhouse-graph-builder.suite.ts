@@ -1,17 +1,11 @@
 import { UserError } from '../../../src/compiler/UserError';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { dbRunner } from './ClickHouseDbRunner';
 import { debugLog, logSqlAndParams } from '../../unit/TestUtil';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 
 describe('ClickHouse JoinGraph', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new ClickHouseDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {

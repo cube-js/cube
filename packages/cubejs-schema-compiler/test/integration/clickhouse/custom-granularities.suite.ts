@@ -1,14 +1,8 @@
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
-import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { dbRunner } from './ClickHouseDbRunner';
 
 describe('Custom Granularities', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new ClickHouseDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
   cubes:

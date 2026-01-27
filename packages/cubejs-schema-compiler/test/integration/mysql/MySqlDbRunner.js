@@ -107,3 +107,5 @@ export class MySqlDbRunner extends BaseDbRunner {
     return new MysqlQuery(compilers, query);
   }
 }
+
+export const dbRunner = new MySqlDbRunner();
