@@ -1228,9 +1228,9 @@ export class BaseQuery {
     if (this.multiStageQuery) {
       return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}`;
     }
-    return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}` +
-      this.groupByClause() +
-      this.baseHaving(this.measureFilters) +
+    const query = `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}` +
+      this.groupByClause();
+    return this.baseHaving(query, this.measureFilters) +
       this.orderBy() +
       this.groupByDimensionLimit();
   }
@@ -1834,9 +1834,9 @@ export class BaseQuery {
     return filterClause.length ? ` WHERE ${filterClause.join(' AND ')}` : '';
   }
 
-  baseHaving(filters) {
+  baseHaving(query, filters) {
     const filterClause = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`);
-    return filterClause.length ? ` HAVING ${filterClause.join(' AND ')}` : '';
+    return filterClause.length ? query + ` HAVING ${filterClause.join(' AND ')}` : query;
   }
 
   timeStampInClientTz(dateParam) {
