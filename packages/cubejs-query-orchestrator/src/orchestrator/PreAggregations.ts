@@ -1,6 +1,6 @@
 import R from 'ramda';
 import crypto from 'crypto';
-import { getEnv, } from '@cubejs-backend/shared';
+import { getEnv, LoggerFn } from '@cubejs-backend/shared';
 
 import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
@@ -270,7 +270,7 @@ export class PreAggregations {
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactoryByDataSource,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     options,
   ) {

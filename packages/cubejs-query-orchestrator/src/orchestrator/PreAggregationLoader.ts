@@ -1,6 +1,6 @@
 import R from 'ramda';
 import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -103,7 +103,7 @@ export class PreAggregationLoader {
 
   public constructor(
     private readonly driverFactory: DriverFactory,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     preAggregations: PreAggregations,
     preAggregation,
