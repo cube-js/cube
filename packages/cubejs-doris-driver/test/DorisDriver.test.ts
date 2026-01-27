@@ -1,0 +1,134 @@
+import { MysqlDBRunner } from '@cubejs-backend/testing-shared';
+
+import { StartedTestContainer } from 'testcontainers';
+import { createDriver } from './doris.db.runner';
+
+import { DorisDriver } from '../src';
+
+const streamToArray = require('stream-to-array');
+
+describe('DorisDriver', () => {
+  let container: StartedTestContainer;
+  let dorisDriver: DorisDriver;
+
+  jest.setTimeout(2 * 60 * 1000);
+
+  beforeAll(async () => {
+    // Use MySQL container for testing since Doris is MySQL-compatible
+    container = await MysqlDBRunner.startContainer({});
+    dorisDriver = createDriver(container);
+    dorisDriver.setLogger((msg: any, event: any) => console.log(`${msg}: ${JSON.stringify(event)}`));
+
+    await dorisDriver.createSchemaIfNotExists('test');
+    await dorisDriver.query('DROP SCHEMA test', []);
+    await dorisDriver.createSchemaIfNotExists('test');
+  });
+
+  afterAll(async () => {
+    await dorisDriver.release();
+
+    if (container) {
+      await container.stop();
+    }
+  });
+
+  test('truncated wrong value (UTF-8 handling)', async () => {
+    await dorisDriver.uploadTable('test.wrong_value', [{ name: 'value', type: 'string' }], {
+      rows: [{ value: 'Tekirdağ' }]
+    });
+    expect(JSON.parse(JSON.stringify(await dorisDriver.query('select * from test.wrong_value', []))))
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
+    expect(JSON.parse(JSON.stringify((await dorisDriver.downloadQueryResults('select * from test.wrong_value', [], { highWaterMark: 1000 })).rows)))
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
+  });
+
+  test('doris to generic type mapping', async () => {
+    await dorisDriver.query('CREATE TABLE test.var_types (some_big bigint(9), some_medium mediumint(9), some_small smallint(3), med_text mediumtext, long_text longtext)', []);
+    await dorisDriver.query('INSERT INTO test.var_types (some_big, some_medium, some_small) VALUES (123, 345, 4)', []);
+    expect(JSON.parse(JSON.stringify((await dorisDriver.downloadQueryResults('select * from test.var_types', [], { highWaterMark: 1000 })).types)))
+      .toStrictEqual([
+        { name: 'some_big', type: 'int' },
+        { name: 'some_medium', type: 'int' },
+        { name: 'some_small', type: 'int' },
+        { name: 'med_text', type: 'text' },
+        { name: 'long_text', type: 'text' },
+      ]);
+  });
+
+  test('boolean field handling', async () => {
+    await dorisDriver.uploadTable('test.boolean', [{ name: 'b_value', type: 'boolean' }], {
+      rows: [
+        { b_value: true },
+        { b_value: true },
+        { b_value: 'true' },
+        { b_value: false },
+        { b_value: 'false' },
+        { b_value: null }
+      ]
+    });
+    expect(JSON.parse(JSON.stringify(await dorisDriver.query('select * from test.boolean where b_value = ?', [true]))))
+      .toStrictEqual([{ b_value: 1 }, { b_value: 1 }, { b_value: 1 }]);
+    expect(JSON.parse(JSON.stringify(await dorisDriver.query('select * from test.boolean where b_value = ?', [false]))))
+      .toStrictEqual([{ b_value: 0 }, { b_value: 0 }]);
+  });
+
+  test('stream query support', async () => {
+    await dorisDriver.uploadTable(
+      'test.streaming_test',
+      [
+        { name: 'id', type: 'bigint' },
+        { name: 'created', type: 'date' },
+        { name: 'price', type: 'decimal' }
+      ],
+      {
+        rows: [
+          { id: 1, created: '2020-01-01', price: '100' },
+          { id: 2, created: '2020-01-02', price: '200' },
+          { id: 3, created: '2020-01-03', price: '300' }
+        ]
+      }
+    );
+
+    const tableData = await dorisDriver.stream('select * from test.streaming_test', [], {
+      highWaterMark: 1000,
+    });
+
+    try {
+      expect(await tableData.types).toEqual([
+        {
+          name: 'id',
+          type: 'int'
+        },
+        {
+          name: 'created',
+          type: 'date'
+        },
+        {
+          name: 'price',
+          type: 'decimal'
+        },
+      ]);
+      expect(await streamToArray(tableData.rowStream)).toEqual([
+        { id: 1, created: '2020-01-01', price: 100 },
+        { id: 2, created: '2020-01-02', price: 200 },
+        { id: 3, created: '2020-01-03', price: 300 }
+      ]);
+    } finally {
+      await tableData.release();
+    }
+  });
+
+  test('table name length validation (64 char limit)', async () => {
+    const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
+    try {
+      await dorisDriver.createTable(tblName, [{ name: 'id', type: 'bigint' }]);
+
+      throw new Error('createTable must throw an exception');
+    } catch (e: any) {
+      expect(e.message).toEqual(
+        'Doris cannot work with table names longer than 64 characters. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${tblName}.`
+      );
+    }
+  });
+});
