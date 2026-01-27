@@ -1,0 +1,427 @@
+# YAML Agent Configuration
+
+<WarningBox>
+
+This feature is available by request only. Please contact your Cube representative to enable YAML agent configuration for your deployment.
+
+</WarningBox>
+
+_Configure AI agents, spaces, rules, and certified queries using YAML configuration files._
+
+YAML Agent Configuration allows you to define and manage your AI agents, spaces, rules, and certified queries as code. This approach enables version control, code review workflows, and programmatic management of your agent configuration.
+
+## Overview
+
+Instead of configuring agents through the Cube Cloud UI, you can create YAML files in the `agents/` directory of your Cube project. These files are automatically loaded and validated when your deployment starts.
+
+### Key Benefits
+
+- **Version Control**: Track changes to agent configuration in Git
+- **Code Review**: Review agent configuration changes through pull requests
+- **Infrastructure as Code**: Manage agent configuration alongside your data model
+- **Multi-file Support**: Split configuration across multiple files for better organization
+- **Validation**: Automatic schema validation with helpful error messages
+
+## File Location
+
+Place your agent configuration files in the `agents/` directory at the root of your Cube project:
+
+```
+your-cube-project/
+├── model/
+│   └── cubes/
+│       └── orders.yml
+├── agents/
+│   ├── config.yml           # Main configuration
+│   ├── spaces/
+│   │   └── sales.yml        # Sales space configuration
+│   └── agents/
+│       └── assistants.yml   # Agent definitions
+└── cube.js
+```
+
+Both `.yml` and `.yaml` file extensions are supported. Files can be organized in subdirectories for better organization.
+
+## Configuration Schema
+
+### Root Structure
+
+The root configuration file can contain two top-level keys:
+
+```yaml
+spaces:
+  - # Space definitions...
+
+agents:
+  - # Agent definitions...
+```
+
+### Spaces
+
+Spaces define isolated environments where agents operate and share context.
+
+```yaml
+spaces:
+  - name: analytics-space          # Required: unique identifier
+    title: "Analytics Space"       # Optional: display name
+    description: "Space for analytics agents"
+    rules:
+      - # Rule definitions...
+    certified_queries:
+      - # Certified query definitions...
+```
+
+#### Space Properties
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Unique identifier for the space |
+| `title` | string | No | Display title for the space |
+| `description` | string | No | Human-readable description |
+| `rules` | array | No | List of agent rules |
+| `certified_queries` | array | No | List of certified queries |
+
+### Rules
+
+Rules provide instructions that guide agent behavior within a space.
+
+```yaml
+spaces:
+  - name: sales-space
+    rules:
+      - name: fiscal-year-rule
+        description: "Use fiscal year for date calculations"
+        prompt: "Always use fiscal year starting April 1st when analyzing dates"
+        type: always
+      
+      - name: efficiency-analysis
+        description: "Sales efficiency calculation guidance"
+        prompt: "When analyzing sales efficiency, calculate as deal size divided by sales cycle length"
+        type: agent_requested
+```
+
+#### Rule Properties
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Unique identifier for the rule |
+| `description` | string | No | Human-readable description |
+| `prompt` | string | Yes | The instruction text injected into agent context |
+| `type` | string | Yes | Either `always` or `agent_requested` |
+
+#### Rule Types
+
+- **`always`**: Applied to every agent interaction within the space
+- **`agent_requested`**: Applied only when the agent determines the rule is relevant
+
+### Certified Queries
+
+Certified queries are pre-approved SQL queries that agents can use for specific user requests.
+
+```yaml
+spaces:
+  - name: sales-space
+    certified_queries:
+      - name: total-revenue
+        description: "Calculate total revenue"
+        user_request: "What is the total revenue?"
+        sql_query: "SELECT SUM(amount) as total_revenue FROM orders WHERE status = 'completed'"
+      
+      - name: monthly-sales
+        description: "Monthly sales breakdown"
+        user_request: "Show me sales by month"
+        sql_query: |
+          SELECT 
+            DATE_TRUNC('month', order_date) as month,
+            SUM(amount) as total_sales
+          FROM orders
+          GROUP BY 1
+          ORDER BY 1
+```
+
+#### Certified Query Properties
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Unique identifier for the certified query |
+| `description` | string | No | Human-readable description |
+| `user_request` | string | Yes | The user request pattern this query answers |
+| `sql_query` | string | Yes | The SQL query to execute |
+
+### Agents
+
+Agents are AI-powered assistants that operate within spaces.
+
+```yaml
+agents:
+  - name: sales-assistant           # Required: unique identifier
+    title: "Sales Assistant"        # Optional: display name
+    description: "AI assistant for sales analytics"
+    space: sales-space              # Required: reference to a space
+    llm: claude_4_sonnet            # Optional: LLM provider
+    embedding_llm: text-embedding-3-large  # Optional: embedding model
+    runtime: reasoning              # Optional: runtime mode
+    accessible_views:               # Optional: list of accessible views
+      - orders_view
+      - customers_view
+    memory_mode: user               # Optional: memory isolation mode
+```
+
+#### Agent Properties
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Unique identifier for the agent |
+| `title` | string | No | Display title for the agent |
+| `description` | string | No | Human-readable description |
+| `space` | string | Yes | Name of the space this agent belongs to |
+| `llm` | string or object | No | LLM provider configuration |
+| `embedding_llm` | string or object | No | Embedding model configuration |
+| `runtime` | string | No | Runtime mode (`plain` or `reasoning`) |
+| `accessible_views` | array | No | List of view names the agent can access |
+| `memory_mode` | string | No | Memory isolation mode |
+
+#### LLM Providers
+
+You can specify a predefined LLM model:
+
+```yaml
+agents:
+  - name: my-agent
+    space: my-space
+    llm: claude_4_sonnet
+```
+
+Available predefined models:
+- `claude_3_5_sonnetv2`
+- `claude_3_7_sonnet`
+- `claude_3_7_sonnet_thinking`
+- `claude_4_sonnet`
+- `claude_4_5_sonnet`
+- `claude_4_5_haiku`
+- `claude_4_5_opus`
+- `gpt_4o`
+- `gpt_4_1`
+- `gpt_4_1_mini`
+- `gpt_5`
+- `gpt_5_mini`
+- `o3`
+- `o4_mini`
+
+Or use a Bring Your Own Model (BYOM) configuration:
+
+```yaml
+agents:
+  - name: my-agent
+    space: my-space
+    llm:
+      byom:
+        name: my-custom-model
+    # Or reference by ID:
+    # llm:
+    #   byom:
+    #     id: 123
+```
+
+#### Embedding Models
+
+Available predefined embedding models:
+- `text-embedding-3-large`
+- `text-embedding-3-small`
+
+BYOM is also supported for embedding models using the same syntax as LLM providers.
+
+#### Runtime Modes
+
+| Mode | Description |
+| --- | --- |
+| `plain` | Optimized for speed and cost |
+| `reasoning` | Enables extended thinking mode for complex analysis |
+
+#### Memory Modes
+
+| Mode | Description |
+| --- | --- |
+| `space` | Memories are shared across all users in the space |
+| `user` | Memories are isolated per user |
+| `disabled` | No memory is stored |
+
+## Complete Example
+
+Here's a complete example showing all configuration options:
+
+```yaml
+# agents/config.yml
+spaces:
+  - name: sales-analytics
+    title: "Sales Analytics"
+    description: "Space for sales team analytics and reporting"
+    rules:
+      - name: fiscal-year
+        description: "Use fiscal year for date calculations"
+        prompt: "Always use fiscal year starting April 1st when analyzing dates. Q1 is April-June, Q2 is July-September, Q3 is October-December, Q4 is January-March."
+        type: always
+      
+      - name: revenue-definition
+        description: "Standard revenue calculation"
+        prompt: "Revenue should be calculated as quantity × unit_price, excluding cancelled orders and refunds."
+        type: always
+      
+      - name: efficiency-analysis
+        description: "Sales efficiency methodology"
+        prompt: "When analyzing sales efficiency, calculate as deal size divided by sales cycle length. Include pipeline velocity metrics for comprehensive analysis."
+        type: agent_requested
+    
+    certified_queries:
+      - name: quarterly-revenue
+        description: "Get revenue by fiscal quarter"
+        user_request: "What is the revenue by quarter?"
+        sql_query: |
+          SELECT 
+            CASE 
+              WHEN MONTH(order_date) BETWEEN 4 AND 6 THEN 'Q1'
+              WHEN MONTH(order_date) BETWEEN 7 AND 9 THEN 'Q2'
+              WHEN MONTH(order_date) BETWEEN 10 AND 12 THEN 'Q3'
+              ELSE 'Q4'
+            END as fiscal_quarter,
+            SUM(quantity * unit_price) as revenue
+          FROM orders
+          WHERE status != 'cancelled'
+          GROUP BY 1
+          ORDER BY 1
+
+  - name: marketing-analytics
+    title: "Marketing Analytics"
+    description: "Space for marketing team analytics"
+    rules:
+      - name: attribution-model
+        description: "Default attribution model"
+        prompt: "Use last-touch attribution model by default for campaign analysis unless otherwise specified."
+        type: always
+
+agents:
+  - name: sales-assistant
+    title: "Sales Assistant"
+    description: "AI assistant for sales analytics and reporting"
+    space: sales-analytics
+    llm: claude_4_sonnet
+    embedding_llm: text-embedding-3-large
+    runtime: reasoning
+    accessible_views:
+      - orders_view
+      - customers_view
+      - products_view
+    memory_mode: user
+
+  - name: sales-report-builder
+    title: "Sales Report Builder"
+    description: "Specialized agent for building sales reports"
+    space: sales-analytics
+    llm: gpt_4o
+    runtime: plain
+    accessible_views:
+      - orders_view
+    memory_mode: space
+
+  - name: marketing-analyst
+    title: "Marketing Analyst"
+    description: "AI assistant for marketing analytics"
+    space: marketing-analytics
+    llm:
+      byom:
+        name: custom-marketing-model
+    runtime: reasoning
+    memory_mode: user
+```
+
+## Multi-File Configuration
+
+You can split configuration across multiple files for better organization:
+
+```yaml
+# agents/spaces/sales.yml
+spaces:
+  - name: sales-analytics
+    title: "Sales Analytics"
+    rules:
+      - name: fiscal-year
+        prompt: "Use fiscal year starting April 1st"
+        type: always
+```
+
+```yaml
+# agents/spaces/marketing.yml
+spaces:
+  - name: marketing-analytics
+    title: "Marketing Analytics"
+    rules:
+      - name: attribution
+        prompt: "Use last-touch attribution"
+        type: always
+```
+
+```yaml
+# agents/agents.yml
+agents:
+  - name: sales-assistant
+    space: sales-analytics
+    llm: claude_4_sonnet
+  
+  - name: marketing-assistant
+    space: marketing-analytics
+    llm: gpt_4o
+```
+
+All files are merged together. The system validates that:
+- Space names are unique across all files
+- Agent names are unique across all files
+- All agent `space` references point to existing spaces
+
+## Validation and Errors
+
+The configuration is validated when your deployment starts. Common validation errors include:
+
+### Missing Required Fields
+
+```
+Agents config validation failed for config.yml:
+Validation error: Required at "agents.0.name"
+```
+
+### Invalid Enum Values
+
+```
+Agents config validation failed for config.yml:
+Validation error: Invalid enum value. Expected 'always' | 'agent_requested', received 'sometimes' at "spaces.0.rules.0.type"
+```
+
+### Duplicate Names
+
+```
+Agents config: duplicate space name "sales-space" in spaces.yml
+```
+
+### Invalid Cross-References
+
+```
+Agents config: agent "sales-assistant" references non-existent space "unknown-space"
+```
+
+### YAML Syntax Errors
+
+```
+Agents config: failed to parse YAML in config.yml: unexpected end of the stream
+```
+
+## Migration from UI Configuration
+
+If you have existing agents configured through the Cube Cloud UI, you can export their configuration and convert it to YAML format. Contact your Cube representative for assistance with migration.
+
+## Best Practices
+
+1. **Use descriptive names**: Choose clear, descriptive names for spaces, agents, and rules
+2. **Document with descriptions**: Add descriptions to help team members understand the purpose of each configuration
+3. **Organize logically**: Use subdirectories to organize related configuration files
+4. **Version control**: Commit configuration changes with meaningful commit messages
+5. **Test in development**: Validate configuration changes in a development environment before deploying to production
+6. **Keep rules focused**: Write specific, actionable rules rather than vague guidelines
