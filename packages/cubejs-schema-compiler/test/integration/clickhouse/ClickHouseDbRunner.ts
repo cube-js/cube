@@ -233,3 +233,5 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     return data;
   }
 }
+
+export const dbRunner = new ClickHouseDbRunner();

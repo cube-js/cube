@@ -143,3 +143,5 @@ export class MSSqlDbRunner extends BaseDbRunner {
     return new MssqlQuery(compilers, query);
   }
 }
+
+export const dbRunner = new MSSqlDbRunner();

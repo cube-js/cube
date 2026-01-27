@@ -1,15 +1,9 @@
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { MSSqlDbRunner } from './MSSqlDbRunner';
+import { dbRunner } from './MSSqlDbRunner';
 
 describe('MSSqlUngrouped', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new MSSqlDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {

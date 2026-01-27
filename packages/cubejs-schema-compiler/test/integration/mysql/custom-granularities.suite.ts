@@ -1,10 +1,8 @@
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
-import { MySqlDbRunner } from './MySqlDbRunner';
+import { dbRunner } from './MySqlDbRunner';
 
 describe('Custom Granularities', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new MySqlDbRunner();
 
   const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
   cubes:

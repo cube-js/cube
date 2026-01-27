@@ -1,16 +1,10 @@
 import R from 'ramda';
 import { MysqlQuery } from '../../../src/adapter/MysqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { MySqlDbRunner } from './MySqlDbRunner';
+import { dbRunner } from './MySqlDbRunner';
 
 describe('MySqlPreAggregations', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new MySqlDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {

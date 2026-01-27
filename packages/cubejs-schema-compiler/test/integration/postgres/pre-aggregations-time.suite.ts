@@ -2,7 +2,7 @@
 import R from 'ramda';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { dbRunner } from './PostgresDBRunner';
 
 const SCHEMA_VARIANTS = [
   // with references postfix
@@ -84,13 +84,10 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
   describe(`PreAggregations in time hierarchy (schema #${index})`, () => {
     jest.setTimeout(200000);
 
-    const dbRunner = new PostgresDBRunner();
-
-    afterAll(async () => {
-      await dbRunner.tearDown();
-    });
-
     const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+
+    // Use schema index as base for suffix to avoid table name conflicts between schema variants
+    const baseSuffix = `s${index}`;
 
     function replaceTableName(query, preAggregation, suffix) {
       const [toReplace, params] = query;
@@ -137,7 +134,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       console.log(JSON.stringify(queries.concat(queryAndParams)));
 
       return dbRunner.testQueries(
-        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
+        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, `${baseSuffix}_1`))
       ).then(res => {
         console.log(JSON.stringify(res));
         expect(res).toEqual(
@@ -197,7 +194,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       console.log(JSON.stringify(queries.concat(queryAndParams)));
 
       return dbRunner.testQueries(
-        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
+        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, `${baseSuffix}_2`))
       ).then(res => {
         console.log(JSON.stringify(res));
         expect(res).toEqual(

@@ -17,7 +17,7 @@ export class PostgresDBRunner extends BaseDbRunner {
       port,
       password: this.password(),
       database: 'model_test',
-      poolSize: 1,
+      poolSize: 10,
       user: process.env.TEST_PG_USER || 'root',
     });
 
@@ -146,12 +146,11 @@ export class PostgresDBRunner extends BaseDbRunner {
           `pg_isready -h localhost -p ${this.port()} -U root -d model_test || exit 1`
         ],
         interval: 1000,
-        timeout: 500,
+        timeout: 1000,
         retries: 20,
         startPeriod: 5 * 1000,
       })
       .withWaitStrategy(Wait.forHealthCheck())
-      .withStartupTimeout(15 * 1000)
       .start();
   }
 
@@ -169,8 +168,3 @@ export class PostgresDBRunner extends BaseDbRunner {
 }
 
 export const dbRunner = new PostgresDBRunner();
-
-// eslint-disable-next-line no-undef
-afterAll(async () => {
-  await dbRunner.tearDown();
-});

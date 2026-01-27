@@ -1,14 +1,8 @@
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { dbRunner } from './ClickHouseDbRunner';
 
 describe('ClickHouse complex joins', () => {
   jest.setTimeout(20 * 1000);
-
-  const dbRunner = new ClickHouseDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`Acube\`, {

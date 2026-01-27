@@ -3,19 +3,13 @@ import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
 
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { dbRunner } from './ClickHouseDbRunner';
 import { logSqlAndParams } from '../../unit/TestUtil';
 
 const itif = (condition, description, fn) => (condition ? it(description, fn) : it.skip(description, fn));
 
 describe('ClickHouse DataSchemaCompiler', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new ClickHouseDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   it('gutter', () => {
     const { compiler } = prepareJsCompiler(`
