@@ -867,6 +867,15 @@ impl AsyncPostgresShim {
                 self.session.state.set_original_user(Some(user));
                 self.session.state.set_auth_context(Some(auth_context));
 
+                // Parse output format from connection parameters
+                if let Some(output_format_str) = parameters.get("output_format") {
+                    if let Some(output_format) =
+                        crate::sql::OutputFormat::from_str(output_format_str)
+                    {
+                        self.session.state.set_output_format(output_format);
+                    }
+                }
+
                 self.write(protocol::Authentication::new(AuthenticationRequest::Ok))
                     .await?;
 
@@ -924,6 +933,19 @@ impl AsyncPostgresShim {
     pub async fn flush(&mut self) -> Result<(), ConnectionError> {
         // TODO: flush network buffers here once buffering has been implemented
         Ok(())
+    }
+
+    /// Create a portal with the session's output format
+    #[allow(dead_code)]
+    fn create_portal(
+        &self,
+        plan: QueryPlan,
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+    ) -> Portal {
+        let output_format = self.session.state.output_format();
+        Portal::new_with_output_format(plan, format, from, span_id, output_format)
     }
 
     pub async fn describe_portal(&mut self, name: String) -> Result<(), ConnectionError> {
@@ -1829,6 +1851,10 @@ impl AsyncPostgresShim {
                             if writer.has_data() {
                                 buffer::write_direct(&mut self.partial_write_buf, &mut self.socket, writer).await?
                             }
+                        }
+                        PortalBatch::ArrowIPCData(ipc_data) => {
+                            // Write Arrow IPC data directly to socket
+                            self.partial_write_buf.extend_from_slice(&ipc_data);
                         }
                         PortalBatch::Completion(completion) => return self.write_completion(completion).await,
                     }

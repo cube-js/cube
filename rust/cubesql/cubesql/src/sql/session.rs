@@ -23,6 +23,37 @@ use crate::{
     RWLockAsync,
 };
 
+/// Output format for query results
+///
+/// Determines how query results are serialized and sent to clients.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputFormat {
+    /// PostgreSQL wire protocol (default)
+    #[default]
+    PostgreSQL,
+    /// Apache Arrow IPC Streaming Format (RFC 0017)
+    ArrowIPC,
+}
+
+impl OutputFormat {
+    /// Parse output format from string
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "postgresql" | "postgres" | "pg" => Some(OutputFormat::PostgreSQL),
+            "arrow_ipc" | "arrow" | "ipc" => Some(OutputFormat::ArrowIPC),
+            _ => None,
+        }
+    }
+
+    /// Get string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            OutputFormat::PostgreSQL => "postgresql",
+            OutputFormat::ArrowIPC => "arrow_ipc",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SessionProperties {
     user: Option<String>,
@@ -94,6 +125,9 @@ pub struct SessionState {
     pub cache_mode: RwLockSync<Option<CacheMode>>,
 
     pub query_timezone: RwLockSync<Option<String>>,
+
+    // Output format for query results
+    pub output_format: RwLockSync<OutputFormat>,
 }
 
 impl SessionState {
@@ -127,6 +161,7 @@ impl SessionState {
             auth_context_expiration,
             cache_mode: RwLockSync::new(None),
             query_timezone: RwLockSync::new(None),
+            output_format: RwLockSync::new(OutputFormat::default()),
         }
     }
 
@@ -351,7 +386,9 @@ impl SessionState {
         match guard {
             Some(vars) => vars,
             _ => match &self.protocol {
-                DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => {
+                    return POSTGRES_DEFAULT_VARIABLES.clone()
+                }
                 DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
             },
         }
@@ -366,7 +403,9 @@ impl SessionState {
         match &*guard {
             Some(vars) => vars.get(name).cloned(),
             _ => match &self.protocol {
-                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
+                DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => {
+                    POSTGRES_DEFAULT_VARIABLES.get(name).cloned()
+                }
                 DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
         }
@@ -411,6 +450,24 @@ impl SessionState {
             api_type.to_string(),
             application_name,
         )
+    }
+
+    /// Get the current output format for query results
+    pub fn output_format(&self) -> OutputFormat {
+        let guard = self
+            .output_format
+            .read()
+            .expect("failed to unlock output_format for reading");
+        *guard
+    }
+
+    /// Set the output format for query results
+    pub fn set_output_format(&self, format: OutputFormat) {
+        let mut guard = self
+            .output_format
+            .write()
+            .expect("failed to unlock output_format for writing");
+        *guard = format;
     }
 }
 

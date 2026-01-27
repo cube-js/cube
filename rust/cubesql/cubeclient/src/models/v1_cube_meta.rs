@@ -12,6 +12,30 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+pub struct V1CubeMetaPreAggregation {
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "type")]
+    pub pre_agg_type: String,
+    #[serde(rename = "granularity", skip_serializing_if = "Option::is_none")]
+    pub granularity: Option<String>,
+    #[serde(
+        rename = "timeDimensionReference",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub time_dimension_reference: Option<String>,
+    #[serde(
+        rename = "dimensionReferences",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dimension_references: Option<String>, // JSON string like "[dim1, dim2]"
+    #[serde(rename = "measureReferences", skip_serializing_if = "Option::is_none")]
+    pub measure_references: Option<String>, // JSON string like "[measure1, measure2]"
+    #[serde(rename = "external", skip_serializing_if = "Option::is_none")]
+    pub external: Option<bool>,
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct V1CubeMeta {
     #[serde(rename = "name")]
     pub name: String,
@@ -37,6 +61,8 @@ pub struct V1CubeMeta {
     pub nested_folders: Option<Vec<models::V1CubeMetaNestedFolder>>,
     #[serde(rename = "hierarchies", skip_serializing_if = "Option::is_none")]
     pub hierarchies: Option<Vec<models::V1CubeMetaHierarchy>>,
+    #[serde(rename = "preAggregations", skip_serializing_if = "Option::is_none")]
+    pub pre_aggregations: Option<Vec<V1CubeMetaPreAggregation>>,
 }
 
 impl V1CubeMeta {
@@ -60,6 +86,7 @@ impl V1CubeMeta {
             folders: None,
             nested_folders: None,
             hierarchies: None,
+            pre_aggregations: None,
         }
     }
 }

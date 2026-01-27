@@ -88,6 +88,15 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         None
     };
 
+    let adbc_port_handle = options.get_value(&mut cx, "adbcPort")?;
+    let adbc_port = if adbc_port_handle.is_a::<JsNumber, _>(&mut cx) {
+        let value = adbc_port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+
+        Some(value.value(&mut cx) as u16)
+    } else {
+        None
+    };
+
     let gateway_port = options.get_value(&mut cx, "gatewayPort")?;
     let gateway_port = if gateway_port.is_a::<JsNumber, _>(&mut cx) {
         let value = gateway_port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
@@ -123,6 +132,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         let config = C::new(NodeConfigurationFactoryOptions {
             gateway_port,
             pg_port,
+            adbc_port,
         });
 
         runtime.block_on(async move {

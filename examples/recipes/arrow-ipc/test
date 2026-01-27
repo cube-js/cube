@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}   Cube CI Testing Helper${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+echo "What would you like to do?"
+echo ""
+echo -e "${GREEN}1)${NC} Quick checks before commit ${YELLOW}(~1-2 min)${NC}"
+echo -e "${GREEN}2)${NC} Full CI tests before push ${YELLOW}(~15-30 min)${NC}"
+echo -e "${GREEN}3)${NC} Fix formatting only"
+echo -e "${GREEN}4)${NC} Run clippy only ${YELLOW}(~2-3 min)${NC}"
+echo -e "${GREEN}5)${NC} Run tests only ${YELLOW}(~5-10 min)${NC}"
+echo -e "${GREEN}6)${NC} Show help/documentation"
+echo ""
+read -p "Enter your choice [1-6]: " choice
+
+case $choice in
+    1)
+        echo ""
+        echo -e "${CYAN}Running quick pre-commit checks...${NC}"
+        exec "$SCRIPT_DIR/run-quick-checks.sh"
+        ;;
+    2)
+        echo ""
+        echo -e "${CYAN}Running full CI tests (this will take a while)...${NC}"
+        exec "$SCRIPT_DIR/run-ci-tests-local.sh"
+        ;;
+    3)
+        echo ""
+        echo -e "${CYAN}Fixing Rust formatting...${NC}"
+        exec "$SCRIPT_DIR/fix-formatting.sh"
+        ;;
+    4)
+        echo ""
+        echo -e "${CYAN}Running clippy...${NC}"
+        exec "$SCRIPT_DIR/run-clippy.sh"
+        ;;
+    5)
+        echo ""
+        echo -e "${CYAN}Running tests only...${NC}"
+        exec "$SCRIPT_DIR/run-tests-only.sh"
+        ;;
+    6)
+        echo ""
+        cat "$SCRIPT_DIR/CI_TESTING_README.md"
+        ;;
+    *)
+        echo ""
+        echo -e "${YELLOW}Invalid choice. Please run again and select 1-6.${NC}"
+        exit 1
+        ;;
+esac
