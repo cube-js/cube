@@ -22,18 +22,18 @@ Instead of configuring agents through the Cube Cloud UI, you can create YAML fil
 
 ## Environment Variables
 
+<InfoBox>
+
+Cube version 1.6.5 or above is required to enable this feature.
+
+</InfoBox>
+
 The following environment variables control the YAML agent configuration feature:
 
 | Environment Variable | Description | Default |
 | --- | --- | --- |
 | `CUBE_CLOUD_AGENTS_CONFIG_ENABLED` | Enables YAML agent configuration. Set to `true` to activate. | `false` |
 | `CUBE_CLOUD_AGENTS_CONFIG_PATH` | Path to the directory containing agent configuration files, relative to the project root. | `agents` |
-
-<InfoBox>
-
-These environment variables are configured by Cube Cloud when the feature is enabled for your deployment. You typically don't need to set them manually.
-
-</InfoBox>
 
 ## File Location
 
