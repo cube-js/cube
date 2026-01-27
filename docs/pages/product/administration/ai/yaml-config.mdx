@@ -22,6 +22,21 @@ Instead of configuring agents through the Cube Cloud UI, you can create YAML fil
 - **Multi-file Support**: Split configuration across multiple files for better organization
 - **Validation**: Automatic schema validation with helpful error messages
 
+## Environment Variables
+
+The following environment variables control the YAML agent configuration feature:
+
+| Environment Variable | Description | Default |
+| --- | --- | --- |
+| `CUBE_CLOUD_AGENTS_CONFIG_ENABLED` | Enables YAML agent configuration. Set to `true` to activate. | `false` |
+| `CUBE_CLOUD_AGENTS_CONFIG_PATH` | Path to the directory containing agent configuration files, relative to the project root. | `agents` |
+
+<InfoBox>
+
+These environment variables are configured by Cube Cloud when the feature is enabled for your deployment. You typically don't need to set them manually.
+
+</InfoBox>
+
 ## File Location
 
 Place your agent configuration files in the `agents/` directory at the root of your Cube project:
@@ -376,52 +391,3 @@ All files are merged together. The system validates that:
 - Space names are unique across all files
 - Agent names are unique across all files
 - All agent `space` references point to existing spaces
-
-## Validation and Errors
-
-The configuration is validated when your deployment starts. Common validation errors include:
-
-### Missing Required Fields
-
-```
-Agents config validation failed for config.yml:
-Validation error: Required at "agents.0.name"
-```
-
-### Invalid Enum Values
-
-```
-Agents config validation failed for config.yml:
-Validation error: Invalid enum value. Expected 'always' | 'agent_requested', received 'sometimes' at "spaces.0.rules.0.type"
-```
-
-### Duplicate Names
-
-```
-Agents config: duplicate space name "sales-space" in spaces.yml
-```
-
-### Invalid Cross-References
-
-```
-Agents config: agent "sales-assistant" references non-existent space "unknown-space"
-```
-
-### YAML Syntax Errors
-
-```
-Agents config: failed to parse YAML in config.yml: unexpected end of the stream
-```
-
-## Migration from UI Configuration
-
-If you have existing agents configured through the Cube Cloud UI, you can export their configuration and convert it to YAML format. Contact your Cube representative for assistance with migration.
-
-## Best Practices
-
-1. **Use descriptive names**: Choose clear, descriptive names for spaces, agents, and rules
-2. **Document with descriptions**: Add descriptions to help team members understand the purpose of each configuration
-3. **Organize logically**: Use subdirectories to organize related configuration files
-4. **Version control**: Commit configuration changes with meaningful commit messages
-5. **Test in development**: Validate configuration changes in a development environment before deploying to production
-6. **Keep rules focused**: Write specific, actionable rules rather than vague guidelines
