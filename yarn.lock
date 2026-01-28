@@ -9148,7 +9148,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/mysql@^2.15.15", "@types/mysql@^2.15.19", "@types/mysql@^2.15.21":
+"@types/mysql@^2.15.15", "@types/mysql@^2.15.19":
   version "2.15.21"
   resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.21.tgz#7516cba7f9d077f980100c85fd500c8210bd5e45"
   integrity sha512-NPotx5CVful7yB+qZbWtXL2fA4e7aEHkihHLjklc6ID8aq7bhguHgeIoC1EmSNTAuCgI6ZXrjt2ZSaXnYX0EUg==
@@ -19642,6 +19642,11 @@ lru.min@^1.0.0:
   resolved "https://registry.yarnpkg.com/lru.min/-/lru.min-1.1.1.tgz#146e01e3a183fa7ba51049175de04667d5701f0e"
   integrity sha512-FbAj6lXil6t8z4z3j0E5mfRlPzxkySotzUHwRXjlpRh10vc6AI6WN62ehZj82VG7M20rqogJ0GLwar2Xa05a8Q==
 
+lru.min@^1.1.0:
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/lru.min/-/lru.min-1.1.3.tgz#c8c3d001dfb4cbe5b8d1f4bea207d4a320e5d76f"
+  integrity sha512-Lkk/vx6ak3rYkRR0Nhu4lFUT2VDnQSxBe8Hbl7f36358p6ow8Bnvr8lrLt98H8J1aGxfhbX4Fs5tYg2+FTwr5Q==
+
 luxon@^3.2.1:
   version "3.4.4"
   resolved "https://registry.yarnpkg.com/luxon/-/luxon-3.4.4.tgz#cf20dc27dc532ba41a169c43fdcc0063601577af"
@@ -20435,6 +20440,21 @@ mute-stream@^2.0.0:
   resolved "https://registry.yarnpkg.com/mute-stream/-/mute-stream-2.0.0.tgz#a5446fc0c512b71c83c44d908d5c7b7b4c493b2b"
   integrity sha512-WWdIxpyjEn+FhQJQQv9aQAYlHoNVdzIzUySNV1gHUPDSdZJ3yZn7pAAbQcV7B56Mvu881q9FZV+0Vx2xC44VWA==
 
+mysql2@^3.11.0:
+  version "3.16.1"
+  resolved "https://registry.yarnpkg.com/mysql2/-/mysql2-3.16.1.tgz#cbe294573792fe4f059000f23d38e16011c83c61"
+  integrity sha512-b75qsDB3ieYEzMsT1uRGsztM/sy6vWPY40uPZlVVl8eefAotFCoS7jaDB5DxDNtlW5kdVGd9jptSpkvujNxI2A==
+  dependencies:
+    aws-ssl-profiles "^1.1.1"
+    denque "^2.1.0"
+    generate-function "^2.3.1"
+    iconv-lite "^0.7.0"
+    long "^5.2.1"
+    lru.min "^1.0.0"
+    named-placeholders "^1.1.6"
+    seq-queue "^0.0.5"
+    sqlstring "^2.3.2"
+
 mysql2@^3.11.5:
   version "3.11.5"
   resolved "https://registry.yarnpkg.com/mysql2/-/mysql2-3.11.5.tgz#1a1cb9a61e78d636da10e122a3c4d6978ad08625"
@@ -20475,6 +20495,13 @@ named-placeholders@^1.1.3:
   integrity sha512-eLoBxg6wE/rZkJPhU/xRX1WTpkFEwDJEN96oxFrTsqBdbT5ec295Q+CoHrL9IT0DipqKhmGcaZmwOt8OON5x1w==
   dependencies:
     lru-cache "^7.14.1"
+
+named-placeholders@^1.1.6:
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/named-placeholders/-/named-placeholders-1.1.6.tgz#c50c6920b43f258f59c16add1e56654f5cc02bb5"
+  integrity sha512-Tz09sEL2EEuv5fFowm419c1+a/jSMiBjI9gHxVLrVdbUkkNUUfjsVYs9pVZu5oCon/kmRh9TfLEObFtkVxmY0w==
+  dependencies:
+    lru.min "^1.1.0"
 
 nan@^2.18.0, nan@^2.19.0, nan@^2.20.0:
   version "2.22.0"
