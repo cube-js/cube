@@ -34,7 +34,7 @@ export function RunOnCubeCloud() {
       ) : (
         <CloudFilled />
       )}
-      {!active ? 'Run' : 'Running'} on Cube Cloud
+      {!active ? 'Run' : 'Running'} in Cloud
     </StyledMenuButton>
   );
 

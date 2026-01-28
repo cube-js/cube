@@ -1155,6 +1155,17 @@ This can be overridden for individual pre-aggregations using the
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                | `true`                |
 
+## `CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME`
+
+The maximum time, in seconds, for exponential backoff for retries when pre-aggregation
+builds fail. When a pre-aggregation refresh fails, retries will be executed with
+exponentially increasing delays, but the delay will not exceed the value specified by
+this variable.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A valid number in seconds | `600`                  | `600`                 |
+
 ## `CUBEJS_REFRESH_WORKER`
 
 If `true`, this instance of Cube will **only** refresh pre-aggregations.

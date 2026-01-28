@@ -1,7 +1,7 @@
 # Integration with Datadog
 
 [Datadog][datadog] is a popular fully managed observability service. This guide
-demonstrates how to set up Cube Cloud to export logs to Datadog.
+demonstrates how to set up Cube Cloud to export logs and metrics to Datadog.
 
 ## Configuration
 
@@ -45,9 +45,36 @@ navigate to <Btn>Logs</Btn> in Datadog and watch the logs coming:
 
 <Screenshot src="https://ucarecdn.com/5e66f3d6-85a7-498c-89e8-41632d1b184c/" />
 
+### Exporting metrics
+
+To export metrics to Datadog, use the same API key from
+<Btn>Organization Settings → API Keys</Btn> as configured for logs.
+
+Then, configure the [`datadog_metrics`][vector-datadog-metrics] sink in your
+[`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.datadog_metrics]
+type = "datadog_metrics"
+inputs = [
+  "metrics"
+]
+default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
+site = "datadoghq.eu"
+```
+
+Again, upon commit the configuration for Vector should take effect in a minute. Then,
+navigate to <Btn>Metrics → Summary</Btn> in Datadog and explore the available
+metrics. Cube metrics are prefixed with `cube_`, such as `cube_cpu_usage_ratio`,
+`cube_memory_usage_ratio`, and `cube_requests_total`.
+
 [datadog]: https://www.datadoghq.com
 [datadog-docs-sites]: https://docs.datadoghq.com/getting_started/site/
 [vector-datadog-logs]:
   https://vector.dev/docs/reference/configuration/sinks/datadog_logs/
+[vector-datadog-metrics]:
+  https://vector.dev/docs/reference/configuration/sinks/datadog_metrics/
 [ref-monitoring-integrations]: /product/workspace/monitoring
 [ref-monitoring-integrations-conf]: /product/workspace/monitoring#configuration

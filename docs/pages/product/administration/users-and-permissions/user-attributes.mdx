@@ -30,7 +30,7 @@ To filter data based on user attributes, implement an access policy in your view
 views:
   - name: orders_view
     access_policy:
-      - role: "*"  # Applies to all roles
+      - group: "*"  # Applies to all groups
         row_level:
           filters:
             - member: customers_city

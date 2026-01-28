@@ -38,17 +38,18 @@ You'll need three key pieces of information:
 
 #### `CUBE_API_KEY`
 
-- Navigate to <Btn>Admin → Agents → Click on Agent → Enable API Key</Btn>
+- Navigate to <Btn>Admin → API Keys</Btn> to obtain your API key
 
-#### `USER_ID`
+#### User Identity (choose one)
 
-- A unique identifier for the user (e.g., email address or user ID)
-- Used for session settings and personalization
+- **`INTERNAL_USER_ID`**: Email address of an existing Cube user. Use this for internal team members who already have Cube accounts. The user's existing permissions and settings will be used.
+- **`EXTERNAL_USER_ID`**: A unique identifier for external/third-party users (e.g., "user-123", "customer@external.com"). Use this when you need to provide custom user attributes, groups, or row-level security settings.
 
 ## Configuration
 
-
 Add the following configuration to your Claude Desktop or Cursor MCP settings:
+
+### For Internal Cube Users
 
 ```json
 {
@@ -59,7 +60,25 @@ Add the following configuration to your Claude Desktop or Cursor MCP settings:
       "env": {
         "CUBE_CHAT_API_URL": "https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state",
         "CUBE_API_KEY": "your_api_key_here",
-        "USER_ID": "user@example.com"
+        "INTERNAL_USER_ID": "analyst@yourcompany.com"
+      }
+    }
+  }
+}
+```
+
+### For External Users
+
+```json
+{
+  "mcpServers": {
+    "cube-mcp-server": {
+      "command": "npx",
+      "args": ["@cube-dev/mcp-server"],
+      "env": {
+        "CUBE_CHAT_API_URL": "https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state",
+        "CUBE_API_KEY": "your_api_key_here",
+        "EXTERNAL_USER_ID": "user-123"
       }
     }
   }
@@ -81,6 +100,11 @@ The server will stream real-time analytics responses with data visualizations an
 ## How It Works
 
 The MCP server integrates with Cube's [Chat API][ref-chat-api] using API key authentication directly. The Chat API URL should be copied from your agent settings in the Cube admin panel to ensure you're using the correct dynamic endpoint for your deployment.
+
+The server supports two types of user authentication:
+
+- **Internal Users**: Existing Cube users authenticated by their email address. They use their configured permissions and settings from Cube.
+- **External Users**: Third-party users with custom identifiers, allowing for dynamic user attributes, groups, and row-level security configuration.
 
 [ref-api-keys]: /product/administration/workspace/api-keys
 [ref-chat-api]: /product/apis-integrations/embed-apis/chat-api

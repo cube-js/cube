@@ -883,6 +883,8 @@ impl CubeTable {
         let schema = table_projected_schema;
         let partition_num = partition_execs.len();
 
+        let table_ordering = lex_ordering_for_index(self.index_snapshot.index.get_row(), &schema)?;
+
         let read_data: Arc<dyn ExecutionPlan> = Arc::new(CubeTableExec {
             schema: schema.clone(),
             partition_execs,
@@ -891,10 +893,7 @@ impl CubeTable {
             properties: PlanProperties::new(
                 EquivalenceProperties::new_with_orderings(
                     schema.clone(),
-                    &[LexOrdering::new(lex_ordering_for_index(
-                        self.index_snapshot.index.get_row(),
-                        &schema,
-                    )?)],
+                    &[LexOrdering::new(table_ordering.clone())],
                 ),
                 Partitioning::UnknownPartitioning(partition_num),
                 EmissionType::Incremental,
@@ -987,6 +986,11 @@ impl CubeTable {
                 .collect::<Result<Vec<_>, _>>()?;
             Arc::new(SortPreservingMergeExec::new(
                 LexOrdering::new(join_columns),
+                read_data,
+            ))
+        } else if !table_ordering.is_empty() {
+            Arc::new(SortPreservingMergeExec::new(
+                LexOrdering::new(table_ordering),
                 read_data,
             ))
         } else {

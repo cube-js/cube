@@ -1,44 +1,49 @@
+---
+toc: false
+---
+
 # Introduction
 
-Cube is the [agentic analytics](#agentic-analytics) platform built on top of the [open-source semantic layer](#semantic-layer).
+Cube is the business intelligence platform powered by the open-source semantic layer.
 
-Cube enables AI agents and users to query, explore, and manipulate data models — transforming the semantic layer into a dynamic, governed workspace for generating insights, automating workflows, and building data products.
+Cube uses AI agents to build data models and enable data consumers to perform analysis. Use AI to quickly build semantic layer and fully control the analytics context.
 
 <YouTubeVideo
   url="https://www.youtube.com/embed/n-U1FvHqE2Q"
   aspectRatio={16/10}
 />
 
-Cube is a new generation of a BI platform built to be used by both humans and AI agents. It empowers different personas across your organization:
+Cube is a new generation of a business intelligence and embedded analytics platform built to be used by both humans and AI agents. It empowers different personas across your organization:
 
 - **Data Engineers** can quickly curate data models with AI assistance, accelerating the development and maintenance of semantic layers
 - **Data Analysts** can perform deep analysis with AI assistance, diving into complex data relationships and patterns
 - **Business Users** benefit from workbooks and dashboards that Cube can automatically build and maintain
-- **AI Agents** can be powered by Cube features through MCP and A2A integrations, enabling automated data discovery, analysis, and reporting workflows
 
-With Cube, you can power copilots, automate data workflows, and create interactive analytics experiences—all grounded in a consistent and governed data model.
-
-## Semantic layer
+## How is Cube different?
 
 At the foundation of Cube's agentic analytics platform is an [open-source semantic layer](https://github.com/cube-js/cube)—the critical infrastructure that enables both AI agents and humans to work with trusted, consistent data.
 
 The semantic layer provides the governed data foundation that makes agentic analytics possible. It organizes data from your cloud data warehouses into centralized, consistent definitions that AI agents can reliably query, explore, and reason about. Without a semantic layer, AI agents would struggle with inconsistent metrics, scattered business logic, and ungoverned data access—making their outputs unreliable and potentially dangerous.
 
-By establishing a single source of truth for metrics, relationships, and business logic, the semantic layer ensures that AI agents and users work with the same trusted definitions. This consistency is essential for agentic analytics: when an AI agent generates insights or automates workflows, it relies on the semantic layer's data model to understand what metrics mean, how entities relate, and what data users are authorized to access.
+### Semantic SQL
 
-The semantic layer also provides the performance and governance infrastructure needed for agentic workflows. Through caching and pre-aggregations, it ensures AI agents can respond quickly without overwhelming your data warehouse. Through access controls, it guarantees that agents respect the same data security policies as human users.
+Unlike other tools, Cube AI agents don't query the data warehouse directly. Instead, they query the semantic layer using Semantic SQL, creating a trusted proxy architecture. The semantic layer runtime acts as guardrails between AI agents and your warehouse—all queries must pass through this deterministic runtime, which validates every request and prevents incorrect queries from reaching your data.
 
-Data engineers use Cube's semantic layer to build and maintain data models, manage access control and caching, and expose data through REST, GraphQL, and SQL APIs—creating the governed foundation that powers agentic analytics experiences, traditional BI tools, and custom data applications.
+Semantic SQL extends Postgres-compatible SQL with the MEASURE function. This architecture lets AI leverage the full power of SQL to build ad-hoc derived calculations on top of existing semantic model calculations, combining flexibility with governance.
 
-### Code-first
+Security policies are enforced deterministically at the semantic layer runtime, ensuring consistent access control across all queries.
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/97dd04e5-f534-424e-8d6b-e6e0c19fd95f/" />
+
+### Semantic layer architecture
+
+#### Code-first
 
 A code-first approach is essential for both traditional data engineering and agentic analytics. Managing data models, configurations, and policies as code enables the same proven practices that power modern software development: version control for collaboration and code reviews, automated testing and documentation, and established patterns for reusability and maintainability.
 
 For agentic analytics specifically, a code-first semantic layer creates new possibilities. AI agents can help curate and maintain data models themselves, accelerating development while maintaining quality through git workflows. The structured, version-controlled nature of code makes it easier for agents to understand changes, suggest improvements, and even implement modifications autonomously.
 
 Everything within Cube—from configurations to data models to access control policies—is managed through code. This foundation enables both human data engineers and AI agents to collaborate on building and maintaining the semantic layer that powers agentic analytics.
-
-### Four pillars of semantic layer
 
 The semantic layer that powers Cube's agentic analytics platform is built on four essential pillars: data modeling, access control, caching, and APIs. Each pillar plays a critical role in enabling AI agents and users to work with data reliably, securely, and efficiently.
 
