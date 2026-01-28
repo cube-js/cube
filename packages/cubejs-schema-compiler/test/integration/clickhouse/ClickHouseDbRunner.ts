@@ -2,7 +2,7 @@ import { createClient } from '@clickhouse/client';
 import type { ClickHouseClient, ResponseJSON } from '@clickhouse/client';
 import { GenericContainer } from 'testcontainers';
 import type { StartedTestContainer } from 'testcontainers';
-import { format as formatSql } from 'sqlstring';
+import { escape } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 
@@ -158,7 +158,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     const requests = queries
       .map(async ([query, params]) => {
         const resultSet = await clickHouse.query({
-          query: formatSql(query, params),
+          query: query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => escape(params[idx])),
           format: 'JSON',
           clickhouse_settings: {
             join_use_nulls: 1,
