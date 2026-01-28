@@ -2,6 +2,7 @@
 /.idea
 upstream
 .cubestore
+.claude
 dist
 node_modules
 downloaded

@@ -243,7 +243,7 @@ impl SqlServiceImpl {
         columns: Vec<ColumnDef>,
         if_not_exists: bool,
     ) -> Result<IdRow<MultiIndex>, CubeError> {
-        let columns = convert_columns_type(&columns)?;
+        let columns = convert_columns_type(&columns, self.config_obj.allow_decimal128())?;
         self.db
             .create_partitioned_index(schema, name, columns, if_not_exists)
             .await
