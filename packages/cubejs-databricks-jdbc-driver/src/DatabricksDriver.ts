@@ -667,8 +667,13 @@ export class DatabricksDriver extends JDBCDriver {
     const response: any[] = await this.query(`DESCRIBE ${tableFullName}`, []);
 
     for (const column of response) {
-      // Databricks describe additional info by default after empty line.
-      if (column.col_name === '') {
+      // Databricks describe appends literal metadata rows for partitioned tables
+      // where the column name is "# Partition Information" and the data_type is empty.
+      if (
+        column.col_name === '' ||
+        (column.col_name === '# Partition Information' &&
+          column.data_type === '')
+      ) {
         break;
       }
       result.push({
