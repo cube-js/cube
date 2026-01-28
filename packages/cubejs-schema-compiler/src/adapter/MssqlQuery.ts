@@ -269,6 +269,7 @@ export class MssqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME2';
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
+    templates.params.param = '@_{{ param_index + 1 }}';
     return templates;
   }
 }
