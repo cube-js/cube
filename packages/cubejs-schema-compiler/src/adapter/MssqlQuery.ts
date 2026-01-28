@@ -90,7 +90,12 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
+    const offset = moment().tz(this.timezone).format('Z');
+
+    // 1. Treating the field as UTC (add '+00:00' offset)
+    // 2. Switch to target timezone offset
+    // 3. Cast to DATETIME2 to get naive timestamp in target timezone
+    return `CAST(SWITCHOFFSET(TODATETIMEOFFSET(${field}, '+00:00'), '${offset}') AS DATETIME2)`;
   }
 
   public timeStampCast(value: string) {
@@ -106,21 +111,24 @@ export class MssqlQuery extends BaseQuery {
   }
 
   /**
-   * Returns sql for source expression floored to timestamps aligned with
-   * intervals relative to origin timestamp point.
-   * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
+   * Returns SQL for source expression floored to timestamps aligned with
+   * intervals relative to the origin timestamp point.
+   * The formula operates with seconds diffs, so it won't produce human-expected dates aligned with offset date parts.
    */
   public dateBin(interval: string, source: string, origin: string): string {
+    // Both source and origin are now DATETIME2 in the query timezone (naive timestamps),
+    // ensuring their in the same timezone context for correct date bin calculation.
+    const originAligned = this.dateTimeCast(`'${origin}'`);
     const beginOfTime = this.dateTimeCast('DATEFROMPARTS(1970, 1, 1)');
     const timeUnit = this.diffTimeUnitForInterval(interval);
 
     // Need to explicitly cast one argument of floor to float to trigger correct sign logic
     return `DATEADD(${timeUnit},
         FLOOR(
-          CAST(DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          CAST(DATEDIFF(${timeUnit}, ${originAligned}, ${source}) AS FLOAT) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
-        ${this.dateTimeCast(`'${origin}'`)}
+        ${originAligned}
     )`;
   }
 
