@@ -543,7 +543,16 @@ export class QueryQueue {
         }
       }));
 
-      const [_active, toProcess] = await queueConnection.getActiveAndToProcess();
+      const [active, toProcess] = await queueConnection.getActiveAndToProcess();
+
+      /**
+       * Important notice: Concurrency configuration works per a specific queue, not per node.
+       *
+       * In production clusters where it contains N nodes, it shares the same concurrency. It leads to a point
+       * where every node tries to pick up jobs as much as concurrency is defined for the whole cluster. To minimize
+       * the effect of competition between nodes, it's important to reduce the number of tries to process by active jobs.
+       */
+      const toProcessLimit = active.length >= this.concurrency ? 1 : this.concurrency - active.length;
 
       const tasks = toProcess
         .filter(([queryKey, _queueId]) => {
@@ -559,7 +568,7 @@ export class QueryQueue {
             return false;
           }
         })
-        .slice(0, this.concurrency)
+        .slice(0, toProcessLimit)
         .map(([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId));
 
       await Promise.all(tasks);
