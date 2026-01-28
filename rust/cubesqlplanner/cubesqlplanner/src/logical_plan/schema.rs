@@ -94,6 +94,23 @@ impl LogicalSchema {
         }
         Ok(result)
     }
+
+    /// Get the member symbol at a given position (as returned by find_member_positions).
+    /// Position ordering: dimensions, then time_dimensions, then measures.
+    pub fn get_member_at_position(&self, position: usize) -> Option<Rc<MemberSymbol>> {
+        let dim_len = self.dimensions.len();
+        let time_dim_len = self.time_dimensions.len();
+
+        if position < dim_len {
+            self.dimensions.get(position).cloned()
+        } else if position < dim_len + time_dim_len {
+            self.time_dimensions.get(position - dim_len).cloned()
+        } else {
+            self.measures
+                .get(position - dim_len - time_dim_len)
+                .cloned()
+        }
+    }
 }
 
 impl PrettyPrint for LogicalSchema {
