@@ -18,14 +18,17 @@ COPY cubestore/cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
 
+ARG WITH_LG_PAGESIZE=0
 ARG WITH_AVX2=1
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
+    [ "$WITH_LG_PAGESIZE" -eq "1" ] && export JEMALLOC_SYS_WITH_LG_PAGE="16"; \
     cargo build --release -p cubestore
 
 # Cube Store get version from his own package
 COPY cubestore/package.json package.json
 COPY cubestore/cubestore cubestore
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
+    [ "$WITH_LG_PAGESIZE" -eq "1" ] && export JEMALLOC_SYS_WITH_LG_PAGE="16"; \
     cargo build --release -p cubestore
 
 FROM debian:bookworm-slim
