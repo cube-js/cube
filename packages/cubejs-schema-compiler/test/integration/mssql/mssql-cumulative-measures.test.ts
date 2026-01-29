@@ -1,7 +1,7 @@
 import { getEnv } from '@cubejs-backend/shared';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { dbRunner } from '../postgres/PostgresDBRunner';
+import { dbRunner } from './MSSqlDbRunner';
 
 describe('MSSqlCumulativeMeasures', () => {
   jest.setTimeout(200000);
