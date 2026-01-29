@@ -270,6 +270,36 @@ export class MssqlQuery extends BaseQuery {
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
     templates.params.param = '@_{{ param_index + 1 }}';
+    // MSSQL does not support ordinal GROUP BY (GROUP BY 1, 2), must use expressions
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
+    // MSSQL does not support ordinal ORDER BY (ORDER BY 1, 2), must use expressions
+    templates.expressions.order_by = '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // MSSQL uses CAST(...AS DATETIME2) instead of ::timestamp
+    templates.statements.time_series_select = 'SELECT CAST(date_from AS DATETIME2) AS "date_from",\n' +
+      'CAST(date_to AS DATETIME2) AS "date_to" \n' +
+      'FROM(\n' +
+      '    VALUES ' +
+      '{% for time_item in seria  %}' +
+      '(\'{{ time_item[0] }}\', \'{{ time_item[1] }}\')' +
+      '{% if not loop.last %}, {% endif %}' +
+      '{% endfor %}' +
+      ') AS dates (date_from, date_to)';
+    // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
+    templates.statements.select = '{% if ctes %} WITH \n' +
+      '{{ ctes | join(\',\n\') }}\n' +
+      '{% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}' +
+      '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+      'FROM (\n' +
+      '{{ from | indent(2, true) }}\n' +
+      ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+      '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS{% endif %}' +
+      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
     return templates;
   }
 }
