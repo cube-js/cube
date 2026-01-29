@@ -18208,4 +18208,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_case_like_naming() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CASE
+                    WHEN customer_gender LIKE '%a%' THEN true
+                    ELSE false
+                END AS has_letter_a
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender IS NOT NULL
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("set".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
 }
