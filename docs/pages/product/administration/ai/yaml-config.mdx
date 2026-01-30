@@ -20,6 +20,30 @@ Instead of configuring agents through the Cube Cloud UI, you can create YAML fil
 - **Multi-file Support**: Split configuration across multiple files for better organization
 - **Validation**: Automatic schema validation with helpful error messages
 
+## UI and YAML Interplay
+
+Understanding how YAML configuration interacts with the Cube Cloud UI is important for effective management:
+
+### Creating Spaces and Agents
+
+Spaces and agents must first be created through the Cube Cloud UI. YAML configuration is used to **override and extend** the configuration of existing spaces and agents, not to create them dynamically. When your deployment starts, the system matches YAML entries to UI-created spaces and agents by their `name` field.
+
+### Configuration Override Behavior
+
+When YAML configuration is enabled:
+
+- **Rules**: Defined in YAML files for the corresponding space
+- **Certified Queries**: When YAML config is enabled, **only YAML is used** for certified queries. UI-based certified query management is disabled to ensure a single source of truth.
+- **Agent Settings**: LLM provider, runtime mode, and memory mode can be overridden via YAML
+
+### UI-Only Settings
+
+The following settings are still managed exclusively through the Cube Cloud UI:
+
+- **Semantic Model Selection**: Accessible views for each agent are configured through the UI
+- **Space and Agent Creation**: Initial creation of spaces and agents
+- **Agent Embedding**: Embedding configuration and deployment settings
+
 ## Environment Variables
 
 <InfoBox>
