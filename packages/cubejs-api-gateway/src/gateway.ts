@@ -1393,8 +1393,8 @@ class ApiGateway {
       });
 
       await res(queryType === QueryTypeEnum.REGULAR_QUERY ?
-        { sql: toQuery(sqlQueries[0]) } :
-        sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
+        { sql: toQuery(sqlQueries[0]), dataSource: sqlQueries[0].dataSource } :
+        sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery), dataSource: sqlQuery.dataSource })));
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
