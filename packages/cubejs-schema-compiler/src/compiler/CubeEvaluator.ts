@@ -267,6 +267,37 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
+  private getMembersFromJoinPath(cube: any, joinPath: any, folderName: string, errorReporter: ErrorReporter): any[] {
+    const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true }) as string;
+
+    const pathParts = fullPath.split('.');
+    const lastCube = pathParts[pathParts.length - 1];
+
+    const matchingCubeInclude = cube.rawCubes()?.find((c: any) => {
+      const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
+      return cubePath === fullPath;
+    });
+
+    if (!matchingCubeInclude) {
+      errorReporter.error(
+        `Join path '${fullPath}' included in folder '${folderName}' not found in view '${cube.name}' cubes definition`
+      );
+      return [];
+    }
+
+    // Get the cube name/alias (which is used as prefix or as the name)
+    const cubeReference = lastCube;
+
+    const members = cube.includedMembers.filter((m: any) => {
+      const memberPathParts = m.memberPath.split('.');
+      const memberCubeName = memberPathParts[0];
+
+      return memberCubeName === cubeReference;
+    });
+
+    return members;
+  }
+
   private prepareFolders(cube: any, errorReporter: ErrorReporter) {
     const folders = cube.rawFolders();
     if (!folders.length) return;
@@ -297,12 +328,19 @@ export class CubeEvaluator extends CubeSymbols {
         includedMembers = this.allMembersOrList(cube, folder.includes);
         includes = includedMembers.map(m => checkMember(m, folder.name)).filter(Boolean);
       } else if (Array.isArray(folder.includes)) {
-        includes = folder.includes.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return processFolder(item);
+        includes = folder.includes.flatMap(item => {
+          // Handle join_path syntax
+          if (typeof item === 'object' && item !== null && 'join_path' in item) {
+            return this.getMembersFromJoinPath(cube, item.join_path, folder.name, errorReporter);
           }
 
-          return checkMember(item, folder.name);
+          // Handle nested folders
+          if (typeof item === 'object' && item !== null && 'name' in item) {
+            return [processFolder(item)];
+          }
+
+          // Handle regular string member names
+          return [checkMember(item, folder.name)];
         });
       }
 

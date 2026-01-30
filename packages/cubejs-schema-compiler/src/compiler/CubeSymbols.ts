@@ -147,15 +147,21 @@ export type ViewIncludedMember = {
   name: string;
 };
 
+export type FolderJoinPathMember = {
+  join_path: any;
+};
+
 export type FolderMember = {
   type?: 'folder';
   name: string;
   includes?: FolderMember[];
 };
 
+export type FolderInclude = string | FolderJoinPathMember | FolderMember;
+
 export type Folder = {
   name: string;
-  includes: FolderMember[];
+  includes: FolderInclude[];
 };
 
 export interface CubeDefinition {
