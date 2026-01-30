@@ -138,4 +138,29 @@ describe('QuestQuery', () => {
 
       expect(queryAndParams[0]).toContain('ILIKE \'%\' || $1 || \'%\'');
     }));
+
+  it('test having filter',
+    () => compiler.compile().then(() => {
+      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: ['visitors.name'],
+        measures: ['visitors.count'],
+        filters: [
+          {
+            member: 'visitors.count',
+            operator: 'gt',
+            values: ['42']
+          },
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      const expected = 'SELECT * FROM (SELECT\n' +
+          '      "visitors".name "visitors__name", count(*) "visitors__count"\n' +
+          '    FROM\n' +
+          '      visitors AS "visitors"  GROUP BY "visitors__name") WHERE ("visitors__count" > $1) ORDER BY "visitors__count" DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['42'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
+    }));
 });
