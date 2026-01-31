@@ -92,16 +92,8 @@ When doing so, `CUBEJS_DB_HOST` will be ignored.
 
 ### Connecting to MySQL 8
 
-MySQL 8 uses a new default authentication plugin (`caching_sha2_password`)
-whereas previous version used `mysql_native_password`. Please
-[see this answer on StackOverflow](https://stackoverflow.com/a/50377944)
-for a workaround.
-
-<InfoBox>
-
-For additional details, check the [relevant issue](https://github.com/cube-js/cube/issues/3525) on GitHub.
-
-</InfoBox>
+MySQL 8 is fully supported and uses the new default authentication plugin
+(`caching_sha2_password`). No additional configuration is required.
 
 [mysql]: https://www.mysql.com/
 [ref-caching-using-preaggs-build-strats]:
