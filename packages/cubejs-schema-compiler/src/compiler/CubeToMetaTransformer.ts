@@ -192,7 +192,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const processFolder = (folder: Folder, path: string[] = [], mergedMembers: string[] = []): NestedFolder => {
       const flatMembers: string[] = [];
-      const nestedMembers: Array<string | NestedFolder> = folder.includes.map((member: FolderMember) => {
+      // After evaluation in CubeEvaluator, folder.includes contains resolved FolderMember items
+      const nestedMembers: Array<string | NestedFolder> = (folder.includes as FolderMember[]).map((member: FolderMember) => {
         if (member.type === 'folder' && member.includes) {
           return processFolder(member as Folder, [...path, folder.name], flatMembers);
         }
