@@ -132,7 +132,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       ...config
     });
     this.pool.on('error', (err) => {
-      console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO
+      this.databasePoolError(err);
     });
     this.config = <Partial<Config>>{
       ...this.getInitialConfiguration(dataSource),
@@ -298,6 +298,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
     const conn = await this.pool.connect();
 
+    // Attach error handler to the client to prevent unhandled error events
+    // from crashing the process when connections are terminated unexpectedly.
+    // See: https://github.com/brianc/node-postgres/issues/2112
+    conn.on('error', (err) => {
+      this.databasePoolError(err);
+    });
+
     try {
       await this.prepareConnection(conn);
 
@@ -341,6 +348,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     PostgresDriver.checkValuesLimit(values);
 
     const conn = await this.pool.connect();
+
+    // Attach error handler to the client to prevent unhandled error events
+    // from crashing the process when connections are terminated unexpectedly.
+    // See: https://github.com/brianc/node-postgres/issues/2112
+    conn.on('error', (err) => {
+      this.databasePoolError(err);
+    });
 
     try {
       await this.prepareConnection(conn);
