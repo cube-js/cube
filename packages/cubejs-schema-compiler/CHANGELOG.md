@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
+
+### Bug Fixes
+
+- **mssql-driver:** Respect timezone for origin in custom granularities ([#10111](https://github.com/cube-js/cube/issues/10111)) ([eaa484a](https://github.com/cube-js/cube/commit/eaa484ae1f7ca3601d202fff03b44782c61b37cb))
+- **mssql-driver:** Support MS SQL dialect for Tesseract ([#10343](https://github.com/cube-js/cube/issues/10343)) ([0ec696f](https://github.com/cube-js/cube/commit/0ec696fdc726d5305a2c63a48b7b4f0be16eda83))
+- **mssql-driver:** Use parameter placeholders for Tesseract ([#10342](https://github.com/cube-js/cube/issues/10342)) ([24ed91f](https://github.com/cube-js/cube/commit/24ed91fbf807dc22aaba45795f2e630d74b9b5f4))
+
+### Features
+
+- **server-core:** Add level field for log messages ([#10337](https://github.com/cube-js/cube/issues/10337)) ([1e7dcb6](https://github.com/cube-js/cube/commit/1e7dcb614dd6537b3bb2a1f9bd04e96c2374a673))
+
+## [1.6.6](https://github.com/cube-js/cube/compare/v1.6.5...v1.6.6) (2026-01-23)
+
+### Bug Fixes
+
+- **schema-compiler:** Correctly align weekly-based cron expressions ([#10229](https://github.com/cube-js/cube/issues/10229)) ([113639d](https://github.com/cube-js/cube/commit/113639dee0d1d3fc2413a26f4b951b71b043d2cc))
+
+## [1.6.5](https://github.com/cube-js/cube/compare/v1.6.4...v1.6.5) (2026-01-22)
+
+### Features
+
+- **schema-compiler:** Support user_attributes in snake_case ([#10287](https://github.com/cube-js/cube/issues/10287)) ([652c7ad](https://github.com/cube-js/cube/commit/652c7ad54e00a9af746fdebe3c7320cceb8b80e0))
+
+## [1.6.4](https://github.com/cube-js/cube/compare/v1.6.3...v1.6.4) (2026-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.3](https://github.com/cube-js/cube/compare/v1.6.2...v1.6.3) (2026-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
+
+### Features
+
+- Allow to specify key for dimensions in schema ([#10270](https://github.com/cube-js/cube/issues/10270)) ([df8161c](https://github.com/cube-js/cube/commit/df8161c4c1ad782493e83088c9260043996eb4c0))
+
 ## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

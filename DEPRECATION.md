@@ -68,6 +68,7 @@ features:
 | Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
 | Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
 | Deprecated | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     |           |
+| Deprecated | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     |           |
 
 ### Node.js 8
 
@@ -427,3 +428,10 @@ options and use the new `cache` parameter of the `/v1/load` endpoint instead.
 **Deprecated in Release: v1.6.0**
 
 The Elasticsearch driver is deprecated and will be removed in a future release.
+
+### `context_to_roles`
+
+**Deprecated in Release: v1.6.4**
+
+The `context_to_roles` configuration option is deprecated and will be removed in a future
+release. Please use `context_to_groups` instead.

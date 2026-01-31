@@ -117,6 +117,12 @@ account_:
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 | — |
 | [Audit Log][ref-audit-log] | <nobr>4..6</nobr> | Depends on the [chosen tier](#audit-log-tiers) |
 
+The following resource types incur cost and apply to the _whole Cube Cloud account_:
+
+| Resource type | Cost per month | Notes |
+| --- | :---: | --- |
+| [AI tokens](#ai-tokens) | Varies | Depends on the number of tokens used |
+
 ### Deployment tiers
 
 [Production clusters][ref-production-cluster] (including individual API instances)
@@ -196,6 +202,16 @@ under the following tiers:
 | ---- | :------------------------: | ------------------ |
 | S    | 4                          | —                  |
 | M    | 6                          | Audit Log data export |
+
+### AI tokens
+
+The price of AI tokens is passed through from the underlying AI service provider without
+any markup. The cost depends on the number of tokens processed by your Cube Cloud account
+when using AI features.
+
+You can control the const by setting the token limit on the <Btn>Billing</Btn> page of
+your Cube Cloud account. When the limit is [reached](#token-limit-exceeded), you can
+increase it to continue using AI features.
 
 ## Total cost examples
 
@@ -303,6 +319,19 @@ account, services may degrade or be suspended until new CCUs are purchased.
 Future purchases and upgrades are subject to the pricing that is in effect at
 the time of the order. No credit is allowed for downgrading CCUs to a lower
 product tier level. Payments are non-refundable.
+
+## Troubleshooting
+
+### `Token limit exceeded`
+
+[On-demand](#payment-plans) customers may encounter the following error when their AI
+usage exceeds the limit set for their Cube Cloud account: `Token limit exceeded. Please
+purchase or allocate more tokens.`
+
+To resolve this issue, a user with administrative permissions needs to increase the limit
+for the AI token consumption at the <Btn>Billing</Btn> page of their Cube Cloud account.
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/648f060c-eeba-4f21-a00e-bbf4b26882c6/"/>
 
 [cube-pricing]: https://cube.dev/pricing
 [link-contact-us]: https://cube.dev/contact

@@ -1694,6 +1694,79 @@ describe('ResultSet', () => {
       ]);
     });
 
+    test('fillWithValue should preserve actual zero values (issue #10225)', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['TestCube.value'],
+          dimensions: ['TestCube.category', 'TestCube.type'],
+          filters: [],
+          timezone: 'UTC'
+        },
+        data: [
+          {
+            'TestCube.category': 'A',
+            'TestCube.type': 'X',
+            'TestCube.value': 10
+          },
+          {
+            'TestCube.category': 'A',
+            'TestCube.type': 'Y',
+            'TestCube.value': 0
+          },
+          {
+            'TestCube.category': 'B',
+            'TestCube.type': 'X',
+            'TestCube.value': 30
+          }
+        ],
+        annotation: {
+          measures: {
+            'TestCube.value': {
+              title: 'Value',
+              shortTitle: 'Value',
+              type: 'number'
+            }
+          },
+          dimensions: {
+            'TestCube.category': {
+              title: 'Category',
+              shortTitle: 'Category',
+              type: 'string'
+            },
+            'TestCube.type': {
+              title: 'Type',
+              shortTitle: 'Type',
+              type: 'string'
+            }
+          },
+          segments: {},
+          timeDimensions: {}
+        }
+      } as any);
+
+      const pivotConfig = {
+        x: ['TestCube.category'],
+        y: ['TestCube.type', 'measures'],
+        fillWithValue: '-'
+      };
+
+      const result = resultSet.tablePivot(pivotConfig);
+
+      // Actual zero values should be preserved, not replaced by fillWithValue
+      expect(result).toEqual([
+        {
+          'TestCube.category': 'A',
+          'X,TestCube.value': 10,
+          'Y,TestCube.value': 0 // Zero should be preserved, not replaced with '-'
+        },
+        {
+          'TestCube.category': 'B',
+          'X,TestCube.value': 30,
+          'Y,TestCube.value': '-' // Missing value should be replaced with '-'
+        }
+      ]);
+    });
+
     test('same dimension and time dimension without granularity', () => {
       const resultSet = new ResultSet({
         query: {

@@ -84,6 +84,39 @@ describe('Transpilers', () => {
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
+  it('CubePropContextTranspiler with full path to user_attributes should work normally', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ securityContext.cubeCloud.user_attributes.userId ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
+  });
+
   it('CubePropContextTranspiler with shorthand userAttributes should work normally', async () => {
     const { cubeEvaluator, compiler } = prepareJsCompiler(`
         cube(\`Test\`, {
@@ -103,6 +136,39 @@ describe('Transpilers', () => {
                     member: \`userId\`,
                     operator: \`equals\`,
                     values: [ userAttributes.userId ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
+  });
+
+  it('CubePropContextTranspiler with shorthand user_attributes should work normally', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ user_attributes.userId ]
                   }
                 ]
               }

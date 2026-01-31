@@ -1,19 +1,9 @@
 import SqlString from 'sqlstring';
 import R from 'ramda';
 
-export type LogLevel = 'trace' | 'info' | 'warn' | 'error';
+import type { LogLevel, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
 
-interface BaseLogMessage {
-  requestId?: string;
-  duration?: number;
-  query?: string | Record<string, any>;
-  values?: any[];
-  allSqlLines?: boolean;
-  showRestParams?: boolean;
-  error?: Error | string;
-  warning?: string;
-  [key: string]: any;
-}
+export type { LogLevel } from '@cubejs-backend/shared';
 
 type Color = '31' | '32' | '33';
 
@@ -60,17 +50,17 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
   return `${prefix}${showRestParams ? `\n${restParams}` : ''}`;
 };
 
-export const devLogger = (level?: LogLevel) => (type: string, { error, warning, ...message }: BaseLogMessage): void => {
+export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { error, warning, ...restParams }: LoggerFnParams): void => {
   const logWarning = () => console.log(
-    `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${withColor(warning || '', colors.yellow)}`
+    `${withColor(type, colors.yellow)}: ${format({ ...restParams, allSqlLines: true, showRestParams: true })} \n${withColor(warning || '', colors.yellow)}`
   );
 
   const logError = () => console.log(
-    `${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${error}`
+    `${withColor(type, colors.red)}: ${format({ ...restParams, allSqlLines: true, showRestParams: true })} \n${error}`
   );
 
   const logDetails = (showRestParams?: boolean) => console.log(
-    `${withColor(type)}: ${format({ ...message, showRestParams })}`
+    `${withColor(type)}: ${format({ ...restParams, showRestParams })}`
   );
 
   if (error) {
@@ -78,8 +68,7 @@ export const devLogger = (level?: LogLevel) => (type: string, { error, warning, 
     return;
   }
 
-  // eslint-disable-next-line default-case
-  switch ((level || 'info').toLowerCase()) {
+  switch (filterByLevel.toLowerCase()) {
     case 'trace': {
       if (!error && !warning) {
         logDetails(true);
@@ -112,22 +101,36 @@ export const devLogger = (level?: LogLevel) => (type: string, { error, warning, 
       }
       break;
     }
+    default:
+      throw new Error(`Unknown log level: ${filterByLevel}`);
   }
 };
 
-interface ProdLogParams {
-  error?: Error | string;
-  warning?: string;
-  [key: string]: any;
-}
-
-export const prodLogger = (level?: LogLevel) => (msg: string, params: ProdLogParams): void => {
+export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string, params: LoggerFnParams): void => {
   const { error, warning } = params;
 
-  const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
+  if (!params.level) {
+    if (error) {
+      params.level = 'error';
+    } else if (warning) {
+      params.level = 'warn';
+    } else {
+      params.level = 'info';
+    }
+  }
 
-  // eslint-disable-next-line default-case
-  switch ((level || 'warn').toLowerCase()) {
+  const logMessage = () => {
+    const { level, timestamp, ...restParams } = params;
+
+    console.log(JSON.stringify({
+      timestamp,
+      level,
+      message,
+      ...restParams,
+    }));
+  };
+
+  switch (filterByLevel.toLowerCase()) {
     case 'trace': {
       if (!error && !warning) {
         logMessage();
@@ -137,7 +140,7 @@ export const prodLogger = (level?: LogLevel) => (msg: string, params: ProdLogPar
     case 'info':
       if ([
         'REST API Request',
-      ].includes(msg)) {
+      ].includes(message)) {
         logMessage();
       }
       break;
@@ -153,5 +156,15 @@ export const prodLogger = (level?: LogLevel) => (msg: string, params: ProdLogPar
       }
       break;
     }
+    default:
+      throw new Error(`Unknown log level: ${filterByLevel}`);
+  }
+};
+
+export const createLogger = (production: boolean, filterByLevel: LogLevel = 'info'): LoggerFn => {
+  if (production) {
+    return prodLogger(filterByLevel);
+  } else {
+    return devLogger(filterByLevel);
   }
 };

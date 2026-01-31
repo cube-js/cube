@@ -8,6 +8,15 @@ dayjs.extend(quarterOfYear);
 dayjs.extend(duration);
 dayjs.extend(isoWeek);
 
+// A custom locale for internal use that doesn't affect the global dayjs instance
+const cubeInternalLocale = 'cube-internal-en';
+const customLocale = {
+  ...en,
+  name: cubeInternalLocale,
+  weekStart: 1
+};
+(dayjs as any).Ls[cubeInternalLocale] = customLocale;
+
 export type SqlInterval = string;
 
 // TODO: Define a better type as unitOfTime.DurationConstructor in moment.js
@@ -59,7 +68,7 @@ export const DEFAULT_GRANULARITY = 'day';
 
 // When granularity is week, weekStart Value must be 1. However, since the client can change it globally
 // (https://day.js.org/docs/en/i18n/changing-locale) So the function below has been added.
-export const internalDayjs = (...args: any[]): dayjs.Dayjs => dayjs(...args).locale({ ...en, weekStart: 1 });
+export const internalDayjs = (...args: any[]): dayjs.Dayjs => dayjs(...args).locale(cubeInternalLocale);
 
 export const TIME_SERIES: Record<string, (range: DayRange) => string[]> = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),

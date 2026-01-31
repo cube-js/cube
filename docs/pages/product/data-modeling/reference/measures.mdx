@@ -847,6 +847,122 @@ cube(`sales`, {
 Named time shifts also allow to reuse the same time shift configuration across multiple
 measures and cubes where they are defined.
 
+### `case`
+
+The `case` parameter is used to define conditional measures, i.e., measures that are
+calculated based on the value of a [`switch` dimension][ref-switch-dimensions].
+
+<WarningBox>
+
+`case` measures are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
+
+</WarningBox>
+
+You do not need to include the [`sql` parameter](#sql) if the `case` parameter is used.
+However, the [`multi_stage` parameter](#multi_stage) must be set to `true` for `case`
+measures.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    currency: {
+      type: `switch`,
+      values: [
+        `USD`,
+        `EUR`,
+        `GBP`
+      ]
+    }
+  },
+
+  measures: {
+    amount_usd: {
+      sql: `amount_usd`,
+      type: `sum`
+    },
+
+    amount_eur: {
+      sql: `amount_eur`,
+      type: `sum`
+    },
+
+    amount_gbp: {
+      sql: `amount_gbp`,
+      type: `sum`
+    },
+
+    amount_in_currency: {
+      multi_stage: true,
+      case: {
+        switch: `${CUBE.currency}`,
+        when: [
+          {
+            value: `EUR`,
+            sql: `${CUBE.amount_eur}`
+          },
+          {
+            value: `GBP`,
+            sql: `${CUBE.amount_gbp}`
+          }
+        ],
+        else: {
+          sql: `${CUBE.amount_usd}`
+        }
+      },
+      type: `number`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+    
+    measures:
+      - name: amount_usd
+        sql: amount_usd
+        type: sum
+
+      - name: amount_eur
+        sql: amount_eur
+        type: sum
+
+      - name: amount_gbp
+        sql: amount_gbp
+        type: sum
+
+      - name: amount_in_currency
+        multi_stage: true
+        case:
+          switch: "{CUBE.currency}"
+          when:
+            - value: EUR
+              sql: "{CUBE.amount_eur}"
+            - value: GBP
+              sql: "{CUBE.amount_gbp}"
+          else:
+            sql: "{CUBE.amount_usd}"
+        type: number
+```
+
+</CodeTabs>
+
 ### `format`
 
 `format` is an optional parameter. It is used to format the output of measures
@@ -943,3 +1059,4 @@ cubes:
 [ref-multi-stage]: /product/data-modeling/concepts/multi-stage-calculations
 [ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
 [ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
+[ref-switch-dimensions]: /product/data-modeling/reference/types-and-formats#switch

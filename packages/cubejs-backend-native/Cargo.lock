@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=e7d183cb3686377810f240dd851e943b4c926f0f#e7d183cb3686377810f240dd851e943b4c926f0f"
 dependencies = [
  "arrow",
  "chrono",
@@ -878,7 +878,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=e7d183cb3686377810f240dd851e943b4c926f0f#e7d183cb3686377810f240dd851e943b4c926f0f"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -911,7 +911,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=e7d183cb3686377810f240dd851e943b4c926f0f#e7d183cb3686377810f240dd851e943b4c926f0f"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -922,7 +922,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=e7d183cb3686377810f240dd851e943b4c926f0f#e7d183cb3686377810f240dd851e943b4c926f0f"
 dependencies = [
  "async-trait",
  "chrono",
@@ -935,7 +935,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=e7d183cb3686377810f240dd851e943b4c926f0f#e7d183cb3686377810f240dd851e943b4c926f0f"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -946,7 +946,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=e7d183cb3686377810f240dd851e943b4c926f0f#e7d183cb3686377810f240dd851e943b4c926f0f"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -1937,14 +1937,16 @@ dependencies = [
 
 [[package]]
 name = "log_nonblock"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "996472e113c3ffe82a220863dfdd137a74b63995b413c1ea81b5a0d494d829d2"
+checksum = "0f4f0da5d6bbed520811b50d73904b3a8d2ad3be42aaa3cbca0ca7ad59735660"
 dependencies = [
  "colored 3.0.0",
  "crossbeam-channel",
  "libc",
  "log",
+ "serde",
+ "serde_json",
  "time",
 ]
 
