@@ -1996,7 +1996,27 @@
   },
   {
     "source": "/product/apis-integrations/embedding",
-    "destination": "/product/presentation/embedding",
+    "destination": "/product/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding",
+    "destination": "/product/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/private-embedding",
+    "destination": "/product/embedding/private-embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/signed-embedding",
+    "destination": "/product/embedding/signed-embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/creator-mode",
+    "destination": "/product/embedding/creator-mode",
     "permanent": true
   },
   {
