@@ -1033,7 +1033,7 @@ const folderSchema = Joi.object().keys({
       Joi.alternatives([
         Joi.string().required(),
         Joi.object().keys({
-          join_path: Joi.func().required(),
+          joinPath: Joi.func().required(),
         }),
         Joi.link('#folderSchema'), // Can contain nested folders
       ]),

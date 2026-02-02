@@ -301,16 +301,16 @@ export function runFoldersTestSuite(
       expect(mixedFolder?.members).toEqual(
         expect.arrayContaining([
           // From users join_path
-          'test_view_nested_join_path.users_age',
-          'test_view_nested_join_path.users_state',
-          'test_view_nested_join_path.users_city',
-          'test_view_nested_join_path.users_gender',
+          'test_view_join_path.users_age',
+          'test_view_join_path.users_state',
+          'test_view_join_path.users_city',
+          'test_view_join_path.users_gender',
           // From addresses join_path
-          'test_view_nested_join_path.addresses_street',
-          'test_view_nested_join_path.addresses_zip_code',
+          'test_view_join_path.addresses_street',
+          'test_view_join_path.addresses_zip_code',
           // Regular fields from orders
-          'test_view_nested_join_path.orders_status',
-          'test_view_nested_join_path.orders_count',
+          'test_view_join_path.orders_status',
+          'test_view_join_path.orders_count',
         ])
       );
     });

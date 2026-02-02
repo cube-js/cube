@@ -338,9 +338,9 @@ export class CubeEvaluator extends CubeSymbols {
         includes = includedMembers.map(m => checkMember(m, folder.name)).filter(Boolean);
       } else if (Array.isArray(folder.includes)) {
         includes = folder.includes.flatMap((item: FolderInclude | FolderMember): (ViewIncludedMember | EvaluatedFolder | null)[] => {
-          // Handle join_path syntax
-          if (typeof item === 'object' && item !== null && 'join_path' in item) {
-            return this.getFolderMembersFromJoinPath(cube, item.join_path, folder.name, errorReporter);
+          // Handle joinPath syntax
+          if (typeof item === 'object' && item !== null && 'joinPath' in item) {
+            return this.getFolderMembersFromJoinPath(cube, item.joinPath, folder.name, errorReporter);
           }
 
           // Handle nested folders

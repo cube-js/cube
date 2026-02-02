@@ -148,8 +148,7 @@ export type ViewIncludedMember = {
 };
 
 export type FolderJoinPathMember = {
-  // eslint-disable-next-line camelcase
-  join_path: () => ToString;
+  joinPath: () => ToString;
 };
 
 export type FolderMember = {
