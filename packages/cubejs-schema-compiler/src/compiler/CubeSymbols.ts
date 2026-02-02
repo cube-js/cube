@@ -148,6 +148,7 @@ export type ViewIncludedMember = {
 };
 
 export type FolderJoinPathMember = {
+  // eslint-disable-next-line camelcase
   join_path: any;
 };
 
@@ -161,7 +162,7 @@ export type FolderInclude = string | FolderJoinPathMember | FolderMember;
 
 export type Folder = {
   name: string;
-  includes: FolderInclude[];
+  includes: FolderInclude[] | '*';
 };
 
 export interface CubeDefinition {
@@ -197,7 +198,7 @@ export interface CubeDefinition {
 
 export interface CubeDefinitionExtended extends CubeDefinition {
   allDefinitions: (type: string) => Record<string, any>;
-  rawFolders: () => any[];
+  rawFolders: () => Folder[];
   rawCubes: () => any[];
 }
 

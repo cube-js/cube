@@ -5,6 +5,9 @@ import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
   CubeSymbols,
+  Folder,
+  FolderInclude,
+  FolderMember,
   HierarchyDefinition,
   JoinDefinition,
   PreAggregationDefinition,
@@ -122,7 +125,7 @@ export type EvaluatedHierarchy = {
 
 export type EvaluatedFolder = {
   name: string;
-  includes: (EvaluatedFolder | DimensionDefinition | MeasureDefinition)[];
+  includes: (EvaluatedFolder | ViewIncludedMember)[];
   type: 'folder';
   [key: string]: any;
 };
@@ -267,8 +270,8 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  private getMembersFromJoinPath(cube: any, joinPath: any, folderName: string, errorReporter: ErrorReporter): any[] {
-    const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true }) as string;
+  private getFolderMembersFromJoinPath(cube: CubeDefinitionExtended, joinPath: unknown, folderName: string, errorReporter: ErrorReporter): ViewIncludedMember[] {
+    const fullPath = this.evaluateReferences(null, joinPath as () => ToString, { collectJoinHints: true });
 
     const pathParts = fullPath.split('.');
     const cubePathName = pathParts[pathParts.length - 1];
@@ -280,8 +283,8 @@ export class CubeEvaluator extends CubeSymbols {
       return [];
     }
 
-    const matchingCubeInclude = cube.rawCubes()?.find((c: any) => {
-      const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
+    const matchingCubeInclude = cube.rawCubes()?.find((c: { joinPath: unknown }) => {
+      const cubePath = this.evaluateReferences(null, c.joinPath as () => ToString, { collectJoinHints: true });
       return cubePath === fullPath;
     });
 
@@ -292,28 +295,30 @@ export class CubeEvaluator extends CubeSymbols {
       return [];
     }
 
-    const members = cube.includedMembers.filter((m: any) => {
-      const memberPathParts = m.memberPath.split('.');
-      const memberCubeName = memberPathParts[0];
+    if (cube.includedMembers) {
+      return cube.includedMembers.filter((m: ViewIncludedMember) => {
+        const memberPathParts = m.memberPath.split('.');
+        const memberCubeName = memberPathParts[0];
 
-      return memberCubeName === cubePathName;
-    });
+        return memberCubeName === cubePathName;
+      });
+    }
 
-    return members;
+    return [];
   }
 
-  private prepareFolders(cube: any, errorReporter: ErrorReporter) {
+  private prepareFolders(cube: CubeDefinitionExtended, errorReporter: ErrorReporter): void {
     const folders = cube.rawFolders();
     if (!folders.length) return;
 
-    const checkMember = (memberName: string, folderName: string) => {
+    const checkMember = (memberName: string, folderName: string): ViewIncludedMember | null => {
       if (memberName.includes('.')) {
         errorReporter.error(
           `Paths aren't allowed in the 'folders' but '${memberName}' has been provided for ${cube.name}`
         );
       }
 
-      const member = cube.includedMembers.find(m => m.name === memberName);
+      const member = cube.includedMembers?.find((m: ViewIncludedMember) => m.name === memberName);
       if (!member) {
         errorReporter.error(
           `Member '${memberName}' included in folder '${folderName}' not found`
@@ -324,38 +329,38 @@ export class CubeEvaluator extends CubeSymbols {
       return member;
     };
 
-    const processFolder = (folder: any): any => {
+    const processFolder = (folder: Folder | FolderMember): EvaluatedFolder => {
       let includedMembers: string[];
-      let includes: any[] = [];
+      let includes: (ViewIncludedMember | EvaluatedFolder | null)[] = [];
 
       if (folder.includes === '*') {
         includedMembers = this.allMembersOrList(cube, folder.includes);
         includes = includedMembers.map(m => checkMember(m, folder.name)).filter(Boolean);
       } else if (Array.isArray(folder.includes)) {
-        includes = folder.includes.flatMap(item => {
+        includes = folder.includes.flatMap((item: FolderInclude | FolderMember): (ViewIncludedMember | EvaluatedFolder | null)[] => {
           // Handle join_path syntax
           if (typeof item === 'object' && item !== null && 'join_path' in item) {
-            return this.getMembersFromJoinPath(cube, item.join_path, folder.name, errorReporter);
+            return this.getFolderMembersFromJoinPath(cube, item.join_path, folder.name, errorReporter);
           }
 
           // Handle nested folders
           if (typeof item === 'object' && item !== null && 'name' in item) {
-            return [processFolder(item)];
+            return [processFolder(item as FolderMember)];
           }
 
           // Handle regular string member names
-          return [checkMember(item, folder.name)];
+          return [checkMember(item as string, folder.name)];
         });
       }
 
       return {
         ...folder,
-        type: 'folder',
-        includes: includes.filter(Boolean)
+        type: 'folder' as const,
+        includes: includes.filter((item): item is ViewIncludedMember | EvaluatedFolder => item !== null)
       };
     };
 
-    cube.folders = folders.map(processFolder);
+    (cube as unknown as EvaluatedCube).folders = folders.map(processFolder);
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
