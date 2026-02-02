@@ -259,7 +259,7 @@ export function runFoldersTestSuite(
         (it) => it.config.name === 'test_view_join_path'
       );
 
-      expect(view?.config.folders.length).toBe(3);
+      expect(view?.config.folders.length).toBe(4);
 
       const ordersFolder = view?.config.folders.find(
         (it) => it.name === 'Orders Folder'
@@ -285,21 +285,34 @@ export function runFoldersTestSuite(
         ])
       );
 
+      const addressesFolder = view?.config.folders.find(
+        (it) => it.name === 'Addresses Folder'
+      );
+      expect(addressesFolder?.members).toEqual(
+        expect.arrayContaining([
+          'test_view_join_path.addresses_street',
+          'test_view_join_path.addresses_zip_code',
+        ])
+      );
+
       const mixedFolder = view?.config.folders.find(
         (it) => it.name === 'Mixed Folder'
       );
       expect(mixedFolder?.members).toEqual(
         expect.arrayContaining([
-          'test_view_join_path.orders_count',
-          'test_view_join_path.orders_id',
-          'test_view_join_path.orders_number',
-          'test_view_join_path.orders_status',
-          'test_view_join_path.users_age',
-          'test_view_join_path.users_state',
+          // From users join_path
+          'test_view_nested_join_path.users_age',
+          'test_view_nested_join_path.users_state',
+          'test_view_nested_join_path.users_city',
+          'test_view_nested_join_path.users_gender',
+          // From addresses join_path
+          'test_view_nested_join_path.addresses_street',
+          'test_view_nested_join_path.addresses_zip_code',
+          // Regular fields from orders
+          'test_view_nested_join_path.orders_status',
+          'test_view_nested_join_path.orders_count',
         ])
       );
-      // Note: count is 8 because hierarchies are now included when using join_path in folders
-      expect(mixedFolder?.members.length).toBe(8);
     });
 
     it('folders with nested join_path syntax (a.b and a.b.c)', async () => {
@@ -328,6 +341,8 @@ export function runFoldersTestSuite(
         expect.arrayContaining([
           'test_view_nested_join_path.users_age',
           'test_view_nested_join_path.users_state',
+          'test_view_nested_join_path.users_city',
+          'test_view_nested_join_path.users_gender',
         ])
       );
 
@@ -349,6 +364,8 @@ export function runFoldersTestSuite(
           // From orders.users join_path
           'test_view_nested_join_path.users_age',
           'test_view_nested_join_path.users_state',
+          'test_view_nested_join_path.users_city',
+          'test_view_nested_join_path.users_gender',
           // From orders.users.addresses join_path
           'test_view_nested_join_path.addresses_street',
           'test_view_nested_join_path.addresses_zip_code',

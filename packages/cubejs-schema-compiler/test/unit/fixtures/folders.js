@@ -201,6 +201,11 @@ view('test_view_join_path', {
       prefix: true,
       includes: ['age', 'state', 'city', 'gender'],
     },
+    {
+      join_path: users.addresses,
+      prefix: true,
+      includes: ['street', 'zip_code'],
+    },
   ],
   folders: [
     {
@@ -212,16 +217,22 @@ view('test_view_join_path', {
       includes: [{ join_path: users }],
     },
     {
+      name: 'Addresses Folder',
+      includes: [{ join_path: users.addresses }],
+    },
+    {
       name: 'Mixed Folder',
       includes: [
-        { join_path: orders },
-        'users_age',
-        'users_state',
+        { join_path: users },
+        { join_path: users.addresses },
+        'orders_status',
+        'orders_count',
       ],
     },
   ],
 });
 
+// similar to test_view_join_path, but with nested join paths
 view('test_view_nested_join_path', {
   cubes: [
     {
@@ -232,7 +243,7 @@ view('test_view_nested_join_path', {
     {
       join_path: orders.users,
       prefix: true,
-      includes: ['age', 'state'],
+      includes: ['age', 'state', 'city', 'gender'],
     },
     {
       join_path: orders.users.addresses,
