@@ -1543,15 +1543,15 @@ export class PreAggregations {
     };
 
     return this.query.evaluateSymbolSqlWithContext(
-      // eslint-disable-next-line prefer-template
-      () => `SELECT ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
-        this.query.groupByClause() +
-        (
-          isFullSimpleQuery ?
-            this.query.baseHaving(this.query.measureFilters) +
-            this.query.orderBy() +
-            this.query.groupByDimensionLimit() : ''
-        ),
+      () => {
+        // eslint-disable-next-line prefer-template
+        const query = `SELECT ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
+          this.query.groupByClause();
+        return isFullSimpleQuery ?
+          this.query.baseHaving(query, this.query.measureFilters) +
+          this.query.orderBy() +
+          this.query.groupByDimensionLimit() : query;
+      },
       {
         renderedReference,
         rollupQuery: true,
