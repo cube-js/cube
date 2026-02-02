@@ -274,11 +274,18 @@ export class CubeEvaluator extends CubeSymbols {
     const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true });
 
     const pathParts = fullPath.split('.');
-    const cubePathName = pathParts[pathParts.length - 1];
+    const pathCubeName = pathParts[pathParts.length - 1];
 
-    if (!this.evaluatedCubes[cubePathName]) {
+    if (!this.evaluatedCubes[pathCubeName]) {
       errorReporter.error(
-        `Cube '${cubePathName}' not found for join path '${fullPath}' in folder '${folderName}'`
+        `Cube '${pathCubeName}' not found for join path '${fullPath}' in folder '${folderName}'`
+      );
+      return [];
+    }
+
+    if (this.evaluatedCubes[pathCubeName].isView) {
+      errorReporter.error(
+        `Cannot use view '${pathCubeName}' in join_path '${fullPath}' (folder '${folderName}' of '${cube.name}'). Only cubes are allowed`
       );
       return [];
     }
@@ -300,7 +307,7 @@ export class CubeEvaluator extends CubeSymbols {
         const memberPathParts = m.memberPath.split('.');
         const memberCubeName = memberPathParts[0];
 
-        return memberCubeName === cubePathName;
+        return memberCubeName === pathCubeName;
       });
     }
 
