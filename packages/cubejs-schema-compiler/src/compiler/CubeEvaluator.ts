@@ -271,7 +271,14 @@ export class CubeEvaluator extends CubeSymbols {
     const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true }) as string;
 
     const pathParts = fullPath.split('.');
-    const lastCube = pathParts[pathParts.length - 1];
+    const cubePathName = pathParts[pathParts.length - 1];
+
+    if (!this.evaluatedCubes[cubePathName]) {
+      errorReporter.error(
+        `Cube '${cubePathName}' not found for join path '${fullPath}' in folder '${folderName}'`
+      );
+      return [];
+    }
 
     const matchingCubeInclude = cube.rawCubes()?.find((c: any) => {
       const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
@@ -285,14 +292,11 @@ export class CubeEvaluator extends CubeSymbols {
       return [];
     }
 
-    // Get the cube name/alias (which is used as prefix or as the name)
-    const cubeReference = lastCube;
-
     const members = cube.includedMembers.filter((m: any) => {
       const memberPathParts = m.memberPath.split('.');
       const memberCubeName = memberPathParts[0];
 
-      return memberCubeName === cubeReference;
+      return memberCubeName === cubePathName;
     });
 
     return members;
