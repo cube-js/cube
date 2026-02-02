@@ -149,7 +149,7 @@ export type ViewIncludedMember = {
 
 export type FolderJoinPathMember = {
   // eslint-disable-next-line camelcase
-  join_path: any;
+  join_path: () => ToString;
 };
 
 export type FolderMember = {
@@ -163,6 +163,25 @@ export type FolderInclude = string | FolderJoinPathMember | FolderMember;
 export type Folder = {
   name: string;
   includes: FolderInclude[] | '*';
+};
+
+// We can include by name and override some details
+export type ViewCubeIncludeMember = {
+  name: string;
+  alias?: string;
+  title?: string;
+  description?: string;
+  format?: string;
+  meta?: any;
+};
+
+export type ViewCubeInclude = {
+  joinPath: () => ToString;
+  prefix?: boolean;
+  split?: boolean;
+  alias?: string;
+  includes: '*' | (string | ViewCubeIncludeMember)[];
+  excludes?: string[];
 };
 
 export interface CubeDefinition {
@@ -199,7 +218,7 @@ export interface CubeDefinition {
 export interface CubeDefinitionExtended extends CubeDefinition {
   allDefinitions: (type: string) => Record<string, any>;
   rawFolders: () => Folder[];
-  rawCubes: () => any[];
+  rawCubes: () => ViewCubeInclude[];
 }
 
 interface SplitViews {
@@ -667,8 +686,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       // If the hierarchy is included all members from it should be included as well
       // Extend `includes` with members from hierarchies that should be auto-included
       const cubes = type === 'dimensions' ? includedCubes.map((it) => {
-        // TODO recheck `it.joinPath` typing
-        const fullPath = this.evaluateReferences(null, it.joinPath as () => ToString, { collectJoinHints: true });
+        const fullPath = this.evaluateReferences(null, it.joinPath, { collectJoinHints: true });
         const split = fullPath.split('.');
         const cubeRef = split[split.length - 1];
 
@@ -684,11 +702,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const currentCubeAutoIncludeMembers = Array.from(autoIncludeMembers)
           .filter((path) => path.startsWith(`${cubeRef}.`))
           .map((path) => path.split('.')[1])
-          .filter(memberName => !it.includes.find((include) => (include.name || include) === memberName));
+          .filter(memberName => !(it.includes as (string | ViewCubeIncludeMember)[]).find((include) => ((typeof include === 'object' ? include.name : include)) === memberName));
 
         return {
           ...it,
-          includes: (it.includes || []).concat(currentCubeAutoIncludeMembers),
+          includes: (it.includes as (string | ViewCubeIncludeMember)[]).concat(currentCubeAutoIncludeMembers),
         };
       }) : includedCubes;
 
@@ -768,7 +786,6 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     for (const cubeInclude of cubes) {
       const fullPath = this.evaluateReferences(
         null,
-        // TODO recheck `cubeInclude.joinPath` typing
         cubeInclude.joinPath as () => ToString,
         { collectJoinHints: true }
       );

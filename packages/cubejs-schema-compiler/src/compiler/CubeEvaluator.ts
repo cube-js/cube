@@ -270,8 +270,8 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  private getFolderMembersFromJoinPath(cube: CubeDefinitionExtended, joinPath: unknown, folderName: string, errorReporter: ErrorReporter): ViewIncludedMember[] {
-    const fullPath = this.evaluateReferences(null, joinPath as () => ToString, { collectJoinHints: true });
+  private getFolderMembersFromJoinPath(cube: CubeDefinitionExtended, joinPath: () => ToString, folderName: string, errorReporter: ErrorReporter): ViewIncludedMember[] {
+    const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true });
 
     const pathParts = fullPath.split('.');
     const cubePathName = pathParts[pathParts.length - 1];
@@ -283,8 +283,8 @@ export class CubeEvaluator extends CubeSymbols {
       return [];
     }
 
-    const matchingCubeInclude = cube.rawCubes()?.find((c: { joinPath: unknown }) => {
-      const cubePath = this.evaluateReferences(null, c.joinPath as () => ToString, { collectJoinHints: true });
+    const matchingCubeInclude = cube.rawCubes()?.find((c) => {
+      const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
       return cubePath === fullPath;
     });
 
