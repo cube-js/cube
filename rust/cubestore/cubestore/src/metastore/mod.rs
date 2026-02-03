@@ -1124,6 +1124,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn get_orphaned_jobs(
         &self,
         orphaned_timeout: Duration,
+        scheduled_orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn delete_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
@@ -3971,8 +3972,10 @@ impl MetaStore for RocksMetaStore {
     async fn get_orphaned_jobs(
         &self,
         orphaned_timeout: Duration,
+        scheduled_orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError> {
         let duration = chrono::Duration::from_std(orphaned_timeout).unwrap();
+        let scheduled_duration = chrono::Duration::from_std(scheduled_orphaned_timeout).unwrap();
         self.read_operation_out_of_queue("get_orphaned_jobs", move |db_ref| {
             let jobs_table = JobRocksTable::new(db_ref);
             let time = Utc::now();
@@ -3980,12 +3983,12 @@ impl MetaStore for RocksMetaStore {
                 .all_rows()?
                 .into_iter()
                 .filter(|j| {
+                    let elapsed = time.signed_duration_since(j.get_row().last_heart_beat().clone());
                     if let JobStatus::Scheduled(_) = j.get_row().status() {
-                        return false;
+                        elapsed > scheduled_duration
+                    } else {
+                        elapsed > duration
                     }
-                    let duration1 =
-                        time.signed_duration_since(j.get_row().last_heart_beat().clone());
-                    duration1 > duration
                 })
                 .collect::<Vec<_>>();
             Ok(all_jobs)

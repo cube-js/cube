@@ -414,6 +414,8 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    fn scheduled_job_orphaned_timeout(&self) -> u64;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -592,6 +594,7 @@ pub struct ConfigObjImpl {
     pub not_used_timeout: u64,
     pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
+    pub scheduled_job_orphaned_timeout: u64,
     pub meta_store_log_upload_interval: u64,
     pub meta_store_log_upload_size_limit: u64,
     pub meta_store_snapshot_interval: u64,
@@ -772,6 +775,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn scheduled_job_orphaned_timeout(&self) -> u64 {
+        self.scheduled_job_orphaned_timeout
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -1372,6 +1379,10 @@ impl Config {
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                scheduled_job_orphaned_timeout: env_parse(
+                    "CUBESTORE_SCHEDULED_JOB_ORPHANED_TIMEOUT",
+                    query_timeout * 3,
+                ),
                 meta_store_log_upload_interval: 30,
                 meta_store_log_upload_size_limit: env_parse_size(
                     "CUBESTORE_METASTORE_UPLOAD_LOG_SIZE_LIMIT",
@@ -1672,6 +1683,7 @@ impl Config {
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
+                scheduled_job_orphaned_timeout: query_timeout * 3,
                 stale_stream_timeout: 60,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
