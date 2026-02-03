@@ -1,4 +1,6 @@
-use crate::test_fixtures::cube_bridge::MockPreAggregationDescription;
+use crate::cube_bridge::member_sql::MemberSql;
+use crate::test_fixtures::cube_bridge::{MockMemberSql, MockPreAggregationDescription};
+use cubenativeutils::CubeError;
 use serde::Deserialize;
 use std::rc::Rc;
 
@@ -76,9 +78,23 @@ fn default_type() -> String {
 
 impl YamlPreAggregationDefinition {
     pub fn build(self, name: String) -> Rc<MockPreAggregationDescription> {
-        let measure_references = self.measures.map(|m| format_member_references(&m));
-        let dimension_references = self.dimensions.map(|d| format_member_references(&d));
-        let time_dimension_reference = self.time_dimension.map(|td| format!("{{{}}}", td));
+        let measure_references = self
+            .measures
+            .map(|m| build_array_references(m))
+            .transpose()
+            .expect("Failed to build measure references");
+
+        let dimension_references = self
+            .dimensions
+            .map(|d| build_array_references(d))
+            .transpose()
+            .expect("Failed to build dimension references");
+
+        let time_dimension_reference = self
+            .time_dimension
+            .map(|td| build_single_reference(td))
+            .transpose()
+            .expect("Failed to build time dimension reference");
 
         Rc::new(
             MockPreAggregationDescription::builder()
@@ -96,10 +112,10 @@ impl YamlPreAggregationDefinition {
     }
 }
 
-fn format_member_references(members: &[String]) -> String {
-    members
-        .iter()
-        .map(|m| format!("{{{}}}", m))
-        .collect::<Vec<_>>()
-        .join(", ")
+fn build_array_references(members: Vec<String>) -> Result<Rc<dyn MemberSql>, CubeError> {
+    MockMemberSql::pre_agg_array_refs(members).map(|m| m as Rc<dyn MemberSql>)
+}
+
+fn build_single_reference(member: String) -> Result<Rc<dyn MemberSql>, CubeError> {
+    MockMemberSql::pre_agg_single_ref(member).map(|m| Rc::new(m) as Rc<dyn MemberSql>)
 }

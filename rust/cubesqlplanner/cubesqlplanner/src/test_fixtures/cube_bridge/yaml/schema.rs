@@ -166,8 +166,11 @@ mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
+    use crate::cube_bridge::member_sql::SqlTemplate;
     use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
+    use crate::test_fixtures::cube_bridge::{MockBaseTools, MockSecurityContext};
     use indoc::indoc;
+    use std::rc::Rc;
 
     #[test]
     fn test_parse_basic_cube() {
@@ -433,7 +436,184 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_multi_stage_example() {
+    fn test_pre_aggregation_references_compile_correctly() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: orders
+                sql: "SELECT * FROM orders"
+                joins:
+                  - name: line_items
+                    sql: "{CUBE}.id = {line_items}.order_id"
+                    relationship: one_to_many
+                dimensions:
+                  - name: status
+                    type: string
+                    sql: status
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+                  - name: total_amount
+                    type: sum
+                    sql: amount
+                pre_aggregations:
+                  - name: main
+                    dimensions:
+                      - orders.status
+                    measures:
+                      - orders.count
+                      - orders.total_amount
+                    time_dimension: orders.created_at
+                    granularity: day
+              - name: line_items
+                sql: "SELECT * FROM line_items"
+                dimensions:
+                  - name: product_id
+                    type: number
+                    sql: product_id
+        "#};
+
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
+        let schema = yaml_schema.build().unwrap();
+
+        let main_pre_agg = schema.get_pre_aggregation("orders", "main").unwrap();
+
+        let measure_refs = main_pre_agg.measure_references().unwrap().unwrap();
+        let dim_refs = main_pre_agg.dimension_references().unwrap().unwrap();
+        let time_dim_ref = main_pre_agg.time_dimension_reference().unwrap().unwrap();
+
+        assert_eq!(measure_refs.args_names(), &vec!["orders"]);
+        assert_eq!(dim_refs.args_names(), &vec!["orders"]);
+        assert_eq!(time_dim_ref.args_names(), &vec!["orders"]);
+
+        let base_tools = Rc::new(MockBaseTools::default());
+        let sec_ctx = Rc::new(MockSecurityContext);
+
+        let (measure_template, measure_args) = measure_refs
+            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
+            .unwrap();
+        let (dim_template, dim_args) = dim_refs
+            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
+            .unwrap();
+        let (time_template, time_args) = time_dim_ref
+            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
+            .unwrap();
+
+        match measure_template {
+            SqlTemplate::StringVec(vec) => {
+                assert_eq!(vec.len(), 2);
+                assert_eq!(vec[0], "{arg:0}");
+                assert_eq!(vec[1], "{arg:1}");
+            }
+            _ => panic!("Expected StringVec for measures"),
+        }
+        assert_eq!(measure_args.symbol_paths.len(), 2);
+        assert_eq!(measure_args.symbol_paths[0], vec!["orders", "count"]);
+        assert_eq!(measure_args.symbol_paths[1], vec!["orders", "total_amount"]);
+
+        match dim_template {
+            SqlTemplate::StringVec(vec) => {
+                assert_eq!(vec.len(), 1);
+                assert_eq!(vec[0], "{arg:0}");
+            }
+            _ => panic!("Expected StringVec for dimensions"),
+        }
+        assert_eq!(dim_args.symbol_paths.len(), 1);
+        assert_eq!(dim_args.symbol_paths[0], vec!["orders", "status"]);
+
+        match time_template {
+            SqlTemplate::String(s) => {
+                assert_eq!(s, "{arg:0}");
+            }
+            _ => panic!("Expected String for time dimension"),
+        }
+        assert_eq!(time_args.symbol_paths.len(), 1);
+        assert_eq!(time_args.symbol_paths[0], vec!["orders", "created_at"]);
+    }
+
+    #[test]
+    fn test_pre_aggregation_with_multiple_cubes() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: orders
+                sql: "SELECT * FROM orders"
+                joins:
+                  - name: line_items
+                    sql: "{CUBE}.id = {line_items}.order_id"
+                    relationship: one_to_many
+                dimensions:
+                  - name: status
+                    type: string
+                    sql: status
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+                  - name: total_qty
+                    type: sum
+                    sql: amount
+                pre_aggregations:
+                  - name: pre_agg_with_multiplied_measures
+                    dimensions:
+                      - orders.status
+                      - line_items.product_id
+                    measures:
+                      - orders.count
+                      - orders.total_qty
+                    time_dimension: orders.created_at
+                    granularity: month
+              - name: line_items
+                sql: "SELECT * FROM line_items"
+                dimensions:
+                  - name: product_id
+                    type: number
+                    sql: product_id
+        "#};
+
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
+        let schema = yaml_schema.build().unwrap();
+
+        let pre_agg = schema
+            .get_pre_aggregation("orders", "pre_agg_with_multiplied_measures")
+            .unwrap();
+
+        let measure_refs = pre_agg.measure_references().unwrap().unwrap();
+        let dim_refs = pre_agg.dimension_references().unwrap().unwrap();
+        let time_dim_ref = pre_agg.time_dimension_reference().unwrap().unwrap();
+
+        assert_eq!(measure_refs.args_names(), &vec!["orders"]);
+        assert_eq!(dim_refs.args_names(), &vec!["orders", "line_items"]);
+        assert_eq!(time_dim_ref.args_names(), &vec!["orders"]);
+
+        let base_tools = Rc::new(MockBaseTools::default());
+        let sec_ctx = Rc::new(MockSecurityContext);
+
+        let (dim_template, dim_args) = dim_refs
+            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
+            .unwrap();
+
+        match dim_template {
+            SqlTemplate::StringVec(vec) => {
+                assert_eq!(vec.len(), 2);
+                assert_eq!(vec[0], "{arg:0}");
+                assert_eq!(vec[1], "{arg:1}");
+            }
+            _ => panic!("Expected StringVec for dimensions"),
+        }
+        assert_eq!(dim_args.symbol_paths.len(), 2);
+        assert_eq!(dim_args.symbol_paths[0], vec!["orders", "status"]);
+        assert_eq!(
+            dim_args.symbol_paths[1],
+            vec!["line_items", "product_id"]
+        );
+    }
+
+    #[test]
+    fn test_multi_stage_example() {
         let yaml = indoc! {r#"
             cubes:
               - name: orders

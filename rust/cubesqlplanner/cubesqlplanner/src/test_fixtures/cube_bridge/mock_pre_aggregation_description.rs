@@ -3,7 +3,6 @@ use crate::cube_bridge::pre_aggregation_description::{
     PreAggregationDescription, PreAggregationDescriptionStatic,
 };
 use crate::impl_static_data;
-use crate::test_fixtures::cube_bridge::MockMemberSql;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -24,13 +23,13 @@ pub struct MockPreAggregationDescription {
     allow_non_strict_date_range_match: Option<bool>,
 
     #[builder(default, setter(strip_option(fallback = measure_references_opt)))]
-    measure_references: Option<String>,
+    measure_references: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = dimension_references_opt)))]
-    dimension_references: Option<String>,
+    dimension_references: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = time_dimension_reference_opt)))]
-    time_dimension_reference: Option<String>,
+    time_dimension_reference: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = rollup_references_opt)))]
-    rollup_references: Option<String>,
+    rollup_references: Option<Rc<dyn MemberSql>>,
 }
 
 impl_static_data!(
@@ -52,10 +51,7 @@ impl PreAggregationDescription for MockPreAggregationDescription {
     }
 
     fn measure_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
-        match &self.measure_references {
-            Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
-            None => Ok(None),
-        }
+        Ok(self.measure_references.clone())
     }
 
     fn has_dimension_references(&self) -> Result<bool, CubeError> {
@@ -63,10 +59,7 @@ impl PreAggregationDescription for MockPreAggregationDescription {
     }
 
     fn dimension_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
-        match &self.dimension_references {
-            Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
-            None => Ok(None),
-        }
+        Ok(self.dimension_references.clone())
     }
 
     fn has_time_dimension_reference(&self) -> Result<bool, CubeError> {
@@ -74,10 +67,7 @@ impl PreAggregationDescription for MockPreAggregationDescription {
     }
 
     fn time_dimension_reference(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
-        match &self.time_dimension_reference {
-            Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
-            None => Ok(None),
-        }
+        Ok(self.time_dimension_reference.clone())
     }
 
     fn has_rollup_references(&self) -> Result<bool, CubeError> {
@@ -85,10 +75,7 @@ impl PreAggregationDescription for MockPreAggregationDescription {
     }
 
     fn rollup_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
-        match &self.rollup_references {
-            Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
-            None => Ok(None),
-        }
+        Ok(self.rollup_references.clone())
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
