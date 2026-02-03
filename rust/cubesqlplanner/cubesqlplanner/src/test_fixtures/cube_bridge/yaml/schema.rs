@@ -1,5 +1,6 @@
 use crate::test_fixtures::cube_bridge::yaml::{
-    YamlDimensionDefinition, YamlMeasureDefinition, YamlSegmentDefinition,
+    YamlDimensionDefinition, YamlMeasureDefinition, YamlPreAggregationDefinition,
+    YamlSegmentDefinition,
 };
 use crate::test_fixtures::cube_bridge::{
     MockCubeDefinition, MockJoinItemDefinition, MockSchema, MockSchemaBuilder,
@@ -27,6 +28,8 @@ struct YamlCube {
     measures: Vec<YamlMeasureEntry>,
     #[serde(default)]
     segments: Vec<YamlSegmentEntry>,
+    #[serde(default)]
+    pre_aggregations: Vec<YamlPreAggregationEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,6 +58,13 @@ struct YamlSegmentEntry {
     name: String,
     #[serde(flatten)]
     definition: YamlSegmentDefinition,
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlPreAggregationEntry {
+    name: String,
+    #[serde(flatten)]
+    definition: YamlPreAggregationDefinition,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,6 +131,14 @@ impl YamlSchema {
                 cube_builder = cube_builder.add_segment(seg_entry.name, seg_def);
             }
 
+            for pre_agg_entry in cube.pre_aggregations {
+                let pre_agg_rc = pre_agg_entry.definition.build(pre_agg_entry.name.clone());
+                let pre_agg_def = Rc::try_unwrap(pre_agg_rc)
+                    .ok()
+                    .expect("Rc should have single owner");
+                cube_builder = cube_builder.add_pre_aggregation(pre_agg_entry.name, pre_agg_def);
+            }
+
             builder = cube_builder.finish_cube();
         }
 
@@ -148,6 +166,7 @@ mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
+    use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
     use indoc::indoc;
 
     #[test]
@@ -298,6 +317,119 @@ mod tests {
 
         let dim = schema.get_dimension("orders", "amount").unwrap();
         assert_eq!(dim.static_data().sub_query, Some(true));
+    }
+
+    #[test]
+    fn test_parse_cube_with_pre_aggregations() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: orders
+                sql: "SELECT * FROM orders"
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: status
+                    type: string
+                    sql: status
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+                  - name: total_amount
+                    type: sum
+                    sql: amount
+                pre_aggregations:
+                  - name: main
+                    type: rollup
+                    measures:
+                      - count
+                      - total_amount
+                    dimensions:
+                      - status
+                    time_dimension: created_at
+                    granularity: day
+                  - name: by_status
+                    measures:
+                      - count
+                    dimensions:
+                      - status
+        "#};
+
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
+        let schema = yaml_schema.build().unwrap();
+
+        assert!(schema.get_cube("orders").is_some());
+
+        let main_pre_agg = schema.get_pre_aggregation("orders", "main").unwrap();
+        assert_eq!(main_pre_agg.static_data().pre_aggregation_type, "rollup");
+        assert_eq!(main_pre_agg.static_data().granularity, Some("day".to_string()));
+        assert!(main_pre_agg.has_measure_references().unwrap());
+        assert!(main_pre_agg.has_dimension_references().unwrap());
+        assert!(main_pre_agg.has_time_dimension_reference().unwrap());
+
+        let by_status_pre_agg = schema.get_pre_aggregation("orders", "by_status").unwrap();
+        assert_eq!(by_status_pre_agg.static_data().pre_aggregation_type, "rollup");
+        assert!(by_status_pre_agg.has_measure_references().unwrap());
+        assert!(by_status_pre_agg.has_dimension_references().unwrap());
+        assert!(!by_status_pre_agg.has_time_dimension_reference().unwrap());
+    }
+
+    #[test]
+    fn test_parse_pre_aggregation_with_all_options() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: sales
+                sql: "SELECT * FROM sales"
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: region
+                    type: string
+                    sql: region
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+                  - name: revenue
+                    type: sum
+                    sql: amount
+                pre_aggregations:
+                  - name: sales_rollup
+                    type: rollup
+                    measures:
+                      - count
+                      - revenue
+                    dimensions:
+                      - region
+                    time_dimension: created_at
+                    granularity: month
+                    external: true
+                    allow_non_strict_date_range_match: false
+                  - name: original_sql_pre_agg
+                    type: original_sql
+                    sql_alias: sales_original
+        "#};
+
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
+        let schema = yaml_schema.build().unwrap();
+
+        let sales_rollup = schema.get_pre_aggregation("sales", "sales_rollup").unwrap();
+        assert_eq!(sales_rollup.static_data().pre_aggregation_type, "rollup");
+        assert_eq!(sales_rollup.static_data().granularity, Some("month".to_string()));
+        assert_eq!(sales_rollup.static_data().external, Some(true));
+        assert_eq!(sales_rollup.static_data().allow_non_strict_date_range_match, Some(false));
+
+        let original_sql = schema.get_pre_aggregation("sales", "original_sql_pre_agg").unwrap();
+        assert_eq!(original_sql.static_data().pre_aggregation_type, "original_sql");
+        assert_eq!(original_sql.static_data().sql_alias, Some("sales_original".to_string()));
     }
 
     #[test]
