@@ -64,7 +64,10 @@ impl JobRunner {
         if let Some(to_process) = job {
             let span = tracing::Span::current();
             span.record("job_id", &to_process.get_id());
-            span.record("job_type", &tracing::field::debug(to_process.get_row().job_type()));
+            span.record(
+                "job_type",
+                &tracing::field::debug(to_process.get_row().job_type()),
+            );
             let res = self.run_local(to_process).await;
             // In case of job queue is in place jump to the next job immediately
             self.notify.notify_one();
