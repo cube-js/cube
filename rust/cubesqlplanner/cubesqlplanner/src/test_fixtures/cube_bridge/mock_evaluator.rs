@@ -277,21 +277,33 @@ impl CubeEvaluator for MockCubeEvaluator {
 
     fn pre_aggregations_for_cube_as_array(
         &self,
-        _cube_name: String,
+        cube_name: String,
     ) -> Result<Vec<Rc<dyn PreAggregationDescription>>, CubeError> {
-        todo!("pre_aggregations_for_cube_as_array is not implemented in MockCubeEvaluator")
+        Ok(self
+            .schema
+            .get_pre_aggregations_for_cube(&cube_name)
+            .map(|pre_aggs| {
+                pre_aggs
+                    .into_iter()
+                    .map(|(_, pre_agg)| pre_agg as Rc<dyn PreAggregationDescription>)
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     fn has_pre_aggregation_description_by_name(&self) -> Result<bool, CubeError> {
-        todo!("has_pre_aggregation_description_by_name is not implemented in MockCubeEvaluator")
+        Ok(true)
     }
 
     fn pre_aggregation_description_by_name(
         &self,
-        _cube_name: String,
-        _name: String,
+        cube_name: String,
+        name: String,
     ) -> Result<Option<Rc<dyn PreAggregationDescription>>, CubeError> {
-        todo!("pre_aggregation_description_by_name is not implemented in MockCubeEvaluator")
+        Ok(self
+            .schema
+            .get_pre_aggregation(&cube_name, &name)
+            .map(|pre_agg| pre_agg as Rc<dyn PreAggregationDescription>))
     }
 
     fn evaluate_rollup_references(

@@ -1,7 +1,8 @@
 use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
-    MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
+    MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockPreAggregationDescription,
+    MockSegmentDefinition,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -18,6 +19,7 @@ pub struct MockCube {
     pub measures: HashMap<String, Rc<MockMeasureDefinition>>,
     pub dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     pub segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    pub pre_aggregations: HashMap<String, Rc<MockPreAggregationDescription>>,
 }
 
 impl MockSchema {
@@ -84,6 +86,25 @@ impl MockSchema {
         self.cubes
             .get(cube_name)
             .and_then(|cube| cube.segments.get(segment_name).cloned())
+    }
+
+    pub fn get_pre_aggregation(
+        &self,
+        cube_name: &str,
+        pre_aggregation_name: &str,
+    ) -> Option<Rc<MockPreAggregationDescription>> {
+        self.cubes
+            .get(cube_name)
+            .and_then(|cube| cube.pre_aggregations.get(pre_aggregation_name).cloned())
+    }
+
+    pub fn get_pre_aggregations_for_cube(
+        &self,
+        cube_name: &str,
+    ) -> Option<HashMap<String, Rc<MockPreAggregationDescription>>> {
+        self.cubes
+            .get(cube_name)
+            .map(|cube| cube.pre_aggregations.clone())
     }
 
     pub fn cube_names(&self) -> Vec<&String> {
@@ -204,6 +225,7 @@ impl MockSchemaBuilder {
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
+            pre_aggregations: HashMap::new(),
             joins: HashMap::new(),
         }
     }
@@ -237,6 +259,7 @@ pub struct MockCubeBuilder {
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    pre_aggregations: HashMap<String, Rc<MockPreAggregationDescription>>,
     joins: HashMap<String, MockJoinItemDefinition>,
 }
 
@@ -273,6 +296,16 @@ impl MockCubeBuilder {
         self
     }
 
+    pub fn add_pre_aggregation(
+        mut self,
+        name: impl Into<String>,
+        definition: MockPreAggregationDescription,
+    ) -> Self {
+        self.pre_aggregations
+            .insert(name.into(), Rc::new(definition));
+        self
+    }
+
     pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
         self.joins.insert(name.into(), definition);
         self
@@ -304,6 +337,7 @@ impl MockCubeBuilder {
             measures: self.measures,
             dimensions: self.dimensions,
             segments: self.segments,
+            pre_aggregations: self.pre_aggregations,
         };
 
         self.schema_builder.cubes.insert(self.cube_name, cube);
@@ -465,6 +499,7 @@ impl MockViewBuilder {
             measures: all_measures,
             dimensions: all_dimensions,
             segments: all_segments,
+            pre_aggregations: HashMap::new(),
         };
 
         self.schema_builder.cubes.insert(self.view_name, view_cube);

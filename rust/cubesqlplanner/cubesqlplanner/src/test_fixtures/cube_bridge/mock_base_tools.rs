@@ -6,10 +6,11 @@ use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockPreAggregationObj, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -33,6 +34,9 @@ pub struct MockBaseTools {
 
     #[builder(default = Rc::new(MockJoinGraph::new()))]
     join_graph: Rc<MockJoinGraph>,
+
+    #[builder(default = HashMap::new())]
+    pre_aggregations: HashMap<String, Rc<MockPreAggregationObj>>,
 }
 
 impl Default for MockBaseTools {
@@ -89,18 +93,36 @@ impl BaseTools for MockBaseTools {
 
     fn get_pre_aggregation_by_name(
         &self,
-        _cube_name: String,
-        _name: String,
+        cube_name: String,
+        name: String,
     ) -> Result<Rc<dyn PreAggregationObj>, CubeError> {
-        todo!("get_pre_aggregation_by_name not implemented in mock")
+        let key = format!("{}.{}", cube_name, name);
+        self.pre_aggregations
+            .get(&key)
+            .map(|pre_agg| pre_agg.clone() as Rc<dyn PreAggregationObj>)
+            .ok_or_else(|| {
+                CubeError::user(format!(
+                    "Pre-aggregation '{}' not found in cube '{}'",
+                    name, cube_name
+                ))
+            })
     }
 
     fn pre_aggregation_table_name(
         &self,
-        _cube_name: String,
-        _name: String,
+        cube_name: String,
+        name: String,
     ) -> Result<String, CubeError> {
-        todo!("pre_aggregation_table_name not implemented in mock")
+        let key = format!("{}.{}", cube_name, name);
+        self.pre_aggregations
+            .get(&key)
+            .and_then(|pre_agg| pre_agg.static_data().table_name.clone())
+            .ok_or_else(|| {
+                CubeError::user(format!(
+                    "Pre-aggregation table name for '{}' in cube '{}' not found",
+                    name, cube_name
+                ))
+            })
     }
 
     fn join_tree_for_hints(
