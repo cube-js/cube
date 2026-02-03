@@ -1,0 +1,15 @@
+cubes:
+    - name: users
+      sql: "SELECT 1"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: userName
+            type: string
+            sql: user_name
+            primary_key: true
+      measures:
+          - name: count
+            type: count
