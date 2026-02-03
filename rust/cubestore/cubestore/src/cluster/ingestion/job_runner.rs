@@ -55,13 +55,16 @@ impl JobRunner {
         }
     }
 
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self), fields(server_name = %self.server_name, job_id = tracing::field::Empty, job_type = tracing::field::Empty))]
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
         let job = self
             .meta_store
             .start_processing_job(self.server_name.to_string(), self.is_long_term)
             .await?;
         if let Some(to_process) = job {
+            let span = tracing::Span::current();
+            span.record("job_id", &to_process.get_id());
+            span.record("job_type", &tracing::field::debug(to_process.get_row().job_type()));
             let res = self.run_local(to_process).await;
             // In case of job queue is in place jump to the next job immediately
             self.notify.notify_one();
