@@ -36,7 +36,6 @@ type QueryKey = [QueryWithParams, IndexesSql, InvalidationKeys] | [QueryWithPara
 type QueryOptions = {
   queryKeyMd5: QueryKey | string;
   newVersionEntry: VersionEntry;
-  query: string;
   values: unknown[];
   requestId: string;
   buildRangeEnd?: string;
