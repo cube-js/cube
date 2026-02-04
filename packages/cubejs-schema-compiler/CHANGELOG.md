@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Features
+
+- **schema-compiler:** Add join_path support in folder includes ([#10349](https://github.com/cube-js/cube/issues/10349)) ([f80ab56](https://github.com/cube-js/cube/commit/f80ab56cdc345e5d430a59f65e702f433516912d))
+
 ## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
 
 ### Bug Fixes

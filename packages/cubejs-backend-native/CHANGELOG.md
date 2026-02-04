@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Bug Fixes
+
+- **cubesql:** Fix planning with `CASE` and `LIKE` ([#10346](https://github.com/cube-js/cube/issues/10346)) ([285185f](https://github.com/cube-js/cube/commit/285185f63380fc4a279fd2100f6e7a98beadadc3))
+
 ## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
 
 ### Features
