@@ -43,6 +43,54 @@ class Md5Hasher implements Hasher {
   }
 }
 
+class Sha256Hasher implements Hasher {
+  private hash: crypto.Hash;
+
+  public constructor() {
+    this.hash = crypto.createHash('sha256');
+  }
+
+  public update(data: string | Buffer): this {
+    this.hash.update(data);
+    return this;
+  }
+
+  public digest(): Buffer;
+
+  public digest(encoding: 'hex'): string;
+
+  public digest(encoding?: 'hex'): Buffer | string {
+    if (encoding === 'hex') {
+      return this.hash.digest('hex');
+    }
+    return this.hash.digest();
+  }
+}
+
+class Sha512Hasher implements Hasher {
+  private hash: crypto.Hash;
+
+  public constructor() {
+    this.hash = crypto.createHash('sha512');
+  }
+
+  public update(data: string | Buffer): this {
+    this.hash.update(data);
+    return this;
+  }
+
+  public digest(): Buffer;
+
+  public digest(encoding: 'hex'): string;
+
+  public digest(encoding?: 'hex'): Buffer | string {
+    if (encoding === 'hex') {
+      return this.hash.digest('hex');
+    }
+    return this.hash.digest();
+  }
+}
+
 class XxHasher implements Hasher {
   private data: Buffer[] = [];
 
@@ -92,8 +140,8 @@ class XxHasher implements Hasher {
  * in non-cryptographic contexts.
  *
  * By default, this uses MD5 hashing for backward compatibility. You can
- * enable xxHash (a faster, non-cryptographic hash) by setting the
- * CUBEJS_HASHING_ALGORITHM environment variable to 'xxhash'.
+ * choose different algorithms by setting the CUBEJS_HASHING_ALGORITHM
+ * environment variable to: 'md5', 'sha256', 'sha512', or 'xxhash'.
  *
  * @example
  * ```typescript
@@ -110,8 +158,20 @@ class XxHasher implements Hasher {
 export function defaultHasher(): Hasher {
   const algorithm = getEnv('hashingAlgorithm');
 
-  if (algorithm && algorithm.toLowerCase() === 'xxhash') {
-    return new XxHasher();
+  if (algorithm) {
+    const alg = algorithm.toLowerCase();
+
+    if (alg === 'xxhash') {
+      return new XxHasher();
+    }
+
+    if (alg === 'sha256') {
+      return new Sha256Hasher();
+    }
+
+    if (alg === 'sha512') {
+      return new Sha512Hasher();
+    }
   }
 
   // Default to MD5 for backward compatibility
