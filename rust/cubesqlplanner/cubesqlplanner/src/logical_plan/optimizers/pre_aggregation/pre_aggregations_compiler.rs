@@ -632,13 +632,21 @@ mod tests {
 
         let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
 
-        // Should compile all 3 pre-aggregations
-        //        assert_eq!(compiled.len(), 3);
+        // Should compile all 8 pre-aggregations from visitors and visitor_checkins cubes
+        //        assert_eq!(compiled.len(), 8);
 
         let names: Vec<String> = compiled.iter().map(|pa| pa.name.clone()).collect();
+
+        // visitors pre-aggregations
         assert!(names.contains(&"daily_rollup".to_string()));
         assert!(names.contains(&"multiplied_rollup".to_string()));
+        assert!(names.contains(&"for_join".to_string()));
+
+        // visitor_checkins pre-aggregations
         assert!(names.contains(&"joined_rollup".to_string()));
+        assert!(names.contains(&"checkins_with_visitor_source".to_string()));
+        assert!(names.contains(&"for_lambda".to_string()));
+        assert!(names.contains(&"lambda_union".to_string()));
     }
 
     #[test]
