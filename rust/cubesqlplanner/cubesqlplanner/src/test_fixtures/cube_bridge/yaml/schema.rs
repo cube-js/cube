@@ -94,7 +94,7 @@ impl YamlSchema {
         for cube in self.cubes {
             let cube_def = MockCubeDefinition::builder()
                 .name(cube.name.clone())
-                .sql_table(cube.sql.clone())
+                .sql(cube.sql.clone())
                 .build();
 
             let mut cube_builder = builder.add_cube(cube.name).cube_def(cube_def);
