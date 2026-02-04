@@ -7,9 +7,8 @@ flows that is not necessarily periodic.
 
 ## Data modeling
 
-XIRR calculation is enabled by the `XIRR` function, implemented in [SQL API][ref-sql-api],
-[DAX API][ref-dax-api], and [MDX API][ref-mdx-api]. It means that queries to any of these
-APIs can use the this function.
+XIRR calculation is enabled by the `XIRR` function, implemented in [SQL API][ref-sql-api]
+and [DAX API][ref-dax-api]. It means that queries to any of these APIs can use the this function.
 
 The `XIRR` function is also implemented in Cube Store, meaning that queries to the SQL API
 or the [REST API][ref-rest-api] that hit pre-aggregations can also use this function.
@@ -193,7 +192,6 @@ All queries above would yield the same result:
 
 [ref-sql-api]: /product/apis-integrations/sql-api/reference#custom-functions
 [ref-dax-api]: /product/apis-integrations/dax-api/reference#financial-functions
-[ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-query-wpp]: /product/apis-integrations/queries#query-with-post-processing
 [ref-query-regular]: /product/apis-integrations/queries#regular-query
