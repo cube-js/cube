@@ -157,17 +157,17 @@ describe('Hash consistency across different data types', () => {
   });
 });
 describe('MD5 hasher (default)', () => {
-  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
 
   beforeEach(() => {
-    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
   });
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
     } else {
-      delete process.env.CUBEJS_HASHING_ALGORITHM;
+      delete process.env.CUBEJS_HASHER_ALGORITHM;
     }
   });
 
@@ -211,21 +211,21 @@ describe('MD5 hasher (default)', () => {
 });
 
 describe('xxHash implementation', () => {
-  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
 
   beforeEach(() => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'xxhash';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
   });
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
     } else {
-      delete process.env.CUBEJS_HASHING_ALGORITHM;
+      delete process.env.CUBEJS_HASHER_ALGORITHM;
     }
   });
 
-  test('should use xxHash when CUBEJS_HASHING_ALGORITHM=xxhash', () => {
+  test('should use xxHash when CUBEJS_HASHER_ALGORITHM=xxhash', () => {
     const input = 'test data';
     const hash = defaultHasher().update(input).digest('hex');
 
@@ -313,7 +313,7 @@ describe('xxHash implementation', () => {
   });
 
   test('should handle case-insensitive algorithm name', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'XXHASH';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'XXHASH';
     const hash = defaultHasher().update('test').digest('hex');
 
     expect(hash).toBeDefined();
@@ -321,7 +321,7 @@ describe('xxHash implementation', () => {
   });
 
   test('should handle XxHash algorithm name', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'XxHash';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'XxHash';
     const hash = defaultHasher().update('test').digest('hex');
 
     expect(hash).toBeDefined();
@@ -330,18 +330,18 @@ describe('xxHash implementation', () => {
 });
 
 describe('Feature flag behavior', () => {
-  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
     } else {
-      delete process.env.CUBEJS_HASHING_ALGORITHM;
+      delete process.env.CUBEJS_HASHER_ALGORITHM;
     }
   });
 
   test('should default to MD5 when env var is not set', () => {
-    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
     const hash = defaultHasher().update('test').digest('hex');
 
     // MD5 hash of 'test'
@@ -349,7 +349,7 @@ describe('Feature flag behavior', () => {
   });
 
   test('should default to MD5 when env var is empty string', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = '';
+    process.env.CUBEJS_HASHER_ALGORITHM = '';
     const hash = defaultHasher().update('test').digest('hex');
 
     // MD5 hash of 'test'
@@ -357,7 +357,7 @@ describe('Feature flag behavior', () => {
   });
 
   test('should default to MD5 for unknown algorithm', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'blake2b';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'blake2b';
     const hash = defaultHasher().update('test').digest('hex');
 
     // MD5 hash of 'test'
@@ -365,10 +365,10 @@ describe('Feature flag behavior', () => {
   });
 
   test('MD5 and xxHash should produce different results', () => {
-    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
     const md5Hash = defaultHasher().update('test').digest('hex');
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'xxhash';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
     const xxHash = defaultHasher().update('test').digest('hex');
 
     expect(md5Hash).not.toBe(xxHash);
@@ -376,21 +376,21 @@ describe('Feature flag behavior', () => {
 });
 
 describe('SHA256 hasher', () => {
-  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
 
   beforeEach(() => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'sha256';
   });
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
     } else {
-      delete process.env.CUBEJS_HASHING_ALGORITHM;
+      delete process.env.CUBEJS_HASHER_ALGORITHM;
     }
   });
 
-  test('should use SHA256 when CUBEJS_HASHING_ALGORITHM=sha256', () => {
+  test('should use SHA256 when CUBEJS_HASHER_ALGORITHM=sha256', () => {
     const input = 'test';
     const hash = defaultHasher().update(input).digest('hex');
 
@@ -444,7 +444,7 @@ describe('SHA256 hasher', () => {
   });
 
   test('should handle case-insensitive algorithm name', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'SHA256';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'SHA256';
     const hash = defaultHasher().update('test').digest('hex');
 
     expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
@@ -466,21 +466,21 @@ describe('SHA256 hasher', () => {
 });
 
 describe('SHA512 hasher', () => {
-  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
 
   beforeEach(() => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha512';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'sha512';
   });
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
     } else {
-      delete process.env.CUBEJS_HASHING_ALGORITHM;
+      delete process.env.CUBEJS_HASHER_ALGORITHM;
     }
   });
 
-  test('should use SHA512 when CUBEJS_HASHING_ALGORITHM=sha512', () => {
+  test('should use SHA512 when CUBEJS_HASHER_ALGORITHM=sha512', () => {
     const input = 'test';
     const hash = defaultHasher().update(input).digest('hex');
 
@@ -534,7 +534,7 @@ describe('SHA512 hasher', () => {
   });
 
   test('should handle case-insensitive algorithm name', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'SHA512';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'SHA512';
     const hash = defaultHasher().update('test').digest('hex');
 
     expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
@@ -564,29 +564,29 @@ describe('SHA512 hasher', () => {
 });
 
 describe('Algorithm comparison', () => {
-  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
     } else {
-      delete process.env.CUBEJS_HASHING_ALGORITHM;
+      delete process.env.CUBEJS_HASHER_ALGORITHM;
     }
   });
 
   test('all algorithms should produce different results', () => {
     const input = 'test';
 
-    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
     const md5Hash = defaultHasher().update(input).digest('hex');
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'sha256';
     const sha256Hash = defaultHasher().update(input).digest('hex');
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha512';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'sha512';
     const sha512Hash = defaultHasher().update(input).digest('hex');
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'xxhash';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
     const xxHash = defaultHasher().update(input).digest('hex');
 
     // All hashes should be different
@@ -601,16 +601,16 @@ describe('Algorithm comparison', () => {
   test('different algorithms produce different buffer lengths', () => {
     const input = 'test';
 
-    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
     const md5Buffer = defaultHasher().update(input).digest();
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'sha256';
     const sha256Buffer = defaultHasher().update(input).digest();
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha512';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'sha512';
     const sha512Buffer = defaultHasher().update(input).digest();
 
-    process.env.CUBEJS_HASHING_ALGORITHM = 'xxhash';
+    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
     const xxHashBuffer = defaultHasher().update(input).digest();
 
     expect(md5Buffer.length).toBe(16);
