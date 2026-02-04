@@ -531,11 +531,7 @@ mod tests {
 
         // Check measures
         assert_eq!(compiled.measures.len(), 2);
-        let measure_names: Vec<String> = compiled
-            .measures
-            .iter()
-            .map(|m| m.full_name())
-            .collect();
+        let measure_names: Vec<String> = compiled.measures.iter().map(|m| m.full_name()).collect();
         assert!(measure_names.contains(&"visitors.count".to_string()));
         assert!(measure_names.contains(&"visitors.unique_source_count".to_string()));
 
@@ -576,11 +572,8 @@ mod tests {
 
         // Check dimensions
         assert_eq!(compiled.dimensions.len(), 2);
-        let dimension_names: Vec<String> = compiled
-            .dimensions
-            .iter()
-            .map(|d| d.full_name())
-            .collect();
+        let dimension_names: Vec<String> =
+            compiled.dimensions.iter().map(|d| d.full_name()).collect();
         assert!(dimension_names.contains(&"visitor_checkins.visitor_id".to_string()));
         assert!(dimension_names.contains(&"visitors.source".to_string()));
 
@@ -615,11 +608,8 @@ mod tests {
 
         // Check dimensions
         assert_eq!(compiled.dimensions.len(), 2);
-        let dimension_names: Vec<String> = compiled
-            .dimensions
-            .iter()
-            .map(|d| d.full_name())
-            .collect();
+        let dimension_names: Vec<String> =
+            compiled.dimensions.iter().map(|d| d.full_name()).collect();
         assert!(dimension_names.contains(&"visitors.source".to_string()));
         assert!(dimension_names.contains(&"visitor_checkins.source".to_string()));
 
@@ -640,19 +630,11 @@ mod tests {
         let cube_names = vec!["visitors".to_string(), "visitor_checkins".to_string()];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
-        let result = compiler.compile_all_pre_aggregations(false);
+        let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
 
-        // Note: rollupJoin compilation will fail due to incomplete join resolution in mocks
-        // For now, we accept this limitation and test only non-join pre-aggregations
-        // In the future, when join resolution is fully implemented in mocks, this test should succeed
-        if result.is_err() {
-            // Skip test if rollupJoin fails - this is expected with current mock limitations
-            return;
-        }
+        // Should compile all 3 pre-aggregations
+        //        assert_eq!(compiled.len(), 3);
 
-        let compiled = result.unwrap();
-
-        // Should compile main rollup types
         let names: Vec<String> = compiled.iter().map(|pa| pa.name.clone()).collect();
         assert!(names.contains(&"daily_rollup".to_string()));
         assert!(names.contains(&"multiplied_rollup".to_string()));
@@ -675,11 +657,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // TODO: rollupJoin test requires full join resolution in MockJoinGraph
-    // Currently blocked on proper join member resolution (from_members/to_members)
-    // The evaluate_rollup_references implementation works, but join planning needs more work
     #[test]
-    #[ignore]
     fn test_compile_rollup_join() {
         let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
         let test_context = TestContext::new(schema).unwrap();
@@ -704,11 +682,8 @@ mod tests {
 
         // Check dimensions
         assert_eq!(compiled.dimensions.len(), 2);
-        let dimension_names: Vec<String> = compiled
-            .dimensions
-            .iter()
-            .map(|d| d.full_name())
-            .collect();
+        let dimension_names: Vec<String> =
+            compiled.dimensions.iter().map(|d| d.full_name()).collect();
         assert!(dimension_names.contains(&"visitor_checkins.visitor_id".to_string()));
         assert!(dimension_names.contains(&"visitors.source".to_string()));
 
@@ -728,10 +703,8 @@ mod tests {
         let cube_names = vec!["visitor_checkins".to_string()];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
-        let pre_agg_name = PreAggregationFullName::new(
-            "visitor_checkins".to_string(),
-            "lambda_union".to_string(),
-        );
+        let pre_agg_name =
+            PreAggregationFullName::new("visitor_checkins".to_string(), "lambda_union".to_string());
         let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
 
         assert_eq!(compiled.name, "lambda_union");
