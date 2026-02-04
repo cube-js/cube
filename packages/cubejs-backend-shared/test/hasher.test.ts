@@ -357,7 +357,7 @@ describe('Feature flag behavior', () => {
   });
 
   test('should default to MD5 for unknown algorithm', () => {
-    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+    process.env.CUBEJS_HASHING_ALGORITHM = 'blake2b';
     const hash = defaultHasher().update('test').digest('hex');
 
     // MD5 hash of 'test'
@@ -372,5 +372,250 @@ describe('Feature flag behavior', () => {
     const xxHash = defaultHasher().update('test').digest('hex');
 
     expect(md5Hash).not.toBe(xxHash);
+  });
+});
+
+describe('SHA256 hasher', () => {
+  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+
+  beforeEach(() => {
+    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+  });
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+    } else {
+      delete process.env.CUBEJS_HASHING_ALGORITHM;
+    }
+  });
+
+  test('should use SHA256 when CUBEJS_HASHING_ALGORITHM=sha256', () => {
+    const input = 'test';
+    const hash = defaultHasher().update(input).digest('hex');
+
+    // Known SHA256 hash for 'test'
+    expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
+  });
+
+  test('should return 32-byte Buffer for SHA256 digest', () => {
+    const hash = defaultHasher().update('test').digest();
+
+    expect(Buffer.isBuffer(hash)).toBe(true);
+    expect(hash.length).toBe(32); // SHA256 produces 32 bytes
+  });
+
+  test('should be consistent with SHA256', () => {
+    const input = 'consistency test';
+    const hash1 = defaultHasher().update(input).digest('hex');
+    const hash2 = defaultHasher().update(input).digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+
+  test('should handle chaining with SHA256', () => {
+    const hash1 = defaultHasher()
+      .update('hello')
+      .update(' ')
+      .update('world')
+      .digest('hex');
+
+    const hash2 = defaultHasher()
+      .update('hello world')
+      .digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+
+  test('should handle Buffer input with SHA256', () => {
+    const buffer = Buffer.from('test buffer');
+    const hash = defaultHasher().update(buffer).digest('hex');
+
+    expect(hash).toBeDefined();
+    expect(typeof hash).toBe('string');
+    expect(hash.length).toBe(64); // SHA256 hex is 64 characters
+  });
+
+  test('should handle empty strings with SHA256', () => {
+    const hash = defaultHasher().update('').digest('hex');
+
+    expect(hash).toBeDefined();
+    expect(typeof hash).toBe('string');
+  });
+
+  test('should handle case-insensitive algorithm name', () => {
+    process.env.CUBEJS_HASHING_ALGORITHM = 'SHA256';
+    const hash = defaultHasher().update('test').digest('hex');
+
+    expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
+  });
+
+  test('should handle mixed string and Buffer updates with SHA256', () => {
+    const hash1 = defaultHasher()
+      .update('hello')
+      .update(Buffer.from('world'))
+      .digest('hex');
+
+    const hash2 = defaultHasher()
+      .update(Buffer.from('hello'))
+      .update('world')
+      .digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+});
+
+describe('SHA512 hasher', () => {
+  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+
+  beforeEach(() => {
+    process.env.CUBEJS_HASHING_ALGORITHM = 'sha512';
+  });
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+    } else {
+      delete process.env.CUBEJS_HASHING_ALGORITHM;
+    }
+  });
+
+  test('should use SHA512 when CUBEJS_HASHING_ALGORITHM=sha512', () => {
+    const input = 'test';
+    const hash = defaultHasher().update(input).digest('hex');
+
+    // Known SHA512 hash for 'test'
+    expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
+  });
+
+  test('should return 64-byte Buffer for SHA512 digest', () => {
+    const hash = defaultHasher().update('test').digest();
+
+    expect(Buffer.isBuffer(hash)).toBe(true);
+    expect(hash.length).toBe(64); // SHA512 produces 64 bytes
+  });
+
+  test('should be consistent with SHA512', () => {
+    const input = 'consistency test';
+    const hash1 = defaultHasher().update(input).digest('hex');
+    const hash2 = defaultHasher().update(input).digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+
+  test('should handle chaining with SHA512', () => {
+    const hash1 = defaultHasher()
+      .update('hello')
+      .update(' ')
+      .update('world')
+      .digest('hex');
+
+    const hash2 = defaultHasher()
+      .update('hello world')
+      .digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+
+  test('should handle Buffer input with SHA512', () => {
+    const buffer = Buffer.from('test buffer');
+    const hash = defaultHasher().update(buffer).digest('hex');
+
+    expect(hash).toBeDefined();
+    expect(typeof hash).toBe('string');
+    expect(hash.length).toBe(128); // SHA512 hex is 128 characters
+  });
+
+  test('should handle empty strings with SHA512', () => {
+    const hash = defaultHasher().update('').digest('hex');
+
+    expect(hash).toBeDefined();
+    expect(typeof hash).toBe('string');
+  });
+
+  test('should handle case-insensitive algorithm name', () => {
+    process.env.CUBEJS_HASHING_ALGORITHM = 'SHA512';
+    const hash = defaultHasher().update('test').digest('hex');
+
+    expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
+  });
+
+  test('should handle mixed string and Buffer updates with SHA512', () => {
+    const hash1 = defaultHasher()
+      .update('hello')
+      .update(Buffer.from('world'))
+      .digest('hex');
+
+    const hash2 = defaultHasher()
+      .update(Buffer.from('hello'))
+      .update('world')
+      .digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+
+  test('should handle JSON stringified objects with SHA512', () => {
+    const obj = { key: 'value', nested: { prop: 123 } };
+    const hash1 = defaultHasher().update(JSON.stringify(obj)).digest('hex');
+    const hash2 = defaultHasher().update(JSON.stringify(obj)).digest('hex');
+
+    expect(hash1).toBe(hash2);
+  });
+});
+
+describe('Algorithm comparison', () => {
+  const originalEnv = process.env.CUBEJS_HASHING_ALGORITHM;
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.CUBEJS_HASHING_ALGORITHM = originalEnv;
+    } else {
+      delete process.env.CUBEJS_HASHING_ALGORITHM;
+    }
+  });
+
+  test('all algorithms should produce different results', () => {
+    const input = 'test';
+
+    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    const md5Hash = defaultHasher().update(input).digest('hex');
+
+    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+    const sha256Hash = defaultHasher().update(input).digest('hex');
+
+    process.env.CUBEJS_HASHING_ALGORITHM = 'sha512';
+    const sha512Hash = defaultHasher().update(input).digest('hex');
+
+    process.env.CUBEJS_HASHING_ALGORITHM = 'xxhash';
+    const xxHash = defaultHasher().update(input).digest('hex');
+
+    // All hashes should be different
+    expect(md5Hash).not.toBe(sha256Hash);
+    expect(md5Hash).not.toBe(sha512Hash);
+    expect(md5Hash).not.toBe(xxHash);
+    expect(sha256Hash).not.toBe(sha512Hash);
+    expect(sha256Hash).not.toBe(xxHash);
+    expect(sha512Hash).not.toBe(xxHash);
+  });
+
+  test('different algorithms produce different buffer lengths', () => {
+    const input = 'test';
+
+    delete process.env.CUBEJS_HASHING_ALGORITHM;
+    const md5Buffer = defaultHasher().update(input).digest();
+
+    process.env.CUBEJS_HASHING_ALGORITHM = 'sha256';
+    const sha256Buffer = defaultHasher().update(input).digest();
+
+    process.env.CUBEJS_HASHING_ALGORITHM = 'sha512';
+    const sha512Buffer = defaultHasher().update(input).digest();
+
+    process.env.CUBEJS_HASHING_ALGORITHM = 'xxhash';
+    const xxHashBuffer = defaultHasher().update(input).digest();
+
+    expect(md5Buffer.length).toBe(16);
+    expect(sha256Buffer.length).toBe(32);
+    expect(sha512Buffer.length).toBe(64);
+    expect(xxHashBuffer.length).toBe(16);
   });
 });
