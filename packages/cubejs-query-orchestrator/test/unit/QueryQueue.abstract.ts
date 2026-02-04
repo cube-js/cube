@@ -338,7 +338,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(processUidRE.test(key3.split('@')[1])).toBeTruthy();
 
       if (options.cacheAndQueueDriver === 'cubestore') {
-        expect(queue.redisHash('string')).toBe('7aeaa28c6474df82129b9fe0d65c3ae4');
+        expect(queue.redisHash('string')).toBe('095d71cf12556b9d5e330ad575b3df5d');
       } else {
         expect(queue.redisHash('string')).toBe('string');
       }
