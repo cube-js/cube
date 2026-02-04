@@ -505,3 +505,181 @@ impl PreAggregationsCompiler {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::test_utils::TestContext;
+
+    #[test]
+    fn test_compile_simple_rollup() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitors".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name =
+            PreAggregationFullName::new("visitors".to_string(), "daily_rollup".to_string());
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        assert_eq!(compiled.name, "daily_rollup");
+        assert_eq!(compiled.cube_name, "visitors");
+        assert_eq!(compiled.granularity, Some("day".to_string()));
+
+        // Check measures
+        assert_eq!(compiled.measures.len(), 2);
+        let measure_names: Vec<String> = compiled
+            .measures
+            .iter()
+            .map(|m| m.full_name())
+            .collect();
+        assert!(measure_names.contains(&"visitors.count".to_string()));
+        assert!(measure_names.contains(&"visitors.unique_source_count".to_string()));
+
+        // Check dimensions
+        assert_eq!(compiled.dimensions.len(), 1);
+        assert_eq!(compiled.dimensions[0].full_name(), "visitors.source");
+
+        // Check time dimensions (with granularity suffix)
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "visitors.created_at_day"
+        );
+    }
+
+    #[test]
+    fn test_compile_joined_rollup() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitor_checkins".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name = PreAggregationFullName::new(
+            "visitor_checkins".to_string(),
+            "joined_rollup".to_string(),
+        );
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        assert_eq!(compiled.name, "joined_rollup");
+        assert_eq!(compiled.cube_name, "visitor_checkins");
+        assert_eq!(compiled.granularity, Some("day".to_string()));
+
+        // Check measures
+        assert_eq!(compiled.measures.len(), 1);
+        assert_eq!(compiled.measures[0].full_name(), "visitor_checkins.count");
+
+        // Check dimensions
+        assert_eq!(compiled.dimensions.len(), 2);
+        let dimension_names: Vec<String> = compiled
+            .dimensions
+            .iter()
+            .map(|d| d.full_name())
+            .collect();
+        assert!(dimension_names.contains(&"visitor_checkins.visitor_id".to_string()));
+        assert!(dimension_names.contains(&"visitors.source".to_string()));
+
+        // Check time dimensions (with granularity suffix)
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "visitor_checkins.created_at_day"
+        );
+    }
+
+    #[test]
+    fn test_compile_multiplied_rollup() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitors".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name =
+            PreAggregationFullName::new("visitors".to_string(), "multiplied_rollup".to_string());
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        assert_eq!(compiled.name, "multiplied_rollup");
+        assert_eq!(compiled.cube_name, "visitors");
+        assert_eq!(compiled.granularity, Some("day".to_string()));
+
+        // Check measures
+        assert_eq!(compiled.measures.len(), 1);
+        assert_eq!(compiled.measures[0].full_name(), "visitors.count");
+
+        // Check dimensions
+        assert_eq!(compiled.dimensions.len(), 2);
+        let dimension_names: Vec<String> = compiled
+            .dimensions
+            .iter()
+            .map(|d| d.full_name())
+            .collect();
+        assert!(dimension_names.contains(&"visitors.source".to_string()));
+        assert!(dimension_names.contains(&"visitor_checkins.source".to_string()));
+
+        // Check time dimensions (with granularity suffix)
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "visitors.created_at_day"
+        );
+    }
+
+    #[test]
+    fn test_compile_all_pre_aggregations() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitors".to_string(), "visitor_checkins".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
+
+        // Should compile all 3 pre-aggregations
+        assert_eq!(compiled.len(), 3);
+
+        let names: Vec<String> = compiled.iter().map(|pa| pa.name.clone()).collect();
+        assert!(names.contains(&"daily_rollup".to_string()));
+        assert!(names.contains(&"multiplied_rollup".to_string()));
+        assert!(names.contains(&"joined_rollup".to_string()));
+    }
+
+    #[test]
+    fn test_compile_nonexistent_pre_aggregation() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitors".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name =
+            PreAggregationFullName::new("visitors".to_string(), "nonexistent".to_string());
+        let result = compiler.compile_pre_aggregation(&pre_agg_name);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pre_aggregation_full_name_from_string() {
+        let name = PreAggregationFullName::from_string("visitors.daily_rollup").unwrap();
+        assert_eq!(name.cube_name, "visitors");
+        assert_eq!(name.name, "daily_rollup");
+    }
+
+    #[test]
+    fn test_pre_aggregation_full_name_invalid() {
+        let result = PreAggregationFullName::from_string("invalid_name");
+        assert!(result.is_err());
+
+        let result2 = PreAggregationFullName::from_string("too.many.parts");
+        assert!(result2.is_err());
+    }
+}
