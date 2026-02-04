@@ -1,3 +1,4 @@
+use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::test_fixtures::cube_bridge::yaml::{
     YamlDimensionDefinition, YamlMeasureDefinition, YamlPreAggregationDefinition,
     YamlSegmentDefinition,
@@ -7,6 +8,8 @@ use crate::test_fixtures::cube_bridge::{
 };
 use cubenativeutils::CubeError;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::hash::Hash;
 use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]
@@ -92,20 +95,22 @@ impl YamlSchema {
         let mut builder = MockSchemaBuilder::new();
 
         for cube in self.cubes {
-            let cube_def = MockCubeDefinition::builder()
-                .name(cube.name.clone())
-                .sql(cube.sql.clone())
-                .build();
-
-            let mut cube_builder = builder.add_cube(cube.name).cube_def(cube_def);
-
+            let mut joins = HashMap::new();
             for join in cube.joins {
                 let join_def = MockJoinItemDefinition::builder()
                     .relationship(join.relationship)
                     .sql(join.sql)
                     .build();
-                cube_builder = cube_builder.add_join(join.name, join_def);
+                joins.insert(join.name.clone(), join_def);
             }
+
+            let cube_def = MockCubeDefinition::builder()
+                .name(cube.name.clone())
+                .sql(cube.sql.clone())
+                .joins(joins)
+                .build();
+
+            let mut cube_builder = builder.add_cube(cube.name).cube_def(cube_def);
 
             for dim_entry in cube.dimensions {
                 let dim_rc = dim_entry.definition.build();
@@ -369,13 +374,19 @@ mod tests {
 
         let main_pre_agg = schema.get_pre_aggregation("orders", "main").unwrap();
         assert_eq!(main_pre_agg.static_data().pre_aggregation_type, "rollup");
-        assert_eq!(main_pre_agg.static_data().granularity, Some("day".to_string()));
+        assert_eq!(
+            main_pre_agg.static_data().granularity,
+            Some("day".to_string())
+        );
         assert!(main_pre_agg.has_measure_references().unwrap());
         assert!(main_pre_agg.has_dimension_references().unwrap());
         assert!(main_pre_agg.has_time_dimension_reference().unwrap());
 
         let by_status_pre_agg = schema.get_pre_aggregation("orders", "by_status").unwrap();
-        assert_eq!(by_status_pre_agg.static_data().pre_aggregation_type, "rollup");
+        assert_eq!(
+            by_status_pre_agg.static_data().pre_aggregation_type,
+            "rollup"
+        );
         assert!(by_status_pre_agg.has_measure_references().unwrap());
         assert!(by_status_pre_agg.has_dimension_references().unwrap());
         assert!(!by_status_pre_agg.has_time_dimension_reference().unwrap());
@@ -426,13 +437,27 @@ mod tests {
 
         let sales_rollup = schema.get_pre_aggregation("sales", "sales_rollup").unwrap();
         assert_eq!(sales_rollup.static_data().pre_aggregation_type, "rollup");
-        assert_eq!(sales_rollup.static_data().granularity, Some("month".to_string()));
+        assert_eq!(
+            sales_rollup.static_data().granularity,
+            Some("month".to_string())
+        );
         assert_eq!(sales_rollup.static_data().external, Some(true));
-        assert_eq!(sales_rollup.static_data().allow_non_strict_date_range_match, Some(false));
+        assert_eq!(
+            sales_rollup.static_data().allow_non_strict_date_range_match,
+            Some(false)
+        );
 
-        let original_sql = schema.get_pre_aggregation("sales", "original_sql_pre_agg").unwrap();
-        assert_eq!(original_sql.static_data().pre_aggregation_type, "original_sql");
-        assert_eq!(original_sql.static_data().sql_alias, Some("sales_original".to_string()));
+        let original_sql = schema
+            .get_pre_aggregation("sales", "original_sql_pre_agg")
+            .unwrap();
+        assert_eq!(
+            original_sql.static_data().pre_aggregation_type,
+            "original_sql"
+        );
+        assert_eq!(
+            original_sql.static_data().sql_alias,
+            Some("sales_original".to_string())
+        );
     }
 
     #[test]
@@ -606,10 +631,7 @@ mod tests {
         }
         assert_eq!(dim_args.symbol_paths.len(), 2);
         assert_eq!(dim_args.symbol_paths[0], vec!["orders", "status"]);
-        assert_eq!(
-            dim_args.symbol_paths[1],
-            vec!["line_items", "product_id"]
-        );
+        assert_eq!(dim_args.symbol_paths[1], vec!["line_items", "product_id"]);
     }
 
     #[test]

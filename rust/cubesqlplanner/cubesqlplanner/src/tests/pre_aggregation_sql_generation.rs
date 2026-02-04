@@ -4,6 +4,7 @@
 //! checking that the generated SQL contains references to pre-aggregation tables.
 
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
+use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::planners::QueryPlanner;
 use crate::planner::query_tools::QueryTools;
