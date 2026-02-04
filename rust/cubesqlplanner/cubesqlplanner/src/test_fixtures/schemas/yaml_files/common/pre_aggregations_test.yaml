@@ -1,0 +1,88 @@
+cubes:
+    - name: visitors
+      sql: "SELECT * FROM visitors"
+      joins:
+          - name: visitor_checkins
+            relationship: one_to_many
+            sql: "{visitors}.id = {visitor_checkins.visitor_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: source
+            type: string
+            sql: source
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+            sql: "COUNT(*)"
+          - name: checkins_total
+            type: sum
+            sql: "{visitor_checkins.count}"
+          - name: unique_source_count
+            type: count_distinct
+            sql: source
+      pre_aggregations:
+          # Simple rollup on single cube - aggregates visitors by source and day
+          - name: daily_rollup
+            type: rollup
+            measures:
+                - count
+                - unique_source_count
+            dimensions:
+                - source
+            time_dimension: created_at
+            granularity: day
+
+          # Multiplied rollup - includes dimension from one_to_many joined cube
+          # Multiplied: one_to_many relationship causes row multiplication
+          - name: multiplied_rollup
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - source
+                - visitor_checkins.source
+            time_dimension: created_at
+            granularity: day
+
+    - name: visitor_checkins
+      sql: "SELECT * FROM visitor_checkins"
+      joins:
+          - name: visitors
+            relationship: many_to_one
+            sql: "{visitor_checkins}.visitor_id = {visitors.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: visitor_id
+            type: number
+            sql: visitor_id
+          - name: source
+            type: string
+            sql: source
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+            sql: "COUNT(*)"
+      pre_aggregations:
+          # Rollup with join - aggregates checkins with visitor source via many_to_one join
+          # Not multiplied: many_to_one relationship doesn't cause multiplication
+          - name: joined_rollup
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - visitor_id
+                - visitors.source
+            time_dimension: created_at
+            granularity: day
