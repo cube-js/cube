@@ -50,6 +50,13 @@ cubes:
             time_dimension: created_at
             granularity: day
 
+          # Base rollup for rollupJoin - contains visitor dimensions
+          - name: for_join
+            type: rollup
+            dimensions:
+                - id
+                - source
+
     - name: visitor_checkins
       sql: "SELECT * FROM visitor_checkins"
       joins:
@@ -86,3 +93,71 @@ cubes:
                 - visitors.source
             time_dimension: created_at
             granularity: day
+
+          # Base rollup for rollupJoin - contains checkin dimensions
+          - name: for_join
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - visitor_id
+
+          # rollupJoin - joins visitors.for_join and visitor_checkins.for_join
+          - name: checkins_with_visitor_source
+            type: rollupJoin
+            measures:
+                - count
+            dimensions:
+                - visitor_id
+                - visitors.source
+            rollups:
+                - visitor_checkins.for_join
+                - visitors.for_join
+
+          # Base rollup for rollupLambda - partitioned by day
+          - name: for_lambda
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - visitor_id
+            time_dimension: created_at
+            granularity: day
+            partition_granularity: day
+
+          # rollupLambda - UNION of for_lambda and visitor_checkins2.for_lambda
+          - name: lambda_union
+            type: rollupLambda
+            rollups:
+                - visitor_checkins.for_lambda
+                - visitor_checkins2.for_lambda
+
+    # Second cube for rollupLambda example
+    - name: visitor_checkins2
+      sql: "SELECT * FROM visitor_checkins"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: visitor_id
+            type: number
+            sql: visitor_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+            sql: "COUNT(*)"
+      pre_aggregations:
+          # Base rollup for rollupLambda - same structure as visitor_checkins.for_lambda
+          - name: for_lambda
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - visitor_id
+            time_dimension: created_at
+            granularity: day
+            partition_granularity: day

@@ -52,6 +52,8 @@ pub struct YamlPreAggregationDefinition {
     #[serde(default)]
     #[allow(dead_code)]
     indexes: Option<Vec<YamlIndex>>,
+    #[serde(default)]
+    rollups: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,6 +98,12 @@ impl YamlPreAggregationDefinition {
             .transpose()
             .expect("Failed to build time dimension reference");
 
+        let rollup_references = self
+            .rollups
+            .map(|r| build_array_references(r))
+            .transpose()
+            .expect("Failed to build rollup references");
+
         Rc::new(
             MockPreAggregationDescription::builder()
                 .name(name)
@@ -107,6 +115,7 @@ impl YamlPreAggregationDefinition {
                 .measure_references_opt(measure_references)
                 .dimension_references_opt(dimension_references)
                 .time_dimension_reference_opt(time_dimension_reference)
+                .rollup_references_opt(rollup_references)
                 .build(),
         )
     }

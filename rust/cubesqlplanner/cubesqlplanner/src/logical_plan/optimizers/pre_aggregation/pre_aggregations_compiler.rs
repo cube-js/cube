@@ -668,6 +668,89 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_rollup_join() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitor_checkins".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name = PreAggregationFullName::new(
+            "visitor_checkins".to_string(),
+            "checkins_with_visitor_source".to_string(),
+        );
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        assert_eq!(compiled.name, "checkins_with_visitor_source");
+        assert_eq!(compiled.cube_name, "visitor_checkins");
+
+        // Check measures
+        assert_eq!(compiled.measures.len(), 1);
+        assert_eq!(compiled.measures[0].full_name(), "visitor_checkins.count");
+
+        // Check dimensions
+        assert_eq!(compiled.dimensions.len(), 2);
+        let dimension_names: Vec<String> = compiled
+            .dimensions
+            .iter()
+            .map(|d| d.full_name())
+            .collect();
+        assert!(dimension_names.contains(&"visitor_checkins.visitor_id".to_string()));
+        assert!(dimension_names.contains(&"visitors.source".to_string()));
+
+        // Check source is Join
+        match compiled.source.as_ref() {
+            PreAggregationSource::Join(_) => {} // Expected
+            _ => panic!("Expected PreAggregationSource::Join"),
+        }
+    }
+
+    #[test]
+    fn test_compile_rollup_lambda() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["visitor_checkins".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name = PreAggregationFullName::new(
+            "visitor_checkins".to_string(),
+            "lambda_union".to_string(),
+        );
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        assert_eq!(compiled.name, "lambda_union");
+        assert_eq!(compiled.cube_name, "visitor_checkins");
+        assert_eq!(compiled.granularity, Some("day".to_string()));
+
+        // Check measures
+        assert_eq!(compiled.measures.len(), 1);
+        assert_eq!(compiled.measures[0].full_name(), "visitor_checkins.count");
+
+        // Check dimensions
+        assert_eq!(compiled.dimensions.len(), 1);
+        assert_eq!(
+            compiled.dimensions[0].full_name(),
+            "visitor_checkins.visitor_id"
+        );
+
+        // Check time dimensions
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "visitor_checkins.created_at_day"
+        );
+
+        // Check source is Union
+        match compiled.source.as_ref() {
+            PreAggregationSource::Union(_) => {} // Expected
+            _ => panic!("Expected PreAggregationSource::Union"),
+        }
+    }
+
+    #[test]
     fn test_pre_aggregation_full_name_from_string() {
         let name = PreAggregationFullName::from_string("visitors.daily_rollup").unwrap();
         assert_eq!(name.cube_name, "visitors");
