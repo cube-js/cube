@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
+import { ConnectionError, QueryError } from './errors';
 import {
   HttpCommand,
   HttpError,
@@ -24,9 +25,9 @@ export class WebSocketConnection {
 
   protected webSocket: any;
 
-  private url: string;
+  private readonly url: string;
 
-  private connectionId: string;
+  private readonly connectionId: string;
 
   public constructor(url: string) {
     this.url = url;
@@ -67,13 +68,18 @@ export class WebSocketConnection {
         webSocket.on('open', () => resolve(webSocket));
         webSocket.on('error', (err) => {
           this.currentConnectionTry += 1;
+
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
               resolve(this.initWebSocket());
             }, this.retryWaitTime());
           } else {
-            reject(err);
+            reject(new ConnectionError(
+              `CubeStore connection failed after ${this.maxConnectRetries} retries: ${err.message}`,
+              err
+            ));
           }
+
           if (webSocket === this.webSocket) {
             this.webSocket = undefined;
           }
@@ -115,7 +121,7 @@ export class WebSocketConnection {
           const resolvers = webSocket.sentMessages[httpMessage.messageId()];
           delete webSocket.sentMessages[httpMessage.messageId()];
           if (!resolvers) {
-            throw new Error(`Cube Store missed message id: ${httpMessage.messageId()}`); // logging
+            throw new QueryError(`Cube Store missed message id: ${httpMessage.messageId()}`);
           }
 
           if (getEnv('nativeOrchestrator') && msg.length > 1000) {
@@ -129,12 +135,12 @@ export class WebSocketConnection {
             const commandType = httpMessage.commandType();
 
             if (commandType === HttpCommand.HttpError) {
-              resolvers.reject(new Error(`${httpMessage.command(new HttpError())?.error()}`));
+              resolvers.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
             } else if (commandType === HttpCommand.HttpResultSet) {
               const resultSet = httpMessage.command(new HttpResultSet());
 
               if (!resultSet) {
-                resolvers.reject(new Error('Empty resultSet'));
+                resolvers.reject(new QueryError('Empty resultSet'));
                 return;
               }
 
@@ -143,7 +149,7 @@ export class WebSocketConnection {
               for (let i = 0; i < columnsLen; i++) {
                 const columnName = resultSet.columns(i);
                 if (!columnName) {
-                  resolvers.reject(new Error('Column name is not defined'));
+                  resolvers.reject(new QueryError('Column name is not defined'));
                   return;
                 }
                 columns.push(columnName);
@@ -154,7 +160,7 @@ export class WebSocketConnection {
               for (let i = 0; i < rowLen; i++) {
                 const row = resultSet.rows(i);
                 if (!row) {
-                  resolvers.reject(new Error('Null row'));
+                  resolvers.reject(new QueryError('Null row'));
                   return;
                 }
                 const valueLen = row.valuesLength();
@@ -168,7 +174,7 @@ export class WebSocketConnection {
 
               resolvers.resolve(result);
             } else {
-              resolvers.reject(new Error('Unsupported command'));
+              resolvers.reject(new QueryError('Unsupported command'));
             }
           }
         });
