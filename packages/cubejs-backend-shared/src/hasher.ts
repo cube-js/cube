@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import { xxh3 } from '@node-rs/xxhash';
+import { getEnv } from './env';
 
 export interface Hasher {
   /**
@@ -15,6 +17,30 @@ export interface Hasher {
    * @returns The hash value as a Buffer
    */
   digest(): Buffer;
+}
+
+class Md5Hasher implements Hasher {
+  private hash: crypto.Hash;
+
+  public constructor() {
+    this.hash = crypto.createHash('md5');
+  }
+
+  public update(data: string | Buffer): this {
+    this.hash.update(data);
+    return this;
+  }
+
+  public digest(): Buffer;
+
+  public digest(encoding: 'hex'): string;
+
+  public digest(encoding?: 'hex'): Buffer | string {
+    if (encoding === 'hex') {
+      return this.hash.digest('hex');
+    }
+    return this.hash.digest();
+  }
 }
 
 class XxHasher implements Hasher {
@@ -60,11 +86,14 @@ class XxHasher implements Hasher {
  * Creates a new default hasher instance.
  *
  * This follows Rust's DefaultHasher pattern and provides a consistent
- * hashing interface throughout the Cube.js codebase. The implementation
- * uses xxHash (xxh128) for fast, non-cryptographic hashing.
+ * hashing interface throughout the Cube.js codebase.
  *
  * The hasher can be used as a drop-in replacement for crypto.createHash()
  * in non-cryptographic contexts.
+ *
+ * By default, this uses MD5 hashing for backward compatibility. You can
+ * enable xxHash (a faster, non-cryptographic hash) by setting the
+ * CUBEJS_HASHING_ALGORITHM environment variable to 'xxhash'.
  *
  * @example
  * ```typescript
@@ -79,7 +108,12 @@ class XxHasher implements Hasher {
  * @returns A new Hasher instance
  */
 export function defaultHasher(): Hasher {
-  // Future: could check environment variable here to switch implementations
-  // e.g., process.env.CUBEJS_HASHER_ALGORITHM
-  return new XxHasher();
+  const algorithm = getEnv('hashingAlgorithm');
+
+  if (algorithm && algorithm.toLowerCase() === 'xxhash') {
+    return new XxHasher();
+  }
+
+  // Default to MD5 for backward compatibility
+  return new Md5Hasher();
 }

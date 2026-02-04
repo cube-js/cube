@@ -164,6 +164,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('false')
     .asBoolStrict(),
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
+  hashingAlgorithm: () => get('CUBEJS_HASHING_ALGORITHM').asString(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
