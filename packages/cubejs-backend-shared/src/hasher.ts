@@ -140,7 +140,7 @@ class XxHasher implements Hasher {
  * in non-cryptographic contexts.
  *
  * By default, this uses MD5 hashing for backward compatibility. You can
- * choose different algorithms by setting the CUBEJS_HASHING_ALGORITHM
+ * choose different algorithms by setting the CUBEJS_HASHER_ALGORITHM
  * environment variable to: 'md5', 'sha256', 'sha512', or 'xxhash'.
  *
  * @example
