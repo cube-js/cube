@@ -441,6 +441,87 @@ views:
 
 </CodeTabs>
 
+You can also use the `join_path` parameter within `includes` to add all members from a
+specific [join path](#join_path) without listing them individually. You can mix
+`join_path` with individual member names in the same folder:
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: `*`
+    },
+    {
+      join_path: base_orders.line_items,
+      includes: `*`
+    },
+    {
+      join_path: base_orders.users,
+      includes: [
+        `count`,
+        {
+          name: `count_distinct`,
+          alias: `users_distinct_count`
+        }
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Order Details`,
+      includes: [
+        { join_path: base_orders }
+      ]
+    },
+    {
+      name: `Line Items & Users`,
+      includes: [
+        { join_path: base_orders.line_items },
+        `count`,
+        `users_distinct_count`
+      ]
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+      - join_path: base_orders.line_items
+        includes: "*"
+
+      - join_path: base_orders.users
+        includes:
+          - count
+          - name: count_distinct
+            alias: users_distinct_count
+
+    folders:
+      - name: Order Details
+        includes:
+          - join_path: base_orders
+
+      - name: Line Items & Users
+        includes:
+          - join_path: base_orders.line_items
+          - count
+          - users_distinct_count
+```
+
+</CodeTabs>
+
+#### Nesting
+
 Nested folders are also supported. The `includes` parameter can contain not only
 references to view members but also other folders:
 
