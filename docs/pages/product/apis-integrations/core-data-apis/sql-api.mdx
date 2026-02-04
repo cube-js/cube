@@ -5,26 +5,6 @@ protocol][postgres-protocol] to a wide range of [data visualization tools][ref-d
 In general, if an application connects to [PostgreSQL][link-postgres] database,
 it can connect to Cube as well.
 
-Unlike [DAX API][ref-dax-api], [MDX API][ref-mdx-api], and [Semantic Layer Sync][ref-sls],
-the SQL API provides a more generic way to work with Cube, limited to what the SQL
-query language and the Postgres protocol can offer.
-
-The SQL API works with the following kinds of data applications:
-
-- [BI tools][ref-bi], e.g., [ThoughtSpot][ref-thoughtspot], [Sigma][ref-sigma],
-[Looker Studio][ref-looker-studio], enabling internal or self-serve [business
-intelligence][cube-bi-use-case] use cases.
-- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter], [Hex][ref-hex],
-or [Deepnote][ref-deepnote].
-- Reverse ETL tools, e.g., Census or Hightouch.
-
-<ReferenceBox>
-
-Please use [this GitHub issue](https://github.com/cube-js/cube/issues/3906) to
-suggest tools of your interest and vote for already proposed ones.
-
-</ReferenceBox>
-
 See [SQL API reference][ref-ref-sql-api] for the list of supported SQL commands,
 functions, and operators. Also, check [query format][ref-sql-query-format] for
 details about supported queries.
