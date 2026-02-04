@@ -1,5 +1,6 @@
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::driver_tools::DriverTools;
+use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
@@ -37,6 +38,13 @@ pub struct MockBaseTools {
 
     #[builder(default = HashMap::new())]
     pre_aggregations: HashMap<String, Rc<MockPreAggregationObj>>,
+
+    #[builder(default = None)]
+    cube_evaluator: Option<Rc<dyn CubeEvaluator>>,
+
+    /// Map of cube_name -> Vec<member_name> for all_cube_members
+    #[builder(default = HashMap::new())]
+    cube_members: HashMap<String, Vec<String>>,
 }
 
 impl Default for MockBaseTools {
@@ -83,8 +91,12 @@ impl BaseTools for MockBaseTools {
         todo!("get_allocated_params not implemented in mock")
     }
 
-    fn all_cube_members(&self, _path: String) -> Result<Vec<String>, CubeError> {
-        todo!("all_cube_members not implemented in mock")
+    fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError> {
+        Ok(self
+            .cube_members
+            .get(&path)
+            .cloned()
+            .unwrap_or_else(Vec::new))
     }
 
     fn interval_and_minimal_time_unit(&self, _interval: String) -> Result<Vec<String>, CubeError> {
