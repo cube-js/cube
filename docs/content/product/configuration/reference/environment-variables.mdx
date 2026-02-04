@@ -1001,6 +1001,14 @@ downloading Cube Store.
 | ------------------ | ---------------------- | --------------------- |
 | A valid GitHub PAT | `false`                | `false`               |
 
+## `CUBEJS_HASHER_ALGORITHM`
+
+The hashing algorithm used for cache keys, query hashes, and pre-aggregation versioning. Changing this value will invalidate all existing cached data and pre-aggregations. MD5 is used by default for historical compatibility; SHA-256, SHA-512, and [xxHash][xxhash-ref] are also available. Performance may vary based on the specific workload and environment, so it's recommended to benchmark different algorithms to determine the best fit for your use case.
+
+| Possible Values                     | Default in Development | Default in Production |
+| ----------------------------------- | ---------------------- | --------------------- |
+| `md5`, `sha256`, `sha512`, `xxhash` | `md5`                  | `md5`                 |
+
 ## `CUBEJS_JWK_URL`
 
 Enables [JSON Web Key (JWK)][ietf-jwk-ref]-based authentication in Cube.
@@ -1902,3 +1910,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-time-dimensions]: /product/data-modeling/reference/dimensions#time
 [ref-time-zone]: /product/apis-integrations/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
+[xxhash-ref]: https://xxhash.com/
