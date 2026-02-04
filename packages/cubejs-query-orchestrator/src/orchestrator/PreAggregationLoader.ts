@@ -504,10 +504,9 @@ export class PreAggregationLoader {
     );
   }
 
-  protected queryOptions(invalidationKeys: InvalidationKeys, query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
+  protected queryOptions(invalidationKeys: InvalidationKeys, _query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
     return {
       queryKeyMd5: queryKeyMd5(this.preAggregationQueryKey(invalidationKeys)),
-      query,
       values: params,
       targetTableName,
       requestId: this.requestId,
