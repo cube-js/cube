@@ -50,7 +50,7 @@ cubes:
             time_dimension: created_at
             granularity: day
 
-          # Base rollup for rollupJoin - contains visitor dimensions
+          # Base rollup for rollupJoin - contains visitor dimensions including join key (id)
           - name: for_join
             type: rollup
             dimensions:

@@ -8,7 +8,7 @@ use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::cube_bridge::segment_definition::SegmentDefinition;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::mock_schema::MockSchema;
-use crate::test_fixtures::cube_bridge::MockJoinGraph;
+use crate::test_fixtures::cube_bridge::{MockBaseTools, MockJoinGraph, MockSecurityContext};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -309,9 +309,22 @@ impl CubeEvaluator for MockCubeEvaluator {
     fn evaluate_rollup_references(
         &self,
         _cube: String,
-        _sql: Rc<dyn MemberSql>,
+        sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<String>, CubeError> {
-        todo!("evaluate_rollup_references is not implemented in MockCubeEvaluator")
+        // Simple implementation for mock: extract symbol paths from compiled template
+        // For YAML schemas, rollups are already provided as strings like "visitors.for_join"
+        // which MockMemberSql parses into symbol_paths like [["visitors", "for_join"]]
+        let (_template, args) = sql.compile_template_sql(
+            Rc::new(MockBaseTools::default()),
+            Rc::new(MockSecurityContext),
+        )?;
+
+        // Convert symbol paths back to dot-separated strings
+        Ok(args
+            .symbol_paths
+            .iter()
+            .map(|path| path.join("."))
+            .collect())
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
