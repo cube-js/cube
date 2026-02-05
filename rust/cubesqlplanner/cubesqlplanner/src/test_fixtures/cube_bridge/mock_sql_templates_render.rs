@@ -3,28 +3,6 @@ use cubenativeutils::CubeError;
 use minijinja::{value::Value, Environment};
 use std::collections::HashMap;
 
-/// Mock implementation of SqlTemplatesRender for testing
-///
-/// This mock provides a simple in-memory template rendering system using minijinja.
-/// It allows tests to define SQL templates and render them with context values.
-///
-/// # Example
-///
-/// ```
-/// use cubesqlplanner::test_fixtures::cube_bridge::MockSqlTemplatesRender;
-/// use minijinja::context;
-///
-/// let mut templates = std::collections::HashMap::new();
-/// templates.insert("filters/equals".to_string(), "{{column}} = {{value}}".to_string());
-///
-/// let render = MockSqlTemplatesRender::try_new(templates).unwrap();
-/// let result = render.render_template(
-///     "filters/equals",
-///     minijinja::context! { column => "id", value => "123" }
-/// ).unwrap();
-///
-/// assert_eq!(result, "id = 123");
-/// ```
 #[derive(Clone)]
 pub struct MockSqlTemplatesRender {
     templates: HashMap<String, String>,
@@ -32,15 +10,6 @@ pub struct MockSqlTemplatesRender {
 }
 
 impl MockSqlTemplatesRender {
-    /// Creates a new MockSqlTemplatesRender with the given templates
-    ///
-    /// # Arguments
-    ///
-    /// * `templates` - HashMap of template name to template content
-    ///
-    /// # Returns
-    ///
-    /// Result containing the MockSqlTemplatesRender or a CubeError if template parsing fails
     pub fn try_new(templates: HashMap<String, String>) -> Result<Self, CubeError> {
         let mut jinja = Environment::new();
         for (name, template) in templates.iter() {
@@ -57,11 +26,6 @@ impl MockSqlTemplatesRender {
         Ok(Self { templates, jinja })
     }
 
-    /// Creates a default MockSqlTemplatesRender with common SQL templates
-    ///
-    /// This includes templates for common filter operations, functions, and types
-    /// that are frequently used in tests. Based on BaseQuery.sqlTemplates() from
-    /// packages/cubejs-schema-compiler/src/adapter/BaseQuery.js
     pub fn default_templates() -> Self {
         let mut templates = HashMap::new();
 

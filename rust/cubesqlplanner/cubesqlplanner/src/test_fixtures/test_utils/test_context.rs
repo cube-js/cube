@@ -1,10 +1,10 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::planners::QueryPlanner;
+use crate::logical_plan::PreAggregation;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::top_level_planner::TopLevelPlanner;
 use crate::planner::QueryProperties;
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
@@ -183,22 +183,17 @@ impl TestContext {
     }
 
     pub fn build_sql(&self, query: &str) -> Result<String, cubenativeutils::CubeError> {
+        let (sql, _) = self.build_sql_with_used_pre_aggregations(query)?;
+        Ok(sql)
+    }
+    pub fn build_sql_with_used_pre_aggregations(
+        &self,
+        query: &str,
+    ) -> Result<(String, Vec<Rc<PreAggregation>>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml(query);
         let request = QueryProperties::try_new(self.query_tools.clone(), options.clone())?;
-        let query_planner = QueryPlanner::new(request.clone(), self.query_tools.clone());
-        let logical_plan = query_planner.plan()?;
-        let templates = self.query_tools.plan_sql_templates(false)?;
-        let physical_plan_builder =
-            PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
-
-        let physical_plan = physical_plan_builder.build(
-            logical_plan,
-            std::collections::HashMap::new(),
-            request.is_total_query(),
-        )?;
-
-        let sql = physical_plan.to_sql(&templates)?;
-        Ok(sql)
+        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), false);
+        planner.plan()
     }
 }
 

@@ -6,6 +6,7 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
     MockDriverTools, MockJoinGraph, MockPreAggregationObj, MockSqlTemplatesRender, MockSqlUtils,
 };
@@ -35,12 +36,6 @@ pub struct MockBaseTools {
 
     #[builder(default = Rc::new(MockJoinGraph::new()))]
     join_graph: Rc<MockJoinGraph>,
-
-    #[builder(default = HashMap::new())]
-    pre_aggregations: HashMap<String, Rc<MockPreAggregationObj>>,
-
-    #[builder(default = None)]
-    cube_evaluator: Option<Rc<dyn CubeEvaluator>>,
 
     /// Map of cube_name -> Vec<member_name> for all_cube_members
     #[builder(default = HashMap::new())]
@@ -105,19 +100,10 @@ impl BaseTools for MockBaseTools {
 
     fn get_pre_aggregation_by_name(
         &self,
-        cube_name: String,
-        name: String,
+        _cube_name: String,
+        _name: String,
     ) -> Result<Rc<dyn PreAggregationObj>, CubeError> {
-        let key = format!("{}.{}", cube_name, name);
-        self.pre_aggregations
-            .get(&key)
-            .map(|pre_agg| pre_agg.clone() as Rc<dyn PreAggregationObj>)
-            .ok_or_else(|| {
-                CubeError::user(format!(
-                    "Pre-aggregation '{}' not found in cube '{}'",
-                    name, cube_name
-                ))
-            })
+        todo!("get_pre_aggregation_by_name not implemented in mock")
     }
 
     fn pre_aggregation_table_name(
@@ -126,15 +112,7 @@ impl BaseTools for MockBaseTools {
         name: String,
     ) -> Result<String, CubeError> {
         let key = format!("{}.{}", cube_name, name);
-        self.pre_aggregations
-            .get(&key)
-            .and_then(|pre_agg| pre_agg.static_data().table_name.clone())
-            .ok_or_else(|| {
-                CubeError::user(format!(
-                    "Pre-aggregation table name for '{}' in cube '{}' not found",
-                    name, cube_name
-                ))
-            })
+        Ok(PlanSqlTemplates::alias_name(&key))
     }
 
     fn join_tree_for_hints(

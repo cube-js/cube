@@ -35,7 +35,10 @@ impl MockMemberSql {
         let path_parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 
         if path_parts.is_empty() || path_parts.iter().any(|p| p.is_empty()) {
-            return Err(CubeError::user(format!("Invalid path in pre-aggregation: {}", path)));
+            return Err(CubeError::user(format!(
+                "Invalid path in pre-aggregation: {}",
+                path
+            )));
         }
 
         let mut args = SqlTemplateArgs::default();
@@ -54,7 +57,9 @@ impl MockMemberSql {
         let paths: Vec<String> = member_paths.into_iter().map(|p| p.into()).collect();
 
         if paths.is_empty() {
-            return Err(CubeError::user("Pre-aggregation array references cannot be empty".to_string()));
+            return Err(CubeError::user(
+                "Pre-aggregation array references cannot be empty".to_string(),
+            ));
         }
 
         let mut all_args = SqlTemplateArgs::default();
@@ -65,7 +70,10 @@ impl MockMemberSql {
             let path_parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 
             if path_parts.is_empty() || path_parts.iter().any(|p| p.is_empty()) {
-                return Err(CubeError::user(format!("Invalid path in pre-aggregation: {}", path)));
+                return Err(CubeError::user(format!(
+                    "Invalid path in pre-aggregation: {}",
+                    path
+                )));
             }
 
             let arg_name = path_parts[0].clone();
@@ -192,7 +200,10 @@ mod tests {
     fn test_multiple_paths() {
         let mock = MockMemberSql::new("{CUBE.field} / {other_cube.field}").unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::String("{arg:0} / {arg:1}".to_string()));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::String("{arg:0} / {arg:1}".to_string())
+        );
         assert_eq!(mock.args.symbol_paths.len(), 2);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "field"]);
         assert_eq!(mock.args.symbol_paths[1], vec!["other_cube", "field"]);
@@ -217,7 +228,10 @@ mod tests {
         let mock =
             MockMemberSql::new("{CUBE.field} / {other_cube.cube2.field} + {revenue}").unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::String("{arg:0} / {arg:1} + {arg:2}".to_string()));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::String("{arg:0} / {arg:1} + {arg:2}".to_string())
+        );
         assert_eq!(mock.args.symbol_paths.len(), 3);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "field"]);
         assert_eq!(
@@ -232,7 +246,10 @@ mod tests {
     fn test_duplicate_paths() {
         let mock = MockMemberSql::new("{CUBE.field} + {CUBE.field}").unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::String("{arg:0} + {arg:0}".to_string()));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::String("{arg:0} + {arg:0}".to_string())
+        );
         assert_eq!(mock.args.symbol_paths.len(), 1);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "field"]);
         assert_eq!(mock.args_names, vec!["CUBE"]);
@@ -242,7 +259,10 @@ mod tests {
     fn test_same_top_level_different_paths() {
         let mock = MockMemberSql::new("{CUBE.field1} + {CUBE.field2}").unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::String("{arg:0} + {arg:1}".to_string()));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::String("{arg:0} + {arg:1}".to_string())
+        );
         assert_eq!(mock.args.symbol_paths.len(), 2);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "field1"]);
         assert_eq!(mock.args.symbol_paths[1], vec!["CUBE", "field2"]);
@@ -253,7 +273,10 @@ mod tests {
     fn test_with_text() {
         let mock = MockMemberSql::new("SUM({CUBE.amount}) * 100").unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::String("SUM({arg:0}) * 100".to_string()));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::String("SUM({arg:0}) * 100".to_string())
+        );
         assert_eq!(mock.args.symbol_paths.len(), 1);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "amount"]);
         assert_eq!(mock.args_names, vec!["CUBE"]);
@@ -263,7 +286,10 @@ mod tests {
     fn test_escaped_braces() {
         let mock = MockMemberSql::new("{{literal}} {CUBE.field}").unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::String("{{literal}} {arg:0}".to_string()));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::String("{{literal}} {arg:0}".to_string())
+        );
         assert_eq!(mock.args.symbol_paths.len(), 1);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "field"]);
         assert_eq!(mock.args_names, vec!["CUBE"]);
@@ -323,21 +349,22 @@ mod tests {
 
         assert_eq!(mock.template, SqlTemplate::String("{arg:0}".to_string()));
         assert_eq!(mock.args.symbol_paths.len(), 1);
-        assert_eq!(mock.args.symbol_paths[0], vec!["users", "orders", "created_at"]);
+        assert_eq!(
+            mock.args.symbol_paths[0],
+            vec!["users", "orders", "created_at"]
+        );
         assert_eq!(mock.args_names, vec!["users"]);
     }
 
     #[test]
     fn test_pre_agg_array_refs_simple() {
-        let mock = MockMemberSql::pre_agg_array_refs(vec![
-            "orders.status",
-            "orders.amount"
-        ]).unwrap();
+        let mock =
+            MockMemberSql::pre_agg_array_refs(vec!["orders.status", "orders.amount"]).unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::StringVec(vec![
-            "{arg:0}".to_string(),
-            "{arg:1}".to_string()
-        ]));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::StringVec(vec!["{arg:0}".to_string(), "{arg:1}".to_string()])
+        );
         assert_eq!(mock.args.symbol_paths.len(), 2);
         assert_eq!(mock.args.symbol_paths[0], vec!["orders", "status"]);
         assert_eq!(mock.args.symbol_paths[1], vec!["orders", "amount"]);
@@ -349,14 +376,18 @@ mod tests {
         let mock = MockMemberSql::pre_agg_array_refs(vec![
             "orders.status",
             "line_items.product_id",
-            "orders.amount"
-        ]).unwrap();
+            "orders.amount",
+        ])
+        .unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::StringVec(vec![
-            "{arg:0}".to_string(),
-            "{arg:1}".to_string(),
-            "{arg:2}".to_string()
-        ]));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::StringVec(vec![
+                "{arg:0}".to_string(),
+                "{arg:1}".to_string(),
+                "{arg:2}".to_string()
+            ])
+        );
         assert_eq!(mock.args.symbol_paths.len(), 3);
         assert_eq!(mock.args.symbol_paths[0], vec!["orders", "status"]);
         assert_eq!(mock.args.symbol_paths[1], vec!["line_items", "product_id"]);
@@ -366,15 +397,14 @@ mod tests {
 
     #[test]
     fn test_pre_agg_array_refs_with_joins() {
-        let mock = MockMemberSql::pre_agg_array_refs(vec![
-            "visitors.aaa.dim_1",
-            "visitors.bbb.dim2"
-        ]).unwrap();
+        let mock =
+            MockMemberSql::pre_agg_array_refs(vec!["visitors.aaa.dim_1", "visitors.bbb.dim2"])
+                .unwrap();
 
-        assert_eq!(mock.template, SqlTemplate::StringVec(vec![
-            "{arg:0}".to_string(),
-            "{arg:1}".to_string()
-        ]));
+        assert_eq!(
+            mock.template,
+            SqlTemplate::StringVec(vec!["{arg:0}".to_string(), "{arg:1}".to_string()])
+        );
         assert_eq!(mock.args.symbol_paths.len(), 2);
         assert_eq!(mock.args.symbol_paths[0], vec!["visitors", "aaa", "dim_1"]);
         assert_eq!(mock.args.symbol_paths[1], vec!["visitors", "bbb", "dim2"]);
@@ -391,15 +421,16 @@ mod tests {
 
     #[test]
     fn test_pre_agg_array_refs_compile_to_string_vec() {
-        let mock = MockMemberSql::pre_agg_array_refs(vec![
-            "orders.status",
-            "line_items.product_id"
-        ]).unwrap();
+        let mock =
+            MockMemberSql::pre_agg_array_refs(vec!["orders.status", "line_items.product_id"])
+                .unwrap();
 
-        let (template, args) = mock.compile_template_sql(
-            Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
-            Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
-        ).unwrap();
+        let (template, args) = mock
+            .compile_template_sql(
+                Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
+                Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
+            )
+            .unwrap();
 
         match template {
             SqlTemplate::StringVec(vec) => {

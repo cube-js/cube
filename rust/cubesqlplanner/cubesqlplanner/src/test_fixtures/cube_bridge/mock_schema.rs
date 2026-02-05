@@ -165,7 +165,6 @@ impl MockSchema {
         let result = MockBaseTools::builder()
             .join_graph(join_graph)
             .driver_tools(driver_tools)
-            .cube_evaluator(Some(evaluator))
             .cube_members(cube_members)
             .build();
         Ok(result)
@@ -209,6 +208,7 @@ impl MockSchema {
         Ok(join_graph)
     }
 
+    #[allow(dead_code)]
     pub fn create_evaluator_with_join_graph(self) -> Result<Rc<MockCubeEvaluator>, CubeError> {
         let mut primary_keys = HashMap::new();
         for (cube_name, cube) in &self.cubes {
