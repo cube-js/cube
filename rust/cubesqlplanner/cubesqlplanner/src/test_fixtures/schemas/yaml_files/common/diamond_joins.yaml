@@ -3,10 +3,10 @@ cubes:
       sql: "SELECT * FROM table_a"
       joins:
           - name: cube_b
-            relationship: many_to_one
+            relationship: one_to_one
             sql: "{cube_a}.b_id = {cube_b.id}"
           - name: cube_c
-            relationship: many_to_one
+            relationship: one_to_one
             sql: "{cube_a}.c_id = {cube_c.id}"
       dimensions:
           - name: id
@@ -37,7 +37,7 @@ cubes:
       sql: "SELECT * FROM table_b"
       joins:
           - name: cube_c
-            relationship: many_to_one
+            relationship: one_to_one
             sql: "{cube_b}.c_id = {cube_c.id}"
       dimensions:
           - name: id
