@@ -127,8 +127,8 @@ function getPreAggsJobsList(
  */
 function getPreAggJobToken(job: PreAggJob) {
   return defaultHasher()
-      .update(JSON.stringify(job))
-      .digest('hex');
+    .update(JSON.stringify(job))
+    .digest('hex');
 }
 
 export class RefreshScheduler {
