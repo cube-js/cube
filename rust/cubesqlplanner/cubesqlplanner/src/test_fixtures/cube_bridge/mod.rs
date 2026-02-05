@@ -59,7 +59,6 @@ pub use mock_measure_definition::MockMeasureDefinition;
 pub use mock_member_order_by::MockMemberOrderBy;
 pub use mock_member_sql::MockMemberSql;
 pub use mock_pre_aggregation_description::MockPreAggregationDescription;
-pub use mock_pre_aggregation_obj::MockPreAggregationObj;
 pub use mock_schema::{MockSchema, MockSchemaBuilder};
 pub use mock_security_context::MockSecurityContext;
 pub use mock_segment_definition::MockSegmentDefinition;

@@ -1,4 +1,3 @@
-use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
@@ -137,7 +136,6 @@ impl MockSchema {
     pub fn create_base_tools(&self) -> Result<MockBaseTools, CubeError> {
         let join_graph = Rc::new(self.create_join_graph()?);
         let driver_tools = Rc::new(MockDriverTools::new());
-        let evaluator = self.clone().create_evaluator();
 
         // Build cube_members map from schema
         let mut cube_members = HashMap::new();
@@ -288,6 +286,7 @@ pub struct MockCubeBuilder {
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
     pre_aggregations: HashMap<String, Rc<MockPreAggregationDescription>>,
+    #[allow(dead_code)]
     joins: HashMap<String, MockJoinItemDefinition>,
 }
 
@@ -334,6 +333,7 @@ impl MockCubeBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
         self.joins.insert(name.into(), definition);
         self
@@ -526,7 +526,6 @@ impl MockViewBuilder {
 mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
-    use crate::cube_bridge::join_item_definition::JoinItemDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
     use crate::test_fixtures::cube_bridge::MockBaseTools;

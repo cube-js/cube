@@ -182,6 +182,7 @@ impl TestContext {
         )
     }
 
+    #[allow(dead_code)]
     pub fn build_sql(&self, query: &str) -> Result<String, cubenativeutils::CubeError> {
         let (sql, _) = self.build_sql_with_used_pre_aggregations(query)?;
         Ok(sql)

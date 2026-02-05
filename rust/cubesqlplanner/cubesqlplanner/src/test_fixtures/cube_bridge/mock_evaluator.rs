@@ -17,6 +17,7 @@ use std::rc::Rc;
 pub struct MockCubeEvaluator {
     schema: MockSchema,
     primary_keys: HashMap<String, Vec<String>>,
+    #[allow(dead_code)]
     join_graph: Option<Rc<MockJoinGraph>>,
 }
 
@@ -53,6 +54,7 @@ impl MockCubeEvaluator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn join_graph(&self) -> Option<Rc<MockJoinGraph>> {
         self.join_graph.clone()
     }

@@ -1,4 +1,3 @@
-use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::test_fixtures::cube_bridge::yaml::{
     YamlDimensionDefinition, YamlMeasureDefinition, YamlPreAggregationDefinition,
     YamlSegmentDefinition,
