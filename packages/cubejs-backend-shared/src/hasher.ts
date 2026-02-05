@@ -156,7 +156,7 @@ class XxHasher implements Hasher {
  * @returns A new Hasher instance
  */
 export function defaultHasher(): Hasher {
-  const algorithm = getEnv('hashingAlgorithm');
+  const algorithm = getEnv('hasherAlgorithm');
 
   if (algorithm) {
     const alg = algorithm.toLowerCase();

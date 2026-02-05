@@ -352,16 +352,14 @@ describe('Feature flag behavior', () => {
     process.env.CUBEJS_HASHER_ALGORITHM = '';
     const hash = defaultHasher().update('test').digest('hex');
 
-    // MD5 hash of 'test'
+    // MD5 hash of 'test' (empty string falls back to default 'md5')
     expect(hash).toBe('098f6bcd4621d373cade4e832627b4f6');
   });
 
-  test('should default to MD5 for unknown algorithm', () => {
+  test('should throw error for unknown algorithm', () => {
     process.env.CUBEJS_HASHER_ALGORITHM = 'blake2b';
-    const hash = defaultHasher().update('test').digest('hex');
 
-    // MD5 hash of 'test'
-    expect(hash).toBe('098f6bcd4621d373cade4e832627b4f6');
+    expect(() => defaultHasher()).toThrow('Value "blake2b" is not valid for CUBEJS_HASHER_ALGORITHM');
   });
 
   test('MD5 and xxHash should produce different results', () => {
