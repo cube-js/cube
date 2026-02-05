@@ -1,0 +1,79 @@
+# Calcite
+
+## Prerequisites
+
+- The hostname for the [Calcite][calcite]-based database server
+- The username/password for the database server
+- The name of the database to use within the database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=calcite
+CUBEJS_DB_HOST=my.calcite.host
+CUBEJS_DB_PORT=3306
+CUBEJS_DB_USER=calcite_user
+CUBEJS_DB_PASS=**********
+CUBEJS_DB_NAME=my_calcite_database
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                                         | Possible Values           | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number            |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox]
+can be used in pre-aggregations when using Calcite as a source database.
+The Calcite dialect falls back to exact `COUNT(DISTINCT ...)` for approximate
+distinct counts, as support varies across Calcite-based adapters.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature | Works with read-only mode? | Is default? |
+| ------- | :------------------------: | :---------: |
+| Simple  |             ✅             |     ✅      |
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for Calcite.
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and a Calcite-based database,
+set the `CUBEJS_DB_SSL` environment variable to `true`. For more information on
+how to configure custom certificates, please check out [Enable SSL Connections
+to the Database][ref-recipe-enable-ssl].
+
+[calcite]: https://calcite.apache.org/
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-recipe-enable-ssl]:
+  /product/configuration/recipes/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx

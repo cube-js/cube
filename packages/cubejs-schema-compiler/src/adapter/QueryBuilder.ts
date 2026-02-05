@@ -17,6 +17,7 @@ import { ElasticSearchQuery } from './ElasticSearchQuery';
 import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
 import { TrinoQuery } from './TrinoQuery';
+import { CalciteQuery } from './CalciteQuery';
 
 const ADAPTERS = {
   postgres: PostgresQuery,
@@ -41,6 +42,7 @@ const ADAPTERS = {
   elasticsearch: ElasticSearchQuery,
   materialize: PostgresQuery,
   cubestore: CubeStoreQuery,
+  calcite: CalciteQuery,
 };
 
 export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];

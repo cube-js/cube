@@ -71,7 +71,21 @@
     "lodash": "^4.17.0",
     "@types/node": "^20",
     "@types/ramda": "0.27.40",
-    "thrift": "0.20.0"
+    "thrift": "0.20.0",
+    "jsonwebtoken/jws": "3.2.3",
+    "google-auth-library/jws": "4.0.1",
+    "gtoken/jws": "4.0.1",
+    "@azure/identity/jws": "4.0.1",
+    "@types/request/form-data": "2.5.4",
+    "superagent/form-data": "2.5.4",
+    "@npmcli/package-json/glob": "10.5.0",
+    "archiver-utils/glob": "10.5.0",
+    "cacache/glob": "10.5.0",
+    "java/glob": "10.5.0",
+    "js-beautify/glob": "10.5.0",
+    "node-gyp/glob": "10.5.0",
+    "rimraf/glob": "10.5.0",
+    "snowflake-sdk/glob": "10.5.0"
   },
   "license": "MIT",
   "packageManager": "yarn@1.22.19"
