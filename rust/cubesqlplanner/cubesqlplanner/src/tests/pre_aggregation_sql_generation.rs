@@ -24,8 +24,10 @@ fn test_basic_pre_agg_sql() {
         .build_sql_with_used_pre_aggregations(query_yaml)
         .expect("Should generate SQL without pre-aggregations");
 
-    println!("Generated SQL (no pre-agg optimization):\n{}", sql);
-
+    // First check atomic assertions - they fail fast with clear messages
     assert_eq!(pre_aggrs.len(), 1, "Should use one pre-aggregation");
-    assert_eq!(pre_aggrs[0].name(), "daily_rollup")
+    assert_eq!(pre_aggrs[0].name(), "daily_rollup");
+
+    // Snapshot the generated SQL as the final check
+    insta::assert_snapshot!(sql);
 }
