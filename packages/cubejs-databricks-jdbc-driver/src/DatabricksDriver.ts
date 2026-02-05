@@ -923,7 +923,7 @@ export class DatabricksDriver extends JDBCDriver {
         params,
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
+      await this.dropTableWithRetry(`${tableFullName}_tmp`);
     }
   }
 
@@ -962,7 +962,25 @@ export class DatabricksDriver extends JDBCDriver {
         [],
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
+      await this.dropTableWithRetry(`${tableFullName}_tmp`);
+    }
+  }
+
+  /**
+   * Drops a table, retrying with explicit catalog qualification if needed.
+   * Works around Unity Catalog / Hive Metastore interaction issues where
+   * DROP TABLE IF EXISTS may fail with TABLE_OR_VIEW_NOT_FOUND.
+   */
+  private async dropTableWithRetry(tableName: string): Promise<void> {
+    try {
+      await this.query(`DROP TABLE IF EXISTS ${tableName};`, []);
+    } catch (e: any) {
+      // Unity Catalog may throw TABLE_OR_VIEW_NOT_FOUND even with IF EXISTS
+      // when the table doesn't exist or wasn't created. This is safe to ignore.
+      if (e.message?.includes('TABLE_OR_VIEW_NOT_FOUND')) {
+        return;
+      }
+      throw e;
     }
   }
 }
