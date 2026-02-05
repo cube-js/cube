@@ -1,0 +1,109 @@
+cubes:
+    - name: cube_a
+      sql: "SELECT * FROM table_a"
+      joins:
+          - name: cube_b
+            relationship: many_to_one
+            sql: "{cube_a}.b_id = {cube_b.id}"
+          - name: cube_c
+            relationship: many_to_one
+            sql: "{cube_a}.c_id = {cube_c.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: b_id
+            type: number
+            sql: b_id
+          - name: c_id
+            type: number
+            sql: c_id
+          - name: name
+            type: string
+            sql: name
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+            sql: "COUNT(*)"
+          - name: total_value
+            type: sum
+            sql: value
+
+    - name: cube_b
+      sql: "SELECT * FROM table_b"
+      joins:
+          - name: cube_c
+            relationship: many_to_one
+            sql: "{cube_b}.c_id = {cube_c.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: c_id
+            type: number
+            sql: c_id
+          - name: category
+            type: string
+            sql: category
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+            sql: "COUNT(*)"
+          - name: max_amount
+            type: max
+            sql: amount
+
+    - name: cube_c
+      sql: "SELECT * FROM table_c"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: code
+            type: string
+            sql: code
+          - name: description
+            type: string
+            sql: description
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+            sql: "COUNT(*)"
+          - name: total_items
+            type: sum
+            sql: item_count
+
+views:
+    - name: a_with_b_and_c
+      cubes:
+          - join_path: cube_a
+            includes:
+                - id
+                - name
+                - count
+          - join_path: cube_a.cube_b
+            includes:
+                - category
+                - count
+          - join_path: cube_a.cube_b.cube_c
+            includes:
+                - code
+                - description
+          - join_path: cube_a.cube_c
+            includes:
+                - code
