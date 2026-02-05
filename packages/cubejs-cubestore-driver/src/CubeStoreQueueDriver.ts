@@ -82,7 +82,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     values.push(JSON.stringify(data));
 
     const rows = await this.driver.query(`QUEUE ADD PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''} ? ?`, values);
-    if (rows?.length) {
+    if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
         rows[0].id ? parseInt(rows[0].id, 10) : null,
@@ -103,7 +103,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),
     ]);
-    if (rows?.length) {
+    if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'cancelQuery');
     }
 
@@ -148,7 +148,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     const rows = await this.driver.query('CACHE INCR ?', [
       `${this.options.redisQueuePrefix}:PROCESSING_COUNTER`
     ]);
-    if (rows?.length) {
+    if (rows && rows.length) {
       return rows[0].value;
     }
 
@@ -183,7 +183,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     const rows = await this.driver.query('QUEUE RESULT ?', [
       this.prefixKey(this.redisHash(queryKey)),
     ]);
-    if (rows?.length) {
+    if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResult');
     }
 
@@ -242,7 +242,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     const rows = await this.driver.query('QUEUE GET ?', [
       queueId || this.prefixKey(hash),
     ]);
-    if (rows?.length) {
+    if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getQueryDef');
     }
 
@@ -268,7 +268,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.options.concurrency,
       this.prefixKey(hash),
     ]);
-    if (rows?.length) {
+    if (rows && rows.length) {
       const active = rows[0].active ? (rows[0].active).split(',') as unknown as QueryKeyHash[] : [];
       const pending = parseInt(rows[0].pending, 10);
 
@@ -299,7 +299,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),
     ]);
-    if (rows?.length) {
+    if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResultBlocking');
     }
 
@@ -345,8 +345,8 @@ export class CubeStoreQueueDriver implements QueueDriverInterface {
       return this.connection;
     }
 
-    this.connection = await this.driverFactory();
-    return this.connection;
+    // eslint-disable-next-line no-return-assign
+    return this.connection = await this.driverFactory();
   }
 
   public async createConnection(): Promise<CubestoreQueueDriverConnection> {
