@@ -524,6 +524,36 @@ impl MockSqlTemplatesRender {
         templates.insert("types/interval".to_string(), "INTERVAL".to_string());
         templates.insert("types/binary".to_string(), "BINARY".to_string());
 
+        // Statements - SQL statement templates for query building
+        templates.insert(
+            "statements/select".to_string(),
+            "{% if ctes %} WITH \n{{ ctes | join(',\n') }}\n{% endif %}SELECT {% if distinct %}DISTINCT {% endif %}{{ select_concat | map(attribute='aliased') | join(', ') }} {% if from %}\nFROM (\n{{ from | indent(2, true) }}\n) AS {{ from_alias }}{% elif from_prepared %}\nFROM {{ from_prepared }}{% endif %}{% if filter %}\nWHERE {{ filter }}{% endif %}{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}{% if having %}\nHAVING {{ having }}{% endif %}{% if order_by %}\nORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}".to_string(),
+        );
+        templates.insert(
+            "statements/group_by_exprs".to_string(),
+            "{{ group_by | map(attribute='index') | join(', ') }}".to_string(),
+        );
+        templates.insert(
+            "statements/join".to_string(),
+            "{{ join_type }} JOIN {{ source }} ON {{ condition }}".to_string(),
+        );
+        templates.insert(
+            "statements/cte".to_string(),
+            "{{ alias }} AS ({{ query | indent(2, true) }})".to_string(),
+        );
+        templates.insert(
+            "statements/time_series_select".to_string(),
+            "SELECT date_from::timestamp AS \"date_from\",\ndate_to::timestamp AS \"date_to\" \nFROM(\n    VALUES {% for time_item in seria  %}('{{ time_item | join(\"', '\") }}'){% if not loop.last %}, {% endif %}{% endfor %}) AS dates (date_from, date_to)".to_string(),
+        );
+        templates.insert(
+            "statements/time_series_get_range".to_string(),
+            "SELECT {{ max_expr }} as {{ quoted_max_name }},\n{{ min_expr }} as {{ quoted_min_name }}\nFROM {{ from_prepared }}\n{% if filter %}WHERE {{ filter }}{% endif %}".to_string(),
+        );
+        templates.insert(
+            "statements/calc_groups_join".to_string(),
+            "{% if original_sql %}{{ original_sql }}\n{% endif %}{% for group in groups  %}{% if original_sql or not loop.first %}CROSS JOIN\n{% endif %}(\n{% for value in group.values  %}SELECT {{ value }} as {{ group.name }}{% if not loop.last %} UNION ALL\n{% endif %}{% endfor %}) AS {{ group.alias }}\n{% endfor %}".to_string(),
+        );
+
         Self::try_new(templates).expect("Default templates should always parse successfully")
     }
 }

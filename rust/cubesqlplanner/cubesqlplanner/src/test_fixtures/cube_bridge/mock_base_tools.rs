@@ -88,7 +88,7 @@ impl BaseTools for MockBaseTools {
     }
 
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
-        todo!("get_allocated_params not implemented in mock")
+        Ok(vec![])
     }
 
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError> {

@@ -1,8 +1,11 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
+use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::planners::QueryPlanner;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::QueryProperties;
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockSchema, MockSecurityContext,
@@ -177,6 +180,25 @@ impl TestContext {
                 )
                 .build(),
         )
+    }
+
+    pub fn build_sql(&self, query: &str) -> Result<String, cubenativeutils::CubeError> {
+        let options = self.create_query_options_from_yaml(query);
+        let request = QueryProperties::try_new(self.query_tools.clone(), options.clone())?;
+        let query_planner = QueryPlanner::new(request.clone(), self.query_tools.clone());
+        let logical_plan = query_planner.plan()?;
+        let templates = self.query_tools.plan_sql_templates(false)?;
+        let physical_plan_builder =
+            PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
+
+        let physical_plan = physical_plan_builder.build(
+            logical_plan,
+            std::collections::HashMap::new(),
+            request.is_total_query(),
+        )?;
+
+        let sql = physical_plan.to_sql(&templates)?;
+        Ok(sql)
     }
 }
 
