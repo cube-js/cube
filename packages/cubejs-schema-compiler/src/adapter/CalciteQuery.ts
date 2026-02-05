@@ -98,7 +98,7 @@ export class CalciteQuery extends BaseQuery {
   }
 
   public unixTimestampSql(): string {
-    return `UNIX_TIMESTAMP()`;
+    return 'UNIX_TIMESTAMP()';
   }
 
   public wrapSegmentForDimensionSelect(sql: string): string {

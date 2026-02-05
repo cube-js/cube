@@ -140,8 +140,8 @@ describe('CalciteQuery', () => {
       timezone: 'UTC'
     });
 
-    const result = (query as any).timeStampCast("'2020-01-01T00:00:00.000'");
-    expect(result).toBe("TIMESTAMP '2020-01-01 00:00:00'");
+    const result = (query as any).timeStampCast('\'2020-01-01T00:00:00.000\'');
+    expect(result).toBe('TIMESTAMP \'2020-01-01 00:00:00\'');
   });
 
   it('does not apply timezone conversion', async () => {
@@ -234,8 +234,8 @@ describe('CalciteQuery', () => {
       timezone: 'UTC'
     });
 
-    const concatResult = (query as any).concatStringsSql(["'a'", "'b'", "'c'"]);
-    expect(concatResult).toBe("CONCAT('a', 'b', 'c')");
+    const concatResult = (query as any).concatStringsSql(['\'a\'', '\'b\'', '\'c\'']);
+    expect(concatResult).toBe('CONCAT(\'a\', \'b\', \'c\')');
   });
 
   it('handles time dimension without granularity in filter', async () => {
