@@ -168,6 +168,7 @@ impl YamlSchema {
 mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
+    use crate::cube_bridge::evaluator::CubeEvaluator;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::member_sql::SqlTemplate;
     use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
@@ -739,5 +740,71 @@ mod tests {
         let view_price = schema.get_dimension("orders_view", "price").unwrap();
         let price_sql = view_price.sql().unwrap().unwrap();
         assert_eq!(price_sql.args_names(), &vec!["line_items"]);
+    }
+
+    #[test]
+    fn test_pre_aggregations_preserve_order() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: orders
+                sql: "SELECT * FROM orders"
+                dimensions:
+                  - name: status
+                    type: string
+                    sql: status
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+                pre_aggregations:
+                  - name: first_rollup
+                    type: rollup
+                    measures:
+                      - count
+                    dimensions:
+                      - status
+                    time_dimension: created_at
+                    granularity: day
+                  - name: second_rollup
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: created_at
+                    granularity: month
+                  - name: third_rollup
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: created_at
+                    granularity: year
+        "#};
+
+        let schema = MockSchema::from_yaml(yaml).unwrap();
+        let evaluator = schema.create_evaluator();
+
+        // Check that pre_aggregations_for_cube_as_array returns pre-aggregations in the same order
+        // as they are defined in YAML
+        let pre_aggs = evaluator
+            .pre_aggregations_for_cube_as_array("orders".to_string())
+            .unwrap();
+
+        assert_eq!(pre_aggs.len(), 3);
+        assert_eq!(pre_aggs[0].static_data().name, "first_rollup");
+        assert_eq!(
+            pre_aggs[0].static_data().granularity,
+            Some("day".to_string())
+        );
+        assert_eq!(pre_aggs[1].static_data().name, "second_rollup");
+        assert_eq!(
+            pre_aggs[1].static_data().granularity,
+            Some("month".to_string())
+        );
+        assert_eq!(pre_aggs[2].static_data().name, "third_rollup");
+        assert_eq!(
+            pre_aggs[2].static_data().granularity,
+            Some("year".to_string())
+        );
     }
 }
