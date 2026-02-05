@@ -1,6 +1,5 @@
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::driver_tools::DriverTools;
-use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
@@ -8,7 +7,7 @@ use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockJoinGraph, MockPreAggregationObj, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;

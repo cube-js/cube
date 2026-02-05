@@ -9,7 +9,6 @@ use crate::test_fixtures::cube_bridge::{
 use cubenativeutils::CubeError;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]

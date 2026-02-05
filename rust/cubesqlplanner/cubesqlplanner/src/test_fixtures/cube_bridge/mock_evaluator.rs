@@ -283,9 +283,7 @@ impl CubeEvaluator for MockCubeEvaluator {
             .schema
             .get_pre_aggregations_for_cube(&cube_name)
             .map(|pre_aggs| {
-                pre_aggs
-                    .into_iter()
-                    .map(|(_, pre_agg)| pre_agg as Rc<dyn PreAggregationDescription>)
+                pre_aggs.into_values().map(|pre_agg| pre_agg as Rc<dyn PreAggregationDescription>)
                     .collect()
             })
             .unwrap_or_default())

@@ -340,7 +340,7 @@ impl MockCubeBuilder {
     }
 
     pub fn finish_cube(mut self) -> MockSchemaBuilder {
-        let mut cube_def = self.cube_definition.unwrap_or_else(|| {
+        let cube_def = self.cube_definition.unwrap_or_else(|| {
             MockCubeDefinition::builder()
                 .name(self.cube_name.clone())
                 .sql_table(format!("public.{}", self.cube_name))
