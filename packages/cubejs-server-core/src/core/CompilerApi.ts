@@ -1,5 +1,5 @@
-import vm from 'vm';
 import crypto from 'crypto';
+import vm from 'vm';
 import {
   AccessPolicyDefinition,
   BaseQuery,
