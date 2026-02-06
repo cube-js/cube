@@ -12,6 +12,8 @@ export * from './QueryCache';
 export * from './QueryFactory';
 export * from './CubeStoreQuery';
 
+export * from './CalciteQuery';
+
 // Base queries that can be re-used across different drivers
 export * from './MysqlQuery';
 export * from './PostgresQuery';
