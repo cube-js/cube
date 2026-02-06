@@ -33,7 +33,6 @@
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "23.3.3",
     "fs-extra": "^9.1.0",
-    "generic-pool": "^3.8.2",
     "node-fetch": "^2.6.1",
     "sqlstring": "^2.3.3",
     "tempy": "^1.0.1",
