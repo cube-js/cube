@@ -7,9 +7,9 @@
 import {
   getEnv,
   assertDataSource,
+  Pool,
 } from '@cubejs-backend/shared';
 import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
-import genericPool, { Pool } from 'generic-pool';
 import { Readable } from 'stream';
 import {
   BaseDriver,
@@ -94,7 +94,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       flags: ['-CONNECT_ATTRS'],
       ...mongoBIDriverConfiguration
     };
-    this.pool = genericPool.createPool({
+    this.pool = new Pool('mongobi', {
       create: async () => {
         const conn: Connection = createConnection(this.config);
 

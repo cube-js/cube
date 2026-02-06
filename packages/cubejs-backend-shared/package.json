@@ -28,6 +28,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.9",
+    "@types/generic-pool": "^3.8.2",
     "@types/bytes": "^3.1.5",
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.7",
@@ -42,6 +43,7 @@
   },
   "dependencies": {
     "@oclif/color": "^0.1.2",
+    "generic-pool": "^3.9.0",
     "bytes": "^3.1.2",
     "cli-progress": "^3.9.0",
     "cross-spawn": "^7.0.3",
