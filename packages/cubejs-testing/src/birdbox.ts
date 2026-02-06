@@ -84,6 +84,8 @@ type RequiredEnv = {
 type OptionalEnv = {
   // SQL API
   CUBEJS_SQL_PORT?: string,
+  // ADBC API
+  CUBEJS_ADBC_PORT?: string,
   CUBEJS_SQL_USER?: string,
   CUBEJS_PG_SQL_PORT?: string,
   CUBEJS_SQL_PASSWORD?: string,

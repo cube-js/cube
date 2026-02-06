@@ -4,6 +4,7 @@ use cubesql::telemetry::{LocalReporter, ReportingLogger};
 use log::Level;
 use simple_logger::SimpleLogger;
 use tests::{
+    arrow_ipc::ArrowIPCIntegrationTestSuite,
     basic::{AsyncTestConstructorResult, AsyncTestSuite},
     postgres::PostgresIntegrationTestSuite,
 };
@@ -49,6 +50,7 @@ fn main() {
     rt.block_on(async {
         let mut runner = TestsRunner::new();
         runner.register_suite(PostgresIntegrationTestSuite::before_all().await);
+        runner.register_suite(ArrowIPCIntegrationTestSuite::before_all().await);
 
         for suites in runner.suites.iter_mut() {
             suites.run().await.unwrap();

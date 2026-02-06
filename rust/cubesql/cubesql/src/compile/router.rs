@@ -362,6 +362,9 @@ impl QueryRouter {
                     ));
                 }
             }
+            DatabaseProtocol::ArrowNative => {
+                log::warn!("set_variable_to_plan is not supported for ArrowNative protocol");
+            }
             DatabaseProtocol::Extension(_) => {
                 log::warn!("set_variable_to_plan is not supported for custom protocol");
             }

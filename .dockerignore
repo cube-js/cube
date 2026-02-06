@@ -6,11 +6,14 @@
 !yarn.lock
 !lerna.json
 !packages/
-!rust/cubestore/js-wrapper/
-!rust/cubestore/tsconfig.json
-!rust/cubestore/package.json
-!rust/cubestore/bin
-!rust/cubesql/package.json
+
+# Rust components - all directories needed for native build
+!rust/cubestore/
+!rust/cubesql/
+!rust/cubenativeutils/
+!rust/cubeorchestrator/
+!rust/cubeshared/
+!rust/cubesqlplanner/
 
 # Ignoring builds for native from local machime to protect a problem with different architecture
 packages/cubejs-backend-native/index.node

@@ -190,6 +190,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "Logs".to_string(),
@@ -246,6 +247,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "NumberCube".to_string(),
@@ -270,6 +272,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "WideCube".to_string(),
@@ -362,6 +365,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
+            pre_aggregations: None,
         },
         CubeMeta {
             name: "MultiTypeCube".to_string(),
@@ -497,6 +501,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             nested_folders: None,
             hierarchies: None,
             meta: None,
+            pre_aggregations: None,
         },
     ]
 }
@@ -525,6 +530,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
         nested_folders: None,
         hierarchies: None,
         meta: None,
+        pre_aggregations: None,
     }]
 }
 
@@ -576,6 +582,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
         nested_folders: None,
         hierarchies: None,
         meta: None,
+        pre_aggregations: None,
     }]
 }
 
@@ -741,6 +748,7 @@ fn get_test_tenant_ctx_with_meta_and_templates(
         .collect();
     Arc::new(MetaContext::new(
         meta,
+        vec![], // pre_aggregations (empty for tests)
         member_to_data_source,
         vec![("default".to_string(), sql_generator(custom_templates))]
             .into_iter()

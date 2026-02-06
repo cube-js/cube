@@ -107,6 +107,7 @@ export interface CanSwitchUserPayload {
 
 export type SQLInterfaceOptions = {
   pgPort?: number,
+  adbcPort?: number,
   contextToApiScopes: (payload: ContextToApiScopesPayload) => ContextToApiScopesResponse | Promise<ContextToApiScopesResponse>,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
