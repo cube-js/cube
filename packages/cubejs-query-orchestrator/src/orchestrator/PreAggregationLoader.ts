@@ -1,6 +1,5 @@
 import R from 'ramda';
-import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
+import { defaultHasher, getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -66,8 +65,8 @@ function queryKeyMd5(queryKey: QueryKey): string {
     return jsonStr;
   }
 
-  // Otherwise, return MD5 hash
-  return crypto.createHash('md5').update(jsonStr).digest('hex');
+  // Otherwise, return hash
+  return defaultHasher().update(jsonStr).digest('hex');
 }
 
 export class PreAggregationLoader {

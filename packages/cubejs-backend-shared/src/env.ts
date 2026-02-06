@@ -164,6 +164,22 @@ const variables: Record<string, (...args: any) => any> = {
     .default('false')
     .asBoolStrict(),
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
+  hasherAlgorithm: () => {
+    const supportedHashers = ['md5', 'sha256', 'sha512', 'xxhash'];
+    const algorithm = get('CUBEJS_HASHER_ALGORITHM')
+      .default('md5')
+      .asString() || 'md5';
+
+    if (!supportedHashers.includes(algorithm.toLowerCase())) {
+      throw new InvalidConfiguration(
+        'CUBEJS_HASHER_ALGORITHM',
+        algorithm,
+        `Must be one of: ${supportedHashers.join(', ')}`
+      );
+    }
+
+    return algorithm;
+  },
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
