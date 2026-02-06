@@ -1,4 +1,6 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import R from 'ramda';
+
+import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -132,6 +134,50 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
+  private getField(id) {
+    const equalIgnoreCase = (a, b) => (
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+    );
+
+    let field;
+
+    field = this.dimensionsForSelect().find(
+      d => equalIgnoreCase(d.dimension, id),
+    );
+
+    if (!field) {
+      field = this.measures.find(
+        d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+      );
+    }
+
+    return field;
+  }
+
+  public getFieldAlias(id) {
+    const field = this.getField(id);
+
+    if (field) {
+      return field.aliasName();
+    }
+
+    return null;
+  }
+
+  public getFieldType(hash) {
+    if (!hash || !hash.id) {
+      return null;
+    }
+
+    const field = this.getField(hash.id);
+
+    if (field) {
+      return field.definition().type;
+    }
+
+    return null;
+  }
+
   public override orderHashToString(hash: { id: string, desc: boolean }) {
     //
     // ClickHouse doesn't support order by index column, so map these to the alias names
@@ -149,6 +195,42 @@ export class ClickHouseQuery extends BaseQuery {
 
     const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
+  }
+
+  private getCollation() {
+    const useCollation = getEnv('clickhouseUseCollation', { dataSource: this.dataSource });
+    if (useCollation) {
+      return getEnv('clickhouseSortCollation', { dataSource: this.dataSource });
+    }
+    return null;
+  }
+
+  public override orderBy() {
+    //
+    // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
+    //
+if (this.order.length === 0) {
+  return '';
+}
+
+const collation = this.getCollation();
+
+const orderByString = this.order
+  .map((order) => {
+    let orderString = this.orderHashToString(order);
+    if (collation && this.getFieldType(order) === 'string') {
+      orderString = `${orderString} COLLATE '${collation}'`;
+    }
+    return orderString;
+  })
+  .filter(Boolean) // Analogue `R.reject(R.isNil)`
+  .join(', ');
+
+    if (!orderByString) {
+      return '';
+    }
+
+    return ` ORDER BY ${orderByString}`;
   }
 
   public groupByClause() {
@@ -277,6 +359,39 @@ export class ClickHouseQuery extends BaseQuery {
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
     delete templates.types.binary;
+
+    templates.expressions.sort = '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}';
+    templates.expressions.order_by = '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}';
+
+    const selectOrderBy = '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}';
+    templates.statements.select = '{% if ctes %} WITH \n' +
+          '{{ ctes | join(\',\n\') }}\n' +
+          '{% endif %}' +
+          'SELECT {% if distinct %}DISTINCT {% endif %}' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+          'FROM (\n' +
+          '{{ from | indent(2, true) }}\n' +
+          ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+          'FROM {{ from_prepared }}' +
+          '{% endif %}' +
+          '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+          '{% if having %}\nHAVING {{ having }}{% endif %}' +
+          selectOrderBy +
+          '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
+          '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}';
+    const collation = this.getCollation();
+
+    if (collation) {
+      templates.expressions.sort = `${templates.expressions.sort}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
+      templates.expressions.order_by = `${templates.expressions.order_by}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
+
+      const collatedSelectOrderBy =
+        '{% if order_by %}\nORDER BY {% for item in order_by %}{{ item.expr }}' +
+        `{%- if item.data_type and item.data_type == 'string' %} COLLATE '${collation}'{% endif %}` +
+        '{%- if not loop.last %}, {% endif %}{% endfor %}{% endif %}';
+      templates.statements.select = templates.statements.select.replace(selectOrderBy, collatedSelectOrderBy);
+    }
     return templates;
   }
 }
