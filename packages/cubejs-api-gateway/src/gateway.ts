@@ -4,6 +4,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
+import { specifiedRules, NoSchemaIntrospectionCustomRule } from 'graphql';
 import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
@@ -266,6 +267,9 @@ class ApiGateway {
           graphiql: getEnv('nodeEnv') !== 'production'
             ? { headerEditorEnabled: true }
             : false,
+          ...(!getEnv('graphQlApiIntrospectionEnabled') && {
+            validationRules: [...specifiedRules, NoSchemaIntrospectionCustomRule],
+          })
         })(req, res);
       })
     );

@@ -59,7 +59,17 @@ export const preAggregationVersionEntriesResultFactory = () => ({
   }
 });
 
+let compilerApiGraphQLSchema: any = null;
+
 export const compilerApi = jest.fn().mockImplementation(async () => ({
+  getGraphQLSchema() {
+    return compilerApiGraphQLSchema;
+  },
+  
+  setGraphQLSchema(schema: any) {
+    compilerApiGraphQLSchema = schema;
+  },
+
   async getSql() {
     return {
       sql: ['SELECT * FROM test', []],

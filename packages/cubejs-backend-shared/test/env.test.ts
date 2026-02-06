@@ -94,4 +94,14 @@ describe('getEnv', () => {
     process.env.CUBEJS_LIVE_PREVIEW = 'false';
     expect(getEnv('livePreview')).toBe(false);
   });
+
+  test('graphQlApiIntrospectionEnabled', () => {
+    expect(getEnv('graphQlApiIntrospectionEnabled')).toBe(true);
+
+    process.env.CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED = 'true';
+    expect(getEnv('graphQlApiIntrospectionEnabled')).toBe(true);
+
+    process.env.CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED = 'false';
+    expect(getEnv('graphQlApiIntrospectionEnabled')).toBe(false);
+  });
 });

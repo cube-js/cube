@@ -878,4 +878,37 @@ describe('API Gateway', () => {
       expect(dataSourceStorage.$testOrchestratorConnectionsDone).toEqual(false);
     });
   });
+
+  describe('GraphQL introspection', () => {
+    const introspectionQuery = '{ __schema { types { name } } }';
+    const authHeader = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+
+    test('returns schema when CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED is true', async () => {
+      process.env.CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED = 'true';
+      
+      const { app } = await createApiGateway();
+      const res = await request(app)
+        .get('/cubejs-api/graphql')
+        .query({ query: introspectionQuery })
+        .set('Authorization', authHeader)
+        .expect(200);
+      expect(res.body.errors).toBeUndefined();
+      expect(res.body.data?.__schema?.types).toBeDefined();
+      expect(Array.isArray(res.body.data.__schema.types)).toBe(true);
+    });
+
+    test('returns validation error when CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED is false', async () => {
+      process.env.CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED = 'false';
+      
+      const { app } = await createApiGateway();
+      const res = await request(app)
+        .get('/cubejs-api/graphql')
+        .query({ query: introspectionQuery })
+        .set('Authorization', authHeader)
+        .expect(400);
+      expect(res.body.errors).toBeDefined();
+      expect(res.body.errors.length).toBeGreaterThan(0);
+      expect(res.body.errors[0].message).toMatch(/introspection/i);
+    });
+  });
 });

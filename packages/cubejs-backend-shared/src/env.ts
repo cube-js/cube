@@ -1811,6 +1811,8 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
+  // GraphQL API
+  graphQlApiIntrospectionEnabled: () => get('CUBEJS_GRAPHQL_API_INTROSPECTION_ENABLED').default('true').asBoolStrict(),
 };
 
 type Vars = typeof variables;
