@@ -77,6 +77,10 @@ on a Windows Server machine.
 It should be configured to authenticate with a _master user_ account. It can be a
 local user on the machine or a domain user.
 
+The Windows machine running the gateway should be joined to the corporate Active
+Directory or Entra ID where your business users have their accounts. The service account running
+the gateway needs minimal permissions but must exist in that same directory.
+
 ### Verifying the credentials
 
 By default, `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` environment variables are used
