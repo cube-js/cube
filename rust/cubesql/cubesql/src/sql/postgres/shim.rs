@@ -3,7 +3,10 @@ use std::{
     time::SystemTime,
 };
 
-use super::{extended::PreparedStatement, pg_auth_service::AuthenticationStatus};
+use super::{
+    ast_helpers::parse_fetch_limit, extended::PreparedStatement,
+    pg_auth_service::AuthenticationStatus,
+};
 use crate::{
     compile::{
         convert_statement_to_cube_query,
@@ -33,7 +36,7 @@ use pg_srv::{
     },
     PgType, PgTypeId, ProtocolError,
 };
-use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement, Value};
+use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -1457,39 +1460,26 @@ impl AsyncPostgresShim {
                 };
 
                 let limit: usize = match direction {
-                    FetchDirection::Count { limit } => {
-                        match limit {
-                            Value::Number(v, negative) => {
-                                if negative {
-                                    // HINT:  Declare it with SCROLL option to enable backward scan.
-                                    // But it's not supported right now!
-                                    return Err(ConnectionError::Protocol(
-                                        protocol::ErrorResponse::error(
-                                            protocol::ErrorCode::ObjectNotInPrerequisiteState,
-                                            "cursor can only scan forward".to_string(),
-                                        )
-                                        .into(),
-                                        span_id.clone(),
-                                    ));
-                                }
+                    FetchDirection::Count { limit } => parse_fetch_limit(&limit, &span_id)?,
 
-                                v.parse::<usize>().map_err(|err| ConnectionError::Protocol(
-                                protocol::ErrorResponse::error(
-                                    protocol::ErrorCode::ProtocolViolation,
-                                    format!(r#""Unable to parse number "{}" for fetch limit: {}"#, v, err),
-                                )
-                                    .into(),
-                                span_id.clone(),
-                            ))?
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
+                    // Fetch the next row. This is the default if direction is omitted.
+                    FetchDirection::Next => 1,
+
+                    FetchDirection::Forward { limit } => match limit {
+                        // Fetch the next count rows. FORWARD 0 re-fetches the current row.
+                        Some(v) => parse_fetch_limit(&v, &span_id)?,
+                        // Fetch the next row (same as NEXT).
+                        None => 1,
+                    },
+
+                    // Fetch all remaining rows.
+                    FetchDirection::All | FetchDirection::ForwardAll => usize::MAX,
+
                     other => {
                         return Err(ConnectionError::Protocol(
                             protocol::ErrorResponse::error(
-                                protocol::ErrorCode::ProtocolViolation,
-                                format!("Limit {} is not supported for FETCH statement", other),
+                                protocol::ErrorCode::FeatureNotSupported,
+                                format!("FETCH with direction ({}) is not supported", other),
                             )
                             .into(),
                             span_id.clone(),

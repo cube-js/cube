@@ -666,6 +666,109 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_fetch_directions(&self) -> RunResult<()> {
+        self.test_simple_query(
+            r#"DECLARE test_fetch_directions CURSOR WITH HOLD FOR SELECT generate_series(1, 100);"#
+                .to_string(),
+            |messages| {},
+        )
+        .await?;
+
+        // Test FETCH FORWARD 1 - should return row "1"
+        self.test_simple_query(
+            r#"FETCH FORWARD 1 IN test_fetch_directions;"#.to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 2); // 1 row + completion
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("1"));
+                } else {
+                    panic!("Expected Row for FETCH FORWARD 1");
+                }
+            },
+        )
+        .await?;
+
+        // Test FETCH NEXT - should return row "2"
+        self.test_simple_query(
+            r#"FETCH NEXT IN test_fetch_directions;"#.to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 2); // 1 row + completion
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("2"));
+                } else {
+                    panic!("Expected Row for FETCH NEXT");
+                }
+            },
+        )
+        .await?;
+
+        // Test FETCH FORWARD 5 - should return rows 3-7
+        self.test_simple_query(
+            r#"FETCH FORWARD 5 IN test_fetch_directions;"#.to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 6); // 5 rows + completion
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("3"));
+                } else {
+                    panic!("Expected Row for FETCH FORWARD 5, first row");
+                }
+                if let SimpleQueryMessage::Row(row) = &messages[4] {
+                    assert_eq!(row.get(0), Some("7"));
+                } else {
+                    panic!("Expected Row for FETCH FORWARD 5, last row");
+                }
+            },
+        )
+        .await?;
+
+        // Test FETCH ALL - should return remaining rows (8-100 = 93 rows)
+        self.test_simple_query(
+            r#"FETCH ALL IN test_fetch_directions;"#.to_string(),
+            |messages| {
+                // 93 rows + 1 completion
+                assert_eq!(messages.len(), 94);
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("8"));
+                } else {
+                    panic!("Expected Row for FETCH ALL, first row");
+                }
+                if let SimpleQueryMessage::Row(row) = &messages[92] {
+                    assert_eq!(row.get(0), Some("100"));
+                } else {
+                    panic!("Expected Row for FETCH ALL, last row");
+                }
+            },
+        )
+        .await?;
+
+        self.test_simple_query(r#"CLOSE test_fetch_directions;"#.to_string(), |_| {})
+            .await?;
+
+        Ok(())
+    }
+
+    async fn test_fetch_forward_all(&self) -> RunResult<()> {
+        self.test_simple_query(
+            r#"DECLARE test_forward_all CURSOR WITH HOLD FOR SELECT generate_series(1, 10);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"FETCH FORWARD ALL IN test_forward_all;"#.to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 11); // 10 rows + 1 completion
+            },
+        )
+        .await?;
+
+        self.test_simple_query(r#"CLOSE test_forward_all;"#.to_string(), |_| {})
+            .await?;
+
+        Ok(())
+    }
+
     // Tableau Desktop uses it
     async fn test_simple_cursors_without_hold(&self) -> RunResult<()> {
         // without hold is default behaviour
@@ -1175,6 +1278,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_stream_single().await?;
         self.test_portal_pagination().await?;
         self.test_simple_cursors().await?;
+        self.test_fetch_directions().await?;
+        self.test_fetch_forward_all().await?;
         self.test_simple_cursors_without_hold().await?;
         self.test_simple_cursors_close_specific().await?;
         self.test_simple_cursors_close_all().await?;

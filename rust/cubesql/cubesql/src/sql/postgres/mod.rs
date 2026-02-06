@@ -1,3 +1,4 @@
+pub(crate) mod ast_helpers;
 pub(crate) mod extended;
 pub mod pg_auth_service;
 pub(crate) mod pg_type;
