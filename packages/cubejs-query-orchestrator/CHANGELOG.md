@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+### Bug Fixes
+
+- Negative residual in version generation leads to endless loop during pre-aggregation refresh ([#10367](https://github.com/cube-js/cube/issues/10367)) ([d53ae5f](https://github.com/cube-js/cube/commit/d53ae5f3a2299d86ab221970d5909c146a5badac))
+
 ## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator
