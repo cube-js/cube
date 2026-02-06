@@ -162,6 +162,4 @@ impl Compiler {
         }
         Ok(node)
     }
-
-    fn parse_path(&self, full_name: &String) -> Result<(String, String), CubeError> {}
 }
