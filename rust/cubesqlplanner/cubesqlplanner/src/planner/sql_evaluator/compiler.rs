@@ -149,6 +149,11 @@ impl Compiler {
         }
     }
 
+    fn cache_result(&mut self, prefix: &str, node: Rc<MemberSymbol>) {
+        let key = (prefix.to_string(), node.full_name().clone());
+        self.members.insert(key, node.clone());
+    }
+
     fn add_evaluator_impl<T: SymbolFactory + 'static>(
         &mut self,
         full_name: &String,

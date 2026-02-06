@@ -1,4 +1,5 @@
 use super::common::Case;
+use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -327,9 +328,7 @@ impl DimensionSymbol {
 }
 
 pub struct DimensionSymbolFactory {
-    cube_name: String,
-    name: String,
-    granularity: Option<String>,
+    path: SymbolPath,
     sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn DimensionDefinition>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -337,40 +336,14 @@ pub struct DimensionSymbolFactory {
 
 impl DimensionSymbolFactory {
     pub fn try_new(
-        full_name: &String,
+        path: SymbolPath,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
-        let parts: Vec<&str> = full_name.split('.').collect();
-        let mut iter;
-        let member_short_path;
-
-        // try_new might be invoked with next full_name variants:
-        // 1. "cube.member"
-        // 2. "cube.member.granularity" might come from multistage things
-        // 3. "cube.cube.cube...cube.member" might come from pre-agg references (as it include full join paths)
-        // And we can not distinguish between "cube.member.granularity" and "cube.cube.member" here,
-        // so we have to try-catch 2 variants of evaluation.
-        if let Ok(iter_by_start) =
-            cube_evaluator.parse_path("dimensions".to_string(), full_name.clone())
-        {
-            member_short_path = full_name.clone();
-            iter = iter_by_start.into_iter();
-        } else {
-            member_short_path = format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]);
-            iter = cube_evaluator
-                .parse_path("dimensions".to_string(), member_short_path.clone())?
-                .into_iter();
-        }
-
-        let cube_name = iter.next().unwrap();
-        let name = iter.next().unwrap();
-        let granularity = iter.next();
-        let definition = cube_evaluator.dimension_by_path(member_short_path)?;
+        let definition = cube_evaluator.dimension_by_path(path.full_name().clone())?;
+        let sql = definition.sql()?;
         Ok(Self {
-            cube_name,
-            name,
-            granularity,
-            sql: definition.sql()?,
+            path,
+            sql,
             definition,
             cube_evaluator,
         })
@@ -383,7 +356,7 @@ impl SymbolFactory for DimensionSymbolFactory {
     }
 
     fn cube_name(&self) -> &String {
-        &self.cube_name
+        self.path.cube_name()
     }
 
     fn deps_names(&self) -> Result<Vec<String>, CubeError> {
@@ -400,9 +373,7 @@ impl SymbolFactory for DimensionSymbolFactory {
 
     fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self {
-            cube_name,
-            name,
-            granularity,
+            path,
             sql,
             definition,
             cube_evaluator,
@@ -411,7 +382,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let dimension_type = definition.static_data().dimension_type.clone();
 
         let sql = if let Some(sql) = sql {
-            Some(compiler.compile_sql_call(&cube_name, sql)?)
+            Some(compiler.compile_sql_call(path.cube_name(), sql)?)
         } else {
             None
         };
@@ -426,13 +397,14 @@ impl SymbolFactory for DimensionSymbolFactory {
             if let (Some(latitude_item), Some(longitude_item)) =
                 (definition.latitude()?, definition.longitude()?)
             {
-                let latitude = compiler.compile_sql_call(&cube_name, latitude_item.sql()?)?;
-                let longitude = compiler.compile_sql_call(&cube_name, longitude_item.sql()?)?;
+                let latitude = compiler.compile_sql_call(path.cube_name(), latitude_item.sql()?)?;
+                let longitude =
+                    compiler.compile_sql_call(path.cube_name(), longitude_item.sql()?)?;
                 (Some(latitude), Some(longitude))
             } else {
                 return Err(CubeError::user(format!(
-                    "Geo dimension '{}.{}'must have latitude and longitude",
-                    cube_name, name
+                    "Geo dimension '{}'must have latitude and longitude",
+                    path.full_name()
                 )));
             }
         } else {
@@ -440,7 +412,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let case = if let Some(native_case) = definition.case()? {
-            Some(Case::try_new(&cube_name, native_case, compiler)?)
+            Some(Case::try_new(path.cube_name(), native_case, compiler)?)
         } else {
             None
         };
@@ -462,7 +434,7 @@ impl SymbolFactory for DimensionSymbolFactory {
                     };
                     let name = item.static_data().name.clone();
                     let sql = if let Some(sql) = item.sql()? {
-                        Some(compiler.compile_sql_call(&cube_name, sql)?)
+                        Some(compiler.compile_sql_call(path.cube_name(), sql)?)
                     } else {
                         None
                     };
@@ -477,9 +449,12 @@ impl SymbolFactory for DimensionSymbolFactory {
             vec![]
         };
 
-        let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
-        let alias =
-            PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
+        let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
+        let alias = PlanSqlTemplates::member_alias_name(
+            cube.static_data().resolved_alias(),
+            path.symbol_name(),
+            &None,
+        );
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
@@ -490,22 +465,24 @@ impl SymbolFactory for DimensionSymbolFactory {
             let pk_members = cube_evaluator
                 .static_data()
                 .primary_keys
-                .get(&cube_name)
+                .get(path.cube_name())
                 .cloned()
                 .unwrap_or_else(|| vec![]);
 
-            if pk_members.iter().any(|pk| **pk == name) {
+            if pk_members.iter().any(|pk| &**pk == path.symbol_name()) {
                 is_self_time_shift_pk = true;
             }
 
             if pk_members.len() > 1 {
                 return Err(CubeError::user(format!(
                     "Cube '{}' has multiple primary keys, but only one is allowed for calendar cubes",
-                    cube_name
+                    path.cube_name()
                 )));
             }
 
-            pk_members.first().map(|pk| format!("{}.{}", cube_name, pk))
+            pk_members
+                .first()
+                .map(|pk| format!("{}.{}", path.cube_name(), pk))
         } else {
             None
         };
@@ -563,12 +540,12 @@ impl SymbolFactory for DimensionSymbolFactory {
             .unwrap_or(false);
 
         let cube_symbol = compiler
-            .add_cube_table_evaluator(cube_name.clone())?
+            .add_cube_table_evaluator(path.cube_name().clone())?
             .as_cube_table()?;
 
         let symbol = MemberSymbol::new_dimension(DimensionSymbol::new(
             cube_symbol,
-            name.clone(),
+            path.symbol_name().clone(),
             dimension_type,
             alias,
             sql,
@@ -589,12 +566,12 @@ impl SymbolFactory for DimensionSymbolFactory {
             propagate_filters_to_sub_query,
         ));
 
-        if let Some(granularity) = &granularity {
+        if let Some(granularity) = path.granularity() {
             if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                 cube_evaluator.clone(),
                 compiler,
-                &cube_name,
-                &name,
+                path.cube_name(),
+                path.symbol_name(),
                 Some(granularity.clone()),
             )? {
                 let time_dim_symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
