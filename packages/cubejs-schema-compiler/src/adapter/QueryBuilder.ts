@@ -41,6 +41,7 @@ const ADAPTERS = {
   elasticsearch: ElasticSearchQuery,
   materialize: PostgresQuery,
   cubestore: CubeStoreQuery,
+  doris: MysqlQuery,
 };
 
 export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];
