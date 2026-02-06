@@ -14,6 +14,7 @@ use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
+
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
@@ -161,4 +162,6 @@ impl Compiler {
         }
         Ok(node)
     }
+
+    fn parse_path(&self, full_name: &String) -> Result<(String, String), CubeError> {}
 }

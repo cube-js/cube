@@ -76,9 +76,9 @@ impl MockCubeEvaluator {
     ) -> Result<Vec<String>, CubeError> {
         let parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 
-        if parts.len() != 2 && parts.len() != 3 {
+        if parts.len() != 2 {
             return Err(CubeError::user(format!(
-                "Invalid path format: '{}'. Expected format: 'cube.member' or 'cube.time_dimension.granularity'",
+                "Invalid path format: '{}'. Expected format: 'cube.member'",
                 path
             )));
         }
@@ -88,31 +88,6 @@ impl MockCubeEvaluator {
 
         if self.schema.get_cube(cube_name).is_none() {
             return Err(CubeError::user(format!("Cube '{}' not found", cube_name)));
-        }
-
-        if parts.len() == 3 {
-            if path_type != "dimension" && path_type != "dimensions" {
-                return Err(CubeError::user(format!(
-                    "Granularity can only be specified for dimensions, not for {}",
-                    path_type
-                )));
-            }
-
-            if let Some(dimension) = self.schema.get_dimension(cube_name, member_name) {
-                if dimension.static_data().dimension_type != "time" {
-                    return Err(CubeError::user(format!(
-                        "Granularity can only be specified for time dimensions, but '{}' is of type '{}'",
-                        member_name,
-                        dimension.static_data().dimension_type
-                    )));
-                }
-                return Ok(parts);
-            } else {
-                return Err(CubeError::user(format!(
-                    "Dimension '{}' not found in cube '{}'",
-                    member_name, cube_name
-                )));
-            }
         }
 
         let exists = match path_type {
