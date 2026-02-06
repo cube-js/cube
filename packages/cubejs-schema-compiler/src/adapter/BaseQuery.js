@@ -4107,20 +4107,27 @@ export class BaseQuery {
     return this.paramAllocator.buildSqlAndParams(`SELECT * FROM ${tableName} LIMIT 1000`);
   }
 
-  indexSql(cube, preAggregation, index, indexName, tableName) {
+  indexSql(cube, preAggregation, index, indexName, tableName, timeDimensions) {
     if (preAggregation.external && this.externalQueryClass) {
-      return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
+      return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName, timeDimensions);
     }
 
     if (index.columns) {
-      const escapedColumns = this.evaluateIndexColumns(cube, index);
+      const escapedColumns = this.evaluateIndexColumns(cube, index, timeDimensions);
       return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
     } else {
       throw new Error('Index SQL support is not implemented');
     }
   }
 
-  evaluateIndexColumns(cube, index) {
+  evaluateIndexColumns(cube, index, timeDimensions) {
+    const timeDimGranularityMap = {};
+    if (timeDimensions) {
+      for (const td of timeDimensions) {
+        timeDimGranularityMap[td.dimension] = td.granularity;
+      }
+    }
+
     const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
     return columns.map(column => {
       const path = column.split('.');
@@ -4132,7 +4139,12 @@ export class BaseQuery {
           this.cubeEvaluator.isSegment(path)
         )
       ) {
-        return this.aliasName(column);
+        const alias = this.aliasName(column);
+        const granularity = timeDimGranularityMap[column];
+        if (granularity) {
+          return `${alias}_${granularity}`;
+        }
+        return alias;
       } else {
         return column;
       }
