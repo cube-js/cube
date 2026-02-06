@@ -670,7 +670,7 @@ impl PostgresIntegrationTestSuite {
         self.test_simple_query(
             r#"DECLARE test_fetch_directions CURSOR WITH HOLD FOR SELECT generate_series(1, 100);"#
                 .to_string(),
-            |messages| {},
+            |_| {},
         )
         .await?;
 

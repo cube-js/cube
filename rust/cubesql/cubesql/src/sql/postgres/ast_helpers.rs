@@ -3,7 +3,7 @@ use std::sync::Arc;
 use pg_srv::protocol;
 use sqlparser::ast::Value;
 
-use super::shim::ConnectionError;
+use super::error::ConnectionError;
 use crate::transport::SpanId;
 
 pub fn parse_fetch_limit(
