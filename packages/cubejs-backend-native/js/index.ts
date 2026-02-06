@@ -160,7 +160,14 @@ export type Sql4SqlCommon = {
     pushdown: boolean;
   }
 };
+
 export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
+
+export type QueryConvertResponse = {
+  status: string;
+  query: any;
+  error?: string;
+};
 
 let loadedNative: any = null;
 
@@ -448,6 +455,12 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   const native = loadNative();
 
   return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const rest4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> => {
+  const native = loadNative();
+
+  return native.rest4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
