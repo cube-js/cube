@@ -343,6 +343,7 @@ pub enum FileStoreProvider {
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
+        endpoint: Option<String>,
     },
     GCS {
         bucket_name: String,
@@ -1310,6 +1311,7 @@ impl Config {
                                 "CUBESTORE_S3_REGION required when CUBESTORE_S3_BUCKET is set",
                             ),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
+                            endpoint: env::var("CUBESTORE_S3_ENDPOINT").ok(),
                         }
                     } else if let Ok(bucket_name) = env::var("CUBESTORE_MINIO_BUCKET") {
                         FileStoreProvider::MINIO {
@@ -1955,15 +1957,18 @@ impl Config {
                 region,
                 bucket_name,
                 sub_path,
+                endpoint,
             } => {
                 let data_dir = self.config_obj.data_dir.clone();
                 let region = region.to_string();
                 let bucket_name = bucket_name.to_string();
                 let sub_path = sub_path.clone();
+                let endpoint = endpoint.clone();
                 self.injector
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
-                            S3RemoteFs::new(data_dir, region, bucket_name, sub_path).unwrap();
+                            S3RemoteFs::new(data_dir, region, bucket_name, sub_path, endpoint)
+                                .unwrap();
                         arc
                     })
                     .await;
