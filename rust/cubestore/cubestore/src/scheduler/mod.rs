@@ -681,9 +681,15 @@ impl SchedulerImpl {
     }
 
     async fn remove_orphaned_jobs(&self) -> Result<(), CubeError> {
+        let query_timeout = self.config.query_timeout();
+        // Use 2x query_timeout for processing jobs that lost heartbeat
+        let processing_orphaned_timeout = Duration::from_secs(query_timeout * 2);
+        // Configurable timeout for scheduled jobs that were never picked up (default: 3x query_timeout)
+        let scheduled_orphaned_timeout =
+            Duration::from_secs(self.config.scheduled_job_orphaned_timeout());
         let orphaned_jobs = self
             .meta_store
-            .get_orphaned_jobs(Duration::from_secs(120)) // TODO config
+            .get_orphaned_jobs(processing_orphaned_timeout, scheduled_orphaned_timeout)
             .await?;
         for job in orphaned_jobs {
             log::info!("Removing orphaned job: {:?}", job);

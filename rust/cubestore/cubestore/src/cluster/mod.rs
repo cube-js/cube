@@ -467,6 +467,7 @@ lazy_static! {
 
 #[async_trait]
 impl Cluster for ClusterImpl {
+    #[instrument(level = "trace", skip(self))]
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
         if self.server_name == node_name || is_self_reference(&node_name) {
             // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
@@ -867,6 +868,7 @@ pub struct JobResultListener {
 }
 
 impl JobResultListener {
+    #[instrument(level = "trace", skip(self))]
     pub async fn wait_for_job_result(
         self,
         row_key: RowKey,
@@ -880,6 +882,7 @@ impl JobResultListener {
             .unwrap())
     }
 
+    #[instrument(level = "trace", skip(self, results))]
     pub async fn wait_for_job_results(
         mut self,
         mut results: Vec<(RowKey, JobType)>,
