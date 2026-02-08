@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_queries_with_flags(vec![\"SET TIME ZONE LOCAL\".to_string(),\n\"SHOW TIMEZONE\".to_string()], DatabaseProtocol::PostgreSQL).await? .0"
+---
++---------+
+| setting |
++---------+
+| GMT     |
++---------+
