@@ -724,7 +724,7 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, compilerId }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).update(this.compilerId).digest('hex');
 
     if (this.compiledYamlCache.has(cacheKey)) {
       const content = this.compiledYamlCache.get(cacheKey)!;
@@ -773,7 +773,7 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).update(this.compilerId).digest('hex');
 
     let renderedFileContent: string;
 
@@ -851,7 +851,7 @@ export class DataSchemaCompiler {
   }
 
   private getJsScript(file: FileContent): vm.Script {
-    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).update(this.compilerId).digest('hex');
 
     if (this.compiledScriptCache.has(cacheKey)) {
       return this.compiledScriptCache.get(cacheKey)!;
