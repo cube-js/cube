@@ -18251,4 +18251,58 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_grouped_join_grouped_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            WITH t1 AS (
+                SELECT DISTINCT customer_gender
+                FROM KibanaSampleDataEcommerce
+                WHERE has_subscription = TRUE
+            ),
+            t2 AS (
+                SELECT
+                    customer_gender,
+                    COUNT(DISTINCT id) AS user_count,
+                    COUNT(
+                        DISTINCT CASE
+                            WHEN has_subscription = TRUE THEN id
+                        END
+                    ) AS subscribed_user_count
+                FROM KibanaSampleDataEcommerce
+                WHERE customer_gender IS NOT NULL
+                GROUP BY 1
+            )
+            SELECT
+                t1.customer_gender,
+                t2.user_count,
+                t2.subscribed_user_count
+            FROM
+                t1 AS t1,
+                t2 AS t2
+            WHERE t1.customer_gender = t2.customer_gender
+            ORDER BY t2.user_count DESC
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("INNER JOIN ("));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }

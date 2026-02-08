@@ -4329,6 +4329,7 @@ export class BaseQuery {
           ') AS {{ from_alias }}{% elif from_prepared %}\n' +
           'FROM {{ from_prepared }}' +
           '{% endif %}' +
+          '{% for join in joins %}\n{{ join }}{% endfor %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if having %}\nHAVING {{ having }}{% endif %}' +
