@@ -199,7 +199,47 @@ describe('index.test', () => {
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
     } catch (e: any) {
-      expect(e.message).toEqual('Unexpected return type, externalDriverFactory must return driver, actual: null');
+      expect(e.message).toEqual('Unexpected return type, externalDriverFactory must return driver or config, actual: null');
+    }
+  });
+
+  test('externalDriverFactory should accept config dict and create driver (Python cube.py support)', async () => {
+    const mockDriver = {
+      setLogger: jest.fn(),
+      testConnection: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn()
+    };
+
+    const createDriverSpy = jest.spyOn(CubejsServerCore, 'createDriver').mockReturnValue(<any>mockDriver);
+
+    try {
+      const options: CreateOptions = {
+        dbType: () => <any>'postgres',
+        // Return a config dict instead of a driver instance (simulates Python cube.py)
+        externalDriverFactory: () => <any>({
+          type: 'postgres',
+          host: 'localhost',
+          port: 5432,
+          database: 'test_db',
+        }),
+      };
+
+      const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
+      const driver = await orchestratorOptions.externalDriverFactory();
+
+      // Verify createDriver was called with the config
+      expect(createDriverSpy).toHaveBeenCalledWith('postgres', {
+        host: 'localhost',
+        port: 5432,
+        database: 'test_db',
+      });
+
+      // Verify driver methods were called
+      expect(mockDriver.setLogger).toHaveBeenCalled();
+      expect(mockDriver.testConnection).toHaveBeenCalled();
+      expect(driver).toBe(mockDriver);
+    } finally {
+      createDriverSpy.mockRestore();
     }
   });
 
