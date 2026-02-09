@@ -36,7 +36,6 @@ type QueryKey = [QueryWithParams, IndexesSql, InvalidationKeys] | [QueryWithPara
 type QueryOptions = {
   queryKeyMd5: QueryKey | string;
   newVersionEntry: VersionEntry;
-  query: string;
   values: unknown[];
   requestId: string;
   buildRangeEnd?: string;
@@ -504,10 +503,9 @@ export class PreAggregationLoader {
     );
   }
 
-  protected queryOptions(invalidationKeys: InvalidationKeys, query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
+  protected queryOptions(invalidationKeys: InvalidationKeys, _query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
     return {
       queryKeyMd5: queryKeyMd5(this.preAggregationQueryKey(invalidationKeys)),
-      query,
       values: params,
       targetTableName,
       requestId: this.requestId,

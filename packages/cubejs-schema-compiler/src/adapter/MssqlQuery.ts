@@ -90,7 +90,12 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
+    const offset = moment().tz(this.timezone).format('Z');
+
+    // 1. Treating the field as UTC (add '+00:00' offset)
+    // 2. Switch to target timezone offset
+    // 3. Cast to DATETIME2 to get naive timestamp in target timezone
+    return `CAST(SWITCHOFFSET(TODATETIMEOFFSET(${field}, '+00:00'), '${offset}') AS DATETIME2)`;
   }
 
   public timeStampCast(value: string) {
@@ -106,21 +111,24 @@ export class MssqlQuery extends BaseQuery {
   }
 
   /**
-   * Returns sql for source expression floored to timestamps aligned with
-   * intervals relative to origin timestamp point.
-   * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
+   * Returns SQL for source expression floored to timestamps aligned with
+   * intervals relative to the origin timestamp point.
+   * The formula operates with seconds diffs, so it won't produce human-expected dates aligned with offset date parts.
    */
   public dateBin(interval: string, source: string, origin: string): string {
+    // Both source and origin are now DATETIME2 in the query timezone (naive timestamps),
+    // ensuring their in the same timezone context for correct date bin calculation.
+    const originAligned = this.dateTimeCast(`'${origin}'`);
     const beginOfTime = this.dateTimeCast('DATEFROMPARTS(1970, 1, 1)');
     const timeUnit = this.diffTimeUnitForInterval(interval);
 
     // Need to explicitly cast one argument of floor to float to trigger correct sign logic
     return `DATEADD(${timeUnit},
         FLOOR(
-          CAST(DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          CAST(DATEDIFF(${timeUnit}, ${originAligned}, ${source}) AS FLOAT) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
-        ${this.dateTimeCast(`'${origin}'`)}
+        ${originAligned}
     )`;
   }
 
@@ -261,6 +269,37 @@ export class MssqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME2';
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
+    templates.params.param = '@_{{ param_index + 1 }}';
+    // MSSQL does not support ordinal GROUP BY (GROUP BY 1, 2), must use expressions
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
+    // MSSQL does not support ordinal ORDER BY (ORDER BY 1, 2), must use expressions
+    templates.expressions.order_by = '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // MSSQL uses CAST(...AS DATETIME2) instead of ::timestamp
+    templates.statements.time_series_select = 'SELECT CAST(date_from AS DATETIME2) AS "date_from",\n' +
+      'CAST(date_to AS DATETIME2) AS "date_to" \n' +
+      'FROM(\n' +
+      '    VALUES ' +
+      '{% for time_item in seria  %}' +
+      '(\'{{ time_item[0] }}\', \'{{ time_item[1] }}\')' +
+      '{% if not loop.last %}, {% endif %}' +
+      '{% endfor %}' +
+      ') AS dates (date_from, date_to)';
+    // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
+    templates.statements.select = '{% if ctes %} WITH \n' +
+      '{{ ctes | join(\',\n\') }}\n' +
+      '{% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}' +
+      '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+      'FROM (\n' +
+      '{{ from | indent(2, true) }}\n' +
+      ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+      '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS{% endif %}' +
+      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
     return templates;
   }
 }

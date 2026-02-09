@@ -30,6 +30,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^excludes$/,
   /^hierarchies\.[_a-zA-Z][_a-zA-Z0-9]*\.levels$/,
   /^cubes\.[0-9]+\.(joinPath|join_path)$/,
+  /^folders\.[0-9]+\.includes\.[0-9]+\.(joinPath|join_path)$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.member$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.values$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.conditions.[0-9]+\.if$/,

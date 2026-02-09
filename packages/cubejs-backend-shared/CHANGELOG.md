@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
+
+### Features
+
+- **server-core:** Add level field for log messages ([#10337](https://github.com/cube-js/cube/issues/10337)) ([1e7dcb6](https://github.com/cube-js/cube/commit/1e7dcb614dd6537b3bb2a1f9bd04e96c2374a673))
+- **server-core:** Exponential backoff in refresh scheduler ([#10302](https://github.com/cube-js/cube/issues/10302)) ([fe714bf](https://github.com/cube-js/cube/commit/fe714bf333dec59a3988d626fdd709062a163b4f))
+
 ## [1.6.6](https://github.com/cube-js/cube/compare/v1.6.5...v1.6.6) (2026-01-23)
 
 **Note:** Version bump only for package @cubejs-backend/shared

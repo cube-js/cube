@@ -154,6 +154,7 @@ impl Compiler {
         factory: T,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let node = factory.build(self)?;
+        node.validate()?;
         let key = (T::symbol_name().to_string(), full_name.clone());
         if T::is_cachable() {
             self.members.insert(key, node.clone());

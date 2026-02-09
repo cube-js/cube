@@ -38,13 +38,19 @@ export function version(cacheKey) {
     const byte = digestBuffer.readUInt8(i);
     shiftCounter += 8;
     // eslint-disable-next-line operator-assignment,no-bitwise
-    residue = (byte << (shiftCounter - 8)) | residue;
+    // Use >>> 0 to ensure unsigned 32-bit integer after the OR operation,
+    // preventing negative values when high bits are set (byte >= 128 with shift >= 24)
+    // eslint-disable-next-line operator-assignment,no-bitwise
+    residue = ((byte << (shiftCounter - 8)) | residue) >>> 0;
     // eslint-disable-next-line no-bitwise
-    while (residue >> 5) {
+    // Use >>> (unsigned right shift) to ensure proper comparison and shifting
+    // of unsigned values, preventing infinite loops with negative residues
+    // eslint-disable-next-line operator-assignment,no-bitwise
+    while (residue >>> 5) {
       result += hashCharset.charAt(residue % 32);
       shiftCounter -= 5;
       // eslint-disable-next-line operator-assignment,no-bitwise
-      residue = residue >> 5;
+      residue = residue >>> 5;
     }
   }
 
