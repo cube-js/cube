@@ -29,7 +29,6 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.6.9",
     "@cubejs-backend/shared": "1.6.9",
-    "generic-pool": "^3.9.0",
     "mysql": "^2.18.1"
   },
   "devDependencies": {
