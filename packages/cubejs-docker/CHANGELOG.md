@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+### Bug Fixes
+
+- **docker:** Set UTF-8 locale environment variables to fix Python UnicodeEncodeError ([#10378](https://github.com/cube-js/cube/issues/10378)) ([104ff5f](https://github.com/cube-js/cube/commit/104ff5f732c80fe54945c959736db5493b4d2575))
+
 ## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
 
 **Note:** Version bump only for package @cubejs-backend/docker

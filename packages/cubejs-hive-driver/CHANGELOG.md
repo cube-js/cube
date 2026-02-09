@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+### Features
+
+- Unify pool to make named timeout errors ([#10375](https://github.com/cube-js/cube/issues/10375)) ([bac3cd0](https://github.com/cube-js/cube/commit/bac3cd0f2f3f572fac037686ffa16a2e687fbcdc))
+
 ## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
 
 **Note:** Version bump only for package @cubejs-backend/hive-driver

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+### Features
+
+- **cubesql:** Support forwards directions for FETCH statement ([#10377](https://github.com/cube-js/cube/issues/10377)) ([7cbafd5](https://github.com/cube-js/cube/commit/7cbafd541a88c1d244e67aa980c208ca7c0ea68a))
+
 ## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
