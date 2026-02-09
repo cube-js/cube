@@ -30,3 +30,5 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
 ENV PYO3_CROSS_PYTHON_VERSION=${PYTHON_RELEASE} \
     PYO3_CROSS_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
     PYO3_CROSS_LIB_DIR=/usr/aarch64-linux-gnu/lib
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8

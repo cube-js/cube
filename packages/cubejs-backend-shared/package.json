@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/shared",
-  "version": "1.6.9",
+  "version": "1.6.10",
   "description": "Shared code for Cube.js backend packages",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -27,7 +27,7 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.9",
+    "@cubejs-backend/linter": "1.6.10",
     "@types/bytes": "^3.1.5",
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.7",
@@ -48,6 +48,7 @@
     "decompress": "^4.2.1",
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",
+    "generic-pool": "^3.9.0",
     "lru-cache": "^11.1.0",
     "moment-range": "^4.0.2",
     "moment-timezone": "^0.5.47",
