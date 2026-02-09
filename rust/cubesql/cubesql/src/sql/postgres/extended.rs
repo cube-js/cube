@@ -599,7 +599,7 @@ mod tests {
     };
     use pg_srv::protocol::Format;
 
-    use crate::sql::{extended::PortalFrom, shim::ConnectionError};
+    use crate::sql::{error::ConnectionError, extended::PortalFrom};
     use datafusion::{
         arrow::{
             array::{ArrayRef, StringArray},
