@@ -99,12 +99,38 @@ describe('OptsHandler class', () => {
       });
     }
 
+    class MockDriver extends OriginalBaseDriver {
+      public readonly dbType: string;
+
+      public readonly dataSource: string;
+
+      public constructor(dbType: string, dataSource = 'default') {
+        super();
+        this.dbType = dbType;
+        this.dataSource = dataSource;
+      }
+
+      public async testConnection() {
+        // nothing
+      }
+
+      public async release() {
+        // nothing
+      }
+
+      public async query() {
+        return [];
+      }
+    }
+
+    const createMockDriver = (dataSource: string) => new MockDriver('postgres', dataSource);
+
     // Case 2
     {
       const core = new CubejsServerCoreExposed({
         ...conf,
         dbType: 'postgres',
-        driverFactory: () => CubejsServerCore.createDriver('postgres'),
+        driverFactory: ({ dataSource }) => createMockDriver(dataSource),
       });
 
       expect(core.options.dbType).toBeDefined();
@@ -117,7 +143,7 @@ describe('OptsHandler class', () => {
       expect(
         JSON.stringify(await core.options.driverFactory({} as DriverContext)),
       ).toEqual(
-        JSON.stringify(CubejsServerCore.createDriver('postgres')),
+        JSON.stringify(createMockDriver('default')),
       );
     }
 
@@ -126,7 +152,7 @@ describe('OptsHandler class', () => {
       const core = new CubejsServerCoreExposed({
         ...conf,
         dbType: () => 'postgres',
-        driverFactory: () => CubejsServerCore.createDriver('postgres'),
+        driverFactory: ({ dataSource }) => createMockDriver(dataSource),
       });
 
       expect(core.options.dbType).toBeDefined();
@@ -139,7 +165,7 @@ describe('OptsHandler class', () => {
       expect(
         JSON.stringify(await core.options.driverFactory({} as DriverContext)),
       ).toEqual(
-        JSON.stringify(CubejsServerCore.createDriver('postgres')),
+        JSON.stringify(createMockDriver('default')),
       );
     }
 
@@ -148,7 +174,7 @@ describe('OptsHandler class', () => {
       const core = new CubejsServerCoreExposed({
         ...conf,
         dbType: () => 'postgres',
-        driverFactory: async () => CubejsServerCore.createDriver('postgres'),
+        driverFactory: async ({ dataSource }) => createMockDriver(dataSource),
       });
 
       expect(core.options.dbType).toBeDefined();
@@ -161,7 +187,7 @@ describe('OptsHandler class', () => {
       expect(
         JSON.stringify(await core.options.driverFactory({} as DriverContext)),
       ).toEqual(
-        JSON.stringify(CubejsServerCore.createDriver('postgres')),
+        JSON.stringify(createMockDriver('default')),
       );
     }
   });

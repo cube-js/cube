@@ -5,7 +5,7 @@
  */
 
 import { assertDataSource, getEnv } from '@cubejs-backend/shared';
-import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
+import { PostgresDriver, PostgresDriverConfiguration, type PgQueryResult } from '@cubejs-backend/postgres-driver';
 import {
   DatabaseStructure,
   DownloadTableCSVData,
@@ -280,8 +280,8 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * @override
    */
   public override async testConnection() {
-    const conn = await this.pool.connect();
-    conn.release();
+    const conn = await this.pool.acquire();
+    await this.pool.release(conn);
   }
 
   public override async stream(
@@ -294,7 +294,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return super.stream(query, values, options);
   }
 
-  protected override async queryResponse(query: string, values: unknown[]) {
+  protected override async queryResponse(query: string, values: unknown[]): Promise<PgQueryResult<any>> {
     RedshiftDriver.checkValuesLimit(values);
 
     return super.queryResponse(query, values);
@@ -390,7 +390,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
     const { bucketType, bucketName, region, unloadArn, keyId, secretKey } = this.config.exportBucket;
 
-    const conn = await this.pool.connect();
+    const conn = await this.pool.acquire();
 
     try {
       const exportPathName = crypto.randomBytes(10).toString('hex');
@@ -477,7 +477,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       };
     } finally {
       conn.removeAllListeners('notice');
-      conn.release();
+      await this.pool.release(conn);
     }
   }
 

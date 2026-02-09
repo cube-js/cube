@@ -208,11 +208,13 @@ export class JDBCDriver extends BaseDriver {
   public async testConnection() {
     let err;
     let connection;
+
     try {
       connection = await this.pool._factory.create();
     } catch (e: any) {
       err = e.message || e;
     }
+
     if (err) {
       throw new Error(err.toString());
     } else {

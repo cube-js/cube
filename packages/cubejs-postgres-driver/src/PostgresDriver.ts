@@ -4,11 +4,8 @@
  * @fileoverview The `PostgresDriver` and related types declaration.
  */
 
-import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import { types, Pool, PoolClient, FieldDef, ClientConfig } from 'pg';
+import { getEnv, assertDataSource, Pool } from '@cubejs-backend/shared';
+import { types, FieldDef, ClientConfig } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import * as moment from 'moment';
@@ -19,6 +16,7 @@ import {
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
+import { PgClient } from './PgClient';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
@@ -89,7 +87,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   private enabled: boolean = false;
 
-  protected readonly pool: Pool;
+  protected readonly pool: Pool<PgClient>;
 
   protected readonly config: Partial<Config>;
 
@@ -125,8 +123,35 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       config.dataSource ||
       assertDataSource('default');
 
-    this.pool = new Pool({
-      idleTimeoutMillis: config.idleTimeoutMillis || 30000,
+    const poolConfig: ClientConfig = {
+      host: getEnv('dbHost', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      user: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      ssl: this.getSslOptions(dataSource),
+      ...config
+    };
+
+    this.pool = new Pool<PgClient>('postgres', {
+      create: async () => {
+        const client = new PgClient(poolConfig);
+        client.on('error', (err) => this.databasePoolError(err));
+        await client.connect();
+
+        return client;
+      },
+      validate: async (client) => {
+        if (client.isEnding() || client.isEnded()) {
+          return false;
+        }
+
+        return client.isQueryable();
+      },
+      destroy: async (client) => {
+        await client.end();
+      },
+    }, {
       min: config.minPoolSize ||
         config.min ||
         getEnv('dbMinPoolSize', { dataSource }) ||
@@ -136,17 +161,17 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         config.max ||
         getEnv('dbMaxPoolSize', { dataSource }) ||
         8,
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
-      ...config
+      evictionRunIntervalMillis: 10000,
+      softIdleTimeoutMillis: 30000,
+      idleTimeoutMillis: config.idleTimeoutMillis || 30000,
+      testOnBorrow: true,
+      acquireTimeoutMillis: 20000,
     });
-    this.pool.on('error', (err) => {
-      console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO
-    });
+
+    // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
+    this.pool.on('factoryCreateError', (err) => this.databasePoolError(err));
+    this.pool.on('factoryDestroyError', (err) => this.databasePoolError(err));
+
     this.config = <Partial<Config>>{
       ...this.getInitialConfiguration(dataSource),
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
@@ -236,18 +261,24 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   public async testConnection(): Promise<void> {
+    // eslint-disable-next-line no-underscore-dangle
+    const conn: PgClient = await this.pool._factory.create();
+
     try {
-      await this.pool.query('SELECT $1::int AS number', ['1']);
+      await conn.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
       if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
         throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
       }
 
       throw e;
+    } finally {
+      // eslint-disable-next-line no-underscore-dangle
+      await this.pool._factory.destroy(conn);
     }
   }
 
-  protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
+  protected async loadUserDefinedTypes(conn: PgClient): Promise<void> {
     if (!this.userDefinedTypes) {
       // Postgres enum types defined as typcategory = 'E' these can be assumed
       // to be of type varchar for the drivers purposes.
@@ -275,7 +306,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected async prepareConnection(
-    conn: PoolClient,
+    conn: PgClient,
     options: { executionTimeout: number } = {
       executionTimeout: this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000
     }
@@ -309,7 +340,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   ): Promise<StreamTableDataWithTypes> {
     PostgresDriver.checkValuesLimit(values);
 
-    const conn = await this.pool.connect();
+    const conn = await this.pool.acquire();
 
     try {
       await this.prepareConnection(conn);
@@ -327,11 +358,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         rowStream,
         types: this.mapFields(fields),
         release: async () => {
-          await conn.release();
+          await this.pool.release(conn);
         }
       };
     } catch (e) {
-      await conn.release();
+      await this.pool.release(conn);
 
       throw e;
     }
@@ -350,12 +381,20 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  protected async withConnection<T>(fn: (conn: PgClient) => Promise<T>): Promise<T> {
+    const conn = await this.pool.acquire();
+
+    try {
+      return await fn(conn);
+    } finally {
+      await this.pool.release(conn);
+    }
+  }
+
   protected async queryResponse(query: string, values: unknown[]) {
     PostgresDriver.checkValuesLimit(values);
 
-    const conn = await this.pool.connect();
-
-    try {
+    return this.withConnection(async (conn) => {
       await this.prepareConnection(conn);
 
       const res = await conn.query({
@@ -366,9 +405,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         },
       });
       return res;
-    } finally {
-      await conn.release();
-    }
+    });
   }
 
   public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
@@ -441,7 +478,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public async release() {
     if (this.enabled) {
-      this.pool.end();
+      await this.pool.drain();
+      await this.pool.clear();
       this.enabled = false;
     }
   }

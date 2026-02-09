@@ -96,6 +96,10 @@ export class Pool<T> {
     return this.pool.min;
   }
 
+  public get options(): { max: number; min: number } {
+    return { max: this.pool.max, min: this.pool.min };
+  }
+
   // Event handling
   public on(event: 'factoryCreateError' | 'factoryDestroyError', listener: (err: Error) => void): this {
     this.pool.on(event, listener);

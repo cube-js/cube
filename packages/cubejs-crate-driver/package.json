@@ -29,8 +29,7 @@
   },
   "dependencies": {
     "@cubejs-backend/postgres-driver": "1.6.11",
-    "@cubejs-backend/shared": "1.6.11",
-    "pg": "^8.7.1"
+    "@cubejs-backend/shared": "1.6.11"
   },
   "license": "Apache-2.0",
   "devDependencies": {
