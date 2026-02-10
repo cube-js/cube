@@ -151,6 +151,65 @@ cubes:
       FROM app_data.payments
 ```
 
+### Reusing macros across files
+
+You can define macros in dedicated `.jinja` files and import them into your
+data model files using Jinja's [`import`][jinja-docs-import] statement. This
+is useful for sharing common patterns across multiple cubes and views.
+
+Consider the following project structure:
+
+```tree
+.
+└── cube/
+    ├── model/
+    │   ├── cubes/
+    │   │   └── orders.yml
+    │   ├── views/
+    │   └── macros/
+    │       └── common_dimensions.jinja
+    └── cube.py
+```
+
+First, define reusable macros in a `.jinja` file under the `macros/` directory:
+
+```yaml filename="model/macros/common_dimensions.jinja"
+{%- macro dimension(column_name, type='string', primary_key=False) -%}
+      - name: {{ column_name }}
+        sql: {{ column_name }}
+        type: {{ type }}
+        {% if primary_key -%}
+        primary_key: true
+        {% endif -%}
+{% endmacro -%}
+
+{%- macro cents_to_dollars(column_name, precision=2) -%}
+  ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
+{%- endmacro -%}
+```
+
+Then, import and use those macros in your data model files:
+
+```yaml filename="model/cubes/orders.yml"
+{%- import "macros/common_dimensions.jinja" as common -%}
+
+cubes:
+  - name: orders
+    sql_table: public.orders
+
+    dimensions:
+      {{ common.dimension('id', 'number', primary_key=True) }}
+      {{ common.dimension('status') }}
+      {{ common.dimension('created_at', 'time') }}
+
+    measures:
+      - name: amount_usd
+        type: sum
+        sql: "{{ common.cents_to_dollars('amount') }}"
+```
+
+The import path is relative to the `model/` directory.
+
 ### Escaping unsafe strings
 
 [Auto-escaping][jinja-docs-autoescaping] of unsafe string values in Jinja
@@ -317,6 +376,8 @@ image][ref-docker-image-extension].
 [jinja-docs-for-loop]: https://jinja.palletsprojects.com/en/3.1.x/templates/#for
 [jinja-docs-macros]:
   https://jinja.palletsprojects.com/en/3.1.x/templates/#macros
+[jinja-docs-import]:
+  https://jinja.palletsprojects.com/en/3.1.x/templates/#import
 [jinja-docs-autoescaping]: https://jinja.palletsprojects.com/en/3.1.x/api/#autoescaping
 [jinja-docs-filters-safe]: https://jinja.palletsprojects.com/en/3.1.x/templates/#jinja-filters.safe
 [ref-cube-dbt]: /product/data-modeling/reference/cube_dbt
