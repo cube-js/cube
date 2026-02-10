@@ -5080,6 +5080,50 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_set_timezone() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_set_time_zone_custom",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIMEZONE TO 'Europe/Rome'".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_time_zone_default",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIMEZONE = DEFAULT".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_time_zone_local",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIME ZONE LOCAL".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
@@ -18250,5 +18294,87 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ..Default::default()
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_set_time_zone() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        context.execute_query("SET TIME ZONE 'Europe/Rome'").await?;
+
+        // Test that time zone has been successfully applied
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            timezone: Some("Europe/Rome".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        // Test that time zone is applied with SQL push down as well
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+        "#;
+        let sql = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        assert!(sql.contains("\"Europe/Rome\""));
+
+        // Test that time zone correctly resets to default
+        context.execute_query("SET TIMEZONE TO DEFAULT").await?;
+
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        };
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        Ok(())
     }
 }
