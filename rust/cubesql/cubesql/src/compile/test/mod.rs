@@ -914,6 +914,7 @@ impl TransportService for TestConnectionTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         _cache_mode: Option<CacheMode>,
+        _force_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         {
             let mut calls = self.load_calls.lock().await;
@@ -956,6 +957,7 @@ impl TransportService for TestConnectionTransport {
         _meta_fields: LoadRequestMeta,
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
+        _force_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("It's a fake transport");
     }

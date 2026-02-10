@@ -1185,7 +1185,8 @@ describe('API Gateway', () => {
         expect.anything(),
         {},
         undefined,
-        undefined
+        undefined,
+        undefined,
       );
     });
 
@@ -1224,7 +1225,44 @@ describe('API Gateway', () => {
         expect.anything(),
         {},
         'stale-while-revalidate',
-        'America/Los_Angeles'
+        'America/Los_Angeles',
+        undefined,
+      );
+    });
+
+    test('forceContinueWait can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        // Simulate writing error to the stream
+        stream.write(`${JSON.stringify({
+          error: "Continue wait"
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          forceContinueWait: true,
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify the mock was called with correct parameters
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        true,
       );
     });
   });

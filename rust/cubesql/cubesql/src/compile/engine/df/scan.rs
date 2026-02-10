@@ -111,6 +111,7 @@ pub struct CubeScanOptions {
     pub change_user: Option<String>,
     pub max_records: Option<usize>,
     pub cache_mode: Option<CacheMode>,
+    pub force_continue_wait: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -481,6 +482,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                     meta,
                     self.schema.clone(),
                     self.member_fields.clone(),
+                    self.options.force_continue_wait,
                 )
                 .await;
             let stream = result.map_err(|err| DataFusionError::External(Box::new(err)))?;
@@ -721,6 +723,7 @@ async fn load_data(
                 schema,
                 member_fields,
                 options.cache_mode,
+                options.force_continue_wait,
             )
             .await
             .map_err(|mut err| {
@@ -1260,6 +1263,7 @@ mod tests {
                 schema: SchemaRef,
                 member_fields: Vec<MemberField>,
                 _cache_mode: Option<CacheMode>,
+                _force_continue_wait: bool,
             ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
                 {
@@ -1295,6 +1299,7 @@ mod tests {
                 _meta_fields: LoadRequestMeta,
                 _schema: SchemaRef,
                 _member_fields: Vec<MemberField>,
+                _force_continue_wait: bool,
             ) -> Result<CubeStreamReceiver, CubeError> {
                 panic!("It's a fake transport");
             }
@@ -1386,6 +1391,7 @@ mod tests {
                 change_user: None,
                 max_records: None,
                 cache_mode: None,
+                force_continue_wait: false,
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
