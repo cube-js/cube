@@ -351,26 +351,6 @@ impl DimensionSymbolFactory {
 }
 
 impl SymbolFactory for DimensionSymbolFactory {
-    fn symbol_name() -> String {
-        "dimension".to_string()
-    }
-
-    fn cube_name(&self) -> &String {
-        self.path.cube_name()
-    }
-
-    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
-        if let Some(member_sql) = &self.sql {
-            Ok(member_sql.args_names().clone())
-        } else {
-            Ok(vec![])
-        }
-    }
-
-    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
-        self.sql.clone()
-    }
-
     fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self {
             path,

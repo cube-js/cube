@@ -71,7 +71,6 @@ fn test_diamond_join_over_path_in_request_sql() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for simple join");
 
-    println!("{}", sql);
     assert!(
         sql.contains(r#"ON "cube_a".b_id = "cube_b".id"#),
         "SQL should contain join condition between cube_a and cube_b"

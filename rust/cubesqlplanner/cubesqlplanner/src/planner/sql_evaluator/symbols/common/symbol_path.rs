@@ -4,11 +4,13 @@ use cubenativeutils::CubeError;
 
 use crate::cube_bridge::evaluator::CubeEvaluator;
 
+#[derive(Debug, Clone)]
 pub enum SymbolPathType {
     Dimension,
     Measure,
 }
 
+#[derive(Debug, Clone)]
 pub struct SymbolPath {
     path_type: SymbolPathType,
     path: Vec<String>,
@@ -96,6 +98,14 @@ impl SymbolPath {
 
     pub fn full_name(&self) -> &String {
         &self.full_name
+    }
+
+    pub fn cache_name(&self) -> String {
+        if let Some(granularity) = &self.granularity {
+            format!("{}.{}", self.full_name, granularity)
+        } else {
+            self.full_name.clone()
+        }
     }
 
     pub fn granularity(&self) -> &Option<String> {
