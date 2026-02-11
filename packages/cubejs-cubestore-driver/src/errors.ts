@@ -7,6 +7,7 @@ export class ConnectionError extends CubeStoreError {
 
   public constructor(message: string, cause?: Error) {
     super(message);
+
     this.name = 'ConnectionError';
     this.cause = cause;
   }
@@ -15,6 +16,7 @@ export class ConnectionError extends CubeStoreError {
 export class QueryError extends CubeStoreError {
   public constructor(message: string) {
     super(message);
+
     this.name = 'QueryError';
   }
 }
