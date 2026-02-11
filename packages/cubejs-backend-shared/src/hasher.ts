@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { xxh3 } from '@node-rs/xxhash';
 import { getEnv } from './env';
 
+const HASHER_ALGORITHM = getEnv('hasherAlgorithm')?.toLowerCase();
+
 export interface Hasher {
   /**
    * @param data - The data to hash (string or Buffer)
@@ -156,22 +158,16 @@ class XxHasher implements Hasher {
  * @returns A new Hasher instance
  */
 export function defaultHasher(): Hasher {
-  const algorithm = getEnv('hasherAlgorithm');
+  if (HASHER_ALGORITHM === 'xxhash') {
+    return new XxHasher();
+  }
 
-  if (algorithm) {
-    const alg = algorithm.toLowerCase();
+  if (HASHER_ALGORITHM === 'sha256') {
+    return new Sha256Hasher();
+  }
 
-    if (alg === 'xxhash') {
-      return new XxHasher();
-    }
-
-    if (alg === 'sha256') {
-      return new Sha256Hasher();
-    }
-
-    if (alg === 'sha512') {
-      return new Sha512Hasher();
-    }
+  if (HASHER_ALGORITHM === 'sha512') {
+    return new Sha512Hasher();
   }
 
   // Default to MD5 for backward compatibility
