@@ -58,7 +58,10 @@ export class WebSocketConnection {
           if (webSocket.readyState === WebSocket.OPEN) {
             webSocket.send(message, (err) => {
               if (err) {
-                rejectSend(err);
+                rejectSend(new ConnectionError(
+                  `CubeStore connection error: ${err.message}`,
+                  err
+                ));
               } else {
                 resolveSend();
               }
@@ -196,10 +199,14 @@ export class WebSocketConnection {
         socket.send(buffer, (err) => {
           if (err) {
             delete socket.sentMessages[messageId];
-            reject(err);
+            reject(new ConnectionError(
+              `CubeStore connection error: ${err.message}`,
+              err
+            ));
           }
         });
       }
+
       socket.sentMessages[messageId] = {
         resolve,
         reject,
