@@ -34,7 +34,7 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => Promise<void>;
 
 export class SubscriptionServer {
-    readonly #cubeRenewSubject = new Subject<unknown>();
+  readonly #cubeRenewSubject = new Subject<unknown>();
 
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
     map((val) => ensureArray(val)),
