@@ -68,7 +68,7 @@ impl SymbolPath {
         };
 
         let path = parts[0..parts.len() - 2]
-            .into_iter()
+            .iter()
             .map(|s| s.to_string())
             .collect();
         Ok(Self::new(
@@ -124,7 +124,7 @@ impl SymbolPath {
             if cube_evaluator.is_dimension(path_to_check.clone())? {
                 let path_type = SymbolPathType::Dimension;
                 let path = parts[0..parts.len() - 3]
-                    .into_iter()
+                    .iter()
                     .map(|s| s.to_string())
                     .collect();
 
