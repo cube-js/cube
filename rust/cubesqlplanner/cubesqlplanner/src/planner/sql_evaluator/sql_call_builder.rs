@@ -1,6 +1,7 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
 use super::{SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
@@ -12,6 +13,7 @@ use std::rc::Rc;
 pub struct SqlCallBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
 }
 
@@ -19,11 +21,13 @@ impl<'a> SqlCallBuilder<'a> {
     pub fn new(
         compiler: &'a mut Compiler,
         cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Self {
         Self {
             compiler,
             cube_evaluator,
+            base_tools,
             security_context,
         }
     }
@@ -34,7 +38,7 @@ impl<'a> SqlCallBuilder<'a> {
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<SqlCall, CubeError> {
         let (template, template_args) = member_sql
-            .compile_template_sql(self.compiler.base_tools(), self.security_context.clone())?;
+            .compile_template_sql(self.base_tools.clone(), self.security_context.clone())?;
 
         let deps = template_args
             .symbol_paths
@@ -54,13 +58,13 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|itm| self.build_filter_group_item(itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = SqlCall::builder()
-            .template(template.clone())
-            .deps(deps)
-            .filter_params(filter_params)
-            .filter_groups(filter_groups)
-            .security_context(template_args.security_context.clone())
-            .build();
+        let result = SqlCall::new(
+            template.clone(),
+            deps,
+            filter_params,
+            filter_groups,
+            template_args.security_context.clone(),
+        );
         Ok(result)
     }
 

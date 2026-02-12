@@ -7,9 +7,9 @@
 import {
   getEnv,
   assertDataSource,
+  Pool,
 } from '@cubejs-backend/shared';
 import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
-import genericPool from 'generic-pool';
 import { promisify } from 'util';
 import {
   BaseDriver,
@@ -92,7 +92,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: MySqlDriverConfiguration;
 
-  protected readonly pool: genericPool.Pool<MySQLConnection>;
+  protected readonly pool: Pool<MySQLConnection>;
 
   /**
    * Class constructor.
@@ -138,7 +138,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       readOnly: true,
       ...restConfig,
     };
-    this.pool = genericPool.createPool({
+    this.pool = new Pool('mysql', {
       create: async () => {
         const conn: any = mysql.createConnection(this.config);
         const connect = promisify(conn.connect.bind(conn));
@@ -447,10 +447,14 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public toGenericType(columnType: string) {
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    return this.tableColumnTypesWithPrecision(table);
+  }
+
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
-      super.toGenericType(columnType);
+      super.toGenericType(columnType, precision, scale);
   }
 
   public capabilities(): DriverCapabilities {

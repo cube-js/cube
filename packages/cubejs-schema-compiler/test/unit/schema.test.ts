@@ -214,10 +214,12 @@ describe('Schema Testing', () => {
 
       expect(logger.mock.calls.length).toEqual(2);
       expect(logger.mock.calls[0]).toEqual([
-        'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+        'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.',
+        {},
       ]);
       expect(logger.mock.calls[1]).toEqual([
-        'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+        'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.',
+        {},
       ]);
     });
 
@@ -350,8 +352,8 @@ describe('Schema Testing', () => {
     expect(dimensions.length).toBeGreaterThan(0);
     expect(dimensions.every((dimension) => dimension.primaryKey)).toBeDefined();
     expect(dimensions.every((dimension) => typeof dimension.primaryKey === 'boolean')).toBe(true);
-    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id').primaryKey).toBe(true);
-    expect(dimensions.find((dimension) => dimension.name === 'CubeA.type').primaryKey).toBe(false);
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id')?.primaryKey).toBe(true);
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.type')?.primaryKey).toBe(false);
   });
 
   it('descriptions', async () => {
@@ -369,15 +371,15 @@ describe('Schema Testing', () => {
 
     expect(dimensions).toBeDefined();
     expect(dimensions.length).toBeGreaterThan(0);
-    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id').description).toBe('id dimension from createCubeSchema');
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id')?.description).toBe('id dimension from createCubeSchema');
 
     expect(measures).toBeDefined();
     expect(measures.length).toBeGreaterThan(0);
-    expect(measures.find((measure) => measure.name === 'CubeA.count').description).toBe('count measure from createCubeSchema');
+    expect(measures.find((measure) => measure.name === 'CubeA.count')?.description).toBe('count measure from createCubeSchema');
 
     expect(segments).toBeDefined();
     expect(segments.length).toBeGreaterThan(0);
-    expect(segments.find((segment) => segment.name === 'CubeA.sfUsers').description).toBe('SF users segment from createCubeSchema');
+    expect(segments.find((segment) => segment.name === 'CubeA.sfUsers')?.description).toBe('SF users segment from createCubeSchema');
   });
 
   it('custom granularities in meta', async () => {
@@ -393,27 +395,27 @@ describe('Schema Testing', () => {
 
     const dg = dimensions.find((dimension) => dimension.name === 'orders.createdAt');
     expect(dg).toBeDefined();
-    expect(dg.granularities).toBeDefined();
-    expect(dg.granularities.length).toBeGreaterThan(0);
+    expect(dg?.granularities).toBeDefined();
+    expect(dg?.granularities?.length).toBeGreaterThan(0);
 
     // Granularity defined with title
-    let gr = dg.granularities.find(g => g.name === 'half_year');
+    let gr = dg?.granularities?.find(g => g.name === 'half_year');
     expect(gr).toBeDefined();
-    expect(gr.title).toBe('6 month intervals');
-    expect(gr.interval).toBe('6 months');
+    expect(gr?.title).toBe('6 month intervals');
+    expect(gr?.interval).toBe('6 months');
 
-    gr = dg.granularities.find(g => g.name === 'half_year_by_1st_april');
+    gr = dg?.granularities?.find(g => g.name === 'half_year_by_1st_april');
     expect(gr).toBeDefined();
-    expect(gr.title).toBe('Half year from Apr to Oct');
-    expect(gr.interval).toBe('6 months');
-    expect(gr.offset).toBe('3 months');
+    expect(gr?.title).toBe('Half year from Apr to Oct');
+    expect(gr?.interval).toBe('6 months');
+    expect(gr?.offset).toBe('3 months');
 
     // // Granularity defined without title -> titlize()
-    gr = dg.granularities.find(g => g.name === 'half_year_by_1st_june');
+    gr = dg?.granularities?.find(g => g.name === 'half_year_by_1st_june');
     expect(gr).toBeDefined();
-    expect(gr.title).toBe('Half Year By1 St June');
-    expect(gr.interval).toBe('6 months');
-    expect(gr.origin).toBe('2020-06-01 10:00:00');
+    expect(gr?.title).toBe('Half Year By1 St June');
+    expect(gr?.interval).toBe('6 months');
+    expect(gr?.origin).toBe('2020-06-01 10:00:00');
   });
 
   describe('Joins', () => {
@@ -557,12 +559,12 @@ describe('Schema Testing', () => {
 
   describe('Views', () => {
     it('extends custom granularities and timeshifts', async () => {
-      const { compiler, metaTransformer } = prepareJsCompiler([
+      const { compiler, cubeEvaluator } = prepareJsCompiler([
         createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
       ]);
       await compiler.compile();
 
-      const { measures, dimensions } = metaTransformer.cubeEvaluator.evaluatedCubes.orders_view;
+      const { measures, dimensions } = cubeEvaluator.evaluatedCubes.orders_view;
       expect(dimensions.createdAt).toMatchSnapshot();
       expect(measures.count_shifted_year).toMatchSnapshot();
     });
@@ -572,10 +574,10 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/folders.yml'),
         'utf8'
       );
-      const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+      const { compiler, cubeEvaluator } = prepareYamlCompiler(modelContent);
       await compiler.compile();
 
-      const testView3 = metaTransformer.cubeEvaluator.evaluatedCubes.test_view3;
+      const testView3 = cubeEvaluator.evaluatedCubes.test_view3;
       expect(testView3.dimensions).toMatchSnapshot();
       expect(testView3.measures).toMatchSnapshot();
       expect(testView3.measures).toMatchSnapshot();

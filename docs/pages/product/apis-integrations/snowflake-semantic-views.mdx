@@ -1,0 +1,54 @@
+# Snowflake Semantic Views Integration
+
+<InfoBox>
+
+Snowflake Semantic Views integration is available in Cube on the [Enterprise plan](https://cube.dev/pricing).
+
+</InfoBox>
+
+Cube supports bi-directional integration with Snowflake Semantic Views. This integration enables you to author views in Cube and use them in Snowflake, or work with Snowflake semantic views directly in Cube. This ensures consistency between your Cube definitions and Snowflake's semantic layer, allowing teams to work in their preferred environment.
+
+## Overview
+
+The Snowflake Semantic Views integration provides two-way synchronization between Cube and Snowflake:
+
+- **Pull integration**: Pull semantic views from Snowflake and turn them into cubes and views in Cube
+- **Push integration**: Push Cube views into Snowflake as native semantic views
+
+This bi-directional approach ensures that your semantic layer definitions remain consistent across both platforms, regardless of where they are authored.
+
+## Pull Integration
+
+From the IDE, users can pull semantic views from Snowflake and turn them into cubes and views in Cube. The pull integration generates code files with cube and view definitions in your Cube repository, making it easy to work with existing Snowflake semantic views.
+
+### How it works
+
+1. Connect to your Snowflake account from the Cube IDE
+2. Browse available semantic views in Snowflake
+3. Select the semantic views you want to import
+4. Cube generates the corresponding cube and view definitions
+5. The generated code files are added to your Cube repository
+
+This allows you to leverage existing Snowflake semantic views in Cube without manual conversion, ensuring consistency between your Snowflake and Cube definitions.
+
+## Push Integration
+
+Alternatively, you can push Cube views into Snowflake as native semantic views. The push integration creates DDL from Cube's definitions and executes it in Snowflake, creating Snowflake Semantic Views that match your Cube schema.
+
+### How it works
+
+1. Select Cube views you want to push to Snowflake
+2. Cube generates DDL statements from your Cube view definitions
+3. The DDL is executed in your Snowflake account
+4. Native Snowflake Semantic Views are created matching your Cube schema
+
+This enables you to use Cube-authored views directly in Snowflake, maintaining consistency across both platforms.
+
+## Benefits
+
+The Snowflake Semantic Views integration provides several advantages:
+
+- **Consistency**: Keep your semantic layer definitions synchronized between Cube and Snowflake
+- **Flexibility**: Work in your preferred environment—author in Cube or Snowflake
+- **Efficiency**: Automatically generate definitions without manual conversion
+- **Collaboration**: Enable teams to work in their preferred tools while maintaining consistency

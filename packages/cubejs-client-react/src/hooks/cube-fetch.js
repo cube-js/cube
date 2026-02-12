@@ -33,6 +33,7 @@ export function useCubeFetch(method, options = {}) {
       const coreOptions = {
         mutexObj: mutexRef.current,
         mutexKey: method,
+        ...(options.baseRequestId ? { baseRequestId: options.baseRequestId } : {})
       };
       const args = method === 'meta' ? [coreOptions] : [query, coreOptions];
 

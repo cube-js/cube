@@ -15,11 +15,13 @@ import {
   DownloadTableCSVData,
   DriverCapabilities,
   DriverInterface,
+  GenericDataBaseType,
   QueryOptions,
   QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
+  TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
   UnloadOptions,
@@ -455,9 +457,16 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public toGenericType(columnType: string) {
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     if (columnType.toLowerCase() in ClickhouseTypeToGeneric) {
       return ClickhouseTypeToGeneric[columnType.toLowerCase()];
+    }
+
+    const match = columnType.trim().toLowerCase().match(/decimal\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+
+    if (match) {
+      precision = Number(match[1]);
+      scale = Number(match[2]);
     }
 
     /**
@@ -478,7 +487,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       }
     }
 
-    return super.toGenericType(columnType);
+    return super.toGenericType(columnType, precision, scale);
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {

@@ -3,11 +3,22 @@ use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
+use std::fmt;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum StringOrSql {
     String(String),
     MemberSql(Rc<dyn StructWithSqlMember>),
+}
+
+impl fmt::Debug for StringOrSql {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StringOrSql::String(s) => write!(f, "String({:?})", s),
+            StringOrSql::MemberSql(_) => write!(f, "MemberSql(<trait object>)"),
+        }
+    }
 }
 
 impl<IT: InnerTypes> NativeDeserialize<IT> for StringOrSql {

@@ -8,11 +8,13 @@ import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
+import { CompilerInterface } from './PrepareCompiler';
 
 export type ToString = { toString(): string };
 
 export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
+  name?: string;
   title?: string;
   interval?: string;
   offset?: string;
@@ -33,6 +35,9 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  order?: 'asc' | 'desc';
+  key?: (...args: any[]) => ToString;
+  keyReference?: string;
 };
 
 export type HierarchyDefinition = {
@@ -131,12 +136,51 @@ export type AccessPolicyDefinition = {
     includesMembers?: string[];
     excludesMembers?: string[];
   };
+  conditions?: {
+    if: Function;
+  }[]
 };
 
 export type ViewIncludedMember = {
   type: string;
   memberPath: string;
   name: string;
+};
+
+export type FolderJoinPathMember = {
+  joinPath: () => ToString;
+};
+
+export type FolderMember = {
+  type?: 'folder';
+  name: string;
+  includes?: FolderMember[];
+};
+
+export type FolderInclude = string | FolderJoinPathMember | FolderMember;
+
+export type Folder = {
+  name: string;
+  includes: FolderInclude[] | '*';
+};
+
+// We can include by name and override some details
+export type ViewCubeIncludeMember = {
+  name: string;
+  alias?: string;
+  title?: string;
+  description?: string;
+  format?: string;
+  meta?: any;
+};
+
+export type ViewCubeInclude = {
+  joinPath: () => ToString;
+  prefix?: boolean;
+  split?: boolean;
+  alias?: string;
+  includes: '*' | (string | ViewCubeIncludeMember)[];
+  excludes?: string[];
 };
 
 export interface CubeDefinition {
@@ -158,7 +202,7 @@ export interface CubeDefinition {
   accessPolicy?: AccessPolicyDefinition[];
   // eslint-disable-next-line camelcase
   access_policy?: any[];
-  folders?: any[];
+  folders?: Folder[];
   includes?: any;
   excludes?: any;
   cubes?: any;
@@ -172,8 +216,8 @@ export interface CubeDefinition {
 
 export interface CubeDefinitionExtended extends CubeDefinition {
   allDefinitions: (type: string) => Record<string, any>;
-  rawFolders: () => any[];
-  rawCubes: () => any[];
+  rawFolders: () => Folder[];
+  rawCubes: () => ViewCubeInclude[];
 }
 
 interface SplitViews {
@@ -215,12 +259,12 @@ export const CONTEXT_SYMBOLS = {
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
-export class CubeSymbols implements TranspilerSymbolResolver {
+export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface {
   public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
   private builtCubes: Record<string, CubeDefinitionExtended>;
 
-  private cubeDefinitions: Record<string, CubeDefinition>;
+  public cubeDefinitions: Record<string, CubeDefinition>;
 
   private funcArgumentsValues: Record<string, string[]>;
 
@@ -258,9 +302,16 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     const sortedByDependency = R.pipe(
       R.sortBy((c: CubeDefinition) => !!c.isView),
     )(cubes);
+
     for (const cube of sortedByDependency) {
       const splitViews: SplitViews = {};
+
       this.symbols[cube.name] = this.transform(cube.name, errorReporter.inContext(`${cube.name} cube`), splitViews);
+
+      if (!cube.isView) {
+        this.evaluateDimensionKeys(this.getCubeDefinition(cube.name), errorReporter.inContext(`${cube.name} cube`));
+      }
+
       for (const viewName of Object.keys(splitViews)) {
         // TODO can we define it when cubeList is defined?
         this.cubeList.push(splitViews[viewName]);
@@ -525,6 +576,45 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     });
   }
 
+  private evaluateDimensionKeys(cube: CubeDefinition, errorReporter: ErrorReporter) {
+    const dimensions = cube.dimensions || {};
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [dimensionName, dimension] of Object.entries(dimensions)) {
+      if (dimension.key) {
+        const keyReference = this.evaluateReference(
+          cube.name,
+          dimension.key,
+          `Dimension '${cube.name}.${dimensionName}' key`
+        );
+
+        const [refCubeName, refDimensionName] = keyReference.split('.');
+
+        if (refCubeName !== cube.name) {
+          errorReporter.error(
+            `Dimension '${cube.name}.${dimensionName}' has a key that references dimension '${keyReference}' ` +
+            'from a different cube. Key must reference a dimension within the same cube.'
+          );
+        } else if (!dimensions[refDimensionName]) {
+          errorReporter.error(
+            `Dimension '${cube.name}.${dimensionName}' references key dimension '${refDimensionName}' ` +
+            `which does not exist in cube '${cube.name}'.`
+          );
+        } else {
+          const referencedDimension = dimensions[refDimensionName];
+          if (referencedDimension.key) {
+            errorReporter.error(
+              `Dimension '${cube.name}.${dimensionName}' references '${keyReference}' as its key, ` +
+              `but '${keyReference}' already defines its own key. Nested keys are not allowed.`
+            );
+          } else {
+            dimension.keyReference = keyReference;
+          }
+        }
+      }
+    }
+  }
+
   protected transformPreAggregations(preAggregations: Object) {
     // eslint-disable-next-line no-restricted-syntax
     for (const preAggregation of Object.values(preAggregations)) {
@@ -595,8 +685,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
       // If the hierarchy is included all members from it should be included as well
       // Extend `includes` with members from hierarchies that should be auto-included
       const cubes = type === 'dimensions' ? includedCubes.map((it) => {
-        // TODO recheck `it.joinPath` typing
-        const fullPath = this.evaluateReferences(null, it.joinPath as () => ToString, { collectJoinHints: true });
+        const fullPath = this.evaluateReferences(null, it.joinPath, { collectJoinHints: true });
         const split = fullPath.split('.');
         const cubeRef = split[split.length - 1];
 
@@ -612,11 +701,11 @@ export class CubeSymbols implements TranspilerSymbolResolver {
         const currentCubeAutoIncludeMembers = Array.from(autoIncludeMembers)
           .filter((path) => path.startsWith(`${cubeRef}.`))
           .map((path) => path.split('.')[1])
-          .filter(memberName => !it.includes.find((include) => (include.name || include) === memberName));
+          .filter(memberName => !(it.includes as (string | ViewCubeIncludeMember)[]).find((include) => ((typeof include === 'object' ? include.name : include)) === memberName));
 
         return {
           ...it,
-          includes: (it.includes || []).concat(currentCubeAutoIncludeMembers),
+          includes: (it.includes as (string | ViewCubeIncludeMember)[]).concat(currentCubeAutoIncludeMembers),
         };
       }) : includedCubes;
 
@@ -696,7 +785,6 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     for (const cubeInclude of cubes) {
       const fullPath = this.evaluateReferences(
         null,
-        // TODO recheck `cubeInclude.joinPath` typing
         cubeInclude.joinPath as () => ToString,
         { collectJoinHints: true }
       );
@@ -819,6 +907,23 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
+  protected processKeyReferenceForView(
+    keyReference: string,
+    viewName: string,
+    viewAllMembers: ViewResolvedMember[],
+    dimensionName: string
+  ): { keyReference: string } {
+    const viewKeyMember = viewAllMembers.find(v => v.member === keyReference);
+
+    if (!viewKeyMember) {
+      throw new UserError(
+        `Dimension '${dimensionName}' has key '${keyReference}' but the key dimension is not included in view '${viewName}'`
+      );
+    }
+
+    return { keyReference: `${viewName}.${viewKeyMember.name}` };
+  }
+
   protected generateIncludeMembers(members: any[], type: string, targetCube: CubeDefinitionExtended, viewAllMembers: ViewResolvedMember[]) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
@@ -883,6 +988,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           format: memberRef.override?.format || resolvedMember.format,
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
+          ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
         };
       } else if (type === 'segments') {
         memberDefinition = {
@@ -912,10 +1018,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
    * resolveSymbolsCall are sync. Async support may be added later with deeper
    * refactoring.
    */
-  protected evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
-    const cubeEvaluator = this;
-
-    return cubeEvaluator.resolveSymbolsCall(contextFn, (name: string) => {
+  public evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
+    return this.resolveSymbolsCall(contextFn, (name: string) => {
       const resolvedSymbol = this.resolveSymbol(cube, name);
       if (resolvedSymbol) {
         return resolvedSymbol;
@@ -930,7 +1034,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     });
   }
 
-  protected evaluateReferences<T extends ToString | Array<ToString>>(
+  public evaluateReferences<T extends ToString | Array<ToString>>(
     cube: string | null,
     referencesFn: (...args: Array<unknown>) => T,
     options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
@@ -977,6 +1081,19 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     // Which means that both `T` and result must be arrays
     // For any branch of return type that can contain array it's OK to return array
     return options.originalSorting ? references : R.sortBy(R.identity, references) as any;
+  }
+
+  public evaluateReference(
+    cube: string,
+    referencesFn: (...args: Array<unknown>) => ToString,
+    context: string
+  ): string {
+    const result = this.evaluateReferences(cube, referencesFn);
+    if (Array.isArray(result)) {
+      throw new UserError(`${context} must be a single reference, not an array`);
+    }
+
+    return result;
   }
 
   public pathFromArray(array: string[]): string {

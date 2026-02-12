@@ -6,6 +6,7 @@ import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator, MeasureDefinition } from './CubeEvaluator';
 import type { CubeDefinition, JoinDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 export type JoinEdge = {
   join: JoinDefinition,
@@ -30,7 +31,7 @@ export type JoinHint = string | string[];
 
 export type JoinHints = JoinHint[];
 
-export class JoinGraph {
+export class JoinGraph implements CompilerInterface {
   private readonly cubeValidator: CubeValidator;
 
   private readonly cubeEvaluator: CubeEvaluator;

@@ -1,13 +1,13 @@
 module.exports = {
   "introduction": "Introduction",
   "getting-started": "Getting started",
-  "configuration": "Configuration",
+  "configuration": "Data Sources & Config",
   "data-modeling": "Data modeling",
+  "exploration": "Explore & Analyze",
+  "presentation": "Present & Share",
+  "embedding": "Embedding",
   "caching": "Caching",
   "auth": "Access control",
   "apis-integrations": "APIs & integrations",
-  "workspace": "Workspace",
-  "agentic-analytics": "Agentic analytics",
-  "deployment": "Deployment",
-  "distribution": "Distribution"
+  "administration": "Administration"
 }

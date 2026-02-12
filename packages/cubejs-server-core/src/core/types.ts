@@ -1,13 +1,13 @@
-import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
+import { Required, SchemaFileRepository, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
 import {
+  CanSwitchSQLUserFn,
   CheckAuthFn,
+  CheckSQLAuthFn,
+  ContextToApiScopesFn,
   ExtendContextFn,
   JWTOptions,
-  UserBackgroundContext,
   QueryRewriteFn,
-  CheckSQLAuthFn,
-  CanSwitchSQLUserFn,
-  ContextToApiScopesFn,
+  UserBackgroundContext,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -89,6 +89,10 @@ export interface DriverContext extends RequestContext {
   dataSource: string;
 }
 
+export interface DbTypeInternalContext {
+  dataSource: string;
+}
+
 export interface DialectContext extends DriverContext {
   dbType: string;
 }
@@ -108,17 +112,24 @@ export type DatabaseType =
   | 'mongobi'
   | 'mssql'
   | 'mysql'
+  | 'mysqlauroraserverless'
   | 'elasticsearch'
   | 'awselasticsearch'
   | 'oracle'
   | 'postgres'
   | 'prestodb'
+  | 'trino'
   | 'redshift'
   | 'snowflake'
   | 'sqlite'
   | 'questdb'
   | 'materialize'
-  | 'pinot';
+  | 'pinot'
+  | 'dremio'
+  | 'duckdb'
+  | 'ksql'
+  | 'vertica'
+  | 'databricks-jdbc';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
@@ -156,24 +167,21 @@ export type DbTypeFn = (context: DriverContext) =>
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
-export type DbTypeAsyncFn = (context: DriverContext) =>
+export type DbTypeInternalFn = (context: DbTypeInternalContext) =>
   Promise<DatabaseType>;
-export type DriverFactoryAsyncFn = (context: DriverContext) =>
+export type DriverFactoryInternalFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;
 
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+
+export type DialectClassFn = (options: { dataSource: string; dbType: string }) => BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type LoggerFnParams = {
-  // It's possible to fill timestamp at the place of logging, otherwise, it will be filled in automatically
-  timestamp?: string,
-  [key: string]: any,
-};
-export type LoggerFn = (msg: string, params: LoggerFnParams) => void;
+export { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
 
 export type BiToolSyncConfig = {
   type: string;
@@ -238,8 +246,8 @@ export interface CreateOptions {
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {
-  dbType: DbTypeAsyncFn;
-  driverFactory: DriverFactoryAsyncFn;
+  dbType: DbTypeInternalFn;
+  driverFactory: DriverFactoryInternalFn;
 }
 
 export type ServerCoreInitializedOptions = Required<

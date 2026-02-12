@@ -220,6 +220,164 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  /**
+   * Test case for overlapping access policies with member-level and row-level filters.
+   *
+   * This tests the scenario where:
+   * - Policy 1: group "*" with memberLevel.includes: [] (no members)
+   * - Policy 2: group "developer" with memberLevel.includes: "*" and row_level filters
+   *
+   * The row-level filter from the developer policy SHOULD be applied when a developer
+   * queries for members, because:
+   *
+   *   Members
+   *     ^
+   *     |   ┌─────────────────┐
+   *     |   │    Policy 1     │  (no members, no row filter)
+   *     |   │   ┌─────────────┼───────────────┐
+   *     |   │   │             │               │
+   *     |   └───┼─────────────┘   Policy 2    │  (all members, with row filter)
+   *     |       │                             │
+   *     |       └─────────────────────────────┘
+   *     └──────────────────────────────────────────> Rows
+   *
+   * Policy 1 covers no members (empty includes), so it should not affect row filtering.
+   * Policy 2 covers all members with a row filter, so the filter MUST be applied.
+   */
+  describe('RBAC via SQL API developer (overlapping policies)', () => {
+    let connection: PgClient;
+  
+    beforeAll(async () => {
+      connection = await createPostgresClient('developer', 'developer_password');
+    });
+  
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+  
+    test('SELECT * from customers should apply row-level filter', async () => {
+      const res = await connection.query('SELECT * FROM customers limit 10');
+      // This query should return rows filtered by city (Los Angeles, New York) from Policy 2
+      // even though Policy 1 (group "*") has empty member includes
+      expect(res.rows).toMatchSnapshot('customers_developer');
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+  
+    test('SELECT count from customers should apply row-level filter', async () => {
+      const res = await connection.query('SELECT count FROM customers');
+      // Count should reflect the filtered rows
+      expect(res.rows).toMatchSnapshot('customers_developer_count');
+    });
+  });
+  
+  describe('RBAC via SQL API admin (overlapping policies - allowAll)', () => {
+    let connection: PgClient;
+  
+    beforeAll(async () => {
+      // Admin is in 'leadership' group which has allowAll
+      connection = await createPostgresClient('admin', 'admin_password');
+    });
+  
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+  
+    test('SELECT * from customers should not apply row-level filter for admin', async () => {
+      const res = await connection.query('SELECT * FROM customers limit 10');
+      // Admin should see all rows without any filter (allowAll)
+      expect(res.rows).toMatchSnapshot('customers_admin');
+    });
+  });
+
+  /**
+   * Two-dimensional policy overlap test (matches diagram in CompilerApi.ts:559-647)
+   *
+   * Policy 1 (role "*"): covers members a, b, id with row filter R1 (id < 500)
+   * Policy 2 (role "policy2_role"): covers members b, c, id with row filter R2 (id >= 500)
+   *
+   *   Members
+   *     ^
+   *     |       ┌─────────────────────────────┐
+   *   c |       │          Policy 2           │
+   *     |   ┌───┼─────────────┐               │
+   *   b |   │   │  (overlap)  │               │
+   *     |   │   └─────────────┼───────────────┘
+   *   a |   │    Policy 1     │
+   *     |   └─────────────────┘
+   *     └──────────────────────────────────────────> Rows
+   *              R1 (id<500)   R2 (id>=500)
+   */
+  describe('RBAC two-dimensional policy overlap (a,b,c diagram)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      // User has policy2_role, so both Policy 1 (*) and Policy 2 apply
+      connection = await createPostgresClient('policy_test', 'policy_test_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    /**
+     * Case 1: Query members (a, b)
+     * Only Policy 1 covers ALL queried members → R1 rows visible (id < 500)
+     */
+    test('Case 1: Query (a, b) → Only R1 rows (id < 500)', async () => {
+      const res = await connection.query(
+        'SELECT member_a, member_b FROM policy_overlap_test LIMIT 1000'
+      );
+      // R1 filter: id < 500, so count should be exactly 499
+      expect(res.rows.length).toBe(499);
+    });
+
+    /**
+     * Case 2: Query members (b, c)
+     * Only Policy 2 covers ALL queried members → R2 rows visible (id >= 500)
+     */
+    test('Case 2: Query (b, c) → Only R2 rows (id >= 500)', async () => {
+      const res = await connection.query(
+        'SELECT member_b, member_c FROM policy_overlap_test LIMIT 60000'
+      );
+      // R2 filter: id >= 500, should get rows from the upper range
+      // The exact count depends on total rows in line_items table
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    /**
+     * Case 3: Query member (b) only
+     * Both policies cover member b → Union of R1 ∪ R2 rows visible (all rows)
+     */
+    test('Case 3: Query (b) only → R1 ∪ R2 rows (union, all rows)', async () => {
+      // First get count from R1 only (querying a, b)
+      const r1Res = await connection.query(
+        'SELECT member_a, member_b FROM policy_overlap_test LIMIT 1000'
+      );
+      const r1Count = r1Res.rows.length;
+
+      // Now get count from union (querying just b - both policies apply)
+      const unionRes = await connection.query(
+        'SELECT member_b FROM policy_overlap_test LIMIT 60000'
+      );
+      const unionCount = unionRes.rows.length;
+
+      // Union should return more rows than R1 alone
+      expect(unionCount).toBeGreaterThan(r1Count);
+    });
+
+    /**
+     * Case 4: Query members (a, b, c)
+     * Neither policy covers ALL three → NO rows visible (denied)
+     */
+    test('Case 4: Query (a, b, c) → Access denied (empty result)', async () => {
+      const res = await connection.query(
+        'SELECT member_a, member_b, member_c FROM policy_overlap_test LIMIT 10'
+      );
+      // No policy covers all three members, so access is denied
+      expect(res.rows.length).toBe(0);
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;
@@ -249,6 +407,9 @@ describe('Cube RBAC Engine', () => {
     });
 
     test('line_items hidden price_dim', async () => {
+      // When querying hidden members, row-level security denies access
+      // by filtering out all rows (returns empty result)
+      // TODO we should evaluate member access before the query runs and bounce early with an error
       let query: Query = {
         measures: ['line_items.count'],
         dimensions: ['line_items.price_dim'],
@@ -256,13 +417,10 @@ describe('Cube RBAC Engine', () => {
           'line_items.price_dim': 'asc',
         },
       };
-      let error = '';
-      try {
-        await client.load(query, {});
-      } catch (e: any) {
-        error = e.toString();
-      }
-      expect(error).toContain('You requested hidden member');
+      const hiddenMemberResult = await client.load(query, {});
+      // Row-level security denies access by returning empty results
+      expect(hiddenMemberResult.rawData()).toEqual([]);
+
       query = {
         measures: ['line_items_view_no_policy.count'],
         dimensions: ['line_items_view_no_policy.price_dim'],

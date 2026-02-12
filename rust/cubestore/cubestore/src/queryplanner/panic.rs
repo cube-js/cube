@@ -1,23 +1,44 @@
+use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::planning::WorkerExec;
 use async_trait::async_trait;
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::Schema;
+use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
-use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+use datafusion::execution::TaskContext;
+use datafusion::logical_expr::{
+    Expr, Extension, InvariantLevel, LogicalPlan, UserDefinedLogicalNode,
 };
+use datafusion::physical_expr::EquivalenceProperties;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion::physical_plan::{
+    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
+    SendableRecordBatchStream,
+};
+use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::cmp::Ordering;
 use std::fmt::Formatter;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PanicWorkerNode {}
 
 impl PanicWorkerNode {
     pub fn into_plan(self) -> LogicalPlan {
-        LogicalPlan::Extension {
+        LogicalPlan::Extension(Extension {
             node: Arc::new(self),
-        }
+        })
+    }
+
+    pub fn from_serialized(inputs: &[LogicalPlan], serialized: PanicWorkerSerialized) -> Self {
+        assert_eq!(0, inputs.len());
+        let PanicWorkerSerialized {} = serialized;
+        Self {}
+    }
+
+    pub fn to_serialized(&self) -> PanicWorkerSerialized {
+        PanicWorkerSerialized {}
     }
 }
 
@@ -30,12 +51,24 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         self
     }
 
+    fn name(&self) -> &str {
+        "PanicWorker"
+    }
+
     fn inputs(&self) -> Vec<&LogicalPlan> {
         vec![]
     }
 
     fn schema(&self) -> &DFSchemaRef {
         &EMPTY_SCHEMA
+    }
+
+    fn check_invariants(
+        &self,
+        _check: InvariantLevel,
+        _plan: &LogicalPlan,
+    ) -> Result<(), DataFusionError> {
+        Ok(())
     }
 
     fn expressions(&self) -> Vec<Expr> {
@@ -46,24 +79,59 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         write!(f, "Panic")
     }
 
-    fn from_template(
+    fn with_exprs_and_inputs(
         &self,
-        exprs: &[Expr],
-        inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion::common::Result<Arc<dyn UserDefinedLogicalNode>> {
         assert!(exprs.is_empty());
         assert!(inputs.is_empty());
 
-        Arc::new(PanicWorkerNode {})
+        Ok(Arc::new(PanicWorkerNode {}))
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .map(|o| self.eq(o))
+            .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other.as_any().downcast_ref::<Self>().map(|o| self.cmp(o))
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct PanicWorkerSerialized {}
+
 #[derive(Debug)]
-pub struct PanicWorkerExec {}
+pub struct PanicWorkerExec {
+    properties: PlanProperties,
+}
 
 impl PanicWorkerExec {
     pub fn new() -> PanicWorkerExec {
-        PanicWorkerExec {}
+        PanicWorkerExec {
+            properties: PlanProperties::new(
+                EquivalenceProperties::new(Arc::new(Schema::empty())),
+                Partitioning::UnknownPartitioning(1),
+                EmissionType::Incremental, // Not really applicable.
+                Boundedness::Bounded,
+            ),
+        }
+    }
+}
+
+impl DisplayAs for PanicWorkerExec {
+    fn fmt_as(&self, _: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "PanicWorkerExec")
     }
 }
 
@@ -73,44 +141,50 @@ impl ExecutionPlan for PanicWorkerExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::empty())
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 0);
         Ok(Arc::new(PanicWorkerExec::new()))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        OptimizerHints::default()
-    }
-
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        _: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         assert_eq!(partition, 0);
         panic!("worker panic")
     }
+
+    fn name(&self) -> &str {
+        "PanicWorkerExec"
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
+    }
 }
 
 pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    Ok(Arc::new(WorkerExec {
-        input: Arc::new(PanicWorkerExec::new()),
-        schema: Arc::new(Schema::empty()),
-        max_batch_rows: 1,
-        limit_and_reverse: None,
-    }))
+    Ok(Arc::new(WorkerExec::new(
+        Arc::new(PanicWorkerExec::new()),
+        /* max_batch_rows */ 1,
+        /* limit_and_reverse */ None,
+        /* required_input_ordering */ None,
+        // worker_partition_count is generally set to 1 for panic worker messages
+        // (SystemCommand::PanicWorker).  What is important is that router and worker nodes have the
+        // same plan properties so that DF optimizations run identically -- router node is creating
+        // a WorkerExec for some reason. (Also, it's important that DF optimizations run identically
+        // when it comes to aggregates pushed down through ClusterSend and the like -- it's actually
+        // NOT important for panic worker planning.)
+        WorkerPlanningParams {
+            worker_partition_count: 1,
+        },
+    )))
 }

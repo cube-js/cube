@@ -523,6 +523,7 @@ impl QueryProperties {
             self.query_tools.clone(),
             &self.measures,
             &self.dimensions,
+            &self.extract_dimensions_from_order(),
             &self.time_dimensions,
             &self.time_dimensions_filters,
             &self.dimensions_filters,
@@ -541,6 +542,7 @@ impl QueryProperties {
             self.query_tools.clone(),
             measures,
             &self.dimensions,
+            &self.extract_dimensions_from_order(),
             &self.time_dimensions,
             &self.time_dimensions_filters,
             &self.dimensions_filters,
@@ -553,11 +555,25 @@ impl QueryProperties {
         self.total_query
     }
 
+    fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
+        self.order_by
+            .iter()
+            .filter_map(|order| {
+                if order.member_evaluator.as_dimension().is_ok() {
+                    Some(order.member_evaluator.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn compute_join_multi_fact_groups(
         query_join_hints: Rc<Vec<JoinHintItem>>,
         query_tools: Rc<QueryTools>,
         measures: &Vec<Rc<MemberSymbol>>,
         dimensions: &Vec<Rc<MemberSymbol>>,
+        order_dimensions: &Vec<Rc<MemberSymbol>>,
         time_dimensions: &Vec<Rc<MemberSymbol>>,
         time_dimensions_filters: &Vec<FilterItem>,
         dimensions_filters: &Vec<FilterItem>,
@@ -567,6 +583,9 @@ impl QueryProperties {
         let dimensions_join_hints = query_tools
             .cached_data_mut()
             .join_hints_for_member_symbol_vec(&dimensions)?;
+        let order_dimensions_join_hints = query_tools
+            .cached_data_mut()
+            .join_hints_for_member_symbol_vec(&order_dimensions)?;
         let time_dimensions_join_hints = query_tools
             .cached_data_mut()
             .join_hints_for_member_symbol_vec(&time_dimensions)?;
@@ -586,6 +605,7 @@ impl QueryProperties {
         let mut dimension_and_filter_join_hints_concat = vec![query_join_hints];
 
         dimension_and_filter_join_hints_concat.extend(dimensions_join_hints.into_iter());
+        dimension_and_filter_join_hints_concat.extend(order_dimensions_join_hints.into_iter());
         dimension_and_filter_join_hints_concat.extend(time_dimensions_join_hints.into_iter());
         dimension_and_filter_join_hints_concat
             .extend(time_dimensions_filters_join_hints.into_iter());
@@ -935,6 +955,16 @@ impl QueryProperties {
         let mut measures = self.measures.clone();
         for item in self.measures_filters.iter() {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
+        }
+        for item in self.order_by.iter() {
+            if let Ok(measure) = item.member_evaluator.as_measure() {
+                if !measures
+                    .iter()
+                    .any(|m| m.full_name() == measure.full_name())
+                {
+                    measures.push(item.member_evaluator.clone());
+                }
+            }
         }
         Ok(measures)
     }

@@ -110,6 +110,8 @@ cube('fiscal_calendar', {
 
 </CodeTabs>
 
+### Joins
+
 Calendar cubes are only useful when they are joined with other cubes in the data model.
 
 <CodeTabs>
@@ -143,6 +145,11 @@ cube(`sales`, {
 ```
 
 </CodeTabs>
+
+When joining a calendar cube to other cubes, the following requirements must be met:
+- The calendar cube's join dimension must be of [type `time`][ref-time-dimension] and
+also be the [`primary_key`][ref-primary-key].
+- The other cube's join dimension must also be of [type `time`][ref-time-dimension].
 
 ## Overriding time shifts
 
@@ -465,3 +472,5 @@ expression in the generated SQL.
 [ref-granularities]: /product/data-modeling/reference/dimensions#granularities
 [ref-cubes]: /product/data-modeling/reference/cube
 [ref-cubes-calendar]: /product/data-modeling/reference/cube#calendar
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key

@@ -1,12 +1,12 @@
 use crate::cachestore::{QueueItemStatus, QueueKey};
 use sqlparser::ast::{
-    ColumnDef, HiveDistributionStyle, Ident, ObjectName, Query, SqlOption,
-    Statement as SQLStatement, Value,
+    ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
+    SqlOption, Statement as SQLStatement, Value,
 };
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
-use sqlparser::tokenizer::{Token, Tokenizer};
+use sqlparser::tokenizer::{Span, Token, Tokenizer};
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -26,6 +26,11 @@ impl Dialect for MySqlDialectWithBackTicks {
 
     fn is_identifier_part(&self, ch: char) -> bool {
         self.is_identifier_start(ch) || (ch >= '0' && ch <= '9')
+    }
+
+    // Behavior we previously had hard-coded into sqlparser
+    fn supports_string_literal_backslash_escape(&self) -> bool {
+        true
     }
 }
 
@@ -220,12 +225,12 @@ impl<'a> CubeStoreParser<'a> {
         let mut tokenizer = Tokenizer::new(dialect, sql);
         let tokens = tokenizer.tokenize()?;
         Ok(CubeStoreParser {
-            parser: Parser::new(tokens, dialect),
+            parser: Parser::new(dialect).with_tokens(tokens),
         })
     }
 
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        match self.parser.peek_token() {
+        match self.parser.peek_token().token {
             Token::Word(w) => match w.keyword {
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
@@ -263,11 +268,11 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
-        match self.parser.peek_token() {
+        match self.parser.peek_token().token {
             Token::Word(w) => {
                 self.parser.next_token();
 
-                Ok(QueueKey::ByPath(w.to_ident().value))
+                Ok(QueueKey::ByPath(w.into_ident(Span::empty()).value))
             }
             Token::SingleQuotedString(v) => {
                 self.parser.next_token();
@@ -294,8 +299,8 @@ impl<'a> CubeStoreParser<'a> {
 
     pub fn parse_streaming_source_table(&mut self) -> Result<Vec<ColumnDef>, ParserError> {
         if self.parser.parse_keyword(Keyword::CREATE) && self.parser.parse_keyword(Keyword::TABLE) {
-            let statement = self.parser.parse_create_table_ext(false, false, false)?;
-            if let SQLStatement::CreateTable { columns, .. } = statement {
+            let statement = self.parser.parse_create_table(false, false, None, false)?;
+            if let SQLStatement::CreateTable(CreateTable { columns, .. }) = statement {
                 Ok(columns)
             } else {
                 Err(ParserError::ParserError(
@@ -310,7 +315,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_cache(&mut self) -> Result<Statement, ParserError> {
-        let method = match self.parser.next_token() {
+        let method = match self.parser.next_token().token {
             Token::Word(w) => w.value.to_ascii_lowercase(),
             other => {
                 return Err(ParserError::ParserError(format!(
@@ -368,7 +373,7 @@ impl<'a> CubeStoreParser<'a> {
     where
         <R as std::str::FromStr>::Err: std::fmt::Display,
     {
-        let is_negative = match self.parser.peek_token() {
+        let is_negative = match self.parser.peek_token().token {
             Token::Minus => {
                 self.parser.next_token();
                 true
@@ -460,7 +465,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_queue(&mut self) -> Result<Statement, ParserError> {
-        let method = match self.parser.next_token() {
+        let method = match self.parser.next_token().token {
             Token::Word(w) => w.value.to_ascii_lowercase(),
             other => {
                 return Err(ParserError::ParserError(format!(
@@ -636,7 +641,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_custom_token(&mut self, token: &str) -> bool {
-        if let Token::Word(w) = self.parser.peek_token() {
+        if let Token::Word(w) = self.parser.peek_token().token {
             if w.value.eq_ignore_ascii_case(token) {
                 self.parser.next_token();
                 true
@@ -649,117 +654,157 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
-        // Note that we disable hive extensions as they clash with `location`.
-        let statement = self.parser.parse_create_table_ext(false, false, false)?;
-        if let SQLStatement::CreateTable {
-            name,
-            columns,
-            constraints,
-            with_options,
-            if_not_exists,
-            file_format,
-            query,
-            without_rowid,
-            or_replace,
-            table_properties,
-            like,
-            ..
-        } = statement
+        let allow_unquoted_hyphen = false;
+        let if_not_exists =
+            self.parser
+                .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
+        let name = self.parser.parse_object_name(allow_unquoted_hyphen)?;
+
+        let like = if self.parser.parse_keyword(Keyword::LIKE)
+            || self.parser.parse_keyword(Keyword::ILIKE)
         {
-            let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
-                self.parser.expect_token(&Token::LParen)?;
-                let res = Some(
-                    self.parser
-                        .parse_comma_separated(|p| p.parse_identifier())?,
-                );
-                self.parser.expect_token(&Token::RParen)?;
-                res
-            } else {
-                None
-            };
-
-            let aggregates = if self.parse_custom_token("aggregations") {
-                self.parser.expect_token(&Token::LParen)?;
-                let res = self.parser.parse_comma_separated(|p| {
-                    let func = p.parse_identifier()?;
-                    p.expect_token(&Token::LParen)?;
-                    let column = p.parse_identifier()?;
-                    p.expect_token(&Token::RParen)?;
-                    Ok((func, column))
-                })?;
-                self.parser.expect_token(&Token::RParen)?;
-                Some(res)
-            } else {
-                None
-            };
-
-            let mut indexes = Vec::new();
-
-            loop {
-                if self.parse_custom_token("aggregate") {
-                    self.parser.expect_keyword(Keyword::INDEX)?;
-                    indexes.push(self.parse_with_index(name.clone(), true)?);
-                } else if self.parser.parse_keyword(Keyword::INDEX) {
-                    indexes.push(self.parse_with_index(name.clone(), false)?);
-                } else {
-                    break;
-                }
-            }
-
-            let partitioned_index = if self.parser.parse_keywords(&[
-                Keyword::ADD,
-                Keyword::TO,
-                Keyword::PARTITIONED,
-                Keyword::INDEX,
-            ]) {
-                let name = self.parser.parse_object_name()?;
-                self.parser.expect_token(&Token::LParen)?;
-                let columns = self
-                    .parser
-                    .parse_comma_separated(Parser::parse_identifier)?;
-                self.parser.expect_token(&Token::RParen)?;
-                Some(PartitionedIndexRef { name, columns })
-            } else {
-                None
-            };
-
-            let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
-                Some(
-                    self.parser
-                        .parse_comma_separated(|p| p.parse_literal_string())?,
-                )
-            } else {
-                None
-            };
-
-            Ok(Statement::CreateTable {
-                create_table: SQLStatement::CreateTable {
-                    or_replace,
-                    name,
-                    columns,
-                    constraints,
-                    hive_distribution: HiveDistributionStyle::NONE,
-                    hive_formats: None,
-                    table_properties,
-                    with_options,
-                    if_not_exists,
-                    external: locations.is_some(),
-                    file_format,
-                    location: None,
-                    query,
-                    without_rowid,
-                    temporary: false,
-                    like,
-                },
-                indexes,
-                aggregates,
-                partitioned_index,
-                locations,
-                unique_key,
-            })
+            self.parser.parse_object_name(allow_unquoted_hyphen).ok()
         } else {
-            Ok(Statement::Statement(statement))
+            None
+        };
+
+        // parse optional column list (schema)
+        let (columns, constraints) = self.parser.parse_columns()?;
+
+        // SQLite supports `WITHOUT ROWID` at the end of `CREATE TABLE`
+        let without_rowid = self
+            .parser
+            .parse_keywords(&[Keyword::WITHOUT, Keyword::ROWID]);
+
+        // PostgreSQL supports `WITH ( options )`, before `AS`
+        let with_options = self.parser.parse_options(Keyword::WITH)?;
+        let table_properties = self.parser.parse_options(Keyword::TBLPROPERTIES)?;
+
+        // Parse optional `AS ( query )`
+        let query = if self.parser.parse_keyword(Keyword::AS) {
+            Some(self.parser.parse_query()?)
+        } else {
+            None
+        };
+
+        let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
+            self.parser.expect_token(&Token::LParen)?;
+            let res = Some(
+                self.parser
+                    .parse_comma_separated(|p| p.parse_identifier())?,
+            );
+            self.parser.expect_token(&Token::RParen)?;
+            res
+        } else {
+            None
+        };
+
+        let aggregates = if self.parse_custom_token("aggregations") {
+            self.parser.expect_token(&Token::LParen)?;
+            let res = self.parser.parse_comma_separated(|p| {
+                let func = p.parse_identifier()?;
+                p.expect_token(&Token::LParen)?;
+                let column = p.parse_identifier()?;
+                p.expect_token(&Token::RParen)?;
+                Ok((func, column))
+            })?;
+            self.parser.expect_token(&Token::RParen)?;
+            Some(res)
+        } else {
+            None
+        };
+
+        let mut indexes = Vec::new();
+
+        loop {
+            if self.parse_custom_token("aggregate") {
+                self.parser.expect_keyword(Keyword::INDEX)?;
+                indexes.push(self.parse_with_index(name.clone(), true)?);
+            } else if self.parser.parse_keyword(Keyword::INDEX) {
+                indexes.push(self.parse_with_index(name.clone(), false)?);
+            } else {
+                break;
+            }
         }
+
+        let partitioned_index = if self.parser.parse_keywords(&[
+            Keyword::ADD,
+            Keyword::TO,
+            Keyword::PARTITIONED,
+            Keyword::INDEX,
+        ]) {
+            let name = self.parser.parse_object_name(true)?;
+            self.parser.expect_token(&Token::LParen)?;
+            let columns = self
+                .parser
+                .parse_comma_separated(|t| Parser::parse_identifier(t))?;
+            self.parser.expect_token(&Token::RParen)?;
+            Some(PartitionedIndexRef { name, columns })
+        } else {
+            None
+        };
+
+        let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
+            Some(
+                self.parser
+                    .parse_comma_separated(|p| p.parse_literal_string())?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Statement::CreateTable {
+            create_table: SQLStatement::CreateTable(CreateTable {
+                or_replace: false,
+                name,
+                columns,
+                constraints,
+                hive_distribution: HiveDistributionStyle::NONE,
+                hive_formats: None,
+                table_properties,
+                with_options,
+                if_not_exists,
+                transient: false,
+                external: locations.is_some(),
+                file_format: None,
+                location: None,
+                query,
+                without_rowid,
+                temporary: false,
+                like,
+                clone: None,
+                engine: None,
+                comment: None,
+                auto_increment_offset: None,
+                default_charset: None,
+                collation: None,
+                on_commit: None,
+                on_cluster: None,
+                primary_key: None,
+                order_by: None,
+                partition_by: None,
+                cluster_by: None,
+                clustered_by: None,
+                options: None,
+                strict: false,
+                copy_grants: false,
+                enable_schema_evolution: None,
+                change_tracking: None,
+                data_retention_time_in_days: None,
+                max_data_extension_time_in_days: None,
+                default_ddl_collation: None,
+                with_aggregation_policy: None,
+                with_row_access_policy: None,
+                global: None,
+                volatile: false,
+                with_tags: None,
+            }),
+            indexes,
+            aggregates,
+            partitioned_index,
+            locations,
+            unique_key,
+        })
     }
 
     pub fn parse_with_index(
@@ -767,27 +812,33 @@ impl<'a> CubeStoreParser<'a> {
         table_name: ObjectName,
         is_aggregate: bool,
     ) -> Result<SQLStatement, ParserError> {
-        let index_name = self.parser.parse_object_name()?;
+        let index_name = self.parser.parse_object_name(true)?;
         self.parser.expect_token(&Token::LParen)?;
         let columns = self
             .parser
             .parse_comma_separated(Parser::parse_order_by_expr)?;
         self.parser.expect_token(&Token::RParen)?;
         //TODO I use unique flag for aggregate index for reusing CreateIndex struct. When adding another type of index, we will need to parse it into a custom structure
-        Ok(SQLStatement::CreateIndex {
-            name: index_name,
+        Ok(SQLStatement::CreateIndex(CreateIndex {
+            name: Some(index_name),
             table_name,
+            using: None,
             columns,
             unique: is_aggregate,
+            concurrently: false,
             if_not_exists: false,
-        })
+            include: vec![],
+            nulls_distinct: None,
+            with: vec![],
+            predicate: None,
+        }))
     }
 
     fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {
         let if_not_exists =
             self.parser
                 .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
-        let schema_name = self.parser.parse_object_name()?;
+        let schema_name = self.parser.parse_object_name(false)?;
         Ok(Statement::CreateSchema {
             schema_name,
             if_not_exists,
@@ -850,9 +901,9 @@ mod tests {
                 assert_eq!(indexes.len(), 3);
 
                 let ind = &indexes[0];
-                if let SQLStatement::CreateIndex {
+                if let SQLStatement::CreateIndex(CreateIndex {
                     columns, unique, ..
-                } = ind
+                }) = ind
                 {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &false);
@@ -861,9 +912,9 @@ mod tests {
                 }
 
                 let ind = &indexes[1];
-                if let SQLStatement::CreateIndex {
+                if let SQLStatement::CreateIndex(CreateIndex {
                     columns, unique, ..
-                } = ind
+                }) = ind
                 {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &true);

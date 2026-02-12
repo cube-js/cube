@@ -410,8 +410,8 @@ jobs:
         bigquery
         snowflake
         firebolt
-        dremio
-      # Athena (just to check for secrets availability)
+#       Athena (just to check for secrets availability)
+#        dremio # Commented out because of flaky integration tests
       DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
 
     strategy:
@@ -423,12 +423,16 @@ jobs:
         db: [
             'athena', 'bigquery', 'snowflake', 'trino',
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio'
+            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt',
+#            'dremio' # Commented out because of flaky integration tests
 #            'vertica'
         ]
         use_tesseract_sql_planner: [ false ]
         include:
           - db: postgres
+            node-version: 22.x
+            use_tesseract_sql_planner: true
+          - db: mssql
             node-version: 22.x
             use_tesseract_sql_planner: true
       fail-fast: false

@@ -18,7 +18,7 @@ pub use datafusion::{
             ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
             Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
-        datatypes::{DataType, SchemaRef},
+        datatypes::{DataType, Schema, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
         record_batch::RecordBatch,
     },
@@ -508,12 +508,13 @@ impl ExecutionPlan for CubeScanExecutionPlan {
 
         // For now execute method executes only one query at a time, so we
         // take the first result
+        let rb_schema = response.first().unwrap().schema().clone();
         one_shot_stream.data = Some(response.first().unwrap().clone());
 
         Ok(Box::pin(CubeScanStreamRouter::new(
             None,
             one_shot_stream,
-            self.schema.clone(),
+            rb_schema,
         )))
     }
 
@@ -1177,7 +1178,18 @@ pub fn convert_transport_response(
         .into_iter()
         .map(|r| {
             let mut response = JsonValueObject::new(r.data.clone());
-            transform_response(&mut response, schema.clone(), &member_fields)
+            let updated_schema = if let Some(last_refresh_time) = r.last_refresh_time.clone() {
+                let mut metadata = schema.metadata().clone();
+                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
+                Arc::new(Schema::new_with_metadata(
+                    schema.fields().to_vec(),
+                    metadata,
+                ))
+            } else {
+                schema.clone()
+            };
+
+            transform_response(&mut response, updated_schema, &member_fields)
         })
         .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
 }

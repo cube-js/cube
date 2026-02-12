@@ -3,6 +3,131 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
+
+### Features
+
+- **server-core:** Add level field for log messages ([#10337](https://github.com/cube-js/cube/issues/10337)) ([1e7dcb6](https://github.com/cube-js/cube/commit/1e7dcb614dd6537b3bb2a1f9bd04e96c2374a673))
+- **server-core:** Exponential backoff in refresh scheduler ([#10302](https://github.com/cube-js/cube/issues/10302)) ([fe714bf](https://github.com/cube-js/cube/commit/fe714bf333dec59a3988d626fdd709062a163b4f))
+
+## [1.6.6](https://github.com/cube-js/cube/compare/v1.6.5...v1.6.6) (2026-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.5](https://github.com/cube-js/cube/compare/v1.6.4...v1.6.5) (2026-01-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.4](https://github.com/cube-js/cube/compare/v1.6.3...v1.6.4) (2026-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.3](https://github.com/cube-js/cube/compare/v1.6.2...v1.6.3) (2026-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+# [1.6.0](https://github.com/cube-js/cube/compare/v1.5.16...v1.6.0) (2025-12-18)
+
+### Bug Fixes
+
+- **server-core:** Access policies row filtering should respect member visibility ([#10257](https://github.com/cube-js/cube/issues/10257)) ([cc0e582](https://github.com/cube-js/cube/commit/cc0e5821669d6babe43d52264ebb3708fe8d1c0f))
+
+### BREAKING CHANGES
+
+- **server-core:** Policies not applicable due to member visibility may stop applying changing row level security filters
+
+- Linter
+
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+### Bug Fixes
+
+- **server-core:** Fix securityContext overwrite ([#10242](https://github.com/cube-js/cube/issues/10242)) ([40f44b0](https://github.com/cube-js/cube/commit/40f44b0cf773d9b855566fe557f8508eac1f1413))
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+### Bug Fixes
+
+- Add await boundary for response sending ([#10233](https://github.com/cube-js/cube/issues/10233)) ([9e9f9d1](https://github.com/cube-js/cube/commit/9e9f9d1ab5ad3712403cd726ab49864f5d416468))
+- Improve WS request sanitization ([#10231](https://github.com/cube-js/cube/issues/10231)) ([6271520](https://github.com/cube-js/cube/commit/62715203c70b71e371bf2ccad83609ea4b9ce2d1))
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **server-core:** pass contextToRoles option ([#10182](https://github.com/cube-js/cube/issues/10182)) ([4b7ba4e](https://github.com/cube-js/cube/commit/4b7ba4e47090d904f31786137b8c8b5d45d519ef))
+
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Fix passing cacheMode from user's request ([#10162](https://github.com/cube-js/cube/issues/10162)) ([64c66c4](https://github.com/cube-js/cube/commit/64c66c4a4bdcf3e7e1ae3094791031e22397243e))
+
+### Performance Improvements
+
+- **schema-compiler:** Add Server Core shared caches for model compilation ([#10144](https://github.com/cube-js/cube/issues/10144)) ([87de073](https://github.com/cube-js/cube/commit/87de0734bf987969096d7f92c65a6ad20ef656e6))
+- **schema-compiler:** More aggressive compilers cleanup ([#10153](https://github.com/cube-js/cube/issues/10153)) ([005a46d](https://github.com/cube-js/cube/commit/005a46d734e25b1b02a3a6315172772e8988b027))
+
+## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
 ## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

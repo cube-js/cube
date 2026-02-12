@@ -1,6 +1,6 @@
 import * as stream from 'stream';
 import R from 'ramda';
-import { CacheMode, getEnv } from '@cubejs-backend/shared';
+import { CacheMode, getEnv, LoggerFn } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   QuerySchemasResult,
@@ -71,7 +71,7 @@ export class QueryOrchestrator {
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
-    protected readonly logger: any,
+    protected readonly logger: LoggerFn,
     options: QueryOrchestratorOptions = {}
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;

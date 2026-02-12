@@ -3,8 +3,8 @@ import moment from 'moment';
 import Joi from 'joi';
 import { getEnv } from '@cubejs-backend/shared';
 
-import { UserError } from './UserError';
-import { dateParser } from './dateParser';
+import { UserError } from './user-error';
+import { dateParser } from './date-parser';
 import { QueryType } from './types/enums';
 
 const getQueryGranularity = (queries) => R.pipe(
@@ -327,7 +327,8 @@ function normalizeQueryCacheMode(query, cacheMode) {
  * @returns {import('./types/query').NormalizedQuery}
  */
 const normalizeQuery = (query, persistent, cacheMode) => {
-  query = normalizeQueryCacheMode(query);
+  query = normalizeQueryCacheMode(query, cacheMode);
+  query.timezone = query.timezone || getEnv('defaultTimezone');
   const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);

@@ -49,7 +49,7 @@ export class PrestodbQuery extends BaseQuery {
     return `from_iso8601_timestamp(${value})`;
   }
 
-  public convertTz(field) {
+  public override convertTz(field) {
     const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
     return this.timezone ?
       `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
@@ -139,6 +139,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
+    templates.functions.STRING_AGG = 'ARRAY_JOIN(ARRAY_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}), COALESCE({{ args[1] }}, \'\'))';
     delete templates.functions.PERCENTILECONT;
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +

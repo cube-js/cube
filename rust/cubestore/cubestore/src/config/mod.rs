@@ -21,6 +21,7 @@ use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
 };
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
+use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::cleanup::RemoteFsCleanup;
@@ -49,7 +50,6 @@ use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
 use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
-use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -492,6 +492,8 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    fn allow_decimal128(&self) -> bool;
+
     fn enable_remove_orphaned_remote_files(&self) -> bool;
 
     fn enable_startup_warmup(&self) -> bool;
@@ -622,6 +624,7 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
@@ -905,6 +908,10 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+
+    fn allow_decimal128(&self) -> bool {
+        self.allow_decimal128
     }
 
     fn enable_remove_orphaned_remote_files(&self) -> bool {
@@ -1462,6 +1469,7 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
                     false,
@@ -1577,6 +1585,14 @@ impl Config {
         Self::make_test_config(Self::test_config_obj(name))
     }
 
+    pub fn migration_test(name: &str) -> Config {
+        let config_obj_impl = Self::test_config_obj(name);
+        Config {
+            injector: Injector::new(),
+            config_obj: Arc::new(config_obj_impl),
+        }
+    }
+
     /// Possibly there is nothing test-specific about this; its purpose is to be publicly used by Config::test.
     pub fn make_test_config(config_obj_impl: ConfigObjImpl) -> Config {
         Config {
@@ -1588,13 +1604,25 @@ impl Config {
     /// Constructs the underlying ConfigObjImpl used in `Config::test`, so that you can modify it
     /// before passing it to Config::make_test_config.
     pub fn test_config_obj(name: &str) -> ConfigObjImpl {
+        Self::test_config_obj_in_directory(&env::current_dir().unwrap(), name)
+    }
+
+    pub fn test_data_dir_path(directory: &Path, test_name: &str) -> PathBuf {
+        directory.join(format!("{}-local-store", test_name))
+    }
+
+    pub fn test_remote_dir_path(directory: &Path, test_name: &str) -> PathBuf {
+        directory.join(format!("{}-upstream", test_name))
+    }
+
+    /// `directory` is likely `env::current_dir().unwrap()`, but it might used to make data_dir and
+    /// remote_dir be pre-existing locations.
+    pub fn test_config_obj_in_directory(directory: &PathBuf, name: &str) -> ConfigObjImpl {
         let query_timeout = 15;
         // Git blame history preserving block
         {
             ConfigObjImpl {
-                data_dir: env::current_dir()
-                    .unwrap()
-                    .join(format!("{}-local-store", name)),
+                data_dir: Self::test_data_dir_path(directory, name),
                 dump_dir: None,
                 partition_split_threshold: 20,
                 partition_size_split_threshold_bytes: 2 * 1024,
@@ -1611,11 +1639,7 @@ impl Config {
                 compaction_in_memory_chunks_ratio_check_threshold: 1000,
                 compaction_in_memory_chunks_schedule_period_secs: 5,
                 store_provider: FileStoreProvider::Filesystem {
-                    remote_dir: Some(
-                        env::current_dir()
-                            .unwrap()
-                            .join(format!("{}-upstream", name)),
-                    ),
+                    remote_dir: Some(Self::test_remote_dir_path(directory, name)),
                 },
                 select_worker_pool_size: 0,
                 select_worker_idle_timeout: 600,
@@ -1663,6 +1687,7 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
@@ -1718,6 +1743,23 @@ impl Config {
     {
         self.start_test_with_options::<_, T, _, _>(
             true,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
+    }
+
+    pub async fn start_migration_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+        T: Future<Output = ()> + Send,
+    {
+        self.start_migration_test_with_options::<_, T, _, _>(
             Option::<
                 Box<
                     dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -1811,11 +1853,62 @@ impl Config {
         }
     }
 
+    pub async fn start_migration_test_with_options<T1, T2, I, F>(
+        &self,
+        configure_injector: Option<I>,
+        test_fn: F,
+    ) where
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+        I: FnOnce(Arc<Injector>) -> T1,
+        F: FnOnce(CubeServices) -> T2,
+    {
+        init_test_logger().await;
+
+        let store_path = self.local_dir().clone();
+        let remote_fs = self.remote_fs().await.unwrap();
+
+        {
+            self.configure_injector().await;
+            if let Some(configure_injector) = configure_injector {
+                configure_injector(self.injector.clone()).await;
+            }
+            let services = self.cube_services().await;
+            services.start_processing_loops().await.unwrap();
+
+            // Should be long enough even for CI.
+            let timeout = Duration::from_secs(600);
+            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                panic!("Test timed out after {} seconds", timeout.as_secs());
+            }
+
+            services.stop_processing_loops().await.unwrap();
+        }
+
+        let _ = DB::destroy(&Options::default(), self.meta_store_path());
+        let _ = DB::destroy(&Options::default(), self.cache_store_path());
+        let _ = fs::remove_dir_all(store_path.clone());
+
+        let remote_files = remote_fs.list("".to_string()).await.unwrap();
+        for file in remote_files {
+            let _ = remote_fs.delete_file(file).await;
+        }
+    }
+
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
         T: Future<Output = ()> + Send,
     {
         Self::test(name).start_test(test_fn).await;
+    }
+
+    pub async fn run_migration_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+        T: Future<Output = ()> + Send,
+    {
+        Self::migration_test(name)
+            .start_migration_test(test_fn)
+            .await;
     }
 
     pub fn config_obj(&self) -> Arc<dyn ConfigObj> {

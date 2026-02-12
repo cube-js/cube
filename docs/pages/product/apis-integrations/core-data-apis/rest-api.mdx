@@ -1,0 +1,350 @@
+# REST API
+
+REST API enables Cube to deliver data over the HTTP protocol to certain kinds of
+data applications, including but not limited to the following ones:
+
+- Most commonly, front-end applications
+- Some [data notebooks][ref-notebooks], e.g., [Observable][ref-observable]
+- [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
+- Automated jobs
+
+Often, the REST API is used to enable [embedded analytics][cube-ea] and
+[real-time analytics][cube-rta] use cases.
+
+See [REST API reference][ref-ref-rest-api] for the list of supported API endpoints.
+Also, check [query format][ref-rest-query-format] for details about query syntax.
+
+<InfoBox>
+
+You can find a mostly complete OpenAPI documentation for the REST API in the
+linked [`openspec.yml` file][gh-cube-openspec] that you can use with tools like Swagger.
+
+</InfoBox>
+
+<InfoBox>
+
+If you've chosen [GraphQL][graphql] as a query language for your front-end
+application, consider using the [GraphQL API][ref-graphql-api] that Cube also
+provides.
+
+</InfoBox>
+
+REST API also provides endpoints for [GraphQL API][ref-graphql-api] and
+[Orchestration API][ref-orchestration-api]. However, they target specific use
+cases and are not considered part of the REST API.
+
+## Transport
+
+The REST API supports the following transports:
+
+| Transport | Description | When to use |
+| --- | --- | --- |
+| HTTP | HTTP-based protocol with long polling | Use by default |
+| WebSocket | [WebSocket][link-websocket]-based protocol with support for real-time updates | Use for applications that require subscriptions to real-time updates |
+
+### HTTP transport
+
+You can use the `curl` utility to execute requests to the REST API. Provide the [API
+token](#authentication) in the `Authorization` header:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  --data-urlencode 'query={
+    "dimensions": [
+      "users.state",
+      "users.city",
+      "orders.status"
+    ],
+    "measures": [
+      "orders.count"
+    ],
+    "filters": [
+      {
+        "member": "users.state",
+        "operator": "notEquals",
+        "values": ["us-wa"]
+      }
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "orders.created_at",
+        "dateRange": ["2020-01-01", "2021-01-01"]
+      }
+    ],
+    "limit": 10
+  }' \
+  http://localhost:4000/cubejs-api/v1/load
+```
+
+You can also use the [`jq` utility][link-jq-utility] to format responses
+from the REST API in your terminal:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  --data-urlencode 'query={"measures": ["orders.count"]}' \
+  http://localhost:4000/cubejs-api/v1/load | jq .data
+```
+
+You can also introspect the data model by querying the [`/v1/meta`
+endpoint][ref-ref-meta-endpoint]:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  http://localhost:4000/cubejs-api/v1/meta | jq
+```
+
+You can also use the [JavaScript SDK][ref-javascript-sdk] to call the REST API
+from your JavaScript applications.
+
+### WebSocket transport
+
+WebSocket transport can be used to provide real-time experience. You can configure it via
+the `CUBEJS_WEB_SOCKETS` environment variable.
+
+You can use the [`websocat` utility][link-websocat] to test the WebSocket transport:
+
+```bash
+websocat ws://localhost:4000/cubejs-api/v1/ws --text
+```
+
+After connecting, send the [API token](#authentication) as the first message:
+
+```json
+{"authorization":"TOKEN"}
+```
+
+Then, send requests. Each request should include a distinct `messageId`, the desired API
+endpoint in `method`, and additional `params`:
+
+```json
+{"messageId":"1","method":"load","params":{"query":{"measures":["orders.count"]}}}
+```
+
+Clients using the [JavaScript SDK][ref-javascript-sdk] can be switched to WebSocket
+by passing `WebSocketTransport` to the `CubeApi` constructor:
+
+```javascript
+import cube from "@cubejs-client/core"
+import WebSocketTransport from "@cubejs-client/ws-transport"
+
+const cubeApi = cube({
+  transport: new WebSocketTransport({
+    authorization: TOKEN,
+    apiUrl: "ws://localhost:4000/"
+  })
+})
+```
+
+<ReferenceBox>
+
+See [this recipe][ref-recipe-real-time-data-fetch] for an example of real-time
+data fetch using the WebSocket transport.
+
+</ReferenceBox>
+
+## Configuration
+
+REST API is enabled by default and secured using [API scopes][self-api-scopes]
+and [CORS][self-cors].
+
+To find your REST API endpoint in Cube Cloud, go to the <Btn>Overview</Btn>
+page, click <Btn>API credentials</Btn>, and choose the <Btn>REST API</Btn> tab.
+
+### Base path
+
+By default, all REST API endpoints are prefixed with a base path of
+`/cubejs-api`, e.g., the `/v1/load` endpoint will be available at
+`/cubejs-api/v1/load`.
+
+<InfoBox>
+
+Exception: `/livez` and `/readyz` endpoints are not prefixed with a base path.
+
+</InfoBox>
+
+You can set a desired base path using the [`basePath`][ref-conf-basepath]
+configuration option.
+
+### API scopes
+
+Each REST API endpoint belongs to an API scope, e.g., the `/v1/load` endpoint
+belongs to the `data` scope. API scopes allow to secure access to API endpoints
+by making them accessible to specific users only or disallowing access for
+everyone. By default, API endpoints in all scopes, except for `jobs`, are
+accessible for everyone.
+
+| API scope | REST API endpoints | Accessible by default? |
+| --- | --- | --- |
+| `meta`    | [`/v1/meta`][ref-ref-meta] | ✅ Yes |
+| `data`    | [`/v1/load`][ref-ref-load], [`/v1/cubesql`][ref-ref-cubesql] | ✅ Yes |
+| `graphql` | `/graphql` | ✅ Yes |
+| `sql`     | [`/v1/sql`][ref-ref-sql] | ✅ Yes |
+| `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No |
+| No scope  | `/livez`, `/readyz` | ✅ Yes |
+
+You can set accessible API scopes _for all requests_ using the
+`CUBEJS_DEFAULT_API_SCOPES` environment variable. For example, to disallow
+access to the GraphQL API for everyone, set `CUBEJS_DEFAULT_API_SCOPES` to
+`meta,data`.
+
+You can also select accessible API scopes _for each request_ using the
+[`contextToApiScopes`][ref-conf-contexttoapiscopes] configuration option, based
+on the provided [security context][ref-security-context]. For example, to
+restrict access to the `/v1/meta` endpoint to service accounts only, you can set
+`CUBEJS_DEFAULT_API_SCOPES` to `data,graphql` and use the following
+configuration in the `cube.js` file, assuming that service accounts have
+`service: true` in their security context:
+
+```javascript
+module.exports = {
+  contextToApiScopes: (securityContext, defaultScopes) => {
+    if (securityContext.service) {
+      return ["meta", ...defaultScopes]
+    }
+
+    return defaultScopes
+  }
+}
+```
+
+### CORS
+
+REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors]. By default,
+requests from any origin (`*`) are allowed.
+
+You can configure CORS using the [`http.cors`][ref-config-cors] configuration
+option. For example, to allow requests from a specific domain only, use the
+following configuration in the `cube.js` file:
+
+```javascript
+module.exports = {
+  http: {
+    cors: {
+      origin: "https://example.com"
+    }
+  }
+}
+```
+
+## Prerequisites
+
+### Authentication
+
+Cube uses API tokens to authorize requests and also for passing additional
+security context, which can be used in the
+[`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
+configuration file][ref-config-js].
+
+The API Token is passed via the Authorization Header. The token itself is a
+[JSON Web Token](https://jwt.io), the [Security section][ref-security] describes
+how to generate it.
+
+In the development environment the token is not required for authorization, but
+you can still use it to pass a security context.
+
+### Error handling
+
+Cube REST API has basic errors and HTTP Error codes for all requests.
+
+| Status | Error response                 | Description                                                                                          |
+| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 400    | Error message                  | General error. It may be a database error, timeout, or other issue. Check error message for details. |
+| 403    | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization.                |
+| 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
+| 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
+
+### Request span annotation
+
+For monitoring tools such as Cube Cloud proper request span annotation should be
+provided in `x-request-id` header of a request. Each request id should consist
+of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
+whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
+should be unique for each separate request. `spanId` should define user
+interaction span such us `Continue wait` retry cycle and it's value shouldn't
+change during one single interaction.
+
+## Cache control
+
+[`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints of the REST API
+allow to control the in-memory cache behavior. The following querying strategies with regards to
+the cache are supported:
+
+| Strategy | Description |
+| --- | --- |
+| `stale-if-slow`         | If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, tries to return fresh value from the data source. If the data source query is slow (hits [`Continue wait`](#continue-wait)), returns stale value from cache. |
+| `stale-while-revalidate`| If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, returns stale data from cache and updates cache in background. |
+| `must-revalidate`       | If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, always waits for fresh value from the data source, even if slow (hits one or more [`Continue wait`](#continue-wait) intervals). |
+| `no-cache`              | Skips [refresh key][ref-refresh-keys] checks. Always returns fresh data from the data source, regardless of cache or query performance. |
+
+## `Continue wait`
+
+If the request takes too long to be processed, the REST API responds with
+`{ "error": "Continue wait" }` and the status code 200.
+
+This is part of the long polling mechanism:
+- After an API instance receives a request, it adds the query to the query queue.
+- If the query takes too long to be processed, the API instance will respond with `Continue wait`. Receiving `Continue wait` doesn't mean the database query has been canceled, and it's actually still being processed by Cube.
+- Clients who received `Continue wait` should continuously retry the same query in a loop until they get a successful result. Database queries that are no longer retried by clients will be marked as orphaned and removed from the query queue. Subsequent calls to the REST API are idempotent and don't lead to scheduling new database queries if not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key].
+
+Possible reasons of `Continue wait`:
+- The query is too heavy for the upstream database, i.e., it takes too long to be processed.
+- The maximum [concurrency][ref-concurrency] is reached, i.e., there are many queries
+waiting in the query queue until the previous ones are completed.
+
+[`continueWaitTimeout`][ref-conf-queue-opts] configuration option can be adjusted
+in order to change the time Cube waits before returning `Continue wait` message.
+However, it's recommended to address the root cause of the issue instead of
+increasing the timeout:
+- Switch from a [traditional database][ref-traditional-databases] to a [data
+warehouse][ref-data-warehouses].
+- Increase the [concurrency][ref-concurrency] if your database can handle it.
+- Implement [pre-aggregations][ref-pre-aggregations] to reduce the query time by using Cube Store.
+
+[mdn-cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+[ref-config-js]: /product/configuration/reference/config
+[ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
+[ref-conf-queue-opts]: /product/configuration/reference/config#queueoptions
+[ref-rest-query-format]: /product/apis-integrations/rest-api/query-format#query-properties
+[ref-ref-meta-endpoint]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-config-cors]: /product/configuration/reference/config#http
+[ref-schema-ref-cube-refresh-key]:
+  /product/data-modeling/reference/cube#refresh_key
+[ref-security]: /product/auth
+[ref-notebooks]: /product/configuration/visualization-tools#notebooks
+[ref-observable]: /product/configuration/visualization-tools/observable
+[ref-low-code]:
+  /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
+[ref-retool]: /product/configuration/visualization-tools/retool
+[ref-conf-basepath]: /product/configuration/reference/config#basepath
+[ref-conf-contexttoapiscopes]:
+  /product/configuration/reference/config#contexttoapiscopes
+[ref-ref-load]: /product/apis-integrations/rest-api/reference#base_pathv1load
+[ref-ref-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-ref-sql]: /product/apis-integrations/rest-api/reference#base_pathv1sql
+[ref-ref-cubesql]: /product/apis-integrations/rest-api/reference#base_pathv1cubesql
+[ref-ref-paj]: /product/apis-integrations/rest-api/reference#base_pathv1pre-aggregationsjobs
+[ref-security-context]: /product/auth/context
+[ref-graphql-api]: /product/apis-integrations/graphql-api
+[ref-orchestration-api]: /product/apis-integrations/orchestration-api
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[graphql]: https://graphql.org
+[self-api-scopes]: #configuration-api-scopes
+[self-cors]: #configuration-cors
+[ref-ref-rest-api]: /product/apis-integrations/rest-api/reference
+[link-jq-utility]: https://jqlang.github.io/jq/
+[gh-cube-openspec]: https://github.com/cube-js/cube/blob/master/packages/cubejs-api-gateway/openspec.yml
+[link-websocket]: https://en.wikipedia.org/wiki/WebSocket
+[ref-concurrency]: /product/configuration/concurrency
+[ref-data-warehouses]: /product/configuration/data-sources#data-warehouses
+[ref-traditional-databases]: /product/configuration/data-sources#transactional-databases
+[ref-pre-aggregations]: /product/caching/using-pre-aggregations
+[ref-javascript-sdk]: /product/apis-integrations/javascript-sdk
+[ref-recipe-real-time-data-fetch]: /product/apis-integrations/recipes/real-time-data-fetch
+[ref-refresh-keys]: /product/data-modeling/reference/cube#refresh_key
+[link-websocat]: https://github.com/vi/websocat

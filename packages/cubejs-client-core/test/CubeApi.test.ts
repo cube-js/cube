@@ -358,3 +358,225 @@ describe('CubeApi with Abort Signal', () => {
     expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
 });
+
+describe('CubeApi with baseRequestId', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  test('should pass baseRequestId from options to request', async () => {
+    const baseRequestId = 'custom-request-id-123';
+
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve('{"results":[]}'),
+        json: () => Promise.resolve({ results: [] })
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.load(
+      { measures: ['Orders.count'] },
+      { baseRequestId }
+    );
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+
+  test('should generate baseRequestId if not provided', async () => {
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve('{"results":[]}'),
+        json: () => Promise.resolve({ results: [] })
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.load(
+      { measures: ['Orders.count'] }
+    );
+
+    expect(requestSpy).toHaveBeenCalled();
+    // Should have a baseRequestId (generated via uuidv4)
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBeDefined();
+    expect(typeof requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe('string');
+  });
+
+  test('should pass baseRequestId to sql request', async () => {
+    const baseRequestId = 'sql-request-id-456';
+
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve('{"sql":{"sql":"SELECT * FROM orders"}}'),
+        json: () => Promise.resolve({ sql: { sql: 'SELECT * FROM orders' } })
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.sql(
+      { measures: ['Orders.count'] },
+      { baseRequestId }
+    );
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+
+  test('should pass baseRequestId to dryRun request', async () => {
+    const baseRequestId = 'dryrun-request-id-789';
+
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve('{"queryType":"regular"}'),
+        json: () => Promise.resolve({ queryType: 'regular' })
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.dryRun(
+      { measures: ['Orders.count'] },
+      { baseRequestId }
+    );
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+
+  test('should pass baseRequestId to subscribe request', async () => {
+    const baseRequestId = 'subscribe-request-id-abc';
+
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve('{"results":[]}'),
+        json: () => Promise.resolve({ results: [] })
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    const subscription = cubeApi.subscribe(
+      { measures: ['Orders.count'] },
+      { baseRequestId },
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {}
+    );
+
+    // Wait for the subscription to be initiated
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+
+    subscription.unsubscribe();
+  });
+
+  test('should pass baseRequestId with multiple queries', async () => {
+    const baseRequestId = 'multi-query-request-id';
+
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.load(
+      [
+        { measures: ['Orders.count'] },
+        { measures: ['Users.count'] }
+      ],
+      { baseRequestId }
+    );
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+
+  test('should pass baseRequestId to meta request', async () => {
+    const baseRequestId = 'meta-request-id-def';
+
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({
+          cubes: [{
+            name: 'Orders',
+            title: 'Orders',
+            measures: [{
+              name: 'count',
+              title: 'Count',
+              shortTitle: 'Count',
+              type: 'number'
+            }],
+            dimensions: [{
+              name: 'status',
+              title: 'Status',
+              type: 'string'
+            }],
+            segments: []
+          }]
+        })),
+        json: () => Promise.resolve({
+          cubes: [{
+            name: 'Orders',
+            title: 'Orders',
+            measures: [{
+              name: 'count',
+              title: 'Count',
+              shortTitle: 'Count',
+              type: 'number'
+            }],
+            dimensions: [{
+              name: 'status',
+              title: 'Status',
+              type: 'string'
+            }],
+            segments: []
+          }]
+        })
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ baseRequestId });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+});

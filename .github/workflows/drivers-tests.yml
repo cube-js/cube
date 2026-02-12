@@ -369,7 +369,6 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
-          DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS: true
           DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE: false
           DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner) || matrix.use_tesseract_sql_planner }}
 

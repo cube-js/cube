@@ -1292,4 +1292,694 @@ describe('Cube Validation', () => {
       expect(result.error).toBeTruthy();
     });
   });
+
+  describe('Custom time format for time dimensions (strptime)', () => {
+    it('time dimension with valid strptime format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%d'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with complex strptime format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%d/%m/%Y %H:%M:%S'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with literal text in format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y Year %m Month'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with escaped percent - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%d %%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with standard format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'id'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with invalid format (no specifiers) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'invalid'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with invalid specifier - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%K-%d'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with incomplete specifier at end - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with only escaped percent - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('non-time dimension with strptime format string - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            format: '%Y-%m-%d'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
+
+  describe('Custom numeric format for measures (d3-format)', () => {
+    it('measures with valid d3-format and standard formats - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        measures: {
+          // .2f - fixed-point with 2 decimal places
+          amount: {
+            sql: () => 'amount',
+            type: 'sum',
+            format: '.2f'
+          },
+          // ,.0f - thousands separator, no decimals
+          revenueGrouped: {
+            sql: () => 'revenue',
+            type: 'sum',
+            format: ',.0f'
+          },
+          // $,.2f - currency symbol with grouping
+          revenueCurrency: {
+            sql: () => 'revenue',
+            type: 'sum',
+            format: '$,.2f'
+          },
+          // .0% - percentage format
+          conversionRate: {
+            sql: () => 'conversion_rate',
+            type: 'avg',
+            format: '.0%'
+          },
+          // .2s - SI prefix notation (e.g., 1.2k, 3.4M)
+          bytes: {
+            sql: () => 'bytes',
+            type: 'sum',
+            format: '.2s'
+          },
+          // +.2f - always show sign
+          change: {
+            sql: () => 'change',
+            type: 'sum',
+            format: '+.2f'
+          },
+          // 010d - zero-padded integer
+          orderId: {
+            type: 'count',
+            format: '010d'
+          },
+          // .2~f - trim trailing zeros
+          trimmed: {
+            sql: () => 'amount',
+            type: 'sum',
+            format: '.2~f'
+          },
+          // Standard formats still work
+          ratioPercent: {
+            sql: () => 'ratio',
+            type: 'avg',
+            format: 'percent'
+          },
+          revenueCurrencyStandard: {
+            sql: () => 'revenue',
+            type: 'sum',
+            format: 'currency'
+          },
+          countNumber: {
+            type: 'count',
+            format: 'number'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('measure with invalid format (unknown type character) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        measures: {
+          amount: {
+            sql: () => 'amount',
+            type: 'sum',
+            format: '.2z' // 'z' is not a valid d3-format type
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('measure with invalid format (random string) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        measures: {
+          amount: {
+            sql: () => 'amount',
+            type: 'sum',
+            format: 'invalid-format'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
+
+  describe('Custom numeric format for number dimensions (d3-format)', () => {
+    it('number dimensions with valid d3-format and standard formats - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          // d3-format specifiers
+          price: {
+            sql: () => 'price',
+            type: 'number',
+            format: '.2f'
+          },
+          quantity: {
+            sql: () => 'quantity',
+            type: 'number',
+            format: ',.0f'
+          },
+          unitPrice: {
+            sql: () => 'unit_price',
+            type: 'number',
+            format: '$,.2f'
+          },
+          // Standard dimension formats work for number type
+          discount: {
+            sql: () => 'discount',
+            type: 'number',
+            format: 'percent'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('number dimension with invalid format - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          price: {
+            sql: () => 'price',
+            type: 'number',
+            format: 'invalid-format'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('string dimension with d3-format string - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            format: '.2f' // d3-format not allowed for string type
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('dimension with valid order asc - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            order: 'asc'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('dimension with valid order desc - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            order: 'desc'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('dimension with invalid order value - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            order: 'invalid' // should only accept 'asc' or 'desc'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('order');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
+
+  describe('View joinPath validation - unique leaf nodes', () => {
+    it('view with duplicate leaf nodes - should fail', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.D.E.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'A.F.X', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      let errorMessage = '';
+      cubeValidator.validate(cube, {
+        error: (message: any) => { errorMessage = message; }
+      } as any);
+
+      expect(errorMessage).toContain('Views can\'t define multiple join paths to the same cube');
+      expect(errorMessage).toContain('View \'test_view\'');
+      expect(errorMessage).toContain('has multiple paths to \'X\'');
+      expect(errorMessage).toContain('within root \'A\'');
+      expect(errorMessage).toContain('\'A.D.E.X\'');
+      expect(errorMessage).toContain('\'A.F.X\'');
+      expect(errorMessage).toContain('Use extends to create a child cube');
+    });
+
+    it('view with unique leaf nodes - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A', prefix: false, includes: ['*'] },
+          { joinPath: () => 'A.D', prefix: false, includes: ['*'] },
+          { joinPath: () => 'A.D.E.X', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with conflict in one root only - should report only that root', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'A.C.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'D.E.X', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      let errorMessage = '';
+      cubeValidator.validate(cube, {
+        error: (msg: any) => { errorMessage = msg; }
+      } as any);
+
+      expect(errorMessage).toContain('has multiple paths to \'X\'');
+      expect(errorMessage).toContain('within root \'A\'');
+      expect(errorMessage).toContain('\'A.B.X\'');
+      expect(errorMessage).toContain('\'A.C.X\'');
+      // D.E.X should NOT be in the error message as it's a different root
+      expect(errorMessage).not.toContain('\'D.E.X\'');
+    });
+
+    it('view with multiple different conflicts in different roots - should report all', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'A.D.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C.E.Y', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C.F.Y', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const errorMessages: string[] = [];
+      cubeValidator.validate(cube, {
+        error: (msg: any) => { errorMessages.push(msg); }
+      } as any);
+
+      const allErrors = errorMessages.join(' ');
+      expect(allErrors).toContain('has multiple paths to \'X\'');
+      expect(allErrors).toContain('has multiple paths to \'Y\'');
+      expect(allErrors).toContain('within root \'A\'');
+      expect(allErrors).toContain('within root \'C\'');
+      expect(allErrors).toContain('\'A.B.X\'');
+      expect(allErrors).toContain('\'A.D.X\'');
+      expect(allErrors).toContain('\'C.E.Y\'');
+      expect(allErrors).toContain('\'C.F.Y\'');
+    });
+
+    it('view with single-segment paths - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A', prefix: false, includes: ['*'] },
+          { joinPath: () => 'B', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with cube in different roots - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A', prefix: false, includes: ['*'] },
+          { joinPath: () => 'B.A', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with same cube in middle of different root paths - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C.B.Y', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with complex transitive conflicts - multiple cubes with conflicts - should fail', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.C', prefix: false, includes: ['*'] },
+          { joinPath: () => 'A.D.C', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      let errorMessage = '';
+      cubeValidator.validate(cube, {
+        error: (msg: any) => { errorMessage = msg; }
+      } as any);
+
+      // All intermediate and leaf cubes that appear in multiple paths should be reported
+      expect(errorMessage).toContain('has multiple paths to \'C\'');
+      expect(errorMessage).toContain('within root \'A\'');
+      expect(errorMessage).toContain('\'A.B.C\'');
+      expect(errorMessage).toContain('\'A.D.C\'');
+    });
+
+    it('view with same cube at different depths in different roots - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C.D.E.B', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with no transitive conflicts - different cubes in paths - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.C', prefix: false, includes: ['*'] },
+          { joinPath: () => 'D.E.F', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with same cube in different roots - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.C', prefix: false, includes: ['*'] },
+          { joinPath: () => 'D.B.C', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+  });
 });

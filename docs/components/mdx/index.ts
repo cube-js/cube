@@ -17,6 +17,7 @@ import { LoomVideo } from "@/components/mdx/LoomVideo/LoomVideo";
 import { ParameterTable } from "@/components/mdx/ReferenceDocs/ParameterTable";
 import { Snippet, SnippetGroup } from "@/components/mdx/Snippets/SnippetGroup";
 import { Diagram, Screenshot } from '@/components/mdx/Screenshot';
+import { ProductVideo } from '@/components/mdx/ProductVideo';
 import { YouTubeVideo } from '@/components/mdx/YouTubeVideo/YouTubeVideo';
 import { CaseStudyPromoBlock } from '@/components/mdx/CaseStudyPromoBlock/CaseStudyPromoBlock';
 import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBlock';
@@ -56,6 +57,7 @@ export const components = {
   Btn: InlineButton,
   Screenshot,
   Diagram,
+  ProductVideo,
   YouTubeVideo,
 
   CommunitySupportedDriver,

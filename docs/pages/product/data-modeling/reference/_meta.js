@@ -7,7 +7,7 @@ module.exports = {
   "segments": "Segments",
   "joins": "Joins",
   "pre-aggregations": "Pre-aggregations",
-  "data-access-policies": "Data access policies",
+  "data-access-policies": "Access policies",
   "types-and-formats": "Types and formats",
   "context-variables": "Context variables",
   "cube-package": "cube package",

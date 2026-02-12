@@ -232,12 +232,31 @@ impl PhysicalPlanBuilder {
     ) -> Result<Vec<OrderBy>, CubeError> {
         let mut result = Vec::new();
         for o in order_by.iter() {
-            for position in logical_schema.find_member_positions(&o.name()) {
+            let positions = logical_schema.find_member_positions(&o.name());
+
+            // TODO: Check for `is_measure` is temporary here until
+            // correct processing of order by dimension that is not included in the
+            // selection list will be implemented
+            if positions.is_empty() && o.member_symbol().is_measure() {
                 result.push(OrderBy::new(
                     Expr::Member(MemberExpression::new(o.member_symbol())),
-                    position + 1,
+                    0,
                     o.desc(),
                 ));
+            } else {
+                for position in positions {
+                    // Use the symbol from schema at the found position instead of
+                    // o.member_symbol() which may lack granularity context for time dimensions.
+                    // This ensures ORDER BY uses the same symbol as GROUP BY.
+                    let symbol = logical_schema
+                        .get_member_at_position(position)
+                        .unwrap_or_else(|| o.member_symbol());
+                    result.push(OrderBy::new(
+                        Expr::Member(MemberExpression::new(symbol)),
+                        position + 1,
+                        o.desc(),
+                    ));
+                }
             }
         }
         Ok(result)

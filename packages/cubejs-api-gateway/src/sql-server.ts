@@ -47,7 +47,8 @@ export class SQLServer {
   ) {
     setupLogger(
       ({ event }) => apiGateway.log(event),
-      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
+      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn',
+      process.env.NODE_ENV === 'production'
     );
 
     // Actually, proxy is enabled in gateway
@@ -65,8 +66,8 @@ export class SQLServer {
     throw new Error('Native api gateway is not enabled');
   }
 
-  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode) {
-    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext, cacheMode);
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode, timezone?: string) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext, cacheMode, timezone);
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {

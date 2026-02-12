@@ -1,8 +1,9 @@
 import Joi from 'joi';
 import cronParser from 'cron-parser';
 
-import type { CubeSymbols, CubeDefinition } from './CubeSymbols';
+import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 /* *****************************
  * ATTENTION:
@@ -118,6 +119,145 @@ const formatSchema = Joi.alternatives([
   })
 ]);
 
+// POSIX strftime specification (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions
+// See: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+// See: https://d3js.org/d3-time-format
+const TIME_SPECIFIERS = new Set([
+  // POSIX standard specifiers
+  'a', 'A', 'b', 'B', 'c', 'd', 'H', 'I', 'j', 'm',
+  'M', 'n', 'p', 'S', 't', 'U', 'w', 'W', 'x', 'X',
+  'y', 'Y', 'Z', '%',
+  // d3-time-format extensions
+  'e', // space-padded day of month
+  'f', // microseconds
+  'g', // ISO 8601 year without century
+  'G', // ISO 8601 year with century
+  'L', // milliseconds
+  'q', // quarter
+  'Q', // milliseconds since UNIX epoch
+  's', // seconds since UNIX epoch
+  'u', // Monday-based weekday [1,7]
+  'V', // ISO 8601 week number
+]);
+
+const customTimeFormatSchema = Joi.string().custom((value, helper) => {
+  let hasSpecifier = false;
+  let i = 0;
+
+  while (i < value.length) {
+    if (value[i] === '%') {
+      if (i + 1 >= value.length) {
+        return helper.message({ custom: `Invalid time format "${value}". Incomplete specifier at end of string` });
+      }
+
+      const specifier = value[i + 1];
+
+      if (!TIME_SPECIFIERS.has(specifier)) {
+        return helper.message({ custom: `Invalid time format "${value}". Unknown specifier '%${specifier}'` });
+      }
+
+      // %% is an escape for literal %, not a date/time specifier
+      if (specifier !== '%') {
+        hasSpecifier = true;
+      }
+
+      i += 2;
+    } else {
+      // Any other character is treated as literal text
+      i++;
+    }
+  }
+
+  if (!hasSpecifier) {
+    return helper.message({
+      custom: `Invalid strptime format "${value}". Format must contain at least one strptime specifier (e.g., %Y, %m, %d)`
+    });
+  }
+
+  return value;
+});
+
+const timeFormatSchema = Joi.alternatives([
+  formatSchema,
+  customTimeFormatSchema
+]);
+
+// d3-format specification (Python format spec mini-language)
+// See: https://d3js.org/d3-format
+// See: https://docs.python.org/3/library/string.html#format-specification-mini-language
+// Format specifier: [[fill]align][sign][symbol][0][width][,][.precision][~][type]
+const NUMERIC_FORMAT_TYPES = new Set([
+  'e', // exponent notation
+  'f', // fixed-point notation
+  'g', // either decimal or exponent notation
+  'r', // decimal notation, rounded to significant digits
+  's', // decimal notation with an SI prefix
+  '%', // multiply by 100 and format as percentage
+  'p', // multiply by 100, round to significant digits, and format as percentage
+  'b', // binary notation
+  'o', // octal notation
+  'd', // decimal notation (integer)
+  'x', // lowercase hexadecimal notation
+  'X', // uppercase hexadecimal notation
+  'c', // character data
+  'n', // like g, but with locale-specific thousand separator
+]);
+
+// d3-format specifier: [[fill]align][sign][symbol][0][width][,][.precision][~][type]
+// Regex breakdown:
+// (?:(.)?([<>=^]))?           - optional fill (any char) + align (<>=^)
+// ([+\-( ])?                  - optional sign (+, -, (, or space)
+// ([$#])?                     - optional symbol ($ or #)
+// (0)?                        - optional zero flag
+// (\d+)?                      - optional width (positive integer)
+// (,)?                        - optional comma flag (grouping)
+// (?:\.(\d+))?                - optional precision (.N where N is non-negative integer)
+// (~)?                        - optional tilde (trim insignificant zeros)
+// ([a-zA-Z%])?                - optional type character
+const NUMERIC_FORMAT_REGEX = /^(?:(.)?([<>=^]))?([+\-( ])?([$#])?(0)?(\d+)?(,)?(?:\.(\d+))?(~)?([a-zA-Z%])?$/;
+
+const customNumericFormatSchema = Joi.string().custom((value, helper) => {
+  const match = value.match(NUMERIC_FORMAT_REGEX);
+  if (!match) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Must be a valid d3-format specifier (e.g., ".2f", ",.0f", "$,.2f", ".0%", ".2s")`
+    });
+  }
+
+  const [, fill, align, sign, symbol, zero, width, comma, precision, tilde, type] = match;
+
+  if (fill && !align) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Fill character requires alignment specifier (<, >, =, or ^)`
+    });
+  }
+
+  if (type && !NUMERIC_FORMAT_TYPES.has(type.toLowerCase())) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Unknown type character '${type}'. Valid types: ${[...NUMERIC_FORMAT_TYPES].join(', ')}`
+    });
+  }
+
+  // Validate that the format is not empty (must have at least something meaningful)
+  if (!sign && !symbol && !zero && !width && !comma && precision === undefined && !tilde && !type) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Format must contain at least one specifier (e.g., type, precision, comma, sign, symbol)`
+    });
+  }
+
+  return value;
+});
+
+const measureFormatSchema = Joi.alternatives([
+  Joi.string().valid('percent', 'currency', 'number'),
+  customNumericFormatSchema
+]);
+
+const dimensionNumericFormatSchema = Joi.alternatives([
+  formatSchema,
+  customNumericFormatSchema
+]);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -130,8 +270,17 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
-  format: formatSchema,
+  format: Joi.when('type', {
+    switch: [
+      { is: 'time', then: timeFormatSchema },
+      { is: 'number', then: dimensionNumericFormatSchema },
+    ],
+    otherwise: formatSchema
+  }),
   meta: Joi.any(),
+  order: Joi.string().valid('asc', 'desc'),
+  key: Joi.func(),
+  keyReference: Joi.string(),
   values: Joi.when('type', {
     is: 'switch',
     then: Joi.array().items(Joi.string()),
@@ -234,7 +383,7 @@ const ToDate = {
 
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
-  format: Joi.any().valid('percent', 'currency', 'number'),
+  format: measureFormatSchema,
   public: Joi.boolean().strict(),
   // TODO: Deprecate and remove, please use public
   visible: Joi.boolean().strict(),
@@ -883,6 +1032,9 @@ const folderSchema = Joi.object().keys({
     Joi.array().items(
       Joi.alternatives([
         Joi.string().required(),
+        Joi.object().keys({
+          joinPath: Joi.func().required(),
+        }),
         Joi.link('#folderSchema'), // Can contain nested folders
       ]),
     ),
@@ -978,7 +1130,7 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
-export class CubeValidator {
+export class CubeValidator implements CompilerInterface {
   protected readonly validCubes: Map<string, boolean> = new Map();
 
   public constructor(
@@ -999,6 +1151,11 @@ export class CubeValidator {
     };
     const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
 
+    if (cube.isView) {
+      // We need to verify that leaf cubes in view are present only once
+      this.validateUniqueLeafCubes(cube.name, cube.cubes, errorReporter);
+    }
+
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error));
     } else {
@@ -1006,6 +1163,55 @@ export class CubeValidator {
     }
 
     return result;
+  }
+
+  /**
+   * Validates that each cube appears only once within each root path in a view.
+   * This ensures that there is only one path to reach each cube within each root's join graph.
+   * For example: 'a.b.c' + 'd.b.c' is valid (different roots), but 'a.b.c' + 'a.d.c' is invalid (same root 'a').
+   */
+  private validateUniqueLeafCubes(viewName: string, cubesArray: any[], errorReporter: ErrorReporter) {
+    if (!cubesArray || cubesArray.length === 0) {
+      return;
+    }
+
+    const rootCubePaths = new Map<string, Map<string, Set<string>>>();
+
+    for (const cube of cubesArray) {
+      try {
+        const fullPath = this.cubeSymbols.evaluateReferences(null, cube.joinPath as () => ToString, { collectJoinHints: true });
+        const split = fullPath.split('.');
+        const rootCube = split[0];
+
+        if (!rootCubePaths.has(rootCube)) {
+          rootCubePaths.set(rootCube, new Map<string, Set<string>>());
+        }
+
+        const cubesJoinPaths = rootCubePaths.get(rootCube)!;
+
+        for (let i = 0; i < split.length; i++) {
+          const cubeName = split[i];
+          const path = split.slice(0, i + 1).join('.');
+
+          if (!cubesJoinPaths.has(cubeName)) {
+            cubesJoinPaths.set(cubeName, new Set<string>());
+          }
+          cubesJoinPaths.get(cubeName)!.add(path);
+        }
+      } catch (e) {
+        // Ignore errors during joinPath evaluation - cube may not be defined yet
+      }
+    }
+
+    // Check for cubes with multiple paths within each root
+    for (const [rootCube, cubesJoinPaths] of rootCubePaths.entries()) {
+      for (const [cubeName, paths] of cubesJoinPaths.entries()) {
+        if (paths.size > 1) {
+          const pathList = Array.from(paths).map(path => `'${path}'`).join(', ');
+          errorReporter.error(`Views can't define multiple join paths to the same cube. View '${viewName}' has multiple paths to '${cubeName}' within root '${rootCube}': ${pathList}. Use extends to create a child cube and reference it instead`);
+        }
+      }
+    }
   }
 
   public isCubeValid(cube: CubeDefinition): boolean {

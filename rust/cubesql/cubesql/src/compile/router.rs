@@ -108,6 +108,12 @@ impl QueryRouter {
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values).await
             }
+            (
+                ast::Statement::SetTimeZone {
+                    timezone, local, ..
+                },
+                _,
+            ) => self.set_time_zone_to_plan(timezone, *local).await,
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable, span_id.clone()).await
             }
@@ -367,28 +373,82 @@ impl QueryRouter {
             }
         }
 
-        let (user_variables, session_columns_to_update): (Vec<_>, Vec<_>) =
+        let (special_variables, session_columns_to_update): (Vec<_>, Vec<_>) =
             session_columns_to_update.into_iter().partition(|v| {
-                v.name.to_lowercase() == "user" || v.name.to_lowercase() == "current_user"
+                matches!(
+                    v.name.to_lowercase().as_str(),
+                    "user" | "current_user" | "timezone"
+                )
             });
 
-        for v in user_variables {
-            let to_user = match v.value {
-                ScalarValue::Utf8(Some(user)) => user,
+        for v in special_variables {
+            match v.name.as_str() {
+                "user" | "current_user" => {
+                    let to_user = match v.value {
+                        ScalarValue::Utf8(Some(user)) => user,
+                        _ => {
+                            return Err(CompilationError::user(format!(
+                                "Invalid user value: {:?}",
+                                v.value
+                            )))
+                        }
+                    };
+                    self.change_user(to_user).await?;
+                }
+                "timezone" => {
+                    let timezone = match v.value {
+                        ScalarValue::Utf8(Some(tz)) => tz,
+                        _ => {
+                            return Err(CompilationError::user(format!(
+                                "Invalid timezone value: {:?}",
+                                v.value
+                            )))
+                        }
+                    };
+                    self.change_timezone(timezone).await?;
+                }
                 _ => {
                     return Err(CompilationError::user(format!(
-                        "Invalid user value: {:?}",
-                        v.value
+                        "Invalid special variable: {:?}",
+                        v.name
                     )))
                 }
-            };
-            self.change_user(to_user).await?;
+            }
         }
 
         if !session_columns_to_update.is_empty() {
             self.state.set_variables(session_columns_to_update);
         }
 
+        Ok(QueryPlan::MetaOk(
+            StatusFlags::empty(),
+            CommandCompletion::Set,
+        ))
+    }
+
+    async fn set_time_zone_to_plan(
+        &self,
+        timezone: &ast::Expr,
+        local: bool,
+    ) -> Result<QueryPlan, CompilationError> {
+        if local {
+            return Err(CompilationError::unsupported(
+                "SET TIME ZONE is not supported with LOCAL, omit or use SESSION".to_string(),
+            ));
+        }
+
+        let timezone_str = match timezone {
+            ast::Expr::Identifier(ident) => ident.value.to_string(),
+            ast::Expr::Value(ast::Value::SingleQuotedString(string)) => string.clone(),
+            _ => {
+                return Err(CompilationError::unsupported(format!(
+                    "Unsupported TimeZone value: {}",
+                    timezone
+                )))
+            }
+        };
+
+        self.change_timezone(timezone_str).await?;
         Ok(QueryPlan::MetaOk(
             StatusFlags::empty(),
             CommandCompletion::Set,
@@ -442,6 +502,28 @@ impl QueryRouter {
             })?;
         self.state
             .set_auth_context(Some(authenticate_response.context));
+        Ok(())
+    }
+
+    async fn change_timezone(&self, timezone: String) -> Result<(), CompilationError> {
+        let mut query_timezone = self.state.query_timezone.write().map_err(|err| {
+            CompilationError::internal(format!("Unable to acquire query timezone lock: {}", err))
+        })?;
+        let tz_name =
+            if timezone.eq_ignore_ascii_case("default") || timezone.eq_ignore_ascii_case("local") {
+                *query_timezone = None;
+                "GMT".to_string()
+            } else {
+                *query_timezone = Some(timezone.clone());
+                timezone
+            };
+
+        let variable = DatabaseVariable::system(
+            "timezone".to_string(),
+            ScalarValue::Utf8(Some(tz_name)),
+            None,
+        );
+        self.state.set_variables(vec![variable]);
         Ok(())
     }
 

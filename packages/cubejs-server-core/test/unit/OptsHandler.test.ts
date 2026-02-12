@@ -4,7 +4,7 @@ import { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestr
 import type {
   DatabaseType,
   DbTypeFn,
-  DbTypeAsyncFn,
+  DbTypeInternalFn,
   ExternalDbTypeFn,
   DriverFactoryFn,
   DriverContext,
@@ -21,7 +21,7 @@ class CubejsServerCoreExposed extends CubejsServerCore {
 
   public declare optsHandler: OptsHandler;
 
-  public declare contextToDbType: DbTypeAsyncFn;
+  public declare contextToDbType: DbTypeInternalFn;
 
   public declare contextToExternalDbType: ExternalDbTypeFn;
 

@@ -47,7 +47,7 @@ impl NodeCubeServices {
 
             futures.push(tokio::spawn(async move {
                 if let Err(e) = gateway_server.processing_loop().await {
-                    log::error!("{}", e.to_string());
+                    log::error!("{}", e);
                 };
 
                 Ok(())

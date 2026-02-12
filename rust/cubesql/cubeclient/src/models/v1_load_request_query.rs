@@ -35,6 +35,8 @@ pub struct V1LoadRequestQuery {
     pub subquery_joins: Option<Vec<models::V1LoadRequestQueryJoinSubquery>>,
     #[serde(rename = "joinHints", skip_serializing_if = "Option::is_none")]
     pub join_hints: Option<Vec<Vec<String>>>,
+    #[serde(rename = "timezone", skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 impl V1LoadRequestQuery {
@@ -51,6 +53,7 @@ impl V1LoadRequestQuery {
             ungrouped: None,
             subquery_joins: None,
             join_hints: None,
+            timezone: None,
         }
     }
 }

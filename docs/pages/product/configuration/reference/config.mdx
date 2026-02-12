@@ -1264,8 +1264,7 @@ Check [this recipe](/product/auth/recipes/sql-api-ldap) for an example of
 using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 
 You can also check for the protocol and the authentication method as follows. This can
-be useful for handling the [NTLM][ref-ntlm] authentication in the [DAX API][ref-dax-api]
-and the [MDX API][ref-mdx-api]:
+be useful for handling the [NTLM][ref-ntlm] authentication in the [DAX API][ref-dax-api]:
 
 <CodeTabs>
 
@@ -1363,26 +1362,27 @@ module.exports = {
 
 </CodeTabs>
 
-### `context_to_roles`
+### `context_to_groups`
 
-Used by [data access policies][ref-dap]. This option is used to derive a list of
-[data access roles][ref-dap-roles] from the [security context][ref-sec-ctx].
+Used by [access policies][ref-dap]. This option is used to derive a list of groups that
+the user belongs to from the [security context][ref-sec-ctx]. These groups can then be
+used to match [access policies][ref-dap-roles].
 
 <CodeTabs>
 
 ```python
 from cube import config
 
-@config('context_to_roles')
-def context_to_roles(ctx: dict) -> list[str]:
-  return ctx['securityContext'].get('roles', ['default'])
+@config('context_to_groups')
+def context_to_groups(ctx: dict) -> list[str]:
+  return ctx['securityContext'].get('groups', ['default'])
 ```
 
 ```javascript
 
 module.exports = {
-  contextToRoles: ({ securityContext }) => {
-    return securityContext.roles || ['default']
+  contextToGroups: ({ securityContext }) => {
+    return securityContext.groups || ['default']
   }
 }
 ```
@@ -1391,24 +1391,24 @@ module.exports = {
 
 If the [user roles mapping][ref-ldap-roles-mapping] in the [LDAP integration][ref-ldap-integration]
 is configured and the [authentication integration][ref-auth-integration] is enabled,
-the `context_to_roles` option might be defined as follows:
+the `context_to_groups` option might be defined as follows:
 
 <CodeTabs>
 
 ```python
 from cube import config
 
-@config('context_to_roles')
-def context_to_roles(ctx: dict) -> list[str]:
-  cloud_ctx = ctx['securityContext'].get('cubeCloud', {'roles': []})
+@config('context_to_groups')
+def context_to_groups(ctx: dict) -> list[str]:
+  cloud_ctx = ctx['securityContext'].get('cubeCloud', {'groups': []})
   return cloud_ctx.get('roles', [])
 ```
 
 ```javascript
 
 module.exports = {
-  contextToRoles: ({ securityContext }) => {
-    const cloud_ctx = securityContext.cubeCloud || { roles: [] }
+  contextToGroups: ({ securityContext }) => {
+    const cloud_ctx = securityContext.cubeCloud || { groups: [] }
     return cloud_ctx.roles || []
   }
 }
@@ -1504,6 +1504,66 @@ Usually used for [multitenancy][ref-multitenancy].
 If not defined, Cube will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve the data source type.
 
+### `context_to_roles`
+
+<WarningBox>
+
+`context_to_roles` is deprecated and will be removed in a future release.
+Use [`context_to_groups`](#context_to_groups) instead.
+
+</WarningBox>
+
+Used by [access policies][ref-dap]. This option is used to derive a list of
+[data access roles][ref-dap-roles] from the [security context][ref-sec-ctx].
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('context_to_roles')
+def context_to_roles(ctx: dict) -> list[str]:
+  return ctx['securityContext'].get('roles', ['default'])
+```
+
+```javascript
+
+module.exports = {
+  contextToRoles: ({ securityContext }) => {
+    return securityContext.roles || ['default']
+  }
+}
+```
+
+</CodeTabs>
+
+If the [user roles mapping][ref-ldap-roles-mapping] in the [LDAP integration][ref-ldap-integration]
+is configured and the [authentication integration][ref-auth-integration] is enabled,
+the `context_to_roles` option might be defined as follows:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('context_to_roles')
+def context_to_roles(ctx: dict) -> list[str]:
+  cloud_ctx = ctx['securityContext'].get('cubeCloud', {'roles': []})
+  return cloud_ctx.get('roles', [])
+```
+
+```javascript
+
+module.exports = {
+  contextToRoles: ({ securityContext }) => {
+    const cloud_ctx = securityContext.cubeCloud || { roles: [] }
+    return cloud_ctx.roles || []
+  }
+}
+```
+
+</CodeTabs>
+
 
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
@@ -1548,6 +1608,5 @@ If not defined, Cube will lookup for environment variable
 [ref-ldap-roles-mapping]: /product/workspace/sso#user-roles-mapping
 [ref-ldap-integration]: /product/workspace/sso#ldap-integration
 [ref-dax-api]: /product/apis-integrations/dax-api
-[ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-ntlm]: /product/auth/methods/ntlm
 [ref-environments]: /product/workspace/environments
