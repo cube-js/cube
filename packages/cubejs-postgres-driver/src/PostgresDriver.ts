@@ -133,13 +133,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     };
 
     this.pool = new Pool<PgClient>('postgres', {
-      create: async () => {
-        const client = new PgClient(poolConfig);
-        client.on('error', (err) => this.databasePoolError(err));
-        await client.connect();
-
-        return client;
-      },
+      create: async () => this.createConnection(poolConfig),
       validate: async (client) => {
         if (client.isEnding() || client.isEnded()) {
           return false;
@@ -178,6 +172,14 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       ...config,
     };
     this.enabled = true;
+  }
+
+  protected async createConnection(poolConfig: ClientConfig): Promise<PgClient> {
+    const client = new PgClient(poolConfig);
+    client.on('error', (err) => this.databasePoolError(err));
+    await client.connect();
+
+    return client;
   }
 
   protected primaryKeysQuery(conditionString?: string): string | null {

@@ -25,6 +25,8 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
+    "@aws-sdk/client-redshift": "^3.22.0",
+    "@aws-sdk/credential-providers": "^3.22.0",
     "@cubejs-backend/base-driver": "1.6.11",
     "@cubejs-backend/postgres-driver": "1.6.11",
     "@cubejs-backend/shared": "1.6.11"

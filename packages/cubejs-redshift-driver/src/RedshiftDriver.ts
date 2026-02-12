@@ -5,7 +5,7 @@
  */
 
 import { assertDataSource, getEnv } from '@cubejs-backend/shared';
-import { PostgresDriver, PostgresDriverConfiguration, type PgQueryResult } from '@cubejs-backend/postgres-driver';
+import { PostgresDriver, PostgresDriverConfiguration, type PgQueryResult, PgClient, PgClientConfig } from '@cubejs-backend/postgres-driver';
 import {
   DatabaseStructure,
   DownloadTableCSVData,
@@ -21,6 +21,8 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
+import { RedshiftCredentialsProvider, RedshiftPlainCredentialsProvider } from './RedshiftCredentialsProvider';
+import { RedshiftIAMCredentialsProvider } from './RedshiftIAMCredentialsProvider';
 
 interface RedshiftDriverExportRequiredAWS {
   bucketType: 's3',
@@ -55,6 +57,8 @@ const IGNORED_SCHEMAS = ['pg_catalog', 'pg_internal', 'information_schema', 'mys
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
   private readonly dbName: string;
 
+  private readonly credentialsProvider: RedshiftCredentialsProvider;
+
   /**
    * Returns default concurrency value.
    */
@@ -84,15 +88,43 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       testConnectionTimeout?: number,
     } = {}
   ) {
-    super(config);
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
 
+    const clusterIdentifier = getEnv('redshiftClusterIdentifier', { dataSource });
+    const dbPass = getEnv('dbPass', { dataSource });
+    const dbUser = getEnv('dbUser', { dataSource });
+
+    let credentialsProvider: RedshiftCredentialsProvider;
+
+    if (clusterIdentifier && !dbPass && !config.password) {
+      credentialsProvider = new RedshiftIAMCredentialsProvider({
+        region: getEnv('redshiftAwsRegion', { dataSource }),
+        assumeRoleArn: getEnv('redshiftAssumeRoleArn', { dataSource }),
+        assumeRoleExternalId: getEnv('redshiftAssumeRoleExternalId', { dataSource }),
+        clusterIdentifier,
+        dbName: getEnv('dbName', { dataSource }),
+      });
+    } else {
+      credentialsProvider = new RedshiftPlainCredentialsProvider(
+        config.user || dbUser,
+        config.password || dbPass,
+      );
+    }
+
+    super(config);
+
+    this.credentialsProvider = credentialsProvider;
+
     // We need a DB name for querying external tables.
     // It's not possible to get it later from the pool
     this.dbName = getEnv('dbName', { dataSource });
+  }
+
+  protected override async createConnection(poolConfig: PgClientConfig): Promise<PgClient> {
+    const { user, password } = await this.credentialsProvider.getCredentials();
+    return super.createConnection({ ...poolConfig, user, password });
   }
 
   protected primaryKeysQuery() {
