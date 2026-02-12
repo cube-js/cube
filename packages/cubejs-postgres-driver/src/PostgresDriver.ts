@@ -174,7 +174,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.enabled = true;
   }
 
-  protected async createConnection(poolConfig: ClientConfig): Promise<PgClient> {
+  protected async createConnection(poolConfig: PgClientConfig): Promise<PgClient> {
     const client = new PgClient(poolConfig);
     client.on('error', (err) => this.databasePoolError(err));
     await client.connect();
