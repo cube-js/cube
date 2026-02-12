@@ -1,7 +1,7 @@
 import * as stream from 'stream';
 import R from 'ramda';
 import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
-import { CacheMode, getEnv } from '@cubejs-backend/shared';
+import { CacheMode, getEnv, LoggerFn } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   QuerySchemasResult,
@@ -68,7 +68,7 @@ export class QueryOrchestrator {
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
-    protected readonly logger: any,
+    protected readonly logger: LoggerFn,
     protected readonly eventEmitter: EventEmitterInterface,
     options: QueryOrchestratorOptions = {}
   ) {

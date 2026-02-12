@@ -214,11 +214,11 @@ engine][link-tesseract]. Tesseract is currently in preview. Use the
 
 </WarningBox>
 
-Unlike the `number` type which is used for calculations on measures (e.g., 
+Unlike the `number` type which is used for calculations on measures (e.g.,
 `SUM(revenue) / COUNT(*)`), `number_agg` indicates that the `sql` parameter contains
 a direct SQL aggregate function.
 
-The `sql` parameter is required and must include a custom aggregate function that returns a numeric 
+The `sql` parameter is required and must include a custom aggregate function that returns a numeric
 value.
 
 <CodeTabs>
@@ -255,7 +255,7 @@ Performs a table count, similar to SQL's `COUNT` function. However, unlike
 writing raw SQL, Cube will properly calculate counts even if your query's
 joins will produce row multiplication.
 
-You do not need to include a `sql` parameter for this type.
+You do not need to include the `sql` parameter for the measure of this type.
 
 `drill_members` parameter is commonly used with type `count`. It allows users to
 click on the measure in the UI and inspect individual records that make up a
@@ -646,8 +646,8 @@ cubes:
 
 </CodeTabs>
 
-Note that the type of the target column should be `TIMESTAMP`. 
-If your time-based column is type `DATE` or another temporal type, 
+Note that the type of the target column should be `TIMESTAMP`.
+If your time-based column is type `DATE` or another temporal type,
 you should cast it to a timestamp in the `sql` parameter of the dimension.
 
 <ReferenceBox>
@@ -760,6 +760,64 @@ cubes:
 ```
 
 </CodeTabs>
+
+### `switch`
+
+`switch` type is used to define a dimension that can only take one of the predefined
+set of values. It is similar to an enum type in programming languages. They are
+particularly useful for defining [`case` measures][ref-case-measures].
+
+<WarningBox>
+
+`switch` dimensions are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
+
+</WarningBox>
+
+You do not need to include the `sql` parameter for the dimension of this type.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    currency: {
+      type: `switch`,
+      values: [
+        `USD`,
+        `EUR`,
+        `GBP`
+      ]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+```
+
+</CodeTabs>
+
+<InfoBox>
+
+When `switch` dimensions are queried or introspected using the [`/v1/meta` REST API
+endpoint][ref-meta-api], they are represented as dimensions of type `string`. 
+
+</InfoBox>
 
 ### `geo`
 
@@ -998,8 +1056,107 @@ cubes:
 
 </CodeTabs>
 
+### Custom time formats
+
+Dimensions with `time` type support custom formatting using
+[POSIX strftime][link-strftime] format strings with [d3-time-format][link-d3-time-format] extensions.
+
+<InfoBox>
+
+Custom time formatting is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+
+</InfoBox>
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      format: `%Y-%m-%d %H:%M:%S`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        format: "%Y-%m-%d %H:%M:%S"
+```
+
+</CodeTabs>
+
+#### Common format examples
+
+| Format string | Example output |
+|---------------|----------------|
+| `%m/%d/%Y %H:%M` | 12/04/2025 14:30 |
+| `%Y-%m-%d %H:%M:%S` | 2025-12-04 14:30:00 |
+| `%B %d, %Y` | December 04, 2025 |
+| `%b %d, %Y` | Dec 04, 2025 |
+| `%I:%M %p` | 02:30 PM |
+| `%A, %B %d` | Thursday, December 04 |
+| `Q%q %Y` | Q4 2025 |
+| `Week %V, %Y` | Week 49, 2025 |
+
+#### Supported format specifiers
+
+| Specifier | Description |
+|-----------|-------------|
+| `%a` | Abbreviated weekday name |
+| `%A` | Full weekday name |
+| `%b` | Abbreviated month name |
+| `%B` | Full month name |
+| `%c` | Locale's date and time |
+| `%d` | Day of month [01,31] |
+| `%e` | Space-padded day of month |
+| `%f` | Microseconds |
+| `%g` | ISO 8601 year without century |
+| `%G` | ISO 8601 year with century |
+| `%H` | Hour (24-hour) [00,23] |
+| `%I` | Hour (12-hour) [01,12] |
+| `%j` | Day of year [001,366] |
+| `%L` | Milliseconds |
+| `%m` | Month [01,12] |
+| `%M` | Minute [00,59] |
+| `%p` | AM or PM |
+| `%q` | Quarter [1,4] |
+| `%Q` | Milliseconds since UNIX epoch |
+| `%s` | Seconds since UNIX epoch |
+| `%S` | Second [00,61] |
+| `%u` | Monday-based weekday [1,7] |
+| `%U` | Sunday-based week number [00,53] |
+| `%V` | ISO 8601 week number |
+| `%w` | Sunday-based weekday [0,6] |
+| `%W` | Monday-based week number [00,53] |
+| `%x` | Locale's date |
+| `%X` | Locale's time |
+| `%y` | Year without century [00,99] |
+| `%Y` | Year with century |
+| `%Z` | Time zone name |
+| `%%` | Literal percent sign |
+
 [ref-string-time-dims]: /product/data-modeling/recipes/string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
   /product/data-modeling/reference/pre-aggregations#rollup
 [ref-calculated-measures]: /product/data-modeling/concepts/calculated-members#calculated-measures
 [ref-drilldowns]: /product/apis-integrations/recipes/drilldowns
+[link-strftime]: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+[link-d3-time-format]: https://d3js.org/d3-time-format
+[ref-viz-tools]: /product/configuration/visualization-tools
+[ref-apis-support]: /product/apis-integrations/core-data-apis#data-modeling
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-case-measures]: /product/data-modeling/reference/measures#case
+[ref-meta-api]: /product/apis-integrations/rest-api/reference#base_pathv1meta

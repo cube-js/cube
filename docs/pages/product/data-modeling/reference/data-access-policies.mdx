@@ -1,30 +1,30 @@
-# Data access policies
+# Access policies
 
 You can use the `access_policy` parameter within [cubes][ref-ref-cubes] and [views][ref-ref-views]
-to configure [data access policies][ref-dap] for them.
+to configure [access policies][ref-dap] for them.
 
 ## Parameters
 
 The `access_policy` parameter should define a list of access policies. Each policy
 can be configured using the following parameters:
 
-- [`role`](#role) defines which [data access role][ref-dap-roles] a policy applies
-to.
+- [`group`](#group) or [`groups`](#groups) define which groups a policy applies to.
 - [`conditions`](#conditions) can be optionally used to specify when a policy
 takes effect.
 - [`member_level`](#member-level) and [`row_level`](#row-level) parameters are used
 to configure [member-level][ref-dap-mls] and [row-level][ref-dap-rls] access.
 
-### `role`
+<InfoBox>
 
-The `role` parameter defines which [data access role][ref-dap-roles], as defined
-by the [`context_to_roles`][ref-context-to-roles] configuration parameter, a
-policy applies to. To define a policy that applies to all users regardless of
-their roles, use the _any role_ shorthand: `role: "*"`.
+When you define access policies for specific groups, access is automatically denied to all other groups. You don't need to create a default policy that denies access.
 
-In the following example, three access policies are defined, with the first one
-applying to all users and two other applying to users with `marketing` or
-`finance` roles, respectively.
+</InfoBox>
+
+### `group`
+
+The `group` parameter defines which group a policy applies to. To define a policy that applies to all users regardless of their groups, use the _any group_ shorthand: `group: "*"`.
+
+In the following example, two access policies are defined for users with `marketing` or `finance` groups, respectively.
 
 <CodeTabs>
 
@@ -34,14 +34,10 @@ cubes:
     # ...
 
     access_policy:
-        # Applies to any role
-      - role: "*"
+      - group: marketing
         # ...
 
-      - role: marketing
-        # ...
-
-      - role: finance
+      - group: finance
         # ...
 ```
 
@@ -51,17 +47,48 @@ cube(`orders`, {
 
   access_policy: [
     {
-      // Applies to any role
-      role: `*`,
+      group: `marketing`,
       // ...
     },
     {
-      role: `marketing`,
+      group: `finance`,
       // ...
-    },
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+### `groups`
+
+The `groups` parameter (plural) allows you to apply the same policy to multiple groups at once by providing an array of group names.
+
+In the following example, a single policy applies to both `analysts` and `managers` groups:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - groups: [analysts, managers]
+        member_level:
+          includes: "*"
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
     {
-      role: `finance`,
-      // ...
+      groups: [`analysts`, `managers`],
+      member_level: {
+        includes: `*`
+      }
     }
   ]
 })
@@ -74,11 +101,10 @@ cube(`orders`, {
 The optional `conditions` parameter, when present, defines a list of conditions
 that should all be `true` in order for a policy to take effect. Each condition is
 configured with an `if` parameter that is expected to reference the [security
-context][ref-sec-ctx].
+context][ref-sec-ctx] or user attributes.
 
-In the following example, a permissive policy for all roles will only apply to
-EMEA-based users, as determined by the `is_EMEA_based` attribute in the security
-context:
+In the following example, a permissive policy for all groups will only apply to
+EMEA-based users, as determined by the `is_EMEA_based` user attribute:
 
 <CodeTabs>
 
@@ -88,9 +114,9 @@ cubes:
     # ...
 
     access_policy:
-      - role: "*"
+      - group: "*"
         conditions:
-          - if: "{ securityContext.is_EMEA_based }"
+          - if: "{ userAttributes.is_EMEA_based }"
         member_level:
           includes: "*"
 ```
@@ -101,9 +127,9 @@ cube(`orders`, {
 
   access_policy: [
     {
-      role: `*`,
+      group: `*`,
       conditions: [
-        { if: securityContext.is_EMEA_based }
+        { if: userAttributes.is_EMEA_based }
       ],
       member_level: {
         includes: `*`
@@ -116,11 +142,11 @@ cube(`orders`, {
 </CodeTabs>
 
 You can use the `conditions` parameter to define multiple policies for the same
-role.
+group.
 
 In the following example, the first policy provides access to a _subset of members_
-to managers who are full-time employees while the other one provides access to
-_all members_ to managers who are full-time employees and have also completed a
+to users in the manager group who are full-time employees while the other one provides access to
+_all members_ to users in the manager group who are full-time employees and have also completed a
 data privacy training:
 
 <CodeTabs>
@@ -131,18 +157,18 @@ cubes:
     # ...
 
     access_policy:
-      - role: manager
+      - group: manager
         conditions:
-          - if: "{ securityContext.is_full_time_employee }"
+          - if: "{ userAttributes.is_full_time_employee }"
         member_level:
           includes:
             - status
             - count
 
-      - role: manager
+      - group: manager
         conditions:
-          - if: "{ securityContext.is_full_time_employee }"
-          - if: "{ securityContext.has_completed_privacy_training }"
+          - if: "{ userAttributes.is_full_time_employee }"
+          - if: "{ userAttributes.has_completed_privacy_training }"
         member_level:
           includes: "*"
 ```
@@ -153,9 +179,9 @@ cube(`orders`, {
 
   access_policy: [
     {
-      role: `manager`,
+      group: `manager`,
       conditions: [
-        { if: securityContext.is_full_time_employee }
+        { if: userAttributes.is_full_time_employee }
       ],
       member_level: {
         includes: [
@@ -165,10 +191,10 @@ cube(`orders`, {
       }
     },
     {
-      role: `manager`,
+      group: `manager`,
       conditions: [
-        { if: securityContext.is_full_time_employee },
-        { if: securityContext.has_completed_privacy_training }
+        { if: userAttributes.is_full_time_employee },
+        { if: userAttributes.has_completed_privacy_training }
       ],
       member_level: {
         includes: `*`
@@ -191,12 +217,12 @@ _all members_ shorthand for both of these paramaters: `includes: "*"`, `excludes
 
 In the following example, member-level access is configured this way:
 
-| Scope | Access |
+| Group | Access |
 | --- | --- |
-| Users with the `manager` role | All members except for `count` |
-| Users with the `observer` role | All members except for `count` and `count_7d` |
-| Users with the `guest` role | Only the `count_30d` measure |
-| All other users | No access to this cube at all |
+| `manager` | All members except for `count` |
+| `observer` | All members except for `count` and `count_7d` |
+| `guest` | Only the `count_30d` measure |
+| All other groups | No access to this cube at all |
 
 <CodeTabs>
 
@@ -206,25 +232,20 @@ cubes:
     # ...
     
     access_policy:
-      - role: "*"
-        member_level:
-          # Includes nothing, i.e., excludes all members
-          includes: []
-      
-      - role: manager
+      - group: manager
         member_level:
           # Includes all members except for `count`
           excludes:
             - count
       
-      - role: observer
+      - group: observer
         member_level:
           # Includes all members except for `count` and `count_7d`
           excludes:
             - count
             - count_7d
       
-      - role: guest
+      - group: guest
         # Includes only `count_30d`, excludes all other members
         member_level:
           includes:
@@ -237,14 +258,7 @@ cube(`orders`, {
 
   access_policy: [
     {
-      role: `*`,
-      // Includes nothing, i.e., excludes all members
-      member_level: {
-        includes: []
-      }
-    },
-    {
-      role: `manager`,
+      group: `manager`,
       // Includes all members except for `count`
       member_level: {
         excludes: [
@@ -253,7 +267,7 @@ cube(`orders`, {
       }
     },
     {
-      role: `observer`,
+      group: `observer`,
       // Includes all members except for `count` and `count_7d`
       member_level: {
         excludes: [
@@ -263,7 +277,7 @@ cube(`orders`, {
       }
     },
     {
-      role: `guest`,
+      group: `guest`,
       // Includes only `count_30d`, excludes all other members
       member_level: {
         includes: [
@@ -286,7 +300,7 @@ learn more about policy evaluation.
 The optional `row_level` parameter, when present, configures [row-level
 access][ref-dap-rls] for a policy by specifying `filters` that should apply to result set rows.
 
-In the following example, users with the `manager` role are allowed to access only
+In the following example, users in the `manager` group are allowed to access only
 rows that have the `state` dimension matching the state from the [security context][ref-sec-ctx].
 All other users are disallowed from accessing any rows at all.
 
@@ -298,13 +312,12 @@ cubes:
     # ...
     
     access_policy:
-      
-      - role: manager
+      - group: manager
         row_level:
           filters:
             - member: state
               operator: equals
-              values: [ "{ securityContext.state }" ]
+              values: [ "{ userAttributes.state }" ]
 ```
 
 ```javascript
@@ -313,13 +326,13 @@ cube(`orders`, {
 
   access_policy: [
     {
-      role: `manager`,
+      group: `manager`,
       row_level: {
         filters: [
           {
             member: `state`,
             operator: `equals`,
-            values: [ securityContext.state ]
+            values: [ userAttributes.state ]
           }
         ]
       }
@@ -340,17 +353,59 @@ Note that access policies also respect [row-level security][ref-rls] restriction
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
 learn more about policy evaluation.
 
+## Using securityContext
+
+The [`userAttributes`][ref-sec-ctx] object is only available in Cube Cloud platform. If you are using Cube Core or authenticating against [Core Data APIs][ref-core-data-apis] directly, you won't have access to `userAttributes`. Instead, you need to use `securityContext` directly when referencing user attributes in access policies (e.g., in `row_level` filters or `conditions`). For example, use `securityContext.userId` instead of `userAttributes.userId`.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: manager
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: [ "{ securityContext.country }" ]
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `manager`,
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [ securityContext.country ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
 
 [ref-ref-cubes]: /product/data-modeling/reference/cube
 [ref-ref-views]: /product/data-modeling/reference/view
 [ref-dap]: /product/auth/data-access-policies
-[ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
 [ref-dap-mls]: /product/auth/data-access-policies#member-level-access
 [ref-dap-rls]: /product/auth/data-access-policies#row-level-access
-[ref-context-to-roles]: /product/configuration/reference/config#context_to_roles
 [ref-mls]: /product/auth/member-level-security
 [ref-rls]: /product/auth/row-level-security
 [ref-sec-ctx]: /product/auth/context
+[ref-core-data-apis]: /product/apis-integrations/core-data-apis
 [ref-rest-query-filters]: /product/apis-integrations/rest-api/query-format#filters-format
 [ref-rest-query-ops]: /product/apis-integrations/rest-api/query-format#filters-operators
 [ref-rest-boolean-ops]: /product/apis-integrations/rest-api/query-format#boolean-logical-operators

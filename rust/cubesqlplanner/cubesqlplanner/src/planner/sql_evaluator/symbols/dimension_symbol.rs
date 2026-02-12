@@ -227,6 +227,16 @@ impl DimensionSymbol {
         Ok(MemberSymbol::new_dimension(Rc::new(result)))
     }
 
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        let result = self
+            .member_sql
+            .iter()
+            .chain(self.latitude.iter())
+            .chain(self.longitude.iter())
+            .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
+        Box::new(result)
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -237,11 +247,6 @@ impl DimensionSymbol {
         }
         if let Some(member_sql) = &self.longitude {
             member_sql.extract_symbol_deps(&mut deps);
-        }
-        if let Some(add_group_by) = &self.add_group_by {
-            for member_sql in add_group_by {
-                deps.extend(member_sql.get_dependencies().into_iter());
-            }
         }
         if let Some(case) = &self.case {
             case.extract_symbol_deps(&mut deps);
@@ -262,11 +267,6 @@ impl DimensionSymbol {
         }
         if let Some(case) = &self.case {
             case.extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(add_group_by) = &self.add_group_by {
-            for member_sql in add_group_by {
-                deps.extend(member_sql.get_dependencies_with_path().into_iter());
-            }
         }
         deps
     }
@@ -527,13 +527,27 @@ impl SymbolFactory for DimensionSymbolFactory {
                 None
             };
 
+        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
-        //TODO move owned logic to rust
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
-        let owned_by_cube =
-            owned_by_cube && !is_multi_stage && definition.static_data().dimension_type != "switch";
-        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
+        let owned_by_cube = if is_multi_stage || dimension_type == "switch" {
+            false
+        } else {
+            let mut owned = false;
+            if let Some(sql) = &sql {
+                owned |= sql.is_owned_by_cube();
+            }
+            if let Some(sql) = &latitude {
+                owned |= sql.is_owned_by_cube();
+            }
+            if let Some(sql) = &longitude {
+                owned |= sql.is_owned_by_cube();
+            }
+            if let Some(case) = &case {
+                owned |= case.is_owned_by_cube();
+            }
+            owned
+        };
         let is_reference = (is_view && is_sql_direct_ref)
             || (!owned_by_cube
                 && !is_sub_query
@@ -600,5 +614,38 @@ impl SymbolFactory for DimensionSymbolFactory {
         }
 
         Ok(symbol)
+    }
+}
+
+impl crate::utils::debug::DebugSql for DimensionSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        if let Some(case) = &self.case {
+            return case.debug_sql(expand_deps);
+        }
+
+        if self.dimension_type == "geo" {
+            let lat = self
+                .latitude
+                .as_ref()
+                .map(|sql| sql.debug_sql(expand_deps))
+                .unwrap_or_else(|| "{missing_latitude}".to_string());
+            let lon = self
+                .longitude
+                .as_ref()
+                .map(|sql| sql.debug_sql(expand_deps))
+                .unwrap_or_else(|| "{missing_longitude}".to_string());
+            return format!("GEO({}, {})", lat, lon);
+        }
+
+        if self.dimension_type == "switch" && self.member_sql.is_none() {
+            return format!("SWITCH({})", self.full_name());
+        }
+
+        let res = if let Some(sql) = &self.member_sql {
+            sql.debug_sql(expand_deps)
+        } else {
+            "".to_string()
+        };
+        res
     }
 }

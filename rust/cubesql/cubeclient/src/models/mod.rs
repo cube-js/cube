@@ -1,9 +1,19 @@
 pub mod v1_cube_meta;
 pub use self::v1_cube_meta::V1CubeMeta;
+pub mod v1_cube_meta_custom_numeric_format;
+pub use self::v1_cube_meta_custom_numeric_format::V1CubeMetaCustomNumericFormat;
+// problem with code-gen, let's rename it as re-export
+pub use self::v1_cube_meta_custom_numeric_format::Type as V1CubeMetaCustomNumericFormatType;
+pub mod v1_cube_meta_custom_time_format;
+pub use self::v1_cube_meta_custom_time_format::V1CubeMetaCustomTimeFormat;
+// problem with code-gen, let's rename it as re-export
+pub use self::v1_cube_meta_custom_time_format::Type as V1CubeMetaCustomTimeFormatType;
 pub mod v1_cube_meta_dimension;
 pub use self::v1_cube_meta_dimension::V1CubeMetaDimension;
 pub mod v1_cube_meta_dimension_granularity;
+pub mod v1_cube_meta_dimension_order;
 pub use self::v1_cube_meta_dimension_granularity::V1CubeMetaDimensionGranularity;
+pub use self::v1_cube_meta_dimension_order::V1CubeMetaDimensionOrder;
 pub mod v1_cube_meta_folder;
 pub use self::v1_cube_meta_folder::V1CubeMetaFolder;
 pub mod v1_cube_meta_format;

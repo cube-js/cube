@@ -1,0 +1,62 @@
+# Roles & Permissions
+
+_Understanding user roles and permissions in Cube._
+
+Cube has three built-in default roles: Admin, Developer, and Explorer. Each role has specific permissions and access levels designed to support different responsibilities within the platform.
+
+The Enterprise tier allows creation of custom roles with a customized set of permissions tailored to your organization's specific needs.
+
+
+## Default Roles
+
+### Admin Role
+
+- Has highest level of privileges
+- Can manage semantic models
+- Can manage other users
+- Has access to admin section
+- Full query capabilities
+
+<InfoBox>
+Admin roles are billed at the developer rate.
+</InfoBox>
+
+### Developer Role
+
+- Can create and edit semantic models
+- Can execute SQL queries against data sources
+- Can create and edit workbooks
+- Can create and edit data apps
+- No access to admin settings
+
+### Explorer Role
+
+- Can query semantic models
+- Can create and edit workbooks
+- Can create and edit data apps
+- Can execute Semantic SQL queries
+- Cannot make changes to semantic models
+- Cannot query source data directly
+
+## Future Implementation
+
+A Viewer role is planned for future implementation with the following capabilities:
+
+- Use Analytics Chat with ability to query Semantic Views and existing reports
+- View (read-only) access to shared data apps
+
+## Agent Permissions
+
+Agents are connected to Semantic Model Deployments and inherit the permission level of the user they are operating under.
+
+Each agent can be configured to use the _Restrict Views_ feature which allows to select the views that are visible to the agent.
+This feature should not be used as a security measure. Configure [access policies][ref-data-access-policies] instead.
+
+## Typical Usage Scenarios
+
+- Explorers: Typically data consumers and analysts
+- Developers: Usually data stewards and data engineers
+- Admins: Typically assigned to data engineers managing the entire Cube instance (billed at the developer rate with additional privileges)
+
+
+[ref-data-access-policies]: /product/auth/data-access-policies

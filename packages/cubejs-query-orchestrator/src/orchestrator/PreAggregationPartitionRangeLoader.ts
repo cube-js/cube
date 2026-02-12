@@ -10,6 +10,7 @@ import {
   timeSeries,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -64,7 +65,7 @@ export class PreAggregationPartitionRangeLoader {
 
   public constructor(
     private readonly driverFactory: DriverFactory,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
@@ -295,6 +296,7 @@ export class PreAggregationPartitionRangeLoader {
       const unionTargetTableName = allTableTargetNames
         .map(targetTableName => `SELECT * FROM ${targetTableName}${emptyResult ? ' WHERE 1 = 0' : ''}`)
         .join(' UNION ALL ');
+
       return {
         targetTableName: allTableTargetNames.length === 1 && !emptyResult ? allTableTargetNames[0] : `(${unionTargetTableName})`,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
@@ -302,6 +304,7 @@ export class PreAggregationPartitionRangeLoader {
         buildRangeEnd: !emptyResult && loadResults.length && loadResults[loadResults.length - 1].buildRangeEnd,
         lambdaTable,
         rollupLambdaId: this.preAggregation.rollupLambdaId,
+        isMultiTableUnion: allTableTargetNames.length > 1,
       };
     } else {
       return new PreAggregationLoader(

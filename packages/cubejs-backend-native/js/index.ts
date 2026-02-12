@@ -353,9 +353,9 @@ function wrapNativeFunctionWithStream(
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
-export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
+export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel, prodLogger: boolean = false): void => {
   const native = loadNative();
-  native.setupLogger({ logger: wrapNativeFunctionWithChannelCallback(logger), logLevel });
+  native.setupLogger({ logger: wrapNativeFunctionWithChannelCallback(logger), logLevel, prodLogger });
 };
 
 /// Reset local to default implementation, which uses STDOUT
@@ -437,10 +437,10 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow'): Promise<void> => {
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone);
 };
 
 // TODO parse result from native code

@@ -3,6 +3,7 @@ export {
   assertDataSource,
   keyByDataSource,
   isDockerImage,
+  convertSizeToBytes,
 } from './env';
 export * from './enums';
 export * from './package';
@@ -23,3 +24,6 @@ export * from './platform';
 export * from './FileRepository';
 export * from './decorators';
 export * from './PerfTracker';
+export * from './disposedProxy';
+export * from './logger';
+export * from './pool';

@@ -2,6 +2,7 @@ use crate::metastore::MetaStoreEvent;
 use crate::CubeError;
 use async_trait::async_trait;
 use log::error;
+use std::mem;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::Mutex;
@@ -79,20 +80,15 @@ impl MetastoreListenerImpl {
 
     async fn process_event(&self, event: &MetaStoreEvent) -> Result<(), CubeError> {
         let mut wait_fns = self.wait_fns.lock().await;
-        let mut to_notify = Vec::new();
-
-        wait_fns.retain(|(notify, wait_fn)| {
-            if wait_fn(event) {
-                to_notify.push(notify.clone());
-                false
-            } else {
-                true
-            }
-        });
+        let wait_fns_ownded: Vec<_> = mem::take(wait_fns.as_mut());
+        let (to_notify, to_keep): (Vec<_>, Vec<_>) = wait_fns_ownded
+            .into_iter()
+            .partition(|(_, wait_fn)| wait_fn(event));
+        *wait_fns = to_keep;
 
         drop(wait_fns);
 
-        for notify in to_notify {
+        for (notify, _) in to_notify {
             notify.notify_waiters();
         }
 

@@ -3,107 +3,15 @@
 With a rich set of APIs, Cube can power and deliver data to all kinds of data
 applications.
 
-[Data APIs](#data-apis) are used to run queries against the data model.
-Despite varying protocols and query formats, all data APIs share common
-[querying concepts][ref-queries].
+Cube provides three types of APIs:
 
-<Diagram src="https://ucarecdn.com/aa9b3201-d254-4a38-a4a9-b3786af6167b/" />
+- **[Embed APIs][ref-embed-apis]** are used to support embedding analytics use cases, including AI-powered chat and signed iframe embedding
+- **[Core Data APIs][ref-core-data-apis]** are used to query data from the semantic layer using various protocols
+- **Management APIs** - currently the [Orchestration API][ref-orchestration-api] is available to control pre-aggregation refreshes externally
 
-Also, there are [management APIs](#management-apis) to control Cube deployments
-externally.
 
-<Diagram src="https://ucarecdn.com/3ff02e30-a010-480d-b6d6-3b927baa0dfe/" />
-
-## Data APIs
-
-A few rules of thumb to help you choose an API:
-
-* To embed chats and dashboards into your applications, use the [embedding][ref-embedding] capabilities.
-
-* For real-time conversations with AI agents, use the [Chat API][ref-chat-api].
-
-* To connect to AI assistants, use the [Model Context Protocol (MCP) server][ref-mcp-server].
-
-* To connect to [Microsoft Power BI][ref-powerbi], use the [DAX API][ref-dax-api].
-
-* To connect to [Microsoft Excel][ref-excel], use either the [MDX API][ref-mdx-api]
-or [Cube Cloud for Excel][ref-cube-cloud-for-excel].
-
-* To connect to [Google Sheets][ref-sheets], use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets].
-
-* For internal or self-serve [business intelligence][cube-issbi], use
-[Semantic Layer Sync][ref-sls] in case it supports your BI tools.
-Otherwise, connect via the [SQL API][ref-sql-api] directly.
-
-* For [embedded analytics][cube-ea] and [real-time analytics][cube-rta], use
-[REST API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST API,
-the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code.
-
-<ReferenceBox>
-
-See this [GitHub issue](https://github.com/cube-js/cube/issues/1744#issuecomment-2291680777)
-for an unofficial, community-maintained [client library for Python](https://github.com/mharrisb1/cube-http-client).
-
-</ReferenceBox>
-
-### Data modeling
-
-Support for data modeling features differ across APIs, integrations, and [visualization
-tools][ref-viz-tools]. Some of the features with partial support are listed below:
-
-| Feature | ✅ Supported in |
-| --- | --- |
-| [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
-| Flat [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>[Apache Superset][ref-superset] via [Semantic Layer Sync][ref-sls]<br/>[Preset][ref-preset] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
-| Nested [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api] |
-
-### Authentication methods
-
-Support for authentication methods differ across APIs, integrations, and [visualization
-tools][ref-viz-tools]:
-
-| Method | ✅ Supported in |
-| --- | --- |
-| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
-| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
-| [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
-| [JSON Web Token][ref-auth-jwt] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
-
-## Management APIs
-
-In case you'd like Cube to work with data orchestration tools and let them push
-changes from upstream data sources to Cube, explore the [Orchestration
-API][ref-orchestration-api].
-
-[cube-issbi]: https://cube.dev/use-cases/semantic-layer
-[cube-ea]: https://cube.dev/use-cases/embedded-analytics
-[cube-rta]: https://cube.dev/use-cases/real-time-analytics
-[ref-queries]: /product/apis-integrations/queries
-[ref-dax-api]: /product/apis-integrations/dax-api
-[ref-sql-api]: /product/apis-integrations/sql-api
-[ref-rest-api]: /product/apis-integrations/rest-api
-[ref-graphql-api]: /product/apis-integrations/graphql-api
-[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-embed-apis]: /product/apis-integrations/embed-apis
+[ref-core-data-apis]: /product/apis-integrations/core-data-apis
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
-[ref-sls]: /product/apis-integrations/semantic-layer-sync
-[ref-js-sdk]: /product/apis-integrations/javascript-sdk
-[ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
-[ref-cube-cloud-for-sheets]: /product/apis-integrations/google-sheets
-[ref-viz-tools]: /product/configuration/visualization-tools
-[ref-hierarchies]: /product/data-modeling/reference/hierarchies
-[ref-folders]: /product/data-modeling/reference/view#folders
-[ref-powerbi]: /product/configuration/visualization-tools/powerbi
-[ref-excel]: /product/configuration/visualization-tools/excel
-[ref-sheets]: /product/configuration/visualization-tools/google-sheets
-[ref-tableau]: /product/configuration/visualization-tools/tableau
-[ref-auth-user-pass]: /product/auth/methods/name-password
-[ref-auth-idp]: /product/auth/methods/identity-provider
-[ref-auth-jwt]: /product/auth/methods/jwt
-[ref-auth-kerberos]: /product/auth/methods/kerberos
-[ref-auth-ntlm]: /product/auth/methods/ntlm
-[ref-superset]: /product/configuration/visualization-tools/superset
-[ref-preset]: /product/configuration/visualization-tools/superset
-[ref-playground]: /product/workspace/playground
-[ref-mcp-server]: /product/apis-integrations/mcp-server
-[ref-chat-api]: /product/apis-integrations/chat-api
-[ref-embedding]: /product/apis-integrations/embedding
+[ref-chat-api]: /product/apis-integrations/embed-apis/chat-api
+[ref-generate-session]: /product/apis-integrations/embed-apis/generate-session

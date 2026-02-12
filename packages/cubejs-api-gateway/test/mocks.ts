@@ -67,7 +67,8 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
         foo__bar: 'Foo.bar',
         foo__time: 'Foo.time',
       },
-      order: [{ id: 'id', desc: true, }]
+      order: [{ id: 'id', desc: true, }],
+      dataSource: 'default'
     };
   },
 

@@ -31,13 +31,15 @@ import {
   EventEmitterInterface,
   RedisEventEmitter, RedisEventEmitterOptions
 } from '@cubejs-backend/event-emitter';
+import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
+
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
-import { CompilerApi } from './CompilerApi';
+import { CompilerApi, type CompilerApiOptions } from './CompilerApi';
 import { DevServer } from './DevServer';
 import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
-import { prodLogger, devLogger } from './logger';
+import { createLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
 import {
   driverDependencies,
@@ -53,7 +55,7 @@ import type {
   ServerCoreInitializedOptions,
   ContextToAppIdFn,
   DatabaseType,
-  DbTypeAsyncFn,
+  DbTypeInternalFn,
   ExternalDbTypeFn,
   OrchestratorOptionsFn,
   OrchestratorInitedOptions,
@@ -137,7 +139,7 @@ export class CubejsServerCore {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
-  protected contextToDbType: DbTypeAsyncFn;
+  protected contextToDbType: DbTypeInternalFn;
 
   protected contextToExternalDbType: ExternalDbTypeFn;
 
@@ -188,10 +190,9 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
-    this.logger = opts.logger || (
-      process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+    this.logger = opts.logger || createLogger(
+      process.env.NODE_ENV === 'production',
+      getEnv('logLevel'),
     );
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
@@ -465,7 +466,7 @@ export class CubejsServerCore {
     }
   }
 
-  public initSubscriptionServer(sendMessage) {
+  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn): SubscriptionServer {
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
@@ -553,6 +554,7 @@ export class CubejsServerCore {
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           contextToRoles: this.options.contextToRoles,
+          contextToGroups: this.options.contextToGroups,
           preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
@@ -598,7 +600,7 @@ export class CubejsServerCore {
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
-    const contextToDbType: DbTypeAsyncFn = this.contextToDbType.bind(this);
+    const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
 
     // orchestrator options can be empty, if user didn't define it.
@@ -713,30 +715,35 @@ export class CubejsServerCore {
     return new CompilerApi(
       repository,
       options.dbType || this.options.dbType,
-      {
-        schemaVersion: options.schemaVersion || this.options.schemaVersion,
-        contextToRoles: this.options.contextToRoles,
-        devServer: this.options.devServer,
-        logger: this.logger,
-        externalDbType: options.externalDbType,
-        preAggregationsSchema: options.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey:
-            this.options.allowUngroupedWithoutPrimaryKey ||
-            getEnv('allowUngroupedWithoutPrimaryKey'),
-        convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
-        compileContext: options.context,
-        dialectClass: options.dialectClass,
-        externalDialectClass: options.externalDialectClass,
-        allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
-        sqlCache: this.options.sqlCache,
-        standalone: this.standalone,
-        allowNodeRequire: options.allowNodeRequire,
-        fastReload: options.fastReload || getEnv('fastReload'),
-        compilerCacheSize: this.options.compilerCacheSize || 250,
-        maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
-        updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive
-      },
+      this.createCompilerApiOptions(options),
     );
+  }
+
+  protected createCompilerApiOptions(options: Record<string, any> = {}): CompilerApiOptions {
+    return {
+      schemaVersion: options.schemaVersion || this.options.schemaVersion,
+      contextToRoles: this.options.contextToRoles,
+      contextToGroups: this.options.contextToGroups,
+      devServer: this.options.devServer,
+      logger: this.logger,
+      externalDbType: options.externalDbType,
+      preAggregationsSchema: options.preAggregationsSchema,
+      allowUngroupedWithoutPrimaryKey:
+          this.options.allowUngroupedWithoutPrimaryKey ||
+          getEnv('allowUngroupedWithoutPrimaryKey'),
+      convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
+      compileContext: options.context,
+      dialectClass: options.dialectClass,
+      externalDialectClass: options.externalDialectClass,
+      allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
+      sqlCache: this.options.sqlCache,
+      standalone: this.standalone,
+      allowNodeRequire: options.allowNodeRequire,
+      fastReload: options.fastReload || getEnv('fastReload'),
+      compilerCacheSize: this.options.compilerCacheSize || 250,
+      maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
+      updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive,
+    };
   }
 
   protected createOrchestratorApi(

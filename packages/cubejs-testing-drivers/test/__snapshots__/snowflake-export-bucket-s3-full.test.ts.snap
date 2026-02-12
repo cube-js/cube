@@ -12591,6 +12591,10 @@ Array [
 exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-s3 SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `
 Array [
   Object {
+    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "totalSales": null,
+  },
+  Object {
     "productName": "Canon PC1080F Personal Copier",
     "totalSales": 2399.96,
   },
@@ -12761,10 +12765,6 @@ Array [
   Object {
     "productName": "OIC #2 Pencils, Medium Soft",
     "totalSales": 3.76,
-  },
-  Object {
-    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
-    "totalSales": null,
   },
 ]
 `;

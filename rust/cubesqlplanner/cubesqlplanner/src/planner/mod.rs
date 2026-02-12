@@ -10,6 +10,7 @@ pub mod query_properties;
 pub mod query_tools;
 pub mod sql_evaluator;
 pub mod sql_templates;
+pub mod top_level_planner;
 pub mod utils;
 pub mod visitor_context;
 
@@ -19,6 +20,7 @@ pub use base_query::BaseQuery;
 pub use params_allocator::ParamsAllocator;
 pub use query_properties::{FullKeyAggregateMeasures, OrderByItem, QueryProperties};
 pub use time_dimension::*;
+pub use top_level_planner::TopLevelPlanner;
 pub use visitor_context::{
     evaluate_sql_call_with_context, evaluate_with_context, FiltersContext, VisitorContext,
 };

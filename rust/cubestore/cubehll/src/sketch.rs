@@ -31,46 +31,46 @@ impl HllSketch {
     /// Create a sketch for an empty set of elements.
     /// The number of buckets is a power of two, not more than 65536.
     pub fn new(num_buckets: u32) -> Result<HllSketch> {
-        return Ok(HllSketch {
+        Ok(HllSketch {
             instance: HllInstance::new(num_buckets)?,
-        });
+        })
     }
 
     /// Maximum number of buckets used for this representation.
     pub fn num_buckets(&self) -> u32 {
-        return self.instance.num_buckets();
+        self.instance.num_buckets()
     }
 
     pub fn index_bit_len(&self) -> u8 {
-        return self.instance.index_bit_len();
+        self.instance.index_bit_len()
     }
 
     pub fn read(data: &[u8]) -> Result<HllSketch> {
-        return Ok(HllSketch {
+        Ok(HllSketch {
             instance: HllInstance::read(data)?,
-        });
+        })
     }
 
     pub fn read_hll_storage_spec(data: &[u8]) -> Result<HllSketch> {
-        return Ok(HllSketch {
+        Ok(HllSketch {
             instance: HllInstance::read_hll_storage_spec(data)?,
-        });
+        })
     }
 
     /// Read from the snowflake JSON format, i.e. result of HLL_EXPORT serialized to string.
     pub fn read_snowflake(s: &str) -> Result<HllSketch> {
-        return Ok(HllSketch {
+        Ok(HllSketch {
             instance: HllInstance::read_snowflake(s)?,
-        });
+        })
     }
 
     pub fn write(&self) -> Vec<u8> {
-        return self.instance.write();
+        self.instance.write()
     }
 
     /// Produces an estimate of the current set size.
     pub fn cardinality(&self) -> u64 {
-        return self.instance.cardinality();
+        self.instance.cardinality()
     }
 
     /// Merges elements from `o` into the current sketch.
@@ -79,5 +79,10 @@ impl HllSketch {
     /// EXPECTS: `index_bit_len` of both sketches are the same.
     pub fn merge_with(&mut self, o: &HllSketch) {
         self.instance.merge_with(&o.instance);
+    }
+
+    /// Allocated size (not including sizeof::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        self.instance.allocated_size()
     }
 }

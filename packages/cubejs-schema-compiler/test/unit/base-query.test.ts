@@ -919,13 +919,13 @@ describe('SQL Generation', () => {
 
           if (q.measures[0].includes('count')) {
             expect(queryString.includes('DATE_BIN(INTERVAL')).toBeTruthy();
-            expect(queryString.includes('INTERVAL \'6 MONTH\'')).toBeTruthy();
+            expect(queryString.toLowerCase().includes('interval \'6 month\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
             expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
-            expect(queryString.includes('INTERVAL \'2 DAY\'')).toBeTruthy();
+            expect(queryString.toLowerCase().includes('interval \'2 day\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
             expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
-            expect(queryString.includes('INTERVAL \'3 DAY\'')).toBeTruthy();
+            expect(queryString.toLowerCase().includes('interval \'3 day\'')).toBeTruthy();
           }
         });
       });
@@ -1250,7 +1250,7 @@ describe('SQL Generation', () => {
         .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 1800) / 3600)`, false, expect.any(BaseQuery)]);
 
       expect(query.everyRefreshKeySql({ every: '30 5 * * 5', timezone }))
-        .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 365400) / 604800)`, false, expect.any(BaseQuery)]);
+        .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 106200) / 604800)`, false, expect.any(BaseQuery)]);
 
       for (let i = 1; i < 59; i++) {
         expect(query.everyRefreshKeySql({ every: `${i} * * * *`, timezone }))

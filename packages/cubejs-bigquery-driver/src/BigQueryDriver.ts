@@ -35,6 +35,8 @@ import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
 
+import { version } from '../package.json';
+
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
   projectId?: string,
@@ -52,6 +54,13 @@ interface BigQueryDriverOptions extends BigQueryOptions {
 
 type BigQueryDriverOptionsInitialized =
   Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
+
+// BigQuery type mappings for types not in the base DbTypeToGenericType
+const BigQueryToGenericType: Record<string, string> = {
+  bignumeric: 'decimal',
+  bigdecimal: 'decimal',
+  decimal: 'decimal'
+};
 
 /**
  * BigQuery driver.
@@ -132,6 +141,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
       exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      userAgent: `CubeDev_Cube/${version}`,
     };
 
     getEnv('dbExportBucketType', {
@@ -291,7 +301,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
     const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
-    return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
+    return bigQueryTable.schema.fields.map((c: any) => {
+      // BigQuery NUMERIC is always (38, 9), BIGNUMERIC is (76, 38)
+      // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#decimal_types
+      if (c.type === 'NUMERIC' || c.type === 'DECIMAL') {
+        return { name: c.name, type: this.toGenericType(c.type, 38, 9) };
+      }
+      if (c.type === 'BIGNUMERIC' || c.type === 'BIGDECIMAL') {
+        return { name: c.name, type: this.toGenericType(c.type, 76, 38) };
+      }
+      return { name: c.name, type: this.toGenericType(c.type) };
+    });
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
@@ -433,5 +453,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return {
       incrementalSchemaLoading: true,
     };
+  }
+
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
+    const mappedType = BigQueryToGenericType[columnType.toLowerCase()] || columnType;
+    return super.toGenericType(mappedType, precision, scale);
   }
 }

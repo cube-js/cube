@@ -10,7 +10,7 @@ use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
@@ -284,10 +284,18 @@ impl HttpServer {
                                 command,
                             },
                             Err(e) => {
+                                let command_text = match &command {
+                                    HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", query),
+                                    HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
+                                    HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
+                                    HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
+                                };
                                 log::error!(
-                                "Error processing HTTP command: {}\n",
-                                e.display_with_backtrace()
-                            );
+                                    "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
+                                    if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
+                                    e.display_with_backtrace(),
+                                    command_text,
+                                );
                                 let command = if e.is_wrong_connection() {
                                     HttpCommand::CloseConnection {
                                         error: e.to_string(),
@@ -356,6 +364,12 @@ impl HttpServer {
                     });
                 } else {
                     cube_ext::spawn(async move {
+                        let command_text = match &command {
+                            HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", query),
+                            HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
+                            HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
+                            HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
+                        };
                         let res = HttpServer::process_command(
                             sql_service.clone(),
                             sql_query_context,
@@ -370,9 +384,10 @@ impl HttpServer {
                             },
                             Err(e) => {
                                 log::error!(
-                                "Error processing HTTP command: {}\n",
-                                e.display_with_backtrace()
-                            );
+                                    "Error processing HTTP command: {}\nThe command: {}",
+                                    e.display_with_backtrace(),
+                                    command_text,
+                                );
                                 HttpMessage {
                                     message_id,
                                     connection_id,
@@ -600,6 +615,7 @@ pub enum HttpCommand {
 impl HttpMessage {
     pub fn bytes(&self) -> Vec<u8> {
         let mut builder = FlatBufferBuilder::with_capacity(1024);
+        let mut data_frame_serialization_start = None::<SystemTime>;
         let args = HttpMessageArgs {
             message_id: self.message_id,
             command_type: match self.command {
@@ -645,6 +661,7 @@ impl HttpMessage {
                     )
                 }
                 HttpCommand::ResultSet { data_frame } => {
+                    data_frame_serialization_start = Some(SystemTime::now());
                     let columns_vec =
                         HttpMessage::build_columns(&mut builder, data_frame.get_columns());
                     let rows = HttpMessage::build_rows(&mut builder, data_frame.clone());
@@ -668,7 +685,16 @@ impl HttpMessage {
         };
         let message = cubeshared::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
-        builder.finished_data().to_vec() // TODO copy
+        let result = builder.finished_data().to_vec(); // TODO copy
+        if let Some(data_frame_serialization_start) = data_frame_serialization_start {
+            app_metrics::HTTP_MESSAGE_DATA_FRAME_SERIALIZATION_TIME_US.report(
+                data_frame_serialization_start
+                    .elapsed()
+                    .unwrap_or_else(|_| Duration::ZERO)
+                    .as_micros() as i64,
+            );
+        }
+        result
     }
 
     pub fn should_close_connection(&self) -> bool {

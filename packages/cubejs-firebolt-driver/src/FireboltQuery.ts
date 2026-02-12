@@ -48,4 +48,14 @@ export class FireboltQuery extends BaseQuery {
   public newFilter(filter: any): BaseFilter {
     return new FireboltFilter(this, filter);
   }
+
+  public defaultRefreshKeyRenewalThreshold() {
+    return 120;
+  }
+
+  public defaultEveryRefreshKey() {
+    return {
+      every: '2 minutes'
+    };
+  }
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
@@ -36,7 +36,7 @@ use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
 use crate::cachestore::CacheStore;
-use crate::cluster::Cluster;
+use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
@@ -47,10 +47,13 @@ use crate::metastore::{
     is_valid_plain_binary_hll, HllFlavour, IdRow, ImportFormat, Index, IndexDef, IndexType,
     MetaStoreTable, Schema,
 };
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batches_to_dataframe, ClusterSendExec, QueryExecutor};
-use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
+use crate::queryplanner::query_executor::{
+    batches_to_dataframe, find_topmost_cluster_send_exec, QueryExecutor,
+};
+use crate::queryplanner::serialized_plan::{PreSerializedPlan, RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
@@ -67,7 +70,6 @@ use crate::{
 };
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
-use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use deepsize::DeepSizeOf;
 
 pub mod cache;
@@ -241,7 +243,7 @@ impl SqlServiceImpl {
         columns: Vec<ColumnDef>,
         if_not_exists: bool,
     ) -> Result<IdRow<MultiIndex>, CubeError> {
-        let columns = convert_columns_type(&columns)?;
+        let columns = convert_columns_type(&columns, self.config_obj.allow_decimal128())?;
         self.db
             .create_partitioned_index(schema, name, columns, if_not_exists)
             .await
@@ -262,7 +264,10 @@ impl SqlServiceImpl {
                 IndexDef {
                     name,
                     multi_index: None,
-                    columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                    columns: columns
+                        .iter()
+                        .map(|c| normalize_for_column_name(&c))
+                        .collect(),
                     index_type: IndexType::Regular, //TODO realize aggregate index here too
                 },
             )
@@ -286,13 +291,15 @@ impl SqlServiceImpl {
         for column in columns {
             let c = if let Some(item) = table_columns
                 .iter()
-                .find(|voc| *voc.get_name() == column.value)
+                .find(|voc| *voc.get_name() == normalize_for_column_name(&column))
             {
                 item
             } else {
                 return Err(CubeError::user(format!(
                     "Column {} is not present in table {}.{}.",
-                    column.value, schema_name, table_name
+                    normalize_for_column_name(&column),
+                    schema_name,
+                    table_name
                 )));
             };
             real_col.push(c);
@@ -321,7 +328,7 @@ impl SqlServiceImpl {
         let logical_plan = self
             .query_planner
             .logical_plan(
-                DFStatement::Statement(Statement::Query(q)),
+                DFStatement::Statement(Box::new(Statement::Query(q))),
                 &InlineTables::new(),
                 None,
             )
@@ -377,24 +384,19 @@ impl SqlServiceImpl {
     ) -> Result<Arc<DataFrame>, CubeError> {
         fn extract_worker_plans(
             p: &Arc<dyn ExecutionPlan>,
-        ) -> Option<Vec<(String, SerializedPlan)>> {
-            if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
-                Some(p.worker_plans())
+        ) -> Result<Option<(Vec<(String, PreSerializedPlan)>, WorkerPlanningParams)>, CubeError>
+        {
+            if let Some(p) = find_topmost_cluster_send_exec(p) {
+                Ok(Some((p.worker_plans()?, p.worker_planning_params())))
             } else {
-                for c in p.children() {
-                    let res = extract_worker_plans(&c);
-                    if res.is_some() {
-                        return res;
-                    }
-                }
-                None
+                Ok(None)
             }
         }
 
         let query_plan = self
             .query_planner
             .logical_plan(
-                DFStatement::Statement(statement),
+                DFStatement::Statement(Box::new(statement)),
                 &InlineTables::new(),
                 None,
             )
@@ -402,11 +404,7 @@ impl SqlServiceImpl {
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
                 let res = if !analyze {
-                    let logical_plan = serialized.logical_plan(
-                        HashMap::new(),
-                        HashMap::new(),
-                        NoopParquetMetadataCache::new(),
-                    )?;
+                    let logical_plan = serialized.logical_plan();
 
                     DataFrame::new(
                         vec![Column::new(
@@ -426,19 +424,28 @@ impl SqlServiceImpl {
                     ];
                     let mut rows = Vec::new();
 
-                    let router_plan = executor.router_plan(serialized.clone(), cluster).await?.0;
+                    let router_plan = executor
+                        .router_plan(serialized.to_serialized_plan()?, cluster)
+                        .await?
+                        .0;
                     rows.push(Row::new(vec![
                         TableValue::String("router".to_string()),
                         TableValue::String("".to_string()),
                         TableValue::String(pp_phys_plan(router_plan.as_ref())),
                     ]));
 
-                    if let Some(worker_plans) = extract_worker_plans(&router_plan) {
+                    if let Some((worker_plans, worker_planning_params)) =
+                        extract_worker_plans(&router_plan)?
+                    {
                         let worker_futures = worker_plans
                             .into_iter()
                             .map(|(name, plan)| async move {
                                 self.cluster
-                                    .run_explain_analyze(&name, plan.clone())
+                                    .run_explain_analyze(
+                                        &name,
+                                        plan.to_serialized_plan()?,
+                                        worker_planning_params,
+                                    )
                                     .await
                                     .map(|p| (name, p))
                             })
@@ -484,35 +491,77 @@ impl SqlServiceImpl {
 }
 
 pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<String> {
-    credentials
-        .iter()
-        .find(|o| o.name.value == prop_name)
-        .and_then(|x| {
-            if let Value::SingleQuotedString(v) = &x.value {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        })
+    for credential in credentials {
+        let SqlOption::KeyValue { key, value } = credential else {
+            continue;
+        };
+        if key.value != prop_name {
+            continue;
+        }
+        return if let Expr::Value(Value::SingleQuotedString(v)) = value {
+            Some(v.to_string())
+        } else {
+            None
+        };
+    }
+    return None;
 }
 
 pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<bool> {
-    credentials
-        .iter()
-        .find(|o| o.name.value == prop_name)
-        .and_then(|x| {
-            if let Value::Boolean(v) = &x.value {
-                Some(*v)
-            } else {
-                None
-            }
-        })
+    for credential in credentials {
+        let SqlOption::KeyValue { key, value } = credential else {
+            continue;
+        };
+        if key.value != prop_name {
+            continue;
+        }
+        return if let Expr::Value(Value::Boolean(v)) = value {
+            Some(*v)
+        } else {
+            None
+        };
+    }
+    return None;
+}
+
+/// Normalizes an ident used for a column name -- hypothetically, by calling `to_ascii_lowercase()`
+/// when it is unquoted.  But actually it does nothing -- unquoted column names are being treated
+/// case sensitively, repeating our behavior for the DF upgrade.  This function serves as a marker
+/// for specific places where we were calling `to_lowercase()` in the DF upgrade branch in case we
+/// want to change those back.
+///
+/// See also:  our function `sql_to_rel_options()`, which turns off unqualified ident normalization
+/// in DataFusion.
+pub fn normalize_for_column_name(ident: &Ident) -> String {
+    // Don't normalize.  We didn't pre-DF upgrade.
+    ident.value.clone()
+
+    // Uses to_ascii_lowercase on unquoted identifiers.
+    // datafusion::sql::planner::IdentNormalizer::new(true).normalize(ident.clone())
+}
+
+/// Normalizes an ident used for "source" names -- hypothetically, this might call
+/// `to_ascii_lowercase()`, but actually it does nothing.  See comment for
+/// `normalize_for_column_name`.
+pub fn normalize_for_source_name(ident: &Ident) -> String {
+    ident.value.clone()
+}
+
+/// Normalizes an ident used for schema or table names.  This in particular ran into backwards
+/// compatibility issues with pre-DF-upgrade Cubestores, or pre-upgrade Cube instances.  Using
+/// `to_lowercase()` on unquoted identifiers used by CREATE SCHEMA didn't work so well because later
+/// queries to information_schema used mixed-case quoted string values.  See also comment for
+/// `normalize_for_column_name`.
+pub fn normalize_for_schema_table_or_index_name(ident: &Ident) -> String {
+    ident.value.clone()
 }
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
 
 impl Dialect for MySqlDialectWithBackTicks {
+    // TODO upgrade DF: There are unimplemented functions as of sqlparser 0.50.0.
+
     fn is_delimited_identifier_start(&self, ch: char) -> bool {
         ch == '"' || ch == '`'
     }
@@ -530,6 +579,11 @@ impl Dialect for MySqlDialectWithBackTicks {
 
     fn is_identifier_part(&self, ch: char) -> bool {
         self.is_identifier_start(ch) || (ch >= '0' && ch <= '9')
+    }
+
+    // Behavior we previously had hard-coded into sqlparser
+    fn supports_string_literal_backslash_escape(&self) -> bool {
+        true
     }
 }
 
@@ -619,7 +673,15 @@ impl SqlService for SqlServiceImpl {
                         }?;
                     } else {
                         let worker = &workers[0];
-                        cluster.run_select(worker, plan).await?;
+                        cluster
+                            .run_select(
+                                worker,
+                                plan,
+                                WorkerPlanningParams {
+                                    worker_partition_count: 1,
+                                },
+                            )
+                            .await?;
                     }
                     panic!("worker did not panic")
                 }
@@ -667,20 +729,20 @@ impl SqlService for SqlServiceImpl {
                     Some(&vec![metrics::format_tag("command", "create_schema")]),
                 );
 
-                let name = schema_name.to_string();
+                let name = normalize_for_schema_table_or_index_name(&schema_name.0[0]);
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::CreateTable {
                 create_table:
-                    Statement::CreateTable {
+                    Statement::CreateTable(CreateTable {
                         name,
                         columns,
                         external,
                         with_options,
                         if_not_exists,
                         ..
-                    },
+                    }),
                 indexes,
                 aggregates,
                 locations,
@@ -699,53 +761,60 @@ impl SqlService for SqlServiceImpl {
                         name
                     )));
                 }
-                let schema_name = &nv[0].value;
-                let table_name = &nv[1].value;
+                let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
+                let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
+                fn filter_sql_option_key_value(opt: &SqlOption) -> Option<(&Ident, &Expr)> {
+                    if let SqlOption::KeyValue { key, value } = opt {
+                        Some((key, value))
+                    } else {
+                        None
+                    }
+                }
                 let mut import_format = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "input_format")
-                    .map_or(Result::Ok(ImportFormat::CSV), |option| {
-                        match &option.value {
-                            Value::SingleQuotedString(input_format) => {
-                                match input_format.as_str() {
-                                    "csv" => Result::Ok(ImportFormat::CSV),
-                                    "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
-                                    _ => Result::Err(CubeError::user(format!(
-                                        "Bad input_format {}",
-                                        option.value
-                                    ))),
-                                }
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "input_format")
+                    .map_or(Result::Ok(ImportFormat::CSV), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(input_format)) => {
+                            match input_format.as_str() {
+                                "csv" => Result::Ok(ImportFormat::CSV),
+                                "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                                _ => Result::Err(CubeError::user(format!(
+                                    "Bad input_format {}",
+                                    value
+                                ))),
                             }
-                            _ => Result::Err(CubeError::user(format!(
-                                "Bad input format {}",
-                                option.value
-                            ))),
                         }
+                        _ => Result::Err(CubeError::user(format!("Bad input format {}", value))),
                     })?;
 
                 let delimiter = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "delimiter")
-                    .map_or(Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(delimiter) => match delimiter.as_str() {
-                            "tab" => Ok(Some('\t')),
-                            "^A" => Ok(Some('\u{0001}')),
-                            s if s.len() != 1 => {
-                                Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "delimiter")
+                    .map_or(Ok(None), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(delimiter)) => {
+                            match delimiter.as_str() {
+                                "tab" => Ok(Some('\t')),
+                                "^A" => Ok(Some('\u{0001}')),
+                                s if s.len() != 1 => {
+                                    Err(CubeError::user(format!("Bad delimiter {}", value)))
+                                }
+                                s => Ok(Some(s.chars().next().unwrap())),
                             }
-                            s => Ok(Some(s.chars().next().unwrap())),
-                        },
-                        _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
+                        }
+                        _ => Err(CubeError::user(format!("Bad delimiter {}", value))),
                     })?;
 
                 let disable_quoting = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "disable_quoting")
-                    .map_or(Ok(false), |option| match &option.value {
-                        Value::Boolean(value) => Ok(*value),
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "disable_quoting")
+                    .map_or(Ok(false), |(_, value)| match value {
+                        Expr::Value(Value::Boolean(value)) => Ok(*value),
                         _ => Err(CubeError::user(format!(
                             "Bad disable_quoting flag (expected boolean) {}",
-                            option.value
+                            value
                         ))),
                     })?;
 
@@ -779,64 +848,62 @@ impl SqlService for SqlServiceImpl {
                 }
                 let build_range_end = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "build_range_end")
-                    .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(build_range_end) => {
-                            let ts = timestamp_from_string(build_range_end)?;
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "build_range_end")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(build_range_end)) => {
+                            let ts = timestamp_from_string(build_range_end.as_str())?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad build_range_end {}",
-                            option.value
-                        ))),
+                        _ => Result::Err(CubeError::user(format!("Bad build_range_end {}", value))),
                     })?;
 
                 let seal_at = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "seal_at")
-                    .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(seal_at) => {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "seal_at")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(seal_at)) => {
                             let ts = timestamp_from_string(seal_at)?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
-                        _ => Result::Err(CubeError::user(format!("Bad seal_at {}", option.value))),
+                        _ => Result::Err(CubeError::user(format!("Bad seal_at {}", value))),
                     })?;
                 let select_statement = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "select_statement")
-                    .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(select_statement) => {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "select_statement")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(select_statement)) => {
                             Result::Ok(Some(select_statement.clone()))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad select_statement {}",
-                            option.value
-                        ))),
+                        _ => {
+                            Result::Err(CubeError::user(format!("Bad select_statement {}", value)))
+                        }
                     })?;
                 let source_table = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "source_table")
-                    .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(source_table) => {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "source_table")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(source_table)) => {
                             Result::Ok(Some(source_table.clone()))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad source_table {}",
-                            option.value
-                        ))),
+                        _ => Result::Err(CubeError::user(format!("Bad source_table {}", value))),
                     })?;
                 let stream_offset = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "stream_offset")
-                    .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(select_statement) => {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "stream_offset")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(select_statement)) => {
                             Result::Ok(Some(select_statement.clone()))
                         }
                         _ => Result::Err(CubeError::user(format!(
                             "Bad stream_offset {}. Expected string.",
-                            option.value
+                            value
                         ))),
                     })?;
 
@@ -865,12 +932,12 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
-            CubeStoreStatement::Statement(Statement::CreateIndex {
+            CubeStoreStatement::Statement(Statement::CreateIndex(CreateIndex {
                 name,
                 table_name,
                 columns,
                 ..
-            }) => {
+            })) => {
                 app_metrics::DATA_QUERIES.add_with_tags(
                     1,
                     Some(&vec![metrics::format_tag("command", "create_index")]),
@@ -882,8 +949,12 @@ impl SqlService for SqlServiceImpl {
                         table_name
                     )));
                 }
-                let schema_name = &table_name.0[0].value;
-                let table_name = &table_name.0[1].value;
+                let schema_name = &normalize_for_schema_table_or_index_name(&table_name.0[0]);
+                let table_name = &normalize_for_schema_table_or_index_name(&table_name.0[1]);
+                let name = name.ok_or(CubeError::user(format!(
+                    "Index name is not defined during index creation for {}.{}",
+                    schema_name, table_name
+                )))?;
                 let res = self
                     .create_index(
                         schema_name.to_string(),
@@ -949,7 +1020,7 @@ impl SqlService for SqlServiceImpl {
                     };
                     let source = self
                         .db
-                        .create_or_update_source(name.value.to_string(), creds?)
+                        .create_or_update_source(normalize_for_source_name(&name), creds?)
                         .await?;
                     Ok(Arc::new(DataFrame::from(vec![source])))
                 } else {
@@ -1019,17 +1090,28 @@ impl SqlService for SqlServiceImpl {
 
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
-            CubeStoreStatement::Statement(Statement::Insert {
-                table_name,
+            CubeStoreStatement::Statement(Statement::Insert(Insert {
+                table,
                 columns,
                 source,
                 ..
-            }) => {
+            })) => {
                 app_metrics::DATA_QUERIES
                     .add_with_tags(1, Some(&vec![metrics::format_tag("command", "insert")]));
 
-                let data = if let SetExpr::Values(Values(data_series)) = &source.body {
-                    data_series
+                let TableObject::TableName(table_name) = table else {
+                    return Err(CubeError::user(format!(
+                        "Insert target is required to be a table name, instead of {}",
+                        table
+                    )));
+                };
+                let source = source.ok_or(CubeError::user(format!(
+                    "Insert source is required for {}",
+                    table_name
+                )))?;
+
+                let data = if let SetExpr::Values(values) = source.body.as_ref() {
+                    &values.rows
                 } else {
                     return Err(CubeError::user(format!(
                         "Data should be present in query. Your query was '{}'",
@@ -1041,8 +1123,8 @@ impl SqlService for SqlServiceImpl {
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", query)));
                 }
-                let schema_name = &nv[0].value;
-                let table_name = &nv[1].value;
+                let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
+                let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
@@ -1059,14 +1141,18 @@ impl SqlService for SqlServiceImpl {
                     .await
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
+                let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
                     .query_planner
                     .logical_plan(
-                        DFStatement::Statement(Statement::Query(q)),
+                        DFStatement::Statement(Box::new(Statement::Query(q))),
                         &context.inline_tables,
                         context.trace_obj.clone(),
                     )
                     .await?;
+
+                app_metrics::DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US
+                    .report(logical_plan_time_start.elapsed()?.as_micros() as i64);
 
                 // TODO distribute and combine
                 let res = match logical_plan {
@@ -1082,10 +1168,14 @@ impl SqlService for SqlServiceImpl {
 
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
+                        let serialized_plan_time_start = SystemTime::now();
+                        let serialized_plan = serialized.to_serialized_plan()?;
+                        app_metrics::DATA_QUERY_TO_SERIALIZED_PLAN_TIME_US
+                            .report(serialized_plan_time_start.elapsed()?.as_micros() as i64);
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, context, serialized, async move |plan| {
+                                .get(query, context, serialized_plan, async move |plan| {
                                     let records;
                                     if workers.len() == 0 {
                                         records =
@@ -1118,6 +1208,7 @@ impl SqlService for SqlServiceImpl {
                 analyze,
                 verbose: _,
                 statement,
+                ..
             }) => match *statement {
                 Statement::Query(q) => self.explain(Statement::Query(q.clone()), analyze).await,
                 _ => Err(CubeError::user(format!(
@@ -1152,7 +1243,7 @@ impl SqlService for SqlServiceImpl {
                 let logical_plan = self
                     .query_planner
                     .logical_plan(
-                        DFStatement::Statement(Statement::Query(q)),
+                        DFStatement::Statement(Box::new(Statement::Query(q))),
                         &context.inline_tables,
                         None,
                     )
@@ -1160,18 +1251,20 @@ impl SqlService for SqlServiceImpl {
                 match logical_plan {
                     QueryPlan::Select(router_plan, _) => {
                         // For tests, pretend we have all partitions on the same worker.
-                        let worker_plan = router_plan.with_partition_id_to_execute(
-                            router_plan
-                                .index_snapshots()
-                                .iter()
-                                .flat_map(|i| {
-                                    i.partitions
-                                        .iter()
-                                        .map(|p| (p.partition.get_id(), RowFilter::default()))
-                                })
-                                .collect(),
-                            context.inline_tables.into_iter().map(|i| i.id).collect(),
-                        );
+                        let worker_plan: PreSerializedPlan = router_plan
+                            .with_partition_id_to_execute(
+                                router_plan
+                                    .index_snapshots()
+                                    .iter()
+                                    .flat_map(|i| {
+                                        i.partitions
+                                            .iter()
+                                            .map(|p| (p.partition.get_id(), RowFilter::default()))
+                                    })
+                                    .collect(),
+                                context.inline_tables.into_iter().map(|i| i.id).collect(),
+                            )?;
+                        let worker_plan: SerializedPlan = worker_plan.to_serialized_plan()?;
                         let mut mocked_names = HashMap::new();
                         for (_, f, _, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(f.clone()).await?;
@@ -1182,15 +1275,27 @@ impl SqlService for SqlServiceImpl {
                             .into_iter()
                             .map(|(c, _, _)| (c.get_id(), Vec::new()))
                             .collect();
+                        let (router_plan, _) = self
+                            .query_executor
+                            .router_plan(router_plan.to_serialized_plan()?, self.cluster.clone())
+                            .await?;
+                        let worker_planning_params =
+                            if let Some(p) = find_topmost_cluster_send_exec(&router_plan) {
+                                p.worker_planning_params()
+                            } else {
+                                WorkerPlanningParams::no_worker()
+                            };
                         return Ok(QueryPlans {
-                            router: self
-                                .query_executor
-                                .router_plan(router_plan, self.cluster.clone())
-                                .await?
-                                .0,
+                            router: router_plan,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches, None)
+                                .worker_plan(
+                                    worker_plan,
+                                    worker_planning_params,
+                                    mocked_names,
+                                    chunk_ids_to_batches,
+                                    None,
+                                )
                                 .await?
                                 .0,
                         });
@@ -1336,7 +1441,7 @@ fn extract_data<'a>(
                 .downcast_mut::<StringBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
@@ -1347,12 +1452,12 @@ fn extract_data<'a>(
                     cell
                 )));
             };
-            builder.append_value(val)?;
+            builder.append_value(val);
         }
         ColumnType::Int => {
             let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val_int = match cell {
@@ -1377,12 +1482,16 @@ fn extract_data<'a>(
                     cell, e
                 )));
             }
-            builder.append_value(val_int.unwrap())?;
+            builder.append_value(val_int.unwrap());
         }
         ColumnType::Int96 => {
-            let builder = builder.as_any_mut().downcast_mut::<Int96Builder>().unwrap();
+            // TODO: Probably some duplicate code between Int96, Decimal, and Decimal96 now.
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val_int = match cell {
@@ -1415,7 +1524,7 @@ fn extract_data<'a>(
                     cell, e
                 )));
             }
-            builder.append_value(val_int.unwrap())?;
+            builder.append_value(val_int.unwrap());
         }
         t @ ColumnType::Decimal { .. } => {
             let scale = u8::try_from(t.target_scale()).unwrap();
@@ -1424,44 +1533,11 @@ fn extract_data<'a>(
                 true => None,
             };
             let d = d.map(|d| d.raw_value());
-            match scale {
-                0 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal0Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                1 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal1Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                2 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal2Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                3 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal3Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                4 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal4Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                5 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal5Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                10 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal10Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                n => panic!("unhandled target scale: {}", n),
-            }
+            builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .unwrap()
+                .append_option(d)
         }
         t @ ColumnType::Decimal96 { .. } => {
             let scale = u8::try_from(t.target_scale()).unwrap();
@@ -1470,44 +1546,11 @@ fn extract_data<'a>(
                 true => None,
             };
             let d = d.map(|d| d.raw_value());
-            match scale {
-                0 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal0Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                1 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal1Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                2 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal2Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                3 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal3Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                4 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal4Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                5 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal5Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                10 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal10Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                n => panic!("unhandled target scale: {}", n),
-            }
+            builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .unwrap()
+                .append_option(d)
         }
         ColumnType::Bytes => {
             let builder = builder
@@ -1515,7 +1558,7 @@ fn extract_data<'a>(
                 .downcast_mut::<BinaryBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val;
@@ -1524,7 +1567,7 @@ fn extract_data<'a>(
             } else {
                 return Err(CubeError::user("Corrupted data in query.".to_string()));
             };
-            builder.append_value(val)?;
+            builder.append_value(val);
         }
         &ColumnType::HyperLogLog(f) => {
             let builder = builder
@@ -1532,7 +1575,7 @@ fn extract_data<'a>(
                 .downcast_mut::<BinaryBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val;
@@ -1545,7 +1588,7 @@ fn extract_data<'a>(
                 .as_any_mut()
                 .downcast_mut::<BinaryBuilder>()
                 .unwrap()
-                .append_value(val)?;
+                .append_value(val);
         }
         ColumnType::Timestamp => {
             let builder = builder
@@ -1553,12 +1596,12 @@ fn extract_data<'a>(
                 .downcast_mut::<TimestampMicrosecondBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             match cell {
                 Expr::Value(Value::SingleQuotedString(v)) => {
-                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000)?;
+                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000);
                 }
                 x => {
                     return Err(CubeError::user(format!(
@@ -1574,7 +1617,7 @@ fn extract_data<'a>(
                 .downcast_mut::<BooleanBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let v = match cell {
@@ -1587,7 +1630,7 @@ fn extract_data<'a>(
                     )))
                 }
             };
-            builder.append_value(v)?;
+            builder.append_value(v);
         }
         ColumnType::Float => {
             let builder = builder
@@ -1595,11 +1638,11 @@ fn extract_data<'a>(
                 .downcast_mut::<Float64Builder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let v = parse_float(cell)?;
-            builder.append_value(v)?;
+            builder.append_value(v);
         }
     }
     Ok(())
@@ -1612,7 +1655,7 @@ pub fn timestamp_from_string(v: &str) -> Result<TimestampValue, CubeError> {
         #[rustfmt::skip] // built from "%Y-%m-%d %H:%M:%S%.3f UTC".
         const FORMAT: [chrono::format::Item; 14] = [Numeric(Year, Zero), Literal("-"), Numeric(Month, Zero), Literal("-"), Numeric(Day, Zero), Space(" "), Numeric(Hour, Zero), Literal(":"), Numeric(Minute, Zero), Literal(":"), Numeric(Second, Zero), Fixed(Nanosecond3), Space(" "), Literal("UTC")];
         match parse_time(v, &FORMAT).and_then(|p| p.to_datetime_with_timezone(&Utc)) {
-            Ok(ts) => nanos = ts.timestamp_nanos(),
+            Ok(ts) => nanos = timestamp_nanos_or_panic(&ts),
             Err(_) => return Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
         }
     } else {
@@ -1652,8 +1695,16 @@ fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr: box Expr::Value(Value::Number(v, _)),
-        } => Ok(crate::import::parse_decimal(v, scale)?.negate()),
+            expr,
+        } => match expr.as_ref() {
+            Expr::Value(Value::Number(v, _)) => {
+                Ok(crate::import::parse_decimal(v, scale)?.negate())
+            }
+            _ => Err(CubeError::user(format!(
+                "Can't parse decimal from, {:?}",
+                cell
+            ))),
+        },
         _ => Err(CubeError::user(format!(
             "Can't parse decimal from, {:?}",
             cell
@@ -1667,8 +1718,16 @@ fn parse_decimal_96(cell: &Expr, scale: u8) -> Result<Decimal96, CubeError> {
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr: box Expr::Value(Value::Number(v, _)),
-        } => Ok(crate::import::parse_decimal_96(v, scale)?.negate()),
+            expr,
+        } => match expr.as_ref() {
+            Expr::Value(Value::Number(v, _)) => {
+                Ok(crate::import::parse_decimal_96(v, scale)?.negate())
+            }
+            _ => Err(CubeError::user(format!(
+                "Can't parse decimal from, {:?}",
+                cell
+            ))),
+        },
         _ => Err(CubeError::user(format!(
             "Can't parse decimal from, {:?}",
             cell
@@ -1689,7 +1748,6 @@ mod tests {
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use async_compression::tokio::write::GzipEncoder;
     use cuberockstore::rocksdb::{Options, DB};
-    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
@@ -1700,7 +1758,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::cluster::MockCluster;
-    use crate::config::{Config, FileStoreProvider};
+    use crate::config::{Config, CubeServices, FileStoreProvider};
     use crate::import::MockImportService;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStore, RowKey, TableId};
     use crate::queryplanner::query_executor::MockQueryExecutor;
@@ -1711,12 +1769,12 @@ mod tests {
     use super::*;
     use crate::cachestore::RocksCacheStore;
     use crate::cluster::rate_limiter::BasicProcessRateLimiter;
+    use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use crate::table::TableValue;
-    use crate::util::int96::Int96;
     use regex::Regex;
 
     #[tokio::test]
@@ -1860,7 +1918,7 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+            let i = service.exec_query("CREATE SCHEMA `Foo`").await.unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -1868,12 +1926,12 @@ mod tests {
                     TableValue::String("Foo".to_string())
                 ])
             );
-            let query = "CREATE TABLE Foo.Persons (
-                                PersonID int,
-                                LastName varchar(255),
-                                FirstName varchar(255),
-                                Address varchar(255),
-                                City varchar(255)
+            let query = "CREATE TABLE `Foo`.`Persons` (
+                                `PersonID` int,
+                                `LastName` varchar(255),
+                                `FirstName` varchar(255),
+                                `Address` varchar(255),
+                                `City` varchar(255)
                               );";
             let i = service.exec_query(&query.to_string()).await.unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![
@@ -1970,7 +2028,7 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+            let i = service.exec_query("CREATE SCHEMA `Foo`").await.unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -1978,13 +2036,13 @@ mod tests {
                     TableValue::String("Foo".to_string())
                 ])
             );
-            let query = "CREATE TABLE Foo.Persons (
-                                PersonID int,
-                                LastName varchar(255),
-                                FirstName varchar(255),
-                                Address varchar(255),
-                                City varchar(255)
-                              ) WITH (seal_at='2022-10-05T01:00:00.000Z', select_statement='SELECT * FROM test WHERE created_at > \\'2022-05-01 00:00:00\\'');";
+            let query = "CREATE TABLE `Foo`.`Persons` (
+                                `PersonID` int,
+                                `LastName` varchar(255),
+                                `FirstName` varchar(255),
+                                `Address` varchar(255),
+                                `City` varchar(255)
+                              ) WITH (seal_at='2022-10-05T01:00:00.000Z', select_statement='SELECT * FROM test WHERE created_at > ''2022-05-01 00:00:00''');";
             let i = service.exec_query(&query.to_string()).await.unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![
                 TableValue::Int(1),
@@ -2187,33 +2245,36 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Float(5.892.into())]));
+            // For this test's purposes there is no a priori reason to expect (precision, scale) =
+            // (32, 6) -- DF decided that on its own initiative.
+            const EXPECTED_SCALE: i8 = 6;
+            assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Decimal(Decimal::new(5892 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Float(0.45.into())]));
+            assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Decimal(Decimal::new(450 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
 
             let result = service
-                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < decimal '10'")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Float(0.45.into())]));
+            assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Decimal(Decimal::new(450 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
         })
             .await;
     }
 
-    #[tokio::test]
-    async fn int96() {
-        Config::test("int96").update_config(|mut c| {
-            c.partition_split_threshold = 2;
-            c
-        }).start_test(async move |services| {
-            let service = services.sql_service;
+    /// Runs int96 test with write operations, or runs read-only on an existing store.
+    async fn int96_helper(services: CubeServices, perform_writes: bool) {
+        let service = services.sql_service;
 
+        if perform_writes {
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             let _ = service
@@ -2225,59 +2286,157 @@ mod tests {
                 .exec_query("INSERT INTO foo.values (id, value) VALUES (1, 10000000000000000000000), (2, 20000000000000000000000), (3, 10000000000000220000000), (4, 12000000000000000000024), (5, 123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Int96(Int96::new(10000000000000000000000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Int96(Int96::new(20000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Int96(Int96::new(10000000000000220000000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Int96(Int96::new(12000000000000000000024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Int96(Int96::new(123))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000000024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT sum(value) from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT sum(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(52000000000000220000147))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Decimal(Decimal::new(
+                52000000000000220000147
+            ))])
+        );
 
-            let result = service
-                .exec_query("SELECT max(value), min(value) from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT max(value), min(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(20000000000000000000000)), TableValue::Int96(Int96::new(123))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(20000000000000000000000)),
+                TableValue::Decimal(Decimal::new(123))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT value + 103, value + value, value = 12000000000000000000024 from foo.values where value = 12000000000000000000024")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value + 103, value + value, value = CAST('12000000000000000000024' AS DECIMAL(38, 0)) from foo.values where value = CAST('12000000000000000000024' AS DECIMAL(38, 0))")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(12000000000000000000127)),
-            TableValue::Int96(Int96::new(2 * 12000000000000000000024)), TableValue::Boolean(true)]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(12000000000000000000127)),
+                TableValue::Decimal(Decimal::new(2 * 12000000000000000000024)),
+                TableValue::Boolean(true)
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT value / 2, value * 2 from foo.values where value > 12000000000000000000024")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query(
+                "SELECT value / 2, value * 2 from foo.values where value > 12000000000000000000024",
+            )
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(10000000000000000000000)),
-            TableValue::Int96(Int96::new(40000000000000000000000))]));
+        // This value 4 just describes DataFusion behavior with Decimal.
+        const EXPECTED_SCALE: i8 = 4;
+        assert!(matches!(
+            result.get_schema().field(0).data_type(),
+            datafusion::arrow::datatypes::DataType::Decimal128(38, EXPECTED_SCALE)
+        ));
+        assert!(matches!(
+            result.get_schema().field(1).data_type(),
+            datafusion::arrow::datatypes::DataType::Decimal128(38, 0)
+        ));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(
+                    10000000000000000000000 * 10i128.pow(EXPECTED_SCALE as u32)
+                )),
+                TableValue::Decimal(Decimal::new(40000000000000000000000))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT * from foo.values order by value")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values order by value")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5), TableValue::Int96(Int96::new(123))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(1), TableValue::Int96(Int96::new(10000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Int96(Int96::new(10000000000000220000000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Int96(Int96::new(12000000000000000000024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(2), TableValue::Int96(Int96::new(20000000000000000000000))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000000024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000))
+            ])
+        );
 
+        if perform_writes {
             let _ = service
                 .exec_query("CREATE TABLE foo.values2 (id int, value int96)")
                 .await
@@ -2287,16 +2446,36 @@ mod tests {
                 .exec_query("INSERT INTO foo.values2 (id, value) VALUES (1, 10000000000000000000000), (2, 20000000000000000000000), (3, 10000000000000000000000), (4, 20000000000000000000000), (5, 123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(123)), TableValue::Int(1)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int96(Int96::new(10000000000000000000000)), TableValue::Int(2)]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int96(Int96::new(20000000000000000000000)), TableValue::Int(2)]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(123)),
+                TableValue::Int(1)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(10000000000000000000000)),
+                TableValue::Int(2)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(20000000000000000000000)),
+                TableValue::Int(2)
+            ])
+        );
 
+        if perform_writes {
             let _ = service
                 .exec_query("CREATE TABLE foo.values3 (id int, value int96)")
                 .await
@@ -2306,30 +2485,83 @@ mod tests {
                 .exec_query("INSERT INTO foo.values3 (id, value) VALUES (1, -10000000000000000000000), (2, -20000000000000000000000), (3, -10000000000000220000000), (4, -12000000000000000000024), (5, -123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values3")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values3")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Int96(Int96::new(-10000000000000000000000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Int96(Int96::new(-20000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Int96(Int96::new(-10000000000000220000000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Int96(Int96::new(-12000000000000000000024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Int96(Int96::new(-123))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(-10000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(-20000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(-10000000000000220000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(-12000000000000000000024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(-123))
+            ])
+        );
+    }
 
-        })
+    #[tokio::test]
+    async fn int96() {
+        Config::test("int96")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_test(async move |services| int96_helper(services, true).await)
             .await;
     }
 
     #[tokio::test]
-    async fn decimal96() {
-        Config::test("decimal96").update_config(|mut c| {
-            c.partition_split_threshold = 2;
-            c
-        }).start_test(async move |services| {
-            let service = services.sql_service;
+    async fn int96_read() {
+        // Copy pre-DF store.
+        let fixtures_path = env::current_dir()
+            .unwrap()
+            .join("testing-fixtures")
+            .join("int96_read");
+        crate::util::copy_dir_all(&fixtures_path, ".").unwrap();
 
+        Config::test("int96_read")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_migration_test(async move |services| int96_helper(services, false).await)
+            .await;
+    }
+
+    async fn decimal96_helper(services: CubeServices, perform_writes: bool) {
+        let service: Arc<dyn SqlService> = services.sql_service;
+
+        if perform_writes {
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             let _ = service
@@ -2341,62 +2573,169 @@ mod tests {
                 .exec_query("INSERT INTO foo.values (id, value) VALUES (1, 100000000000000000000.10), (2, 200000000000000000000), (3, 100000000000002200000.01), (4, 120000000000000000.10024), (5, 1.23)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Decimal96(Decimal96::new(10000000000000000000010000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Decimal96(Decimal96::new(20000000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Decimal96(Decimal96::new(10000000000000220000001000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Decimal96(Decimal96::new(12000000000000000010024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Decimal96(Decimal96::new(123000))]));
+        assert_eq!(
+            result.get_schema().field(1).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(27, 5)
+        );
 
-            let result = service
-                .exec_query("SELECT sum(value) from foo.values")
-                .await
-                .unwrap();
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000010000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000001000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000010024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123000))
+            ])
+        );
 
+        let result = service
+            .exec_query("SELECT sum(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(40012000000000220000144024))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Decimal(Decimal::new(
+                40012000000000220000144024
+            ))])
+        );
 
-            let result = service
-                .exec_query("SELECT max(value), min(value) from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT max(value), min(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(20000000000000000000000000)), TableValue::Decimal96(Decimal96::new(123000))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(20000000000000000000000000)),
+                TableValue::Decimal(Decimal::new(123000))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT value + 10.103, value + value from foo.values where id = 4")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value + CAST('10.103' AS DECIMAL(27, 5)), value + value from foo.values where id = 4")
+            .await
+            .unwrap();
 
+        // 27, 5 comes from Cube's convert_columns_type.  Precision = 28 here comes from DataFusion behavior.
+        assert_eq!(
+            result.get_schema().field(0).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(28, 5)
+        );
+        assert_eq!(
+            result.get_schema().field(1).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(28, 5)
+        );
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(12000000000000001020324)),
+                TableValue::Decimal(Decimal::new(2 * 12000000000000000010024))
+            ])
+        );
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(12000000000000001020324)),
-            TableValue::Decimal96(Decimal96::new(2 * 12000000000000000010024))]));
+        let result = service
+            .exec_query(
+                "SELECT value / 2, value * 2 from foo.values where value > 100000000000002200000",
+            )
+            .await
+            .unwrap();
 
-           let result = service
-                .exec_query("SELECT value / 2, value * 2 from foo.values where value > 100000000000002200000")
-                .await
-                .unwrap();
+        // 31, 9, and 38, 5 simply describes the DF behavior we see (starting from value being a
+        // decimal(27, 5)).  Prior to DF upgrade, this returned a Float.
+        assert_eq!(
+            result.get_schema().field(0).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(31, 9)
+        );
+        assert_eq!(
+            result.get_schema().field(1).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(38, 5)
+        );
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(100000000000000000000000000000)),
+                TableValue::Decimal(Decimal::new(40000000000000000000000000))
+            ])
+        );
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Float(1.0000000000000002e20.into()),
-            TableValue::Float(4.0000000000000007e20.into())]));
+        let result = service
+            .exec_query("SELECT * from foo.values order by value")
+            .await
+            .unwrap();
 
-           let result = service
-                .exec_query("SELECT * from foo.values order by value")
-                .await
-                .unwrap();
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000010024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000010000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000001000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000000))
+            ])
+        );
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5), TableValue::Decimal96(Decimal96::new(123000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(4), TableValue::Decimal96(Decimal96::new(12000000000000000010024))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(1), TableValue::Decimal96(Decimal96::new(10000000000000000000010000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(3), TableValue::Decimal96(Decimal96::new(10000000000000220000001000))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(2), TableValue::Decimal96(Decimal96::new(20000000000000000000000000))]));
-
-              let _ = service
+        if perform_writes {
+            let _ = service
                 .exec_query("CREATE TABLE foo.values2 (id int, value decimal(27, 2))")
                 .await
                 .unwrap();
@@ -2405,17 +2744,36 @@ mod tests {
                 .exec_query("INSERT INTO foo.values2 (id, value) VALUES (1, 100000000000000000000.10), (2, 20000000000000000000000.1), (3, 100000000000000000000.10), (4, 20000000000000000000000.1), (5, 123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(12300)), TableValue::Int(1)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal96(Decimal96::new(10000000000000000000010)), TableValue::Int(2)]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Decimal96(Decimal96::new(2000000000000000000000010)), TableValue::Int(2)]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(12300)),
+                TableValue::Int(1)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(10000000000000000000010)),
+                TableValue::Int(2)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(2000000000000000000000010)),
+                TableValue::Int(2)
+            ])
+        );
 
-
+        if perform_writes {
             let _ = service
                 .exec_query("CREATE TABLE foo.values3 (id int, value decimal96)")
                 .await
@@ -2425,19 +2783,76 @@ mod tests {
                 .exec_query("INSERT INTO foo.values3 (id, value) VALUES (1, -100000000000000000000.10), (2, -200000000000000000000), (3, -100000000000002200000.01), (4, -120000000000000000.10024), (5, -1.23)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values3")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values3")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Decimal96(Decimal96::new(-10000000000000000000010000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Decimal96(Decimal96::new(-20000000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Decimal96(Decimal96::new(-10000000000000220000001000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Decimal96(Decimal96::new(-12000000000000000010024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Decimal96(Decimal96::new(-123000))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(-10000000000000000000010000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(-20000000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(-10000000000000220000001000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(-12000000000000000010024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(-123000))
+            ])
+        );
+    }
 
-        })
+    #[tokio::test]
+    async fn decimal96() {
+        Config::test("decimal96")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_test(async move |services| decimal96_helper(services, true).await)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn decimal96_read() {
+        // Copy pre-DF store.
+        let fixtures_path = env::current_dir()
+            .unwrap()
+            .join("testing-fixtures")
+            .join("decimal96_read");
+        crate::util::copy_dir_all(&fixtures_path, ".").unwrap();
+
+        Config::test("decimal96_read")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_migration_test(async move |services| decimal96_helper(services, false).await)
             .await;
     }
 
@@ -2458,6 +2873,7 @@ mod tests {
                 let mut bools = Vec::new();
                 for i in 0..1000 {
                     bools.push(i % (batch + 1) == 0);
+
                 }
 
                 let values = bools.into_iter().map(|b| format!("({})", b)).join(", ");
@@ -2528,17 +2944,18 @@ mod tests {
                                 \n  Projection, [sel__a, sel__b, sel__c]\
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
-                                \n        Union\
-                                \n          Filter\
-                                \n            Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -2566,20 +2983,63 @@ mod tests {
                                 \n  Projection, [sel__a, sel__b, sel__c]\
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
-                                \n        Union\
-                                \n          Filter\
-                                \n            Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
                 _ => assert!(false),
             };
+
+            // Modified from pre-DF upgrade to use foo.a.a = foo.a.b in place of 1 = 0.
+            let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
+                         select * from ( \
+                                        select * from foo.a where foo.a.a = foo.a.b \
+                                        ) \
+                             union all
+                             select * from
+                                ( \
+                                        select * from foo.a1 \
+                                        union all \
+                                        select * from foo.b1 \
+                                ) \
+                            union all
+                            select * from foo.b \
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+            match &result.get_rows()[0].values()[0] {
+                TableValue::String(s) => {
+                    assert_eq!(s,
+                                "Sort\
+                                \n  Projection, [sel__a, sel__b, sel__c]\
+                                \n    Aggregate\
+                                \n      ClusterSend, indices: [[1, 3, 4, 2]]\
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+
+                               );
+                }
+                _ => assert!(false),
+            };
+
+            // Kept from the pre-DF upgrade (with modified query above) -- the select statement with
+            // the 1 = 0 comparison now gets optimized out.  Interesting and perhaps out of scope
+            // for this test.
             let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
                          select * from ( \
                                         select * from foo.a where 1 = 0\
@@ -2600,22 +3060,21 @@ mod tests {
                                 "Sort\
                                 \n  Projection, [sel__a, sel__b, sel__c]\
                                 \n    Aggregate\
-                                \n      ClusterSend, indices: [[1, 3, 4, 2]]\
-                                \n        Union\
-                                \n          Filter\
-                                \n            Filter\
-                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
-
-                               );
+                                \n      ClusterSend, indices: [[3, 4, 2]]\
+                                \n        SubqueryAlias\
+                                \n          Projection, [foo.a.a:a, foo.a.b:b, foo.a.c:c]\
+                                \n            Union, schema: fields:[foo.a1.a, foo.a1.b, foo.a1.c], metadata:{}\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                );
                 }
                 _ => assert!(false),
             };
+
         }).await;
     }
 
@@ -2819,6 +3278,8 @@ mod tests {
                         .unwrap();
                 }
 
+                Delay::new(Duration::from_millis(10000)).await;
+
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
                     .await
@@ -2841,24 +3302,32 @@ mod tests {
 
                 println!("All partitions: {:#?}", partitions);
 
-                // TODO API to wait for all jobs to be completed and all events processed
-                Delay::new(Duration::from_millis(500)).await;
+                // Semi-busy-wait for, or, seemingly, induce, compaction for 2000 ms.
+                let num_attempts = 100;
+                for i in 0..num_attempts {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
 
-                let plans = service
-                    .plan_query("SELECT sum(num) from foo.numbers where num = 50")
-                    .await
-                    .unwrap();
+                    let plans = service
+                        .plan_query("SELECT sum(num) from foo.numbers where num = 50")
+                        .await
+                        .unwrap();
 
-                let worker_plan = pp_phys_plan(plans.worker.as_ref());
-                println!("Worker Plan: {}", worker_plan);
-                let parquet_regex = Regex::new(r"\d+-[a-z0-9]+.parquet").unwrap();
-                let matches = parquet_regex.captures_iter(&worker_plan).count();
-                assert!(
-                    // TODO 2 because partition pruning doesn't respect half open intervals yet
-                    matches < 3 && matches > 0,
-                    "{}\nshould have 2 and less partition scan nodes",
-                    worker_plan
-                );
+                    let worker_plan = pp_phys_plan(plans.worker.as_ref());
+                    let parquet_regex = Regex::new(r"\d+-[a-z0-9]+\.parquet").unwrap();
+                    let matches = parquet_regex.captures_iter(&worker_plan).count();
+                    let chunk_parquet_regex = Regex::new(r"\d+-[a-z0-9]+\.chunk\.parquet").unwrap();
+                    let chunk_matches = chunk_parquet_regex.captures_iter(&worker_plan).count();
+                    if matches < 3 && matches > 0 && chunk_matches == 0 {
+                        break;
+                    } else if i == num_attempts - 1 {
+                        panic!(
+                            "{}\nshould have 2 and less partition scan nodes, matches = {}, chunk_matches = {}",
+                            worker_plan,
+                            matches,
+                            chunk_matches,
+                        );
+                    }
+                }
             })
             .await;
     }
@@ -2898,19 +3367,20 @@ mod tests {
                     .unwrap();
                 let plan_regexp = Regex::new(r"ParquetScan.*\.parquet").unwrap();
 
-                let expected = "Projection, [SUM(foo.numbers.num)@0:SUM(num)]\
-                \n  FinalHashAggregate\
+                let expected = "LinearFinalAggregate\
+                \n  CoalescePartitions\
                 \n    Worker\
-                \n      PartialHashAggregate\
-                \n        Filter\
-                \n          MergeSort\
-                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
-                \n              FilterByKeyRange\
-                \n                CheckMemoryExec\
-                \n                  ParquetScan\
-                \n              FilterByKeyRange\
-                \n                CheckMemoryExec\
-                \n                  ParquetScan";
+                \n      CoalescePartitions\
+                \n        LinearPartialAggregate\
+                \n          Filter\
+                \n            MergeSort\
+                \n              Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n                FilterByKeyRange\
+                \n                  CheckMemoryExec\
+                \n                    ParquetScan\
+                \n                FilterByKeyRange\
+                \n                  CheckMemoryExec\
+                \n                    ParquetScan";
                 let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
                 let p = plan_regexp.replace_all(&plan, "ParquetScan");
                 println!("pp {}", p);
@@ -3880,9 +4350,9 @@ mod tests {
             };
             assert_eq!(
                 pp_plan,
-                "Projection, [information_schema.tables.table_name]\
+                "Projection, [information_schema.tables.table_name:table_name]\
                 \n  Filter\
-                \n    Scan information_schema.tables, source: InfoSchemaTableProvider, fields: [table_schema, table_name]"
+                \n    Scan information_schema.tables, source: InfoSchemaTableProvider(table: Tables), fields: [table_schema, table_name]"
             );
         }).await;
     }
@@ -3913,9 +4383,9 @@ mod tests {
                 };
             assert_eq!(
                 pp_plan,
-                "Projection, [foo.orders.platform, SUM(foo.orders.amount)]\
-                \n  Aggregate\
-                \n    ClusterSend, indices: [[1]]\
+                "Aggregate\
+                \n  ClusterSend, indices: [[1]]\
+                \n    Projection, [foo.orders.platform:platform, foo.orders.amount:amount]\
                 \n      Filter\
                 \n        Scan foo.orders, source: CubeTable(index: default:1:[1]), fields: [platform, age, amount]"
             );
@@ -4004,8 +4474,8 @@ mod tests {
                         TableValue::String(pp_plan) => {
                             assert_eq!(
                                 pp_plan,
-                                "Projection, [platform, SUM(foo.orders.amount)@1:SUM(amount)]\
-                                \n  FinalHashAggregate\
+                                "LinearFinalAggregate\
+                                \n  CoalescePartitions\
                                 \n    ClusterSend, partitions: [[1]]"
                             );
                         },
@@ -4026,11 +4496,12 @@ mod tests {
                 match &worker_row
                     .values()[2] {
                         TableValue::String(pp_plan) => {
+                            // CoalesceBatches is disabled; if reenabled, it is expected above Filter.
                             let regex = Regex::new(
-                                r"PartialHas+hAggregate\s+Filter\s+Merge\s+Scan, index: default:1:\[1\], fields+: \[platform, age, amount\]\s+ParquetScan, files+: .*\.chunk\.parquet"
+                                r"LinearPartialAggregate\s+Filter\s+Scan, index: default:1:\[1\], fields: \[platform, age, amount\]\s+ParquetScan, files: \S*\.chunk\.parquet"
                             ).unwrap();
                             let matches = regex.captures_iter(&pp_plan).count();
-                            assert_eq!(matches, 1);
+                            assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
                         },
                         _ => {assert!(false);}
                     };
@@ -4167,7 +4638,7 @@ mod tests {
                 .unwrap();
 
             let _ = service
-                .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= ''2022-01-01'' AND time < ''2022-02-01''') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .unwrap();
 
@@ -4211,7 +4682,7 @@ mod tests {
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
-                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                select_statement = 'SELECT a as a, b + c as b FROM `EVENTS_BY_TYPE` WHERE c > 10',\
                 source_table = 'CREATE TABLE events1 (a int, b int, c int)'
                             ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
                 .await
@@ -4390,6 +4861,96 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
+            })
+            .await;
+
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+    }
+
+    #[tokio::test]
+    async fn ungroupped_with_order_and_limit() {
+        Config::test("ungroupped_with_order_and_limit")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query(
+                        "CREATE TABLE test.topk_test (id int, name varchar, total_sales int)",
+                    )
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.topk_test (id, name, total_sales) VALUES
+                        (121, 'Octavia', 58600),
+                        (122, 'Parker', 15800),
+                        (123, 'Quintessa', 79500),
+                        (124, 'Reginald', 32100),
+                        (125, 'Scarlett', 6900),
+                        (126, 'Tristan', 91700),
+                        (127, 'Unity', 48900),
+                        (128, 'Valentina', 25300),
+                        (129, 'Winston', 67200),
+                        (130, 'Xiomara', 39800),
+                        (131, 'Yesenia', 12100),
+                        (132, 'Zephyr', 84300),
+                        (133, 'Alessandra', 55900),
+                        (134, 'Brendan', 20600),
+                        (135, 'Cordelia', 76400),
+                        (136, 'Darius', 43700),
+                        (137, 'Emilia', 8600),
+                        (138, 'Fletcher', 65800),
+                        (139, 'Guadalupe', 36200),
+                        (140, 'Hendrix', 97100),
+                        (141, 'Imogen', 29000),
+                        (142, 'Jameson', 72300),
+                        (143, 'Kalani', 45500),
+                        (144, 'Lennox', 17200),
+                        (145, 'Magnolia', 88600),
+                        (146, 'Nathaniel', 51800),
+                        (147, 'Orion', 23900),
+                        (148, 'Penelope', 69700),
+                        (149, 'Quincey', 40400),
+                        (150, 'Remington', 10400),
+                        (151, 'Seraphina', 81200),
+                        (152, 'Thaddeus', 54100),
+                        (153, 'Ulysses', 27400),
+                        (154, 'Vivienne', 92900),
+                        (155, 'Weston', 47200),
+                        (156, 'Ximena', 18900),
+                        (157, 'Yannick', 75800),
+                        (158, 'Zinnia', 34400),
+                        (159, 'Atticus', 62700),
+                        (160, 'Beatrix', 49800)",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT name, total_sales FROM test.topk_test  ORDER BY 1 ASC limit 3",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    res.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("Alessandra".to_string()),
+                            TableValue::Int(55900),
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("Atticus".to_string()),
+                            TableValue::Int(62700),
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("Beatrix".to_string()),
+                            TableValue::Int(49800),
+                        ]),
+                    ]
+                );
             })
             .await;
 

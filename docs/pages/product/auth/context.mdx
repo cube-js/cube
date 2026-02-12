@@ -248,6 +248,34 @@ To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
 `scheduledRefreshContexts` in your `cube.js` configuration
 file][ref-config-sched-refresh].
 
+### Usage for member-level security
+
+You can also use `COMPILE_CONTEXT` to control whether a data model entity should be
+public or private [dynamically][ref-dynamic-data-modeling].
+
+In the example below, the `customers` view would only be visible to a subset
+of [tenants][ref-multitenancy] that have the `team` property set to `marketing`
+in the security context: 
+
+```yml filename="model/views/customers.yml"
+views:
+  - name: customers
+    public: "{{ is_accessible_by_team('marketing', COMPILE_CONTEXT) }}"
+```
+
+```python filename="model/globals.py"
+from cube import TemplateContext
+
+template = TemplateContext()
+
+@template.function('is_accessible_by_team')
+def is_accessible_by_team(team: str, ctx: dict) -> bool:
+  return team == ctx['securityContext'].setdefault('team', 'default')
+```
+
+If you'd like to keep a data model entity public but prevent access to it
+anyway, you can use the [`query_rewrite` configuration option][ref-query-rewrite] for that.
+
 ## Testing during development
 
 During development, it is often useful to be able to edit the security context
@@ -280,6 +308,227 @@ Authentication integration is available in Cube Cloud on [all product tiers](htt
 You can enable the authentication integration by navigating to the <Btn>Settings → Configuration</Btn>
 of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</Btn> toggle.
 
+## Common patterns
+
+### Enforcing mandatory filters
+
+You can use `query_rewrite` to enforce mandatory filters that apply to all queries. This is useful when you need to ensure certain conditions are always met, such as filtering data by date range or restricting access to specific data subsets.
+
+For example, if you want to only show orders created after a specific date across all queries, you can add a mandatory filter:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  query['filters'].append({
+    'member': 'orders.created_at',
+    'operator': 'afterDate',
+    'values': ['2019-12-30']
+  })
+  return query
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query) => {
+    query.filters.push({
+      member: `orders.created_at`,
+      operator: "afterDate",
+      values: ["2019-12-30"]
+    })
+
+    return query
+  }
+}
+```
+
+</CodeTabs>
+
+This filter will be automatically applied to all queries, ensuring that only orders created after December 30th, 2019 are returned, regardless of any other filters specified in the query.
+
+### Enforcing role-based access
+
+You can use `query_rewrite` to enforce role-based access control by filtering data based on the user's role from the security context.
+
+For example, to restrict access so that users with the `operator` role can only view processing orders, while users with the `manager` role can only view shipped and completed orders:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  if not ctx['securityContext'].get('role'):
+    raise ValueError("No role found in Security Context!")
+
+  role = ctx['securityContext']['role']
+  
+  if role == "manager":
+    query['filters'].append({
+      'member': 'orders.status',
+      'operator': 'equals',
+      'values': ['shipped', 'completed']
+    })
+  elif role == "operator":
+    query['filters'].append({
+      'member': 'orders.status',
+      'operator': 'equals',
+      'values': ['processing']
+    })
+
+  return query
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    if (!securityContext.role) {
+      throw new Error("No role found in Security Context!")
+    }
+
+    if (securityContext.role == "manager") {
+      query.filters.push({
+        member: "orders.status",
+        operator: "equals",
+        values: ["shipped", "completed"]
+      })
+    }
+
+    if (securityContext.role == "operator") {
+      query.filters.push({
+        member: "orders.status",
+        operator: "equals",
+        values: ["processing"]
+      })
+    }
+
+    return query
+  }
+}
+```
+
+</CodeTabs>
+
+### Enforcing column-based access
+
+You can use `query_rewrite` to enforce column-based access control by filtering data based on relationships and user attributes from the security context.
+
+For example, to restrict suppliers to only see their own products based on their email:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  cube_names = [
+    *(query.get('dimensions', [])),
+    *(query.get('measures', []))
+  ]
+  cube_names = [e.split(".")[0] for e in cube_names]
+
+  if "products" in cube_names:
+    email = ctx['securityContext'].get('email')
+    if not email:
+      raise ValueError("No email found in Security Context!")
+
+    query['filters'].append({
+      'member': 'suppliers.email',
+      'operator': 'equals',
+      'values': [email]
+    })
+
+  return query
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    const cubeNames = [
+      ...(query.dimensions || []),
+      ...(query.measures || [])
+    ].map((e) => e.split(".")[0])
+
+    if (cubeNames.includes("products")) {
+      if (!securityContext.email) {
+        throw new Error("No email found in Security Context!")
+      }
+
+      query.filters.push({
+        member: `suppliers.email`,
+        operator: "equals",
+        values: [securityContext.email]
+      })
+    }
+
+    return query
+  }
+}
+```
+
+</CodeTabs>
+
+### Controlling access to cubes and views
+
+You can use `extend_context` and `COMPILE_CONTEXT` to control access to cubes and views based on user properties from the security context.
+
+For example, to make a view accessible only to users with a `department` claim set to `finance`:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('extend_context')
+def extend_context(ctx: dict) -> dict:
+  return {
+    'securityContext': {
+      **ctx['securityContext'],
+      'isFinance': ctx['securityContext'].get('department') == 'finance'
+    }
+  }
+```
+
+```javascript
+module.exports = {
+  extendContext: ({ securityContext }) => {
+    return {
+      securityContext: {
+        ...securityContext,
+        isFinance: securityContext.department === "finance"
+      }
+    }
+  }
+}
+```
+
+</CodeTabs>
+
+Then in your data model, use `COMPILE_CONTEXT` to control visibility:
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: total_revenue_per_customer
+    public: {{ COMPILE_CONTEXT['securityContext']['isFinance'] }}
+    # ...
+```
+
+```javascript
+view(`total_revenue_per_customer`, {
+  public: COMPILE_CONTEXT.securityContext.isFinance,
+  // ...
+})
+```
+
+</CodeTabs>
+
 
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
@@ -294,3 +543,5 @@ of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</
 [ref-auth-integration]: /product/auth#authentication-integration
 [ref-ldap-integration]: /product/workspace/sso#ldap-integration
 [ref-extend-context]: /product/configuration/reference/config#extend_context
+[ref-dynamic-data-modeling]: /product/data-modeling/dynamic
+[ref-multitenancy]: /product/configuration/multitenancy

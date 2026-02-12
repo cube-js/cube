@@ -5,11 +5,15 @@ import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
   CubeSymbols,
+  Folder,
+  FolderInclude,
+  FolderMember,
   HierarchyDefinition,
   JoinDefinition,
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
-  type ToString
+  type ToString,
+  ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
@@ -35,6 +39,9 @@ export type DimensionDefinition = {
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
+  order?: 'asc' | 'desc';
+  key?: (...args: any[]) => ToString;
+  keyReference?: string;
 };
 
 export type TimeShiftDefinition = {
@@ -100,7 +107,7 @@ export type PreAggregationReferences = {
 export type PreAggregationInfo = {
   id: string,
   preAggregationName: string,
-  preAggregation: unknown,
+  preAggregation: any,
   cube: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
@@ -118,12 +125,13 @@ export type EvaluatedHierarchy = {
 
 export type EvaluatedFolder = {
   name: string;
-  includes: (EvaluatedFolder | DimensionDefinition | MeasureDefinition)[];
+  includes: (EvaluatedFolder | ViewIncludedMember)[];
   type: 'folder';
   [key: string]: any;
 };
 
 export type EvaluatedCube = {
+  name: string;
   measures: Record<string, MeasureDefinition>;
   dimensions: Record<string, DimensionDefinition>;
   segments: Record<string, SegmentDefinition>;
@@ -136,6 +144,8 @@ export type EvaluatedCube = {
   sql?: (...args: any[]) => string;
   sqlTable?: (...args: any[]) => string;
   accessPolicy?: AccessPolicyDefinition[];
+  isView?: boolean;
+  includedMembers?: ViewIncludedMember[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -260,18 +270,62 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  private prepareFolders(cube: any, errorReporter: ErrorReporter) {
+  private getFolderMembersFromJoinPath(cube: CubeDefinitionExtended, joinPath: () => ToString, folderName: string, errorReporter: ErrorReporter): ViewIncludedMember[] {
+    const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true });
+
+    const pathParts = fullPath.split('.');
+    const pathCubeName = pathParts[pathParts.length - 1];
+
+    if (!this.evaluatedCubes[pathCubeName]) {
+      errorReporter.error(
+        `Cube '${pathCubeName}' not found for join path '${fullPath}' in folder '${folderName}'`
+      );
+      return [];
+    }
+
+    if (this.evaluatedCubes[pathCubeName].isView) {
+      errorReporter.error(
+        `Cannot use view '${pathCubeName}' in join_path '${fullPath}' (folder '${folderName}' of '${cube.name}'). Only cubes are allowed`
+      );
+      return [];
+    }
+
+    const matchingCubeInclude = cube.rawCubes()?.find((c) => {
+      const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
+      return cubePath === fullPath;
+    });
+
+    if (!matchingCubeInclude) {
+      errorReporter.error(
+        `Join path '${fullPath}' included in folder '${folderName}' not found in view '${cube.name}' cubes definition`
+      );
+      return [];
+    }
+
+    if (cube.includedMembers) {
+      return cube.includedMembers.filter((m: ViewIncludedMember) => {
+        const memberPathParts = m.memberPath.split('.');
+        const memberCubeName = memberPathParts[0];
+
+        return memberCubeName === pathCubeName;
+      });
+    }
+
+    return [];
+  }
+
+  private prepareFolders(cube: CubeDefinitionExtended, errorReporter: ErrorReporter): void {
     const folders = cube.rawFolders();
     if (!folders.length) return;
 
-    const checkMember = (memberName: string, folderName: string) => {
+    const checkMember = (memberName: string, folderName: string): ViewIncludedMember | null => {
       if (memberName.includes('.')) {
         errorReporter.error(
           `Paths aren't allowed in the 'folders' but '${memberName}' has been provided for ${cube.name}`
         );
       }
 
-      const member = cube.includedMembers.find(m => m.name === memberName);
+      const member = cube.includedMembers?.find((m: ViewIncludedMember) => m.name === memberName);
       if (!member) {
         errorReporter.error(
           `Member '${memberName}' included in folder '${folderName}' not found`
@@ -282,31 +336,38 @@ export class CubeEvaluator extends CubeSymbols {
       return member;
     };
 
-    const processFolder = (folder: any): any => {
+    const processFolder = (folder: Folder | FolderMember): EvaluatedFolder => {
       let includedMembers: string[];
-      let includes: any[] = [];
+      let includes: (ViewIncludedMember | EvaluatedFolder | null)[] = [];
 
       if (folder.includes === '*') {
         includedMembers = this.allMembersOrList(cube, folder.includes);
         includes = includedMembers.map(m => checkMember(m, folder.name)).filter(Boolean);
       } else if (Array.isArray(folder.includes)) {
-        includes = folder.includes.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return processFolder(item);
+        includes = folder.includes.flatMap((item: FolderInclude | FolderMember): (ViewIncludedMember | EvaluatedFolder | null)[] => {
+          // Handle joinPath syntax
+          if (typeof item === 'object' && item !== null && 'joinPath' in item) {
+            return this.getFolderMembersFromJoinPath(cube, item.joinPath, folder.name, errorReporter);
           }
 
-          return checkMember(item, folder.name);
+          // Handle nested folders
+          if (typeof item === 'object' && item !== null && 'name' in item) {
+            return [processFolder(item as FolderMember)];
+          }
+
+          // Handle regular string member names
+          return [checkMember(item as string, folder.name)];
         });
       }
 
       return {
         ...folder,
-        type: 'folder',
-        includes: includes.filter(Boolean)
+        type: 'folder' as const,
+        includes: includes.filter((item): item is ViewIncludedMember | EvaluatedFolder => item !== null)
       };
     };
 
-    cube.folders = folders.map(processFolder);
+    (cube as unknown as EvaluatedCube).folders = folders.map(processFolder);
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {

@@ -604,7 +604,7 @@ impl SqlService for CacheStoreSqlService {
                 let logical_plan = self
                     .query_planner
                     .logical_plan(
-                        DFStatement::Statement(Statement::Query(q)),
+                        DFStatement::Statement(Box::new(Statement::Query(q))),
                         &ctx.inline_tables,
                         None,
                     )

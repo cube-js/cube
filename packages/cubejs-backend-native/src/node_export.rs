@@ -30,8 +30,11 @@ use std::sync::Arc;
 
 use cubesql::telemetry::LocalReporter;
 use cubesql::{telemetry::ReportingLogger, CubeError};
+#[cfg(feature = "async-log")]
+use log_nonblock::NonBlockingLoggerBuilder;
 use neon::prelude::*;
 use neon::result::Throw;
+#[cfg(not(feature = "async-log"))]
 use simple_logger::SimpleLogger;
 
 pub(crate) struct SQLInterface {
@@ -223,6 +226,7 @@ async fn handle_sql_query(
     stream_methods: WritableStreamMethods,
     sql_query: &str,
     cache_mode: &str,
+    timezone: Option<String>,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         Uuid::new_v4().to_string(),
@@ -250,6 +254,15 @@ async fn handle_sql_query(
                     }),
                 )
                 .await?;
+        }
+
+        {
+            let mut cm = session
+                .state
+                .query_timezone
+                .write()
+                .expect("failed to unlock session query_timezone for change");
+            *cm = timezone;
         }
 
         let cache_enum = cache_mode.parse().map_err(CubeError::user)?;
@@ -313,6 +326,13 @@ async fn handle_sql_query(
             let columns_json = serde_json::to_value(&columns)?;
             let mut schema_response = Map::new();
             schema_response.insert("schema".into(), columns_json);
+
+            if let Some(last_refresh_time) = stream_schema.metadata().get("lastRefreshTime") {
+                schema_response.insert(
+                    "lastRefreshTime".into(),
+                    serde_json::Value::String(last_refresh_time.clone()),
+                );
+            }
 
             write_jsonl_message(
                 channel.clone(),
@@ -437,6 +457,20 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     let cache_mode = cx.argument::<JsString>(4)?.value(&mut cx);
 
+    let timezone: Option<String> = match cx.argument::<JsValue>(5) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                None
+            } else {
+                match val.downcast::<JsString, _>(&mut cx) {
+                    Ok(v) => Some(v.value(&mut cx)),
+                    Err(_) => None,
+                }
+            }
+        }
+        Err(_) => None,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -485,6 +519,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             stream_methods,
             &sql_query,
             &cache_mode,
+            timezone,
         )
         .await;
 
@@ -566,7 +601,16 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let log_level_handle = options.get_value(&mut cx, "logLevel")?;
     let log_level = get_log_level_from_variable(log_level_handle, &mut cx)?;
 
-    let logger = create_logger(log_level);
+    let prod_logger_handle = options.get_value(&mut cx, "prodLogger")?;
+    let prod_logger = if prod_logger_handle.is_a::<JsBoolean, _>(&mut cx) {
+        prod_logger_handle
+            .downcast_or_throw::<JsBoolean, _>(&mut cx)?
+            .value(&mut cx)
+    } else {
+        false
+    };
+
+    let logger = create_logger(log_level, prod_logger);
     log_reroute::reroute_boxed(Box::new(logger));
 
     ReportingLogger::init(
@@ -578,19 +622,42 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub fn create_logger(log_level: log::Level) -> SimpleLogger {
-    SimpleLogger::new()
+#[cfg(not(feature = "async-log"))]
+pub fn create_logger(log_level: log::Level, _prod_logger: bool) -> Box<dyn log::Log> {
+    let logger = SimpleLogger::new()
         .with_level(log::Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
         .with_module_level("cube_xmla", log_level.to_level_filter())
         .with_module_level("cube_xmla_engine", log_level.to_level_filter())
         .with_module_level("cubejs_native", log_level.to_level_filter())
         .with_module_level("datafusion", log::Level::Warn.to_level_filter())
-        .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", log::Level::Warn.to_level_filter());
+
+    Box::new(logger)
+}
+
+#[cfg(feature = "async-log")]
+pub fn create_logger(log_level: log::Level, prod_logger: bool) -> Box<dyn log::Log> {
+    let builder = NonBlockingLoggerBuilder::new()
+        .with_level(log::Level::Error.to_level_filter())
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("cube_xmla", log_level.to_level_filter())
+        .with_module_level("cube_xmla_engine", log_level.to_level_filter())
+        .with_module_level("cubejs_native", log_level.to_level_filter())
+        .with_module_level("datafusion", log::Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", log::Level::Warn.to_level_filter());
+
+    let logger = if prod_logger {
+        builder.with_json().build().unwrap()
+    } else {
+        builder.build().unwrap()
+    };
+
+    Box::new(logger)
 }
 
 pub fn setup_local_logger(log_level: log::Level) {
-    let logger = create_logger(log_level);
+    let logger = create_logger(log_level, false);
     log_reroute::reroute_boxed(Box::new(logger));
 
     ReportingLogger::init(

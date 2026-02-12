@@ -5080,6 +5080,50 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_set_timezone() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_set_time_zone_custom",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIMEZONE TO 'Europe/Rome'".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_time_zone_default",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIMEZONE = DEFAULT".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_time_zone_local",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIME ZONE LOCAL".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
@@ -18176,6 +18220,159 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         insta::assert_snapshot!(
             "coerce_string_to_number",
             execute_query("SELECT COS('0')".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_string_agg_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT STRING_AGG(DISTINCT customer_gender, ', ') AS agg
+            FROM KibanaSampleDataEcommerce
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("STRING_AGG(DISTINCT "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_like_naming() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CASE
+                    WHEN customer_gender LIKE '%a%' THEN true
+                    ELSE false
+                END AS has_letter_a
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender IS NOT NULL
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("set".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_set_time_zone() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        context.execute_query("SET TIME ZONE 'Europe/Rome'").await?;
+
+        // Test that time zone has been successfully applied
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            timezone: Some("Europe/Rome".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        // Test that time zone is applied with SQL push down as well
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+        "#;
+        let sql = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        assert!(sql.contains("\"Europe/Rome\""));
+
+        // Test that time zone correctly resets to default
+        context.execute_query("SET TIMEZONE TO DEFAULT").await?;
+
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        };
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
         );
 
         Ok(())

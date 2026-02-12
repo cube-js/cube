@@ -75,6 +75,7 @@ yarn build  # Build for production
 3. **API Gateway**: Provides REST, GraphQL, and SQL APIs
 4. **CubeSQL**: Postgres-compatible SQL interface (Rust)
 5. **CubeStore**: Distributed OLAP storage engine (Rust)
+6. **Tesseract**: Native SQL planner (Rust) located in `/rust/cubesqlplanner` - enabled via `CUBESQL_SQL_PUSH_DOWN=true` environment variable
 
 ### Package Management
 - Uses Yarn workspaces with Lerna for package management

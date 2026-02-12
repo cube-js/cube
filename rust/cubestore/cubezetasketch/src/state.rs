@@ -61,7 +61,7 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        return State {
+        State {
             type_: DEFAULT_TYPE,
             num_values: DEFAULT_NUM_VALUES,
             encoding_version: DEFAULT_ENCODING_VERSION,
@@ -71,7 +71,7 @@ impl Default for State {
             sparse_precision: DEFAULT_SPARSE_PRECISION_OR_NUM_BUCKETS,
             data: None,
             sparse_data: None,
-        };
+        }
     }
 }
 
@@ -134,7 +134,7 @@ const DEFAULT_SPARSE_PRECISION_OR_NUM_BUCKETS: i32 = 0;
 impl State {
     // TODO: remove, change data from Option<> to Vec<>
     pub fn has_data(&self) -> bool {
-        return self.data.is_some() && !self.data.as_ref().unwrap().is_empty();
+        self.data.is_some() && !self.data.as_ref().unwrap().is_empty()
     }
 
     /// Parses a serialized HyperLogLog++ `AggregatorStateProto` and populates this object's
@@ -161,7 +161,7 @@ impl State {
             }
         }
 
-        return Ok(s);
+        Ok(s)
     }
 
     /// Parses a `HyperLogLogPlusUniqueStateProto` message. Since the message is nested within an
@@ -182,7 +182,7 @@ impl State {
                 _ => input.skip_field(wire_type)?,
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn to_byte_array(&self) -> Vec<u8> {
@@ -191,7 +191,7 @@ impl State {
         let mut output = CodedOutputStream::bytes(result.as_mut_slice());
         self.write_to(hll_size, &mut output);
         output.check_eof();
-        return result;
+        result
     }
 
     fn write_to(&self, hll_size: u32, stream: &mut CodedOutputStream) {
@@ -279,7 +279,7 @@ impl State {
         size += hll_size.len_varint();
         size += hll_size;
 
-        return (size, hll_size);
+        (size, hll_size)
     }
 
     fn get_serialized_hll_size(&self) -> u32 {
@@ -312,6 +312,22 @@ impl State {
             size += sparse_data.len() as u32;
         }
 
-        return size;
+        size
+    }
+
+    /// Allocated size not including size_of::<Self>().  Must be exact (or worst-case).
+    pub fn allocated_size(&self) -> usize {
+        fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
+            v.capacity() * size_of::<T>()
+        }
+
+        let mut sum = 0;
+        if let Some(d) = &self.data {
+            sum += vec_alloc_size(d);
+        }
+        if let Some(sd) = &self.sparse_data {
+            sum += vec_alloc_size(sd);
+        }
+        sum
     }
 }

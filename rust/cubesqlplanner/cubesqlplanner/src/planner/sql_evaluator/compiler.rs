@@ -56,10 +56,6 @@ impl Compiler {
         }
     }
 
-    pub fn base_tools(&self) -> Rc<dyn BaseTools> {
-        self.base_tools.clone()
-    }
-
     pub fn add_measure_evaluator(
         &mut self,
         measure: String,
@@ -136,6 +132,7 @@ impl Compiler {
         let call_builder = SqlCallBuilder::new(
             self,
             self.cube_evaluator.clone(),
+            self.base_tools.clone(),
             self.security_context.clone(),
         );
         let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
@@ -157,6 +154,7 @@ impl Compiler {
         factory: T,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let node = factory.build(self)?;
+        node.validate()?;
         let key = (T::symbol_name().to_string(), full_name.clone());
         if T::is_cachable() {
             self.members.insert(key, node.clone());

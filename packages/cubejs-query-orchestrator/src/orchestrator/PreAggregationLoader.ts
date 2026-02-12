@@ -1,5 +1,6 @@
 import R from 'ramda';
-import { getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import crypto from 'crypto';
+import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -33,9 +34,8 @@ type IndexesSql = { sql: [string, unknown[]], indexName: string }[];
 type QueryKey = [QueryWithParams, IndexesSql, InvalidationKeys] | [QueryWithParams, InvalidationKeys];
 
 type QueryOptions = {
-  queryKey: QueryKey;
+  queryKeyMd5: QueryKey | string;
   newVersionEntry: VersionEntry;
-  query: string;
   values: unknown[];
   requestId: string;
   buildRangeEnd?: string;
@@ -45,6 +45,29 @@ type QueryOptions = {
 // Extra defence for drivers that don't expose now() yet.
 function nowTimestamp(client: DriverInterface) {
   return client.nowTimestamp?.() ?? new Date().getTime();
+}
+
+/**
+ * Computes MD5 hash of the query key.
+ * Special handling for FETCH_TABLES_FOR queries - returns the original string instead of hash.
+ */
+function queryKeyMd5(queryKey: QueryKey): string {
+  const jsonStr = JSON.stringify(queryKey);
+
+  // Special case: if query contains FETCH_TABLES_FOR, return the string representation
+  if (jsonStr.includes('FETCH_TABLES_FOR')) {
+    // Extract the SQL string from the query key if it's a string
+    if (Array.isArray(queryKey) && queryKey.length > 0) {
+      const firstElement = queryKey[0];
+      if (Array.isArray(firstElement) && typeof firstElement[0] === 'string') {
+        return firstElement[0];
+      }
+    }
+    return jsonStr;
+  }
+
+  // Otherwise, return MD5 hash
+  return crypto.createHash('md5').update(jsonStr).digest('hex');
 }
 
 export class PreAggregationLoader {
@@ -79,7 +102,7 @@ export class PreAggregationLoader {
 
   public constructor(
     private readonly driverFactory: DriverFactory,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     preAggregations: PreAggregations,
     preAggregation,
@@ -480,10 +503,9 @@ export class PreAggregationLoader {
     );
   }
 
-  protected queryOptions(invalidationKeys: InvalidationKeys, query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
+  protected queryOptions(invalidationKeys: InvalidationKeys, _query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
     return {
-      queryKey: this.preAggregationQueryKey(invalidationKeys),
-      query,
+      queryKeyMd5: queryKeyMd5(this.preAggregationQueryKey(invalidationKeys)),
       values: params,
       targetTableName,
       requestId: this.requestId,

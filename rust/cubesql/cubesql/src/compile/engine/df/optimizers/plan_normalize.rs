@@ -1018,7 +1018,11 @@ fn expr_normalize_cold_path(
             }))
         }
 
-        Expr::AggregateUDF { fun, args } => {
+        Expr::AggregateUDF {
+            fun,
+            args,
+            distinct,
+        } => {
             let fun = Arc::clone(fun);
             let args = args
                 .iter()
@@ -1032,7 +1036,12 @@ fn expr_normalize_cold_path(
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
-            Ok(Box::new(Expr::AggregateUDF { fun, args }))
+            let distinct = *distinct;
+            Ok(Box::new(Expr::AggregateUDF {
+                fun,
+                args,
+                distinct,
+            }))
         }
 
         Expr::InSubquery {

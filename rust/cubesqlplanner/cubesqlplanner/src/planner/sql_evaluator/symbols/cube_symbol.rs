@@ -214,3 +214,20 @@ impl SymbolFactory for CubeTableSymbolFactory {
         )))
     }
 }
+
+impl crate::utils::debug::DebugSql for CubeNameSymbol {
+    fn debug_sql(&self, _expand_deps: bool) -> String {
+        self.cube_name().clone()
+    }
+}
+
+impl crate::utils::debug::DebugSql for CubeTableSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        let sql_debug = if let Some(sql) = &self.member_sql {
+            sql.debug_sql(expand_deps)
+        } else {
+            "NULL".to_string()
+        };
+        format!("{}({})", self.cube_name(), sql_debug)
+    }
+}

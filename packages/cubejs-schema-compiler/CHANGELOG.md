@@ -3,6 +3,149 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Features
+
+- **schema-compiler:** Add join_path support in folder includes ([#10349](https://github.com/cube-js/cube/issues/10349)) ([f80ab56](https://github.com/cube-js/cube/commit/f80ab56cdc345e5d430a59f65e702f433516912d))
+
+## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
+
+### Bug Fixes
+
+- **mssql-driver:** Respect timezone for origin in custom granularities ([#10111](https://github.com/cube-js/cube/issues/10111)) ([eaa484a](https://github.com/cube-js/cube/commit/eaa484ae1f7ca3601d202fff03b44782c61b37cb))
+- **mssql-driver:** Support MS SQL dialect for Tesseract ([#10343](https://github.com/cube-js/cube/issues/10343)) ([0ec696f](https://github.com/cube-js/cube/commit/0ec696fdc726d5305a2c63a48b7b4f0be16eda83))
+- **mssql-driver:** Use parameter placeholders for Tesseract ([#10342](https://github.com/cube-js/cube/issues/10342)) ([24ed91f](https://github.com/cube-js/cube/commit/24ed91fbf807dc22aaba45795f2e630d74b9b5f4))
+
+### Features
+
+- **server-core:** Add level field for log messages ([#10337](https://github.com/cube-js/cube/issues/10337)) ([1e7dcb6](https://github.com/cube-js/cube/commit/1e7dcb614dd6537b3bb2a1f9bd04e96c2374a673))
+
+## [1.6.6](https://github.com/cube-js/cube/compare/v1.6.5...v1.6.6) (2026-01-23)
+
+### Bug Fixes
+
+- **schema-compiler:** Correctly align weekly-based cron expressions ([#10229](https://github.com/cube-js/cube/issues/10229)) ([113639d](https://github.com/cube-js/cube/commit/113639dee0d1d3fc2413a26f4b951b71b043d2cc))
+
+## [1.6.5](https://github.com/cube-js/cube/compare/v1.6.4...v1.6.5) (2026-01-22)
+
+### Features
+
+- **schema-compiler:** Support user_attributes in snake_case ([#10287](https://github.com/cube-js/cube/issues/10287)) ([652c7ad](https://github.com/cube-js/cube/commit/652c7ad54e00a9af746fdebe3c7320cceb8b80e0))
+
+## [1.6.4](https://github.com/cube-js/cube/compare/v1.6.3...v1.6.4) (2026-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.3](https://github.com/cube-js/cube/compare/v1.6.2...v1.6.3) (2026-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
+
+### Features
+
+- Allow to specify key for dimensions in schema ([#10270](https://github.com/cube-js/cube/issues/10270)) ([df8161c](https://github.com/cube-js/cube/commit/df8161c4c1ad782493e83088c9260043996eb4c0))
+
+## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+# [1.6.0](https://github.com/cube-js/cube/compare/v1.5.16...v1.6.0) (2025-12-18)
+
+### Features
+
+- **cubestore:** Upgrade to DataFusion 46.0.1 ([#10215](https://github.com/cube-js/cube/issues/10215)) ([4ef3442](https://github.com/cube-js/cube/commit/4ef3442827b5c105c0f707674d4dae5ce282ae96))
+- **schema-compiler:** view's cubes multiple join path validation ([#10264](https://github.com/cube-js/cube/issues/10264)) ([d5fe933](https://github.com/cube-js/cube/commit/d5fe93351149362a52d73da36ce773c6960980d8))
+
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Features
+
+- **cubesql:** Support `STRING_AGG` SQL push down ([#10256](https://github.com/cube-js/cube/issues/10256)) ([8c82fa5](https://github.com/cube-js/cube/commit/8c82fa5e9d3503bb4c7b5b7fbe85afa8d5656d14))
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+### Features
+
+- Allow to specify default dimension order in schema ([#10224](https://github.com/cube-js/cube/issues/10224)) ([f2e1a98](https://github.com/cube-js/cube/commit/f2e1a98a66ae5c656a553d178e94281f053c771b))
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix datetime tz conversion for Athena/Trino ([#10207](https://github.com/cube-js/cube/issues/10207)) ([32d50a5](https://github.com/cube-js/cube/commit/32d50a5d5a594f30dff2b1a55c87f5afdb89976f))
+
+### Features
+
+- Support custom date formatting for time dimensions ([#10204](https://github.com/cube-js/cube/issues/10204)) ([8e18659](https://github.com/cube-js/cube/commit/8e186592feb35b224d50eefa280f5422865e73bc))
+- Support custom numeric formatting ([#10213](https://github.com/cube-js/cube/issues/10213)) ([898d4d0](https://github.com/cube-js/cube/commit/898d4d05b5c20c284c02c37718ae754c5646cd49))
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix matching for pre-aggs with custom granularities ([#10180](https://github.com/cube-js/cube/issues/10180)) ([e426f6b](https://github.com/cube-js/cube/commit/e426f6b3737fbbec724a266722ef9520b3582592))
+
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Free jinja instance after compilation ([#10169](https://github.com/cube-js/cube/issues/10169)) ([ec7ca2f](https://github.com/cube-js/cube/commit/ec7ca2f627520eabcd751775ef9a6d02fc3cb262))
+
+## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Fix passing cacheMode from user's request ([#10162](https://github.com/cube-js/cube/issues/10162)) ([64c66c4](https://github.com/cube-js/cube/commit/64c66c4a4bdcf3e7e1ae3094791031e22397243e))
+
+### Performance Improvements
+
+- **schema-compiler:** Add Server Core shared caches for model compilation ([#10144](https://github.com/cube-js/cube/issues/10144)) ([87de073](https://github.com/cube-js/cube/commit/87de0734bf987969096d7f92c65a6ad20ef656e6))
+- **schema-compiler:** Optimize CubeToMetaTransformer compilation flow ([#10150](https://github.com/cube-js/cube/issues/10150)) ([caac28b](https://github.com/cube-js/cube/commit/caac28bea4bf75ec1daa360586b99ae2521cdd82))
+
+## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
+
+### Bug Fixes
+
+- **tesseract:** Multi-stage dimension dependent on another multi-stage dimension didn’t work ([#10147](https://github.com/cube-js/cube/issues/10147)) ([ca71721](https://github.com/cube-js/cube/commit/ca717211e7340c6e0f7551b535465a21ec126262))
+
 ## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

@@ -771,7 +771,7 @@ export class BaseQuery {
     }
     const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
 
-    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
+    if (this.options.cacheMode !== 'no-cache' && !this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -844,6 +844,10 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
+    if (this.options.cacheMode === 'no-cache') {
+      return false;
+    }
+
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery?.preAggregation.external) {
@@ -4252,6 +4256,7 @@ export class BaseQuery {
         COVAR_POP: 'COVAR_POP({{ args_concat }})',
         COVAR_SAMP: 'COVAR_SAMP({{ args_concat }})',
         GROUP_ANY: 'max({{ expr }})',
+        STRING_AGG: 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})',
         COALESCE: 'COALESCE({{ args_concat }})',
         CONCAT: 'CONCAT({{ args_concat }})',
         FLOOR: 'FLOOR({{ args_concat }})',
@@ -4472,12 +4477,15 @@ export class BaseQuery {
   }
 
   parseCronSyntax(every) {
-    // One of the years that start from monday (first day of week)
-    // Mon, 01 Jan 2018 00:00:00 GMT
-    const startDate = 1514764800000;
+    // Use the Unix epoch as the reference point for calculating dayOffset.
+    // The refresh key SQL formula is: FLOOR((unix_timestamp - dayOffset) / interval)
+    // Since Unix timestamps are measured from Thu, 01 Jan 1970 00:00:00 UTC,
+    // week boundaries naturally fall on Thursdays when dividing by 604800 (1 week).
+    // By calculating dayOffset from the epoch to the first cron fire time,
+    // we correctly shift the boundaries to align with the desired day of week.
     const opt = {
       utc: true,
-      currentDate: new Date(startDate)
+      currentDate: new Date(0) // Unix epoch
     };
 
     try {
@@ -4485,14 +4493,15 @@ export class BaseQuery {
       let dayOffset = interval.next().getTime();
       const dayOffsetPrev = interval.prev().getTime();
 
-      if (dayOffsetPrev === startDate) {
-        dayOffset = startDate;
+      // If the cron fires exactly at the epoch, use 0 as dayOffset
+      if (dayOffsetPrev === 0) {
+        dayOffset = 0;
       }
 
       return {
         start: interval.next(),
         end: interval.next(),
-        dayOffset: (dayOffset - startDate) / 1000,
+        dayOffset: dayOffset / 1000, // Convert from ms to seconds
       };
     } catch (err) {
       throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);

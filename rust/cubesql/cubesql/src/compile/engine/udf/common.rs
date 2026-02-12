@@ -61,9 +61,10 @@ type IntervalMonthDayNano = <IntervalMonthDayNanoType as ArrowPrimitiveType>::Na
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =
     Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync>;
-pub type StateTypeFunction = Arc<dyn Fn(&DataType) -> Result<Arc<Vec<DataType>>> + Send + Sync>;
+pub type StateTypeFunction =
+    Arc<dyn Fn(&DataType, bool) -> Result<Arc<Vec<DataType>>> + Send + Sync>;
 pub type AccumulatorFunctionImplementation =
-    Arc<dyn Fn() -> Result<Box<dyn Accumulator>> + Send + Sync>;
+    Arc<dyn Fn(bool) -> Result<Box<dyn Accumulator>> + Send + Sync>;
 
 pub fn create_version_udf(v: String) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -2167,10 +2168,10 @@ pub fn create_measure_udaf() -> AggregateUDF {
         }
     });
 
-    let accumulator: AccumulatorFunctionImplementation = Arc::new(|| todo!("Not implemented"));
+    let accumulator: AccumulatorFunctionImplementation = Arc::new(|_| todo!("Not implemented"));
 
     let state_type = Arc::new(vec![DataType::Float64]);
-    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+    let state_type: StateTypeFunction = Arc::new(move |_, _| Ok(state_type.clone()));
 
     AggregateUDF::new(
         MEASURE_UDAF_NAME,
@@ -2200,10 +2201,10 @@ pub fn create_patch_measure_udaf() -> AggregateUDF {
     });
 
     let accumulator: AccumulatorFunctionImplementation =
-        Arc::new(|| todo!("Internal, should not execute"));
+        Arc::new(|_| todo!("Internal, should not execute"));
 
     let state_type = Arc::new(vec![DataType::Float64]);
-    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+    let state_type: StateTypeFunction = Arc::new(move |_, _| Ok(state_type.clone()));
 
     AggregateUDF::new(
         PATCH_MEASURE_UDAF_NAME,
@@ -3825,7 +3826,7 @@ pub fn create_udaf_stub(
     return_type: Option<DataType>,
     volatility: Option<Volatility>,
 ) -> AggregateUDF {
-    let fun: AccumulatorFunctionImplementation = Arc::new(move || {
+    let fun: AccumulatorFunctionImplementation = Arc::new(move |_| {
         Err(DataFusionError::NotImplemented(format!(
             "{} is not implemented, it's a stub",
             name
@@ -3844,7 +3845,7 @@ pub fn create_udaf_stub(
         Ok(Arc::new(DataType::Null))
     });
 
-    let state_type: StateTypeFunction = Arc::new(move |dt| Ok(Arc::new(vec![dt.clone()])));
+    let state_type: StateTypeFunction = Arc::new(move |dt, _| Ok(Arc::new(vec![dt.clone()])));
 
     AggregateUDF::new(
         name,

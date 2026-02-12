@@ -14,7 +14,7 @@ use crate::{
         },
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{AuthContextRef, SessionState},
     transport::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
         SqlTemplates, TransportLoadRequestQuery, TransportService,
@@ -642,6 +642,7 @@ impl CubeScanWrapperNode {
         &self,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
     ) -> result::Result<CubeScanWrappedSqlNode, CubeError> {
         let schema = self.schema();
         let wrapped_plan = self.wrapped_plan.clone();
@@ -649,6 +650,7 @@ impl CubeScanWrapperNode {
             &self.meta,
             transport,
             load_request_meta,
+            state,
             self.clone().set_max_limit_for_node(wrapped_plan),
             true,
             Vec::new(),
@@ -920,6 +922,7 @@ impl CubeScanWrapperNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -964,6 +967,7 @@ impl CubeScanWrapperNode {
                             meta,
                             transport,
                             load_request_meta,
+                            state,
                             node,
                             can_rename_columns,
                             values,
@@ -997,6 +1001,7 @@ impl CubeScanWrapperNode {
         meta: &'ctx MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -1007,6 +1012,7 @@ impl CubeScanWrapperNode {
             meta,
             transport,
             load_request_meta,
+            state,
             node,
             can_rename_columns,
             values,
@@ -1141,6 +1147,7 @@ impl WrappedSelectNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         sql: &mut SqlQuery,
         data_source: Option<&str>,
     ) -> result::Result<HashMap<String, String>, CubeError> {
@@ -1156,6 +1163,7 @@ impl WrappedSelectNode {
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
+                state.clone(),
                 subquery.clone(),
                 true,
                 sql.values.clone(),
@@ -1190,9 +1198,19 @@ impl WrappedSelectNode {
                 )
                 .await
             }
-            Expr::AggregateUDF { fun, args } => {
+            Expr::AggregateUDF {
+                fun,
+                args,
+                distinct,
+            } => {
                 if fun.name != PATCH_MEASURE_UDAF_NAME {
                     return Ok((None, sql_query));
+                }
+
+                if *distinct {
+                    return Err(CubeError::internal(
+                        "Patch measure with DISTINCT flag is not supported".to_string(),
+                    ));
                 }
 
                 let Some(push_to_cube_context) = push_to_cube_context else {
@@ -2861,10 +2879,20 @@ impl WrappedSelectNode {
                     })?;
                 Ok((resulting_sql, sql_query))
             }
-            Expr::AggregateUDF { ref fun, ref args } => {
+            Expr::AggregateUDF {
+                ref fun,
+                ref args,
+                distinct,
+            } => {
                 match fun.name.as_str() {
                     // TODO allow this only in agg expr
                     MEASURE_UDAF_NAME => {
+                        if distinct {
+                            return Err(DataFusionError::Internal(
+                                "MEASURE function with DISTINCT flag is not supported".to_string(),
+                            ));
+                        }
+
                         let Some(PushToCubeContext {
                             ungrouped_scan_node,
                             ..
@@ -2900,11 +2928,37 @@ impl WrappedSelectNode {
 
                         Ok((format!("${{{}}}", member.field_name), sql_query))
                     }
-                    // There's no branch for PatchMeasure, because it should generate via different path
-                    _ => Err(DataFusionError::Internal(format!(
-                        "Can't generate SQL for UDAF: {}",
+                    PATCH_MEASURE_UDAF_NAME => Err(DataFusionError::Internal(format!(
+                        "{} UDAF should generate SQL via different path: {expr}",
                         fun.name
                     ))),
+                    _ => {
+                        let mut sql_args = Vec::new();
+                        for arg in args {
+                            let (sql, query) = Self::generate_sql_for_expr_rec(
+                                sql_query,
+                                sql_generator.clone(),
+                                arg.clone(),
+                                push_to_cube_context,
+                                subqueries,
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_args.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .udaf_function(&fun, sql_args, distinct)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for UDAF: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
                 }
             }
             Expr::InList {
@@ -3054,6 +3108,7 @@ impl WrappedSelectNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -3152,6 +3207,7 @@ impl WrappedSelectNode {
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
+                state.clone(),
                 &mut sql,
                 Some(data_source),
             )
@@ -3211,6 +3267,7 @@ impl WrappedSelectNode {
                     meta,
                     transport.clone(),
                     load_request_meta.clone(),
+                    state.clone(),
                     lp.clone(),
                     true,
                     sql.values.clone(),
@@ -3356,7 +3413,14 @@ impl WrappedSelectNode {
                     .all(|member| meta.find_dimension_with_name(member).is_some())
             });
 
+        let timezone = state
+            .query_timezone
+            .read()
+            .map_err(|_| CubeError::internal("Failed to acquire timezone read lock".to_string()))?
+            .clone();
+
         let load_request = V1LoadRequestQuery {
+            timezone,
             measures: Some(
                 aggregate
                     .iter()
@@ -3506,6 +3570,7 @@ impl WrappedSelectNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -3517,6 +3582,7 @@ impl WrappedSelectNode {
                     meta,
                     transport,
                     load_request_meta,
+                    state,
                     node,
                     can_rename_columns,
                     values,
@@ -3534,6 +3600,7 @@ impl WrappedSelectNode {
             meta,
             transport.clone(),
             load_request_meta.clone(),
+            state.clone(),
             self.from.clone(),
             true,
             values.clone(),
@@ -3546,6 +3613,7 @@ impl WrappedSelectNode {
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
+                state,
                 &mut sql,
                 data_source.as_deref(),
             )

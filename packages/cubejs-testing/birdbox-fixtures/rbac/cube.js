@@ -91,6 +91,47 @@ module.exports = {
         },
       };
     }
+    // Developer user for testing overlapping policies scenario
+    // where group "*" has empty member includes and "developer" has row filter
+    if (user === 'developer') {
+      if (password && password !== 'developer_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'developer',
+            userAttributes: {
+              region: 'CA',
+              allowedCities: ['Los Angeles', 'New York'],
+            },
+            roles: [],
+            groups: ['developer'],
+          },
+        },
+      };
+    }
+    // User for testing two-dimensional policy overlap (matches diagram in CompilerApi.ts)
+    // Has policy2_role, so both Policy 1 (*) and Policy 2 (policy2_role) apply
+    if (user === 'policy_test') {
+      if (password && password !== 'policy_test_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'policy_test',
+            userAttributes: {},
+            roles: ['policy2_role'],
+            groups: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };

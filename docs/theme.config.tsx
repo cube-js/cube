@@ -104,20 +104,18 @@ const config: DocsThemeConfig = {
           size="s"
           href="https://cubecloud.dev/auth/signup?utm_source=docs&utm_medium=site&UTM_Publisher=Cube"
         >
-          Try Cube for Free
+          Get started for free
         </BlogButton>
       </div>
     )
   },
   toc: {
-    extraContent: (
-      <div>
-        <br/>
-        <a target="_blank" href="https://cube.dev/blog/cube-cloud-named-fast-moving-leader-in-gigaoms-2024-sonar-report?utm_source=cube&utm_medium=docs">
-          <img src="https://ucarecdn.com/a16cd6ee-4310-4507-a528-3caeda0777c2/"/>
-        </a>
-      </div>
-    )
+  },
+  editLink: {
+    component: null
+  },
+  feedback: {
+    content: null
   }
 };
 

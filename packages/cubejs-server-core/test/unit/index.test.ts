@@ -29,6 +29,13 @@ class CubejsServerCoreOpen extends CubejsServerCore {
   }
 }
 
+// Mock to expose protected methods for testing
+class CompilerApiOpen extends CompilerApi {
+  public getRolesFromContext = super.getRolesFromContext;
+
+  public getGroupsFromContext = super.getGroupsFromContext;
+}
+
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
@@ -448,6 +455,42 @@ describe('index.test', () => {
           contextToGroups: async () => ['analytics']
         }
       )).not.toThrow();
+    });
+
+    test('contextToRoles should be called and return expected roles', async () => {
+      const logger = jest.fn(() => {});
+      const contextToRoles = jest.fn(async () => ['admin', 'manager']);
+
+      const compilerApi = new CompilerApiOpen(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToRoles
+        }
+      );
+
+      const roles = await compilerApi.getRolesFromContext({ securityContext: { userId: 123 } });
+      expect(contextToRoles).toHaveBeenCalledWith({ securityContext: { userId: 123 } });
+      expect(roles).toEqual(new Set(['admin', 'manager']));
+    });
+
+    test('contextToGroups should be called and return expected groups', async () => {
+      const logger = jest.fn(() => {});
+      const contextToGroups = jest.fn(async () => ['analytics', 'engineering']);
+
+      const compilerApi = new CompilerApiOpen(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToGroups
+        }
+      );
+
+      const groups = await compilerApi.getGroupsFromContext({ securityContext: { userId: 456 } });
+      expect(contextToGroups).toHaveBeenCalledWith({ securityContext: { userId: 456 } });
+      expect(groups).toEqual(new Set(['analytics', 'engineering']));
     });
   });
 

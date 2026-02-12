@@ -45,7 +45,18 @@ export interface CompilerInterface {
   compile: (cubes: any[], errorReporter: ErrorReporter) => void;
 }
 
-export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
+export type Compiler = {
+    compiler: DataSchemaCompiler;
+    metaTransformer: CubeToMetaTransformer;
+    cubeEvaluator: CubeEvaluator;
+    contextEvaluator: ContextEvaluator;
+    joinGraph: JoinGraph;
+    compilerCache: CompilerCache;
+    headCommitId?: string;
+    compilerId: string;
+};
+
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
@@ -118,9 +129,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   };
 };
 
-export const compile = (repo: SchemaFileRepository, options?: PrepareCompilerOptions) => {
+export const compile = async (repo: SchemaFileRepository, options?: PrepareCompilerOptions): Promise<Compiler> => {
   const compilers = prepareCompiler(repo, options);
-  return compilers.compiler.compile().then(
-    () => compilers
-  );
+  await compilers.compiler.compile();
+  return compilers;
 };

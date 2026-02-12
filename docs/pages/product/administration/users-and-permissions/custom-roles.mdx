@@ -1,0 +1,153 @@
+# Custom roles
+
+<InfoBox>
+
+Custom roles are available in Cube Cloud on
+[Enterprise plan.](https://cube.dev/pricing)
+
+</InfoBox>
+
+Cube comes with [default roles][ref-default-roles] that cover common use cases. However, if you need more customization, you can create custom roles with a fine-grained set of permissions tailored to your organization's specific needs.
+
+[ref-default-roles]: /product/administration/users-and-permissions/roles-and-permissions
+
+
+## Managing roles
+
+In Cube Cloud, users are not assigned permissions directly. Instead, they are assigned
+_roles_ that are associated with _policies_. Each policy define what _actions_ they can
+perform and on what _resources_ they can perform those actions. This approach makes it
+easier to manage permissions at scale.
+
+Each role can be associated with one or more of the following policies:
+
+| Policy | Description |
+| --- | --- |
+| `Global` | Controls account-level functionality, e.g., as Billing. |
+| `Deployment` | Controls deployment-level functionality, e.g., as Playground. |
+| `Report` | Controls access to specific reports in Saved Reports. |
+| `ReportFolder` | Controls access to specific folders in Saved Reports. |
+| `Agent` | Controls access to specific [AI agents][ref-ai-agents]. |
+| `AgentSpace` | Controls access to specific AI agent [spaces][ref-ai-spaces]. |
+| `Workbook` | Controls access to specific [workbooks][ref-workbooks]. |
+
+Each policy can apply to _all resources_ or _specific resources_. For example, a policy
+could apply to all deployments or only to a specific deployment.
+
+Also, each policy can have _all actions_ or only _specific actions_ associated with it.
+For example, a policy could allow a user to view, create, or delete one or more
+deployments if it's associated with those specific actions.
+
+See [actions reference](#actions) for a list of available actions.
+
+### Browsing roles
+
+To see a list of custom roles, go to the **Admin -> Custom Roles** page in your Cube
+account:
+
+<Screenshot
+  alt="Cube Cloud Custom Roles"
+  src="https://lgo0ecceic.ucarecd.net/60f2733e-4e70-4e83-944d-7611e4102c38/"
+/>
+
+### Creating a role
+
+To create a new role, click the <Btn>Add Role</Btn> button. Enter a name and an optional
+description for the role, then click <Btn>Add Policy</Btn> and select either <Btn>Deployment</Btn>
+or <Btn>Global</Btn> for this policy's scope.
+
+Deployment policies apply to deployment-level functionality, such as the
+Playground and Data Model editor. Global policies apply to account-level
+functionality, such as Billing. Once the policy scope has been
+selected, you can restrict which actions this role can perform by selecting
+"Specific" and using the dropdown to select specific actions.
+
+<Screenshot
+  alt="Cube Cloud Custom Roles"
+  src="https://lgo0ecceic.ucarecd.net/94f9a6b0-b77e-415f-b096-60426369b2c6/"
+/>
+
+When you are finished, click <Btn>Create</Btn> to create the role.
+
+## Assigning roles to users
+
+To assign custom roles to users:
+
+1. Navigate to <Btn>Admin → Users</Btn>
+2. Choose one of the following methods:
+   - **From the users table**: Use the dropdown in the users table
+   - **From individual user page**: Click on a user and assign roles from their profile page
+3. You can assign multiple custom roles to a single user
+
+## Actions
+
+Policies can have the following actions associated with them.
+
+### `Global`
+
+| Action | Description |
+| --- | --- |
+| `Alerts Access`<br/>`Alerts Create`<br/>`Alerts Edit`<br/>`Alerts Delete` | View, create, edit, and delete [budgets][ref-budgets]. |
+| `Billing Access` | Access the billing data of the Cube Cloud account. |
+| `Deployment Manage` | Create and delete deployments in the Cube Cloud account. |
+| `Agent Admin` | Administer AI agents across the account. |
+| `AI BI Developer` | Developer-level access to AI BI features with full AI token usage. |
+| `AI BI User` | User-level access to AI BI features with standard AI token usage. |
+| `AI BI Viewer` | Viewer-level access to AI BI features with limited AI token usage. |
+
+### `Deployment`
+
+| Action | Description |
+| --- | --- |
+| `Deployment View`<br/>`Deployment Edit` | Access the deployment, change its settings. |
+| `Playground Access` | Use [Playground][ref-playground]. |
+| `Data Model View` | View the source code in the [data model][ref-data-model] editor, use [Visual Model][ref-visual-model]. |
+| `Data Model Edit (all branches)`<br/>`Data Model Edit (dev branches only)` | Use the [development mode][ref-dev-mode], edit the data model, perform Git operations (e.g., commit, pull, push). |
+| `Queries & Metrics Access` | Use [Query History][ref-query-history] and [Performance Insights][ref-perf-insights]. |
+| `SQL Runner Access` | Use [SQL Runner][ref-sql-runner]. |
+| `Data Assets Access` | Use [Semantic Catalog][ref-semantic-catalog]. |
+
+### `Report`
+
+| Action | Description |
+| --- | --- |
+| `Report Read`<br/>`Report Manage` | View and create/delete reports. |
+
+### `ReportFolder`
+
+| Action | Description |
+| --- | --- |
+| `Report Read`<br/>`Report Manage` | View and create/delete report folders. |
+
+### `Agent`
+
+| Action | Description |
+| --- | --- |
+| `Agent Access`<br/>`Agent Manage` | View and manage AI agents. |
+
+### `AgentSpace`
+
+| Action | Description |
+| --- | --- |
+| `Agent Space Manage` | Manage AI agent spaces. |
+
+### `Workbook`
+
+| Action | Description |
+| --- | --- |
+| `Workbook Read`<br/>`Workbook Manage`<br/>`Workbook Edit` | View, manage, and edit workbooks. |
+
+
+[ref-budgets]: /product/workspace/budgets
+[ref-playground]: /product/workspace/playground
+[ref-data-model]: /product/workspace/data-model
+[ref-visual-model]: /product/workspace/visual-model
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-query-history]: /product/workspace/query-history
+[ref-perf-insights]: /product/workspace/performance
+[ref-sql-runner]: /product/workspace/sql-runner
+[ref-semantic-catalog]: /product/workspace/semantic-catalog
+[ref-ai-agents]: /product/administration/ai/spaces-agents-models#2-agents-ai-agents
+[ref-ai-spaces]: /product/administration/ai/spaces-agents-models#1-spaces-agent-spaces
+[ref-workbooks]: /product/exploration/workbooks
+

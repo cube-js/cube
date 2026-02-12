@@ -17,7 +17,7 @@ pub struct QueryProcessor<'a> {
 impl QueryProcessor<'_> {
     fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
         match logical_plan.source() {
-            QuerySource::FullKeyAggregate(_) => true,
+            QuerySource::FullKeyAggregate(fk) => !fk.is_empty(),
             QuerySource::PreAggregation(_) => false,
             QuerySource::LogicalJoin(_) => false,
         }
