@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+### Bug Fixes
+
+- **bigquery-driver:** Pass precision and scale to decimal type, thanks [@lvauvillier](https://github.com/lvauvillier) ([#10368](https://github.com/cube-js/cube/issues/10368)) ([159f528](https://github.com/cube-js/cube/commit/159f5282e0d05647289e0f43138816ef8567ca0d))
+
 ## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver

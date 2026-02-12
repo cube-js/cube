@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+### Bug Fixes
+
+- **bigquery-driver:** Pass precision and scale to decimal type, thanks [@lvauvillier](https://github.com/lvauvillier) ([#10368](https://github.com/cube-js/cube/issues/10368)) ([159f528](https://github.com/cube-js/cube/commit/159f5282e0d05647289e0f43138816ef8567ca0d))
+- **cubestore-driver:** Wrap ECONNRESET errors with ConnectionError ([#10388](https://github.com/cube-js/cube/issues/10388)) ([e952942](https://github.com/cube-js/cube/commit/e952942deeb0cbfb5239343179ce2740c2862ff2))
+
+### Features
+
+- **cubejs-api-gateway:** Adds dataSource to the /v1/sql API response, thanks [@seshness](https://github.com/seshness) ([#10350](https://github.com/cube-js/cube/issues/10350)) ([6bfe75e](https://github.com/cube-js/cube/commit/6bfe75e106f8004fb2467e5e6d3caefa25cc7820))
+- **cubesql:** Support setting time zone with `SET TIMEZONE` ([#10364](https://github.com/cube-js/cube/issues/10364)) ([5bb1e7d](https://github.com/cube-js/cube/commit/5bb1e7d45c94cadd221a5b19c29f818c3d654e57))
+
 ## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
 
 ### Bug Fixes

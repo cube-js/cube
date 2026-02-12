@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+### Bug Fixes
+
+- **cubestore-driver:** Wrap ECONNRESET errors with ConnectionError ([#10388](https://github.com/cube-js/cube/issues/10388)) ([e952942](https://github.com/cube-js/cube/commit/e952942deeb0cbfb5239343179ce2740c2862ff2))
+
 ## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
 
 ### Features
