@@ -60,7 +60,7 @@ fn test_simple_paths_in_time_dimension_request_sql() {
           - cube_a.count
         time_dimensions:
           - dimension: cube_a.cube_c.created_at
-          - granularity: day
+            granularity: day
     "};
 
     let sql = test_context
@@ -73,7 +73,7 @@ fn test_simple_paths_in_time_dimension_request_sql() {
         "SQL should contain join condition between cube_a and cube_c"
     );
 
-    //insta::assert_snapshot!(sql);
+    insta::assert_snapshot!(sql);
 }
 
 #[test]

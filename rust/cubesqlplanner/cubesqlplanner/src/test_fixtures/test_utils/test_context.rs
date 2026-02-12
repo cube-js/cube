@@ -92,6 +92,12 @@ impl TestContext {
     ///   - visitors.visitor_count
     /// dimensions:
     ///   - visitors.source
+    /// time_dimensions:
+    ///   - dimension: visitors.created_at
+    ///     granularity: day
+    ///     dateRange:
+    ///       - "2024-01-01"
+    ///       - "2024-12-31"
     /// order:
     ///   - id: visitors.visitor_count
     ///     desc: true
@@ -154,6 +160,16 @@ impl TestContext {
             })
             .filter(|f| !f.is_empty());
 
+        let time_dimensions = yaml_options
+            .time_dimensions
+            .map(|items| {
+                items
+                    .into_iter()
+                    .map(|item| item.into_time_dimension())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|td| !td.is_empty());
+
         Rc::new(
             MockBaseQueryOptions::builder()
                 .cube_evaluator(self.query_tools.cube_evaluator().clone())
@@ -163,6 +179,7 @@ impl TestContext {
                 .measures(measures)
                 .dimensions(dimensions)
                 .segments(segments)
+                .time_dimensions(time_dimensions)
                 .order(order)
                 .filters(filters)
                 .limit(yaml_options.limit)
@@ -340,5 +357,146 @@ measures:
         let static_data = options.static_data();
         assert!(static_data.order.is_none());
         assert!(static_data.filters.is_none());
+    }
+
+    #[test]
+    fn test_time_dimensions_parsing_full() {
+        use indoc::indoc;
+
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let yaml = indoc! {"
+            measures:
+              - visitors.count
+            time_dimensions:
+              - dimension: visitors.created_at
+                granularity: day
+                dateRange:
+                  - \"2024-01-01\"
+                  - \"2024-12-31\"
+        "};
+
+        let options = ctx.create_query_options_from_yaml(yaml);
+        let static_data = options.static_data();
+
+        let time_dimensions = static_data.time_dimensions.as_ref().unwrap();
+        assert_eq!(time_dimensions.len(), 1);
+
+        let td = &time_dimensions[0];
+        assert_eq!(td.dimension, "visitors.created_at");
+        assert_eq!(td.granularity, Some("day".to_string()));
+
+        let date_range = td.date_range.as_ref().unwrap();
+        assert_eq!(date_range.len(), 2);
+        assert_eq!(date_range[0], "2024-01-01");
+        assert_eq!(date_range[1], "2024-12-31");
+    }
+
+    #[test]
+    fn test_time_dimensions_parsing_minimal() {
+        use indoc::indoc;
+
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let yaml = indoc! {"
+            measures:
+              - visitors.count
+            time_dimensions:
+              - dimension: visitors.created_at
+        "};
+
+        let options = ctx.create_query_options_from_yaml(yaml);
+        let static_data = options.static_data();
+
+        let time_dimensions = static_data.time_dimensions.as_ref().unwrap();
+        assert_eq!(time_dimensions.len(), 1);
+
+        let td = &time_dimensions[0];
+        assert_eq!(td.dimension, "visitors.created_at");
+        assert_eq!(td.granularity, None);
+        assert_eq!(td.date_range, None);
+    }
+
+    #[test]
+    fn test_time_dimensions_parsing_multiple() {
+        use indoc::indoc;
+
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let yaml = indoc! {"
+            measures:
+              - visitors.count
+            time_dimensions:
+              - dimension: visitors.created_at
+                granularity: day
+                dateRange:
+                  - \"2024-01-01\"
+                  - \"2024-12-31\"
+              - dimension: visitors.updated_at
+                granularity: month
+        "};
+
+        let options = ctx.create_query_options_from_yaml(yaml);
+        let static_data = options.static_data();
+
+        let time_dimensions = static_data.time_dimensions.as_ref().unwrap();
+        assert_eq!(time_dimensions.len(), 2);
+
+        // First time dimension
+        let td1 = &time_dimensions[0];
+        assert_eq!(td1.dimension, "visitors.created_at");
+        assert_eq!(td1.granularity, Some("day".to_string()));
+        assert!(td1.date_range.is_some());
+
+        // Second time dimension
+        let td2 = &time_dimensions[1];
+        assert_eq!(td2.dimension, "visitors.updated_at");
+        assert_eq!(td2.granularity, Some("month".to_string()));
+        assert_eq!(td2.date_range, None);
+    }
+
+    #[test]
+    fn test_time_dimensions_with_other_fields() {
+        use indoc::indoc;
+
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let yaml = indoc! {"
+            measures:
+              - visitors.count
+            dimensions:
+              - visitors.source
+            time_dimensions:
+              - dimension: visitors.created_at
+                granularity: day
+            filters:
+              - dimension: visitors.source
+                operator: equals
+                values:
+                  - google
+            order:
+              - id: visitors.count
+                desc: true
+            limit: \"100\"
+        "};
+
+        let options = ctx.create_query_options_from_yaml(yaml);
+        let static_data = options.static_data();
+
+        // Verify time_dimensions
+        let time_dimensions = static_data.time_dimensions.as_ref().unwrap();
+        assert_eq!(time_dimensions.len(), 1);
+        assert_eq!(time_dimensions[0].dimension, "visitors.created_at");
+
+        // Verify other fields still work
+        assert!(options.measures().unwrap().is_some());
+        assert!(options.dimensions().unwrap().is_some());
+        assert!(static_data.filters.is_some());
+        assert!(static_data.order.is_some());
+        assert_eq!(static_data.limit, Some("100".to_string()));
     }
 }
