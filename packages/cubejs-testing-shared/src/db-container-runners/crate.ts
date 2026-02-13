@@ -1,4 +1,4 @@
-import { GenericContainer } from 'testcontainers';
+import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
@@ -8,7 +8,8 @@ export class CrateDBRunner extends DbRunnerAbstract {
 
     const container = new GenericContainer(`crate/crate:${version}`)
       .withExposedPorts(5432)
-      .withStartupTimeout(10 * 1000);
+      .withWaitStrategy(Wait.forLogMessage('started'))
+      .withStartupTimeout(15 * 1000);
 
     if (options.volumes) {
       const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));
