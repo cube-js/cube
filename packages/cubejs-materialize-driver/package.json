@@ -30,8 +30,6 @@
     "@cubejs-backend/base-driver": "1.6.11",
     "@cubejs-backend/postgres-driver": "1.6.11",
     "@cubejs-backend/shared": "1.6.11",
-    "@types/pg": "^8.6.0",
-    "pg": "^8.6.0",
     "semver": "^7.6.3"
   },
   "license": "Apache-2.0",

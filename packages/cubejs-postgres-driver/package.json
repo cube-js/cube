@@ -29,10 +29,10 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.6.11",
     "@cubejs-backend/shared": "1.6.11",
-    "@types/pg": "^8.6.0",
+    "@types/pg": "^8.16.0",
     "@types/pg-query-stream": "^1.0.3",
     "moment": "^2.24.0",
-    "pg": "^8.6.0",
+    "pg": "^8.18.0",
     "pg-query-stream": "^4.1.0"
   },
   "license": "Apache-2.0",

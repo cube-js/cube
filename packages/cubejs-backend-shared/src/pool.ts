@@ -6,8 +6,6 @@
 
 import genericPool, { Pool as GenericPool, Factory, Options } from 'generic-pool';
 
-export { Factory, Options as PoolOptions } from 'generic-pool';
-
 export class PoolTimeoutError extends Error {
   public readonly poolName: string;
 
@@ -18,6 +16,14 @@ export class PoolTimeoutError extends Error {
   }
 }
 
+export type PoolFactory<T> = Factory<T>;
+export type PoolOptions = Options;
+// Allow passing specific options from Pool options in the specific driver
+export type PoolUserOptions = Pick<
+  PoolOptions,
+  'acquireTimeoutMillis' | 'evictionRunIntervalMillis' | 'softIdleTimeoutMillis' | 'idleTimeoutMillis'
+>;
+
 /**
  * Uses composition instead of inheritance because generic-pool doesn't export
  * a Pool class, the Pool type is an interface, not an extendable class.
@@ -27,7 +33,7 @@ export class Pool<T> {
 
   private readonly name: string;
 
-  public constructor(name: string, factory: Factory<T>, options?: Options) {
+  public constructor(name: string, factory: PoolFactory<T>, options?: Options) {
     this.name = name;
     this.pool = genericPool.createPool<T>(factory, options);
   }
@@ -94,6 +100,10 @@ export class Pool<T> {
 
   public get min(): number {
     return this.pool.min;
+  }
+
+  public get options(): { max: number; min: number } {
+    return { max: this.pool.max, min: this.pool.min };
   }
 
   // Event handling
