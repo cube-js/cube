@@ -638,6 +638,33 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Database min pool size.
+   */
+  dbMinPoolSize: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    if (process.env[keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)]) {
+      const min = parseInt(
+        `${process.env[keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)]}`,
+        10,
+      );
+      if (min < 0) {
+        throw new Error(
+          `The ${
+            keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)
+          } must be a positive number or zero.`
+        );
+      }
+
+      return min;
+    }
+
+    return undefined;
+  },
+
+  /**
    * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
