@@ -64,7 +64,7 @@ describe('CubeApi Load', () => {
     expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
   });
 
-  test('simple query + { mutexKey, castNumerics }', async () => {
+  test('simple query + { mutexKey, castNumerics, cache }', async () => {
     // Create a spy on the request method
     jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
@@ -79,7 +79,7 @@ describe('CubeApi Load', () => {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
 
-    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { mutexKey: 'mutexKey', castNumerics: true });
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { mutexKey: 'mutexKey', castNumerics: true, cache: 'no-cache' });
     expect(res).toBeInstanceOf(ResultSet);
     expect(res.rawData()).toEqual(NumericCastedData);
   });

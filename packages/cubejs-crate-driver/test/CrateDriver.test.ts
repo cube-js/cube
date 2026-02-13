@@ -22,8 +22,8 @@ describe('CrateDriver', () => {
   });
 
   afterAll(async () => {
-    await tests?.release();
-    await db?.stop();
+    await tests.release();
+    await db.stop();
   });
 
   test('query', async () => {
