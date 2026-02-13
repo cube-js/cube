@@ -8,7 +8,7 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import { types, Pool, PoolConfig, PoolClient, FieldDef } from 'pg';
+import { types, Pool, PoolClient, FieldDef, ClientConfig } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import * as moment from 'moment';
@@ -58,7 +58,13 @@ const hllTypeParser = (val: string) => Buffer.from(
   'hex'
 ).toString('base64');
 
-export type PostgresDriverConfiguration = Partial<PoolConfig> & {
+export type PostgresDriverConfiguration = ClientConfig & {
+  // @deprecated Please use maxPoolSize
+  max?: number | undefined;
+  // @deprecated Please use minPoolSize
+  min?: number | undefined;
+  idleTimeoutMillis?: number | undefined | null;
+
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
@@ -87,9 +93,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   protected readonly config: Partial<Config>;
 
-  /**
-   * Class constructor.
-   */
   public constructor(
     config: Partial<Config> & {
       /**
@@ -101,6 +104,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Min pool size value for the [cube]<-->[db] pool.
+       */
+      minPoolSize?: number,
 
       /**
        * Time to wait for a response from a connection after validation
@@ -118,9 +126,14 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       assertDataSource('default');
 
     this.pool = new Pool({
-      idleTimeoutMillis: 30000,
+      idleTimeoutMillis: config.idleTimeoutMillis || 30000,
+      min: config.minPoolSize ||
+        config.min ||
+        getEnv('dbMinPoolSize', { dataSource }) ||
+        0,
       max:
         config.maxPoolSize ||
+        config.max ||
         getEnv('dbMaxPoolSize', { dataSource }) ||
         8,
       host: getEnv('dbHost', { dataSource }),
