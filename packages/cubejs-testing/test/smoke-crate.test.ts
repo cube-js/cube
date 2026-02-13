@@ -42,8 +42,8 @@ describe('crate', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox?.stop();
-    await db?.stop();
+    await birdbox.stop();
+    await db.stop();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query measure', () => testQueryMeasure(client));
