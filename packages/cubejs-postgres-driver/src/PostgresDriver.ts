@@ -4,7 +4,7 @@
  * @fileoverview The `PostgresDriver` and related types declaration.
  */
 
-import { getEnv, assertDataSource, Pool } from '@cubejs-backend/shared';
+import { getEnv, assertDataSource, Pool, type PoolUserOptions } from '@cubejs-backend/shared';
 import { types, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
@@ -56,12 +56,11 @@ const hllTypeParser = (val: string) => Buffer.from(
   'hex'
 ).toString('base64');
 
-export type PostgresDriverConfiguration = PgClientConfig & {
+export type PostgresDriverConfiguration = PgClientConfig & PoolUserOptions & {
   // @deprecated Please use maxPoolSize
   max?: number | undefined;
   // @deprecated Please use minPoolSize
   min?: number | undefined;
-  idleTimeoutMillis?: number | undefined | null;
 
   storeTimezone?: string,
   executionTimeout?: number,
@@ -161,11 +160,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         config.max ||
         getEnv('dbMaxPoolSize', { dataSource }) ||
         8,
-      evictionRunIntervalMillis: 10000,
-      softIdleTimeoutMillis: 30000,
+      evictionRunIntervalMillis: config.evictionRunIntervalMillis || 10000,
+      softIdleTimeoutMillis: config.softIdleTimeoutMillis || 30000,
       idleTimeoutMillis: config.idleTimeoutMillis || 30000,
+      acquireTimeoutMillis: config.acquireTimeoutMillis || 20000,
       testOnBorrow: true,
-      acquireTimeoutMillis: 20000,
     });
 
     // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
