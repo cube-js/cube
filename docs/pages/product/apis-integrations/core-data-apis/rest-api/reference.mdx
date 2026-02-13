@@ -29,6 +29,7 @@ Response
   - `title` - Human readable title from the data model.
   - `shortTitle` - Short title for visualization usage (ex. chart overlay)
   - `type` - Data type
+- `lastRefreshTime` - An ISO 8601 timestamp indicating when the data was last refreshed.
 - `total` - The total number of rows returned for the query. Useful for
   paginating results.
 
@@ -68,6 +69,7 @@ Example response:
       "users.count": "700"
     }
   ],
+  "lastRefreshTime": "2025-01-13T12:00:00.000Z",
   "annotation": {
     "measures": {
       "users.count": {
@@ -327,9 +329,10 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
-the `schema` property with column names and types. The following objects contain
-chunks of the result set under the `data` property. Each chunk includes one or more
-rows of the result set.
+the `schema` property with column names and types, and optionally
+`lastRefreshTime` indicating when the data was last refreshed.
+The following objects contain chunks of the result set under the `data` property.
+Each chunk includes one or more rows of the result set.
 
 ### Example
 
@@ -347,7 +350,7 @@ curl \
 Response:
 
 ```json
-{"schema":[{"name":"value","column_type":"Int64"}]}
+{"schema":[{"name":"value","column_type":"Int64"}],"lastRefreshTime":"2025-01-13T12:00:00.000Z"}
 {"data":[["789"]]}
 {"data":[["123"]]}
 {"data":[["456"]]}
@@ -367,7 +370,7 @@ curl \
 Response:
 
 ```json
-{"schema":[{"name":"full_name","column_type":"String"},{"name":"wins","column_type":"Int64"},{"name":"avg_position","column_type":"Double"}]}
+{"schema":[{"name":"full_name","column_type":"String"},{"name":"wins","column_type":"Int64"},{"name":"avg_position","column_type":"Double"}],"lastRefreshTime":"2025-01-13T12:00:00.000Z"}
 {"data":[["Max VERSTAPPEN","10","3.730769230769231"],["Lando NORRIS","4","4"],["Charles LECLERC","4","4.730769230769231"],["Oscar PIASTRI","3","4.8076923076923075"],["Andrea Kimi ANTONELLI","0","5"]]}
 ```
 

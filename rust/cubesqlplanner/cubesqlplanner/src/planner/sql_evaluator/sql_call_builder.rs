@@ -58,13 +58,13 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|itm| self.build_filter_group_item(itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = SqlCall::builder()
-            .template(template.clone())
-            .deps(deps)
-            .filter_params(filter_params)
-            .filter_groups(filter_groups)
-            .security_context(template_args.security_context.clone())
-            .build();
+        let result = SqlCall::new(
+            template.clone(),
+            deps,
+            filter_params,
+            filter_groups,
+            template_args.security_context.clone(),
+        );
         Ok(result)
     }
 

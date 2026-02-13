@@ -104,7 +104,7 @@ const config: DocsThemeConfig = {
           size="s"
           href="https://cubecloud.dev/auth/signup?utm_source=docs&utm_medium=site&UTM_Publisher=Cube"
         >
-          Try Cube for Free
+          Get started for free
         </BlogButton>
       </div>
     )

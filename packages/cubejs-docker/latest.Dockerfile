@@ -1,4 +1,4 @@
-FROM node:22.20.0-bookworm-slim AS builder
+FROM node:22.22.0-bookworm-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -21,7 +21,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:22.20.0-bookworm-slim
+FROM node:22.22.0-bookworm-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -36,6 +36,8 @@ RUN DEBIAN_FRONTEND=noninteractive \
 RUN yarn policies set-version v1.22.22
 
 ENV NODE_ENV=production
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
 WORKDIR /cube
 

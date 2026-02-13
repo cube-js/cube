@@ -18,3 +18,5 @@ RUN cd tmp && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${
     && cd .. && rm -rf Python-${PYTHON_VERSION};
 
 ENV PYO3_PYTHON=python${PYTHON_RELEASE}
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8

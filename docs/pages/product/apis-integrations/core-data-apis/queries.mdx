@@ -371,6 +371,21 @@ option][ref-conf-allow-ungrouped] to override this.
 Additionally, note that ungrouped queries have additional requirements for
 [pre-aggregation matching][ref-matching-preaggs-ungrouped].
 
+## Troubleshooting
+
+### No `count` measure
+
+You might encounter the following error when running an [ungrouped query](#ungrouped-query)
+that includes `HAVING COUNT(1) > 0` (or a similar expression) against a cube or a view that
+have no measure called `count`. [Tableau][ref-tableau] is knows to generate such queries.
+
+```
+Failed to deserialize: invalid type: unit value, expected struct JoinDefinitionStatic
+```
+
+The rrot cause is that Cube needs to know how to calculate `COUNT(1)` and it expects a measure
+called `count` to be defined in the cube or view. Please add one to resolve this issue.
+
 
 [wiki-utc-time-zone]: https://en.wikipedia.org/wiki/Coordinated_Universal_Time
 [ref-data-model]: /product/data-modeling/overview
@@ -396,3 +411,4 @@ Additionally, note that ungrouped queries have additional requirements for
 [ref-query-rewrite]: /product/configuration/reference/config#query_rewrite
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
 [ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming
+[ref-tableau]: /product/configuration/visualization-tools/tableau

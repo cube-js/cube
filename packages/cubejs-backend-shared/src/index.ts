@@ -25,3 +25,5 @@ export * from './FileRepository';
 export * from './decorators';
 export * from './PerfTracker';
 export * from './disposedProxy';
+export * from './logger';
+export * from './pool';

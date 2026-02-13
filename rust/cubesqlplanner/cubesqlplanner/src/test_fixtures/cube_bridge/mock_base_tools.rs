@@ -5,11 +5,13 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
     MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -33,6 +35,10 @@ pub struct MockBaseTools {
 
     #[builder(default = Rc::new(MockJoinGraph::new()))]
     join_graph: Rc<MockJoinGraph>,
+
+    /// Map of cube_name -> Vec<member_name> for all_cube_members
+    #[builder(default = HashMap::new())]
+    cube_members: HashMap<String, Vec<String>>,
 }
 
 impl Default for MockBaseTools {
@@ -76,11 +82,15 @@ impl BaseTools for MockBaseTools {
     }
 
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
-        todo!("get_allocated_params not implemented in mock")
+        Ok(vec![])
     }
 
-    fn all_cube_members(&self, _path: String) -> Result<Vec<String>, CubeError> {
-        todo!("all_cube_members not implemented in mock")
+    fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError> {
+        Ok(self
+            .cube_members
+            .get(&path)
+            .cloned()
+            .unwrap_or_else(Vec::new))
     }
 
     fn interval_and_minimal_time_unit(&self, _interval: String) -> Result<Vec<String>, CubeError> {
@@ -97,10 +107,11 @@ impl BaseTools for MockBaseTools {
 
     fn pre_aggregation_table_name(
         &self,
-        _cube_name: String,
-        _name: String,
+        cube_name: String,
+        name: String,
     ) -> Result<String, CubeError> {
-        todo!("pre_aggregation_table_name not implemented in mock")
+        let key = format!("{}.{}", cube_name, name);
+        Ok(PlanSqlTemplates::alias_name(&key))
     }
 
     fn join_tree_for_hints(

@@ -11,7 +11,7 @@ use sqlparser::ast::{
 use std::{collections::HashMap, error::Error};
 
 use super::types::ColumnType;
-use crate::sql::shim::ConnectionError;
+use crate::sql::postgres::ConnectionError;
 
 #[derive(Debug)]
 enum PlaceholderType {

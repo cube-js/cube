@@ -1,12 +1,12 @@
 # Core Data APIs
 
-Core Data APIs enable you to query and retrieve data from your Cube semantic layer using various protocols and formats, including SQL, DAX, MDX, REST, and GraphQL.
+Core Data APIs enable you to query and retrieve data from your Cube semantic layer using various protocols and formats, including SQL, DAX, REST, and GraphQL.
 
 ## Choosing the Right API
 
 * To connect to [Microsoft Power BI][ref-powerbi], use the [DAX API][ref-dax-api]
 
-* To connect to [Microsoft Excel][ref-excel], use either the [MDX API][ref-mdx-api] or [Cube Cloud for Excel][ref-cube-cloud-for-excel]
+* To connect to [Microsoft Excel][ref-excel], use [Cube Cloud for Excel][ref-cube-cloud-for-excel]
 
 * To connect to [Google Sheets][ref-sheets], use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets]
 
@@ -33,9 +33,9 @@ tools][ref-viz-tools]. Some of the features with partial support are listed belo
 | Feature | ✅ Supported in |
 | --- | --- |
 | [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
-| Flat [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>[Apache Superset][ref-superset] via [Semantic Layer Sync][ref-sls]<br/>[Preset][ref-preset] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
-| Nested [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api] |
-| [Custom time formats][ref-custom-time-formats] | [Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api]<br/><br/>Also, supported in [Playground][ref-playground] and [Workbooks][ref-workbooks] |
+| Flat [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>[Apache Superset][ref-superset] via [Semantic Layer Sync][ref-sls]<br/>[Preset][ref-preset] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
+| Nested [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api] |
+| [Custom time formats][ref-custom-time-formats] | [Playground][ref-playground] and [Workbooks][ref-workbooks] |
 
 ## Authentication methods
 
@@ -44,8 +44,8 @@ tools][ref-viz-tools]:
 
 | Method | ✅ Supported in |
 | --- | --- |
-| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
-| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
+| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
+| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
 | [JSON Web Token][ref-auth-jwt] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
 
@@ -55,7 +55,6 @@ tools][ref-viz-tools]:
 [ref-queries]: /product/apis-integrations/core-data-apis/queries
 [ref-sql-api]: /product/apis-integrations/core-data-apis/sql-api
 [ref-dax-api]: /product/apis-integrations/core-data-apis/dax-api
-[ref-mdx-api]: /product/apis-integrations/core-data-apis/mdx-api
 [ref-rest-api]: /product/apis-integrations/core-data-apis/rest-api
 [ref-graphql-api]: /product/apis-integrations/core-data-apis/graphql-api
 [ref-sls]: /product/apis-integrations/semantic-layer-sync

@@ -1,5 +1,5 @@
 module.exports = {
   "dashboards": "Dashboards",
-  "embedding": "Embedding"
+  "scheduled-refreshes": "Scheduled Refreshes"
 }
 

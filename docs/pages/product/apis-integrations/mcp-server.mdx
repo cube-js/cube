@@ -1,6 +1,6 @@
 # MCP server
 
-The Cube MCP (Model Context Protocol) server provides seamless integration with AI assistants like Claude Desktop and Cursor, enabling direct chat functionality with Cube's AI agent for analytics and data exploration.
+Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth. You don’t need to run a local MCP server or manage API keys.
 
 <InfoBox>
 
@@ -12,43 +12,166 @@ The MCP server is available on [Premium and Enterprise plans](https://cube.dev/p
 
 Model Context Protocol (MCP) is an open standard that enables AI assistants to securely connect to external data sources and tools. The Cube MCP Server acts as a bridge between your AI assistant and Cube's analytics platform, allowing you to ask data questions directly from your coding environment.
 
+## Remote MCP server (recommended)
 
-## Tools Available
+Cube hosts a remote MCP server endpoint for your tenant. MCP clients connect over HTTPS and authenticate via OAuth.
 
-- `chat`: Interactive chat with Cube AI agent for analytics and data exploration with streaming real-time responses
+### Overview
 
-## Installation & Setup
+- **Endpoint:** `https://<cube-mcp-server-host>/api/mcp`
+- **OAuth discovery:** `https://<cube-mcp-server-host>/.well-known/oauth`
+- **OAuth flow:** Authorization Code + PKCE, `client_id` = `cube-mcp-client`, scope = `mcp-agent-access`
+- **Agent selection:** Uses the **Remote MCP Defaults** (default deployment + agent) set by your admin
 
-### Prerequisites
+### Admin setup
 
-Before setting up the MCP server, ensure you have:
+#### Prerequisites
+
+Before enabling Remote MCP, make sure you have:
 
 - **Admin privileges** in your Cube instance
 - An active Cube tenant
-- Claude Desktop or Cursor installed
+- Remote MCP URL configured
 
-### 1. Obtain Required Credentials
+#### 1) Confirm Remote MCP URL
 
-You'll need three key pieces of information:
+Remote MCP uses your Cube MCP server host. If the URL isn’t configured, the Remote MCP page will show “Remote MCP configuration is unavailable.”
 
-#### `CUBE_CHAT_API_URL`
+#### 2) Set Remote MCP Defaults
 
-- Copy the complete Chat API URL from your agent settings (**Chat API URL** field) in <Btn>Admin → Agents → Click on Agent</Btn>
-- This is the full endpoint URL for your agent
+Go to <Btn>Admin → Remote MCP</Btn> and select:
 
-#### `CUBE_API_KEY`
+- **Default Deployment**
+- **Default Agent**
 
-- Navigate to <Btn>Admin → Agents → Click on Agent → Enable API Key</Btn>
+These defaults are required for the OAuth token exchange.
 
-#### `USER_ID`
+<Screenshot src="https://lgo0ecceic.ucarecd.net/284e72c6-c536-4a24-b5ae-9c0a9bf0e8b7/"/>
 
-- A unique identifier for the user (e.g., email address or user ID)
-- Used for session settings and personalization
+## Connect to Claude
 
-## Configuration
+### Claude Code
 
+```bash
+claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/api/mcp
+```
 
-Add the following configuration to your Claude Desktop or Cursor MCP settings:
+#### Authentication and usage flow:
+
+1. Run the command copied from <Btn>Admin → Remote MCP → Claude → Claude Code</Btn>.
+2. Then run Claude and use `/mcp` to list available servers.
+3. Select `cube-mcp-server` and choose `Authenticate`.
+2. A browser window opens for authentication.
+3. Log into Cube and choose your tenant.
+4. Return to Claude Code and start asking questions.
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/68c3e7e2-def2-4aec-84a5-8cded3473def/"/>
+
+### Claude (Team/Enterprise)
+
+1. Open Settings in Claude (web or desktop).
+2. Scroll to **Integrations** and click **Add more**.
+3. Use:
+   - **Integration name:** Cube MCP
+   - **Integration URL:** `https://<cube-mcp-server-host>/api/mcp`
+4. Complete the OAuth flow to grant access.
+5. Enable tools in any new chats.
+
+#### Use Cube in Claude chat
+
+1. Start a new chat in Claude.
+2. Open the tools menu and enable **Cube MCP** (use the tools search if you have many tools).
+3. Ask a data question. Toggle the tool off to disable it for that chat.
+
+### Claude (Desktop app)
+
+```json
+{
+  "mcpServers": {
+    "cube-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "--transport", "http", "https://<cube-mcp-server-host>/api/mcp"]
+    }
+  }
+}
+```
+
+## Connect to Cursor
+
+Add the Remote MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
+
+```json
+{
+  "mcpServers": {
+    "cube-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "--transport", "http", "https://<cube-mcp-server-host>/api/mcp"]
+    }
+  }
+}
+```
+
+## Connect to Codex
+
+Preferred (CLI):
+
+```bash
+codex mcp add cube-mcp-server --url https://<cube-mcp-server-host>/api/mcp
+```
+
+If this is your first time using MCP in Codex, enable the feature in `~/.codex/config.toml`:
+
+```editorconfig
+[features]
+rmcp_client = true
+```
+
+Manual setup:
+
+```editorconfig
+[features]
+rmcp_client = true
+
+[mcp_servers."cube-mcp-server"]
+url = "https://<cube-mcp-server-host>/api/mcp"
+```
+
+Then run `codex mcp login cube-mcp-server` to authenticate.
+
+## Connect to other MCP clients
+
+For any MCP-compatible client:
+
+1. Add a new server with the **Remote MCP Endpoint**.
+2. The client will auto-discover OAuth and prompt for authentication.
+3. Complete the OAuth flow to grant access to your Cube deployment.
+
+## Available actions
+
+- Chat with your Cube AI agent over MCP
+- Query data and request analysis
+- Receive responses directly in your MCP client
+
+## Example workflows
+
+- Ask a data question in natural language
+- Get SQL generated by the agent
+- Request summaries, trends, and insights
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/102c3c3e-3657-42aa-8d3d-2029ca21115c/"/>
+
+## Troubleshooting
+
+- **Remote MCP configuration is unavailable**: Configure the Remote MCP URL.
+- **Remote MCP OAuth integration is not configured**: Enable MCP in <Btn>Admin → Team & Security → OAuth Integrations</Btn>.
+- **Remote MCP defaults are not configured**: Set defaults in <Btn>Admin → Remote MCP</Btn> under **Remote MCP Defaults**.
+- **redirect_uri is not allowed**: For self-hosted or custom clients, update `MCP_ALLOWED_REDIRECT_PATTERNS` on console-server.
+
+## Local MCP server
+
+The local MCP server runs on the client and talks directly to the Chat API using an API key. Use this for self-hosted or development setups. Remote MCP is recommended for most users.
+
+Basic config example:
 
 ```json
 {
@@ -59,28 +182,13 @@ Add the following configuration to your Claude Desktop or Cursor MCP settings:
       "env": {
         "CUBE_CHAT_API_URL": "https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state",
         "CUBE_API_KEY": "your_api_key_here",
-        "USER_ID": "user@example.com"
+        "INTERNAL_USER_ID": "analyst@yourcompany.com"
       }
     }
   }
 }
 ```
 
-## Usage Examples
+For local server details and updates, see the GitHub repo for `@cube-dev/mcp-server`: [cubedevinc/cube-mcp-server][ref-mcp-server-github].
 
-Once configured, you can interact with Cube's AI agent directly from your AI assistant:
-
-Ask natural language questions about your data:
-
-- _Show me revenue trends for the last 6 months_
-- _What are our top-performing products this quarter?_
-- _How does customer acquisition compare year-over-year?_
-
-The server will stream real-time analytics responses with data visualizations and SQL queries.
-
-## How It Works
-
-The MCP server integrates with Cube's [Chat API][ref-chat-api] using API key authentication directly. The Chat API URL should be copied from your agent settings in the Cube admin panel to ensure you're using the correct dynamic endpoint for your deployment.
-
-[ref-api-keys]: /product/administration/workspace/api-keys
-[ref-chat-api]: /product/apis-integrations/embed-apis/chat-api
+[ref-mcp-server-github]: https://github.com/cubedevinc/cube-mcp-server

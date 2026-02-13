@@ -245,8 +245,14 @@ impl PhysicalPlanBuilder {
                 ));
             } else {
                 for position in positions {
+                    // Use the symbol from schema at the found position instead of
+                    // o.member_symbol() which may lack granularity context for time dimensions.
+                    // This ensures ORDER BY uses the same symbol as GROUP BY.
+                    let symbol = logical_schema
+                        .get_member_at_position(position)
+                        .unwrap_or_else(|| o.member_symbol());
                     result.push(OrderBy::new(
-                        Expr::Member(MemberExpression::new(o.member_symbol())),
+                        Expr::Member(MemberExpression::new(symbol)),
                         position + 1,
                         o.desc(),
                     ));

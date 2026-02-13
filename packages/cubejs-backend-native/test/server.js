@@ -116,6 +116,7 @@ const meta_fixture = require('./meta');
   native.setupLogger(
     ({ event }) => console.log(event),
     'trace',
+    false,
   );
 
   const server = await native.registerInterface({

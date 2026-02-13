@@ -287,7 +287,7 @@ impl TableCreator {
         trace_obj: &Option<String>,
         extension: &Option<serde_json::Value>,
     ) -> Result<IdRow<Table>, CubeError> {
-        let columns_to_set = convert_columns_type(columns)?;
+        let columns_to_set = convert_columns_type(columns, self.config_obj.allow_decimal128())?;
         let mut indexes_to_create = Vec::new();
         if let Some(mut p) = partitioned_index {
             let part_index_name = match p.name.0.as_mut_slice() {
@@ -464,7 +464,7 @@ impl TableCreator {
             let cols = parser
                 .parse_streaming_source_table()
                 .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
-            let res = convert_columns_type(&cols)
+            let res = convert_columns_type(&cols, self.config_obj.allow_decimal128())
                 .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
             Some(res)
         } else {
@@ -573,7 +573,10 @@ impl TableCreator {
     }
 }
 
-pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeError> {
+pub fn convert_columns_type(
+    columns: &Vec<ColumnDef>,
+    allow_decimal128: bool,
+) -> Result<Vec<Column>, CubeError> {
     let mut rolupdb_columns = Vec::new();
 
     for (i, col) in columns.iter().enumerate() {
@@ -617,7 +620,8 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                         ExactNumberInfo::Precision(p) => (Some(*p), None),
                         ExactNumberInfo::PrecisionAndScale(p, s) => (Some(*p), Some(*s)),
                     };
-                    let (precision, scale) = proper_decimal_args(&precision, &scale);
+                    let (precision, scale) =
+                        proper_decimal_args(&precision, &scale, allow_decimal128);
                     if precision > 18 {
                         ColumnType::Decimal96 {
                             precision: precision as i32,
@@ -726,16 +730,21 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
     }
     Ok(rolupdb_columns)
 }
-fn proper_decimal_args(precision: &Option<u64>, scale: &Option<u64>) -> (i32, i32) {
+fn proper_decimal_args(
+    precision: &Option<u64>,
+    scale: &Option<u64>,
+    allow_decimal128: bool,
+) -> (i32, i32) {
     let mut precision = precision.unwrap_or(18);
-    let scale = scale.unwrap_or(5);
-    // TODO upgrade DF
-    // if precision > 27 {
-    //     precision = 27;
-    // }
-    // if scale > 5 {
-    //     scale = 10;
-    // }
+    let mut scale = scale.unwrap_or(5);
+    if !allow_decimal128 {
+        if precision > 27 {
+            precision = 27;
+        }
+        if scale > 5 {
+            scale = 10;
+        }
+    }
     if scale > precision {
         precision = scale;
     }

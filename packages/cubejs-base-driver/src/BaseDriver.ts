@@ -13,6 +13,7 @@ import {
   isFilePath,
   isSslKey,
   isSslCert,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import fs from 'fs';
 
@@ -152,7 +153,7 @@ const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
 export abstract class BaseDriver implements DriverInterface {
   private readonly testConnectionTimeoutValue: number = 10000;
 
-  protected logger: any;
+  protected logger?: LoggerFn;
 
   /**
    * Class constructor.
@@ -673,7 +674,7 @@ export abstract class BaseDriver implements DriverInterface {
     return cancelCombinator(fn);
   }
 
-  public setLogger(logger: any) {
+  public setLogger(logger: LoggerFn) {
     this.logger = logger;
   }
 

@@ -38,7 +38,7 @@ export default function Header({ selectedKeys }: Props) {
     <StyledHeader>
       <div style={{ float: 'left' }}>
         <img
-          src="./cube-logo.svg"
+          src="./cube-core-logo-adapted_for_dark_bg.svg"
           style={{ height: 28, marginRight: 28 }}
           alt=""
         />
@@ -58,8 +58,8 @@ export default function Header({ selectedKeys }: Props) {
             <Link to="/frontend-integrations">Frontend Integrations</Link>
           </StyledMenuItem>
 
-          <StyledMenuItem key="/connect-to-bi">
-            <Link to="/connect-to-bi">Connect to BI</Link>
+          <StyledMenuItem key="/cube-bi">
+            <Link to="/cube-bi">Cube BI</Link>
           </StyledMenuItem>
 
           <StyledMenuButton
