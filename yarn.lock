@@ -3165,7 +3165,7 @@
     pump "^3.0.0"
     secure-json-parse "^2.3.1"
 
-"@emnapi/core@^1.1.0":
+"@emnapi/core@^1.1.0", "@emnapi/core@^1.3.1":
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/@emnapi/core/-/core-1.3.1.tgz#9c62d185372d1bddc94682b87f376e03dfac3f16"
   integrity sha512-pVGjBIt1Y6gg3EJN8jTcfpP/+uuRksIo055oE/OBkDNcjZqVbfkWCksG1Jp4yZnj3iKWyWX8fdG/j6UDYPbFog==
@@ -3173,7 +3173,7 @@
     "@emnapi/wasi-threads" "1.0.1"
     tslib "^2.4.0"
 
-"@emnapi/runtime@^1.1.0":
+"@emnapi/runtime@^1.1.0", "@emnapi/runtime@^1.3.1":
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/@emnapi/runtime/-/runtime-1.3.1.tgz#0fcaa575afc31f455fd33534c19381cfce6c6f60"
   integrity sha512-kEBmG8KyqtxJZv+ygbEim+KCGtIq1fC22Ms3S4ziXmYKm8uyoLX0MHONVKwp+9opg390VaKRNt4a7A9NwmpNhw==
@@ -5310,6 +5310,15 @@
     "@emnapi/runtime" "^1.1.0"
     "@tybys/wasm-util" "^0.9.0"
 
+"@napi-rs/wasm-runtime@^0.2.5":
+  version "0.2.7"
+  resolved "https://registry.yarnpkg.com/@napi-rs/wasm-runtime/-/wasm-runtime-0.2.7.tgz#288f03812a408bc53c2c3686c65f38fe90f295eb"
+  integrity sha512-5yximcFK5FNompXfJFoWanu5l8v1hNGqNHh9du1xETp9HWk/B/PzvchX55WYOPaIeNglG8++68AAiauBAtbnzw==
+  dependencies:
+    "@emnapi/core" "^1.3.1"
+    "@emnapi/runtime" "^1.3.1"
+    "@tybys/wasm-util" "^0.9.0"
+
 "@ngtools/webpack@18.2.19":
   version "18.2.19"
   resolved "https://registry.yarnpkg.com/@ngtools/webpack/-/webpack-18.2.19.tgz#b5ba332a47bdf8660abbfb5369f2d4d0588bfefc"
@@ -5321,6 +5330,98 @@
   integrity sha512-fL1wpr8hhD5gT2dA1qifeVaoDFlQR5es8tFuKqjHX+kdOtdNHnxkVZbtIrR2rxnMFvehkjaZRNV2H/gPXlb0hw==
   dependencies:
     easy-stack "1.0.1"
+
+"@node-rs/xxhash-android-arm-eabi@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-android-arm-eabi/-/xxhash-android-arm-eabi-1.7.6.tgz#49c9461e73f7bbd30d1c3fba289f5abd70b2642e"
+  integrity sha512-ptmfpFZ8SgTef58Us+0HsZ9BKhyX/gZYbhLkuzPt7qUoMqMSJK85NC7LEgzDgjUiG+S5GahEEQ9/tfh9BVvKhw==
+
+"@node-rs/xxhash-android-arm64@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-android-arm64/-/xxhash-android-arm64-1.7.6.tgz#ddf69837c66b1531590a6cb0b065570946c993e2"
+  integrity sha512-n4MyZvqifuoARfBvrZ2IBqmsGzwlVI3kb2mB0gVvoHtMsPbl/q94zoDBZ7WgeP3t4Wtli+QS3zgeTCOWUbqqUQ==
+
+"@node-rs/xxhash-darwin-arm64@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-darwin-arm64/-/xxhash-darwin-arm64-1.7.6.tgz#768b73984b7239dff40e1df35d412e39b7cd3a2e"
+  integrity sha512-6xGuE07CiCIry/KT3IiwQd/kykTOmjKzO/ZnHlE5ibGMx64NFE0qDuwJbxQ4rGyUzgJ0KuN9ZdOhUDJmepnpcw==
+
+"@node-rs/xxhash-darwin-x64@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-darwin-x64/-/xxhash-darwin-x64-1.7.6.tgz#b22fd63c9b337d3c6ff5acd2b26a9bb6e53285af"
+  integrity sha512-Z4oNnhyznDvHhxv+s0ka+5KG8mdfLVucZMZMejj9BL+CPmamClygPiHIRiifRcPAoX9uPZykaCsULngIfLeF3Q==
+
+"@node-rs/xxhash-freebsd-x64@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-freebsd-x64/-/xxhash-freebsd-x64-1.7.6.tgz#16fd0350fbed351bcdaf0d7f22ceee9579eb93a6"
+  integrity sha512-arCDOf3xZ5NfBL5fk5J52sNPjXL2cVWN6nXNB3nrtRFFdPBLsr6YXtshAc6wMVxnIW4VGaEv/5K6IpTA8AFyWw==
+
+"@node-rs/xxhash-linux-arm-gnueabihf@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-linux-arm-gnueabihf/-/xxhash-linux-arm-gnueabihf-1.7.6.tgz#fa89aa1e69b872d858c42e91b380eed7440ec21a"
+  integrity sha512-ndLLEW+MwLH3lFS0ahlHCcmkf2ykOv/pbP8OBBeAOlz/Xc3jKztg5IJ9HpkjKOkHk470yYxgHVaw1QMoMzU00A==
+
+"@node-rs/xxhash-linux-arm64-gnu@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-linux-arm64-gnu/-/xxhash-linux-arm64-gnu-1.7.6.tgz#b39d340779fcca5240da1c78a70504341b6abfa4"
+  integrity sha512-VX7VkTG87mAdrF2vw4aroiRpFIIN8Lj6NgtGHF+IUVbzQxPudl4kG+FPEjsNH8y04yQxRbPE7naQNgHcTKMrNw==
+
+"@node-rs/xxhash-linux-arm64-musl@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-linux-arm64-musl/-/xxhash-linux-arm64-musl-1.7.6.tgz#3adfa6a0793617a32dc8208f2eb542a095af01d2"
+  integrity sha512-AB5m6crGYSllM9F/xZNOQSPImotR5lOa9e4arW99Bv82S+gcpphI8fGMDOVTTCXY/RLRhvvhwzLDxmLB2O8VDg==
+
+"@node-rs/xxhash-linux-x64-gnu@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-linux-x64-gnu/-/xxhash-linux-x64-gnu-1.7.6.tgz#b82e8bd2b8c38ed10044e531741e2684806c071e"
+  integrity sha512-a2A6M+5tc0PVlJlE/nl0XsLEzMpKkwg7Y1lR5urFUbW9uVQnKjJYQDrUojhlXk0Uv3VnYQPa6ThmwlacZA5mvQ==
+
+"@node-rs/xxhash-linux-x64-musl@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-linux-x64-musl/-/xxhash-linux-x64-musl-1.7.6.tgz#b23bbc32837693c0e7c1d2b5bb6d84c1a0987d0f"
+  integrity sha512-WioGJSC1GoxQpmdQrG5l/uddSBAS4XCWczHNwXe895J5xadGQzyvmr0r17BNfihvbBUDH1H9jwouNYzDDeA6+A==
+
+"@node-rs/xxhash-wasm32-wasi@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-wasm32-wasi/-/xxhash-wasm32-wasi-1.7.6.tgz#ca5ae8b2c1a65dcbb349713685ddf0479bb01e7e"
+  integrity sha512-WDXXKMMFMrez+esm2DzMPHFNPFYf+wQUtaXrXwtxXeQMFEzleOLwEaqV0+bbXGJTwhPouL3zY1Qo2xmIH4kkTg==
+  dependencies:
+    "@napi-rs/wasm-runtime" "^0.2.5"
+
+"@node-rs/xxhash-win32-arm64-msvc@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-win32-arm64-msvc/-/xxhash-win32-arm64-msvc-1.7.6.tgz#b6b6fd422ab4af6411fb00c05a49fe5185387868"
+  integrity sha512-qjDFUZJT/Zq0yFS+0TApkD86p0NBdPXlOoHur9yNeO9YX2/9/b1sC2P7N27PgOu13h61TUOvTUC00e/82jAZRQ==
+
+"@node-rs/xxhash-win32-ia32-msvc@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-win32-ia32-msvc/-/xxhash-win32-ia32-msvc-1.7.6.tgz#512671309ef5b7aa5e675f58a167e99ff968bceb"
+  integrity sha512-s7a+mQWOTnU4NiiypRq/vbNGot/il0HheXuy9oxJ0SW2q/e4BJ8j0pnP6UBlAjsk+005A76vOwsEj01qbQw8+A==
+
+"@node-rs/xxhash-win32-x64-msvc@1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash-win32-x64-msvc/-/xxhash-win32-x64-msvc-1.7.6.tgz#3ac70d92d85028999bdda209cd587871e077bb78"
+  integrity sha512-zHOHm2UaIahRhgRPJll+4Xy4Z18aAT/7KNeQW+QJupGvFz+GzOFXMGs3R/3B1Ktob/F5ui3i1MrW9GEob3CWTg==
+
+"@node-rs/xxhash@^1.7.6":
+  version "1.7.6"
+  resolved "https://registry.yarnpkg.com/@node-rs/xxhash/-/xxhash-1.7.6.tgz#8ba2c17a3d0ea2cd2ea4db2568bb357a82ea9ca4"
+  integrity sha512-XMisO+aQHsVpxRp/85EszTtOQTOlhPbd149P/Xa9F55wafA6UM3h2UhOgOs7aAzItnHU/Aw1WQ1FVTEg7WB43Q==
+  optionalDependencies:
+    "@node-rs/xxhash-android-arm-eabi" "1.7.6"
+    "@node-rs/xxhash-android-arm64" "1.7.6"
+    "@node-rs/xxhash-darwin-arm64" "1.7.6"
+    "@node-rs/xxhash-darwin-x64" "1.7.6"
+    "@node-rs/xxhash-freebsd-x64" "1.7.6"
+    "@node-rs/xxhash-linux-arm-gnueabihf" "1.7.6"
+    "@node-rs/xxhash-linux-arm64-gnu" "1.7.6"
+    "@node-rs/xxhash-linux-arm64-musl" "1.7.6"
+    "@node-rs/xxhash-linux-x64-gnu" "1.7.6"
+    "@node-rs/xxhash-linux-x64-musl" "1.7.6"
+    "@node-rs/xxhash-wasm32-wasi" "1.7.6"
+    "@node-rs/xxhash-win32-arm64-msvc" "1.7.6"
+    "@node-rs/xxhash-win32-ia32-msvc" "1.7.6"
+    "@node-rs/xxhash-win32-x64-msvc" "1.7.6"
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
