@@ -23,7 +23,7 @@ describe('CrateDriver', () => {
 
   afterAll(async () => {
     await tests?.release();
-    await db.stop();
+    await db?.stop();
   });
 
   test('query', async () => {
