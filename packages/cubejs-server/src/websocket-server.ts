@@ -6,7 +6,7 @@ import { CancelableInterval, createCancelableInterval, getEnv } from '@cubejs-ba
 import type { CubejsServerCore } from '@cubejs-backend/server-core';
 import type http from 'http';
 import type https from 'https';
-import { SubscriptionServer } from './ws/subscription-server';
+import { SubscriptionServer } from '@cubejs-backend/api-gateway';
 
 export interface WebSocketServerOptions {
   processSubscriptionsInterval?: number,

@@ -31,7 +31,7 @@ const createMocks = () => {
 
   const mockEventEmitterInterface = {
     on: jest.fn(),
-    off: jest.fn(),
+    emit: jest.fn(),
   };
 
   return {
@@ -150,7 +150,7 @@ describe('SubscriptionServer', () => {
 
   describe('Auth Flow', () => {
     it('should complete successful authorization handshake', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface, sentMessages } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
       
       await server.processMessage('conn-1', JSON.stringify({ authorization: 'valid-token' }));
@@ -164,7 +164,7 @@ describe('SubscriptionServer', () => {
     });
 
     it('should reject when contextAcceptor rejects', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface, sentMessages } = createMocks();
       mockContextAcceptor.mockResolvedValue({ accepted: false, rejectMessage: { error: 'Rejected' } });
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
@@ -175,7 +175,7 @@ describe('SubscriptionServer', () => {
     });
 
     it('should return 403 for unauthorized method call', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface, sentMessages } = createMocks();
       mockSubscriptionStore.getAuthContext.mockResolvedValue(null);
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
