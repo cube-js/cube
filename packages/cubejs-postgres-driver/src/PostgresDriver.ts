@@ -5,7 +5,7 @@
  */
 
 import { getEnv, assertDataSource, Pool } from '@cubejs-backend/shared';
-import { types, FieldDef, ClientConfig } from 'pg';
+import { types, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import * as moment from 'moment';
@@ -16,7 +16,7 @@ import {
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
-import { PgClient } from './PgClient';
+import { PgClient, PgClientConfig } from './PgClient';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
@@ -56,7 +56,7 @@ const hllTypeParser = (val: string) => Buffer.from(
   'hex'
 ).toString('base64');
 
-export type PostgresDriverConfiguration = ClientConfig & {
+export type PostgresDriverConfiguration = PgClientConfig & {
   // @deprecated Please use maxPoolSize
   max?: number | undefined;
   // @deprecated Please use minPoolSize
@@ -123,7 +123,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       config.dataSource ||
       assertDataSource('default');
 
-    const poolConfig: ClientConfig = {
+    const poolConfig: PgClientConfig = {
       host: getEnv('dbHost', { dataSource }),
       database: getEnv('dbName', { dataSource }),
       port: getEnv('dbPort', { dataSource }),

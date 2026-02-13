@@ -1,4 +1,4 @@
-import { Client, QueryResult, QueryResultRow } from 'pg';
+import { Client, QueryResult, ClientConfig, QueryResultRow } from 'pg';
 
 export class PgClient extends Client {
   public isEnding(): boolean {
@@ -14,4 +14,5 @@ export class PgClient extends Client {
   }
 }
 
+export type PgClientConfig = ClientConfig;
 export type PgQueryResult<T extends QueryResultRow = any> = QueryResult<T>;
