@@ -1,4 +1,4 @@
-FROM node:20.17.0-bookworm-slim AS build
+FROM node:22.22.0-bookworm-slim AS build
 
 ARG IMAGE_VERSION=dev
 
@@ -86,7 +86,7 @@ RUN yarn lerna run build
 
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
-FROM node:20.17.0-bookworm-slim AS final
+FROM node:22.22.0-bookworm-slim AS final
 
 ARG IMAGE_VERSION=dev
 

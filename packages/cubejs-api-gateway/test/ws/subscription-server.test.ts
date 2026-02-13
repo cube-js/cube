@@ -29,20 +29,26 @@ const createMocks = () => {
 
   const mockContextAcceptor = jest.fn().mockResolvedValue({ accepted: true });
 
+  const mockEventEmitterInterface = {
+    on: jest.fn(),
+    off: jest.fn(),
+  };
+
   return {
     mockApiGateway,
     mockSubscriptionStore,
     mockSendMessage,
     mockContextAcceptor,
     sentMessages,
+    mockEventEmitterInterface,
   };
 };
 
 describe('SubscriptionServer', () => {
   describe('Message Validation', () => {
     it('should accept valid auth message', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface, sentMessages } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       await server.processMessage('conn-1', JSON.stringify({ authorization: 'token123' }));
 
@@ -51,8 +57,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should accept valid unsubscribe message', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 'msg-1' }));
 
@@ -60,8 +66,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should accept unsubscribe with numeric messageId', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 123 }));
 
@@ -69,8 +75,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should accept valid load message', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface, sentMessages } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'load',
@@ -84,8 +90,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should accept messageId as number', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface, sentMessages } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'load',
@@ -99,8 +105,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should reject invalid JSON payload', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       await server.processMessage('conn-1', 'not valid json');
 
@@ -110,8 +116,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should reject message with unknown fields', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'load',
@@ -126,8 +132,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should reject messageId & requestId', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'load',
@@ -144,9 +150,9 @@ describe('SubscriptionServer', () => {
 
   describe('Auth Flow', () => {
     it('should complete successful authorization handshake', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
-
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
+      
       await server.processMessage('conn-1', JSON.stringify({ authorization: 'valid-token' }));
 
       expect(mockApiGateway.checkAuthFn).toHaveBeenCalledWith(
@@ -158,9 +164,9 @@ describe('SubscriptionServer', () => {
     });
 
     it('should reject when contextAcceptor rejects', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
       mockContextAcceptor.mockResolvedValue({ accepted: false, rejectMessage: { error: 'Rejected' } });
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
 
@@ -169,9 +175,9 @@ describe('SubscriptionServer', () => {
     });
 
     it('should return 403 for unauthorized method call', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
       mockSubscriptionStore.getAuthContext.mockResolvedValue(null);
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'load',
@@ -191,8 +197,8 @@ describe('SubscriptionServer', () => {
 
   describe('Method Dispatch', () => {
     it('should call load method correctly', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'load',
@@ -212,8 +218,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should call sql method correctly', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'sql',
@@ -231,8 +237,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should call meta method correctly', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'meta',
@@ -249,8 +255,8 @@ describe('SubscriptionServer', () => {
     });
 
     it('should call subscribe method correctly', async () => {
-      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
-      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, mockEventEmitterInterface } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor, mockEventEmitterInterface);
 
       const message = {
         method: 'subscribe',
