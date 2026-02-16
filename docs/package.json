@@ -32,9 +32,6 @@
     "remark-math": "^5.1.1",
     "unist-util-visit": "^4.1.2"
   },
-  "resolutions": {
-    "next-mdx-remote": "4.2.1"
-  },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.3",
     "@types/node": "^18.13.0",
