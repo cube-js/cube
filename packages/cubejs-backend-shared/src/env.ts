@@ -1580,6 +1580,71 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Redshift AWS region for IAM authentication.
+   */
+  redshiftAwsRegion: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_AWS_REGION', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift provisioned cluster identifier for IAM authentication.
+   */
+  redshiftClusterIdentifier: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift Serverless workgroup name for IAM authentication.
+   */
+  redshiftWorkgroupName: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_WORKGROUP_NAME', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift IAM Assume Role ARN for cross-account access.
+   */
+  redshiftAssumeRoleArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_ASSUME_ROLE_ARN', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift IAM Assume Role External ID.
+   */
+  redshiftAssumeRoleExternalId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_ASSUME_ROLE_EXTERNAL_ID', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * Materialize Driver                                              *
    ***************************************************************** */
