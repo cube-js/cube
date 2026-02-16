@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
+
+### Bug Fixes
+
+- **postgres-driver:** Don't expose PoolConfig as driver options ([#10393](https://github.com/cube-js/cube/issues/10393)) ([4f2e72f](https://github.com/cube-js/cube/commit/4f2e72fe17979013a50da06c8be5a69685c079ad))
+
+### Features
+
+- **postgres-driver:** Migrate to our Pool implementation ([#10389](https://github.com/cube-js/cube/issues/10389)) ([a57cabe](https://github.com/cube-js/cube/commit/a57cabed6bab72a34c738cb9b0d6e65c9a72ec60))
+- **redshift-driver:** Support IAM auth ([#10391](https://github.com/cube-js/cube/issues/10391)) ([c711ca7](https://github.com/cube-js/cube/commit/c711ca7c3b781fd975b9b9e5325865b9d27710a4))
+
 ## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
 
 **Note:** Version bump only for package @cubejs-backend/shared
