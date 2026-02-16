@@ -96,11 +96,15 @@ export class YamlCompiler {
 
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
+        this.checkDuplicateNames(yamlObj.cubes || [], 'cube', errorsReport);
+
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
           const transpiledCube = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
           transpiledFilesContent.push(transpiledCube);
         });
       } else if (key === 'views') {
+        this.checkDuplicateNames(yamlObj.views || [], 'view', errorsReport);
+
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
           const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
           transpiledFilesContent.push(transpiledView);
@@ -314,6 +318,22 @@ export class YamlCompiler {
 
     const body: any = ast.program.body[0];
     return body?.expression;
+  }
+
+  private checkDuplicateNames(items: any[], type: 'cube' | 'view', errorsReport: ErrorReporter) {
+    const seen = new Set<string>();
+
+    for (const item of items) {
+      if (item?.name) {
+        if (seen.has(item.name)) {
+          errorsReport.error(
+            `Found duplicate ${type} name '${item.name}'.`
+          );
+        } else {
+          seen.add(item.name);
+        }
+      }
+    }
   }
 
   private yamlArrayToObj(
