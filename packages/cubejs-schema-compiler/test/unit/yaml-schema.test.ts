@@ -180,7 +180,6 @@ cubes:
     });
   });
 
-
   it('members must be defined as arrays', async () => {
     const { compiler } = prepareYamlCompiler(
       `
