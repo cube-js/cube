@@ -128,11 +128,12 @@ export class YamlCompiler {
   private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
     camelizeCube(cubeObj);
 
-    cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
-    cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
-    cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
-    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
-    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
+    const ctx = { cubeName: cubeObj.name };
+    cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport, ctx);
+    cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport, ctx);
+    cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport, ctx);
+    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport, ctx);
+    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport, ctx);
 
     cubeObj.joins = cubeObj.joins || []; // For edge cases where joins are not defined/null
     if (!Array.isArray(cubeObj.joins)) {
@@ -315,10 +316,38 @@ export class YamlCompiler {
     return body?.expression;
   }
 
-  private yamlArrayToObj(yamlArray, memberType: string, errorsReport: ErrorReporter) {
+  private yamlArrayToObj(
+    yamlArray,
+    memberType: string,
+    errorsReport: ErrorReporter,
+    ctx: { cubeName: string; parent?: { type: string; name: string } }
+  ) {
     if (!Array.isArray(yamlArray)) {
       errorsReport.error(`${memberType}s must be defined as array`);
       return {};
+    }
+
+    // Check for duplicate names
+    const names = yamlArray
+      .map(item => item?.name)
+      .filter(name => name != null);
+
+    const seen = new Set<string>();
+
+    for (const name of names) {
+      if (seen.has(name)) {
+        if (ctx.parent) {
+          errorsReport.error(
+            `Found duplicate ${memberType} '${name}' in ${ctx.parent.type} '${ctx.parent.name}' in cube '${ctx.cubeName}'.`
+          );
+        } else {
+          errorsReport.error(
+            `Member names must be unique within a cube. Found duplicate ${memberType} '${name}' in cube '${ctx.cubeName}'.`
+          );
+        }
+      }
+
+      seen.add(name);
     }
 
     const remapped = yamlArray.map(({ name, indexes, granularities, ...rest }) => {
@@ -329,12 +358,18 @@ export class YamlCompiler {
 
       const res = { [name]: {} };
       if (memberType === 'preAggregation' && indexes) {
-        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
+        indexes = this.yamlArrayToObj(indexes || [], 'preAggregation.index', errorsReport, {
+          cubeName: ctx.cubeName,
+          parent: { type: 'pre-aggregation', name }
+        });
         res[name] = { indexes, ...res[name] };
       }
 
       if (memberType === 'dimension' && granularities) {
-        granularities = this.yamlArrayToObj(granularities || [], `${memberType}.granularity`, errorsReport);
+        granularities = this.yamlArrayToObj(granularities || [], 'dimension.granularity', errorsReport, {
+          cubeName: ctx.cubeName,
+          parent: { type: 'time dimension', name }
+        });
         res[name] = { granularities, ...res[name] };
       }
 
