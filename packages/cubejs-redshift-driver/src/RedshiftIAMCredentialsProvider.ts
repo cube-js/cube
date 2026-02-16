@@ -45,7 +45,7 @@ export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvid
 
     if (!options.dbName) {
       throw new Error(
-        'CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER is required for IAM authentication'
+        'CUBEJS_DB_NAME is required for IAM authentication'
       );
     }
 
