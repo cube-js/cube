@@ -1,0 +1,72 @@
+# SCIM provisioning with Microsoft Entra ID
+
+With SCIM (System for Cross-domain Identity Management) enabled, you can
+automate user provisioning in Cube Cloud and keep user groups synchronized
+with Microsoft Entra ID (formerly Azure Active Directory).
+
+<InfoBox>
+
+SCIM provisioning with Microsoft Entra ID is available in Cube Cloud on
+[Enterprise and above](https://cube.dev/pricing) product tiers.
+Contact [Cube support](https://cube.dev/contact) to activate SCIM for your account.
+
+</InfoBox>
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- Microsoft Entra SAML authentication already configured. If not, complete
+  the [SAML setup][ref-saml] first.
+- Admin permissions in Cube Cloud.
+- Sufficient permissions in Microsoft Entra to manage Enterprise Applications.
+
+## Generate an API key in Cube Cloud
+
+To allow Entra ID to communicate with Cube Cloud via SCIM, you'll need to
+create a dedicated API key:
+
+1. In Cube Cloud, navigate to <Btn>Settings → API Keys</Btn>.
+2. Create a new API key. Give it a descriptive name such as **Entra SCIM**.
+3. Copy the generated key and store it securely — you'll need it in the
+   next step.
+
+## Set up provisioning in Microsoft Entra
+
+This section assumes you already have a Cube Cloud Enterprise Application
+in Microsoft Entra. If you haven't created one yet, follow the
+[SAML setup guide][ref-saml] first.
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com).
+2. Go to <Btn>Applications → Enterprise Applications</Btn> and open your
+   Cube Cloud application.
+3. Navigate to <Btn>Manage → Provisioning</Btn>.
+4. Set the <Btn>Provisioning Mode</Btn> to **Automatic**.
+5. Under <Btn>Admin Credentials</Btn>, fill in the following:
+   - **Tenant URL** — Your Cube Cloud deployment URL with `/api/scim/v2`
+     appended. For example: `https://your-deployment.cubecloud.dev/api/scim/v2`
+   - **Secret Token** — The API key you generated in the previous step.
+6. Click <Btn>Test Connection</Btn> to verify that Entra ID can reach
+   Cube Cloud. Proceed once the test is successful.
+
+## Configure attribute mappings
+
+Next, configure which user and group attributes are synchronized with
+Cube Cloud:
+
+1. In the <Btn>Mappings</Btn> section, select the object type you want to
+   configure — either users or groups.
+2. Remove all default attribute mappings **except** the following:
+   - **For users**: keep `userName` and `displayName`.
+   - **For groups**: keep `displayName` and `members`.
+3. Click <Btn>Save</Btn>.
+
+<InfoBox>
+
+Users provisioned via SCIM will receive the Explorer role.
+To grant admin permissions, update the user's role manually in
+Cube Cloud under <Btn>Team & Security</Btn>.
+
+</InfoBox>
+
+[ref-saml]: /product/administration/sso/microsoft-entra-id/saml

@@ -1811,22 +1811,42 @@
   },
   {
     "source": "/product/workspace/sso",
-    "destination": "/product/administration/workspace/sso",
+    "destination": "/product/administration/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso",
+    "destination": "/product/administration/sso",
     "permanent": true
   },
   {
     "source": "/product/workspace/sso/google-workspace",
-    "destination": "/product/administration/workspace/sso/google-workspace",
+    "destination": "/product/administration/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/google-workspace",
+    "destination": "/product/administration/sso/google-workspace",
     "permanent": true
   },
   {
     "source": "/product/workspace/sso/microsoft-entra-id",
-    "destination": "/product/administration/workspace/sso/microsoft-entra-id",
+    "destination": "/product/administration/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/microsoft-entra-id",
+    "destination": "/product/administration/sso/microsoft-entra-id",
     "permanent": true
   },
   {
     "source": "/product/workspace/sso/okta",
-    "destination": "/product/administration/workspace/sso/okta",
+    "destination": "/product/administration/sso/okta",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/okta",
+    "destination": "/product/administration/sso/okta",
     "permanent": true
   },
   {
