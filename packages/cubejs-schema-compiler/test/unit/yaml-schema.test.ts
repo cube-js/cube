@@ -146,6 +146,69 @@ cubes:
       }
     });
 
+    it('detects duplicate cube names', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: orders
+    sql_table: orders_v2
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
+      }
+    });
+
+    it('detects duplicate view names', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - id
+
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate view name 'orders_view'");
+      }
+    });
+
     it('detects duplicate dimension granularities', async () => {
       const { compiler } = prepareYamlCompiler(`
 cubes:
