@@ -55,9 +55,7 @@ const IGNORED_SCHEMAS = ['pg_catalog', 'pg_internal', 'information_schema', 'mys
  * Redshift driver class.
  */
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
-  private readonly dbName: string;
-
-  private readonly credentialsProvider: RedshiftCredentialsProvider;
+  private readonly credentials: RedshiftCredentialsProvider;
 
   /**
    * Returns default concurrency value.
@@ -95,6 +93,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     const clusterIdentifier = getEnv('redshiftClusterIdentifier', { dataSource });
     const dbPass = getEnv('dbPass', { dataSource });
     const dbUser = getEnv('dbUser', { dataSource });
+    const dbName = getEnv('dbName', { dataSource });
 
     let credentialsProvider: RedshiftCredentialsProvider;
 
@@ -104,26 +103,23 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         assumeRoleArn: getEnv('redshiftAssumeRoleArn', { dataSource }),
         assumeRoleExternalId: getEnv('redshiftAssumeRoleExternalId', { dataSource }),
         clusterIdentifier,
-        dbName: getEnv('dbName', { dataSource }),
+        dbName,
       });
     } else {
       credentialsProvider = new RedshiftPlainCredentialsProvider(
         config.user || dbUser,
         config.password || dbPass,
+        dbName
       );
     }
 
     super(config);
 
-    this.credentialsProvider = credentialsProvider;
-
-    // We need a DB name for querying external tables.
-    // It's not possible to get it later from the pool
-    this.dbName = getEnv('dbName', { dataSource });
+    this.credentials = credentialsProvider;
   }
 
   protected override async createConnection(poolConfig: PgClientConfig): Promise<PgClient> {
-    const { user, password } = await this.credentialsProvider.getCredentials();
+    const { user, password } = await this.credentials.getCredentials();
     return super.createConnection({ ...poolConfig, user, password });
   }
 
@@ -196,11 +192,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   // eslint-disable-next-line camelcase
   private async tablesForExternalSchema(schemaName: string): Promise<{ table_name: string }[]> {
-    return this.query(`SHOW TABLES FROM SCHEMA ${this.dbName}.${schemaName}`, []);
+    return this.query(`SHOW TABLES FROM SCHEMA ${this.credentials.getDbName()}.${schemaName}`, []);
   }
 
   private async columnsForExternalTable(schemaName: string, tableName: string): Promise<QueryColumnsResult[]> {
-    return this.query(`SHOW COLUMNS FROM TABLE ${this.dbName}.${schemaName}.${tableName}`, []);
+    return this.query(`SHOW COLUMNS FROM TABLE ${this.credentials.getDbName()}.${schemaName}.${tableName}`, []);
   }
 
   /**
@@ -222,7 +218,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * @override
    */
   public override async getSchemas(): Promise<QuerySchemasResult[]> {
-    const schemas = await this.query<QuerySchemasResult>(`SHOW SCHEMAS FROM DATABASE ${this.dbName}`, []);
+    const schemas = await this.query<QuerySchemasResult>(`SHOW SCHEMAS FROM DATABASE ${this.credentials.getDbName()}`, []);
 
     return schemas
       .filter(s => !IGNORED_SCHEMAS.includes(s.schema_name))

@@ -11,13 +11,13 @@ export interface RedshiftIAMCredentialProviderOptions {
 }
 
 interface CachedCredentials {
-  dbUser: string;
-  dbPassword: string;
+  user: string;
+  password: string;
   expiration: Date;
 }
 
-// Refresh 10m before expiry
-const REFRESH_BUFFER_MS = 10 * 60 * 1000;
+// Refresh 1m before expiry
+const REFRESH_BUFFER_MS = 60 * 1000;
 
 export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvider {
   protected readonly region: string;
@@ -63,12 +63,15 @@ export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvid
     }
   }
 
-  public async getCredentials(): Promise<{ user: string; password: string }> {
-    const creds = await this.resolveCredentials();
-    return { user: creds.dbUser, password: creds.dbPassword };
+  public getDbName(): string {
+    return this.dbName;
   }
 
-  private isExpired(): boolean {
+  public async getCredentials(): Promise<{ user: string; password: string }> {
+    return this.resolveCredentials();
+  }
+
+  protected isExpired(): boolean {
     if (!this.cached) {
       return true;
     }
@@ -76,12 +79,12 @@ export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvid
     return (this.cached.expiration.getTime() - Date.now()) < REFRESH_BUFFER_MS;
   }
 
-  private async resolveCredentials(): Promise<CachedCredentials> {
+  protected async resolveCredentials(): Promise<CachedCredentials> {
     if (this.cached && !this.isExpired()) {
       return this.cached;
     }
 
-    // Concurrency guard=
+    // Concurrency guard
     if (this.inflightRefresh) {
       return this.inflightRefresh;
     }
@@ -93,7 +96,7 @@ export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvid
     return this.inflightRefresh;
   }
 
-  private async refreshCredentials(): Promise<CachedCredentials> {
+  protected async refreshCredentials(): Promise<CachedCredentials> {
     const client = new RedshiftClient({
       region: this.region,
       ...(this.awsCredentials && { credentials: this.awsCredentials }),
@@ -102,6 +105,8 @@ export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvid
     const command = new GetClusterCredentialsWithIAMCommand({
       ClusterIdentifier: this.clusterIdentifier,
       DbName: this.dbName,
+      // By default, it's 15m, 1h is a maximum time
+      DurationSeconds: 1800
     });
 
     const response = await client.send(command);
@@ -111,8 +116,8 @@ export class RedshiftIAMCredentialsProvider implements RedshiftCredentialsProvid
     }
 
     this.cached = {
-      dbUser: response.DbUser,
-      dbPassword: response.DbPassword,
+      user: response.DbUser,
+      password: response.DbPassword,
       expiration: response.Expiration,
     };
 
