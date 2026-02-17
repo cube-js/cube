@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
+
+### Features
+
+- **schema-compiler:** Pass jinjaUsed flag to native transpileYaml ([#10402](https://github.com/cube-js/cube/issues/10402)) ([884811a](https://github.com/cube-js/cube/commit/884811a85ff940834722876b1570fa861f387ed5))
+- **schema-compiler:** Yaml - duplicate check for view/cube names ([#10400](https://github.com/cube-js/cube/issues/10400)) ([11a140f](https://github.com/cube-js/cube/commit/11a140f4183b8a44a8800549da22b588ecd5ac02))
+- **schema-compiler:** Yaml - validate duplicates ([#10399](https://github.com/cube-js/cube/issues/10399)) ([d711612](https://github.com/cube-js/cube/commit/d71161210cb24b4b0039c343a3f67d8fe4197f3a))
+
+### Performance Improvements
+
+- **schema-compiler:** Remove JSON.stringify in cache key hashing ([#10404](https://github.com/cube-js/cube/issues/10404)) ([6aae245](https://github.com/cube-js/cube/commit/6aae245585fc8a654a264e34eaf7a47f860d1533))
+
 ## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

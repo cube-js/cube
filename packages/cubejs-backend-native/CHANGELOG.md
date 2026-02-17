@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
+
+### Features
+
+- **schema-compiler:** Pass jinjaUsed flag to native transpileYaml ([#10402](https://github.com/cube-js/cube/issues/10402)) ([884811a](https://github.com/cube-js/cube/commit/884811a85ff940834722876b1570fa861f387ed5))
+
 ## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
 
 **Note:** Version bump only for package @cubejs-backend/native
