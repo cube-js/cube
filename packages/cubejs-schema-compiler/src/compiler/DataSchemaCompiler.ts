@@ -97,6 +97,7 @@ export type TranspileOptions = {
   transpilerNames?: string[];
   compilerId?: string;
   stage?: 0 | 1 | 2 | 3;
+  jinjaUsed?: boolean;
 };
 
 export type CompileStage = 0 | 1 | 2 | 3;
@@ -581,7 +582,9 @@ export class DataSchemaCompiler {
   private async transpileFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    options: TranspileOptions = {}
+    options: TranspileOptions = {
+      jinjaUsed: false,
+    }
   ): Promise<(FileContent | undefined)> {
     if (file.fileName.endsWith('.js')) {
       return this.transpileJsFile(file, errorsReport, options);
@@ -638,13 +641,14 @@ export class DataSchemaCompiler {
   private async transpileYamlFilesNativeBulk(
     files: FileContent[],
     errorsReport: ErrorReporter,
-    { compilerId }: TranspileOptions
+    { compilerId, jinjaUsed }: TranspileOptions
   ): Promise<(FileContent | undefined)[]> {
     const reqDataArr = files.map(file => ({
       fileName: file.fileName,
       fileContent: file.content,
       transpilers: [],
       compilerId: compilerId || '',
+      jinjaUsed: jinjaUsed || false,
     }));
     const res = await transpileYaml(reqDataArr);
 
@@ -722,7 +726,7 @@ export class DataSchemaCompiler {
   private async transpileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    { cubeNames, cubeSymbols, compilerId }: TranspileOptions
+    { cubeNames, cubeSymbols, compilerId, jinjaUsed }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
     const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
 
@@ -738,6 +742,7 @@ export class DataSchemaCompiler {
         fileContent: file.content,
         transpilers: [],
         compilerId: compilerId || '',
+        jinjaUsed: jinjaUsed || false,
       };
 
       errorsReport.inFile(file);
@@ -754,6 +759,7 @@ export class DataSchemaCompiler {
         fileName: file.fileName,
         content: file.content,
         transpilers: [],
+        jinjaUsed: jinjaUsed || false,
         cubeNames,
         cubeSymbols,
       };
@@ -790,12 +796,16 @@ export class DataSchemaCompiler {
       this.compiledJinjaCache.set(cacheKey, renderedFileContent);
     }
 
-    return this.transpileYamlFile({ ...file, content: renderedFileContent }, errorsReport, options);
+    return this.transpileYamlFile({ ...file, content: renderedFileContent }, errorsReport, {
+      ...options,
+      jinjaUsed: true
+    });
   }
 
   public withQuery(query, fn) {
     const oldQuery = this.currentQuery;
     this.currentQuery = query;
+
     try {
       return fn();
     } finally {

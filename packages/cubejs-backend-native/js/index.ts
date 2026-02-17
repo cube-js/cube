@@ -127,6 +127,7 @@ export interface TransformConfig {
   fileContent: string;
   transpilers: string[];
   compilerId: string;
+  jinjaUsed?: boolean;
   metaData?: {
     cubeNames: string[];
     cubeSymbols: Record<string, Record<string, boolean>>;
