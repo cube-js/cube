@@ -759,6 +759,7 @@ export class DataSchemaCompiler {
         fileName: file.fileName,
         content: file.content,
         transpilers: [],
+        jinjaUsed: jinjaUsed || false,
         cubeNames,
         cubeSymbols,
       };
@@ -804,6 +805,7 @@ export class DataSchemaCompiler {
   public withQuery(query, fn) {
     const oldQuery = this.currentQuery;
     this.currentQuery = query;
+
     try {
       return fn();
     } finally {
