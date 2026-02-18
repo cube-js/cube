@@ -1,0 +1,7 @@
+.wrapper {
+  margin: 24px 0;
+}
+
+.wrapper > iframe {
+  border-radius: 6px;
+}

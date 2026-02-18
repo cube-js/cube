@@ -1,6 +1,9 @@
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs'
 import { Btn } from './components/mdx/Btn'
 import { InfoBox, WarningBox, SuccessBox, ReferenceBox } from './components/mdx/AlertBox'
+import { Screenshot, Diagram } from './components/mdx/Screenshot'
+import { YouTubeVideo } from './components/mdx/YouTubeVideo'
+import { LoomVideo } from './components/mdx/LoomVideo'
 
 const themeComponents = getThemeComponents()
 
@@ -14,8 +17,8 @@ const EmptyStub = () => null
 const customComponents = {
   // UI Components
   Btn,
-  Screenshot: EmptyStub,
-  Diagram: EmptyStub,
+  Screenshot,
+  Diagram,
 
   // Code display
   CodeTabs: Stub,
@@ -31,8 +34,8 @@ const customComponents = {
   GridItem: Stub,
 
   // Video embeds
-  YouTubeVideo: EmptyStub,
-  LoomVideo: EmptyStub,
+  YouTubeVideo,
+  LoomVideo,
 
   // Cube-specific components
   CommunitySupportedDriver: Stub,
