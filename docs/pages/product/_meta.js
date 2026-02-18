@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "introduction": "Introduction",
   "getting-started": "Getting started",
   "configuration": "Data Sources & Config",

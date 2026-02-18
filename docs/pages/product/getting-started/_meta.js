@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "connect-your-data": "Connect your data",
   "use-analytics-chat": "Use analytics chat",
   "create-workbooks-and-dashboards": "Create workbooks and dashboards",

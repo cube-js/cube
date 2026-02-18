@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "getting-started-pre-aggregations": "Getting started with pre-aggregations",
   "using-pre-aggregations": "Using pre-aggregations",
   "matching-pre-aggregations": "Matching pre-aggregations",

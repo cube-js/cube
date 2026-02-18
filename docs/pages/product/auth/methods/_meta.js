@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "name-password": "Name and password",
   "kerberos": "Kerberos",
   "ntlm": "NTLM",

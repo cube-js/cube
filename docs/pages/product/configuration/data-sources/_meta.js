@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "aws-athena": "Amazon Athena",
   "aws-redshift": "Amazon Redshift",
   "pinot": "Apache Pinot",

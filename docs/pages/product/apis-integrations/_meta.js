@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "embed-apis": "Embed APIs",
   "core-data-apis": "Core Data APIs",
   "orchestration-api": "Orchestration API",

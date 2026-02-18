@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "overview": "Overview",
   "concepts": "Concepts",
   "syntax": "Syntax",

@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "environment-variables": "Environment variables",
   "using-ssl-connections-to-data-source": "SSL",
   "data-store-cost-saving-guide": "Data source usage",

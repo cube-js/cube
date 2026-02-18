@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "load-data": "Load data",
   "connect-to-snowflake": "Connect to Snowflake",
   "create-data-model": "Create data model",

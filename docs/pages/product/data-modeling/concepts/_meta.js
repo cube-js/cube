@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "calculated-members": "Calculated members",
   "multi-stage-calculations": "Multi-stage calculations",
   "working-with-joins": "Joins between cubes",

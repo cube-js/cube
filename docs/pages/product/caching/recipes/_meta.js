@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "non-additivity": "Non-additive measures",
   "incrementally-building-pre-aggregations-for-a-date-range": "Incremental pre-aggregations",
   "disabling-pre-aggregations": "Disabling pre-aggregations",

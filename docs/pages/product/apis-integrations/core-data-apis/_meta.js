@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "queries": "Queries",
   "sql-api": "SQL API",
   "dax-api": "DAX API",

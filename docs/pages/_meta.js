@@ -12,7 +12,7 @@
 // deployment: "Deployment",
 // monitoring: "Monitoring",
 
-module.exports = {
+export default {
   // index: {
   //   title: "Home",
   //   theme: {

@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "vizard": "Chart Prototyping",
   "data-model": "Data Model",
   "visual-model": "Visual Model",

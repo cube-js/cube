@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "cubejs-client-core": "core",
   "cubejs-client-react": "react",
   "cubejs-client-ngx": "ngx",

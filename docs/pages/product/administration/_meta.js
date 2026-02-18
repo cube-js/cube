@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "users-and-permissions": "Users & permissions",
   "sso": "SSO & identity providers",
   "ai": "AI",

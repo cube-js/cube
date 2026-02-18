@@ -1,9 +1,8 @@
-module.exports = {
+export default {
   "appsmith": "Appsmith",
   "bubble": "Bubble",
   "budibase": "Budibase",
   "deepnote": "Deepnote",
-  "explo": "Explo",
   "google-sheets": "Google Sheets",
   "hashboard": "Hashboard",
   "hex": "Hex",

@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "style-guide": "Style guide",
   "designing-metrics": "Designing metrics",
   "percentiles": "Averages and percentiles",

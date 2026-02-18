@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "providers": "Cloud providers",
   "infrastructure": "Infrastructure options",
   "vpc": "VPC",

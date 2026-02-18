@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "load-data": "Load data",
   "connect-to-databricks": "Connect to Databricks",
   "create-data-model": "Create data model",

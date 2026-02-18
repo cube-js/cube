@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "cube": "Cubes",
   "view": "Views",
   "measures": "Measures",
