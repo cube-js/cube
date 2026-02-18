@@ -1,0 +1,44 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: left;
+  padding: 22px;
+  gap: 16px;
+  border: 1px solid #E5E5EC;
+  border-radius: 8px;
+  box-sizing: border-box;
+  box-shadow: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+@media screen and (min-width: 992px) {
+  .wrapper {
+    height: 86px;
+  }
+}
+
+.wrapper:hover {
+  background: #F6F6F8;
+}
+
+.item {
+  display: flex;
+}
+
+.image {
+  display: flex;
+  height: 40px;
+  align-self: center;
+}
+
+.title {
+  display: flex;
+  align-self: center;
+  margin-left: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  color: #0f0f35;
+}

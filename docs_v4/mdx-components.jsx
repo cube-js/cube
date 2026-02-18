@@ -4,6 +4,9 @@ import { InfoBox, WarningBox, SuccessBox, ReferenceBox } from './components/mdx/
 import { Screenshot, Diagram } from './components/mdx/Screenshot'
 import { YouTubeVideo } from './components/mdx/YouTubeVideo'
 import { LoomVideo } from './components/mdx/LoomVideo'
+import { CommunitySupportedDriver } from './components/mdx/CommunitySupportedDriver'
+import { Grid } from './components/mdx/Grid'
+import { GridItem } from './components/mdx/GridItem'
 
 const themeComponents = getThemeComponents()
 
@@ -30,15 +33,15 @@ const customComponents = {
   ReferenceBox,
 
   // Layout
-  Grid: Stub,
-  GridItem: Stub,
+  Grid,
+  GridItem,
 
   // Video embeds
   YouTubeVideo,
   LoomVideo,
 
   // Cube-specific components
-  CommunitySupportedDriver: Stub,
+  CommunitySupportedDriver,
   QueryBuilder: EmptyStub,
   QueryRenderer: EmptyStub,
   CubeProvider: Stub,
