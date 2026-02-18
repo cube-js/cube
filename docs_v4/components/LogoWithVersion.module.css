@@ -1,0 +1,19 @@
+.container {
+  display: flex;
+  align-items: center;
+  width: 16rem; /* Match sidebar width (w-64) */
+}
+
+.logoLink {
+  display: flex;
+  align-items: center;
+}
+
+.version {
+  color: #6b7280;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  background: #f3f4f6;
+  margin-left: 0.625rem;
+}
