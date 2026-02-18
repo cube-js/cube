@@ -16,7 +16,7 @@ default = ["with-chrono"]
 tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1.36"
 log = "0.4"
-bytes = "1.2"
+bytes = "1.11"
 byteorder = "1.4"
 thiserror = "2"
 chrono = { version = "0.4", package = "chrono", default-features = false, features = [
