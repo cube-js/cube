@@ -2,10 +2,19 @@ import nextra from 'nextra'
 import path from 'path'
 
 const withNextra = nextra({
-  // Nextra options
+  contentDirBasePath: '/'
 })
 
 export default withNextra({
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/product/introduction',
+        permanent: false
+      }
+    ]
+  },
   outputFileTracingRoot: import.meta.dirname,
   turbopack: {
     root: import.meta.dirname,

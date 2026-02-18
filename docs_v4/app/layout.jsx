@@ -45,7 +45,7 @@ export default async function RootLayout({ children }) {
       dir="ltr"
       suppressHydrationWarning
     >
-      <Head>
+      <Head backgroundColor={{ light: '#ffffff', dark: '#111111' }}>
         {/* Additional head tags can be added here */}
       </Head>
       <body>
