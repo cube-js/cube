@@ -1,7 +1,8 @@
-import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Layout, Navbar } from 'nextra-theme-docs'
 import { Head } from 'nextra/components'
 import { getPageMap } from 'nextra/page-map'
 import 'nextra-theme-docs/style.css'
+import { Footer } from '../components/Footer'
 
 export const metadata = {
   title: 'Cube Documentation',
@@ -14,7 +15,7 @@ const navbar = (
   />
 )
 
-const footer = <Footer>MIT {new Date().getFullYear()} Cube Dev, Inc.</Footer>
+const footer = <Footer />
 
 export default async function RootLayout({ children }) {
   return (
@@ -32,6 +33,7 @@ export default async function RootLayout({ children }) {
           pageMap={await getPageMap()}
           docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs_v4"
           footer={footer}
+          sidebar={{ defaultMenuCollapseLevel: 1 }}
         >
           {children}
         </Layout>
