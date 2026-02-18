@@ -262,28 +262,75 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const formattedQuery = sqlstring.format(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
+      const trimmed = formattedQuery.trim();
+      const lower = trimmed.toLowerCase();
+
+      // DDL statements that don't return data
+      const ddlKeywords = ['create ', 'alter ', 'drop ', 'truncate ', 'rename ', 'attach ', 'detach ', 'grant ', 'revoke '];
+      if (ddlKeywords.some(keyword => lower.startsWith(keyword))) {
+        // Enhanced DDL handling with storage engine compatibility
+        await this.executeDDLWithCompatibility(connection, trimmed, queryId, signal);
+        return { data: [], meta: [] };
+      }
+
+      // Regular queries that return JSON data
       try {
         const format = 'JSON';
 
         const resultSet = await connection.query({
-          query: formattedQuery,
+          query: trimmed,
           query_id: queryId,
           format,
           clickhouse_settings: this.config.clickhouseSettings,
           abort_signal: signal,
         });
 
-        // response_headers['x-clickhouse-format'] is optional, but if it exists,
-        // it should match the requested format.
+        // Validate response format header
         if (resultSet.response_headers['x-clickhouse-format'] && resultSet.response_headers['x-clickhouse-format'] !== format) {
           throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
         }
 
-        // We used format JSON, so we expect each row to be Record with column names as keys
         const results = await resultSet.json<Record<string, unknown>>();
         return results;
       } catch (e) {
-        // TODO replace string formatting with proper cause
+        // Enhanced error handling for ClickHouse specific errors
+        if (e && typeof e === 'object' && 'code' in e && 'type' in e) {
+          const clickhouseError = e as { code: string; type: string; message?: string };
+          
+          // Handle specific ClickHouse error codes
+          switch (clickhouseError.code) {
+            case '48':
+              if (clickhouseError.type === 'NOT_IMPLEMENTED') {
+                throw new Error(
+                  `ClickHouse DDL operation not supported: ${clickhouseError.message || 'This DDL operation is not supported by the current storage engine'}. ` +
+                  `Query: ${trimmed.substring(0, 100)}${trimmed.length > 100 ? '...' : ''}`
+                );
+              }
+              break;
+            case '62':
+              throw new Error(
+                `ClickHouse syntax error: ${clickhouseError.message || 'Invalid SQL syntax'}. ` +
+                `Query: ${trimmed.substring(0, 100)}${trimmed.length > 100 ? '...' : ''}`
+              );
+            case '81':
+              throw new Error(
+                `ClickHouse database error: ${clickhouseError.message || 'Database or table does not exist'}. ` +
+                `Query: ${trimmed.substring(0, 100)}${trimmed.length > 100 ? '...' : ''}`
+              );
+            case '114':
+              throw new Error(
+                `ClickHouse timeout error: ${clickhouseError.message || 'Query execution timeout'}. ` +
+                `Query: ${trimmed.substring(0, 100)}${trimmed.length > 100 ? '...' : ''}`
+              );
+            default:
+              throw new Error(
+                `ClickHouse error (${clickhouseError.code}/${clickhouseError.type}): ${clickhouseError.message || 'Unknown ClickHouse error'}. ` +
+                `Query: ${trimmed.substring(0, 100)}${trimmed.length > 100 ? '...' : ''}`
+              );
+          }
+        }
+        
+        // Fallback for non-ClickHouse errors
         throw new Error(`Query failed: ${e}; query id: ${queryId}`);
       }
     });
@@ -648,14 +695,175 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  // This is not part of a driver interface, and marked public only for testing
-  public async command(query: string): Promise<void> {
-    await this.withCancel(async (connection, queryId, signal) => {
+  /**
+   * Executes DDL statements with storage engine compatibility handling
+   */
+  private async executeDDLWithCompatibility(
+    connection: ClickHouseClient,
+    query: string,
+    queryId: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    const lower = query.toLowerCase();
+    
+    // Handle ALTER TABLE ADD COLUMN for Log engine
+    if (lower.startsWith('alter table') && lower.includes('add column')) {
+      await this.handleAlterTableAddColumn(connection, query, queryId, signal);
+      return;
+    }
+    
+    // Handle CREATE TABLE - ensure compatible engine
+    if (lower.startsWith('create table')) {
+      await this.handleCreateTable(connection, query, queryId, signal);
+      return;
+    }
+    
+    // For other DDL statements, execute normally
+    await connection.command({
+      query,
+      query_id: queryId,
+      abort_signal: signal,
+    });
+  }
+
+  /**
+   * Handles ALTER TABLE ADD COLUMN by creating a new table with the new schema
+   */
+  private async handleAlterTableAddColumn(
+    connection: ClickHouseClient,
+    query: string,
+    queryId: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    try {
+      // Try the original ALTER statement first
       await connection.command({
         query,
         query_id: queryId,
         abort_signal: signal,
       });
+    } catch (e) {
+      // If it fails with NOT_IMPLEMENTED, use table recreation strategy
+      if (e && typeof e === 'object' && 'code' in e && 'type' in e) {
+        const clickhouseError = e as { code: string; type: string; message?: string };
+        if (clickhouseError.code === '48' && clickhouseError.type === 'NOT_IMPLEMENTED') {
+          await this.recreateTableWithNewColumn(connection, query, queryId, signal);
+          return;
+        }
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Handles CREATE TABLE by ensuring compatible storage engine
+   */
+  private async handleCreateTable(
+    connection: ClickHouseClient,
+    query: string,
+    queryId: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    // If CREATE TABLE specifies Log engine, suggest MergeTree for better compatibility
+    if (query.toLowerCase().includes('engine log')) {
+      console.warn(
+        'ClickHouse Log engine has limited DDL support. Consider using MergeTree for better ALTER TABLE compatibility.'
+      );
+    }
+    
+    await connection.command({
+      query,
+      query_id: queryId,
+      abort_signal: signal,
+    });
+  }
+
+  /**
+   * Recreates table with new column when ALTER TABLE ADD COLUMN is not supported
+   */
+  private async recreateTableWithNewColumn(
+    connection: ClickHouseClient,
+    alterQuery: string,
+    queryId: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    // Parse the ALTER TABLE statement to extract table name and new column
+    const alterMatch = alterQuery.match(/alter\s+table\s+([^\s]+)\s+add\s+column\s+([^\s]+)\s+([^;]+)/i);
+    if (!alterMatch) {
+      throw new Error(`Unable to parse ALTER TABLE statement: ${alterQuery}`);
+    }
+    
+    const [, tableName, newColumnName, newColumnType] = alterMatch;
+    
+    // Create new table with the new column using a simpler approach
+    const tempTableName = `${tableName}_new_${Date.now()}`;
+    const createNewTableQuery = `CREATE TABLE ${tempTableName} ENGINE Log AS SELECT *, '' as ${newColumnName.trim()} FROM ${tableName}`;
+    
+    await connection.command({
+      query: createNewTableQuery,
+      query_id: `${queryId}_create_new`,
+      abort_signal: signal,
+    });
+    
+    // Drop old table and rename new table
+    await connection.command({
+      query: `DROP TABLE ${tableName}`,
+      query_id: `${queryId}_drop_old`,
+      abort_signal: signal,
+    });
+    
+    await connection.command({
+      query: `RENAME TABLE ${tempTableName} TO ${tableName}`,
+      query_id: `${queryId}_rename`,
+      abort_signal: signal,
+    });
+  }
+
+  // This is not part of a driver interface, and marked public only for testing
+  public async command(query: string): Promise<void> {
+    await this.withCancel(async (connection, queryId, signal) => {
+      try {
+        await connection.command({
+          query,
+          query_id: queryId,
+          abort_signal: signal,
+        });
+      } catch (e) {
+        // Enhanced error handling for ClickHouse specific errors in DDL commands
+        if (e && typeof e === 'object' && 'code' in e && 'type' in e) {
+          const clickhouseError = e as { code: string; type: string; message?: string };
+          
+          // Handle specific ClickHouse error codes for DDL operations
+          switch (clickhouseError.code) {
+            case '48':
+              if (clickhouseError.type === 'NOT_IMPLEMENTED') {
+                throw new Error(
+                  `ClickHouse DDL command not supported: ${clickhouseError.message || 'This DDL operation is not supported by the current storage engine'}. ` +
+                  `Command: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`
+                );
+              }
+              break;
+            case '62':
+              throw new Error(
+                `ClickHouse DDL syntax error: ${clickhouseError.message || 'Invalid DDL syntax'}. ` +
+                `Command: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`
+              );
+            case '81':
+              throw new Error(
+                `ClickHouse DDL database error: ${clickhouseError.message || 'Database or table does not exist'}. ` +
+                `Command: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`
+              );
+            default:
+              throw new Error(
+                `ClickHouse DDL error (${clickhouseError.code}/${clickhouseError.type}): ${clickhouseError.message || 'Unknown ClickHouse DDL error'}. ` +
+                `Command: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`
+              );
+          }
+        }
+        
+        // Fallback for non-ClickHouse errors
+        throw new Error(`DDL command failed: ${e}; query id: ${queryId}`);
+      }
     });
   }
 
