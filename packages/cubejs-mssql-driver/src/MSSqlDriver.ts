@@ -132,7 +132,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       },
       ...config
     };
-    const { readOnly, ...poolConfig } = this.config;
+    const { readOnly: _, ...poolConfig } = this.config;
     this.connectionPool = new ConnectionPool(poolConfig as MsSQLConfig);
     this.initialConnectPromise = this.connectionPool.connect();
   }
