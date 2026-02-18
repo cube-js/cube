@@ -129,6 +129,18 @@ No extra configuration is required to configure batching for Snowflake.
 Snowflake supports using both [AWS S3][aws-s3] and [Google Cloud
 Storage][google-cloud-storage] for export bucket functionality.
 
+<InfoBox>
+
+Export buckets may be shared across multiple Cube deployments; however, they should not be accessed by external applications or other data sources. 
+
+</InfoBox>
+
+<InfoBox>
+
+To help manage storage costs, it is strongly recommended to configure a retention policy on the bucket, with a duration between 1 hour and 7 days.
+
+</InfoBox>
+
 #### AWS S3
 
 <InfoBox>
