@@ -1,4 +1,5 @@
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs'
+import { Btn } from './components/mdx/Btn'
 
 const themeComponents = getThemeComponents()
 
@@ -11,7 +12,7 @@ const EmptyStub = () => null
 // Stub components - to be replaced with real implementations
 const customComponents = {
   // UI Components
-  Btn: Stub,
+  Btn,
   Screenshot: EmptyStub,
   Diagram: EmptyStub,
 

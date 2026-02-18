@@ -1,0 +1,23 @@
+.button {
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 22px;
+
+  display: inline-block;
+  padding: 0 6px;
+  background: white;
+
+  border-radius: 4px;
+  margin-right: 4px;
+  border: 1px solid hsl(240, 16%, 91%);
+  box-shadow: 2px 2px 0 hsl(240, 16%, 91%);
+}
+
+.button:hover:has(> a) {
+  border-color: hsl(251, 61%, 52%);
+}
+
+.button a,
+.button a:hover {
+  border-bottom: none;
+}
