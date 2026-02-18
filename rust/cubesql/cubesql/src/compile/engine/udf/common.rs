@@ -1392,6 +1392,46 @@ fn postgres_datetime_format_to_iso(format: String) -> String {
         .replace(".MS", "%.3f")
 }
 
+pub fn create_epoch_to_timestamp_udf() -> ScalarUDF {
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
+        Arc::new(move |args: &[ColumnarValue]| match args {
+            [ColumnarValue::Scalar(ScalarValue::Int64(Some(value)))] => Ok(ColumnarValue::Scalar(
+                ScalarValue::TimestampNanosecond(Some(value.clone() * 1_000_000_000), None),
+            )),
+            [ColumnarValue::Scalar(ScalarValue::Float64(Some(value)))] => {
+                let seconds = value.round() as i64;
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                    Some(seconds * 1_000_000_000),
+                    None,
+                )))
+            }
+            [ColumnarValue::Scalar(ScalarValue::Decimal128(Some(value), _, _))] => {
+                let seconds = (*value) as i64;
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                    Some(seconds * 1_000_000_000),
+                    None,
+                )))
+            }
+            _ => Err(DataFusionError::Execution(
+                "Unsupported arguments for to_timestamp".to_string(),
+            )),
+        });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    let signature = Signature::one_of(
+        vec![
+            TypeSignature::Exact(vec![DataType::Int64]),
+            TypeSignature::Exact(vec![DataType::Float64]),
+            TypeSignature::Exact(vec![DataType::Decimal(10, 0)]),
+        ],
+        Volatility::Immutable,
+    );
+
+    ScalarUDF::new("epoch_to_timestamp", &signature, &return_type, &fun)
+}
+
 pub fn create_str_to_date_udf() -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |args: &[ColumnarValue]| {

@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+assertion_line: 316
+expression: "execute_query(\"\n                SELECT epoch_to_timestamp(1621123456)\n                UNION ALL\n                SELECT epoch_to_timestamp(1621123456.789)\n                UNION ALL\n                SELECT epoch_to_timestamp(cast(1621123456 as numeric(10)))\n            \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------------------+
+| epoch_to_timestamp(Int64(1621123456)) |
++---------------------------------------+
+| 2021-05-16T00:04:16.000               |
+| 2021-05-16T00:04:17.000               |
+| 2021-05-16T00:04:16.000               |
++---------------------------------------+
