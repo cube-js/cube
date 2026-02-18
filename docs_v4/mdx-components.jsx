@@ -1,5 +1,6 @@
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs'
 import { Btn } from './components/mdx/Btn'
+import { InfoBox, WarningBox, SuccessBox, ReferenceBox } from './components/mdx/AlertBox'
 
 const themeComponents = getThemeComponents()
 
@@ -20,10 +21,10 @@ const customComponents = {
   CodeTabs: Stub,
 
   // Alert boxes
-  InfoBox: Stub,
-  WarningBox: Stub,
-  SuccessBox: Stub,
-  ReferenceBox: Stub,
+  InfoBox,
+  WarningBox,
+  SuccessBox,
+  ReferenceBox,
 
   // Layout
   Grid: Stub,

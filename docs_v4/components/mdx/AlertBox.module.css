@@ -1,0 +1,35 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-left: 3px solid;
+  margin: 24px 0;
+  font-size: 16px;
+  line-height: 28px;
+}
+
+.info {
+  background-color: #EBF4FC;
+  border-left-color: #3C94E5;
+  color: #2A4475;
+}
+
+.warning {
+  background-color: #FEF6EF;
+  border-left-color: #F0A45E;
+  color: #7A442A;
+}
+
+.success {
+  background-color: #E9F9F2;
+  border-left-color: #27C27C;
+  color: #26534B;
+}
+
+.reference {
+  background-color: #f6f6f6;
+  border-left-color: #666666;
+  color: #333333;
+}
