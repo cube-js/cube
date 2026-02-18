@@ -138,7 +138,7 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const tablesSchema = await driver.tablesSchema();
+      const tablesSchema = await driver.tablesSchemaV2();
 
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
