@@ -25,14 +25,14 @@ CUBEJS_DB_PASS=**********
 
 | Environment Variable | Description                                                                         | Possible Values           | Required |
 | -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |
-| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
-| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| <EnvVar>CUBEJS_DB_HOST</EnvVar>     | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| <EnvVar>CUBEJS_DB_PORT</EnvVar>     | The port for the database connection                                                | A valid port number       |    ❌    |
+| <EnvVar>CUBEJS_DB_NAME</EnvVar>     | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| <EnvVar>CUBEJS_DB_USER</EnvVar>     | The username used to connect to the database                                        | A valid database username |    ✅    |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>     | The password used to connect to the database                                        | A valid database password |    ✅    |
+| <EnvVar>CUBEJS_DB_SSL</EnvVar>      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
+| <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar> | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
+| <EnvVar>CUBEJS_CONCURRENCY</EnvVar> | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
@@ -73,7 +73,7 @@ Postgres does not support export buckets.
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Postgres, set the
-`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+<EnvVar>CUBEJS_DB_SSL</EnvVar> environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
@@ -83,14 +83,14 @@ Database][ref-recipe-enable-ssl].
 
 Use `CUBEJS_DB_SSL=true` to enable SSL if you have SSL enabled for your RDS
 cluster. Download the new certificate [here][aws-rds-pem], and provide the
-contents of the downloaded file to `CUBEJS_DB_SSL_CA`. All other SSL-related
+contents of the downloaded file to <EnvVar>CUBEJS_DB_SSL_CA</EnvVar>. All other SSL-related
 environment variables can be left unset. See [the SSL section][self-ssl] for
 more details. More info on AWS RDS SSL can be found [here][aws-docs-rds-ssl].
 
 ### Google Cloud SQL
 
-You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
-`true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how
+You can connect to an SSL-enabled MySQL database by setting <EnvVar>CUBEJS_DB_SSL</EnvVar> to
+`true`. You may also need to set <EnvVar>CUBEJS_DB_SSL_SERVERNAME</EnvVar>, depending on how
 you are [connecting to Cloud SQL][gcp-docs-sql-connect].
 
 ### Heroku

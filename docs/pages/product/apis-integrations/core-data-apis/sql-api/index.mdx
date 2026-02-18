@@ -126,20 +126,20 @@ There are trade-offs associated with each query type:
 
 ### Cube Core
 
-**SQL API is disabled by default.** To enable the SQL API, set `CUBEJS_PG_SQL_PORT`
+**SQL API is disabled by default.** To enable the SQL API, set <EnvVar>CUBEJS_PG_SQL_PORT</EnvVar>
 to a port number you'd like to connect to with a Postgres-compatible tool.
 
 | Credential | Environment variable, etc.     |
 |:---------- |:------------------------------ |
 | Host       | Host you're running Cube at    |
-| Port       | Set via `CUBEJS_PG_SQL_PORT`   |
-| User name  | Set via `CUBEJS_SQL_USER`      |
-| Password   | Set via `CUBEJS_SQL_PASSWORD`  |
+| Port       | Set via <EnvVar>CUBEJS_PG_SQL_PORT</EnvVar>   |
+| User name  | Set via <EnvVar>CUBEJS_SQL_USER</EnvVar>      |
+| Password   | Set via <EnvVar>CUBEJS_SQL_PASSWORD</EnvVar>  |
 | Database   | Any valid string, e.g., `cube` |
 
 You can also use
 [`checkSqlAuth`][ref-config-checksqlauth],
-[`canSwitchSqlUser`][ref-config-canswitchsqluser], and `CUBEJS_SQL_SUPER_USER`
+[`canSwitchSqlUser`][ref-config-canswitchsqluser], and <EnvVar>CUBEJS_SQL_SUPER_USER</EnvVar>
 to configure [custom authentication][ref-sql-api-auth].
 
 #### Example
@@ -183,7 +183,7 @@ and choose the <Btn>SQL API</Btn> tab.
 
 By default, the SQL API is enabled on port 5432, the user name is `cube`, and
 a random  string is generated for the password. You can customize these with
-`CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and `CUBEJS_SQL_PASSWORD` environment
+<EnvVar>CUBEJS_PG_SQL_PORT</EnvVar>, <EnvVar>CUBEJS_SQL_USER</EnvVar>, and <EnvVar>CUBEJS_SQL_PASSWORD</EnvVar> environment
 variables by navigating to <Btn>Settings → Configration</Btn>.
 
 ### Query planning
@@ -208,7 +208,7 @@ does not apply to SQL API queries. They can return an unlimited number of rows.
 
 Each concurrent connection to the SQL API consumes some resources and attempting
 to establish too many connections at once can lead to an out-of-memory crash.
-You can use the `CUBEJS_MAX_SESSIONS` environment variable to adjust the session
+You can use the <EnvVar>CUBEJS_MAX_SESSIONS</EnvVar> environment variable to adjust the session
 limit.
 
 ## Troubleshooting

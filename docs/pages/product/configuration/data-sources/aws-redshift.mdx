@@ -41,7 +41,7 @@ instead of username and password. When running in AWS (EC2, ECS, EKS with
 IRSA), the driver can use the instance's IAM role to obtain temporary
 database credentials automatically.
 
-Omit `CUBEJS_DB_USER` and `CUBEJS_DB_PASS` to enable IAM authentication:
+Omit <EnvVar>CUBEJS_DB_USER</EnvVar> and <EnvVar>CUBEJS_DB_PASS</EnvVar> to enable IAM authentication:
 
 ```dotenv
 CUBEJS_DB_TYPE=redshift
@@ -97,21 +97,21 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 
 | Environment Variable                        | Description                                                                         | Possible Values           | Required |
 | ------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`                            | The host URL for a database                                                         | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`                            | The port for the database connection                                                | A valid port number       |    ❌    |
-| `CUBEJS_DB_NAME`                            | The name of the database to connect to                                              | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`                            | The username used to connect to the database                                        | A valid database username | ✅<sup>1</sup> |
-| `CUBEJS_DB_PASS`                            | The password used to connect to the database                                        | A valid database password | ✅<sup>1</sup> |
-| `CUBEJS_DB_SSL`                             | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
-| `CUBEJS_DB_MAX_POOL`                        | The maximum number of concurrent database connections to pool. Default is `16`      | A valid number            |    ❌    |
-| `CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER`     | The Redshift cluster identifier. Required for IAM authentication                    | A valid cluster identifier |    ❌    |
-| `CUBEJS_DB_REDSHIFT_AWS_REGION`             | The AWS region of the Redshift cluster. Required for IAM authentication             | [A valid AWS region][aws-docs-regions] |    ❌    |
-| `CUBEJS_DB_REDSHIFT_ASSUME_ROLE_ARN`        | The ARN of the IAM role to assume for cross-account access                          | A valid IAM role ARN      |    ❌    |
-| `CUBEJS_DB_REDSHIFT_ASSUME_ROLE_EXTERNAL_ID`| The external ID for the assumed role's trust policy                                 | A string                  |    ❌    |
-| `CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN`      |                                                                                     |                           |    ❌    |
-| `CUBEJS_CONCURRENCY`                        | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
+| <EnvVar>CUBEJS_DB_HOST</EnvVar>                            | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| <EnvVar>CUBEJS_DB_PORT</EnvVar>                            | The port for the database connection                                                | A valid port number       |    ❌    |
+| <EnvVar>CUBEJS_DB_NAME</EnvVar>                            | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| <EnvVar>CUBEJS_DB_USER</EnvVar>                            | The username used to connect to the database                                        | A valid database username | ✅<sup>1</sup> |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>                            | The password used to connect to the database                                        | A valid database password | ✅<sup>1</sup> |
+| <EnvVar>CUBEJS_DB_SSL</EnvVar>                             | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
+| <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar>                        | The maximum number of concurrent database connections to pool. Default is `16`      | A valid number            |    ❌    |
+| <EnvVar>CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER</EnvVar>     | The Redshift cluster identifier. Required for IAM authentication                    | A valid cluster identifier |    ❌    |
+| <EnvVar>CUBEJS_DB_REDSHIFT_AWS_REGION</EnvVar>             | The AWS region of the Redshift cluster. Required for IAM authentication             | [A valid AWS region][aws-docs-regions] |    ❌    |
+| <EnvVar>CUBEJS_DB_REDSHIFT_ASSUME_ROLE_ARN</EnvVar>        | The ARN of the IAM role to assume for cross-account access                          | A valid IAM role ARN      |    ❌    |
+| <EnvVar>CUBEJS_DB_REDSHIFT_ASSUME_ROLE_EXTERNAL_ID</EnvVar>| The external ID for the assumed role's trust policy                                 | A string                  |    ❌    |
+| <EnvVar>CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN</EnvVar>      |                                                                                     |                           |    ❌    |
+| <EnvVar>CUBEJS_CONCURRENCY</EnvVar>                        | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
 
-<sup>1</sup> Required when using password-based authentication. When using IAM authentication, omit these and set `CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER` and `CUBEJS_DB_REDSHIFT_AWS_REGION` instead. The driver uses the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, etc.) to obtain temporary database credentials.
+<sup>1</sup> Required when using password-based authentication. When using IAM authentication, omit these and set <EnvVar>CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER</EnvVar> and <EnvVar>CUBEJS_DB_REDSHIFT_AWS_REGION</EnvVar> instead. The driver uses the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, etc.) to obtain temporary database credentials.
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
@@ -181,7 +181,7 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ## SSL
 
 To enable SSL-encrypted connections between Cube and AWS Redshift, set the
-`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+<EnvVar>CUBEJS_DB_SSL</EnvVar> environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 

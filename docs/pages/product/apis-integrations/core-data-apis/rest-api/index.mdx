@@ -108,7 +108,7 @@ from your JavaScript applications.
 ### WebSocket transport
 
 WebSocket transport can be used to provide real-time experience. You can configure it via
-the `CUBEJS_WEB_SOCKETS` environment variable.
+the <EnvVar>CUBEJS_WEB_SOCKETS</EnvVar> environment variable.
 
 You can use the [`websocat` utility][link-websocat] to test the WebSocket transport:
 
@@ -192,15 +192,15 @@ accessible for everyone.
 | No scope  | `/livez`, `/readyz` | ✅ Yes |
 
 You can set accessible API scopes _for all requests_ using the
-`CUBEJS_DEFAULT_API_SCOPES` environment variable. For example, to disallow
-access to the GraphQL API for everyone, set `CUBEJS_DEFAULT_API_SCOPES` to
+<EnvVar>CUBEJS_DEFAULT_API_SCOPES</EnvVar> environment variable. For example, to disallow
+access to the GraphQL API for everyone, set <EnvVar>CUBEJS_DEFAULT_API_SCOPES</EnvVar> to
 `meta,data`.
 
 You can also select accessible API scopes _for each request_ using the
 [`contextToApiScopes`][ref-conf-contexttoapiscopes] configuration option, based
 on the provided [security context][ref-security-context]. For example, to
 restrict access to the `/v1/meta` endpoint to service accounts only, you can set
-`CUBEJS_DEFAULT_API_SCOPES` to `data,graphql` and use the following
+<EnvVar>CUBEJS_DEFAULT_API_SCOPES</EnvVar> to `data,graphql` and use the following
 configuration in the `cube.js` file, assuming that service accounts have
 `service: true` in their security context:
 

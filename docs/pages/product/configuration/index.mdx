@@ -15,7 +15,7 @@ statically and is not supposed to change while a Cube deployment is running.
 
 <InfoBox>
 
-For example, `CUBEJS_DATASOURCES` defines a list of data sources to connect
+For example, <EnvVar>CUBEJS_DATASOURCES</EnvVar> defines a list of data sources to connect
 to; changing that list would require the deployment to restart.
 
 </InfoBox>
@@ -184,7 +184,7 @@ Cube Cloud automatically installs dependencies from `requirements.txt` and
 ## Development mode
 
 Cube can be run in an insecure, development mode by setting the
-`CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube in development
+<EnvVar>CUBEJS_DEV_MODE</EnvVar> environment variable to `true`. Putting Cube in development
 mode does the following:
 
 - Disables authentication checks.

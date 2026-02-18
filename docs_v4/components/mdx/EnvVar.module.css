@@ -1,0 +1,11 @@
+.link {
+}
+
+.code {
+  color: hsl(251, 61%, 52%) !important;
+  border-color: hsl(251, 61%, 82%) !important;
+}
+
+.link:hover .code {
+  border-color: hsl(251, 61%, 52%) !important;
+}

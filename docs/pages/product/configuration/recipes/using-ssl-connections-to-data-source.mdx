@@ -8,11 +8,11 @@ instructions.
 
 ## Configuration
 
-Generally, you can enable SSL via the `CUBEJS_DB_SSL` environment variable.
+Generally, you can enable SSL via the <EnvVar>CUBEJS_DB_SSL</EnvVar> environment variable.
 
 ### Cube Core
 
-To enable SSL, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube can
+To enable SSL, set the <EnvVar>CUBEJS_DB_SSL</EnvVar> environment variable to `true`. Cube can
 also be configured to use custom connection settings. For example, to use a
 custom certificate authority and certificates, you could do the following:
 
@@ -69,10 +69,10 @@ Add the following environment variables:
 
 | Environment Variable | Description                                                                                                                                                                                                 | Example                                  |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
-| `CUBEJS_DB_SSL_CA`   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]          | A valid CA bundle or a path to one       |
-| `CUBEJS_DB_SSL_CERT` | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options] | A valid SSL certificate or a path to one |
-| `CUBEJS_DB_SSL_KEY`  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]       | A valid SSL private key or a path to one |
+| <EnvVar>CUBEJS_DB_SSL</EnvVar>      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
+| <EnvVar>CUBEJS_DB_SSL_CA</EnvVar>   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]          | A valid CA bundle or a path to one       |
+| <EnvVar>CUBEJS_DB_SSL_CERT</EnvVar> | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options] | A valid SSL certificate or a path to one |
+| <EnvVar>CUBEJS_DB_SSL_KEY</EnvVar>  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]       | A valid SSL private key or a path to one |
 
 [nodejs-docs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options

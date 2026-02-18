@@ -18,8 +18,8 @@ The diagram below shows how it works during the request processing in Cube:
 
 Relevant configuration options: [`check_auth`][ref-config-check-auth] and [`jwt`][ref-config-jwt].
 
-Relevant environment variables: `CUBEJS_API_SECRET`, `CUBEJS_JWT_KEY`, `CUBEJS_JWK_URL`,
-`CUBEJS_JWT_AUDIENCE`, `CUBEJS_JWT_ISSUER`, `CUBEJS_JWT_SUBJECT`, `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+Relevant environment variables: <EnvVar>CUBEJS_API_SECRET</EnvVar>, <EnvVar>CUBEJS_JWT_KEY</EnvVar>, <EnvVar>CUBEJS_JWK_URL</EnvVar>,
+<EnvVar>CUBEJS_JWT_AUDIENCE</EnvVar>, <EnvVar>CUBEJS_JWT_ISSUER</EnvVar>, <EnvVar>CUBEJS_JWT_SUBJECT</EnvVar>, <EnvVar>CUBEJS_JWT_CLAIMS_NAMESPACE</EnvVar>.
 
 ## Custom authentication
 
@@ -66,7 +66,7 @@ can still use it to [pass a security context][ref-sec-ctx].
 
 Authentication tokens are generated based on your API secret. Cube CLI generates
 an API Secret when a project is scaffolded and saves this value in the `.env`
-file as `CUBEJS_API_SECRET`.
+file as <EnvVar>CUBEJS_API_SECRET</EnvVar>.
 
 You can generate two types of tokens:
 

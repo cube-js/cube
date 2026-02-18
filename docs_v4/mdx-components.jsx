@@ -9,6 +9,7 @@ import { Grid } from './components/mdx/Grid'
 import { GridItem } from './components/mdx/GridItem'
 import { CodeTabs } from './components/mdx/CodeTabs'
 import { Pre } from './components/mdx/Pre'
+import { EnvVar } from './components/mdx/EnvVar'
 
 const themeComponents = getThemeComponents()
 
@@ -45,6 +46,7 @@ const customComponents = {
 
   // Cube-specific components
   CommunitySupportedDriver,
+  EnvVar,
   QueryBuilder: EmptyStub,
   QueryRenderer: EmptyStub,
   CubeProvider: Stub,

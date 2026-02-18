@@ -95,7 +95,7 @@ Let's break the options down:
 - By default, Cube operators use `cube_default` as an Airflow connection name.
 - The connection shoud be of the `generic` type.
 - `conn_host` should be set to the URL of your Cube deployment.
-- `conn_password` should be set to the value of the `CUBEJS_API_SECRET`
+- `conn_password` should be set to the value of the <EnvVar>CUBEJS_API_SECRET</EnvVar>
   environment variable.
 - `conn_extra` should contain a security context (as `security_context`) that
   will be sent with API requests.

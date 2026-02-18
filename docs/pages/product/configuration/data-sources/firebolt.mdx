@@ -29,14 +29,14 @@ CUBEJS_FIREBOLT_ENGINE_NAME=engine_name
 
 | Environment Variable           | Description                                                                         | Possible Values                                                         | Required |
 | ------------------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | :------: |
-| `CUBEJS_DB_NAME`               | The name of the database to connect to                                              | A valid database name                                                   |    ✅    |
-| `CUBEJS_DB_USER`               | A service account ID for accessing Firebolt programmatically                        | A valid service id                                                      |    ✅    |
-| `CUBEJS_DB_PASS`               | A service account secret for accessing Firebolt programmatically                    | A valid service secret                                                  |    ✅    |
-| `CUBEJS_FIREBOLT_ACCOUNT`      | Account name                                                                        | An account name                                                         |    ✅    |
-| `CUBEJS_FIREBOLT_ENGINE_NAME`  | Engine name to connect to                                                           | A valid engine name                                                     |    ✅    |
-| `CUBEJS_FIREBOLT_API_ENDPOINT` | Firebolt API endpoint. Used for authentication                                      | `api.dev.firebolt.io`, `api.staging.firebolt.io`, `api.app.firebolt.io` |    -     |
-| `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number                                                          |    ❌    |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| <EnvVar>CUBEJS_DB_NAME</EnvVar>               | The name of the database to connect to                                              | A valid database name                                                   |    ✅    |
+| <EnvVar>CUBEJS_DB_USER</EnvVar>               | A service account ID for accessing Firebolt programmatically                        | A valid service id                                                      |    ✅    |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>               | A service account secret for accessing Firebolt programmatically                    | A valid service secret                                                  |    ✅    |
+| <EnvVar>CUBEJS_FIREBOLT_ACCOUNT</EnvVar>      | Account name                                                                        | An account name                                                         |    ✅    |
+| <EnvVar>CUBEJS_FIREBOLT_ENGINE_NAME</EnvVar>  | Engine name to connect to                                                           | A valid engine name                                                     |    ✅    |
+| <EnvVar>CUBEJS_FIREBOLT_API_ENDPOINT</EnvVar> | Firebolt API endpoint. Used for authentication                                      | `api.dev.firebolt.io`, `api.staging.firebolt.io`, `api.app.firebolt.io` |    -     |
+| <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar>           | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number                                                          |    ❌    |
+| <EnvVar>CUBEJS_CONCURRENCY</EnvVar> | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 

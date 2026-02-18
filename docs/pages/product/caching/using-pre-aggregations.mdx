@@ -29,7 +29,7 @@ source instead, unless the [rollup-only mode](#rollup-only-mode) is enabled.
 
 In the rollup-only mode, Cube will **only** fulfill queries using
 pre-aggregations. To enable the rollup-only mode, use the
-`CUBEJS_ROLLUP_ONLY` environment variable.
+<EnvVar>CUBEJS_ROLLUP_ONLY</EnvVar> environment variable.
 
 It can be useful to prevent queries from your end users from ever hitting the
 upstream data source, e.g., if you prefer to use your data warehouse only to

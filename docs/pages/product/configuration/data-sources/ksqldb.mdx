@@ -64,10 +64,10 @@ CUBEJS_DB_PASS=password
 
 | Environment Variable | Description                                                                   | Possible Values           | Required |
 | -------------------- | ----------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_URL`      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| <EnvVar>CUBEJS_DB_URL</EnvVar>      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
+| <EnvVar>CUBEJS_DB_USER</EnvVar>     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
+| <EnvVar>CUBEJS_CONCURRENCY</EnvVar> | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 

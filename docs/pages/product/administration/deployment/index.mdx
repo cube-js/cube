@@ -96,7 +96,7 @@ cluster:
 By default, Cube Store listens on the port `3030` for queries coming from Cube.
 The port could be changed by setting `CUBESTORE_HTTP_PORT` environment variable.
 In a case of using custom port, please make sure to change
-`CUBEJS_CUBESTORE_PORT` environment variable for Cube API Instances and Refresh
+<EnvVar>CUBEJS_CUBESTORE_PORT</EnvVar> environment variable for Cube API Instances and Refresh
 Worker.
 
 Both the router and worker use the [Cube Store Docker image][dh-cubestore]. The

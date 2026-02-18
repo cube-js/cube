@@ -54,7 +54,7 @@ By default, Cube uses the following concurrency settings for data sources:
 | [Snowflake][ref-snowflake] | 8 |
 | All other data sources | 5 or [less, if specified in the driver][link-github-data-source-concurrency] |
 
-You can use the `CUBEJS_CONCURRENCY` environment variable to adjust the maximum
+You can use the <EnvVar>CUBEJS_CONCURRENCY</EnvVar> environment variable to adjust the maximum
 number of concurrent queries to a data source. It's recommended to use the default
 configuration unless you're sure that your data source can handle more concurrent
 queries.
@@ -62,7 +62,7 @@ queries.
 ### Connection pooling
 
 For data sources that support connection pooling, the maximum number of concurrent
-connections to the database can also be set by using the `CUBEJS_DB_MAX_POOL`
+connections to the database can also be set by using the <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar>
 environment variable. If changing this from the default, you must ensure that the
 new value is greater than the number of concurrent connections used by Cube's query
 queues and the refresh worker.

@@ -16,3 +16,19 @@
 [data-language="tree"] pre code span {
   background-color: transparent !important;
 }
+
+/* Style inline code (code not in pre blocks) */
+:not(pre) > code,
+code:not(.nextra-code) {
+  background-color: hsl(240, 12%, 97%) !important;
+  border: 1px solid hsl(240, 9%, 92%) !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-size: 0.875em !important;
+}
+
+/* Inline code outside links should inherit text color */
+:not(a) > code {
+  color: inherit !important;
+}
+

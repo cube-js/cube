@@ -40,7 +40,7 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
-In the command above, we're specifying `CUBEJS_CUBESTORE_HOST` to let Cube know
+In the command above, we're specifying <EnvVar>CUBEJS_CUBESTORE_HOST</EnvVar> to let Cube know
 where Cube Store is running.
 
 You can also use Docker Compose to achieve the same:
@@ -386,7 +386,7 @@ Error: Query execution timeout after 10 min of waiting
 It means that your pre-aggregation is too heavy and takes too long to build.
 
 As a temporary solution, you can increase the timeout for all queies that Cube
-runs against your data source via the `CUBEJS_DB_QUERY_TIMEOUT` environment variable.
+runs against your data source via the <EnvVar>CUBEJS_DB_QUERY_TIMEOUT</EnvVar> environment variable.
 
 However, it is recommended that you optimize your pre-aggregations instead:
 

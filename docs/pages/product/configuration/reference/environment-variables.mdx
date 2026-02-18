@@ -109,7 +109,7 @@ It can be also set as `concurrency` in the [`orchestrator_options` configuration
 option](/product/configuration/reference/config#orchestrator_options).
 
 If you'd like to adjust the concurrency for the refresh worker, use
-`CUBEJS_REFRESH_WORKER_CONCURRENCY`.
+<EnvVar>CUBEJS_REFRESH_WORKER_CONCURRENCY</EnvVar>.
 
 ## `CUBEJS_REFRESH_WORKER_CONCURRENCY`
 
@@ -118,7 +118,7 @@ has to the database.
 
 | Possible Values | Default in Development       | Default in Production        |
 | --------------- | ---------------------------- | ---------------------------- |
-| A valid number  | Same as `CUBEJS_CONCURRENCY` | Same as `CUBEJS_CONCURRENCY` |
+| A valid number  | Same as <EnvVar>CUBEJS_CONCURRENCY</EnvVar> | Same as <EnvVar>CUBEJS_CONCURRENCY</EnvVar> |
 
 ## `CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`
 
@@ -127,7 +127,7 @@ application id as determined by the [`context_to_app_id`][ref-context-to-app-id]
 configuration option.
 
 Note that this parameter doesn't override the overall refresh worker concurrency,
-configured via the `CUBEJS_REFRESH_WORKER_CONCURRENCY` environment variable, and
+configured via the <EnvVar>CUBEJS_REFRESH_WORKER_CONCURRENCY</EnvVar> environment variable, and
 it should be adjusted accordingly.
 
 | Possible Values                      | Default in Development | Default in Production |
@@ -136,7 +136,7 @@ it should be adjusted accordingly.
 
 <InfoBox>
 
-Previously, this environment variable was named `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`.
+Previously, this environment variable was named <EnvVar>CUBEJS_SCHEDULED_REFRESH_CONCURRENCY</EnvVar>.
 
 </InfoBox>
 
@@ -595,7 +595,7 @@ The mount path to use for a [Databricks DBFS mount][databricks-docs-dbfs].
 ## `CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN`
 
 An ARN of an AWS IAM role with permission to write to the configured bucket (see
-`CUBEJS_DB_EXPORT_BUCKET`).
+<EnvVar>CUBEJS_DB_EXPORT_BUCKET</EnvVar>).
 
 <InfoBox>
 
@@ -956,7 +956,7 @@ If `true`, enables [development mode](/product/configuration#development-mode).
 ## `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
 
 If `true`, it enables dropping pre-aggregations that Refresh Worker doesn't
-touch within `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`.
+touch within <EnvVar>CUBEJS_TOUCH_PRE_AGG_TIMEOUT</EnvVar>.
 Pre-aggregations are touched whenever they are rebuilt or a Refresh Worker
 checks its freshness. The first drop will be initiated when the Refresh Worker
 is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
@@ -1061,7 +1061,7 @@ option](/product/configuration/reference/config#jwt).
 ## `CUBEJS_JWT_KEY`
 
 The secret key used to sign and verify JWTs. Similar to
-`CUBEJS_API_SECRET`.
+<EnvVar>CUBEJS_API_SECRET</EnvVar>.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1121,8 +1121,8 @@ API instance.
 
 <InfoBox>
 
-If Cube is configured to act as a refresh worker instance using `CUBEJS_REFRESH_WORKER`,
-then `CUBEJS_PRE_AGGREGATIONS_BUILDER` will be `true`.
+If Cube is configured to act as a refresh worker instance using <EnvVar>CUBEJS_REFRESH_WORKER</EnvVar>,
+then <EnvVar>CUBEJS_PRE_AGGREGATIONS_BUILDER</EnvVar> will be `true`.
 
 </InfoBox>
 
@@ -1465,7 +1465,7 @@ For externally refreshed pre-aggregations, make sure each pre-aggregation is ref
 
 The number of seconds without a touch before pre-aggregation is considered
 orphaned and marked for removal. Please see
-`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` to
+<EnvVar>CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH</EnvVar> to
 learn more.
 
 | Possible Values | Default in Development | Default in Production |
@@ -1614,7 +1614,7 @@ The logging level for Cube Store.
 | ----------------------------------------- | ---------------------- | --------------------- |
 | `error`, `warn`, `info`, `debug`, `trace` | `error`                | `error`               |
 
-See also `CUBEJS_LOG_LEVEL`.
+See also <EnvVar>CUBEJS_LOG_LEVEL</EnvVar>.
 
 ## `CUBESTORE_META_ADDR`
 

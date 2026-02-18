@@ -10,7 +10,7 @@ scenarios involving [multitenancy][ref-config-multitenancy].
 
 ## Environment variables
 
-Declare the list of data sources using the `CUBEJS_DATASOURCES` environment
+Declare the list of data sources using the <EnvVar>CUBEJS_DATASOURCES</EnvVar> environment
 variable, then use
 [decorated environment variables](#decorated-environment-variables) to configure
 each data source:
@@ -43,7 +43,7 @@ source name:
 CUBEJS_[DS_<DATASOURCE>_]<ENV_VAR>
 ```
 
-For example, using the `datasource1` data source, `CUBEJS_DB_TYPE` could be
+For example, using the `datasource1` data source, <EnvVar>CUBEJS_DB_TYPE</EnvVar> could be
 decorated as:
 
 ```dotenv

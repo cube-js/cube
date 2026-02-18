@@ -41,7 +41,7 @@ module.exports = {
 
 </CodeTabs>
 
-This configuration option can also be set using the `CUBEJS_SCHEMA_PATH`
+This configuration option can also be set using the <EnvVar>CUBEJS_SCHEMA_PATH</EnvVar>
 environment variable. The default value is `model`.
 
 Use [`repositoryFactory`][self-repofactory] for [multitenancy][ref-multitenancy]
@@ -303,7 +303,7 @@ module.exports = {
 
 </CodeTabs>
 
-This configuration option can also be set using the `CUBEJS_CACHE_AND_QUEUE_DRIVER`
+This configuration option can also be set using the <EnvVar>CUBEJS_CACHE_AND_QUEUE_DRIVER</EnvVar>
 environment variable.
 
 ### `context_to_orchestrator_id`
@@ -373,7 +373,7 @@ Should be used to configure data source connections **dynamically** in
 [multitenancy][ref-multitenancy].
 
 Not recommended to be used when [multiple data sources][ref-multiple-data-sources]
-can be configured **statically**. Use `CUBEJS_DATASOURCES` and decorated environment
+can be configured **statically**. Use <EnvVar>CUBEJS_DATASOURCES</EnvVar> and decorated environment
 variables in that case.
 
 In Python, should return a dictionary; in JavaScript, should return an object.
@@ -463,8 +463,8 @@ You can pass this object to set advanced options for the query orchestrator.
 <WarningBox>
 
 Setting these options is highly discouraged as these are considered to be
-system-level settings. Please use `CUBEJS_ROLLUP_ONLY`, `CUBEJS_DB_QUERY_TIMEOUT`, and
-`CUBEJS_CONCURRENCY` [environment variables][ref-environment-variables] instead.
+system-level settings. Please use <EnvVar>CUBEJS_ROLLUP_ONLY</EnvVar>, <EnvVar>CUBEJS_DB_QUERY_TIMEOUT</EnvVar>, and
+<EnvVar>CUBEJS_CONCURRENCY</EnvVar> [environment variables][ref-environment-variables] instead.
 
 </WarningBox>
 
@@ -472,7 +472,7 @@ Timeout and interval options' values are in seconds.
 
 | Option              | Description                                                                                                                                                                                                                        | Default Value |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| `concurrency`       | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
+| `concurrency`       | Maximum number of queries to be processed simultaneosly. For drivers with connection pool <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar> should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
 | `executionTimeout`  | Total timeout of single query                                                                                                                                                                                                      | `600`         |
 | `orphanedTimeout`   | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
 | `heartBeatInterval` | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
@@ -558,7 +558,7 @@ This allows reusing pre-aggregations across environments, saving both time and c
 
 </InfoBox>
 
-This configuration option can also be set using the `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
+This configuration option can also be set using the <EnvVar>CUBEJS_PRE_AGGREGATIONS_SCHEMA</EnvVar>
 environment variable.
 
 <WarningBox>
@@ -623,7 +623,7 @@ out of memory errors.
 
 </WarningBox>
 
-Cube enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
+Cube enables background refresh by default using the <EnvVar>CUBEJS_REFRESH_WORKER</EnvVar>
 environment variable.
 
 <CodeTabs>
@@ -711,7 +711,7 @@ module.exports = {
 The default value is a list of a single time zone: `UTC`.
 
 This configuration option can also be set using the
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
+<EnvVar>CUBEJS_SCHEDULED_REFRESH_TIMEZONES</EnvVar> environment variable.
 
 ### `scheduled_refresh_contexts`
 
@@ -877,7 +877,7 @@ module.exports = {
 </CodeTabs>
 
 This configuration option can also be set using the
-`CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY` environment variable.
+<EnvVar>CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY</EnvVar> environment variable.
 
 <InfoBox>
 
@@ -999,7 +999,7 @@ and effectively allow or disallow access to REST API endpoints, based on
 the [security context][ref-sec-ctx].
 
 Security context is provided as the first argument. An array of scopes that
-was set via `CUBEJS_DEFAULT_API_SCOPES` is provided as the second argument.
+was set via <EnvVar>CUBEJS_DEFAULT_API_SCOPES</EnvVar> is provided as the second argument.
 
 Called on each request.
 
@@ -1193,19 +1193,19 @@ Please [track this issue](https://github.com/cube-js/cube/issues/8136).
 
 | Option | Description | Environment variable |
 | ------ | ----------- | -------------------- |
-| `jwkUrl` | URL from which JSON Web Key Sets (JWKS) can be retrieved | Can also be set using `CUBEJS_JWK_URL` |
-| `key` | JSON string that represents a cryptographic key. Similar to `CUBEJS_API_SECRET` | Can also be set using `CUBEJS_JWT_KEY` |
-| `algorithms` | [Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs] | Can also be set using `CUBEJS_JWT_ALGS` |
-| `issuer` | Issuer value which will be used to enforce the [`iss` claim from inbound JWTs][link-jwt-ref-iss] | Can also be set using `CUBEJS_JWT_ISSUER` |
-| `audience` | Audience value which will be used to enforce the [`aud` claim from inbound JWTs][link-jwt-ref-aud] | Can also be set using `CUBEJS_JWT_AUDIENCE` |
-| `subject` | Subject value which will be used to enforce the [`sub` claim from inbound JWTs][link-jwt-ref-sub] | Can also be set using `CUBEJS_JWT_SUBJECT` |
-| `claimsNamespace` | Namespace within the decoded JWT under which any custom claims can be found | Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE` |
+| `jwkUrl` | URL from which JSON Web Key Sets (JWKS) can be retrieved | Can also be set using <EnvVar>CUBEJS_JWK_URL</EnvVar> |
+| `key` | JSON string that represents a cryptographic key. Similar to <EnvVar>CUBEJS_API_SECRET</EnvVar> | Can also be set using <EnvVar>CUBEJS_JWT_KEY</EnvVar> |
+| `algorithms` | [Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs] | Can also be set using <EnvVar>CUBEJS_JWT_ALGS</EnvVar> |
+| `issuer` | Issuer value which will be used to enforce the [`iss` claim from inbound JWTs][link-jwt-ref-iss] | Can also be set using <EnvVar>CUBEJS_JWT_ISSUER</EnvVar> |
+| `audience` | Audience value which will be used to enforce the [`aud` claim from inbound JWTs][link-jwt-ref-aud] | Can also be set using <EnvVar>CUBEJS_JWT_AUDIENCE</EnvVar> |
+| `subject` | Subject value which will be used to enforce the [`sub` claim from inbound JWTs][link-jwt-ref-sub] | Can also be set using <EnvVar>CUBEJS_JWT_SUBJECT</EnvVar> |
+| `claimsNamespace` | Namespace within the decoded JWT under which any custom claims can be found | Can also be set using <EnvVar>CUBEJS_JWT_CLAIMS_NAMESPACE</EnvVar> |
 
 ### `check_sql_auth`
 
 Used in the [SQL API][ref-sql-api]. Default
 implementation verifies user name and password from environment variables:
-`CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, but in [development
+<EnvVar>CUBEJS_SQL_USER</EnvVar>, <EnvVar>CUBEJS_SQL_PASSWORD</EnvVar>, but in [development
 mode][ref-development-mode] it ignores validation.
 
 Called on each new connection to Cube SQL API, on change user by `SET USER` or `__user` field, every `CUBESQL_AUTH_EXPIRE_SECS`.
@@ -1320,7 +1320,7 @@ module.exports = {
 ### `can_switch_sql_user`
 
 Used in the [SQL API][ref-sql-api]. Default implementation depends on
-`CUBEJS_SQL_SUPER_USER` and returns `true` when it's equal to session's user.
+<EnvVar>CUBEJS_SQL_SUPER_USER</EnvVar> and returns `true` when it's equal to session's user.
 
 Called on each change request from Cube SQL API.
 
@@ -1446,7 +1446,7 @@ module.exports = {
 
 </CodeTabs>
 
-See also the `CUBEJS_LOG_LEVEL` environment variable.
+See also the <EnvVar>CUBEJS_LOG_LEVEL</EnvVar> environment variable.
 
 ### `telemetry`
 
@@ -1456,7 +1456,7 @@ queries issued. This statistics is used solely for the purpose of constant
 cube.js improvement.
 
 You can opt out of it any time by setting `telemetry` option to `False` or,
-alternatively, by setting `CUBEJS_TELEMETRY` environment variable to `false`.
+alternatively, by setting <EnvVar>CUBEJS_TELEMETRY</EnvVar> environment variable to `false`.
 
 <CodeTabs>
 
@@ -1502,7 +1502,7 @@ to dynamically select a database type depending on the security context.
 Usually used for [multitenancy][ref-multitenancy].
 
 If not defined, Cube will lookup for environment variable
-`CUBEJS_DB_TYPE` to resolve the data source type.
+<EnvVar>CUBEJS_DB_TYPE</EnvVar> to resolve the data source type.
 
 ### `context_to_roles`
 
