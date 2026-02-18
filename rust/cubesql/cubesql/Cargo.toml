@@ -19,7 +19,7 @@ cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "1423a0c16ebba665bdbfdd0e2b8d36f417baa514" }
 base64 = "0.13.0"
-tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
+tokio = { version = "^1.38", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.14.0"
 serde_json = "^1.0"
