@@ -652,20 +652,29 @@ export class CubejsServerCore {
             let driver: BaseDriver | null = null;
 
             try {
-              driver = await this.options.externalDriverFactory(context);
-              if (typeof driver === 'object' && driver != null) {
-                if (driver.setLogger) {
-                  driver.setLogger(this.logger);
-                }
+              const val = await this.options.externalDriverFactory(context);
 
-                await driver.testConnection();
-
-                return driver;
+              if (isDriver(val)) {
+                driver = <BaseDriver>val;
+              } else if (val && (<DriverConfig>val).type && typeof (<DriverConfig>val).type === 'string') {
+                const { type, ...rest } = <DriverConfig>val;
+                driver = CubejsServerCore.createDriver(type, rest);
+              } else if (val && typeof val === 'object') {
+                // Accept driver-like objects for backward compatibility
+                driver = <BaseDriver><unknown>val;
+              } else {
+                throw new Error(
+                  `Unexpected return type, externalDriverFactory must return driver or config, actual: ${getRealType(val)}`
+                );
               }
 
-              throw new Error(
-                `Unexpected return type, externalDriverFactory must return driver, actual: ${getRealType(driver)}`
-              );
+              if (driver.setLogger) {
+                driver.setLogger(this.logger);
+              }
+
+              await driver.testConnection();
+
+              return driver;
             } catch (e) {
               externalPreAggregationsDriverPromise = null;
 
