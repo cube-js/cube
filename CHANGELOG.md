@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+### Bug Fixes
+
+- **cubesql:** Support date-only `TO_TIMESTAMP` formats ([#10409](https://github.com/cube-js/cube/issues/10409)) ([1ca4624](https://github.com/cube-js/cube/commit/1ca46240e7a200d0cd5d664065c15287a7252a62))
+- **cubestore:** bug with nulls in Decimal96 ([#10408](https://github.com/cube-js/cube/issues/10408)) ([048dd5f](https://github.com/cube-js/cube/commit/048dd5f53072d289820fd4b63e2309d778eecb38))
+
+### Features
+
+- **cubesql:** Support SQL pushdown for `LAG`/`LEAD` functions ([#10407](https://github.com/cube-js/cube/issues/10407)) ([c968656](https://github.com/cube-js/cube/commit/c968656970a90e640548e6b0165e5f1327cf150a))
+
 ## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
 
 ### Bug Fixes

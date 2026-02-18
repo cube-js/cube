@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+### Bug Fixes
+
+- **cubestore:** bug with nulls in Decimal96 ([#10408](https://github.com/cube-js/cube/issues/10408)) ([048dd5f](https://github.com/cube-js/cube/commit/048dd5f53072d289820fd4b63e2309d778eecb38))
+
 ## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

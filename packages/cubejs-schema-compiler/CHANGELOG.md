@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+### Features
+
+- **cubesql:** Support SQL pushdown for `LAG`/`LEAD` functions ([#10407](https://github.com/cube-js/cube/issues/10407)) ([c968656](https://github.com/cube-js/cube/commit/c968656970a90e640548e6b0165e5f1327cf150a))
+
 ## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
 
 ### Features
