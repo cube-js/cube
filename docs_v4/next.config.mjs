@@ -2,7 +2,15 @@ import nextra from 'nextra'
 import path from 'path'
 
 const withNextra = nextra({
-  contentDirBasePath: '/'
+  contentDirBasePath: '/',
+  mdxOptions: {
+    rehypePrettyCodeOptions: {
+      theme: {
+        light: 'one-light',
+        dark: 'one-dark-pro'
+      }
+    }
+  }
 })
 
 export default withNextra({

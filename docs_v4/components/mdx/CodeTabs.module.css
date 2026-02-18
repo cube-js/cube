@@ -45,6 +45,34 @@
   margin-top: 0 !important;
 }
 
+.codeContent figure,
+.codeContent pre {
+  margin-top: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+.codeContent pre {
+  background-color: rgba(124, 58, 237, 0.05) !important;
+  box-shadow: none !important;
+}
+
+.codeContent figure {
+  box-shadow: none !important;
+}
+
+.codeContent > div {
+  box-shadow: none !important;
+}
+
+.codeContent pre code {
+  background-color: transparent !important;
+}
+
+.codeContent pre code span {
+  background-color: transparent !important;
+}
+
 :global(.dark) .tabs {
   background-color: rgba(124, 58, 237, 0.1);
 }

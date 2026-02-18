@@ -1,0 +1,18 @@
+/* Style tree code blocks like regular code blocks */
+[data-language="tree"] {
+  margin-top: 24px;
+}
+
+[data-language="tree"] pre {
+  background-color: rgba(124, 58, 237, 0.05) !important;
+  box-shadow: none !important;
+}
+
+[data-language="tree"] figure {
+  box-shadow: none !important;
+}
+
+[data-language="tree"] pre code,
+[data-language="tree"] pre code span {
+  background-color: transparent !important;
+}

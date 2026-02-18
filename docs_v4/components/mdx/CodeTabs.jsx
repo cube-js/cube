@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Pre } from 'nextra/components'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import styles from './CodeTabs.module.css'
 
 const langs = {
@@ -23,44 +22,60 @@ const STORAGE_KEY = 'cube-docs.default-code-lang'
 const PREFERRED_LANGS = ['yaml', 'python']
 
 export const CodeTabs = ({ children }) => {
-  const [selectedTab, setSelectedTab] = useState(PREFERRED_LANGS[0])
+  const containerRef = useRef(null)
+  const [codeBlocks, setCodeBlocks] = useState([])
+  const [selectedTab, setSelectedTab] = useState(null)
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  const tabs = useMemo(() => {
-    let tabsMap = children.reduce((dict, tab, i) => {
-      const result = { ...dict }
-      if (result[tab.props['data-language']] === undefined) {
-        result[tab.props['data-language']] = i
-      }
-      return result
-    }, {})
+  // Extract languages from DOM after render
+  useEffect(() => {
+    if (!containerRef.current) return
 
-    // Place the tab with the preferred language on the first position
-    let tabWithPreferredLangKey = Object.keys(tabsMap).find(key => PREFERRED_LANGS.includes(key))
-    if (tabWithPreferredLangKey !== undefined) {
-      let tabWithPreferredLangValue = tabsMap[tabWithPreferredLangKey]
-      delete tabsMap[tabWithPreferredLangKey]
-      tabsMap = {
-        [tabWithPreferredLangKey]: tabWithPreferredLangValue,
-        ...tabsMap
+    const blocks = []
+    // Find all code blocks with data-language attribute (from our custom Pre wrapper)
+    const wrappers = containerRef.current.querySelectorAll(':scope > [data-language]')
+
+    wrappers.forEach((wrapper, index) => {
+      const lang = wrapper.getAttribute('data-language')
+      if (lang) {
+        blocks.push({ lang, index, wrapper })
       }
+    })
+
+    // Sort: preferred languages first
+    blocks.sort((a, b) => {
+      const aPreferred = PREFERRED_LANGS.indexOf(a.lang)
+      const bPreferred = PREFERRED_LANGS.indexOf(b.lang)
+      if (aPreferred !== -1 && bPreferred === -1) return -1
+      if (bPreferred !== -1 && aPreferred === -1) return 1
+      if (aPreferred !== -1 && bPreferred !== -1) return aPreferred - bPreferred
+      return 0
+    })
+
+    setCodeBlocks(blocks)
+
+    // Set initial tab
+    const defaultLang = localStorage.getItem(STORAGE_KEY)
+    const availableLangs = blocks.map(b => b.lang)
+
+    if (defaultLang && availableLangs.includes(defaultLang)) {
+      setSelectedTab(defaultLang)
+    } else if (blocks.length > 0) {
+      setSelectedTab(blocks[0].lang)
     }
 
-    return tabsMap
+    setIsInitialized(true)
   }, [children])
 
+  // Sync with other CodeTabs instances
   useEffect(() => {
-    const defaultLang = localStorage.getItem(STORAGE_KEY)
+    if (!isInitialized) return
 
-    if (defaultLang && tabs[defaultLang] !== undefined) {
-      setSelectedTab(defaultLang)
-    } else {
-      const [lang] = Object.entries(tabs).find(tab => tab[1] === 0)
-      setSelectedTab(lang)
-    }
+    const availableLangs = codeBlocks.map(b => b.lang)
 
     const syncHandler = (e) => {
       const lang = e.detail.lang
-      if (tabs[lang] !== undefined) {
+      if (availableLangs.includes(lang)) {
         setSelectedTab(lang)
       }
     }
@@ -68,7 +83,7 @@ export const CodeTabs = ({ children }) => {
     const storageHandler = (e) => {
       if (e.key === STORAGE_KEY) {
         const lang = e.newValue
-        if (lang && tabs[lang] !== undefined) {
+        if (lang && availableLangs.includes(lang)) {
           setSelectedTab(lang)
         }
       }
@@ -81,47 +96,66 @@ export const CodeTabs = ({ children }) => {
       window.removeEventListener('storage', storageHandler)
       window.removeEventListener('codetabs.changed', syncHandler)
     }
-  }, [tabs])
+  }, [codeBlocks, isInitialized])
+
+  // Update visibility of code blocks based on selected tab
+  useEffect(() => {
+    if (!containerRef.current || !selectedTab || codeBlocks.length === 0) return
+
+    codeBlocks.forEach((block) => {
+      if (block.wrapper) {
+        block.wrapper.style.display = block.lang === selectedTab ? 'block' : 'none'
+      }
+    })
+  }, [selectedTab, codeBlocks])
+
+  // Get unique languages maintaining order
+  const tabsList = React.useMemo(() => {
+    const seen = new Set()
+    return codeBlocks
+      .filter(block => {
+        if (seen.has(block.lang)) return false
+        seen.add(block.lang)
+        return true
+      })
+      .map(block => block.lang)
+  }, [codeBlocks])
+
+  const handleTabClick = useCallback((lang) => {
+    if (lang !== selectedTab) {
+      if (lang === 'python' || lang === 'javascript' || lang === 'yaml') {
+        localStorage.setItem(STORAGE_KEY, lang)
+        window.dispatchEvent(
+          new CustomEvent('codetabs.changed', {
+            detail: { lang }
+          })
+        )
+      }
+      setSelectedTab(lang)
+    }
+  }, [selectedTab])
 
   return (
     <div className={styles.codeBlock}>
-      <div className={styles.tabs}>
-        {Object.entries(tabs)
-          .map(tab => children.find(child => child.props['data-language'] === tab[0]))
-          .filter(tab => tab !== undefined && !!tab.props['data-language'])
-          .map((tab, i) => {
-            if (tab === undefined) return null
-            let lang = tab.props['data-language']
-            if (lang === 'js') {
-              lang = 'javascript'
-            }
+      {tabsList.length > 0 && (
+        <div className={styles.tabs}>
+          {tabsList.map((lang) => {
+            const displayLang = lang === 'js' ? 'javascript' : lang
             return (
               <div
-                key={i}
-                className={`${styles.tab} ${lang === selectedTab ? styles.selectedTab : ''}`}
-                onClick={() => {
-                  if (
-                    lang !== selectedTab &&
-                    (lang === 'python' || lang === 'javascript' || lang === 'yaml')
-                  ) {
-                    localStorage.setItem(STORAGE_KEY, lang)
-                    window.dispatchEvent(
-                      new CustomEvent('codetabs.changed', {
-                        detail: { lang }
-                      })
-                    )
-                  }
-                  setSelectedTab(lang)
-                }}
+                key={lang}
+                className={`${styles.tab} ${displayLang === selectedTab || lang === selectedTab ? styles.selectedTab : ''}`}
+                onClick={() => handleTabClick(lang)}
               >
-                {langs[lang] || lang}
+                {langs[displayLang] || displayLang}
               </div>
             )
           })}
+        </div>
+      )}
+      <div ref={containerRef} className={styles.codeContent}>
+        {children}
       </div>
-      <Pre hasCopyCode={true} className={styles.pre}>
-        {children && children.find(child => child.props['data-language'] === selectedTab)?.props.children}
-      </Pre>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { CommunitySupportedDriver } from './components/mdx/CommunitySupportedDri
 import { Grid } from './components/mdx/Grid'
 import { GridItem } from './components/mdx/GridItem'
 import { CodeTabs } from './components/mdx/CodeTabs'
+import { Pre } from './components/mdx/Pre'
 
 const themeComponents = getThemeComponents()
 
@@ -26,6 +27,7 @@ const customComponents = {
 
   // Code display
   CodeTabs,
+  pre: Pre,
 
   // Alert boxes
   InfoBox,
