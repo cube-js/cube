@@ -1799,13 +1799,13 @@ class ApiGateway {
           context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
-            requestId: context.requestId,
           }
           : null
       ),
       annotation,
+      requestId: context.requestId,
+      usedPreAggregations: response.usedPreAggregations,
       dataSource: response.dataSource,
       dbType: response.dbType,
       extDbType: response.extDbType,
