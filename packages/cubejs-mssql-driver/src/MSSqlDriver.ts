@@ -20,7 +20,7 @@ import {
   TableColumnQueryResult,
   GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
-import { QueryStream } from './QueryStream';
+import { QueryStream, transformRow } from './QueryStream';
 
 // ********* Value converters ***************** //
 const numericTypes = [
@@ -292,7 +292,10 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       // TODO time zone UTC set in driver ?
 
       cancelFn = () => request.cancel();
-      return request.query(query).then(res => res.recordset);
+      return request.query(query).then(res => {
+        res.recordset.forEach(transformRow);
+        return res.recordset;
+      });
     });
     promise.cancel = () => cancelFn && cancelFn();
     return promise;
