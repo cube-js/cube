@@ -7,6 +7,7 @@ import { LoomVideo } from './components/mdx/LoomVideo'
 import { CommunitySupportedDriver } from './components/mdx/CommunitySupportedDriver'
 import { Grid } from './components/mdx/Grid'
 import { GridItem } from './components/mdx/GridItem'
+import { CodeTabs } from './components/mdx/CodeTabs'
 
 const themeComponents = getThemeComponents()
 
@@ -24,7 +25,7 @@ const customComponents = {
   Diagram,
 
   // Code display
-  CodeTabs: Stub,
+  CodeTabs,
 
   // Alert boxes
   InfoBox,

@@ -1,0 +1,54 @@
+.codeBlock {
+  margin-top: 24px;
+}
+
+.tabs {
+  display: flex;
+  border-radius: 12px 12px 0 0;
+  background-color: rgba(124, 58, 237, 0.05);
+  box-shadow: inset 0px -1px 0px rgba(0, 0, 0, 0.08);
+}
+
+.tabs > div:first-child {
+  border-top-left-radius: 12px;
+}
+
+.tab {
+  padding: 10px 16px;
+  cursor: pointer;
+  line-height: 28px;
+  font-weight: 500;
+  color: #374151;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.tab:hover {
+  color: hsl(342, 95%, 59%);
+  box-shadow: inset 0px -2.6px 0px hsl(342, 100%, 82%);
+}
+
+.selectedTab {
+  color: hsl(251, 61%, 52%);
+  cursor: default;
+  background-color: rgba(124, 58, 237, 0.08);
+  box-shadow: inset 0px -2.6px 0px hsl(251, 61%, 52%);
+}
+
+.selectedTab:hover {
+  color: hsl(251, 61%, 52%);
+  box-shadow: inset 0px -2.6px 0px hsl(251, 61%, 52%);
+}
+
+.pre {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  margin-top: 0 !important;
+}
+
+:global(.dark) .tabs {
+  background-color: rgba(124, 58, 237, 0.1);
+}
+
+:global(.dark) .tab {
+  color: #d1d5db;
+}
