@@ -18377,4 +18377,40 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_lag_lead_fn_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                order_date,
+                customer_gender,
+                LAG(customer_gender, 1) OVER (ORDER BY order_date) AS lag,
+                LEAD(customer_gender, 1) OVER (ORDER BY order_date) AS lead
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1, 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("LAG("));
+        assert!(sql.contains("LEAD("));
+        assert!(sql.contains(" OVER (ORDER BY "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }

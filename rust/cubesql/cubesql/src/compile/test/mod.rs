@@ -632,6 +632,8 @@ pub fn sql_generator(
                     ("functions/FLOOR".to_string(), "FLOOR({{ args_concat }})".to_string()),
                     ("functions/CEIL".to_string(), "CEIL({{ args_concat }})".to_string()),
                     ("functions/TRUNC".to_string(), "TRUNC({{ args_concat }})".to_string()),
+                    ("functions/LAG".to_string(), "LAG({{ args_concat }})".to_string()),
+                    ("functions/LEAD".to_string(), "LEAD({{ args_concat }})".to_string()),
                     ("functions/LEAST".to_string(), "LEAST({{ args_concat }})".to_string()),
                     ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
