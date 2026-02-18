@@ -30,6 +30,46 @@ class OracleFilter extends BaseFilter {
 }
 
 export class OracleQuery extends BaseQuery {
+  private static readonly ORACLE_TZ_FORMAT_WITH_Z = 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"';
+
+  private static readonly ORACLE_TZ_FORMAT_NO_Z = 'YYYY-MM-DD"T"HH24:MI:SS.FF';
+
+  /**
+   * Determines if a value represents a SQL identifier (column name) rather than a bind parameter.
+   * Handles both unquoted identifiers (e.g., "date_from", "table.column") and quoted
+   * identifiers (e.g., "date_from", "table"."column").
+   */
+  private isIdentifierToken(value: string): boolean {
+    return (
+      /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(value) ||
+      /^"[^"]+"(\."[^"]+")*$/.test(value)
+    );
+  }
+
+  /**
+   * Generates Oracle TO_TIMESTAMP_TZ function call for timezone-aware timestamp conversion.
+   *
+   * The format string must match the actual data format:
+   * - Filter parameters ('?') come as ISO 8601 strings with 'Z' suffix (e.g., '2024-01-01T00:00:00.000Z')
+   * - Generated time series columns (date_from/date_to) contain VALUES data without 'Z' (e.g., '2024-01-01T00:00:00.000')
+   *
+   * @param value - Either '?' for bind parameters, a column identifier, or a SQL expression
+   * @param includeZFormat - Whether format string should expect 'Z' suffix (true for filter params, false for series columns)
+   * @returns Oracle SQL expression with appropriate bind placeholder or direct column reference
+   */
+  private toTimestampTz(value: string, includeZFormat: boolean): string {
+    const format = includeZFormat ? OracleQuery.ORACLE_TZ_FORMAT_WITH_Z : OracleQuery.ORACLE_TZ_FORMAT_NO_Z;
+    if (value === '?') {
+      return `TO_TIMESTAMP_TZ(:"?", '${format}')`;
+    }
+    if (this.isIdentifierToken(value)) {
+      // Column identifiers (e.g., date_from, date_to from generated time series) - use directly
+      return `TO_TIMESTAMP_TZ(${value}, '${format}')`;
+    }
+    // SQL expressions or literals - embed directly in TO_TIMESTAMP_TZ call
+    return `TO_TIMESTAMP_TZ(${value}, '${format}')`;
+  }
+
   /**
    * "LIMIT" on Oracle is illegal
    * TODO replace with limitOffsetClause override
@@ -75,15 +115,26 @@ export class OracleQuery extends BaseQuery {
     return field;
   }
 
+  /**
+   * Casts a value to Oracle DATE type using timezone-aware parsing.
+   * For bind parameters ('?'), includes 'Z' suffix in format string.
+   * For column identifiers (e.g., date_from/date_to from time series), omits 'Z'.
+   *
+   * @param value - Bind parameter placeholder '?', column identifier, or SQL expression
+   */
   public dateTimeCast(value) {
-    // Use timezone-aware parsing for ISO 8601 with milliseconds and trailing 'Z', then cast to DATE
-    // to preserve index-friendly comparisons against DATE columns.
-    return `CAST(TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"') AS DATE)`;
+    return `CAST(${this.toTimestampTz(value, value === '?')} AS DATE)`;
   }
 
+  /**
+   * Casts a value to Oracle TIMESTAMP WITH TIME ZONE.
+   * For bind parameters ('?'), includes 'Z' suffix in format string.
+   * For column identifiers (e.g., date_from/date_to from time series), omits 'Z'.
+   *
+   * @param value - Bind parameter placeholder '?', column identifier, or SQL expression
+   */
   public timeStampCast(value) {
-    // Return timezone-aware timestamp for TIMESTAMP comparisons
-    return `TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"')`;
+    return this.toTimestampTz(value, value === '?');
   }
 
   public timeStampParam(timeDimension) {
