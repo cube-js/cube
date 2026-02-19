@@ -11,8 +11,18 @@ import { GridItem } from './components/mdx/GridItem'
 import { CodeTabs } from './components/mdx/CodeTabs'
 import { Pre } from './components/mdx/Pre'
 import { EnvVar } from './components/mdx/EnvVar'
+import { FeedbackBlock } from './components/FeedbackBlock'
 
 const themeComponents = getThemeComponents()
+
+// Custom wrapper that adds FeedbackBlock at the bottom of each page
+const ThemeWrapper = themeComponents.wrapper
+const CustomWrapper = ({ children, ...props }) => (
+  <ThemeWrapper {...props}>
+    {children}
+    <FeedbackBlock />
+  </ThemeWrapper>
+)
 
 // Stub component that renders children
 const Stub = ({ children }) => <>{children}</>
@@ -58,6 +68,7 @@ export function useMDXComponents(components) {
   return {
     ...themeComponents,
     ...customComponents,
+    wrapper: CustomWrapper,
     ...components
   }
 }

@@ -39,6 +39,7 @@ const ceraPro = localFont({
 import { Footer } from '../components/Footer'
 import { LogoWithVersion } from '../components/LogoWithVersion'
 import { GetStartedButton } from '../components/GetStartedButton'
+import { AnalyticsProvider } from '../components/AnalyticsProvider'
 
 const SlackIcon = () => (
   <svg
@@ -87,18 +88,33 @@ export default async function RootLayout({ children }) {
           saturation: { light: 61, dark: 69 }
         }}
       >
-        {/* Additional head tags can be added here */}
+        {process.env.NODE_ENV === 'production' && (
+          <script dangerouslySetInnerHTML={{ __html: `
+            (function(w,d,s,l,i){
+              w[l]=w[l]||[];
+              w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+              var f=d.getElementsByTagName(s)[0],
+                  j=d.createElement(s),
+                  dl=l!='dataLayer'?'&l='+l:'';
+              j.async=true;
+              j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+              f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','GTM-52W7VM2');
+          `}} />
+        )}
       </Head>
       <body>
-        <Layout
-          navbar={navbar}
-          pageMap={await getPageMap()}
-          docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs_v4"
-          footer={footer}
-          sidebar={{ defaultMenuCollapseLevel: 1 }}
-        >
-          {children}
-        </Layout>
+        <AnalyticsProvider>
+          <Layout
+            navbar={navbar}
+            pageMap={await getPageMap()}
+            docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs_v4"
+            footer={footer}
+            sidebar={{ defaultMenuCollapseLevel: 1 }}
+          >
+            {children}
+          </Layout>
+        </AnalyticsProvider>
       </body>
     </html>
   )
