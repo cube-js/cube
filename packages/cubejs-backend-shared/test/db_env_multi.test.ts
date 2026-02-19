@@ -1524,6 +1524,77 @@ describe('Multiple datasources', () => {
     );
   });
 
+ test('getEnv("clickhouseSortCollation")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION = 'wrong1';
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION = 'wrong2';
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION;
+    delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION;
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('en');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('en');
+    expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
+  test('getEnv("clickhouseUseCollation")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION = 'true';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_USE_COLLATION = 'true';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_USE_COLLATION = 'true';
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(true);
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION = 'false';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_USE_COLLATION = 'false';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_USE_COLLATION = 'false';
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(false);
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION = 'wrong';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_USE_COLLATION = 'wrong';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_USE_COLLATION = 'wrong';
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'default' })).toThrow(
+      'The CUBEJS_DB_CLICKHOUSE_USE_COLLATION must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toThrow(
+      'The CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_USE_COLLATION must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_USE_COLLATION;
+    delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_USE_COLLATION;
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(true);
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("clickhouseCompression")', () => {
     process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'true';
     process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION = 'true';

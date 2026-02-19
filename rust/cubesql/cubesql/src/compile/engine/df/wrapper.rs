@@ -27,8 +27,8 @@ use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
-        LogicalPlan, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, ExprSchemable,
+        GroupingSet, JoinType, LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
@@ -864,6 +864,10 @@ impl CubeScanWrapperNode {
                 // When generating column expression that points to literal member it would render literal and generate alias
                 // Here it should just generate the literal
                 // 2. It would not allow to provide aliases for expressions, instead it usually generates them
+                let data_type = expr
+                    .get_type(&node.schema)
+                    .and_then(|dt| WrappedSelectNode::generate_sql_type(generator.clone(), dt))
+                    .unwrap_or_else(|_| "".to_string());
                 let (expr, sql) = WrappedSelectNode::generate_sql_for_expr(
                     new_sql,
                     generator.clone(),
@@ -872,7 +876,11 @@ impl CubeScanWrapperNode {
                     &HashMap::new(),
                 )
                 .await?;
-                columns.push(AliasedColumn { expr, alias });
+                columns.push(AliasedColumn {
+                    expr,
+                    alias,
+                    data_type,
+                });
                 new_sql = sql;
             }
 
@@ -1663,6 +1671,10 @@ impl WrappedSelectNode {
                 )?,
                 None => HashSet::new(),
             };
+            let data_type = expr
+                .get_type(&schema)
+                .and_then(|dt| Self::generate_sql_type(generator.clone(), dt))
+                .unwrap_or_else(|_| "".to_string());
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 sql,
                 generator.clone(),
@@ -1679,6 +1691,7 @@ impl WrappedSelectNode {
                 AliasedColumn {
                     expr: expr_sql,
                     alias,
+                    data_type,
                 },
                 used_members,
             ));
@@ -2157,6 +2170,13 @@ impl WrappedSelectNode {
                 asc,
                 nulls_first,
             } => {
+                let data_type = if let Some(ctx) = push_to_cube_context {
+                    expr.get_type(ctx.ungrouped_scan_node.schema())
+                        .and_then(|dt| Self::generate_sql_type(sql_generator.clone(), dt))
+                        .unwrap_or_else(|_| "".to_string())
+                } else {
+                    "".to_string()
+                };
                 let (expr, sql_query) = Self::generate_sql_for_expr_rec(
                     sql_query,
                     sql_generator.clone(),
@@ -2167,7 +2187,7 @@ impl WrappedSelectNode {
                 .await?;
                 let resulting_sql = sql_generator
                     .get_sql_templates()
-                    .sort_expr(expr, asc, nulls_first)
+                    .sort_expr(expr, asc, nulls_first, data_type)
                     .map_err(|e| {
                         DataFusionError::Internal(format!(
                             "Can't generate SQL for sort expr: {}",
@@ -3369,6 +3389,11 @@ impl WrappedSelectNode {
             let join_condition = join_condition[0].0.expr.clone();
             sql = new_sql;
 
+            let data_type = condition
+                .get_type(&self.schema)
+                .and_then(|dt| Self::generate_sql_type(generator.clone(), dt))
+                .unwrap_or_else(|_| "".to_string());
+
             let join_sql_expression = {
                 // TODO this is NOT a proper way to generate member expr here
                 // TODO Do we even want a full-blown member expression here? or arguments + expr will be enough?
@@ -3376,6 +3401,7 @@ impl WrappedSelectNode {
                     &AliasedColumn {
                         expr: join_condition,
                         alias: "__join__alias__unused".to_string(),
+                        data_type,
                     },
                     join_condition_members,
                     &ungrouped_scan_node.used_cubes,
