@@ -1,4 +1,9 @@
 export default {
+  '*': {
+    theme: {
+      timestamp: false
+    }
+  },
   product: {
     type: "page",
     title: "Documentation"
