@@ -221,3 +221,21 @@ tr:nth-child(even) {
   }
 }
 
+/* Purple Banner wrapper - animated reveal */
+.pb-wrapper {
+  --purple-banner-font: var(--font-cera-pro), system-ui, -apple-system, sans-serif;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.pb-wrapper--visible {
+  max-height: 100px;
+}
+
+@media (max-width: 768px) {
+  .pb-wrapper--visible {
+    max-height: 160px;
+  }
+}
+

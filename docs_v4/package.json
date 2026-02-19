@@ -10,6 +10,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@cube-dev/purple-banner": "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz",
     "cubedev-tracking": "1.1.0",
     "next": "^16.1.6",
     "nextra": "^4.6.1",

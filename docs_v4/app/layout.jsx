@@ -40,6 +40,7 @@ import { Footer } from '../components/Footer'
 import { LogoWithVersion } from '../components/LogoWithVersion'
 import { GetStartedButton } from '../components/GetStartedButton'
 import { AnalyticsProvider } from '../components/AnalyticsProvider'
+import { PurpleBannerWrapper } from '../components/PurpleBannerWrapper'
 
 const SlackIcon = () => (
   <svg
@@ -104,6 +105,7 @@ export default async function RootLayout({ children }) {
         )}
       </Head>
       <body>
+        <PurpleBannerWrapper />
         <AnalyticsProvider>
           <Layout
             navbar={navbar}
