@@ -1,5 +1,6 @@
 import nextra from 'nextra'
 import path from 'path'
+import redirects from './redirects.json' with { type: 'json' }
 
 const withNextra = nextra({
   contentDirBasePath: '/',
@@ -20,7 +21,8 @@ export default withNextra({
         source: '/',
         destination: '/product/introduction',
         permanent: false
-      }
+      },
+      ...redirects
     ]
   },
   outputFileTracingRoot: import.meta.dirname,

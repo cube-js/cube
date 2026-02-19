@@ -1,0 +1,2142 @@
+[
+  {
+    "source": "/product/administration/workspace/access-control",
+    "destination": "/product/administration/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/aws",
+    "destination": "/product/administration/deployment/byoc/aws/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/real-time-data-fetch",
+    "destination": "/product/apis-integrations/recipes/real-time-data-fetch",
+    "permanent": true
+  },
+  {
+    "source": "/guides",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/guides/data-store-cost-saving-guide",
+    "destination": "/product/configuration/recipes/data-store-cost-saving-guide",
+    "permanent": true
+  },
+  {
+    "source": "/guides/style-guide",
+    "destination": "/product/data-modeling/recipes/style-guide",
+    "permanent": true
+  },
+  {
+    "source": "/guides/designing-metrics",
+    "destination": "/product/data-modeling/recipes/designing-metrics",
+    "permanent": true
+  },
+  {
+    "source": "/guides/dbt",
+    "destination": "/product/data-modeling/recipes/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/upgrading-cube/migrating-from-express-to-docker",
+    "destination": "https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-exploration/drilldowns",
+    "destination": "/product/apis-integrations/recipes/drilldowns",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-exploration/cast-numerics",
+    "destination": "/product/apis-integrations/recipes/cast-numerics",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-exploration/query-history-export",
+    "destination": "/product/administration/workspace/recipes/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/non-additivity",
+    "destination": "/product/caching/recipes/non-additivity",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
+    "destination": "/product/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/disabling-pre-aggregations",
+    "destination": "/product/caching/recipes/disabling-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/using-originalsql-and-rollups-effectively",
+    "destination": "/product/caching/recipes/using-originalsql-and-rollups-effectively",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/refreshing-select-partitions",
+    "destination": "/product/caching/recipes/refreshing-select-partitions",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/joining-multiple-data-sources",
+    "destination": "/product/caching/recipes/joining-multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/getting-unique-values-for-a-field",
+    "destination": "/product/apis-integrations/recipes/getting-unique-values-for-a-field",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/sorting",
+    "destination": "/product/apis-integrations/recipes/sorting",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/pagination",
+    "destination": "/product/apis-integrations/recipes/pagination",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-sources/multiple-sources-same-schema",
+    "destination": "/product/configuration/recipes/multiple-sources-same-schema",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-sources/using-ssl-connections-to-data-source",
+    "destination": "/product/configuration/recipes/using-ssl-connections-to-data-source",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/environment-variables",
+    "destination": "/product/configuration/recipes/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/multitenancy/custom-data-model-per-tenant",
+    "destination": "/product/configuration/recipes/custom-data-model-per-tenant",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/code-reusability/environment-variables",
+    "destination": "/product/configuration/recipes/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/code-reusability/schema-generation",
+    "destination": "/product/data-modeling/recipes/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/percentiles",
+    "destination": "/product/data-modeling/recipes/percentiles",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/nested-aggregates",
+    "destination": "/product/data-modeling/recipes/nested-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/filtered-aggregates",
+    "destination": "/product/data-modeling/recipes/filtered-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/period-over-period",
+    "destination": "/product/data-modeling/recipes/period-over-period",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/custom-granularity",
+    "destination": "/product/data-modeling/recipes/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/custom-calendar",
+    "destination": "/product/data-modeling/recipes/custom-calendar",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/snapshots",
+    "destination": "/product/data-modeling/recipes/snapshots",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/entity-attribute-value",
+    "destination": "/product/data-modeling/recipes/entity-attribute-value",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+    "destination": "/product/data-modeling/recipes/passing-dynamic-parameters-in-a-query",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/using-dynamic-measures",
+    "destination": "/product/data-modeling/recipes/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/dynamic-union-tables",
+    "destination": "/product/data-modeling/recipes/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/string-time-dimensions",
+    "destination": "/product/data-modeling/recipes/string-time-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/aws-cognito",
+    "destination": "/product/auth/methods/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/auth0-guide",
+    "destination": "/product/auth/methods/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/sql-api-ldap",
+    "destination": "/product/auth/methods/ldap",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/aws-cognito",
+    "destination": "/product/auth/methods/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/auth0-guide",
+    "destination": "/product/auth/methods/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/sql-api-ldap",
+    "destination": "/product/auth/methods/ldap",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/using-different-schemas-for-tenants",
+    "destination": "/product/configuration/recipes/custom-data-model-per-tenant#loading-from-disk",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/controlling-access-to-cubes-and-views",
+    "destination": "/product/auth/context#controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/role-based-access",
+    "destination": "/product/auth/context#enforcing-role-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/column-based-access",
+    "destination": "/product/auth/context#enforcing-column-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/controlling-access-to-cubes-and-views",
+    "destination": "/product/auth/context#controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/role-based-access",
+    "destination": "/product/auth/context#enforcing-role-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/column-based-access",
+    "destination": "/product/auth/context#enforcing-column-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/enforcing-mandatory-filters",
+    "destination": "/product/auth/context#enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/enforcing-mandatory-filters",
+    "destination": "/product/auth/context#enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/xirr",
+    "destination": "/product/data-modeling/recipes/xirr",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/funnels",
+    "destination": "/product/data-modeling/recipes/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/cohort-retention",
+    "destination": "/product/data-modeling/recipes/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/event-analytics",
+    "destination": "/product/data-modeling/recipes/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/active-users",
+    "destination": "/product/data-modeling/recipes/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/reference",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/reference/python/cube",
+    "destination": "/product/data-modeling/reference/cube-package",
+    "permanent": true
+  },
+  {
+    "source": "/reference/python/lkml2cube",
+    "destination": "/product/data-modeling/reference/lkml2cube",
+    "permanent": true
+  },
+  {
+    "source": "/reference/python/cube_dbt",
+    "destination": "/product/data-modeling/reference/cube_dbt",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model",
+    "destination": "/product/data-modeling/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/cube",
+    "destination": "/product/data-modeling/reference/cube",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/dimensions",
+    "destination": "/product/data-modeling/reference/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/measures",
+    "destination": "/product/data-modeling/reference/measures",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/joins",
+    "destination": "/product/data-modeling/reference/joins",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/segments",
+    "destination": "/product/data-modeling/reference/segments",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/types-and-formats",
+    "destination": "/product/data-modeling/reference/types-and-formats",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/view",
+    "destination": "/product/data-modeling/reference/view",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/hierarchies",
+    "destination": "/product/data-modeling/reference/hierarchies",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/context-variables",
+    "destination": "/product/data-modeling/reference/context-variables",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/data-access-policies",
+    "destination": "/product/data-modeling/reference/data-access-policies",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/pre-aggregations",
+    "destination": "/product/data-modeling/reference/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/reference/configuration/environment-variables",
+    "destination": "/product/configuration/reference/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/advanced/multiple-data-sources",
+    "destination": "/product/configuration/multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/advanced/multitenancy",
+    "destination": "/product/configuration/multitenancy",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/visual-modeler",
+    "destination": "/product/administration/workspace/visual-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync/power-bi",
+    "destination": "/product/configuration/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-core",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-core",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-react",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-react",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ngx",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-vue",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ws-transport",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ws-transport",
+    "permanent": true
+  },
+  {
+    "source": "/reference/cli",
+    "destination": "/product/administration/workspace/cli/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/graphql-api",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/rest-api",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/sql-api",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/publicity",
+    "destination": "/product/auth/member-level-security",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/fiscal-year-quarter-dimensions",
+    "destination": "/product/data-modeling/recipes/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/semantic-layer-sync",
+    "destination": "/product/apis-integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/cloudwatch",
+    "destination": "/product/administration/workspace/monitoring/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/s3",
+    "destination": "/product/administration/workspace/monitoring/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/datadog",
+    "destination": "/product/administration/workspace/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/grafana-cloud",
+    "destination": "/product/administration/workspace/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations",
+    "destination": "/product/administration/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/subquery-dimensions",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/additional-concepts",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/using-dbt",
+    "destination": "/product/data-modeling/recipes/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/jinja",
+    "destination": "/product/data-modeling/dynamic/jinja",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/data-blending",
+    "destination": "/product/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/dynamic-schema-creation",
+    "destination": "/product/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/syntax",
+    "destination": "/product/data-modeling/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/schema-execution-environment",
+    "destination": "/product/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/concepts",
+    "destination": "/product/data-modeling/concepts",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/code-reusability-extending-cubes",
+    "destination": "/product/data-modeling/concepts/code-reusability-extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/working-with-joins",
+    "destination": "/product/data-modeling/concepts/working-with-joins",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/overview",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/introduction",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/cubejs-introduction",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/semantic-layer-sync",
+    "destination": "/product/apis-integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/sql-runner",
+    "destination": "/product/administration/workspace/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/workspace/preferences",
+    "destination": "/product/administration/workspace/preferences",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/inspecting-queries",
+    "destination": "/product/administration/workspace/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/inspecting-pre-aggregations",
+    "destination": "/product/administration/workspace/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/development-api",
+    "destination": "/product/administration/workspace/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/dev-tools/dev-playground",
+    "destination": "/product/exploration/playground",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/dev-tools/dev-playground",
+    "destination": "/product/exploration/playground",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/cube-ide",
+    "destination": "/product/administration/workspace/data-model",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/cube-ide",
+    "destination": "/product/administration/workspace/data-model",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/dev-tools/cube-ide",
+    "destination": "/product/administration/workspace/data-model",
+    "permanent": true
+  },
+  {
+    "source": "/using-the-cubejs-cli",
+    "destination": "/product/administration/workspace/cli",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/access-control/",
+    "destination": "/product/administration/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/schema/getting-started",
+    "destination": "/product/data-modeling/overview",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/alerts",
+    "destination": "/product/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/dev-tools/alerts/",
+    "destination": "/product/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/style-guide",
+    "destination": "/product/data-modeling/recipes/style-guide",
+    "permanent": true
+  },
+  {
+    "source": "/recipes",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/examples",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/tutorials",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/configuration/overview",
+    "destination": "/product/configuration",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases",
+    "destination": "/product/configuration/data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/connecting-to-the-database",
+    "destination": "/product/configuration/data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream",
+    "destination": "/product/configuration/visualization-tools",
+    "permanent": true
+  },
+  {
+    "source": "/caching/using-pre-aggregations",
+    "destination": "/product/caching/using-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/caching/running-in-production",
+    "destination": "/product/caching/running-in-production",
+    "permanent": true
+  },
+  {
+    "source": "/caching",
+    "destination": "/product/caching",
+    "permanent": true
+  },
+  {
+    "source": "/caching/pre-aggregations/lambda-pre-aggregations",
+    "destination": "/product/caching/lambda-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/caching/pre-aggregations/getting-started",
+    "destination": "/product/caching/getting-started-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/security/context",
+    "destination": "/product/auth/context",
+    "permanent": true
+  },
+  {
+    "source": "/security",
+    "destination": "/product/auth",
+    "permanent": true
+  },
+  {
+    "source": "/apis-integrations",
+    "destination": "/product/apis-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/workspace/sso/",
+    "destination": "/product/administration/sso",
+    "permanent": true
+  },
+  {
+    "source": "/workspace/sso/okta",
+    "destination": "/product/administration/sso/okta",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/production-checklist",
+    "destination": "/product/administration/deployment/core#production-checklist",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/overview",
+    "destination": "/product/administration/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/deployment",
+    "destination": "/product/administration/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/guide",
+    "destination": "/product/administration/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/view",
+    "destination": "/product/data-modeling/reference/view",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/types-and-formats",
+    "destination": "/product/data-modeling/reference/types-and-formats",
+    "permanent": true
+  },
+  {
+    "source": "/types-and-formats",
+    "destination": "/product/data-modeling/reference/types-and-formats",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/segments",
+    "destination": "/product/data-modeling/reference/segments",
+    "permanent": true
+  },
+  {
+    "source": "/segments",
+    "destination": "/product/data-modeling/reference/segments",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/pre-aggregations",
+    "destination": "/product/data-modeling/reference/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/pre-aggregations",
+    "destination": "/product/data-modeling/reference/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/measures",
+    "destination": "/product/data-modeling/reference/measures",
+    "permanent": true
+  },
+  {
+    "source": "/measures",
+    "destination": "/product/data-modeling/reference/measures",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/joins",
+    "destination": "/product/data-modeling/reference/joins",
+    "permanent": true
+  },
+  {
+    "source": "/joins",
+    "destination": "/product/data-modeling/reference/joins",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/dimensions",
+    "destination": "/product/data-modeling/reference/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/dimensions",
+    "destination": "/product/data-modeling/reference/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/cube",
+    "destination": "/product/data-modeling/reference/cube",
+    "permanent": true
+  },
+  {
+    "source": "/cube",
+    "destination": "/product/data-modeling/reference/cube",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started",
+    "destination": "/product/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/faqs/troubleshooting",
+    "destination": "/product/faqs/troubleshooting",
+    "permanent": true
+  },
+  {
+    "source": "/faqs/tips-and-tricks",
+    "destination": "/product/faqs/tips-and-tricks",
+    "permanent": true
+  },
+  {
+    "source": "/faqs/general",
+    "destination": "/product/faqs/general",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/execution-environment",
+    "destination": "/product/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/schema-execution-environment",
+    "destination": "/product/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/using-dbt",
+    "destination": "/product/data-modeling/recipes/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/polymorphic-cubes",
+    "destination": "/product/data-modeling/advanced/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/polymorphic-cubes",
+    "destination": "/product/data-modeling/advanced/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/polymorphic-cubes",
+    "destination": "/product/data-modeling/advanced/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/dynamic-schema-creation",
+    "destination": "/product/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/schema/dynamic-schema-creation",
+    "destination": "/product/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/data-blending",
+    "destination": "/product/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/data-blending",
+    "destination": "/product/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/data-blending",
+    "destination": "/product/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/extending-cubes",
+    "destination": "/product/data-modeling/concepts/code-reusability-extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/extending-cubes",
+    "destination": "/product/data-modeling/concepts/code-reusability-extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/extending-cubes",
+    "destination": "/product/data-modeling/concepts/code-reusability-extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/export-import",
+    "destination": "/product/data-modeling/advanced/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/export-import",
+    "destination": "/product/data-modeling/advanced/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/export-import",
+    "destination": "/product/data-modeling/advanced/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/reference/functions-operators",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/reference#sql-functions-and-operators",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/reference/commands",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/reference#sql-commands",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/joins",
+    "destination": "/product/data-modeling/concepts/working-with-joins",
+    "permanent": true
+  },
+  {
+    "source": "/direction-of-joins",
+    "destination": "/product/data-modeling/concepts/working-with-joins",
+    "permanent": true
+  },
+  {
+    "source": "/many-to-many-relationship",
+    "destination": "/product/data-modeling/concepts/working-with-joins",
+    "permanent": true
+  },
+  {
+    "source": "/data-modeling/syntax",
+    "destination": "/product/data-modeling/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/working-with-yaml",
+    "destination": "/product/data-modeling/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/schema/getting-started/yaml",
+    "destination": "/product/data-modeling/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/concepts",
+    "destination": "/product/data-modeling/concepts",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/additional-concepts",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/drill-downs",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/subquery",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/working-with-string-time-dimensions",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/rest-api",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/backend/graphql",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/@cubejs-client-vue",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/@cubejs-client-ngx",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/reference/environment-variables",
+    "destination": "/product/configuration/reference/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/config",
+    "destination": "/product/configuration/reference/config",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/integrations",
+    "destination": "/product/administration/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/logs",
+    "destination": "/product/administration/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/grafana-cloud",
+    "destination": "/product/administration/workspace/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/datadog",
+    "destination": "/product/administration/workspace/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc",
+    "destination": "/product/administration/deployment/vpc",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc/gcp",
+    "destination": "/product/administration/deployment/vpc/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc/azure",
+    "destination": "/product/administration/deployment/vpc/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc/aws",
+    "destination": "/product/administration/deployment/vpc/aws",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/thoughtspot",
+    "destination": "/product/configuration/visualization-tools/thoughtspot",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/tableau",
+    "destination": "/product/configuration/visualization-tools/tableau",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/superset",
+    "destination": "/product/configuration/visualization-tools/superset",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/using-apache-superset-with-cube-sql",
+    "destination": "/product/configuration/visualization-tools/superset",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/streamlit",
+    "destination": "/product/configuration/visualization-tools/streamlit",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/retool",
+    "destination": "/product/configuration/visualization-tools/retool",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/powerbi",
+    "destination": "/product/configuration/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/observable",
+    "destination": "/product/configuration/visualization-tools/observable",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/metabase",
+    "destination": "/product/configuration/visualization-tools/metabase",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/jupyter",
+    "destination": "/product/configuration/visualization-tools/jupyter",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/hex",
+    "destination": "/product/configuration/visualization-tools/hex",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/deepnote",
+    "destination": "/product/configuration/visualization-tools/deepnote",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/budibase",
+    "destination": "/product/configuration/visualization-tools/budibase",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/bubble",
+    "destination": "/product/configuration/visualization-tools/bubble",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/appsmith",
+    "destination": "/product/configuration/visualization-tools/appsmith",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/ksqldb",
+    "destination": "/product/configuration/data-sources/ksqldb",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/trino",
+    "destination": "/product/configuration/data-sources/trino",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/snowflake",
+    "destination": "/product/configuration/data-sources/snowflake",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/sqlite",
+    "destination": "/product/configuration/data-sources/sqlite",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/questdb",
+    "destination": "/product/configuration/data-sources/questdb",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/presto",
+    "destination": "/product/configuration/data-sources/presto",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/prestodb",
+    "destination": "/product/configuration/data-sources/presto",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/postgres",
+    "destination": "/product/configuration/data-sources/postgres",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/oracle",
+    "destination": "/product/configuration/data-sources/oracle",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/mysql",
+    "destination": "/product/configuration/data-sources/mysql",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/mongodb",
+    "destination": "/product/configuration/data-sources/mongodb",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/materialize",
+    "destination": "/product/configuration/data-sources/materialize",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/mssql",
+    "destination": "/product/configuration/data-sources/ms-sql",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/hive-sparksql",
+    "destination": "/product/configuration/data-sources/hive",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/google-bigquery",
+    "destination": "/product/configuration/data-sources/google-bigquery",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/firebolt",
+    "destination": "/product/configuration/data-sources/firebolt",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/elasticsearch",
+    "destination": "/product/configuration/data-sources/elasticsearch",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/druid",
+    "destination": "/product/configuration/data-sources/druid",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/databricks/jdbc",
+    "destination": "/product/configuration/data-sources/databricks-jdbc",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/clickhouse",
+    "destination": "/product/configuration/data-sources/clickhouse",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/aws-redshift",
+    "destination": "/product/configuration/data-sources/aws-redshift",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/aws-athena",
+    "destination": "/product/configuration/data-sources/aws-athena",
+    "permanent": true
+  },
+  {
+    "source": "/config/multitenancy",
+    "destination": "/product/configuration/multitenancy",
+    "permanent": true
+  },
+  {
+    "source": "/config/multiple-data-sources",
+    "destination": "/product/configuration/multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/reference/joins",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/joins",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/security",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/security",
+    "permanent": true
+  },
+  {
+    "source": "/real-time-data-fetch",
+    "destination": "/product/apis-integrations/recipes/real-time-data-fetch",
+    "permanent": true
+  },
+  {
+    "source": "/query-format",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/http-api/rest",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api/prefect",
+    "destination": "/product/apis-integrations/orchestration-api/prefect",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api",
+    "destination": "/product/apis-integrations/orchestration-api",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api/dagster",
+    "destination": "/product/apis-integrations/orchestration-api/dagster",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api/airflow",
+    "destination": "/product/apis-integrations/orchestration-api/airflow",
+    "permanent": true
+  },
+  {
+    "source": "/http-api/graphql",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction",
+    "destination": "/product/apis-integrations/javascript-sdk",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction/vue",
+    "destination": "/product/apis-integrations/javascript-sdk/vue",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction/react",
+    "destination": "/product/apis-integrations/javascript-sdk/react",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction/angular",
+    "destination": "/product/apis-integrations/javascript-sdk/angular",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/platforms/docker",
+    "destination": "/product/administration/deployment/core",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/pricing",
+    "destination": "/product/administration/deployment/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/platforms/cube-cloud",
+    "destination": "/product/administration/deployment/cloud",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/limits",
+    "destination": "/product/administration/deployment/limits",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/deployment-types",
+    "destination": "/product/administration/deployment/deployment-types",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/custom-domains",
+    "destination": "/product/administration/deployment/custom-domains",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/deploys",
+    "destination": "/product/administration/deployment/continuous-deployment",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/cloud/auto-suspension",
+    "destination": "/product/administration/deployment/auto-suspension",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/learn-more",
+    "destination": "/product/getting-started/core/learn-more",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/add-a-pre-aggregation",
+    "destination": "/product/getting-started/core/add-a-pre-aggregation",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/query-data",
+    "destination": "/product/getting-started/core/query-data",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/create-a-project",
+    "destination": "/product/getting-started/core/create-a-project",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/overview",
+    "destination": "/product/getting-started/core",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started-docker",
+    "destination": "/product/getting-started/core",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/docker",
+    "destination": "/product/getting-started/core",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/query-from-react-app",
+    "destination": "/product/getting-started/cloud/query-from-react-app",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/query-from-BI",
+    "destination": "/product/getting-started/cloud/query-from-bi",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/create-data-model",
+    "destination": "/product/getting-started/cloud/create-data-model",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/connect-to-snowflake",
+    "destination": "/product/getting-started/cloud/connect-to-snowflake",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/load-data",
+    "destination": "/product/getting-started/cloud/load-data",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/overview",
+    "destination": "/product/getting-started/cloud",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/cli",
+    "destination": "/product/getting-started/migrate-from-core/upload-with-cli",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/ssh/gitlab",
+    "destination": "/product/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/github",
+    "destination": "/product/getting-started/migrate-from-core/import-github-repository",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/ssh/git",
+    "destination": "/product/getting-started/migrate-from-core/import-git-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/ssh/bitbucket",
+    "destination": "/product/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/migrating-from-express-to-docker",
+    "destination": "https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/using-originalsql-and-rollups-effectively",
+    "destination": "/product/caching/recipes/using-originalsql-and-rollups-effectively",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/non-additivity",
+    "destination": "/product/caching/recipes/non-additivity",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/joining-multiple-data-sources",
+    "destination": "/product/caching/recipes/joining-multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/incrementally-building-pre-aggregations-for-a-date-range",
+    "destination": "/product/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/refreshing-select-partitions",
+    "destination": "/product/caching/recipes/refreshing-select-partitions",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/pagination",
+    "destination": "/product/apis-integrations/recipes/pagination",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/getting-unique-values-for-a-field",
+    "destination": "/product/apis-integrations/recipes/getting-unique-values-for-a-field",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/enforcing-mandatory-filters",
+    "destination": "/product/auth/context#enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/enable-ssl-connections-to-database",
+    "destination": "/product/configuration/recipes/using-ssl-connections-to-data-source",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/multiple-sources-same-schema",
+    "destination": "/product/configuration/recipes/multiple-sources-same-schema",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/authn-with-auth0",
+    "destination": "/product/auth/methods/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/security/jwt/auth0",
+    "destination": "/product/auth/methods/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/authn-with-aws-cognito",
+    "destination": "/product/auth/methods/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/security/jwt/aws-cognito",
+    "destination": "/product/auth/methods/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/referencing-dynamic-measures",
+    "destination": "/product/data-modeling/recipes/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/snapshots",
+    "destination": "/product/data-modeling/recipes/snapshots",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/percentiles",
+    "destination": "/product/data-modeling/recipes/percentiles",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/passing-dynamic-parameters-in-a-query",
+    "destination": "/product/data-modeling/recipes/passing-dynamic-parameters-in-a-query",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/entity-attribute-value",
+    "destination": "/product/data-modeling/recipes/entity-attribute-value",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/dynamically-union-tables",
+    "destination": "/product/data-modeling/recipes/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/dynamically-union-tables",
+    "destination": "/product/data-modeling/recipes/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/schema-generation",
+    "destination": "/guides/recipes/code-reusability/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/schema-generation",
+    "destination": "/guides/recipes/code-reusability/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/funnels",
+    "destination": "/product/data-modeling/recipes/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/funnels",
+    "destination": "/product/data-modeling/recipes/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/event-analytics",
+    "destination": "/product/data-modeling/recipes/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/event-analytics",
+    "destination": "/product/data-modeling/recipes/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/cohort-retention",
+    "destination": "/product/data-modeling/recipes/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/cohort-retention",
+    "destination": "/product/data-modeling/recipes/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/active-users",
+    "destination": "/product/data-modeling/recipes/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/active-users",
+    "destination": "/product/data-modeling/recipes/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/using-different-schemas-for-tenants",
+    "destination": "/product/configuration/recipes/custom-data-model-per-tenant#loading-from-disk",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/role-based-access",
+    "destination": "/product/auth/context#enforcing-role-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/controlling-access-to-cubes-and-views",
+    "destination": "/product/auth/context#controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/column-based-access",
+    "destination": "/product/auth/context#enforcing-column-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/reference/configuration/config",
+    "destination": "/product/configuration/reference/config",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure",
+    "destination": "/product/administration/deployment/vpc/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace",
+    "destination": "/product/administration/workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/access-control",
+    "destination": "/product/administration/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/api-keys",
+    "destination": "/product/administration/workspace/api-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/audit-log",
+    "destination": "/product/administration/workspace/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/budgets",
+    "destination": "/product/administration/workspace/budgets",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/chats-history",
+    "destination": "/product/administration/workspace/chats-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/cli",
+    "destination": "/product/administration/workspace/cli",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/cli/reference",
+    "destination": "/product/administration/workspace/cli/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/data-model",
+    "destination": "/product/administration/workspace/data-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/dev-mode",
+    "destination": "/product/administration/workspace/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/encryption-keys",
+    "destination": "/product/administration/workspace/encryption-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/environments",
+    "destination": "/product/administration/workspace/environments",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/integrations",
+    "destination": "/product/administration/workspace/integrations",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring",
+    "destination": "/product/administration/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/cloudwatch",
+    "destination": "/product/administration/workspace/monitoring/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/datadog",
+    "destination": "/product/administration/workspace/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/grafana-cloud",
+    "destination": "/product/administration/workspace/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/new-relic",
+    "destination": "/product/administration/workspace/monitoring/new-relic",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/s3",
+    "destination": "/product/administration/workspace/monitoring/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/performance",
+    "destination": "/product/administration/workspace/performance",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/playground",
+    "destination": "/product/exploration/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/playground",
+    "destination": "/product/exploration/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/pre-aggregations",
+    "destination": "/product/administration/workspace/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/preferences",
+    "destination": "/product/administration/workspace/preferences",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/query-history",
+    "destination": "/product/administration/workspace/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/recipes/query-history-export",
+    "destination": "/product/administration/workspace/recipes/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/rollup-designer",
+    "destination": "/product/administration/workspace/rollup-designer",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/saved-reports",
+    "destination": "/product/administration/workspace/saved-reports",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/semantic-catalog",
+    "destination": "/product/administration/workspace/semantic-catalog",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sql-runner",
+    "destination": "/product/administration/workspace/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso",
+    "destination": "/product/administration/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso",
+    "destination": "/product/administration/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/google-workspace",
+    "destination": "/product/administration/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/google-workspace",
+    "destination": "/product/administration/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/microsoft-entra-id",
+    "destination": "/product/administration/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/microsoft-entra-id",
+    "destination": "/product/administration/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/okta",
+    "destination": "/product/administration/sso/okta",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/okta",
+    "destination": "/product/administration/sso/okta",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/visual-model",
+    "destination": "/product/administration/workspace/visual-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/vizard",
+    "destination": "/product/administration/workspace/vizard",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment",
+    "destination": "/product/administration/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud",
+    "destination": "/product/administration/deployment/cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/auto-suspension",
+    "destination": "/product/administration/deployment/auto-suspension",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc",
+    "destination": "/product/administration/deployment/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/aws/deployment",
+    "destination": "/product/administration/deployment/byoc/aws/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/aws/privatelink",
+    "destination": "/product/administration/deployment/byoc/aws/privatelink",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/azure",
+    "destination": "/product/administration/deployment/byoc/azure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/gcp/deployment",
+    "destination": "/product/administration/deployment/byoc/gcp/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/continuous-deployment",
+    "destination": "/product/administration/deployment/continuous-deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/custom-domains",
+    "destination": "/product/administration/deployment/custom-domains",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/deployment-types",
+    "destination": "/product/administration/deployment/deployment-types",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/deployments",
+    "destination": "/product/administration/deployment/deployments",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/infrastructure",
+    "destination": "/product/administration/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/limits",
+    "destination": "/product/administration/deployment/limits",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/pricing",
+    "destination": "/product/administration/deployment/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers",
+    "destination": "/product/administration/deployment/providers",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers/aws",
+    "destination": "/product/administration/deployment/providers/aws",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers/azure",
+    "destination": "/product/administration/deployment/providers/azure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers/gcp",
+    "destination": "/product/administration/deployment/providers/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/scalability",
+    "destination": "/product/administration/deployment/scalability",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/support",
+    "destination": "/product/administration/deployment/support",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc",
+    "destination": "/product/administration/deployment/vpc",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/aws",
+    "destination": "/product/administration/deployment/vpc/aws",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/aws/private-link",
+    "destination": "/product/administration/deployment/vpc/aws/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/aws/vpc-peering",
+    "destination": "/product/administration/deployment/vpc/aws/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure/private-link",
+    "destination": "/product/administration/deployment/vpc/azure/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure/vpc-peering",
+    "destination": "/product/administration/deployment/vpc/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/gcp",
+    "destination": "/product/administration/deployment/vpc/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/warm-up",
+    "destination": "/product/administration/deployment/warm-up",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/core",
+    "destination": "/product/administration/deployment/core",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/production-checklist",
+    "destination": "/product/administration/deployment/core#production-checklist",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/embedding",
+    "destination": "/product/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding",
+    "destination": "/product/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/private-embedding",
+    "destination": "/product/embedding/private-embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/signed-embedding",
+    "destination": "/product/embedding/signed-embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/creator-mode",
+    "destination": "/product/embedding/creator-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/distribution",
+    "destination": "/product/administration/distribution",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/spaces-agents-models",
+    "destination": "/product/administration/ai/spaces-agents-models",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/agent-rules",
+    "destination": "/product/administration/ai/agent-rules",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/memory-isolation",
+    "destination": "/product/administration/ai/memory-isolation",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/user-attributes",
+    "destination": "/product/administration/users-and-permissions/user-attributes",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/roles-and-permissions",
+    "destination": "/product/administration/users-and-permissions/roles-and-permissions",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/queries",
+    "destination": "/product/apis-integrations/core-data-apis/queries",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/joins",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/query-format",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/security",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/security",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/dax-api",
+    "destination": "/product/apis-integrations/core-data-apis/dax-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/dax-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/dax-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/mdx-api",
+    "destination": "/product/apis-integrations/core-data-apis/mdx-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/query-format",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/graphql-api",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/graphql-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/chat-api",
+    "destination": "/product/apis-integrations/embed-apis/chat-api",
+    "permanent": true
+  }
+]
