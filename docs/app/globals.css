@@ -1,0 +1,261 @@
+/* Override primary colors */
+:root {
+  --x-color-primary-600: hsl(251, 61%, 52%);
+  /* Darker, more saturated backgrounds for sidebar active items */
+  --x-color-primary-50: hsl(251, 70%, 95%);
+  --x-color-primary-100: hsl(251, 70%, 92%);
+
+  /* Brand colors */
+  --purple: hsl(251, 94%, 66%);
+  --purple_bright: hsl(251, 61%, 52%);
+  --purple_bg: hsl(240, 50%, 98%);
+  --purple_bg_a08: hsla(244, 94%, 66%, 0.08);
+
+  --pink: hsl(342, 69%, 53%);
+  --pink_bright: hsl(342, 62%, 48%);
+
+  /* Dark palette */
+  --dark: hsl(240, 32%, 10%);
+  --dark_03: hsl(240, 8%, 45%);
+  --dark_04: hsl(240, 9%, 69%);
+  --dark_05: hsl(240, 16%, 91%);
+  --dark_bg: hsl(240, 12%, 97%);
+
+  /* Gray */
+  --gray_01: hsl(228, 6%, 31%);
+  --gray_02: hsl(225, 4%, 39%);
+
+  /* Spacing */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-s: 16px;
+  --space-m: 24px;
+  --space-l: 32px;
+  --space-xl: 48px;
+  --space-2xl: 64px;
+}
+
+/* Dark mode: brighter purple for links and UI elements */
+.dark {
+  --nextra-primary-lightness: 65%;
+}
+
+/* Content links in dark mode - brighter purple */
+.dark main a {
+  color: hsl(251, 90%, 75%) !important;
+}
+
+/* Left sidebar active item - brighter purple in dark mode */
+.dark aside:first-of-type a.x\:font-semibold,
+.dark aside:first-of-type a[class*="font-semibold"] {
+  background-color: hsl(251, 50%, 22%) !important;
+  color: hsl(251, 100%, 85%) !important;
+}
+
+/* Left sidebar hover - more visible in dark mode */
+.dark aside:first-of-type a:hover {
+  background-color: hsl(240, 10%, 20%) !important;
+}
+
+/* Font family definitions */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-cera-pro), system-ui, -apple-system, sans-serif;
+}
+
+code, pre, kbd, samp {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Code block styling - matches old docs style */
+.nextra-code {
+  margin-top: var(--space-m) !important;
+}
+
+.nextra-code pre {
+  background-color: rgba(124, 58, 237, 0.05) !important;
+  --tw-ring-shadow: none !important;
+  box-shadow: none !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+code.nextra-code {
+  font-size: 0.875rem !important;
+}
+
+.nextra-code pre > div:first-child {
+  margin-top: 0 !important;
+}
+
+.nextra-code pre code {
+  margin-top: 0 !important;
+  font-size: 0.8rem !important;
+}
+
+.nextra-code pre code,
+.nextra-code pre code span {
+  background-color: transparent !important;
+  line-height: 1.5 !important;
+}
+
+/* Dark mode code blocks */
+.dark .nextra-code pre {
+  background-color: rgba(124, 58, 237, 0.1) !important;
+}
+
+/* Code block filename header - match code block background */
+.nextra-code > div:first-child:has(+ pre) {
+  background-color: rgba(124, 58, 237, 0.12) !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.15) !important;
+  padding: 10px 16px !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.dark .nextra-code > div:first-child:has(+ pre) {
+  background-color: rgba(124, 58, 237, 0.15) !important;
+  border-bottom-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+/* Style tree code blocks like regular code blocks */
+[data-language="tree"] {
+  margin-top: var(--space-m);
+}
+
+[data-language="tree"] pre {
+  background-color: rgba(124, 58, 237, 0.05) !important;
+  box-shadow: none !important;
+}
+
+[data-language="tree"] figure {
+  box-shadow: none !important;
+}
+
+[data-language="tree"] pre code,
+[data-language="tree"] pre code span {
+  background-color: transparent !important;
+}
+
+/* Style inline code (code not in pre blocks) */
+:not(pre) > code,
+code:not(.nextra-code) {
+  background-color: hsla(240, 12%, 97%, 0.75) !important;
+  border: 1px solid var(--dark_05) !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-size: 0.875em !important;
+}
+
+.dark :not(pre) > code,
+.dark code:not(.nextra-code) {
+  background-color: hsla(240, 6%, 18%, 0.75) !important;
+  border-color: hsl(240, 6%, 28%) !important;
+}
+
+/* Inline code in headings should inherit font size */
+h1 code, h2 code, h3 code, h4 code, h5 code, h6 code,
+h1 code.nextra-code, h2 code.nextra-code, h3 code.nextra-code,
+h4 code.nextra-code, h5 code.nextra-code, h6 code.nextra-code {
+  font-size: 0.85em !important;
+}
+
+/* Inline code outside links should inherit text color */
+:not(a) > code {
+  color: inherit !important;
+}
+
+/* Link underline opacity - only for content area links */
+article a {
+  text-decoration-color: color-mix(in srgb, currentColor 25%, transparent) !important;
+}
+
+article a:hover {
+  text-decoration: underline !important;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent) !important;
+}
+
+/* Remove underline from sidebar/nav links */
+aside a,
+nav a,
+header a,
+footer a {
+  text-decoration: none !important;
+}
+
+aside a:hover,
+nav a:hover,
+header a:hover,
+footer a:hover {
+  text-decoration: none !important;
+}
+
+/* External link arrows - hide them (target Nextra's LinkArrowIcon by its classes) */
+a[href^="http"] svg.x\:shrink-0 {
+  display: none !important;
+}
+
+/* Table styling */
+table {
+  font-size: 1rem;
+  line-height: 1.43;
+}
+
+th {
+  background-color: hsla(240, 12%, 97%, 0.75);
+}
+
+.dark th {
+  background-color: hsla(240, 6%, 20%, 0.75);
+}
+
+/* Remove striped rows - overrides Nextra's x:even:bg-gray-100 */
+tr:nth-child(even) {
+  background-color: transparent !important;
+}
+
+/* Search popup - make wider */
+@media (min-width: 768px) {
+  .nextra-search .nextra-search-results {
+    width: 750px !important;
+  }
+}
+
+/* Video styling - margins like Screenshot */
+article video {
+  margin: var(--space-m) 0;
+}
+
+/* Navbar icons - vertical alignment */
+nav[class*="nextra-nav"] a[href],
+nav[class*="nextra-nav"] > a,
+header nav a[href] {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Search button alignment */
+nav[class*="nextra-nav"] button:not([aria-label="Menu"]),
+header nav button:not([aria-label="Menu"]) {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Purple Banner wrapper - animated reveal */
+.pb-wrapper {
+  --purple-banner-font: var(--font-cera-pro), system-ui, -apple-system, sans-serif;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.pb-wrapper--visible {
+  max-height: 100px;
+}
+
+@media (max-width: 768px) {
+  .pb-wrapper--visible {
+    max-height: 160px;
+  }
+}
+

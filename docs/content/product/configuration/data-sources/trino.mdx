@@ -1,0 +1,132 @@
+# Trino
+
+## Prerequisites
+
+- The hostname for the [Trino][trino] database server
+- The username/password for the [Trino][trino] database server
+- The name of the database to use within the [Trino][trino] database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=trino
+CUBEJS_DB_HOST=my.trino.host
+CUBEJS_DB_USER=trino_user
+CUBEJS_DB_PASS=**********
+CUBEJS_DB_PRESTO_CATALOG=my_trino_catalog
+CUBEJS_DB_SCHEMA=my_trino_schema
+```
+
+## Environment Variables
+
+| Environment Variable       | Description                                                                         | Possible Values                               | Required |
+| -------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- | :------: |
+| <EnvVar>CUBEJS_DB_HOST</EnvVar>           | The host URL for a database                                                         | A valid database host URL                     |    ✅    |
+| <EnvVar>CUBEJS_DB_PORT</EnvVar>           | The port for the database connection                                                | A valid port number                           |    ❌    |
+| <EnvVar>CUBEJS_DB_USER</EnvVar>           | The username used to connect to the database                                        | A valid database username                     |    ✅    |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
+| <EnvVar>CUBEJS_DB_PRESTO_CATALOG</EnvVar> | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
+| <EnvVar>CUBEJS_DB_PRESTO_AUTH_TOKEN</EnvVar> | The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header. | A valid authentication token |    ❌    |
+| <EnvVar>CUBEJS_DB_SCHEMA</EnvVar>         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
+| <EnvVar>CUBEJS_DB_SSL</EnvVar>            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
+| <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar>       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
+| <EnvVar>CUBEJS_CONCURRENCY</EnvVar> | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| <EnvVar>CUBEJS_DB_EXPORT_BUCKET_TYPE</EnvVar> | The export bucket type for pre-aggregations | `s3`, `gcs` | ❌ |
+| <EnvVar>CUBEJS_DB_EXPORT_BUCKET</EnvVar> | The export bucket to connect to | A valid bucket URL | ❌ |
+| <EnvVar>CUBEJS_DB_EXPORT_BUCKET_AWS_KEY</EnvVar> | The AWS Access Key ID to use for export bucket writes | A valid AWS Access Key ID | ❌ |
+| <EnvVar>CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET</EnvVar> | The AWS Secret Access Key to use for export bucket writes | A valid AWS Secret Access Key | ❌ |
+| <EnvVar>CUBEJS_DB_EXPORT_BUCKET_AWS_REGION</EnvVar> | The AWS region to use for export bucket writes | A valid AWS region | ❌ |
+| <EnvVar>CUBEJS_DB_EXPORT_GCS_CREDENTIALS</EnvVar> | A Base64 encoded JSON key file for connecting to Google Cloud Storage | A valid Google Cloud JSON key file, encoded as a Base64 string | ❌ |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using Trino as a source database. To learn more
+about Trino support for approximate aggregate functions, [click
+here][trino-docs-approx-agg-fns].
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Simple        |             ✅             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
+
+By default, Trino uses a [simple][self-preaggs-simple] strategy to
+build pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for Trino.
+
+### Export Bucket
+
+Trino supports using both [AWS S3][aws-s3] and [Google Cloud Storage][google-cloud-storage] for export bucket functionality.
+
+#### AWS S3
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+#### Google Cloud Storage
+
+<InfoBox>
+
+When using an export bucket, remember to assign the **Storage Object Admin**
+role to your Google Cloud credentials (<EnvVar>CUBEJS_DB_EXPORT_GCS_CREDENTIALS</EnvVar>).
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET=gs://trino-export-bucket
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
+CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
+```
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and Trino, set the
+<EnvVar>CUBEJS_DB_SSL</EnvVar> environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+[aws-s3]: https://aws.amazon.com/s3/
+[google-cloud-storage]: https://cloud.google.com/storage
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[self-preaggs-simple]: #simple
+[trino]: https://trino.io/
+[trino-docs-approx-agg-fns]:
+  https://trino.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
+[ref-recipe-enable-ssl]:
+  /product/configuration/recipes/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
