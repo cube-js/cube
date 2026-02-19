@@ -16,6 +16,7 @@ const withNextra = nextra({
 })
 
 export default withNextra({
+  basePath: process.env.BASE_PATH || '',
   async redirects() {
     return [
       {
