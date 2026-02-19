@@ -4,6 +4,14 @@ import {
   getEnv,
 } from '@cubejs-backend/shared';
 
+export function transformRow(row: Record<string, any>) {
+  for (const [key, value] of Object.entries(row)) {
+    if (value instanceof Date) {
+      row[key] = value.toJSON();
+    }
+  }
+}
+
 /**
  * MS-SQL query stream class.
  */
@@ -23,7 +31,7 @@ export class QueryStream extends Readable {
     });
     this.request = request;
     this.request.on('row', row => {
-      this.transformRow(row);
+      transformRow(row);
       const canAdd = this.push(row);
       if (this.toRead-- <= 0 || !canAdd) {
         this.request?.pause();
@@ -43,14 +51,6 @@ export class QueryStream extends Readable {
   public _read(toRead: number) {
     this.toRead += toRead;
     this.request?.resume();
-  }
-
-  private transformRow(row: Record<string, any>) {
-    for (const [key, value] of Object.entries(row)) {
-      if (value instanceof Date) {
-        row[key] = value.toJSON();
-      }
-    }
   }
 
   /**
