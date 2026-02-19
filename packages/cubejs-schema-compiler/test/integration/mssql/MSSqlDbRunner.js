@@ -1,6 +1,4 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { GenericContainer, Wait } from 'testcontainers';
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { MSSqlDriver } from '@cubejs-backend/mssql-driver';
 
 import { BaseDbRunner } from '../utils/BaseDbRunner';
