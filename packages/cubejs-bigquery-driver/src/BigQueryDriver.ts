@@ -152,7 +152,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     this.bigquery = new BigQuery(this.options);
     if (this.options.exportBucket) {
       this.storage = new Storage(this.options);
-      this.bucket = this.storage.bucket(this.options.exportBucket);
+      const { bucketName } = this.parseBucketUrl(this.options.exportBucket);
+      this.bucket = this.storage.bucket(bucketName);
     }
   }
 
@@ -346,7 +347,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
-    const destination = this.bucket.file(`${table}-*.csv.gz`);
+    // Extract path component from exportBucket configuration
+    const { path } = this.parseBucketUrl(this.options.exportBucket);
+    const exportPrefix = path ? `${path}/${table}` : table;
+
+    const destination = this.bucket.file(`${exportPrefix}-*.csv.gz`);
     const [schema, tableName] = table.split('.');
     const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
     const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
@@ -356,7 +361,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     // Please use that if you need. Here is a different flow
     // because bigquery requires storage/bucket object for other things,
     // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
-    const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
+    const [files] = await this.bucket.getFiles({ prefix: `${exportPrefix}-` });
     const urls = await Promise.all(files.map(async file => {
       const [url] = await file.getSignedUrl({
         action: 'read',
