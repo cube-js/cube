@@ -110,7 +110,7 @@ export default async function RootLayout({ children }) {
           <Layout
             navbar={navbar}
             pageMap={await getPageMap()}
-            docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs_v4"
+            docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs"
             footer={footer}
             sidebar={{ defaultMenuCollapseLevel: 1 }}
           >
