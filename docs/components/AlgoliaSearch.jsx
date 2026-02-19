@@ -2,6 +2,8 @@
 
 import { SearchIcon, SearchTrigger } from '@cube-dev/marketing-ui'
 
+// Algolia search trigger for navbar
+
 export function AlgoliaSearch() {
   return (
     <SearchTrigger
