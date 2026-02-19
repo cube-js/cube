@@ -1,5 +1,5 @@
 .codeBlock {
-  margin-top: 24px;
+  margin-top: var(--space-m);
 }
 
 .tabs {
@@ -18,30 +18,43 @@
   cursor: pointer;
   line-height: 28px;
   font-weight: 500;
-  color: #374151;
+  color: var(--gray_01);
   transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .tab:hover {
-  color: hsl(342, 95%, 59%);
+  color: var(--pink);
   box-shadow: inset 0px -2.6px 0px hsl(342, 100%, 82%);
 }
 
 .selectedTab {
-  color: hsl(251, 61%, 52%);
+  color: var(--purple_bright);
   cursor: default;
-  background-color: rgba(124, 58, 237, 0.08);
-  box-shadow: inset 0px -2.6px 0px hsl(251, 61%, 52%);
+  background-color: var(--purple_bg_a08);
+  box-shadow: inset 0px -2.6px 0px var(--purple_bright);
 }
 
 .selectedTab:hover {
-  color: hsl(251, 61%, 52%);
-  box-shadow: inset 0px -2.6px 0px hsl(251, 61%, 52%);
+  color: var(--purple_bright);
+  box-shadow: inset 0px -2.6px 0px var(--purple_bright);
 }
 
 .pre {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
+  margin-top: 0 !important;
+}
+
+.codeContent {
+  margin-top: 0 !important;
+}
+
+.codeContent > div,
+.codeContent > [data-language] {
+  margin-top: 0 !important;
+}
+
+.codeContent :global(.nextra-code) {
   margin-top: 0 !important;
 }
 
@@ -75,6 +88,7 @@
 
 :global(.dark) .tabs {
   background-color: rgba(124, 58, 237, 0.1);
+  box-shadow: inset 0px -1px 0px rgba(255, 255, 255, 0.15);
 }
 
 :global(.dark) .tab {

@@ -1,6 +1,6 @@
 .Footer {
-  padding-top: 48px;
-  padding-bottom: 48px;
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-xl);
   background-color: var(--nextra-bg);
   border-top: 1px solid rgba(192, 192, 234, 0.4);
 }
@@ -23,7 +23,7 @@
 }
 
 .Copyright {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--nextra-colors-gray-500);
   margin-top: 12px;
 }
@@ -34,7 +34,7 @@
 }
 
 .Column__Title {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--nextra-colors-gray-900);
   margin-bottom: 12px;
@@ -51,7 +51,7 @@
 }
 
 .Link {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--nextra-colors-gray-500);
   text-decoration: none;
   transition: color 300ms;
@@ -59,18 +59,18 @@
 }
 
 .Link:not(:last-child) {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-xs);
 }
 
 .Link:hover {
-  color: #7A77FF;
+  color: var(--purple);
 }
 
 .Status {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
   background-color: rgba(0, 0, 0, 0.05);
   padding: 6px 12px;
   border-radius: 6px;
@@ -135,13 +135,13 @@
 }
 
 .ChannelLink:hover {
-  color: #7A77FF;
+  color: var(--purple);
 }
 
 @media (max-width: 979px) {
   .Footer {
-    padding-top: 64px;
-    padding-bottom: 64px;
+    padding-top: var(--space-2xl);
+    padding-bottom: var(--space-2xl);
   }
 
   .Footer__content {

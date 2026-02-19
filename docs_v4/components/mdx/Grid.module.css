@@ -1,11 +1,11 @@
 .grid {
   width: 100%;
   display: grid;
-  grid-row-gap: 20px;
-  grid-column-gap: 20px;
+  grid-row-gap: var(--space-s);
+  grid-column-gap: var(--space-s);
   grid-template-columns: repeat(1, 1fr);
   grid-template-rows: auto;
-  margin: 20px 0;
+  margin: var(--space-s) 0;
 }
 
 .cols2 {

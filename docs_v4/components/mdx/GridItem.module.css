@@ -3,8 +3,8 @@
   align-items: center;
   justify-content: left;
   padding: 22px;
-  gap: 16px;
-  border: 1px solid #E5E5EC;
+  gap: var(--space-s);
+  border: 1px solid var(--dark_05);
   border-radius: 8px;
   box-sizing: border-box;
   box-shadow: none;
@@ -20,7 +20,15 @@
 }
 
 .wrapper:hover {
-  background: #F6F6F8;
+  background: var(--dark_bg);
+}
+
+:global(.dark) .wrapper {
+  border-color: hsl(240, 6%, 30%);
+}
+
+:global(.dark) .wrapper:hover {
+  background: hsl(240, 6%, 22%);
 }
 
 .item {
@@ -37,8 +45,12 @@
   display: flex;
   align-self: center;
   margin-left: 12px;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: bold;
   letter-spacing: 0.02em;
-  color: #0f0f35;
+  color: var(--dark);
+}
+
+:global(.dark) .title {
+  color: var(--nextra-colors-gray-100);
 }

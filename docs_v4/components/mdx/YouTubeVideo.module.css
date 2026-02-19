@@ -1,5 +1,5 @@
 .wrapper {
-  margin: 24px 0;
+  margin: var(--space-m) 0;
 }
 
 .wrapper > iframe {

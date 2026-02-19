@@ -1,20 +1,26 @@
 .button {
   font-weight: 400;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 22px;
 
   display: inline-block;
   padding: 0 6px;
-  background: white;
+  background: rgba(255, 255, 255, 0.75);
 
   border-radius: 4px;
-  margin-right: 4px;
-  border: 1px solid hsl(240, 16%, 91%);
-  box-shadow: 2px 2px 0 hsl(240, 16%, 91%);
+  margin-right: var(--space-2xs);
+  border: 1px solid var(--dark_05);
+  box-shadow: 2px 2px 0 var(--dark_05);
+}
+
+:global(.dark) .button {
+  background: hsla(240, 6%, 22%, 0.75);
+  border-color: hsl(240, 6%, 30%);
+  box-shadow: 2px 2px 0 hsl(240, 6%, 30%);
 }
 
 .button:hover:has(> a) {
-  border-color: hsl(251, 61%, 52%);
+  border-color: var(--purple_bright);
 }
 
 .button a,

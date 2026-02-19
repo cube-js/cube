@@ -4,8 +4,8 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build",
+    "dev": "NODE_OPTIONS='--max-old-space-size=16384' next dev --webpack",
+    "build": "NODE_OPTIONS='--max-old-space-size=16384' next build --webpack",
     "start": "next start"
   },
   "dependencies": {

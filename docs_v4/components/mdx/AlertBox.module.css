@@ -3,10 +3,10 @@
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  padding: 12px 16px;
+  padding: 12px var(--space-s);
   border-left: 3px solid;
-  margin: 24px 0;
-  font-size: 16px;
+  margin: var(--space-m) 0;
+  font-size: 1rem;
   line-height: 28px;
 }
 
@@ -32,4 +32,34 @@
   background-color: #f6f6f6;
   border-left-color: #666666;
   color: #333333;
+}
+
+/* Dark mode */
+:global(.dark) .info {
+  background-color: hsl(210, 50%, 18%);
+  border-left-color: hsl(210, 70%, 50%);
+  color: hsl(210, 70%, 80%);
+}
+
+:global(.dark) .warning {
+  background-color: hsl(30, 40%, 18%);
+  border-left-color: hsl(30, 70%, 55%);
+  color: hsl(30, 60%, 80%);
+}
+
+:global(.dark) .success {
+  background-color: hsl(150, 40%, 15%);
+  border-left-color: hsl(150, 60%, 45%);
+  color: hsl(150, 50%, 75%);
+}
+
+:global(.dark) .reference {
+  background-color: hsl(0, 0%, 18%);
+  border-left-color: hsl(0, 0%, 50%);
+  color: hsl(0, 0%, 80%);
+}
+
+/* Remove table margin inside alert boxes */
+.box :global(table) {
+  margin-top: 0 !important;
 }

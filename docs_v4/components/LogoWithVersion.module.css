@@ -10,10 +10,15 @@
 }
 
 .version {
-  color: #6b7280;
+  color: var(--dark_03);
   font-size: 0.875rem;
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
-  background: #f3f4f6;
+  background: var(--dark_bg);
   margin-left: 0.625rem;
+}
+
+:global(.dark) .version {
+  color: hsl(240, 6%, 65%);
+  background: hsl(240, 6%, 20%);
 }

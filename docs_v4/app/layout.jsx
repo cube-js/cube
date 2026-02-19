@@ -1,8 +1,41 @@
 import { Layout, Navbar } from 'nextra-theme-docs'
 import { Head } from 'nextra/components'
 import { getPageMap } from 'nextra/page-map'
+import localFont from 'next/font/local'
 import 'nextra-theme-docs/style.css'
 import './globals.css'
+
+const ceraPro = localFont({
+  src: [
+    {
+      path: '../fonts/CeraPro-Regular.woff2',
+      weight: '300',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Regular.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Medium.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Bold.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Bold.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-cera-pro',
+})
+
 import { Footer } from '../components/Footer'
 import { LogoWithVersion } from '../components/LogoWithVersion'
 import { GetStartedButton } from '../components/GetStartedButton'
@@ -45,8 +78,15 @@ export default async function RootLayout({ children }) {
       lang="en"
       dir="ltr"
       suppressHydrationWarning
+      className={ceraPro.variable}
     >
-      <Head backgroundColor={{ light: '#ffffff', dark: '#111111' }}>
+      <Head
+        backgroundColor={{ light: '#ffffff', dark: '#111111' }}
+        color={{
+          hue: { light: 251, dark: 342 },
+          saturation: { light: 61, dark: 69 }
+        }}
+      >
         {/* Additional head tags can be added here */}
       </Head>
       <body>
