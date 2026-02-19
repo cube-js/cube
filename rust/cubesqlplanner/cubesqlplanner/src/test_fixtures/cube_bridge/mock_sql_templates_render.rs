@@ -3,28 +3,6 @@ use cubenativeutils::CubeError;
 use minijinja::{value::Value, Environment};
 use std::collections::HashMap;
 
-/// Mock implementation of SqlTemplatesRender for testing
-///
-/// This mock provides a simple in-memory template rendering system using minijinja.
-/// It allows tests to define SQL templates and render them with context values.
-///
-/// # Example
-///
-/// ```
-/// use cubesqlplanner::test_fixtures::cube_bridge::MockSqlTemplatesRender;
-/// use minijinja::context;
-///
-/// let mut templates = std::collections::HashMap::new();
-/// templates.insert("filters/equals".to_string(), "{{column}} = {{value}}".to_string());
-///
-/// let render = MockSqlTemplatesRender::try_new(templates).unwrap();
-/// let result = render.render_template(
-///     "filters/equals",
-///     minijinja::context! { column => "id", value => "123" }
-/// ).unwrap();
-///
-/// assert_eq!(result, "id = 123");
-/// ```
 #[derive(Clone)]
 pub struct MockSqlTemplatesRender {
     templates: HashMap<String, String>,
@@ -32,15 +10,6 @@ pub struct MockSqlTemplatesRender {
 }
 
 impl MockSqlTemplatesRender {
-    /// Creates a new MockSqlTemplatesRender with the given templates
-    ///
-    /// # Arguments
-    ///
-    /// * `templates` - HashMap of template name to template content
-    ///
-    /// # Returns
-    ///
-    /// Result containing the MockSqlTemplatesRender or a CubeError if template parsing fails
     pub fn try_new(templates: HashMap<String, String>) -> Result<Self, CubeError> {
         let mut jinja = Environment::new();
         for (name, template) in templates.iter() {
@@ -57,11 +26,6 @@ impl MockSqlTemplatesRender {
         Ok(Self { templates, jinja })
     }
 
-    /// Creates a default MockSqlTemplatesRender with common SQL templates
-    ///
-    /// This includes templates for common filter operations, functions, and types
-    /// that are frequently used in tests. Based on BaseQuery.sqlTemplates() from
-    /// packages/cubejs-schema-compiler/src/adapter/BaseQuery.js
     pub fn default_templates() -> Self {
         let mut templates = HashMap::new();
 
@@ -523,6 +487,36 @@ impl MockSqlTemplatesRender {
         templates.insert("types/time".to_string(), "TIME".to_string());
         templates.insert("types/interval".to_string(), "INTERVAL".to_string());
         templates.insert("types/binary".to_string(), "BINARY".to_string());
+
+        // Statements - SQL statement templates for query building
+        templates.insert(
+            "statements/select".to_string(),
+            "{% if ctes %} WITH \n{{ ctes | join(',\n') }}\n{% endif %}SELECT {% if distinct %}DISTINCT {% endif %}{{ select_concat | map(attribute='aliased') | join(', ') }} {% if from %}\nFROM (\n{{ from | indent(2, true) }}\n) AS {{ from_alias }}{% elif from_prepared %}\nFROM {{ from_prepared }}{% endif %}{% if filter %}\nWHERE {{ filter }}{% endif %}{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}{% if having %}\nHAVING {{ having }}{% endif %}{% if order_by %}\nORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}".to_string(),
+        );
+        templates.insert(
+            "statements/group_by_exprs".to_string(),
+            "{{ group_by | map(attribute='index') | join(', ') }}".to_string(),
+        );
+        templates.insert(
+            "statements/join".to_string(),
+            "{{ join_type }} JOIN {{ source }} ON {{ condition }}".to_string(),
+        );
+        templates.insert(
+            "statements/cte".to_string(),
+            "{{ alias }} AS ({{ query | indent(2, true) }})".to_string(),
+        );
+        templates.insert(
+            "statements/time_series_select".to_string(),
+            "SELECT date_from::timestamp AS \"date_from\",\ndate_to::timestamp AS \"date_to\" \nFROM(\n    VALUES {% for time_item in seria  %}('{{ time_item | join(\"', '\") }}'){% if not loop.last %}, {% endif %}{% endfor %}) AS dates (date_from, date_to)".to_string(),
+        );
+        templates.insert(
+            "statements/time_series_get_range".to_string(),
+            "SELECT {{ max_expr }} as {{ quoted_max_name }},\n{{ min_expr }} as {{ quoted_min_name }}\nFROM {{ from_prepared }}\n{% if filter %}WHERE {{ filter }}{% endif %}".to_string(),
+        );
+        templates.insert(
+            "statements/calc_groups_join".to_string(),
+            "{% if original_sql %}{{ original_sql }}\n{% endif %}{% for group in groups  %}{% if original_sql or not loop.first %}CROSS JOIN\n{% endif %}(\n{% for value in group.values  %}SELECT {{ value }} as {{ group.name }}{% if not loop.last %} UNION ALL\n{% endif %}{% endfor %}) AS {{ group.alias }}\n{% endfor %}".to_string(),
+        );
 
         Self::try_new(templates).expect("Default templates should always parse successfully")
     }

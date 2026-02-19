@@ -14,16 +14,29 @@ import {
   HttpTable
 } from '../codegen';
 
+interface SentMessage {
+  resolve: (value: any) => void;
+  reject: (reason?: any) => void;
+  buffer: Uint8Array;
+}
+
+interface CubeStoreWebSocket extends WebSocket {
+  readyPromise: Promise<CubeStoreWebSocket>;
+  lastHeartBeat: Date;
+  sentMessages: Record<number, SentMessage>;
+  sendAsync: (message: Uint8Array) => Promise<void>;
+}
+
 export class WebSocketConnection {
   protected messageCounter: number;
 
-  protected maxConnectRetries: number;
+  protected readonly maxConnectRetries: number;
 
-  protected noHeartBeatTimeout: number;
+  protected readonly noHeartBeatTimeout: number;
 
   protected currentConnectionTry: number;
 
-  protected webSocket: any;
+  protected webSocket: CubeStoreWebSocket | null = null;
 
   private readonly url: string;
 
@@ -38,10 +51,10 @@ export class WebSocketConnection {
     this.connectionId = uuidv4();
   }
 
-  protected async initWebSocket() {
+  protected async initWebSocket(): Promise<CubeStoreWebSocket> {
     if (!this.webSocket) {
-      const webSocket: any = new WebSocket(this.url);
-      webSocket.readyPromise = new Promise<WebSocket>((resolve, reject) => {
+      const webSocket = new WebSocket(this.url) as CubeStoreWebSocket;
+      webSocket.readyPromise = new Promise<CubeStoreWebSocket>((resolve, reject) => {
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
           if (webSocket.readyState === WebSocket.OPEN) {
@@ -53,12 +66,15 @@ export class WebSocketConnection {
           }
         }, 5000);
 
-        webSocket.sendAsync = async (message) => new Promise<void>((resolveSend, rejectSend) => {
+        webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend, rejectSend) => {
           // If socket is closing this message should be resent
           if (webSocket.readyState === WebSocket.OPEN) {
             webSocket.send(message, (err) => {
               if (err) {
-                rejectSend(err);
+                rejectSend(new ConnectionError(
+                  `CubeStore connection error: ${err.message}`,
+                  err
+                ));
               } else {
                 resolveSend();
               }
@@ -81,7 +97,7 @@ export class WebSocketConnection {
           }
 
           if (webSocket === this.webSocket) {
-            this.webSocket = undefined;
+            this.webSocket = null;
           }
         });
         webSocket.on('pong', () => {
@@ -112,10 +128,10 @@ export class WebSocketConnection {
           }
 
           if (webSocket === this.webSocket) {
-            this.webSocket = undefined;
+            this.webSocket = null;
           }
         });
-        webSocket.on('message', async (msg) => {
+        webSocket.on('message', async (msg: Buffer) => {
           const buf = new flatbuffers.ByteBuffer(msg);
           const httpMessage = HttpMessage.getRootAsHttpMessage(buf);
           const resolvers = webSocket.sentMessages[httpMessage.messageId()];
@@ -179,10 +195,12 @@ export class WebSocketConnection {
           }
         });
       });
+
       webSocket.sentMessages = {};
       this.webSocket = webSocket;
     }
-    return this.webSocket.readyPromise;
+
+    return this.webSocket!.readyPromise;
   }
 
   private retryWaitTime() {
@@ -196,10 +214,14 @@ export class WebSocketConnection {
         socket.send(buffer, (err) => {
           if (err) {
             delete socket.sentMessages[messageId];
-            reject(err);
+            reject(new ConnectionError(
+              `CubeStore connection error: ${err.message}`,
+              err
+            ));
           }
         });
       }
+
       socket.sentMessages[messageId] = {
         resolve,
         reject,

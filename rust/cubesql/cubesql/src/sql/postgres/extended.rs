@@ -14,7 +14,7 @@ use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
 use std::{fmt, pin::Pin, sync::Arc};
 
-use crate::sql::shim::{ConnectionError, QueryPlanExt};
+use super::{shim::QueryPlanExt, ConnectionError};
 use datafusion::{
     arrow::array::Array, dataframe::DataFrame as DFDataFrame,
     physical_plan::SendableRecordBatchStream,
@@ -599,7 +599,7 @@ mod tests {
     };
     use pg_srv::protocol::Format;
 
-    use crate::sql::{extended::PortalFrom, shim::ConnectionError};
+    use crate::sql::{error::ConnectionError, extended::PortalFrom};
     use datafusion::{
         arrow::{
             array::{ArrayRef, StringArray},

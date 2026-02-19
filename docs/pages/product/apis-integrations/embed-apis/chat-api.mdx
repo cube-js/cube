@@ -177,6 +177,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
   - **`name`** (string): Name of the tool being called
   - **`input`** (string): JSON string containing the input parameters for the tool
   - **`result`** (string): JSON string containing the tool's response (only present when tool call is complete)
+- **`graphPath`** (string[]): Identifies which node of the agent graph produced this message. For example, `["cube_data_analyst_agent"]` for the main agent node or `["cube_data_analyst_agent", "tools"]` for tool calls. Messages with `graphPath[0] === "final"` represent the final consolidated answer.
 - **`isDelta`** (boolean): Whether this is an incremental content update
 - **`isInProcess`** (boolean): Whether the message is still being generated
 - **`sort`** (number): Message ordering sequence number
@@ -360,6 +361,56 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
   "sort": 10
 }
 ```
+
+### Getting the Final Assistant Message
+
+When consuming the streamed NDJSON response, you may want to extract only
+the final answer that the agent produced — for example, to display it in a
+chat UI or to store it for later reference.
+
+The agent graph emits many intermediate messages (thinking steps, tool calls,
+incremental deltas, state updates, etc.). To isolate the **final answer**,
+filter the streamed messages using these two conditions:
+
+1. `role === "assistant"` — only assistant messages.
+2. `graphPath[0] === "final"` **and** `graphPath.length <= 2` — messages
+   produced by the "final" node of the agent graph.
+
+The **last** message that satisfies both conditions is the final answer.
+
+```javascript
+// Collect all streamed messages first
+const messages = [];
+
+for await (const line of readLines(response.body)) {
+  if (line) {
+    messages.push(JSON.parse(line));
+  }
+}
+
+// Filter for final-answer messages
+const finalMessages = messages.filter(
+  (msg) =>
+    msg.role === "assistant" &&
+    Array.isArray(msg.graphPath) &&
+    msg.graphPath[0] === "final" &&
+    msg.graphPath.length <= 2
+);
+
+// The last one is the definitive final answer
+const finalAnswer = finalMessages[finalMessages.length - 1];
+console.log("Final answer:", finalAnswer?.content);
+```
+
+<InfoBox>
+
+The `graphPath` property is an array of strings that traces the path through
+the agent's internal execution graph. Intermediate nodes (e.g.,
+`["cube_data_analyst_agent"]` or `["cube_data_analyst_agent", "tools"]`)
+produce working messages, while the `"final"` node emits the consolidated
+response that should be presented to the user.
+
+</InfoBox>
 
 ### Tool Calls
 
