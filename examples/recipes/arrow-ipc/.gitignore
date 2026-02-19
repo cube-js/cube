@@ -1,0 +1,22 @@
+# Runtime logs
+*.log
+
+# Process ID files
+*.pid
+
+# Node modules (uses root workspace)
+node_modules/
+
+# Yarn lock (uses root workspace yarn.lock)
+yarn.lock
+
+# Environment file (use .env.example as template)
+.env
+
+# Build artifacts
+bin/
+
+# CubeStore data
+.cubestore/
+.venv/
+/__pycache__*

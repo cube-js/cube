@@ -184,7 +184,9 @@ pub fn parse_sql_to_statements(
     }
 
     let parse_result = match protocol {
-        DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
+        DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => {
+            Parser::parse_sql(&PostgreSqlDialect {}, query.as_str())
+        }
         DatabaseProtocol::Extension(_) => unimplemented!(),
     };
 

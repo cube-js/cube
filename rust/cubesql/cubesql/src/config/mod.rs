@@ -8,9 +8,10 @@ use crate::{
     },
     sql::{
         pg_auth_service::{PostgresAuthService, PostgresAuthServiceDefaultImpl},
-        PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+        ArrowNativeServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
+        SqlAuthService,
     },
-    transport::{HttpTransport, TransportService},
+    transport::{HybridTransport, TransportService},
     CubeError,
 };
 use futures::future::join_all;
@@ -60,6 +61,17 @@ impl CubeServices {
             }));
         }
 
+        if self.injector.has_service_typed::<ArrowNativeServer>().await {
+            let arrow_server = self.injector.get_service_typed::<ArrowNativeServer>().await;
+            futures.push(tokio::spawn(async move {
+                if let Err(e) = arrow_server.processing_loop().await {
+                    error!("{}", e.to_string());
+                };
+
+                Ok(())
+            }));
+        }
+
         Ok(futures)
     }
 
@@ -70,6 +82,14 @@ impl CubeServices {
         if self.injector.has_service_typed::<PostgresServer>().await {
             self.injector
                 .get_service_typed::<PostgresServer>()
+                .await
+                .stop_processing(shutdown_mode)
+                .await?;
+        }
+
+        if self.injector.has_service_typed::<ArrowNativeServer>().await {
+            self.injector
+                .get_service_typed::<ArrowNativeServer>()
                 .await
                 .stop_processing(shutdown_mode)
                 .await?;
@@ -89,6 +109,8 @@ pub trait ConfigObj: DIService + Debug {
     fn bind_address(&self) -> &Option<String>;
 
     fn postgres_bind_address(&self) -> &Option<String>;
+
+    fn arrow_native_bind_address(&self) -> &Option<String>;
 
     fn query_timeout(&self) -> u64;
 
@@ -123,6 +145,7 @@ pub trait ConfigObj: DIService + Debug {
 pub struct ConfigObjImpl {
     pub bind_address: Option<String>,
     pub postgres_bind_address: Option<String>,
+    pub arrow_native_bind_address: Option<String>,
     pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
     pub auth_expire_secs: u64,
@@ -154,6 +177,9 @@ impl ConfigObjImpl {
                     .map(|v| format!("0.0.0.0:{}", v.parse::<u16>().unwrap()))
             }),
             postgres_bind_address: env::var("CUBESQL_PG_PORT")
+                .ok()
+                .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
+            arrow_native_bind_address: env::var("CUBEJS_ADBC_PORT")
                 .ok()
                 .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
             nonce: None,
@@ -194,6 +220,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn postgres_bind_address(&self) -> &Option<String> {
         &self.postgres_bind_address
+    }
+
+    fn arrow_native_bind_address(&self) -> &Option<String> {
+        &self.arrow_native_bind_address
     }
 
     fn nonce(&self) -> &Option<Vec<u8>> {
@@ -269,6 +299,7 @@ impl Config {
             config_obj: Arc::new(ConfigObjImpl {
                 bind_address: None,
                 postgres_bind_address: None,
+                arrow_native_bind_address: None,
                 nonce: None,
                 query_timeout,
                 auth_expire_secs: 60,
@@ -313,10 +344,13 @@ impl Config {
             .register_typed::<dyn ConfigObj, _, _, _>(|_| async move { config_obj_to_register })
             .await;
 
+        // Register HybridTransport (intelligently routes between Http and CubeStore)
         self.injector
-            .register_typed::<dyn TransportService, _, _, _>(|_| async move {
-                Arc::new(HttpTransport::new())
-            })
+            .register_typed_with_default::<dyn TransportService, HybridTransport, _, _>(
+                |_| async move {
+                    Arc::new(HybridTransport::new().expect("Failed to initialize HybridTransport"))
+                },
+            )
             .await;
 
         self.injector
@@ -367,6 +401,23 @@ impl Config {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     PostgresServer::new(
                         config.postgres_bind_address().as_ref().unwrap().to_string(),
+                        i.get_service_typed().await,
+                    )
+                })
+                .await;
+        }
+
+        if self.config_obj.arrow_native_bind_address().is_some() {
+            self.injector
+                .register_typed::<ArrowNativeServer, _, _, _>(|i| async move {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    ArrowNativeServer::new(
+                        config
+                            .arrow_native_bind_address()
+                            .as_ref()
+                            .unwrap()
+                            .to_string(),
+                        i.get_service_typed().await,
                         i.get_service_typed().await,
                     )
                 })

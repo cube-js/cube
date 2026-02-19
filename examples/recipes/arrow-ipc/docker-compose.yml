@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: docker.io/postgres:14
+    restart: always
+    command: -c 'max_connections=1024' -c 'shared_buffers=128GB'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 7432:5432
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+
+volumes:
+  postgresql:

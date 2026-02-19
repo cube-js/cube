@@ -1,0 +1,77 @@
+---
+cubes:
+  - name: orders_with_preagg
+    description: Orders cube WITH pre-aggregations for performance comparison
+    title: Orders (With Pre-Aggregation)
+    sql_table: public.order
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+
+      - name: market_code
+        type: string
+        sql: market_code
+
+      - name: brand_code
+        type: string
+        sql: brand_code
+
+      - name: updated_at
+        type: time
+        sql: updated_at
+
+      - name: inserted_at
+        type: time
+        sql: inserted_at
+
+    measures:
+      - name: count
+        type: count
+        description: Total number of orders
+
+      - name: total_amount_sum
+        type: sum
+        sql: total_amount
+        description: Sum of total amounts
+
+      - name: tax_amount_sum
+        type: sum
+        sql: tax_amount
+        description: Sum of tax amounts
+
+      - name: subtotal_amount_sum
+        type: sum
+        sql: subtotal_amount
+        description: Sum of subtotal amounts
+
+      - name: customer_id_distinct
+        type: count_distinct
+        sql: customer_id
+        description: Distinct customer count
+
+    # Pre-aggregations for performance testing
+    pre_aggregations:
+      - name: orders_by_market_brand_hourly
+        type: rollup
+        external: true
+        measures:
+          - count
+          - total_amount_sum
+          - tax_amount_sum
+          - subtotal_amount_sum
+          - customer_id_distinct
+        dimensions:
+          - market_code
+          - brand_code
+        time_dimension: updated_at
+        granularity: hour
+        refresh_key:
+          sql: SELECT MAX(id) FROM public.order
+        build_range_start:
+          sql: SELECT  min(inserted_at) FROM public.order # "SELECT NOW() - INTERVAL '1 year'"
+        build_range_end:
+          sql: SELECT  MAX(updated_at) FROM public.order

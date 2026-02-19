@@ -249,9 +249,14 @@ impl TransportService for HttpTransport {
             }
         };
 
+        // Parse pre-aggregations from cubes
+        let cubes = response.cubes.unwrap_or_else(Vec::new);
+        let pre_aggregations = parse_pre_aggregations_from_cubes(&cubes);
+
         // Not used -- doesn't make sense to implement
         let value = Arc::new(MetaContext::new(
-            response.cubes.unwrap_or_else(Vec::new),
+            cubes,
+            pre_aggregations,
             HashMap::new(),
             HashMap::new(),
             Uuid::new_v4(),
@@ -984,4 +989,77 @@ impl SqlTemplates {
     pub fn inner_join(&self) -> Result<String, CubeError> {
         self.render_template("join_types/inner", context! {})
     }
+}
+
+/// Parse pre-aggregation metadata from cube definitions
+pub fn parse_pre_aggregations_from_cubes(
+    cubes: &[crate::transport::CubeMeta],
+) -> Vec<crate::transport::PreAggregationMeta> {
+    let mut pre_aggregations = Vec::new();
+
+    for cube in cubes {
+        if let Some(cube_pre_aggs) = &cube.pre_aggregations {
+            for pa in cube_pre_aggs {
+                // Parse dimension references from string like "[dim1, dim2]"
+                let dimensions = parse_reference_string(&pa.dimension_references);
+
+                // Parse measure references from string like "[measure1, measure2]"
+                let measures = parse_reference_string(&pa.measure_references);
+
+                pre_aggregations.push(crate::transport::PreAggregationMeta {
+                    name: pa.name.clone(),
+                    cube_name: cube.name.clone(),
+                    pre_agg_type: pa.pre_agg_type.clone(),
+                    granularity: pa.granularity.clone(),
+                    time_dimension: pa.time_dimension_reference.clone(),
+                    dimensions,
+                    measures,
+                    external: pa.external.unwrap_or(false),
+                });
+            }
+        }
+    }
+
+    if !pre_aggregations.is_empty() {
+        log::info!(
+            "✅ Loaded {} pre-aggregation(s) from {} cube(s)",
+            pre_aggregations.len(),
+            cubes.len()
+        );
+        for pa in &pre_aggregations {
+            log::debug!(
+                "  Pre-agg: {}.{} (type: {}, external: {}, measures: {}, dimensions: {})",
+                pa.cube_name,
+                pa.name,
+                pa.pre_agg_type,
+                pa.external,
+                pa.measures.len(),
+                pa.dimensions.len()
+            );
+        }
+    }
+
+    pre_aggregations
+}
+
+/// Parse reference string like "[item1, item2, item3]" into Vec<String>
+/// Also strips cube prefixes if present (e.g., "cube.field" -> "field")
+fn parse_reference_string(refs: &Option<String>) -> Vec<String> {
+    refs.as_ref()
+        .map(|s| {
+            s.trim_matches(|c| c == '[' || c == ']')
+                .split(',')
+                .map(|item| {
+                    let trimmed = item.trim();
+                    // Strip cube prefix if present (e.g., "mandata_captate.market_code" -> "market_code")
+                    if let Some(dot_pos) = trimmed.rfind('.') {
+                        trimmed[dot_pos + 1..].to_string()
+                    } else {
+                        trimmed.to_string()
+                    }
+                })
+                .filter(|item| !item.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }

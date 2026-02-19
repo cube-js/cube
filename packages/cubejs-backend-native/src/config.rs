@@ -111,6 +111,7 @@ pub struct NodeConfigurationImpl {
 pub struct NodeConfigurationFactoryOptions {
     pub gateway_port: Option<u16>,
     pub pg_port: Option<u16>,
+    pub adbc_port: Option<u16>,
 }
 
 #[async_trait]
@@ -131,6 +132,9 @@ impl NodeConfiguration for NodeConfigurationImpl {
         let config = config.update_config(|mut c| {
             if let Some(p) = options.pg_port {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+            if let Some(p) = options.adbc_port {
+                c.arrow_native_bind_address = Some(format!("0.0.0.0:{}", p));
             };
 
             c

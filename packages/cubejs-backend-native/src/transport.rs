@@ -20,8 +20,8 @@ use cubesql::compile::engine::df::scan::{
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
-    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
-    TransportMetaResponse,
+    parse_pre_aggregations_from_cubes, SpanId, SqlGenerator, SqlResponse,
+    TransportLoadRequestQuery, TransportLoadResponse, TransportMetaResponse,
 };
 use cubesql::{
     di_service,
@@ -211,8 +211,14 @@ impl TransportService for NodeBridgeTransport {
                 response.compiler_id, e
             ))
         })?;
+
+        // Parse pre-aggregations from cubes
+        let cubes = response.cubes.unwrap_or_default();
+        let pre_aggregations = parse_pre_aggregations_from_cubes(&cubes);
+
         Ok(Arc::new(MetaContext::new(
-            response.cubes.unwrap_or_default(),
+            cubes,
+            pre_aggregations,
             member_to_data_source,
             data_source_to_sql_generator,
             compiler_id,

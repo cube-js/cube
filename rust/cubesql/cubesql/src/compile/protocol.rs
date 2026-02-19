@@ -52,6 +52,7 @@ impl Hash for dyn DatabaseProtocolDetails {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatabaseProtocol {
     PostgreSQL,
+    ArrowNative,
     Extension(Arc<dyn DatabaseProtocolDetails>),
 }
 
@@ -59,6 +60,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     fn get_name(&self) -> &'static str {
         match &self {
             DatabaseProtocol::PostgreSQL => "postgres",
+            DatabaseProtocol::ArrowNative => "arrow_native",
             DatabaseProtocol::Extension(ext) => ext.get_name(),
         }
     }
@@ -66,6 +68,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     fn support_set_variable(&self) -> bool {
         match &self {
             DatabaseProtocol::Extension(ext) => ext.support_set_variable(),
+            DatabaseProtocol::ArrowNative => false,
             _ => true,
         }
     }
@@ -73,6 +76,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     fn support_transactions(&self) -> bool {
         match &self {
             DatabaseProtocol::PostgreSQL => true,
+            DatabaseProtocol::ArrowNative => false,
             DatabaseProtocol::Extension(ext) => ext.support_transactions(),
         }
     }
@@ -85,6 +89,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
 
                 DatabaseVariables::default()
             }
+            DatabaseProtocol::ArrowNative => DatabaseVariables::default(),
             DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
         }
     }
@@ -100,6 +105,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     ) -> Option<Arc<dyn datasource::TableProvider>> {
         match self {
             DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tr),
+            DatabaseProtocol::ArrowNative => self.get_arrow_native_provider(context, tr),
             DatabaseProtocol::Extension(ext) => ext.get_provider(&context, tr),
         }
     }
@@ -110,6 +116,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     ) -> Result<String, CubeError> {
         match self {
             DatabaseProtocol::PostgreSQL => self.get_postgres_table_name(table_provider),
+            DatabaseProtocol::ArrowNative => self.get_arrow_native_table_name(table_provider),
             DatabaseProtocol::Extension(ext) => ext.table_name_by_table_provider(table_provider),
         }
     }

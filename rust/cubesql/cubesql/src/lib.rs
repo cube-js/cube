@@ -11,6 +11,7 @@ extern crate core;
 
 pub mod compile;
 pub mod config;
+pub mod cubestore;
 pub mod error;
 pub mod sql;
 pub mod telemetry;

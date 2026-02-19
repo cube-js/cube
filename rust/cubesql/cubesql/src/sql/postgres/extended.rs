@@ -205,6 +205,7 @@ pub enum PortalFrom {
 pub enum PortalBatch {
     Description(protocol::RowDescription),
     Rows(BatchWriter),
+    ArrowIPCData(Vec<u8>),
     Completion(protocol::PortalCompletion),
 }
 
@@ -216,6 +217,8 @@ pub struct Portal {
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
     span_id: Option<Arc<SpanId>>,
+    // Output format for query results (Arrow IPC or PostgreSQL)
+    output_format: crate::sql::OutputFormat,
 }
 
 unsafe impl Send for Portal {}
@@ -253,6 +256,24 @@ impl Portal {
             from,
             span_id,
             state: Some(PortalState::Prepared(PreparedState { plan })),
+            output_format: crate::sql::OutputFormat::default(),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_with_output_format(
+        plan: QueryPlan,
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+        output_format: crate::sql::OutputFormat,
+    ) -> Self {
+        Self {
+            format,
+            from,
+            span_id,
+            state: Some(PortalState::Prepared(PreparedState { plan })),
+            output_format,
         }
     }
 
@@ -266,6 +287,7 @@ impl Portal {
             from,
             span_id,
             state: Some(PortalState::Empty),
+            output_format: crate::sql::OutputFormat::default(),
         }
     }
 
@@ -318,20 +340,42 @@ impl Portal {
                 )
                 .into());
             } else {
-                let writer = self.dataframe_to_writer(frame_state.batch)?;
-                let num_rows = writer.num_rows() as u32;
+                // Check if we should output Arrow IPC format
+                let use_arrow_ipc = self.output_format == crate::sql::OutputFormat::ArrowIPC;
 
-                if let Some(description) = &frame_state.description {
-                    yield Ok(PortalBatch::Description(description.clone()));
+                if use_arrow_ipc {
+                    // For Arrow IPC with frame state (MetaTabular), fall back to PostgreSQL format
+                    // since we don't have a convenient RecordBatch here
+                    let writer = self.dataframe_to_writer(frame_state.batch)?;
+                    let num_rows = writer.num_rows() as u32;
+
+                    if let Some(description) = &frame_state.description {
+                        yield Ok(PortalBatch::Description(description.clone()));
+                    }
+
+                    yield Ok(PortalBatch::Rows(writer));
+
+                    self.state = Some(PortalState::Finished(FinishedState {
+                        description: frame_state.description,
+                    }));
+
+                    return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_rows, false)));
+                } else {
+                    let writer = self.dataframe_to_writer(frame_state.batch)?;
+                    let num_rows = writer.num_rows() as u32;
+
+                    if let Some(description) = &frame_state.description {
+                        yield Ok(PortalBatch::Description(description.clone()));
+                    }
+
+                    yield Ok(PortalBatch::Rows(writer));
+
+                    self.state = Some(PortalState::Finished(FinishedState {
+                        description: frame_state.description,
+                    }));
+
+                    return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_rows, false)));
                 }
-
-                yield Ok(PortalBatch::Rows(writer));
-
-                self.state = Some(PortalState::Finished(FinishedState {
-                    description: frame_state.description,
-                }));
-
-                return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_rows, false)));
             }
         }
     }
@@ -410,6 +454,37 @@ impl Portal {
         Ok((unused, self.dataframe_to_writer(frame)?))
     }
 
+    fn serialize_batch_to_arrow_ipc(
+        &self,
+        batch: RecordBatch,
+        max_rows: usize,
+        left: &mut usize,
+    ) -> Result<(Option<RecordBatch>, Vec<u8>), ConnectionError> {
+        let mut unused: Option<RecordBatch> = None;
+
+        let batch_for_write = if max_rows == 0 {
+            batch
+        } else {
+            if batch.num_rows() > *left {
+                let (batch, right) = split_record_batch(batch, *left);
+                unused = right;
+                *left = 0;
+
+                batch
+            } else {
+                *left -= batch.num_rows();
+                batch
+            }
+        };
+
+        // Serialize to Arrow IPC format
+        let ipc_data =
+            crate::sql::arrow_ipc::ArrowIPCSerializer::serialize_single(&batch_for_write)
+                .map_err(|e| ConnectionError::Cube(e, None))?;
+
+        Ok((unused, ipc_data))
+    }
+
     fn hand_execution_stream_state<'a>(
         &'a mut self,
         mut stream_state: InExecutionStreamState,
@@ -419,16 +494,30 @@ impl Portal {
             let mut left: usize = max_rows;
             let mut num_of_rows = 0;
 
+            // Check if we should output Arrow IPC format
+            let use_arrow_ipc = self.output_format == crate::sql::OutputFormat::ArrowIPC;
+
             if let Some(description) = &stream_state.description {
-                yield Ok(PortalBatch::Description(description.clone()));
+                // Skip description for Arrow IPC (not part of IPC format)
+                if !use_arrow_ipc {
+                    yield Ok(PortalBatch::Description(description.clone()));
+                }
             }
 
             if let Some(unused_batch) = stream_state.unused.take() {
-                let (usused_batch, batch_writer) = self.iterate_stream_batch(unused_batch, max_rows, &mut left)?;
-                stream_state.unused = usused_batch;
-                num_of_rows = batch_writer.num_rows() as u32;
+                if use_arrow_ipc {
+                    let (unused_batch, ipc_data) = self.serialize_batch_to_arrow_ipc(unused_batch, max_rows, &mut left)?;
+                    stream_state.unused = unused_batch;
+                    num_of_rows = if ipc_data.is_empty() { 0 } else { 1 }; // Count batches, not rows for IPC
 
-                yield Ok(PortalBatch::Rows(batch_writer));
+                    yield Ok(PortalBatch::ArrowIPCData(ipc_data));
+                } else {
+                    let (unused_batch, batch_writer) = self.iterate_stream_batch(unused_batch, max_rows, &mut left)?;
+                    stream_state.unused = unused_batch;
+                    num_of_rows = batch_writer.num_rows() as u32;
+
+                    yield Ok(PortalBatch::Rows(batch_writer));
+                }
             }
 
             if max_rows > 0 && left == 0 {
@@ -448,18 +537,34 @@ impl Portal {
                     }
                     Some(res) => match res {
                         Ok(batch) => {
-                            let (unused_batch, writer) = self.iterate_stream_batch(batch, max_rows, &mut left)?;
+                            if use_arrow_ipc {
+                                let (unused_batch, ipc_data) = self.serialize_batch_to_arrow_ipc(batch, max_rows, &mut left)?;
 
-                            num_of_rows += writer.num_rows() as u32;
+                                num_of_rows += 1; // Count batches for IPC
 
-                            yield Ok(PortalBatch::Rows(writer));
+                                yield Ok(PortalBatch::ArrowIPCData(ipc_data));
 
-                            if max_rows > 0 && left == 0 {
-                                stream_state.unused = unused_batch;
+                                if max_rows > 0 && left == 0 {
+                                    stream_state.unused = unused_batch;
 
-                                self.state = Some(PortalState::InExecutionStream(stream_state));
+                                    self.state = Some(PortalState::InExecutionStream(stream_state));
 
-                                return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_of_rows, true)));
+                                    return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_of_rows, true)));
+                                }
+                            } else {
+                                let (unused_batch, writer) = self.iterate_stream_batch(batch, max_rows, &mut left)?;
+
+                                num_of_rows += writer.num_rows() as u32;
+
+                                yield Ok(PortalBatch::Rows(writer));
+
+                                if max_rows > 0 && left == 0 {
+                                    stream_state.unused = unused_batch;
+
+                                    self.state = Some(PortalState::InExecutionStream(stream_state));
+
+                                    return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_of_rows, true)));
+                                }
                             }
                         }
                         Err(err) => return yield Err(err.into()),
@@ -705,6 +810,7 @@ mod tests {
                 None,
             ))),
             span_id: None,
+            output_format: crate::sql::OutputFormat::default(),
         };
 
         let mut portal = Pin::new(&mut p);
@@ -738,6 +844,7 @@ mod tests {
                 None,
             ))),
             span_id: None,
+            output_format: crate::sql::OutputFormat::default(),
         };
 
         let mut portal = Pin::new(&mut p);
@@ -766,6 +873,7 @@ mod tests {
                 Some(protocol::RowDescription::new(vec![])),
             ))),
             span_id: None,
+            output_format: crate::sql::OutputFormat::default(),
         };
 
         let mut portal = Pin::new(&mut p);
@@ -801,6 +909,7 @@ mod tests {
                 Some(protocol::RowDescription::new(vec![])),
             ))),
             span_id: None,
+            output_format: crate::sql::OutputFormat::default(),
         };
 
         execute_portal_single_batch(&mut portal, 1, 1).await?;
@@ -824,6 +933,7 @@ mod tests {
                 Some(protocol::RowDescription::new(vec![])),
             ))),
             span_id: None,
+            output_format: crate::sql::OutputFormat::default(),
         };
 
         // use 1 batch
