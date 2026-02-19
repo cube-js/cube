@@ -293,7 +293,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
 
       cancelFn = () => request.cancel();
       return request.query(query).then(res => {
-        res.recordset.forEach(transformRow);
+        res.recordset?.forEach(transformRow);
         return res.recordset;
       });
     });
