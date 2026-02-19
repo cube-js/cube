@@ -226,6 +226,21 @@ article video {
   margin: var(--space-m) 0;
 }
 
+/* Navbar icons - vertical alignment */
+nav[class*="nextra-nav"] a[href],
+nav[class*="nextra-nav"] > a,
+header nav a[href] {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Search button alignment */
+nav[class*="nextra-nav"] button:not([aria-label="Menu"]),
+header nav button:not([aria-label="Menu"]) {
+  display: flex !important;
+  align-items: center !important;
+}
+
 /* Purple Banner wrapper - animated reveal */
 .pb-wrapper {
   --purple-banner-font: var(--font-cera-pro), system-ui, -apple-system, sans-serif;

@@ -4,6 +4,7 @@ import redirects from './redirects.json' with { type: 'json' }
 
 const withNextra = nextra({
   contentDirBasePath: '/',
+  search: false,
   mdxOptions: {
     rehypePrettyCodeOptions: {
       theme: {

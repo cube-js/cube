@@ -41,6 +41,8 @@ import { LogoWithVersion } from '../components/LogoWithVersion'
 import { GetStartedButton } from '../components/GetStartedButton'
 import { AnalyticsProvider } from '../components/AnalyticsProvider'
 import { PurpleBannerWrapper } from '../components/PurpleBannerWrapper'
+import { AlgoliaSearch } from '../components/AlgoliaSearch'
+import { SearchProviderWrapper } from '../components/SearchProviderWrapper'
 
 const SlackIcon = () => (
   <svg
@@ -108,18 +110,21 @@ export default async function RootLayout({ children }) {
         )}
       </Head>
       <body>
-        <PurpleBannerWrapper />
-        <AnalyticsProvider>
-          <Layout
-            navbar={navbar}
-            pageMap={await getPageMap()}
-            docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs"
-            footer={footer}
-            sidebar={{ defaultMenuCollapseLevel: 1 }}
-          >
-            {children}
-          </Layout>
-        </AnalyticsProvider>
+        <SearchProviderWrapper>
+          <PurpleBannerWrapper />
+          <AnalyticsProvider>
+            <Layout
+              navbar={navbar}
+              pageMap={await getPageMap()}
+              docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs"
+              footer={footer}
+              sidebar={{ defaultMenuCollapseLevel: 1 }}
+              search={<AlgoliaSearch />}
+            >
+              {children}
+            </Layout>
+          </AnalyticsProvider>
+        </SearchProviderWrapper>
       </body>
     </html>
   )
