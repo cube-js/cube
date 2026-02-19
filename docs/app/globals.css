@@ -221,6 +221,11 @@ tr:nth-child(even) {
   }
 }
 
+/* Video styling - margins like Screenshot */
+article video {
+  margin: var(--space-m) 0;
+}
+
 /* Purple Banner wrapper - animated reveal */
 .pb-wrapper {
   --purple-banner-font: var(--font-cera-pro), system-ui, -apple-system, sans-serif;
