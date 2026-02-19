@@ -302,7 +302,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('UTC')
     .asString(),
   preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
 
   /** ****************************************************************
