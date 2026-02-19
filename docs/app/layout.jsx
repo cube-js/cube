@@ -55,7 +55,10 @@ const SlackIcon = () => (
 )
 
 export const metadata = {
-  title: 'Cube Documentation',
+  title: {
+    template: '%s | Cube documentation',
+    default: 'Cube documentation',
+  },
   description: 'Cube documentation built with Nextra'
 }
 
