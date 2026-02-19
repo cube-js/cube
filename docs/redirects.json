@@ -1346,7 +1346,7 @@
   },
   {
     "source": "/deployment/platforms/cube-cloud",
-    "destination": "/product/administration/deployment/cloud",
+    "destination": "/product/administration/deployment/infrastructure",
     "permanent": true
   },
   {
@@ -1861,7 +1861,7 @@
   },
   {
     "source": "/product/deployment/cloud",
-    "destination": "/product/administration/deployment/cloud",
+    "destination": "/product/administration/deployment/infrastructure",
     "permanent": true
   },
   {
