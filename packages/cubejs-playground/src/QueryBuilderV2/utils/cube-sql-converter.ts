@@ -246,8 +246,11 @@ export class CubeSQLConverter {
         false
       );
 
-      if (filters) {
-        query.push(`WHERE ${[filters, ...(this.query.segments || [])].join(' AND ')}`);
+      if (filters || this.query.segments?.length) {
+        query.push(`WHERE ${[
+          ...(filters ? [filters] : []), 
+          ...(this.query.segments || [])
+        ].join(' AND ')}`);
       }
 
       if (measureFilters.length) {
