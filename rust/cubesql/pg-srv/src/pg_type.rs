@@ -13,7 +13,7 @@ pub struct PgType<'a> {
     pub typnamespace: u32,
     /// Owner of the type. references pg_authid.oid
     pub typowner: u32,
-    /// For a fixed-size type, typlen is the number of bytes in the internal representation of the type. But for a variable-length type, typlen is negative. -1 indicates a “varlena” type (one that has a length word), -2 indicates a null-terminated C string.
+    /// For a fixed-size type, typlen is the number of bytes in the internal representation of the type. But for a variable-length type, typlen is negative. -1 indicates a "varlena" type (one that has a length word), -2 indicates a null-terminated C string.
     pub typlen: i16,
     pub typbyval: bool,
     pub typtype: &'a str,
@@ -29,6 +29,8 @@ pub struct PgType<'a> {
     pub typbasetype: u32,
     pub typreceive: &'static str,
     pub typreceive_oid: u32,
+    pub typsend: &'static str,
+    pub typoutput: &'static str,
 }
 
 impl PgType<'_> {
@@ -60,6 +62,183 @@ impl PgType<'_> {
             }
         } else {
             "record_in".to_string()
+        }
+    }
+
+    pub fn get_typoutput(&self) -> String {
+        if let Some(ty_id) = PgTypeId::from_oid(self.oid) {
+            match ty_id {
+                PgTypeId::ARRAYTEXT
+                | PgTypeId::ARRAYINT2
+                | PgTypeId::ARRAYINT4
+                | PgTypeId::ARRAYINT8
+                | PgTypeId::ARRAYFLOAT4
+                | PgTypeId::ARRAYFLOAT8
+                | PgTypeId::ARRAYBOOL
+                | PgTypeId::ARRAYBYTEA
+                | PgTypeId::ARRAYNAME
+                | PgTypeId::ARRAYTID
+                | PgTypeId::ARRAYBPCHAR
+                | PgTypeId::ARRAYVARCHAR
+                | PgTypeId::ARRAYOID
+                | PgTypeId::ARRAYACLITEM
+                | PgTypeId::ARRAYINET
+                | PgTypeId::ARRAYTIMESTAMP
+                | PgTypeId::ARRAYDATE
+                | PgTypeId::ARRAYTIME
+                | PgTypeId::ARRAYTIMESTAMPTZ
+                | PgTypeId::ARRAYINTERVAL
+                | PgTypeId::ARRAYNUMERIC
+                | PgTypeId::ARRAYTIMETZ
+                | PgTypeId::ARRAYRECORD
+                | PgTypeId::ARRAYPGLSN
+                | PgTypeId::ARRAYINT4RANGE
+                | PgTypeId::ARRAYNUMRANGE
+                | PgTypeId::ARRAYTSRANGE
+                | PgTypeId::ARRAYTSTZRANGE
+                | PgTypeId::ARRAYDATERANGE
+                | PgTypeId::ARRAYINT8RANGE
+                | PgTypeId::ARRAYINT4MULTIRANGE
+                | PgTypeId::ARRAYNUMMULTIRANGE
+                | PgTypeId::ARRAYTSMULTIRANGE
+                | PgTypeId::ARRAYDATEMULTIRANGE
+                | PgTypeId::ARRAYINT8MULTIRANGE
+                | PgTypeId::ARRAYPGAM
+                | PgTypeId::ARRAYPGLANGUAGE
+                | PgTypeId::ARRAYPGEVENTTRIGGER
+                | PgTypeId::ARRAYPGCAST
+                | PgTypeId::ARRAYPGEXTENSION
+                | PgTypeId::ARRAYPGFOREIGNDATAWRAPPER
+                | PgTypeId::ARRAYPGFOREIGNSERVER
+                | PgTypeId::ARRAYPGCONSTRAINT
+                | PgTypeId::ARRAYPGNAMESPACE
+                | PgTypeId::ARRAYPGCLASS
+                | PgTypeId::ARRAYMONEY => "array_out".to_string(),
+                PgTypeId::TIMESTAMP
+                | PgTypeId::TIMESTAMPTZ
+                | PgTypeId::DATE
+                | PgTypeId::TIME
+                | PgTypeId::TIMETZ => self.typname.to_owned() + "_out",
+                PgTypeId::TSMULTIRANGE
+                | PgTypeId::NUMMULTIRANGE
+                | PgTypeId::DATEMULTIRANGE
+                | PgTypeId::INT4MULTIRANGE
+                | PgTypeId::INT8MULTIRANGE => "multirange_out".to_string(),
+                PgTypeId::INT4RANGE
+                | PgTypeId::INT8RANGE
+                | PgTypeId::NUMRANGE
+                | PgTypeId::TSRANGE
+                | PgTypeId::TSTZRANGE
+                | PgTypeId::DATERANGE
+                | PgTypeId::ANYRANGE => "range_out".to_string(),
+                PgTypeId::MONEY => "cash_out".to_string(),
+                PgTypeId::RECORD => "record_out".to_string(),
+                PgTypeId::PGCLASS
+                | PgTypeId::PGNAMESPACE
+                | PgTypeId::PGAM
+                | PgTypeId::PGLANGUAGE
+                | PgTypeId::PGEVENTTRIGGER
+                | PgTypeId::PGCAST
+                | PgTypeId::PGEXTENSION
+                | PgTypeId::PGFOREIGNDATAWRAPPER
+                | PgTypeId::PGFOREIGNSERVER
+                | PgTypeId::PGCONSTRAINT => "record_out".to_string(),
+                PgTypeId::ANYARRAY => "anyarray_out".to_string(),
+                PgTypeId::ANYELEMENT | PgTypeId::ANYENUM => "-".to_string(),
+                PgTypeId::CHARACTERDATA | PgTypeId::SQLIDENTIFIER => "domain_out".to_string(),
+                _ => self.typname.to_owned() + "out",
+            }
+        } else {
+            "record_out".to_string()
+        }
+    }
+
+    pub fn get_typsend(&self) -> String {
+        if let Some(ty_id) = PgTypeId::from_oid(self.oid) {
+            match ty_id {
+                PgTypeId::ARRAYTEXT
+                | PgTypeId::ARRAYINT2
+                | PgTypeId::ARRAYINT4
+                | PgTypeId::ARRAYINT8
+                | PgTypeId::ARRAYFLOAT4
+                | PgTypeId::ARRAYFLOAT8
+                | PgTypeId::ARRAYBOOL
+                | PgTypeId::ARRAYBYTEA
+                | PgTypeId::ARRAYNAME
+                | PgTypeId::ARRAYTID
+                | PgTypeId::ARRAYBPCHAR
+                | PgTypeId::ARRAYVARCHAR
+                | PgTypeId::ARRAYOID
+                | PgTypeId::ARRAYACLITEM
+                | PgTypeId::ARRAYINET
+                | PgTypeId::ARRAYTIMESTAMP
+                | PgTypeId::ARRAYDATE
+                | PgTypeId::ARRAYTIME
+                | PgTypeId::ARRAYTIMESTAMPTZ
+                | PgTypeId::ARRAYINTERVAL
+                | PgTypeId::ARRAYNUMERIC
+                | PgTypeId::ARRAYTIMETZ
+                | PgTypeId::ARRAYRECORD
+                | PgTypeId::ARRAYPGLSN
+                | PgTypeId::ARRAYINT4RANGE
+                | PgTypeId::ARRAYNUMRANGE
+                | PgTypeId::ARRAYTSRANGE
+                | PgTypeId::ARRAYTSTZRANGE
+                | PgTypeId::ARRAYDATERANGE
+                | PgTypeId::ARRAYINT8RANGE
+                | PgTypeId::ARRAYINT4MULTIRANGE
+                | PgTypeId::ARRAYNUMMULTIRANGE
+                | PgTypeId::ARRAYTSMULTIRANGE
+                | PgTypeId::ARRAYDATEMULTIRANGE
+                | PgTypeId::ARRAYINT8MULTIRANGE
+                | PgTypeId::ARRAYPGAM
+                | PgTypeId::ARRAYPGLANGUAGE
+                | PgTypeId::ARRAYPGEVENTTRIGGER
+                | PgTypeId::ARRAYPGCAST
+                | PgTypeId::ARRAYPGEXTENSION
+                | PgTypeId::ARRAYPGFOREIGNDATAWRAPPER
+                | PgTypeId::ARRAYPGFOREIGNSERVER
+                | PgTypeId::ARRAYPGCONSTRAINT
+                | PgTypeId::ARRAYPGNAMESPACE
+                | PgTypeId::ARRAYPGCLASS
+                | PgTypeId::ARRAYMONEY => "array_send".to_string(),
+                PgTypeId::TIMESTAMP
+                | PgTypeId::TIMESTAMPTZ
+                | PgTypeId::DATE
+                | PgTypeId::TIME
+                | PgTypeId::TIMETZ => self.typname.to_owned() + "_send",
+                PgTypeId::TSMULTIRANGE
+                | PgTypeId::NUMMULTIRANGE
+                | PgTypeId::DATEMULTIRANGE
+                | PgTypeId::INT4MULTIRANGE
+                | PgTypeId::INT8MULTIRANGE => "multirange_send".to_string(),
+                PgTypeId::INT4RANGE
+                | PgTypeId::INT8RANGE
+                | PgTypeId::NUMRANGE
+                | PgTypeId::TSRANGE
+                | PgTypeId::TSTZRANGE
+                | PgTypeId::DATERANGE
+                | PgTypeId::ANYRANGE => "range_send".to_string(),
+                PgTypeId::MONEY => "cash_send".to_string(),
+                PgTypeId::RECORD => "record_send".to_string(),
+                PgTypeId::PGCLASS
+                | PgTypeId::PGNAMESPACE
+                | PgTypeId::PGAM
+                | PgTypeId::PGLANGUAGE
+                | PgTypeId::PGEVENTTRIGGER
+                | PgTypeId::PGCAST
+                | PgTypeId::PGEXTENSION
+                | PgTypeId::PGFOREIGNDATAWRAPPER
+                | PgTypeId::PGFOREIGNSERVER
+                | PgTypeId::PGCONSTRAINT => "record_send".to_string(),
+                PgTypeId::ANYARRAY => "anyarray_send".to_string(),
+                PgTypeId::ANYELEMENT | PgTypeId::ANYENUM => "-".to_string(),
+                PgTypeId::ACLITEM => "-".to_string(),
+                PgTypeId::CHARACTERDATA | PgTypeId::SQLIDENTIFIER => "domain_send".to_string(),
+                _ => self.typname.to_owned() + "send",
+            }
+        } else {
+            "record_send".to_string()
         }
     }
 
@@ -133,6 +312,8 @@ const UNSPECIFIED: &PgType = &PgType {
     typbasetype: 0,
     typreceive: "",
     typreceive_oid: 0,
+    typsend: "-",
+    typoutput: "-",
 };
 
 define_pg_types![
@@ -156,6 +337,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "boolrecv",
         typreceive_oid: 2436,
+        typsend: "boolsend",
+        typoutput: "boolout",
     },
 
     BYTEA (17) {
@@ -177,8 +360,9 @@ define_pg_types![
         typstorage: "x",
         typbasetype: 0,
         typreceive: "bytearecv",
-        // TODO: Get from pg_proc
-        typreceive_oid: 0,
+        typreceive_oid: 2412,
+        typsend: "byteasend",
+        typoutput: "byteaout",
     },
 
     NAME (19) {
@@ -200,8 +384,9 @@ define_pg_types![
         typstorage: "p",
         typbasetype: 0,
         typreceive: "namerecv",
-        // TODO: Get from pg_proc
-        typreceive_oid: 0,
+        typreceive_oid: 2422,
+        typsend: "namesend",
+        typoutput: "nameout",
     },
 
     INT8 (20) {
@@ -224,6 +409,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "int8recv",
         typreceive_oid: 2408,
+        typsend: "int8send",
+        typoutput: "int8out",
     },
 
     INT2 (21) {
@@ -245,8 +432,9 @@ define_pg_types![
         typstorage: "p",
         typbasetype: 0,
         typreceive: "int2recv",
-        // TODO: Get from pg_proc
-        typreceive_oid: 0,
+        typreceive_oid: 2404,
+        typsend: "int2send",
+        typoutput: "int2out",
     },
 
     INT4 (23) {
@@ -269,6 +457,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "int4recv",
         typreceive_oid: 2406,
+        typsend: "int4send",
+        typoutput: "int4out",
     },
 
     TEXT (25) {
@@ -291,6 +481,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "textrecv",
         typreceive_oid: 2414,
+        typsend: "textsend",
+        typoutput: "textout",
     },
 
     OID (26) {
@@ -312,8 +504,9 @@ define_pg_types![
         typstorage: "p",
         typbasetype: 0,
         typreceive: "oidrecv",
-        // TODO: Get from pg_proc
-        typreceive_oid: 0,
+        typreceive_oid: 2418,
+        typsend: "oidsend",
+        typoutput: "oidout",
     },
 
     TID (27) {
@@ -335,8 +528,9 @@ define_pg_types![
         typstorage: "p",
         typbasetype: 0,
         typreceive: "tidrecv",
-        // TODO: Get from pg_proc
-        typreceive_oid: 0,
+        typreceive_oid: 2440,
+        typsend: "tidsend",
+        typoutput: "tidout",
     },
 
     PGCLASS (83) {
@@ -360,6 +554,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGCLASS (273) {
@@ -383,6 +579,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     FLOAT4 (700) {
@@ -405,6 +603,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "float4recv",
         typreceive_oid: 2424,
+        typsend: "-",
+        typoutput: "-",
     },
 
     FLOAT8 (701) {
@@ -427,6 +627,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "float8recv",
         typreceive_oid: 2426,
+        typsend: "-",
+        typoutput: "-",
     },
 
     MONEY (790) {
@@ -450,6 +652,8 @@ define_pg_types![
         typreceive: "cash_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYMONEY (791) {
@@ -473,6 +677,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     INET (869) {
@@ -496,6 +702,8 @@ define_pg_types![
         typreceive: "inet_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYBOOL (1000) {
@@ -519,6 +727,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYBYTEA (1001) {
@@ -542,6 +752,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYNAME (1003) {
@@ -565,6 +777,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT2 (1005) {
@@ -588,6 +802,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT4 (1007) {
@@ -611,6 +827,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTEXT (1009) {
@@ -634,6 +852,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTID (1010) {
@@ -657,6 +877,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYBPCHAR (1014) {
@@ -680,6 +902,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYVARCHAR (1015) {
@@ -703,6 +927,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT8 (1016) {
@@ -726,6 +952,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYFLOAT4 (1021) {
@@ -749,6 +977,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYFLOAT8 (1022) {
@@ -772,6 +1002,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYOID (1028) {
@@ -795,6 +1027,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ACLITEM (1033) {
@@ -818,6 +1052,8 @@ define_pg_types![
         typreceive: "-",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYACLITEM (1034) {
@@ -841,6 +1077,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINET (1041) {
@@ -864,6 +1102,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     BPCHAR (1042) {
@@ -887,6 +1127,8 @@ define_pg_types![
         typreceive: "bpcharrecv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     VARCHAR (1043) {
@@ -909,6 +1151,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "varcharrecv",
         typreceive_oid: 2432,
+        typsend: "-",
+        typoutput: "-",
     },
 
     DATE (1082) {
@@ -932,6 +1176,8 @@ define_pg_types![
         typreceive: "date_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TIME (1083) {
@@ -955,6 +1201,8 @@ define_pg_types![
         typreceive: "time_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TIMESTAMP (1114) {
@@ -977,6 +1225,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "timestamp_recv",
         typreceive_oid: 2474,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTIMESTAMP (1115) {
@@ -1000,6 +1250,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYDATE (1182) {
@@ -1023,6 +1275,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTIME (1183) {
@@ -1046,6 +1300,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TIMESTAMPTZ (1184) {
@@ -1069,6 +1325,8 @@ define_pg_types![
         typreceive: "timestamptz_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTIMESTAMPTZ (1185) {
@@ -1092,6 +1350,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     INTERVAL (1186) {
@@ -1115,6 +1375,8 @@ define_pg_types![
         typreceive: "interval_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINTERVAL (1187) {
@@ -1138,6 +1400,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYNUMERIC (1231) {
@@ -1161,6 +1425,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TIMETZ (1266) {
@@ -1184,6 +1450,8 @@ define_pg_types![
         typreceive: "timetz_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTIMETZ (1270) {
@@ -1207,6 +1475,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     NUMERIC (1700) {
@@ -1229,6 +1499,8 @@ define_pg_types![
         typbasetype: 0,
         typreceive: "numeric_recv",
         typreceive_oid: 2460,
+        typsend: "-",
+        typoutput: "-",
     },
 
     RECORD (2249) {
@@ -1252,6 +1524,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ANYARRAY (2277) {
@@ -1275,6 +1549,8 @@ define_pg_types![
         typreceive: "anyarray_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ANYELEMENT (2283) {
@@ -1298,6 +1574,8 @@ define_pg_types![
         typreceive: "-",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYRECORD (2287) {
@@ -1321,6 +1599,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGLSN (3220) {
@@ -1344,6 +1624,8 @@ define_pg_types![
         typreceive: "pg_lsn_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGLSN (3221) {
@@ -1367,6 +1649,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ANYENUM (3500) {
@@ -1390,6 +1674,8 @@ define_pg_types![
         typreceive: "-",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ANYRANGE (3831) {
@@ -1413,6 +1699,8 @@ define_pg_types![
         typreceive: "-",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     INT4RANGE (3904) {
@@ -1436,6 +1724,8 @@ define_pg_types![
         typreceive: "range_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT4RANGE (3905) {
@@ -1459,6 +1749,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     NUMRANGE (3906) {
@@ -1482,6 +1774,8 @@ define_pg_types![
         typreceive: "range_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYNUMRANGE (3907) {
@@ -1505,6 +1799,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TSRANGE (3908) {
@@ -1528,6 +1824,8 @@ define_pg_types![
         typreceive: "range_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTSRANGE (3909) {
@@ -1551,6 +1849,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TSTZRANGE (3910) {
@@ -1574,6 +1874,8 @@ define_pg_types![
         typreceive: "range_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTSTZRANGE (3911) {
@@ -1597,6 +1899,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     DATERANGE (3912) {
@@ -1620,6 +1924,8 @@ define_pg_types![
         typreceive: "range_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYDATERANGE (3913) {
@@ -1643,6 +1949,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     INT8RANGE (3926) {
@@ -1666,6 +1974,8 @@ define_pg_types![
         typreceive: "range_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT8RANGE (3927) {
@@ -1689,6 +1999,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     INT4MULTIRANGE (4451) {
@@ -1712,6 +2024,8 @@ define_pg_types![
         typreceive: "multirange_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     NUMMULTIRANGE (4532) {
@@ -1735,6 +2049,8 @@ define_pg_types![
         typreceive: "multirange_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     TSMULTIRANGE (4533) {
@@ -1758,6 +2074,8 @@ define_pg_types![
         typreceive: "multirange_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     DATEMULTIRANGE (4535) {
@@ -1781,6 +2099,8 @@ define_pg_types![
         typreceive: "multirange_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     INT8MULTIRANGE (4536) {
@@ -1804,6 +2124,8 @@ define_pg_types![
         typreceive: "multirange_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT4MULTIRANGE (6150) {
@@ -1827,6 +2149,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYNUMMULTIRANGE (6151) {
@@ -1850,6 +2174,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYTSMULTIRANGE (6152) {
@@ -1873,6 +2199,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYDATEMULTIRANGE (6155) {
@@ -1896,6 +2224,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYINT8MULTIRANGE (6157) {
@@ -1919,6 +2249,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGAM (10014) {
@@ -1942,6 +2274,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGAM (10015) {
@@ -1965,6 +2299,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGLANGUAGE (10020) {
@@ -1988,6 +2324,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGLANGUAGE (10021) {
@@ -2011,6 +2349,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGEVENTTRIGGER (10038) {
@@ -2034,6 +2374,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGEVENTTRIGGER (10039) {
@@ -2057,6 +2399,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGCAST (10042) {
@@ -2080,6 +2424,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGCAST (10043) {
@@ -2103,6 +2449,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGEXTENSION (10073) {
@@ -2126,6 +2474,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGEXTENSION (10074) {
@@ -2149,6 +2499,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGFOREIGNDATAWRAPPER (10075) {
@@ -2172,6 +2524,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGFOREIGNDATAWRAPPER (10076) {
@@ -2195,6 +2549,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGFOREIGNSERVER (10077) {
@@ -2218,6 +2574,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGFOREIGNSERVER (10078) {
@@ -2241,6 +2599,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGCONSTRAINT (12002) {
@@ -2264,6 +2624,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGCONSTRAINT (12003) {
@@ -2287,6 +2649,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     ARRAYPGNAMESPACE (12046) {
@@ -2310,6 +2674,8 @@ define_pg_types![
         typreceive: "array_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     PGNAMESPACE (12047) {
@@ -2333,6 +2699,8 @@ define_pg_types![
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     CHARACTERDATA (13408) {
@@ -2356,6 +2724,8 @@ define_pg_types![
         typreceive: "domain_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 
     SQLIDENTIFIER (13410) {
@@ -2379,6 +2749,8 @@ define_pg_types![
         typreceive: "domain_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
+        typsend: "-",
+        typoutput: "-",
     },
 ];
 

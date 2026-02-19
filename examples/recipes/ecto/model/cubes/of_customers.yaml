@@ -1,0 +1,123 @@
+---
+cubes:
+  - name: of_customers
+    description: of Customers
+    title: customers cube
+    dimensions:
+      - meta:
+          ecto_fields:
+            - brand_code
+            - market_code
+            - email
+        name: email_per_brand_per_market
+        type: string
+        primary_key: true
+        sql: brand_code||market_code||email
+      - meta:
+          ecto_field: first_name
+          ecto_field_type: string
+        name: given_name
+        type: string
+        description: good documentation
+        sql: first_name
+      - meta:
+          ecto_fields:
+            - birthday_day
+            - birthday_month
+        name: zodiac
+        type: string
+        description: SQL for a zodiac sign for given [:birthday_day, :birthday_month], not _gyroscope_, TODO unicode of Emoji
+        sql: |
+          CASE
+          WHEN (birthday_month = 1 AND birthday_day >= 20) OR (birthday_month = 2 AND birthday_day <= 18) THEN 'Aquarius'
+          WHEN (birthday_month = 2 AND birthday_day >= 19) OR (birthday_month = 3 AND birthday_day <= 20) THEN 'Pisces'
+          WHEN (birthday_month = 3 AND birthday_day >= 21) OR (birthday_month = 4 AND birthday_day <= 19) THEN 'Aries'
+          WHEN (birthday_month = 4 AND birthday_day >= 20) OR (birthday_month = 5 AND birthday_day <= 20) THEN 'Taurus'
+          WHEN (birthday_month = 5 AND birthday_day >= 21) OR (birthday_month = 6 AND birthday_day <= 20) THEN 'Gemini'
+          WHEN (birthday_month = 6 AND birthday_day >= 21) OR (birthday_month = 7 AND birthday_day <= 22) THEN 'Cancer'
+          WHEN (birthday_month = 7 AND birthday_day >= 23) OR (birthday_month = 8 AND birthday_day <= 22) THEN 'Leo'
+          WHEN (birthday_month = 8 AND birthday_day >= 23) OR (birthday_month = 9 AND birthday_day <= 22) THEN 'Virgo'
+          WHEN (birthday_month = 9 AND birthday_day >= 23) OR (birthday_month = 10 AND birthday_day <= 22) THEN 'Libra'
+          WHEN (birthday_month = 10 AND birthday_day >= 23) OR (birthday_month = 11 AND birthday_day <= 21) THEN 'Scorpio'
+          WHEN (birthday_month = 11 AND birthday_day >= 22) OR (birthday_month = 12 AND birthday_day <= 21) THEN 'Sagittarius'
+          WHEN (birthday_month = 12 AND birthday_day >= 22) OR (birthday_month = 1 AND birthday_day <= 19) THEN 'Capricorn'
+          ELSE 'Professor Abe Weissman'
+          END
+      - meta:
+          ecto_fields:
+            - birthday_day
+            - birthday_month
+        name: star_sector
+        type: number
+        description: integer from 0 to 11 for zodiac signs
+        sql: |
+          CASE
+          WHEN (birthday_month = 1 AND birthday_day >= 20) OR (birthday_month = 2 AND birthday_day <= 18) THEN 0
+          WHEN (birthday_month = 2 AND birthday_day >= 19) OR (birthday_month = 3 AND birthday_day <= 20) THEN 1
+          WHEN (birthday_month = 3 AND birthday_day >= 21) OR (birthday_month = 4 AND birthday_day <= 19) THEN 2
+          WHEN (birthday_month = 4 AND birthday_day >= 20) OR (birthday_month = 5 AND birthday_day <= 20) THEN 3
+          WHEN (birthday_month = 5 AND birthday_day >= 21) OR (birthday_month = 6 AND birthday_day <= 20) THEN 4
+          WHEN (birthday_month = 6 AND birthday_day >= 21) OR (birthday_month = 7 AND birthday_day <= 22) THEN 5
+          WHEN (birthday_month = 7 AND birthday_day >= 23) OR (birthday_month = 8 AND birthday_day <= 22) THEN 6
+          WHEN (birthday_month = 8 AND birthday_day >= 23) OR (birthday_month = 9 AND birthday_day <= 22) THEN 7
+          WHEN (birthday_month = 9 AND birthday_day >= 23) OR (birthday_month = 10 AND birthday_day <= 22) THEN 8
+          WHEN (birthday_month = 10 AND birthday_day >= 23) OR (birthday_month = 11 AND birthday_day <= 21) THEN 9
+          WHEN (birthday_month = 11 AND birthday_day >= 22) OR (birthday_month = 12 AND birthday_day <= 21) THEN 10
+          WHEN (birthday_month = 12 AND birthday_day >= 22) OR (birthday_month = 1 AND birthday_day <= 19) THEN 11
+          ELSE -1
+          END
+      - meta:
+          ecto_fields:
+            - brand_code
+            - market_code
+        name: bm_code
+        type: string
+        sql: "brand_code|| '_' || market_code"
+      - meta:
+          ecto_field: brand_code
+          ecto_field_type: string
+        name: brand
+        type: string
+        description: Beer
+        sql: brand_code
+      - meta:
+          ecto_field: market_code
+          ecto_field_type: string
+        name: market
+        type: string
+        description: market_code, like AU
+        sql: market_code
+      - meta:
+          ecto_field: updated_at
+          ecto_field_type: naive_datetime
+        name: updated
+        type: time
+        description: updated_at timestamp
+        sql: updated_at
+      - meta:
+          ecto_field: inserted_at
+        name: inserted_at
+        type: time
+        description: inserted_at
+        sql: inserted_at
+    measures:
+      - name: count
+        type: count
+        description: no need for fields for :count type measure
+      - meta:
+          ecto_field: email
+          ecto_type: string
+        name: emails_distinct
+        type: count_distinct
+        description: count distinct of emails
+        sql: email
+      - meta:
+          ecto_field: email
+          ecto_type: string
+        name: aquarii
+        type: count_distinct
+        description: Filtered by start sector = 0
+        filters:
+          - sql: (birthday_month = 1 AND birthday_day >= 20) OR (birthday_month = 2 AND birthday_day <= 18)
+        sql: email
+    sql_table: customer

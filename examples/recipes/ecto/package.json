@@ -1,0 +1,12 @@
+{
+  "name": "ecto-adbc-postgres",
+  "private": true,
+  "scripts": {
+    "dev": "../../../node_modules/.bin/cubejs-server",
+    "build": "../../../node_modules/.bin/cubejs build"
+  },
+  "devDependencies": {
+    "@cubejs-backend/server": "*",
+    "@cubejs-backend/postgres-driver": "*"
+  }
+}
