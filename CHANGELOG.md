@@ -3,6 +3,88 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+### Bug Fixes
+
+- **cubesql:** Support date-only `TO_TIMESTAMP` formats ([#10409](https://github.com/cube-js/cube/issues/10409)) ([1ca4624](https://github.com/cube-js/cube/commit/1ca46240e7a200d0cd5d664065c15287a7252a62))
+- **cubestore:** bug with nulls in Decimal96 ([#10408](https://github.com/cube-js/cube/issues/10408)) ([048dd5f](https://github.com/cube-js/cube/commit/048dd5f53072d289820fd4b63e2309d778eecb38))
+
+### Features
+
+- **cubesql:** Support SQL pushdown for `LAG`/`LEAD` functions ([#10407](https://github.com/cube-js/cube/issues/10407)) ([c968656](https://github.com/cube-js/cube/commit/c968656970a90e640548e6b0165e5f1327cf150a))
+
+## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
+
+### Bug Fixes
+
+- **docs:** pin next-mdx-remote to 4.2.1 to address CVE-2026-0969 ([#10397](https://github.com/cube-js/cube/issues/10397)) ([ed5d4df](https://github.com/cube-js/cube/commit/ed5d4df27c17f75492f3c7006aa71d66b29b3eed))
+
+### Features
+
+- **schema-compiler:** Pass jinjaUsed flag to native transpileYaml ([#10402](https://github.com/cube-js/cube/issues/10402)) ([884811a](https://github.com/cube-js/cube/commit/884811a85ff940834722876b1570fa861f387ed5))
+- **schema-compiler:** Yaml - duplicate check for view/cube names ([#10400](https://github.com/cube-js/cube/issues/10400)) ([11a140f](https://github.com/cube-js/cube/commit/11a140f4183b8a44a8800549da22b588ecd5ac02))
+- **schema-compiler:** Yaml - validate duplicates ([#10399](https://github.com/cube-js/cube/issues/10399)) ([d711612](https://github.com/cube-js/cube/commit/d71161210cb24b4b0039c343a3f67d8fe4197f3a))
+
+### Performance Improvements
+
+- **schema-compiler:** Remove JSON.stringify in cache key hashing ([#10404](https://github.com/cube-js/cube/issues/10404)) ([6aae245](https://github.com/cube-js/cube/commit/6aae245585fc8a654a264e34eaf7a47f860d1533))
+
+## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
+
+### Bug Fixes
+
+- **postgres-driver:** Don't expose PoolConfig as driver options ([#10393](https://github.com/cube-js/cube/issues/10393)) ([4f2e72f](https://github.com/cube-js/cube/commit/4f2e72fe17979013a50da06c8be5a69685c079ad))
+- **tesseract:** Allow paths for symbols in request ([#10392](https://github.com/cube-js/cube/issues/10392)) ([9dea1fc](https://github.com/cube-js/cube/commit/9dea1fc6735e7be86e76fcfd5fbc62d769257799))
+
+### Features
+
+- **postgres-driver:** Migrate to our Pool implementation ([#10389](https://github.com/cube-js/cube/issues/10389)) ([a57cabe](https://github.com/cube-js/cube/commit/a57cabed6bab72a34c738cb9b0d6e65c9a72ec60))
+- **redshift-driver:** Support IAM auth ([#10391](https://github.com/cube-js/cube/issues/10391)) ([c711ca7](https://github.com/cube-js/cube/commit/c711ca7c3b781fd975b9b9e5325865b9d27710a4))
+
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+### Bug Fixes
+
+- **bigquery-driver:** Pass precision and scale to decimal type, thanks [@lvauvillier](https://github.com/lvauvillier) ([#10368](https://github.com/cube-js/cube/issues/10368)) ([159f528](https://github.com/cube-js/cube/commit/159f5282e0d05647289e0f43138816ef8567ca0d))
+- **cubestore-driver:** Wrap ECONNRESET errors with ConnectionError ([#10388](https://github.com/cube-js/cube/issues/10388)) ([e952942](https://github.com/cube-js/cube/commit/e952942deeb0cbfb5239343179ce2740c2862ff2))
+
+### Features
+
+- **cubejs-api-gateway:** Adds dataSource to the /v1/sql API response, thanks [@seshness](https://github.com/seshness) ([#10350](https://github.com/cube-js/cube/issues/10350)) ([6bfe75e](https://github.com/cube-js/cube/commit/6bfe75e106f8004fb2467e5e6d3caefa25cc7820))
+- **cubesql:** Support setting time zone with `SET TIMEZONE` ([#10364](https://github.com/cube-js/cube/issues/10364)) ([5bb1e7d](https://github.com/cube-js/cube/commit/5bb1e7d45c94cadd221a5b19c29f818c3d654e57))
+
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+### Bug Fixes
+
+- **docker:** Set UTF-8 locale environment variables to fix Python UnicodeEncodeError ([#10378](https://github.com/cube-js/cube/issues/10378)) ([104ff5f](https://github.com/cube-js/cube/commit/104ff5f732c80fe54945c959736db5493b4d2575))
+
+### Features
+
+- **cubesql:** Support forwards directions for FETCH statement ([#10377](https://github.com/cube-js/cube/issues/10377)) ([7cbafd5](https://github.com/cube-js/cube/commit/7cbafd541a88c1d244e67aa980c208ca7c0ea68a))
+- Unify pool to make named timeout errors ([#10375](https://github.com/cube-js/cube/issues/10375)) ([bac3cd0](https://github.com/cube-js/cube/commit/bac3cd0f2f3f572fac037686ffa16a2e687fbcdc))
+
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+### Bug Fixes
+
+- Negative residual in version generation leads to endless loop during pre-aggregation refresh ([#10367](https://github.com/cube-js/cube/issues/10367)) ([d53ae5f](https://github.com/cube-js/cube/commit/d53ae5f3a2299d86ab221970d5909c146a5badac))
+
+### Features
+
+- **cubestore-driver:** improve WebSocket connection error messages ([#10355](https://github.com/cube-js/cube/issues/10355)) ([76b7873](https://github.com/cube-js/cube/commit/76b78738955f4419ce35aeb9f6cd4b73305e79dc))
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Bug Fixes
+
+- **cubesql:** Fix planning with `CASE` and `LIKE` ([#10346](https://github.com/cube-js/cube/issues/10346)) ([285185f](https://github.com/cube-js/cube/commit/285185f63380fc4a279fd2100f6e7a98beadadc3))
+
+### Features
+
+- **schema-compiler:** Add join_path support in folder includes ([#10349](https://github.com/cube-js/cube/issues/10349)) ([f80ab56](https://github.com/cube-js/cube/commit/f80ab56cdc345e5d430a59f65e702f433516912d))
+
 ## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
 
 ### Bug Fixes

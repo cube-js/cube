@@ -4262,6 +4262,8 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
+        LAG: 'LAG({{ args_concat }})',
+        LEAD: 'LEAD({{ args_concat }})',
 
         // There is a difference in behaviour of these function processing in different DBs and DWHs.
         // The SQL standard requires greatest and least to return null in case one argument is null.

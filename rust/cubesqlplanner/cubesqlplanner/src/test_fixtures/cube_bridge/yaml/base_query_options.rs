@@ -1,4 +1,4 @@
-use crate::cube_bridge::base_query_options::{FilterItem, OrderByItem};
+use crate::cube_bridge::base_query_options::{FilterItem, OrderByItem, TimeDimension};
 use serde::de;
 use serde::{Deserialize, Deserializer};
 
@@ -10,6 +10,8 @@ pub struct YamlBaseQueryOptions {
     pub dimensions: Option<Vec<String>>,
     #[serde(default)]
     pub segments: Option<Vec<String>>,
+    #[serde(default)]
+    pub time_dimensions: Option<Vec<YamlTimeDimension>>,
     #[serde(default)]
     pub order: Option<Vec<YamlOrderByItem>>,
     #[serde(default)]
@@ -131,6 +133,25 @@ impl YamlFilterItem {
                 operator: base.operator,
                 values: base.values,
             },
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct YamlTimeDimension {
+    pub dimension: String,
+    #[serde(default)]
+    pub granularity: Option<String>,
+    #[serde(default, rename = "dateRange")]
+    pub date_range: Option<Vec<String>>,
+}
+
+impl YamlTimeDimension {
+    pub fn into_time_dimension(self) -> TimeDimension {
+        TimeDimension {
+            dimension: self.dimension,
+            granularity: self.granularity,
+            date_range: self.date_range,
         }
     }
 }

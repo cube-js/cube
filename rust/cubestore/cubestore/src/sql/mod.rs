@@ -4219,6 +4219,370 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn csv_import_with_decimals_and_empty_strings() {
+        Config::test("csv_import_with_decimals_and_empty_strings")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let dir = env::temp_dir();
+                let path = dir.join("csv_import_decimals_test.csv.gz");
+
+                let mut file = GzipEncoder::new(BufWriter::new(
+                    tokio::fs::File::create(path.clone()).await.unwrap(),
+                ));
+
+                let csv_data = r#"id,product_name,order_date,discount,profit,quantity,total_amount
+8673,"Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",2020-02-01T00:00:00.000Z,0.200000000,6.19920,2,18.36800
+2655,"Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",2020-09-01T00:00:00.000Z,0E-9,77.57640,3,1292.94000
+8425,"Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",2020-10-01T00:00:00.000Z,0E-9,129.29400,5,2154.90000
+6651,"Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",2020-09-01T00:00:00.000Z,0.200000000,15.49800,5,45.92000
+2595,Tyvek Side-Opening Peel & Seel Expanding Envelopes,2020-05-01T00:00:00.000Z,0E-9,81.43200,2,180.96000
+4227,"Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",2020-11-01T00:00:00.000Z,0E-9,21.58240,4,45.92000
+8878,Lexmark 20R1285 X6650 Wireless All-in-One Printer,2020-09-01T00:00:00.000Z,0E-9,225.60000,4,600.00000
+2455,Kingston Digital DataTraveler 16GB USB 2.2,2020-03-01T00:00:00.000Z,0E-9,13.60400,8,71.60000
+2329,Wausau Papers Astrobrights Colored Envelopes,2020-09-01T00:00:00.000Z,0.200000000,5.20260,3,14.35200
+6272,Panasonic KP-380BK Classic Electric Pencil Sharpener,2020-12-01T00:00:00.000Z,0E-9,44.97500,5,179.90000
+9619,Panasonic KP-380BK Classic Electric Pencil Sharpener,2020-11-01T00:00:00.000Z,0.200000000,5.39700,3,86.35200
+7310,Plymouth Boxed Rubber Bands by Plymouth,2020-06-01T00:00:00.000Z,0E-9,0.70650,3,14.13000
+9473,Harbour Creations 67200 Series Stacking Chairs,2020-11-01T00:00:00.000Z,0.100000000,24.20120,2,128.12400
+1995,Plymouth Boxed Rubber Bands by Plymouth,2020-06-01T00:00:00.000Z,0.200000000,-2.11950,3,11.30400
+9618,Hewlett Packard 610 Color Digital Copier / Printer,2020-11-01T00:00:00.000Z,0.400000000,74.99850,3,899.98200
+6125,Kingston Digital DataTraveler 16GB USB 2.1,2020-06-01T00:00:00.000Z,0E-9,8.50250,5,44.75000
+3060,Anderson Hickey Conga Table Tops & Accessories,2020-10-01T00:00:00.000Z,0.200000000,-3.35060,2,24.36800
+4012,Recycled Eldon Regeneration Jumbo File,2020-11-01T00:00:00.000Z,0.200000000,3.92960,4,39.29600
+5277,Kingston Digital DataTraveler 16GB USB 2.0,2020-12-01T00:00:00.000Z,0E-9,8.50250,5,44.75000
+3717,Plymouth Boxed Rubber Bands by Plymouth,2020-05-01T00:00:00.000Z,0E-9,1.17750,5,23.55000
+2952,Harbour Creations 67200 Series Stacking Chairs,2020-11-01T00:00:00.000Z,0.200000000,9.96520,2,113.88800
+5220,Harbour Creations 67200 Series Stacking Chairs,2020-09-01T00:00:00.000Z,0E-9,134.53020,7,498.26000
+9584,DMI Eclipse Executive Suite Bookcases,2020-06-01T00:00:00.000Z,0.200000000,-5.00980,1,400.78400
+4031,"Iceberg Nesting Folding Chair, 19w x 6d x 43h",2020-12-01T00:00:00.000Z,0E-9,60.54880,4,232.88000
+8958,Lexmark 20R1285 X6650 Wireless All-in-One Printer,2020-12-01T00:00:00.000Z,0.500000000,-7.20000,2,""
+3059,"Linden 10 Round Wall Clock, Black",2020-10-01T00:00:00.000Z,0E-9,10.39040,2,30.56000
+4882,Logitech di_Novo Edge Keyboard,2020-11-01T00:00:00.000Z,0E-9,517.47930,9,2249.91000
+7425,"Linden 10 Round Wall Clock, Black",2020-04-01T00:00:00.000Z,0.200000000,6.41760,3,36.67200
+6205,Magna Visual Magnetic Picture Hangers,2020-12-01T00:00:00.000Z,0.200000000,1.73520,2,7.71200
+1494,Magna Visual Magnetic Picture Hangers,2020-10-01T00:00:00.000Z,0E-9,3.66320,2,9.64000
+1013,Project Tote Personal File,2020-06-01T00:00:00.000Z,0E-9,4.06870,1,14.03000
+6459,"OIC #2 Pencils, Medium Soft",2020-05-01T00:00:00.000Z,0E-9,1.09040,2,3.76000
+8621,"Linden 10 Round Wall Clock, Black",2020-11-01T00:00:00.000Z,0.600000000,-19.86400,5,30.56000
+523,Balt Solid Wood Rectangular Table,2020-01-01T00:00:00.000Z,0E-9,21.09800,2,210.98000
+849,"Linden 10 Round Wall Clock, Black",2020-01-01T00:00:00.000Z,0.200000000,8.55680,4,48.89600
+3934,"OIC #2 Pencils, Medium Soft",2020-09-01T00:00:00.000Z,0E-9,2.72600,5,9.40000
+7698,Canon PC1080F Personal Copier,2020-12-01T00:00:00.000Z,0E-9,467.99220,2,1199.98000
+7174,Canon PC1080F Personal Copier,2020-03-01T00:00:00.000Z,0.200000000,569.99050,5,2399.96000
+3448,"OIC #2 Pencils, Medium Soft",2020-06-01T00:00:00.000Z,0E-9,1.09040,2,3.76000
+3083,Google Nexus 6,2020-05-01T00:00:00.000Z,0E-9,134.99250,3,539.97000
+4161,Google Nexus 7,2020-05-01T00:00:00.000Z,0E-9,134.99250,3,539.97000
+7293,Okidata C610n Printer,2020-12-01T00:00:00.000Z,0.500000000,-272.58000,2,649.00000
+8697,HTC One,2020-06-01T00:00:00.000Z,0.200000000,26.99730,3,239.97600
+2661,Google Nexus 5,2020-11-01T00:00:00.000Z,0E-9,494.97250,11,1979.89000
+"#;
+                file.write_all(csv_data.as_bytes()).await.unwrap();
+                file.shutdown().await.unwrap();
+
+                let _ = service
+                    .exec_query("CREATE SCHEMA IF NOT EXISTS Test")
+                    .await
+                    .unwrap();
+                let _ = service
+                    .exec_query(&format!(
+                        "CREATE TABLE Test.Orders (\
+                            id int, \
+                            product_name text, \
+                            order_date timestamp, \
+                            discount decimal, \
+                            profit decimal, \
+                            quantity int, \
+                            total_amount decimal96\
+                        ) LOCATION '{}'",
+                        path.to_string_lossy()
+                    ))
+                    .await
+                    .unwrap();
+
+                let result = service
+                    .exec_query("SELECT id, product_name, order_date, discount, profit, quantity, total_amount FROM Test.Orders ORDER BY id")
+                    .await
+                    .unwrap();
+
+                assert_eq!(result.get_rows().len(), 44);
+
+                let expected: Vec<(i64, &str, Option<&str>)> = vec![
+                    (523, "Balt Solid Wood Rectangular Table", Some("210.98000")),
+                    (849, "Linden 10 Round Wall Clock, Black", Some("48.89600")),
+                    (1013, "Project Tote Personal File", Some("14.03000")),
+                    (1494, "Magna Visual Magnetic Picture Hangers", Some("9.64000")),
+                    (1995, "Plymouth Boxed Rubber Bands by Plymouth", Some("11.30400")),
+                    (2329, "Wausau Papers Astrobrights Colored Envelopes", Some("14.35200")),
+                    (2455, "Kingston Digital DataTraveler 16GB USB 2.2", Some("71.60000")),
+                    (2595, "Tyvek Side-Opening Peel & Seel Expanding Envelopes", Some("180.96000")),
+                    (2655, "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish", Some("1292.94000")),
+                    (2661, "Google Nexus 5", Some("1979.89000")),
+                    (2952, "Harbour Creations 67200 Series Stacking Chairs", Some("113.88800")),
+                    (3059, "Linden 10 Round Wall Clock, Black", Some("30.56000")),
+                    (3060, "Anderson Hickey Conga Table Tops & Accessories", Some("24.36800")),
+                    (3083, "Google Nexus 6", Some("539.97000")),
+                    (3448, "OIC #2 Pencils, Medium Soft", Some("3.76000")),
+                    (3717, "Plymouth Boxed Rubber Bands by Plymouth", Some("23.55000")),
+                    (3934, "OIC #2 Pencils, Medium Soft", Some("9.40000")),
+                    (4012, "Recycled Eldon Regeneration Jumbo File", Some("39.29600")),
+                    (4031, "Iceberg Nesting Folding Chair, 19w x 6d x 43h", Some("232.88000")),
+                    (4161, "Google Nexus 7", Some("539.97000")),
+                    (4227, "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box", Some("45.92000")),
+                    (4882, "Logitech di_Novo Edge Keyboard", Some("2249.91000")),
+                    (5220, "Harbour Creations 67200 Series Stacking Chairs", Some("498.26000")),
+                    (5277, "Kingston Digital DataTraveler 16GB USB 2.0", Some("44.75000")),
+                    (6125, "Kingston Digital DataTraveler 16GB USB 2.1", Some("44.75000")),
+                    (6205, "Magna Visual Magnetic Picture Hangers", Some("7.71200")),
+                    (6272, "Panasonic KP-380BK Classic Electric Pencil Sharpener", Some("179.90000")),
+                    (6459, "OIC #2 Pencils, Medium Soft", Some("3.76000")),
+                    (6651, "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box", Some("45.92000")),
+                    (7174, "Canon PC1080F Personal Copier", Some("2399.96000")),
+                    (7293, "Okidata C610n Printer", Some("649.00000")),
+                    (7310, "Plymouth Boxed Rubber Bands by Plymouth", Some("14.13000")),
+                    (7425, "Linden 10 Round Wall Clock, Black", Some("36.67200")),
+                    (7698, "Canon PC1080F Personal Copier", Some("1199.98000")),
+                    (8425, "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish", Some("2154.90000")),
+                    (8621, "Linden 10 Round Wall Clock, Black", Some("30.56000")),
+                    (8673, "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box", Some("18.36800")),
+                    (8697, "HTC One", Some("239.97600")),
+                    (8878, "Lexmark 20R1285 X6650 Wireless All-in-One Printer", Some("600.00000")),
+                    (8958, "Lexmark 20R1285 X6650 Wireless All-in-One Printer", None),
+                    (9473, "Harbour Creations 67200 Series Stacking Chairs", Some("128.12400")),
+                    (9584, "DMI Eclipse Executive Suite Bookcases", Some("400.78400")),
+                    (9618, "Hewlett Packard 610 Color Digital Copier / Printer", Some("899.98200")),
+                    (9619, "Panasonic KP-380BK Classic Electric Pencil Sharpener", Some("86.35200")),
+                ];
+
+                let mut mismatch_count = 0;
+                for (i, (exp_id, exp_name, exp_total)) in expected.iter().enumerate() {
+                    let row = &result.get_rows()[i];
+                    if row.values()[0] != TableValue::Int(*exp_id) {
+                        println!("MISMATCH Row {}: id expected={}, got {:?}", i, exp_id, row.values()[0]);
+                        mismatch_count += 1;
+                    }
+                    if row.values()[1] != TableValue::String(exp_name.to_string()) {
+                        println!("MISMATCH Row {} (id={}): product_name expected='{}', got {:?}", i, exp_id, exp_name, row.values()[1]);
+                        mismatch_count += 1;
+                    }
+                    match exp_total {
+                        None => {
+                            if row.values()[6] != TableValue::Null {
+                                println!("MISMATCH Row {} (id={}): total_amount expected=Null, got {:?}", i, exp_id, row.values()[6]);
+                                mismatch_count += 1;
+                            }
+                        }
+                        Some(val) => {
+                            let parts: Vec<&str> = val.split('.').collect();
+                            let int_part: i128 = parts[0].parse().unwrap();
+                            let frac_str = parts[1];
+                            let frac_part: i128 = frac_str.parse().unwrap();
+                            let scale = frac_str.len() as u32;
+                            let raw = int_part * 10i128.pow(scale) + frac_part;
+                            let matches = row.values()[6]
+                                == TableValue::Decimal(Decimal::new(raw))
+                                || row.values()[6]
+                                    == TableValue::Decimal96(Decimal96::new(raw));
+                            if !matches {
+                                println!("MISMATCH Row {} (id={}): total_amount expected raw_value={}, got {:?}", i, exp_id, raw, row.values()[6]);
+                                mismatch_count += 1;
+                            }
+                        }
+                    }
+                }
+                assert_eq!(mismatch_count, 0);
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn csv_import_with_decimal_and_empty_strings() {
+        Config::test("csv_import_with_decimal_and_empty_strings")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let dir = env::temp_dir();
+                let path = dir.join("csv_import_decimal_test.csv.gz");
+
+                let mut file = GzipEncoder::new(BufWriter::new(
+                    tokio::fs::File::create(path.clone()).await.unwrap(),
+                ));
+
+                let csv_data = r#"id,product_name,order_date,discount,profit,quantity,total_amount
+8673,"Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",2020-02-01T00:00:00.000Z,0.200000000,6.19920,2,18.36800
+2655,"Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",2020-09-01T00:00:00.000Z,0E-9,77.57640,3,1292.94000
+8425,"Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",2020-10-01T00:00:00.000Z,0E-9,129.29400,5,2154.90000
+6651,"Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",2020-09-01T00:00:00.000Z,0.200000000,15.49800,5,45.92000
+2595,Tyvek Side-Opening Peel & Seel Expanding Envelopes,2020-05-01T00:00:00.000Z,0E-9,81.43200,2,180.96000
+4227,"Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",2020-11-01T00:00:00.000Z,0E-9,21.58240,4,45.92000
+8878,Lexmark 20R1285 X6650 Wireless All-in-One Printer,2020-09-01T00:00:00.000Z,0E-9,225.60000,4,600.00000
+2455,Kingston Digital DataTraveler 16GB USB 2.2,2020-03-01T00:00:00.000Z,0E-9,13.60400,8,71.60000
+2329,Wausau Papers Astrobrights Colored Envelopes,2020-09-01T00:00:00.000Z,0.200000000,5.20260,3,14.35200
+6272,Panasonic KP-380BK Classic Electric Pencil Sharpener,2020-12-01T00:00:00.000Z,0E-9,44.97500,5,179.90000
+9619,Panasonic KP-380BK Classic Electric Pencil Sharpener,2020-11-01T00:00:00.000Z,0.200000000,5.39700,3,86.35200
+7310,Plymouth Boxed Rubber Bands by Plymouth,2020-06-01T00:00:00.000Z,0E-9,0.70650,3,14.13000
+9473,Harbour Creations 67200 Series Stacking Chairs,2020-11-01T00:00:00.000Z,0.100000000,24.20120,2,128.12400
+1995,Plymouth Boxed Rubber Bands by Plymouth,2020-06-01T00:00:00.000Z,0.200000000,-2.11950,3,11.30400
+9618,Hewlett Packard 610 Color Digital Copier / Printer,2020-11-01T00:00:00.000Z,0.400000000,74.99850,3,899.98200
+6125,Kingston Digital DataTraveler 16GB USB 2.1,2020-06-01T00:00:00.000Z,0E-9,8.50250,5,44.75000
+3060,Anderson Hickey Conga Table Tops & Accessories,2020-10-01T00:00:00.000Z,0.200000000,-3.35060,2,24.36800
+4012,Recycled Eldon Regeneration Jumbo File,2020-11-01T00:00:00.000Z,0.200000000,3.92960,4,39.29600
+5277,Kingston Digital DataTraveler 16GB USB 2.0,2020-12-01T00:00:00.000Z,0E-9,8.50250,5,44.75000
+3717,Plymouth Boxed Rubber Bands by Plymouth,2020-05-01T00:00:00.000Z,0E-9,1.17750,5,23.55000
+2952,Harbour Creations 67200 Series Stacking Chairs,2020-11-01T00:00:00.000Z,0.200000000,9.96520,2,113.88800
+5220,Harbour Creations 67200 Series Stacking Chairs,2020-09-01T00:00:00.000Z,0E-9,134.53020,7,498.26000
+9584,DMI Eclipse Executive Suite Bookcases,2020-06-01T00:00:00.000Z,0.200000000,-5.00980,1,400.78400
+4031,"Iceberg Nesting Folding Chair, 19w x 6d x 43h",2020-12-01T00:00:00.000Z,0E-9,60.54880,4,232.88000
+8958,Lexmark 20R1285 X6650 Wireless All-in-One Printer,2020-12-01T00:00:00.000Z,0.500000000,-7.20000,2,""
+3059,"Linden 10 Round Wall Clock, Black",2020-10-01T00:00:00.000Z,0E-9,10.39040,2,30.56000
+4882,Logitech di_Novo Edge Keyboard,2020-11-01T00:00:00.000Z,0E-9,517.47930,9,2249.91000
+7425,"Linden 10 Round Wall Clock, Black",2020-04-01T00:00:00.000Z,0.200000000,6.41760,3,36.67200
+6205,Magna Visual Magnetic Picture Hangers,2020-12-01T00:00:00.000Z,0.200000000,1.73520,2,7.71200
+1494,Magna Visual Magnetic Picture Hangers,2020-10-01T00:00:00.000Z,0E-9,3.66320,2,9.64000
+1013,Project Tote Personal File,2020-06-01T00:00:00.000Z,0E-9,4.06870,1,14.03000
+6459,"OIC #2 Pencils, Medium Soft",2020-05-01T00:00:00.000Z,0E-9,1.09040,2,3.76000
+8621,"Linden 10 Round Wall Clock, Black",2020-11-01T00:00:00.000Z,0.600000000,-19.86400,5,30.56000
+523,Balt Solid Wood Rectangular Table,2020-01-01T00:00:00.000Z,0E-9,21.09800,2,210.98000
+849,"Linden 10 Round Wall Clock, Black",2020-01-01T00:00:00.000Z,0.200000000,8.55680,4,48.89600
+3934,"OIC #2 Pencils, Medium Soft",2020-09-01T00:00:00.000Z,0E-9,2.72600,5,9.40000
+7698,Canon PC1080F Personal Copier,2020-12-01T00:00:00.000Z,0E-9,467.99220,2,1199.98000
+7174,Canon PC1080F Personal Copier,2020-03-01T00:00:00.000Z,0.200000000,569.99050,5,2399.96000
+3448,"OIC #2 Pencils, Medium Soft",2020-06-01T00:00:00.000Z,0E-9,1.09040,2,3.76000
+3083,Google Nexus 6,2020-05-01T00:00:00.000Z,0E-9,134.99250,3,539.97000
+4161,Google Nexus 7,2020-05-01T00:00:00.000Z,0E-9,134.99250,3,539.97000
+7293,Okidata C610n Printer,2020-12-01T00:00:00.000Z,0.500000000,-272.58000,2,649.00000
+8697,HTC One,2020-06-01T00:00:00.000Z,0.200000000,26.99730,3,239.97600
+2661,Google Nexus 5,2020-11-01T00:00:00.000Z,0E-9,494.97250,11,1979.89000
+"#;
+                file.write_all(csv_data.as_bytes()).await.unwrap();
+                file.shutdown().await.unwrap();
+
+                let _ = service
+                    .exec_query("CREATE SCHEMA IF NOT EXISTS Test")
+                    .await
+                    .unwrap();
+                let _ = service
+                    .exec_query(&format!(
+                        "CREATE TABLE Test.Orders (\
+                            id int, \
+                            product_name text, \
+                            order_date timestamp, \
+                            discount decimal, \
+                            profit decimal, \
+                            quantity int, \
+                            total_amount decimal\
+                        ) LOCATION '{}'",
+                        path.to_string_lossy()
+                    ))
+                    .await
+                    .unwrap();
+
+                let result = service
+                    .exec_query("SELECT id, product_name, order_date, discount, profit, quantity, total_amount FROM Test.Orders ORDER BY id")
+                    .await
+                    .unwrap();
+
+                assert_eq!(result.get_rows().len(), 44);
+
+                let expected: Vec<(i64, &str, Option<&str>)> = vec![
+                    (523, "Balt Solid Wood Rectangular Table", Some("210.98000")),
+                    (849, "Linden 10 Round Wall Clock, Black", Some("48.89600")),
+                    (1013, "Project Tote Personal File", Some("14.03000")),
+                    (1494, "Magna Visual Magnetic Picture Hangers", Some("9.64000")),
+                    (1995, "Plymouth Boxed Rubber Bands by Plymouth", Some("11.30400")),
+                    (2329, "Wausau Papers Astrobrights Colored Envelopes", Some("14.35200")),
+                    (2455, "Kingston Digital DataTraveler 16GB USB 2.2", Some("71.60000")),
+                    (2595, "Tyvek Side-Opening Peel & Seel Expanding Envelopes", Some("180.96000")),
+                    (2655, "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish", Some("1292.94000")),
+                    (2661, "Google Nexus 5", Some("1979.89000")),
+                    (2952, "Harbour Creations 67200 Series Stacking Chairs", Some("113.88800")),
+                    (3059, "Linden 10 Round Wall Clock, Black", Some("30.56000")),
+                    (3060, "Anderson Hickey Conga Table Tops & Accessories", Some("24.36800")),
+                    (3083, "Google Nexus 6", Some("539.97000")),
+                    (3448, "OIC #2 Pencils, Medium Soft", Some("3.76000")),
+                    (3717, "Plymouth Boxed Rubber Bands by Plymouth", Some("23.55000")),
+                    (3934, "OIC #2 Pencils, Medium Soft", Some("9.40000")),
+                    (4012, "Recycled Eldon Regeneration Jumbo File", Some("39.29600")),
+                    (4031, "Iceberg Nesting Folding Chair, 19w x 6d x 43h", Some("232.88000")),
+                    (4161, "Google Nexus 7", Some("539.97000")),
+                    (4227, "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box", Some("45.92000")),
+                    (4882, "Logitech di_Novo Edge Keyboard", Some("2249.91000")),
+                    (5220, "Harbour Creations 67200 Series Stacking Chairs", Some("498.26000")),
+                    (5277, "Kingston Digital DataTraveler 16GB USB 2.0", Some("44.75000")),
+                    (6125, "Kingston Digital DataTraveler 16GB USB 2.1", Some("44.75000")),
+                    (6205, "Magna Visual Magnetic Picture Hangers", Some("7.71200")),
+                    (6272, "Panasonic KP-380BK Classic Electric Pencil Sharpener", Some("179.90000")),
+                    (6459, "OIC #2 Pencils, Medium Soft", Some("3.76000")),
+                    (6651, "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box", Some("45.92000")),
+                    (7174, "Canon PC1080F Personal Copier", Some("2399.96000")),
+                    (7293, "Okidata C610n Printer", Some("649.00000")),
+                    (7310, "Plymouth Boxed Rubber Bands by Plymouth", Some("14.13000")),
+                    (7425, "Linden 10 Round Wall Clock, Black", Some("36.67200")),
+                    (7698, "Canon PC1080F Personal Copier", Some("1199.98000")),
+                    (8425, "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish", Some("2154.90000")),
+                    (8621, "Linden 10 Round Wall Clock, Black", Some("30.56000")),
+                    (8673, "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box", Some("18.36800")),
+                    (8697, "HTC One", Some("239.97600")),
+                    (8878, "Lexmark 20R1285 X6650 Wireless All-in-One Printer", Some("600.00000")),
+                    (8958, "Lexmark 20R1285 X6650 Wireless All-in-One Printer", None),
+                    (9473, "Harbour Creations 67200 Series Stacking Chairs", Some("128.12400")),
+                    (9584, "DMI Eclipse Executive Suite Bookcases", Some("400.78400")),
+                    (9618, "Hewlett Packard 610 Color Digital Copier / Printer", Some("899.98200")),
+                    (9619, "Panasonic KP-380BK Classic Electric Pencil Sharpener", Some("86.35200")),
+                ];
+
+                let mut mismatch_count = 0;
+                for (i, (exp_id, exp_name, exp_total)) in expected.iter().enumerate() {
+                    let row = &result.get_rows()[i];
+                    if row.values()[0] != TableValue::Int(*exp_id) {
+                        println!("MISMATCH Row {}: id expected={}, got {:?}", i, exp_id, row.values()[0]);
+                        mismatch_count += 1;
+                    }
+                    if row.values()[1] != TableValue::String(exp_name.to_string()) {
+                        println!("MISMATCH Row {} (id={}): product_name expected='{}', got {:?}", i, exp_id, exp_name, row.values()[1]);
+                        mismatch_count += 1;
+                    }
+                    match exp_total {
+                        None => {
+                            if row.values()[6] != TableValue::Null {
+                                println!("MISMATCH Row {} (id={}): total_amount expected=Null, got {:?}", i, exp_id, row.values()[6]);
+                                mismatch_count += 1;
+                            }
+                        }
+                        Some(val) => {
+                            let parts: Vec<&str> = val.split('.').collect();
+                            let int_part: i128 = parts[0].parse().unwrap();
+                            let frac_str = parts[1];
+                            let frac_part: i128 = frac_str.parse().unwrap();
+                            let scale = frac_str.len() as u32;
+                            let raw = int_part * 10i128.pow(scale) + frac_part;
+                            let matches = row.values()[6]
+                                == TableValue::Decimal(Decimal::new(raw))
+                                || row.values()[6]
+                                    == TableValue::Decimal96(Decimal96::new(raw));
+                            if !matches {
+                                println!("MISMATCH Row {} (id={}): total_amount expected raw_value={}, got {:?}", i, exp_id, raw, row.values()[6]);
+                                mismatch_count += 1;
+                            }
+                        }
+                    }
+                }
+                assert_eq!(mismatch_count, 0);
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn compaction() {
         Config::test("compaction").update_config(|mut config| {
             config.partition_split_threshold = 5;

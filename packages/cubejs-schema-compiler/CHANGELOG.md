@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+### Features
+
+- **cubesql:** Support SQL pushdown for `LAG`/`LEAD` functions ([#10407](https://github.com/cube-js/cube/issues/10407)) ([c968656](https://github.com/cube-js/cube/commit/c968656970a90e640548e6b0165e5f1327cf150a))
+
+## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
+
+### Features
+
+- **schema-compiler:** Pass jinjaUsed flag to native transpileYaml ([#10402](https://github.com/cube-js/cube/issues/10402)) ([884811a](https://github.com/cube-js/cube/commit/884811a85ff940834722876b1570fa861f387ed5))
+- **schema-compiler:** Yaml - duplicate check for view/cube names ([#10400](https://github.com/cube-js/cube/issues/10400)) ([11a140f](https://github.com/cube-js/cube/commit/11a140f4183b8a44a8800549da22b588ecd5ac02))
+- **schema-compiler:** Yaml - validate duplicates ([#10399](https://github.com/cube-js/cube/issues/10399)) ([d711612](https://github.com/cube-js/cube/commit/d71161210cb24b4b0039c343a3f67d8fe4197f3a))
+
+### Performance Improvements
+
+- **schema-compiler:** Remove JSON.stringify in cache key hashing ([#10404](https://github.com/cube-js/cube/issues/10404)) ([6aae245](https://github.com/cube-js/cube/commit/6aae245585fc8a654a264e34eaf7a47f860d1533))
+
+## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Features
+
+- **schema-compiler:** Add join_path support in folder includes ([#10349](https://github.com/cube-js/cube/issues/10349)) ([f80ab56](https://github.com/cube-js/cube/commit/f80ab56cdc345e5d430a59f65e702f433516912d))
+
 ## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
 
 ### Bug Fixes
