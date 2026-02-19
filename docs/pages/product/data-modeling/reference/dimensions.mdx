@@ -293,9 +293,201 @@ cubes:
 
 </CodeTabs>
 
+### `links`
+
+The `links` parameter allows to define links associated with a dimension.
+They can be rendered as HTML links by supporting tools, e.g., [Workbooks][ref-workbooks].
+
+Links are useful to let users to navigate to related external resources (e.g., Google
+search), internal tools (e.g., Salesforce), or other pages in a BI tool.
+
+Each link must have a `label` and an `url`. `url` should be a valid absolute URL and it
+can [reference][ref-references] column and dimension values.
+
+Optionally, a link might use the `icon` parameter to reference an icon from a [supported
+icon set][link-tabler] to be displayed alongside the link label.
+
+Optionally, a link might use the `target` parameter to specify [where to open it][link-target]:
+`blank` (default) to open in a new tab/window or `self` to open in the same tab/window.
+
+```yaml
+cubes:
+  - name: employees
+
+    dimensions:
+      # Definitions of dimensions such as `email`, etc.
+
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - label: Search on Google
+            # You can reference the dimension value in the URL
+            url: "https://www.google.com/search?q={full_name}"
+            icon: brand-google
+            target: blank
+          
+          - label: Search in Salesforce
+            # You can reference values of other dimensions in the URL as well
+            url: "https://your-company.salesforce.com/search/results/?q={email}"
+            target: blank
+
+          - label: Write an email
+            # Use URL schema to hint the application, e.g., 'mailto:' for email clients
+            url: "mailto:{email}"
+            icon: send
+```
+
+#### `params`
+
+The optional `params` parameter can be used to add additional query parameters to the
+URL. It accepts a map of key-value pairs, where keys are parameter names and values are
+parameter values.
+
+Values in `params` can [reference][ref-references] columns and dimension values.
+Additionally, values in `params` can reference filters applied to the current query using
+the [`FILTER_PARAMS` context variable][ref-filter-params].
+
+Conveniently, the `propagate_filters_to_params` parameter, `true` by default, can be used
+to pass all filters from the current query as an additional parameter. Filters will use
+the same format as the [`filters` query parameter][ref-rest-filters] in the REST API.
+The `param_name_for_filters` parameter, `filters` by default, can be used to customize
+the name of this additional parameter.
+
+All parameters keys and values will be [URL-encoded][link-encode-uri-component]
+when the full URL is constructed.
+
+```yaml
+cubes:
+  - name: employees
+
+    dimensions:
+      # Definitions of dimensions such as `id`, `country_code`, etc.
+
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - label: Check performance dashboard
+            url: "https://my-account.cubecloud.dev/new/d/123/dashboards/KSqDYdUz6Ble"
+            params:
+              # Pass dimension values as query parameters
+              filter_user_id: "{id}"
+              # Pass filters from the current query as query parameters
+              filter_country_code: "{FILTER_PARAMS.employees.country_code}"
+              # Pass additional parameters, if needed
+              utm_source: cube
+
+          - label: Check another dashboard
+            url: "https://my-account.cubecloud.dev/new/d/456/dashboards/iuZjHd8h5mKLe"
+            # Don't pass any filters from the current query
+            propagate_filters_to_params: false
+
+          - label: Check one more dashboard
+            url: "https://my-account.cubecloud.dev/new/d/456/dashboards/iuZjHd8h5mKLe"
+            # Pass all filters from the current query as the `my_precious_filters` query parameter
+            param_name_for_filters: my_precious_filters
+```
+
+#### Dimensions
+
+Each link will be rendered as a few additional [synthetic](#synthetic) dimensions in the
+result set, with the following naming convention, where `<id>` is a zero-based index of
+the link in the `links` array:
+
+- `<dimension_name>___link_<id>_label`
+- `<dimension_name>___link_<id>_url`
+- `<dimension_name>___link_<id>_target`
+- `<dimension_name>___link_<id>_icon`
+
+<InfoBox>
+
+All references in link URLs and parameters must resolve to a single value for a given
+value of the dimension on which the link is defined. Otherwise, it will result in
+duplicate rows in the result set.
+
+</InfoBox>
+
+### `html`
+
+The `html` parameter allows to define an HTML fragment associated with a dimension.
+It can be rendered in eligible visualizations by supporting tools, e.g.,
+[Workbooks][ref-workbooks].
+
+HTML fragments are useful to provide users with rich formatting that goes beyond the
+capabilities of the [`format` parameter](#format).
+
+```yaml
+cubes:
+  - name: employees
+
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        html: |
+          <span style="color: red; text-decoration: line-through;">
+            {full_name}
+          </span>
+```
+
+HTML fragments can also use Jinja templates to render dynamic content. In that case, the
+Jinja template has to be [properly escaped][ref-jinja-escaping] using a literal variable
+expression (`{{ '...' }}`) or a raw block (`{% raw %} ... {% endraw %}`) to avoid being
+processed during the data model compilation. This approach is known as _Jinja-in-Jinja_.
+
+```yaml
+cubes:
+  - name: employees
+
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        html: {{ '{% if "{full_name}" | length > 10 %}looooooong {full_name}{% else %}short {full_name}{% endif %}' }}
+
+      - name: full_name_block
+        sql: full_name
+        type: string
+        html: |
+          {% raw %}
+            {% if {full_name} | length > 10 %}
+              looooooong {full_name}
+            {% else %}
+              short {full_name}
+            {% endif %}
+          {% endraw %}
+
+      - name: full_name_block_loop
+        sql: full_name
+        type: string
+        html: |
+          {% raw %}
+            <ul>
+            {% for part in {full_name} | split(" ") %}
+              <li>{{ part }}</li>
+            {% endfor %}
+            </ul>
+          {% endraw %}
+```
+
+#### Dimensions
+
+An HTML fragment will be rendered as an additional [synthetic](#synthetic) dimension in
+the result set, with the following naming convention: `<dimension_name>___html`.
+
+<InfoBox>
+
+All references in HTML fragments must resolve to a single value for a given value of the
+dimension on which the fragment is defined. Otherwise, it will result in duplicate rows in
+the result set.
+
+</InfoBox>
+
 ### `meta`
 
-Custom metadata. Can be used to pass any information to the frontend.
+The `meta` parameter allows to attach arbitrary information to a dimension.
+It can be consumed and interpreted by supporting tools.
 
 <CodeTabs>
 
@@ -647,6 +839,13 @@ cubes:
 
 </CodeTabs>
 
+### `synthetic`
+
+The `synthetic` parameter can't be set by a user directly. It is used to mark dimensions
+that are automatically created by Cube, e.g., for [links](#links).
+
+You can check if a dimension is synthetic via the [`/v1/meta` API endpoint][ref-meta].
+
 ### `granularities`
 
 By default, the following granularities are available for time dimensions:
@@ -960,3 +1159,12 @@ cube(`fiscal_calendar`, {
 [ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
 [ref-cube-calendar]: /product/data-modeling/reference/cube#calendar
 [ref-measure-time-shift]: /product/data-modeling/reference/measures#time_shift
+[ref-workbooks]: /product/exploration/workbooks
+[link-target]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a#target
+[link-tabler]: https://tabler.io/icons
+[ref-references]: /product/data-modeling/syntax#references
+[ref-filter-params]: /product/data-modeling/reference/context-variables#filter_params
+[link-encode-uri-component]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
+[ref-rest-filters]: /product/apis-integrations/rest-api/query-format#query-properties
+[ref-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-jinja-escaping]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
