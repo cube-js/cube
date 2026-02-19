@@ -214,3 +214,10 @@ tr:nth-child(even) {
   background-color: transparent !important;
 }
 
+/* Search popup - make wider */
+@media (min-width: 768px) {
+  .nextra-search .nextra-search-results {
+    width: 750px !important;
+  }
+}
+
