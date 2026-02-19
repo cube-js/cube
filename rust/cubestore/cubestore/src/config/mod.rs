@@ -414,6 +414,8 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    fn scheduled_job_orphaned_timeout(&self) -> u64;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -552,6 +554,14 @@ pub trait ConfigObj: DIService {
     fn remote_files_cleanup_batch_size(&self) -> u64;
 
     fn create_table_max_retries(&self) -> u64;
+
+    fn http_location_size_max_retries(&self) -> u64;
+
+    fn http_location_size_initial_sleep_ms(&self) -> u64;
+
+    fn http_location_size_sleep_multiplier(&self) -> u64;
+
+    fn http_location_size_timeout_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -586,6 +596,7 @@ pub struct ConfigObjImpl {
     pub not_used_timeout: u64,
     pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
+    pub scheduled_job_orphaned_timeout: u64,
     pub meta_store_log_upload_interval: u64,
     pub meta_store_log_upload_size_limit: u64,
     pub meta_store_snapshot_interval: u64,
@@ -655,6 +666,10 @@ pub struct ConfigObjImpl {
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
     pub create_table_max_retries: u64,
+    pub http_location_size_max_retries: u64,
+    pub http_location_size_initial_sleep_ms: u64,
+    pub http_location_size_sleep_multiplier: u64,
+    pub http_location_size_timeout_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -763,6 +778,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn scheduled_job_orphaned_timeout(&self) -> u64 {
+        self.scheduled_job_orphaned_timeout
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -1032,6 +1051,22 @@ impl ConfigObj for ConfigObjImpl {
 
     fn create_table_max_retries(&self) -> u64 {
         self.create_table_max_retries
+    }
+
+    fn http_location_size_max_retries(&self) -> u64 {
+        self.http_location_size_max_retries
+    }
+
+    fn http_location_size_initial_sleep_ms(&self) -> u64 {
+        self.http_location_size_initial_sleep_ms
+    }
+
+    fn http_location_size_sleep_multiplier(&self) -> u64 {
+        self.http_location_size_sleep_multiplier
+    }
+
+    fn http_location_size_timeout_secs(&self) -> u64 {
+        self.http_location_size_timeout_secs
     }
 
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
@@ -1351,6 +1386,10 @@ impl Config {
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                scheduled_job_orphaned_timeout: env_parse(
+                    "CUBESTORE_SCHEDULED_JOB_ORPHANED_TIMEOUT",
+                    query_timeout * 3,
+                ),
                 meta_store_log_upload_interval: 30,
                 meta_store_log_upload_size_limit: env_parse_size(
                     "CUBESTORE_METASTORE_UPLOAD_LOG_SIZE_LIMIT",
@@ -1577,6 +1616,22 @@ impl Config {
                     50000,
                 ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
+                http_location_size_max_retries: env_parse(
+                    "CUBESTORE_HTTP_LOCATION_SIZE_MAX_RETRIES",
+                    1,
+                ),
+                http_location_size_initial_sleep_ms: env_parse(
+                    "CUBESTORE_HTTP_LOCATION_SIZE_INITIAL_SLEEP_MS",
+                    100,
+                ),
+                http_location_size_sleep_multiplier: env_parse(
+                    "CUBESTORE_HTTP_LOCATION_SIZE_SLEEP_MULTIPLIER",
+                    2,
+                ),
+                http_location_size_timeout_secs: env_parse(
+                    "CUBESTORE_HTTP_LOCATION_SIZE_TIMEOUT_SECS",
+                    60,
+                ),
             }),
         }
     }
@@ -1652,6 +1707,7 @@ impl Config {
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
+                scheduled_job_orphaned_timeout: query_timeout * 3,
                 stale_stream_timeout: 60,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
@@ -1722,6 +1778,10 @@ impl Config {
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
                 create_table_max_retries: 3,
+                http_location_size_max_retries: 1,
+                http_location_size_initial_sleep_ms: 100,
+                http_location_size_sleep_multiplier: 2,
+                http_location_size_timeout_secs: 60,
             }
         }
     }

@@ -615,6 +615,7 @@ impl MetaStore for MetaStoreMock {
     async fn get_orphaned_jobs(
         &self,
         _orphaned_timeout: Duration,
+        _scheduled_orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }

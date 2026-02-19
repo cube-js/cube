@@ -11,6 +11,7 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::instrument;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct JobProcessResult {
@@ -72,6 +73,7 @@ impl JobProcessor for JobProcessorImpl {
         Ok(())
     }
 
+    #[instrument(level = "trace", skip(self, job))]
     async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError> {
         self.processor.process_separate_job(&job).await
     }
@@ -110,6 +112,7 @@ impl JobIsolatedProcessor {
         )
     }
 
+    #[instrument(level = "trace", skip(self, job))]
     pub async fn process_separate_job(&self, job: &Job) -> Result<JobProcessResult, CubeError> {
         match job.job_type() {
             JobType::PartitionCompaction => {

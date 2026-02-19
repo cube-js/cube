@@ -21,6 +21,7 @@ use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
+use tracing::{instrument, Instrument};
 
 pub struct JobRunner {
     pub config_obj: Arc<dyn ConfigObj>,
@@ -54,15 +55,24 @@ impl JobRunner {
         }
     }
 
+    #[instrument(level = "trace", skip(self), fields(server_name = %self.server_name, job_id = tracing::field::Empty, job_type = tracing::field::Empty))]
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
         let job = self
             .meta_store
             .start_processing_job(self.server_name.to_string(), self.is_long_term)
             .await?;
         if let Some(to_process) = job {
-            self.run_local(to_process).await?;
+            let span = tracing::Span::current();
+            span.record("job_id", &to_process.get_id());
+            span.record(
+                "job_type",
+                &tracing::field::debug(to_process.get_row().job_type()),
+            );
+            let res = self.run_local(to_process).await;
             // In case of job queue is in place jump to the next job immediately
             self.notify.notify_one();
+
+            return res;
         }
         Ok(())
     }
@@ -76,6 +86,7 @@ impl JobRunner {
         Some(Duration::from_secs(self.config_obj.import_job_timeout()))
     }
 
+    #[instrument(level = "trace", skip(self, job))]
     async fn run_local(&self, job: IdRow<Job>) -> Result<(), CubeError> {
         let start = SystemTime::now();
         let job_id = job.get_id();
@@ -169,6 +180,7 @@ impl JobRunner {
         Ok(())
     }
 
+    #[instrument(level = "trace", skip(self, job))]
     fn route_job(&self, job: &Job) -> Result<JoinHandle<Result<(), CubeError>>, CubeError> {
         // spawn here is required in case there's a panic in a job. If job panics worker process loop will survive it.
         match job.job_type() {
@@ -176,9 +188,10 @@ impl JobRunner {
                 if let RowKey::Table(TableId::WALs, wal_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let wal_id = *wal_id;
-                    Ok(cube_ext::spawn(async move {
-                        chunk_store.partition(wal_id).await
-                    }))
+                    Ok(cube_ext::spawn(
+                        async move { chunk_store.partition(wal_id).await }
+                            .instrument(tracing::trace_span!("WalPartitioning", wal_id)),
+                    ))
                 } else {
                     Self::fail_job_row_key(job)
                 }
@@ -187,9 +200,10 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let partition_id = *partition_id;
-                    Ok(cube_ext::spawn(async move {
-                        chunk_store.repartition(partition_id).await
-                    }))
+                    Ok(cube_ext::spawn(
+                        async move { chunk_store.repartition(partition_id).await }
+                            .instrument(tracing::trace_span!("Repartition", partition_id)),
+                    ))
                 } else {
                     Self::fail_job_row_key(job)
                 }
@@ -202,130 +216,23 @@ impl JobRunner {
                     let metastore = self.meta_store.clone();
                     let job_processor = self.job_processor.clone();
                     let job_to_move = job.clone();
-                    Ok(cube_ext::spawn(async move {
-                        let wait_ms = process_rate_limiter
-                            .wait_for_allow(TaskType::Job, timeout)
-                            .await?; //TODO config, may be same ad orphaned timeout
-
-                        let (_, _, table, _) =
-                            metastore.get_partition_for_compaction(partition_id).await?;
-                        let table_id = table.get_id();
-                        let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
-                        let trace_index = TraceIndex {
-                            table_id: Some(table_id),
-                            trace_obj,
-                        };
-
-                        match job_processor.process_job(job_to_move).await {
-                            Ok(job_res) => {
-                                process_rate_limiter
-                                    .commit_task_usage(
-                                        TaskType::Job,
-                                        job_res.data_loaded_size() as i64,
-                                        wait_ms,
-                                        trace_index,
-                                    )
-                                    .await;
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        }
-                    }))
-                } else {
-                    Self::fail_job_row_key(job)
-                }
-            }
-            JobType::InMemoryChunksCompaction => {
-                if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
-                    let compaction_service = self.compaction_service.clone();
-                    let partition_id = *partition_id;
-                    log::warn!(
-                        "JobType::InMemoryChunksCompaction is deprecated and should not be used"
-                    );
-                    Ok(cube_ext::spawn(async move {
-                        compaction_service
-                            .compact_in_memory_chunks(partition_id)
-                            .await
-                    }))
-                } else {
-                    Self::fail_job_row_key(job)
-                }
-            }
-            JobType::NodeInMemoryChunksCompaction(_) => {
-                if let RowKey::Table(TableId::Tables, _) = job.row_reference() {
-                    let compaction_service = self.compaction_service.clone();
-                    let node_name = self.server_name.clone();
-                    Ok(cube_ext::spawn(async move {
-                        compaction_service
-                            .compact_node_in_memory_chunks(node_name)
-                            .await
-                    }))
-                } else {
-                    Self::fail_job_row_key(job)
-                }
-            }
-            JobType::MultiPartitionSplit => {
-                if let RowKey::Table(TableId::MultiPartitions, _) = job.row_reference() {
-                    let job_to_move = job.clone();
-                    let job_processor = self.job_processor.clone();
-                    Ok(cube_ext::spawn(async move {
-                        job_processor.process_job(job_to_move).await.map(|_| ())
-                    }))
-                } else {
-                    Self::fail_job_row_key(job)
-                }
-            }
-            JobType::FinishMultiSplit => {
-                if let RowKey::Table(TableId::MultiPartitions, _) = job.row_reference() {
-                    let job_to_move = job.clone();
-                    let job_processor = self.job_processor.clone();
-                    Ok(cube_ext::spawn(async move {
-                        job_processor.process_job(job_to_move).await.map(|_| ())
-                    }))
-                } else {
-                    Self::fail_job_row_key(job)
-                }
-            }
-            JobType::TableImport => {
-                if let RowKey::Table(TableId::Tables, _) = job.row_reference() {
-                    let job_to_move = job.clone();
-                    let job_processor = self.job_processor.clone();
-                    Ok(cube_ext::spawn(async move {
-                        job_processor.process_job(job_to_move).await.map(|_| ())
-                    }))
-                } else {
-                    Self::fail_job_row_key(job)
-                }
-            }
-            JobType::TableImportCSV(location) => {
-                if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
-                    let table_id = *table_id;
-                    let import_service = self.import_service.clone();
-                    let location = location.to_string();
-                    let process_rate_limiter = self.process_rate_limiter.clone();
-                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
-                    let metastore = self.meta_store.clone();
-                    let job_to_move = job.clone();
-                    let job_processor = self.job_processor.clone();
-                    Ok(cube_ext::spawn(async move {
-                        let is_streaming = Table::is_stream_location(&location);
-                        let data_loaded_size = if is_streaming {
-                            None
-                        } else {
-                            Some(DataLoadedSize::new())
-                        };
-                        if !is_streaming {
+                    Ok(cube_ext::spawn(
+                        async move {
                             let wait_ms = process_rate_limiter
                                 .wait_for_allow(TaskType::Job, timeout)
                                 .await?; //TODO config, may be same ad orphaned timeout
+
+                            let (_, _, table, _) =
+                                metastore.get_partition_for_compaction(partition_id).await?;
+                            let table_id = table.get_id();
+                            let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                            let trace_index = TraceIndex {
+                                table_id: Some(table_id),
+                                trace_obj,
+                            };
+
                             match job_processor.process_job(job_to_move).await {
                                 Ok(job_res) => {
-                                    let trace_obj =
-                                        metastore.get_trace_obj_by_table_id(table_id).await?;
-                                    let trace_index = TraceIndex {
-                                        table_id: Some(table_id),
-                                        trace_obj,
-                                    };
                                     process_rate_limiter
                                         .commit_task_usage(
                                             TaskType::Job,
@@ -338,13 +245,164 @@ impl JobRunner {
                                 }
                                 Err(e) => Err(e),
                             }
-                        } else {
-                            import_service
-                                .clone()
-                                .import_table_part(table_id, &location, data_loaded_size.clone())
+                        }
+                        .instrument(tracing::trace_span!("PartitionCompaction", partition_id)),
+                    ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::InMemoryChunksCompaction => {
+                if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let partition_id = *partition_id;
+                    log::warn!(
+                        "JobType::InMemoryChunksCompaction is deprecated and should not be used"
+                    );
+                    Ok(cube_ext::spawn(
+                        async move {
+                            compaction_service
+                                .compact_in_memory_chunks(partition_id)
                                 .await
                         }
-                    }))
+                        .instrument(tracing::trace_span!(
+                            "InMemoryChunksCompaction",
+                            partition_id
+                        )),
+                    ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::NodeInMemoryChunksCompaction(_) => {
+                if let RowKey::Table(TableId::Tables, _) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let node_name = self.server_name.clone();
+                    let node_name_for_span = node_name.clone();
+                    Ok(cube_ext::spawn(
+                        async move {
+                            compaction_service
+                                .compact_node_in_memory_chunks(node_name)
+                                .await
+                        }
+                        .instrument(tracing::trace_span!(
+                            "NodeInMemoryChunksCompaction",
+                            node = %node_name_for_span
+                        )),
+                    ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::MultiPartitionSplit => {
+                if let RowKey::Table(TableId::MultiPartitions, multi_partition_id) =
+                    job.row_reference()
+                {
+                    let multi_partition_id = *multi_partition_id;
+                    let job_to_move = job.clone();
+                    let job_processor = self.job_processor.clone();
+                    Ok(cube_ext::spawn(
+                        async move { job_processor.process_job(job_to_move).await.map(|_| ()) }
+                            .instrument(tracing::trace_span!(
+                                "MultiPartitionSplit",
+                                multi_partition_id
+                            )),
+                    ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::FinishMultiSplit => {
+                if let RowKey::Table(TableId::MultiPartitions, multi_partition_id) =
+                    job.row_reference()
+                {
+                    let multi_partition_id = *multi_partition_id;
+                    let job_to_move = job.clone();
+                    let job_processor = self.job_processor.clone();
+                    Ok(cube_ext::spawn(
+                        async move { job_processor.process_job(job_to_move).await.map(|_| ()) }
+                            .instrument(tracing::trace_span!(
+                                "FinishMultiSplit",
+                                multi_partition_id
+                            )),
+                    ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::TableImport => {
+                if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
+                    let table_id = *table_id;
+                    let job_to_move = job.clone();
+                    let job_processor = self.job_processor.clone();
+                    Ok(cube_ext::spawn(
+                        async move { job_processor.process_job(job_to_move).await.map(|_| ()) }
+                            .instrument(tracing::trace_span!("TableImport", table_id)),
+                    ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::TableImportCSV(location) => {
+                if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
+                    let table_id = *table_id;
+                    let import_service = self.import_service.clone();
+                    let location = location.to_string();
+                    let location_for_span = location.clone();
+                    let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
+                    let job_to_move = job.clone();
+                    let job_processor = self.job_processor.clone();
+                    Ok(cube_ext::spawn(
+                        async move {
+                            let is_streaming = Table::is_stream_location(&location);
+                            let data_loaded_size = if is_streaming {
+                                None
+                            } else {
+                                Some(DataLoadedSize::new())
+                            };
+                            if !is_streaming {
+                                let wait_ms = process_rate_limiter
+                                    .wait_for_allow(TaskType::Job, timeout)
+                                    .await?; //TODO config, may be same ad orphaned timeout
+                                match job_processor.process_job(job_to_move).await {
+                                    Ok(job_res) => {
+                                        let trace_obj =
+                                            metastore.get_trace_obj_by_table_id(table_id).await?;
+                                        let trace_index = TraceIndex {
+                                            table_id: Some(table_id),
+                                            trace_obj,
+                                        };
+                                        process_rate_limiter
+                                            .commit_task_usage(
+                                                TaskType::Job,
+                                                job_res.data_loaded_size() as i64,
+                                                wait_ms,
+                                                trace_index,
+                                            )
+                                            .await;
+                                        Ok(())
+                                    }
+                                    Err(e) => Err(e),
+                                }
+                            } else {
+                                import_service
+                                    .clone()
+                                    .import_table_part(
+                                        table_id,
+                                        &location,
+                                        data_loaded_size.clone(),
+                                    )
+                                    .await
+                            }
+                        }
+                        .instrument(tracing::trace_span!(
+                            "TableImportCSV",
+                            table_id,
+                            location = %location_for_span
+                        )),
+                    ))
                 } else {
                     Self::fail_job_row_key(job)
                 }
@@ -358,41 +416,47 @@ impl JobRunner {
                     let metastore = self.meta_store.clone();
                     let job_to_move = job.clone();
                     let job_processor = self.job_processor.clone();
-                    Ok(cube_ext::spawn(async move {
-                        let wait_ms = process_rate_limiter
-                            .wait_for_allow(TaskType::Job, timeout)
-                            .await?; //TODO config, may be same ad orphaned timeout
-                        let chunk = metastore.get_chunk(chunk_id).await?;
-                        if !chunk.get_row().in_memory() {
-                            let (_, _, table, _) = metastore
-                                .get_partition_for_compaction(chunk.get_row().get_partition_id())
-                                .await?;
-                            let table_id = table.get_id();
-                            let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
-                            let trace_index = TraceIndex {
-                                table_id: Some(table_id),
-                                trace_obj,
-                            };
-                            match job_processor.process_job(job_to_move).await {
-                                Ok(job_res) => {
-                                    process_rate_limiter
-                                        .commit_task_usage(
-                                            TaskType::Job,
-                                            job_res.data_loaded_size() as i64,
-                                            wait_ms,
-                                            trace_index,
-                                        )
-                                        .await;
-                                    Ok(())
+                    Ok(cube_ext::spawn(
+                        async move {
+                            let wait_ms = process_rate_limiter
+                                .wait_for_allow(TaskType::Job, timeout)
+                                .await?; //TODO config, may be same ad orphaned timeout
+                            let chunk = metastore.get_chunk(chunk_id).await?;
+                            if !chunk.get_row().in_memory() {
+                                let (_, _, table, _) = metastore
+                                    .get_partition_for_compaction(
+                                        chunk.get_row().get_partition_id(),
+                                    )
+                                    .await?;
+                                let table_id = table.get_id();
+                                let trace_obj =
+                                    metastore.get_trace_obj_by_table_id(table_id).await?;
+                                let trace_index = TraceIndex {
+                                    table_id: Some(table_id),
+                                    trace_obj,
+                                };
+                                match job_processor.process_job(job_to_move).await {
+                                    Ok(job_res) => {
+                                        process_rate_limiter
+                                            .commit_task_usage(
+                                                TaskType::Job,
+                                                job_res.data_loaded_size() as i64,
+                                                wait_ms,
+                                                trace_index,
+                                            )
+                                            .await;
+                                        Ok(())
+                                    }
+                                    Err(e) => Err(e),
                                 }
-                                Err(e) => Err(e),
+                            } else {
+                                chunk_store
+                                    .repartition_chunk(chunk_id, DataLoadedSize::new())
+                                    .await
                             }
-                        } else {
-                            chunk_store
-                                .repartition_chunk(chunk_id, DataLoadedSize::new())
-                                .await
                         }
-                    }))
+                        .instrument(tracing::trace_span!("RepartitionChunk", chunk_id)),
+                    ))
                 } else {
                     Self::fail_job_row_key(job)
                 }
