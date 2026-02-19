@@ -1371,14 +1371,14 @@ impl ClusterSendExec {
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Result<Vec<(String, (Vec<PartitionWithFilters>, Vec<InlineTableId>))>, CubeError> {
-        let partitions = Self::logical_partitions(snapshots, tree)?;
-        Ok(Self::assign_nodes(config, partitions))
+        let (partitions, can_be_splitted) = Self::logical_partitions(snapshots, tree)?;
+        Ok(Self::assign_nodes(config, partitions, can_be_splitted))
     }
 
     fn logical_partitions(
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
-    ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
+    ) -> Result<(Vec<Vec<InlineCompoundPartition>>, bool), CubeError> {
         let mut to_multiply = Vec::new();
         let mut multi_partitions = HashMap::<u64, Vec<_>>::new();
         let mut has_inline_tables = false;
@@ -1440,21 +1440,23 @@ impl ClusterSendExec {
                     "Partitioned index queries aren't supported with inline tables".to_string(),
                 ));
             }
-            return Ok(Self::distribute_multi_partitions(multi_partitions, tree)
+            let res = Self::distribute_multi_partitions(multi_partitions, tree)
                 .into_iter()
                 .map(|i| {
                     i.into_iter()
                         .map(|p| InlineCompoundPartition::Partition(p))
                         .collect()
                 })
-                .collect());
+                .collect();
+            return Ok((res, false));
         }
-        // Ordinary partitions need to be duplicated on multiple machines.
+        let can_be_splitted = to_multiply.len() == 1; //We can only split partitions if there’s no multiplication for join.
+                                                      // Ordinary partitions need to be duplicated on multiple machines.
         let partitions = to_multiply
             .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<Vec<_>>>();
-        Ok(partitions)
+        Ok((partitions, can_be_splitted))
     }
 
     fn distribute_multi_partitions(
@@ -1496,7 +1498,7 @@ impl ClusterSendExec {
         ps
     }
 
-    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {
+    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(IdRow<Partition>, RowRange)> {
         if ps.is_empty() {
             return Vec::new();
         }
@@ -1506,7 +1508,7 @@ impl ClusterSendExec {
         if multi_id.is_none() {
             return ps
                 .iter()
-                .map(|p| (p.get_id(), RowRange::default()))
+                .map(|p| (p.clone(), RowRange::default()))
                 .collect();
         }
         let filter = RowRange {
@@ -1521,7 +1523,7 @@ impl ClusterSendExec {
             } else {
                 filter.clone()
             };
-            r.push((p.get_id(), pf))
+            r.push((p.clone(), pf))
         }
         r
     }
@@ -1529,8 +1531,10 @@ impl ClusterSendExec {
     fn assign_nodes(
         c: &dyn ConfigObj,
         logical: Vec<Vec<InlineCompoundPartition>>,
+        can_be_splitted: bool,
     ) -> Vec<(String, (Vec<(u64, RowRange)>, Vec<InlineTableId>))> {
-        let mut m: HashMap<_, (Vec<(u64, RowRange)>, Vec<InlineTableId>)> = HashMap::new();
+        let mut m: HashMap<_, (Vec<(IdRow<Partition>, RowRange)>, Vec<InlineTableId>)> =
+            HashMap::new();
         for ps in &logical {
             let inline_table_ids = ps
                 .iter()
@@ -1570,7 +1574,60 @@ impl ClusterSendExec {
 
         let mut r = m.into_iter().collect_vec();
         r.sort_unstable_by(|l, r| l.0.cmp(&r.0));
-        r
+        r.into_iter()
+            .map(|(worker, data)| {
+                let splitted = Self::split_worker_parititons(c, data, can_be_splitted);
+                splitted.into_iter().map(move |data| (worker.clone(), data))
+            })
+            .flatten()
+            .collect_vec()
+    }
+
+    fn split_worker_parititons(
+        c: &dyn ConfigObj,
+        partitions: (Vec<(IdRow<Partition>, RowRange)>, Vec<InlineTableId>),
+        can_be_splitted: bool,
+    ) -> Vec<(Vec<(u64, RowRange)>, Vec<InlineTableId>)> {
+        if !can_be_splitted {
+            return vec![(
+                partitions
+                    .0
+                    .into_iter()
+                    .map(|(p, range)| (p.id, range))
+                    .collect_vec(),
+                partitions.1,
+            )];
+        }
+        let rows_split_threshold = c.partition_split_threshold() * c.cluster_send_split_threshold();
+        let file_size_split_threshold =
+            c.partition_size_split_threshold_bytes() * c.cluster_send_split_threshold();
+        let mut result = vec![];
+        let mut current_rows = 0;
+        let mut current_files_size = 0;
+        let mut current_chunk = vec![];
+        let (partitions, _) = partitions;
+        for (partition, range) in partitions {
+            let rows = partition.get_row().main_table_row_count();
+            let file_size = partition.get_row().file_size().unwrap_or_default();
+            if current_rows + rows > rows_split_threshold
+                || current_files_size + file_size > file_size_split_threshold
+            {
+                if !current_chunk.is_empty() {
+                    result.push((std::mem::take(&mut current_chunk), vec![]));
+                    current_rows = 0;
+                    current_files_size = 0;
+                }
+            }
+
+            current_rows += rows;
+            current_files_size += file_size;
+            current_chunk.push((partition.id, range));
+        }
+        if !current_chunk.is_empty() {
+            result.push((current_chunk, vec![]));
+        }
+
+        result
     }
 
     pub fn with_changed_schema(
