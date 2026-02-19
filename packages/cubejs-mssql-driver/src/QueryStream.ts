@@ -7,6 +7,8 @@ import {
 export function transformRow(row: Record<string, any>) {
   for (const [key, value] of Object.entries(row)) {
     if (value instanceof Date) {
+      // toJSON() returns an ISO-8601 UTC string (e.g. "2017-01-03T00:00:00.000Z")
+      // because useUTC: true makes tedious construct Date objects via Date.UTC(),
       row[key] = value.toJSON();
     }
   }
