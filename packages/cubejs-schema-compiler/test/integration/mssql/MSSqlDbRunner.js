@@ -1,56 +1,57 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { GenericContainer, Wait } from 'testcontainers';
-import sql from 'mssql';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { MSSqlDriver } from '@cubejs-backend/mssql-driver';
 
 import { BaseDbRunner } from '../utils/BaseDbRunner';
 import { MssqlQuery } from '../../../src';
 
 export class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
+    const driver = new MSSqlDriver({
+      server: 'localhost',
+      port,
+      user: 'sa',
+      password: this.password(),
+      readOnly: false,
+      options: {
+        trustServerCertificate: true,
+        encrypt: false,
+        useUTC: false,
+      },
+      pool: {
+        max: 4,
+        min: 0,
+        idleTimeoutMillis: 30000,
+        acquireTimeoutMillis: 20000,
+      },
+    });
+
+    await driver.testConnection();
+
     return {
-      testQueries: async (queries, fixture) => {
-        const pool = new sql.ConnectionPool({
-          server: 'localhost',
-          port,
-          user: 'sa',
-          password: this.password(),
-          options: {
-            // local dev / self-signed certs
-            trustServerCertificate: true,
-          }
-        });
-
-        await pool.connect();
-
-        try {
-          const tx = new sql.Transaction(pool);
-          await tx.begin();
-          try {
-            await this.prepareFixture(tx, fixture);
-            const result = await queries.map(query => async () => {
-              const request = new sql.Request(tx);
-              (query[1] || []).forEach((v, i) => request.input(`_${i + 1}`, v));
-              return (await request.query(query[0])).recordset;
-            }).reduce((a, b) => a.then(b), Promise.resolve());
-            await tx.commit();
-            return result;
-          } catch (e) {
-            // console.log(e.stack);
-            await tx.rollback();
-            throw e;
-          }
-        } finally {
-          await pool.close();
+      testQueries: async (queries, _fixture) => {
+        await this.prepareFixture(driver);
+        let result;
+        for (const query of queries) {
+          result = await driver.query(query[0], query[1] || []);
         }
-      }
+        return result;
+      },
+      close: async () => {
+        await driver.release();
+      },
     };
   }
 
-  async prepareFixture(tx) {
+  async prepareFixture(driver) {
     const query = async (q) => {
-      const request = new sql.Request(tx);
-      await request.query(q);
+      await driver.query(q, []);
     };
+    await query('DROP TABLE IF EXISTS ##visitors');
+    await query('DROP TABLE IF EXISTS ##visitor_checkins');
+    await query('DROP TABLE IF EXISTS ##cards');
+    await query('DROP TABLE IF EXISTS ##numbers');
     await query('CREATE TABLE ##visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(MAX), latitude DECIMAL, longitude DECIMAL)');
     await query('CREATE TABLE ##visitor_checkins (id INT, visitor_id INT, created_at datetime, source VARCHAR(MAX))');
     await query('CREATE TABLE ##cards (id INT, visitor_id INT, visitor_checkin_id INT)');

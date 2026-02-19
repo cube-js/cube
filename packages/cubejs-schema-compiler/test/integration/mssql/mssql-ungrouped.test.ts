@@ -365,7 +365,7 @@ describe('MSSqlUngrouped', () => {
     { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__google_sourced_checkins: null },
     { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__google_sourced_checkins: null },
     { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: new Date('2017-01-05T00:00:00.000Z'), visitor_checkins__google_sourced_checkins: 1 },
+    { visitor_checkins__created_at_day: new Date('2017-01-05T00:00:00.000Z'), visitor_checkins__google_sourced_checkins: '1' },
   ]));
 
   it('ungrouped filtered distinct count', () => runQueryTest({
@@ -389,7 +389,7 @@ describe('MSSqlUngrouped', () => {
     { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_google_sourced_checkins: null },
     { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_google_sourced_checkins: null },
     { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: new Date('2017-01-05T00:00:00.000Z'), visitor_checkins__unique_google_sourced_checkins: 1 },
+    { visitor_checkins__created_at_day: new Date('2017-01-05T00:00:00.000Z'), visitor_checkins__unique_google_sourced_checkins: '1' },
   ]));
 
   it('ungrouped ratio measure', () => runQueryTest({
@@ -408,12 +408,12 @@ describe('MSSqlUngrouped', () => {
     ungrouped: true,
     allowUngroupedWithoutPrimaryKey: true,
   }, [
-    { visitor_checkins__created_at_day: new Date('2017-01-02T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: new Date('2017-01-03T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: new Date('2017-01-05T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: new Date('2017-01-02T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: '1' },
+    { visitor_checkins__created_at_day: new Date('2017-01-03T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: '1' },
+    { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: '1' },
+    { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: '1' },
+    { visitor_checkins__created_at_day: new Date('2017-01-04T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: '1' },
+    { visitor_checkins__created_at_day: new Date('2017-01-05T00:00:00.000Z'), visitor_checkins__unique_sources_per_checking: '1' },
   ]));
 
   it('ungrouped', () => runQueryTest({
@@ -432,22 +432,22 @@ describe('MSSqlUngrouped', () => {
     timezone: 'America/Los_Angeles',
     ungrouped: true
   }, [{
-    visitors__id: 6,
+    visitors__id: '6',
     visitors__created_at_day: new Date('2016-09-06T00:00:00.000Z')
   }, {
-    visitors__id: 1,
+    visitors__id: '1',
     visitors__created_at_day: new Date('2017-01-02T00:00:00.000Z')
   }, {
-    visitors__id: 2,
+    visitors__id: '2',
     visitors__created_at_day: new Date('2017-01-04T00:00:00.000Z')
   }, {
-    visitors__id: 3,
+    visitors__id: '3',
     visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z')
   }, {
-    visitors__id: 4,
+    visitors__id: '4',
     visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z')
   }, {
-    visitors__id: 5,
+    visitors__id: '5',
     visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z')
   }]));
 
@@ -468,7 +468,7 @@ describe('MSSqlUngrouped', () => {
     ungrouped: true,
     offset: 5
   }, [{
-    visitors__id: 5,
+    visitors__id: '5',
     visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z')
   }]));
 
