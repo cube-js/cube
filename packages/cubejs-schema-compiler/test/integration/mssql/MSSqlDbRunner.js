@@ -17,7 +17,6 @@ export class MSSqlDbRunner extends BaseDbRunner {
       options: {
         trustServerCertificate: true,
         encrypt: false,
-        useUTC: false,
       },
       pool: {
         max: 4,

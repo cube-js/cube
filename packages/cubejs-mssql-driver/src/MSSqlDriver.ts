@@ -121,7 +121,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
         encrypt: getEnv('dbSsl', { dataSource }),
-        useUTC: false
+        useUTC: true
       },
       pool: {
         max:

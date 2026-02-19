@@ -216,19 +216,19 @@ describe('MSSqlPreAggregations', () => {
       .then((res) => {
         expect(res).toEqual([
           {
-            visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
             visitors__count: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
             visitors__count: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
             visitors__count: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-07T00:00:00.000Z',
             visitors__count: '2',
           },
         ]);
@@ -272,22 +272,22 @@ describe('MSSqlPreAggregations', () => {
           expect(res)
             .toEqual([
               {
-                visitors__created_at_day: new Date('2017-01-02T00:00:00.000Z'),
+                visitors__created_at_day: '2017-01-02T00:00:00.000Z',
                 visitors__checkins_total: '3',
                 visitors__source: 'some',
               },
               {
-                visitors__created_at_day: new Date('2017-01-04T00:00:00.000Z'),
+                visitors__created_at_day: '2017-01-04T00:00:00.000Z',
                 visitors__checkins_total: '2',
                 visitors__source: 'some',
               },
               {
-                visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+                visitors__created_at_day: '2017-01-05T00:00:00.000Z',
                 visitors__checkins_total: '1',
                 visitors__source: 'google',
               },
               {
-                visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+                visitors__created_at_day: '2017-01-06T00:00:00.000Z',
                 visitors__checkins_total: '0',
                 visitors__source: null
               }
@@ -329,19 +329,19 @@ describe('MSSqlPreAggregations', () => {
       .then((res) => {
         expect(res).toEqual([
           {
-            visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
             visitors__ratio: '0.333333333333',
           },
           {
-            visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
             visitors__ratio: '0.5',
           },
           {
-            visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
             visitors__ratio: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-07T00:00:00.000Z',
             visitors__ratio: null,
           },
         ]);
@@ -387,7 +387,7 @@ describe('MSSqlPreAggregations', () => {
         console.log(JSON.stringify(res));
         expect(res).toEqual([
           {
-            visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
             visitors__checkins_total: '1',
           },
         ]);
