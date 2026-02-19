@@ -41,18 +41,18 @@ export class MSSqlDbRunner extends BaseDbRunner {
     };
   }
 
+  /**
+   * @param {MSSqlDriver} driver
+   */
   async prepareFixture(driver) {
-    const query = async (q) => {
-      await driver.query(q, []);
-    };
-    await query('DROP TABLE IF EXISTS ##visitors');
-    await query('DROP TABLE IF EXISTS ##visitor_checkins');
-    await query('DROP TABLE IF EXISTS ##cards');
-    await query('DROP TABLE IF EXISTS ##numbers');
-    await query('CREATE TABLE ##visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(MAX), latitude DECIMAL, longitude DECIMAL)');
-    await query('CREATE TABLE ##visitor_checkins (id INT, visitor_id INT, created_at datetime, source VARCHAR(MAX))');
-    await query('CREATE TABLE ##cards (id INT, visitor_id INT, visitor_checkin_id INT)');
-    await query(`
+    await driver.query('DROP TABLE IF EXISTS ##visitors', []);
+    await driver.query('DROP TABLE IF EXISTS ##visitor_checkins', []);
+    await driver.query('DROP TABLE IF EXISTS ##cards', []);
+    await driver.query('DROP TABLE IF EXISTS ##numbers', []);
+    await driver.query('CREATE TABLE ##visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(MAX), latitude DECIMAL, longitude DECIMAL)', []);
+    await driver.query('CREATE TABLE ##visitor_checkins (id INT, visitor_id INT, created_at datetime, source VARCHAR(MAX))', []);
+    await driver.query('CREATE TABLE ##cards (id INT, visitor_id INT, visitor_checkin_id INT)', []);
+    await driver.query(`
     INSERT INTO
     ##visitors
     (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
@@ -62,8 +62,8 @@ export class MSSqlDbRunner extends BaseDbRunner {
     (4, 400, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 10.60),
     (5, 500, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 58.10),
     (6, 500, '2016-09-07', '2016-09-07', 2, NULL, 120.120, 58.10)
-    `);
-    await query(`
+    `, []);
+    await driver.query(`
     INSERT INTO
     ##visitor_checkins
     (id, visitor_id, created_at, source) VALUES
@@ -73,24 +73,24 @@ export class MSSqlDbRunner extends BaseDbRunner {
     (4, 2, '2017-01-05', NULL),
     (5, 2, '2017-01-05', NULL),
     (6, 3, '2017-01-06', NULL)
-    `);
-    await query(`
+    `, []);
+    await driver.query(`
     INSERT INTO
     ##cards
     (id, visitor_id, visitor_checkin_id) VALUES
     (1, 1, 1),
     (2, 1, 2),
     (3, 3, 6)
-    `);
-    await query('CREATE TABLE ##numbers (num INT);');
-    await query(`
+    `, []);
+    await driver.query('CREATE TABLE ##numbers (num INT);', []);
+    await driver.query(`
     INSERT INTO ##numbers (num) VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9),
                                   (10), (11), (12), (13), (14), (15), (16), (17), (18), (19),
                                   (20), (21), (22), (23), (24), (25), (26), (27), (28), (29),
                                   (30), (31), (32), (33), (34), (35), (36), (37), (38), (39),
                                   (40), (41), (42), (43), (44), (45), (46), (47), (48), (49),
                                   (50), (51), (52), (53), (54), (55), (56), (57), (58), (59);
-    `);
+    `, []);
   }
 
   password() {
