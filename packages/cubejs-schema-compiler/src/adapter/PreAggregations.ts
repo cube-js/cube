@@ -359,7 +359,8 @@ export class PreAggregations {
                 preAggregation,
                 preAggregation.indexes?.[index],
                 indexName,
-                tableName
+                tableName,
+                references.timeDimensions
               )
             };
           }
@@ -372,7 +373,7 @@ export class PreAggregations {
             return {
               indexName,
               type: preAggregation.indexes?.[index].type,
-              columns: queryForSqlEvaluation.evaluateIndexColumns(cube, preAggregation.indexes?.[index])
+              columns: queryForSqlEvaluation.evaluateIndexColumns(cube, preAggregation.indexes?.[index], references.timeDimensions)
             };
           }
         ),
