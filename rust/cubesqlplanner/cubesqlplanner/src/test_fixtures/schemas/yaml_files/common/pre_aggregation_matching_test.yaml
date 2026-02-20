@@ -71,7 +71,7 @@ cubes:
         measures:
           - count
           - total_amount
-          - min_amount
+          - avg_amount
         dimensions:
           - country
         time_dimension: created_at

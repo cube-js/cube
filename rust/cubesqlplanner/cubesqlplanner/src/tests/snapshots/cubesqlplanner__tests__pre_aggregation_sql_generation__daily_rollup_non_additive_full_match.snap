@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__country" "orders__country", date_trunc('day', "orders__created_at_day") "orders__created_at_day", sum("orders__avg_amount") "orders__avg_amount" 
+FROM  orders__daily_countries_rollup  AS "orders__daily_countries_rollup"
+GROUP BY 1, 2
+ORDER BY  2  ASC
