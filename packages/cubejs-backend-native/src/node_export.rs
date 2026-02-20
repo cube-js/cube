@@ -227,6 +227,7 @@ async fn handle_sql_query(
     sql_query: &str,
     cache_mode: &str,
     timezone: Option<String>,
+    force_continue_wait: bool,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         Uuid::new_v4().to_string(),
@@ -274,6 +275,15 @@ async fn handle_sql_query(
                 .write()
                 .expect("failed to unlock session cache_mode for change");
             *cm = Some(cache_enum);
+        }
+
+        {
+            let mut cm = session
+                .state
+                .force_continue_wait
+                .write()
+                .expect("failed to unlock session force_continue_wait for change");
+            *cm = force_continue_wait;
         }
 
         let session_clone = Arc::clone(&session);
@@ -471,6 +481,20 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => None,
     };
 
+    let force_continue_wait: bool = match cx.argument::<JsValue>(6) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                false
+            } else {
+                match val.downcast::<JsBoolean, _>(&mut cx) {
+                    Ok(v) => v.value(&mut cx),
+                    Err(_) => false,
+                }
+            }
+        }
+        Err(_) => false,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -520,6 +544,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             &sql_query,
             &cache_mode,
             timezone,
+            force_continue_wait,
         )
         .await;
 

@@ -345,6 +345,7 @@ impl TransportService for NodeBridgeTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        force_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
@@ -451,6 +452,9 @@ impl TransportService for NodeBridgeTransport {
 
             if let Err(e) = &result {
                 if e.message.to_lowercase().contains("continue wait") {
+                    if force_continue_wait {
+                        return Err(CubeError::internal("Continue wait".to_string()));
+                    }
                     continue;
                 }
             }
@@ -471,15 +475,24 @@ impl TransportService for NodeBridgeTransport {
                         match error_value {
                             serde_json::Value::String(error) => {
                                 if error.to_lowercase() == *"continue wait" {
-                                    debug!(
-                                "[transport] load - retrying request (continue wait) requestId: {}",
-                                request_id
-                            );
+                                    if force_continue_wait {
+                                        debug!(
+                                            "[transport] load - throwing continue wait, requestId: {}",
+                                            request_id
+                                        );
+                                        return Err(CubeError::internal(
+                                            "Continue wait".to_string(),
+                                        ));
+                                    }
 
+                                    debug!(
+                                        "[transport] load - retrying request (continue wait) requestId: {}",
+                                        request_id
+                                    );
                                     continue;
-                                } else {
-                                    return Err(CubeError::user(error.clone()));
                                 }
+
+                                return Err(CubeError::user(error.clone()));
                             }
                             other => {
                                 error!(
@@ -538,6 +551,7 @@ impl TransportService for NodeBridgeTransport {
         meta: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        force_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError> {
         trace!("[transport] Request ->");
 
@@ -585,6 +599,9 @@ impl TransportService for NodeBridgeTransport {
 
             if let Err(e) = &res {
                 if e.message.to_lowercase().contains("continue wait") {
+                    if force_continue_wait {
+                        return Err(CubeError::internal("Continue wait".to_string()));
+                    }
                     continue;
                 }
             }

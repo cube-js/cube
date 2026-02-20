@@ -146,6 +146,7 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        force_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn load_stream(
@@ -157,6 +158,7 @@ pub trait TransportService: Send + Sync + Debug {
         meta_fields: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        force_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError>;
 
     async fn can_switch_user_for_session(
@@ -287,6 +289,7 @@ impl TransportService for HttpTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        _force_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
@@ -328,6 +331,7 @@ impl TransportService for HttpTransport {
         _meta_fields: LoadRequestMeta,
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
+        _force_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("Does not work for standalone mode yet");
     }
