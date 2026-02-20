@@ -52,7 +52,7 @@ cubes:
         title: WAU to MAU
         type: number
         sql:
-          "100.000 * {weekly_active_users} / NULLIF({monthly_active_users}, 0)"
+          "1.0 * {weekly_active_users} / NULLIF({monthly_active_users}, 0)"
         format: percent
 
     dimensions:
@@ -96,7 +96,7 @@ cube(`active_users`, {
 
     wau_to_mau: {
       title: `WAU to MAU`,
-      sql: `100.000 * ${weekly_active_users} / NULLIF(${monthly_active_users}, 0)`,
+      sql: `1.0 * ${weekly_active_users} / NULLIF(${monthly_active_users}, 0)`,
       type: `number`,
       format: `percent`
     }

@@ -241,7 +241,7 @@ cube(`users`, {
     },
 
     paying_percentage: {
-      sql: `100.0 * ${paying_count} / ${count}`,
+      sql: `1.0 * ${paying_count} / ${count}`,
       type: `number`,
       format: `percent`
     }
@@ -267,7 +267,7 @@ cubes:
           - sql: "{CUBE}.paying = 'true'"
 
       - name: paying_percentage
-        sql: "100.0 * {paying_count} / {count}"
+        sql: "1.0 * {paying_count} / {count}"
         type: number
         format: percent
 

@@ -147,7 +147,7 @@ cube(`orders`, {
 
   measures: {
     purchases_ratio: {
-      sql: `${purchases} / ${count} * 100.0`,
+      sql: `1.0 * ${purchases} / ${count}`,
       type: `number`,
       format: `percent`
     }
@@ -162,7 +162,7 @@ cubes:
 
     measures:
       - name: purchases_ratio
-        sql: "{purchases} / {count} * 100.0"
+        sql: "1.0 * {purchases} / {count}"
         type: number
         format: percent
 ```
@@ -551,7 +551,7 @@ cube(`orders`, {
 
   measures: {
     purchase_conversion: {
-      sql: `${purchase} / ${checkout} * 100.0`,
+      sql: `1.0 * ${purchase} / ${checkout}`,
       type: `number`,
       format: `percent`
     }
@@ -566,12 +566,29 @@ cubes:
 
     measures:
       - name: purchase_conversion
-        sql: "{purchase} / {checkout} * 100.0"
+        sql: "1.0 * {purchase} / {checkout}"
         type: number
         format: percent
 ```
 
 </CodeTabs>
+
+<WarningBox>
+
+When using the `percent` format, do not multiply by 100 in your SQL expression.
+Presentation tools like [Explore][ref-explore], [Workbooks][ref-workbooks], and
+[Dashboards][ref-dashboards] apply this multiplication implicitly when displaying
+percent-formatted values, e.g., a value of `0.5` will be displayed as `50%`.
+
+</WarningBox>
+
+<InfoBox>
+
+Use `1.0 * numerator / denominator` to ensure decimal division, as integer
+division would truncate the result, e.g., `5 / 10` may return `0`, not `0.5`,
+depending on your data source and column types.
+
+</InfoBox>
 
 ### `currency`
 
@@ -1033,7 +1050,7 @@ cube(`orders`, {
 
   dimensions: {
     open_rate: {
-      sql: `COALESCE(100.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
+      sql: `COALESCE(1.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
       type: `number`,
       format: `percent`
     }
@@ -1049,7 +1066,7 @@ cubes:
     dimensions:
       - name: open_rate
         sql:
-          "COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
+          "COALESCE(1.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
         type: number
         format: percent
 ```
@@ -1160,3 +1177,6 @@ cubes:
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-case-measures]: /product/data-modeling/reference/measures#case
 [ref-meta-api]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-explore]: /product/exploration/explore
+[ref-workbooks]: /product/exploration/workbooks
+[ref-dashboards]: /product/presentation/dashboards
