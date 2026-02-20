@@ -72,3 +72,43 @@ fn test_partial_match_main_rollup() {
 
     insta::assert_snapshot!(sql);
 }
+
+#[test]
+fn test_full_match_non_additive_measure() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["main_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.avg_amount
+            dimensions:
+              - orders.status
+              - orders.city
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "main_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_no_match_non_additive_measure_partial() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["main_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.avg_amount
+            dimensions:
+              - orders.status
+        "})
+        .unwrap();
+
+    assert!(pre_aggrs.is_empty());
+}
