@@ -465,6 +465,27 @@ mod tests {
         assert_eq!(run_matcher(&ctx, &pre_agg, dims, vec![]), MatchState::Full);
     }
 
+    fn run_matcher_with_filters(
+        ctx: &TestContext,
+        pre_agg: &CompiledPreAggregation,
+        dimensions: Vec<Rc<MemberSymbol>>,
+        time_dimensions: Vec<Rc<MemberSymbol>>,
+        filters: &Vec<FilterItem>,
+        time_dimension_filters: &Vec<FilterItem>,
+    ) -> MatchState {
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), pre_agg);
+        matcher
+            .try_match(
+                &dimensions,
+                &time_dimensions,
+                filters,
+                time_dimension_filters,
+                &vec![],
+            )
+            .unwrap();
+        matcher.result()
+    }
+
     #[test]
     fn test_compound_dimension_matching() {
         let ctx = create_test_context();
@@ -485,6 +506,124 @@ mod tests {
         let pre_agg = compile_pre_agg(&ctx, "mixed_dimensions_rollup");
         assert_eq!(
             run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            MatchState::Partial,
+        );
+    }
+
+    #[test]
+    fn test_filter_matching() {
+        use indoc::indoc;
+
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
+
+        // equals filter on pre-agg dimension covers it → Full
+        let qp = ctx
+            .create_query_properties(indoc! {"
+                measures:
+                  - orders.count
+                dimensions:
+                  - orders.city
+                filters:
+                  - dimension: orders.status
+                    operator: equals
+                    values:
+                      - shipped
+            "})
+            .unwrap();
+        assert_eq!(
+            run_matcher_with_filters(
+                &ctx,
+                &pre_agg,
+                qp.dimensions().clone(),
+                vec![],
+                qp.dimensions_filters(),
+                qp.time_dimensions_filters(),
+            ),
+            MatchState::Full,
+        );
+
+        // non-equals filter matches but doesn't cover → Partial
+        let qp = ctx
+            .create_query_properties(indoc! {"
+                measures:
+                  - orders.count
+                dimensions:
+                  - orders.city
+                filters:
+                  - dimension: orders.status
+                    operator: contains
+                    values:
+                      - ship
+            "})
+            .unwrap();
+        assert_eq!(
+            run_matcher_with_filters(
+                &ctx,
+                &pre_agg,
+                qp.dimensions().clone(),
+                vec![],
+                qp.dimensions_filters(),
+                qp.time_dimensions_filters(),
+            ),
+            MatchState::Partial,
+        );
+
+        // filter on dimension not in pre-agg → NotMatched
+        let qp = ctx
+            .create_query_properties(indoc! {"
+                measures:
+                  - orders.count
+                dimensions:
+                  - orders.status
+                  - orders.city
+                filters:
+                  - dimension: orders.id
+                    operator: gt
+                    values:
+                      - \"5\"
+            "})
+            .unwrap();
+        assert_eq!(
+            run_matcher_with_filters(
+                &ctx,
+                &pre_agg,
+                qp.dimensions().clone(),
+                vec![],
+                qp.dimensions_filters(),
+                qp.time_dimensions_filters(),
+            ),
+            MatchState::NotMatched,
+        );
+
+        // OR group: dimensions matched but not covered → Partial
+        let qp = ctx
+            .create_query_properties(indoc! {"
+                measures:
+                  - orders.count
+                dimensions:
+                  - orders.city
+                filters:
+                  - or:
+                      - dimension: orders.status
+                        operator: equals
+                        values:
+                          - shipped
+                      - dimension: orders.status
+                        operator: equals
+                        values:
+                          - processing
+            "})
+            .unwrap();
+        assert_eq!(
+            run_matcher_with_filters(
+                &ctx,
+                &pre_agg,
+                qp.dimensions().clone(),
+                vec![],
+                qp.dimensions_filters(),
+                qp.time_dimensions_filters(),
+            ),
             MatchState::Partial,
         );
     }

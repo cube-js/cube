@@ -222,6 +222,14 @@ impl TestContext {
         )
     }
 
+    pub fn create_query_properties(
+        &self,
+        yaml: &str,
+    ) -> Result<Rc<QueryProperties>, CubeError> {
+        let options = self.create_query_options_from_yaml(yaml);
+        QueryProperties::try_new(self.query_tools.clone(), options)
+    }
+
     #[allow(dead_code)]
     pub fn build_sql(&self, query: &str) -> Result<String, cubenativeutils::CubeError> {
         let (sql, _) = self.build_sql_with_used_pre_aggregations(query)?;
