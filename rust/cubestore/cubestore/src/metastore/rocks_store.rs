@@ -978,6 +978,24 @@ impl RocksStore {
         Ok(meta_store)
     }
 
+    pub fn apply_log_batch(self: &Arc<Self>, batch: WriteBatchContainer) -> Result<(), CubeError> {
+        self.db.write_without_wal(batch.write_batch())?;
+
+        Ok(())
+    }
+
+    pub async fn after_logs_applying(self: &Arc<Self>) -> Result<(), CubeError> {
+        let latest_sequence_number = self.db.latest_sequence_number();
+
+        let mut last_upload_seq = self.last_upload_seq.write().await;
+        *last_upload_seq = latest_sequence_number;
+
+        let mut last_check_seq = self.last_check_seq.write().await;
+        *last_check_seq = latest_sequence_number;
+
+        Ok(())
+    }
+
     pub async fn check_all_indexes(meta_store: &Arc<Self>) -> Result<(), CubeError> {
         let meta_store_to_move = meta_store.clone();
 

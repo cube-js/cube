@@ -528,17 +528,20 @@ impl MetaStoreFs for BaseRocksStoreFs {
         for (log_file, _) in logs_to_batch_to_seq.iter() {
             let path_to_log = self.remote_fs.local_file(log_file.clone()).await?;
             let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
-            if let Ok(batch) = batch {
-                let db = rocks_store.db.clone();
-                db.write(batch.write_batch())?;
-            } else if let Err(e) = batch {
-                error!(
-                    "Corrupted {} WAL file. Discarding: {:?} {}",
-                    self.name, log_file, e
-                );
-                break;
+            match batch {
+                Ok(batch) => rocks_store.apply_log_batch(batch)?,
+                Err(e) => {
+                    error!(
+                        "Corrupted {} WAL file. Discarding: {:?} {}",
+                        self.name, log_file, e
+                    );
+                    break;
+                }
             }
         }
+
+        rocks_store.after_logs_applying().await?;
+
         Ok(())
     }
 
