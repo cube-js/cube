@@ -54,6 +54,26 @@ impl MockSchema {
         })
     }
 
+    pub fn only_pre_aggregations(&self, names: &[&str]) -> Self {
+        let cubes = self
+            .cubes
+            .iter()
+            .map(|(cube_name, cube)| {
+                let filtered = MockCube {
+                    pre_aggregations: cube
+                        .pre_aggregations
+                        .iter()
+                        .filter(|(name, _)| names.contains(&name.as_str()))
+                        .cloned()
+                        .collect(),
+                    ..cube.clone()
+                };
+                (cube_name.clone(), filtered)
+            })
+            .collect();
+        Self { cubes }
+    }
+
     pub fn get_cube(&self, name: &str) -> Option<&MockCube> {
         self.cubes.get(name)
     }
