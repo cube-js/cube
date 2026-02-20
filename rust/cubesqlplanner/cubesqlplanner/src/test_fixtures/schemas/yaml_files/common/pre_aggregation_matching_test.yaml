@@ -1,0 +1,48 @@
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: city
+        type: string
+        sql: city
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+      - name: total_amount
+        type: sum
+        sql: amount
+      - name: min_amount
+        type: min
+        sql: amount
+      - name: max_amount
+        type: max
+        sql: amount
+      - name: avg_amount
+        type: avg
+        sql: amount
+      - name: unique_status_count
+        type: count_distinct
+        sql: status
+      - name: amount_per_count
+        type: number
+        sql: "{total_amount} / {count}"
+    pre_aggregations:
+      - name: main_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - status
+          - city
