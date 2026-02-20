@@ -112,7 +112,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`delimiter = '${options.delimiter}'`);
     }
     if (options.disableQuoting) {
-      withEntries.push(`disable_quoting = true`);
+      withEntries.push('disable_quoting = true');
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
