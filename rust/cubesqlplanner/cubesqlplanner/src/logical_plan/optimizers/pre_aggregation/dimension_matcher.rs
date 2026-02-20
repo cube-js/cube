@@ -399,6 +399,18 @@ mod tests {
                 &ctx,
                 &pre_agg,
                 vec![ctx.create_dimension("orders.country").unwrap()],
+                vec![ctx
+                    .create_time_dimension("orders.created_at", Some("hour"))
+                    .unwrap()],
+            ),
+            MatchState::NotMatched,
+        );
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![ctx.create_dimension("orders.country").unwrap()],
                 vec![],
             ),
             MatchState::Partial,
