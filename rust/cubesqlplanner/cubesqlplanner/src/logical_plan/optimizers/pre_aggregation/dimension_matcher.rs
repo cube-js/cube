@@ -618,8 +618,6 @@ mod tests {
                 indoc! {"
                     measures:
                       - orders.count
-                    dimensions:
-                      - orders.city
                     filters:
                       - or:
                           - dimension: orders.status
@@ -633,6 +631,28 @@ mod tests {
                 "},
             ),
             MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    filters:
+                      - and:
+                          - dimension: orders.status
+                            operator: equals
+                            values:
+                              - shipped
+                          - dimension: orders.city
+                            operator: equals
+                            values:
+                              - New York
+                "},
+            ),
+            MatchState::Full,
         );
     }
 }
