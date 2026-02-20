@@ -304,71 +304,140 @@ mod tests {
     use crate::test_fixtures::test_utils::TestContext;
 
     fn create_test_context() -> TestContext {
-        let schema =
-            MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml");
+        let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml");
         TestContext::new(schema).unwrap()
     }
 
-    fn compile_pre_agg(ctx: &TestContext) -> Rc<CompiledPreAggregation> {
+    fn compile_pre_agg(ctx: &TestContext, pre_agg_name: &str) -> Rc<CompiledPreAggregation> {
         let cube_names = vec!["orders".to_string()];
         let mut compiler =
-            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names)
-                .unwrap();
-        let name = PreAggregationFullName::new(
-            "orders".to_string(),
-            "main_rollup".to_string(),
-        );
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
+        let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
         compiler.compile_pre_aggregation(&name).unwrap()
+    }
+
+    fn run_matcher(
+        ctx: &TestContext,
+        pre_agg: &CompiledPreAggregation,
+        dimensions: Vec<Rc<MemberSymbol>>,
+        time_dimensions: Vec<Rc<MemberSymbol>>,
+    ) -> MatchState {
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), pre_agg);
+        matcher
+            .try_match(&dimensions, &time_dimensions, &vec![], &vec![], &vec![])
+            .unwrap();
+        matcher.result()
     }
 
     #[test]
     fn test_full_match_dimensions() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx);
+        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
 
-        // Query uses both status and city — same as pre-agg
-        let query_dims = vec![
+        let dims = vec![
             ctx.create_dimension("orders.status").unwrap(),
             ctx.create_dimension("orders.city").unwrap(),
         ];
-
-        let mut matcher =
-            DimensionMatcher::new(ctx.query_tools().clone(), &pre_agg);
-        matcher
-            .try_match(&query_dims, &vec![], &vec![], &vec![], &vec![])
-            .unwrap();
-        assert_eq!(matcher.result(), MatchState::Full);
+        assert_eq!(run_matcher(&ctx, &pre_agg, dims, vec![]), MatchState::Full);
     }
 
     #[test]
     fn test_partial_match_unused_dimension() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx);
+        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
 
-        // Query uses only status, city is unused -> Partial
-        let query_dims = vec![ctx.create_dimension("orders.status").unwrap()];
-
-        let mut matcher =
-            DimensionMatcher::new(ctx.query_tools().clone(), &pre_agg);
-        matcher
-            .try_match(&query_dims, &vec![], &vec![], &vec![], &vec![])
-            .unwrap();
-        assert_eq!(matcher.result(), MatchState::Partial);
+        let dims = vec![ctx.create_dimension("orders.status").unwrap()];
+        assert_eq!(
+            run_matcher(&ctx, &pre_agg, dims, vec![]),
+            MatchState::Partial
+        );
     }
 
     #[test]
     fn test_not_matched_missing_dimension() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx);
+        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
 
-        // Query needs id which is not in pre-agg [status, city] -> NotMatched
-        let query_dims = vec![ctx.create_dimension("orders.id").unwrap()];
+        let dims = vec![ctx.create_dimension("orders.id").unwrap()];
+        assert_eq!(
+            run_matcher(&ctx, &pre_agg, dims, vec![]),
+            MatchState::NotMatched
+        );
+    }
 
-        let mut matcher =
-            DimensionMatcher::new(ctx.query_tools().clone(), &pre_agg);
-        matcher
-            .try_match(&query_dims, &vec![], &vec![], &vec![], &vec![])
-            .unwrap();
-        assert_eq!(matcher.result(), MatchState::NotMatched);
+    #[test]
+    fn test_time_dimension_matching() {
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "daily_countries_rollup");
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![ctx.create_dimension("orders.country").unwrap()],
+                vec![ctx
+                    .create_time_dimension("orders.created_at", Some("day"))
+                    .unwrap()],
+            ),
+            MatchState::Full,
+        );
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![ctx.create_dimension("orders.country").unwrap()],
+                vec![ctx
+                    .create_time_dimension("orders.created_at", Some("month"))
+                    .unwrap()],
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![ctx.create_dimension("orders.country").unwrap()],
+                vec![],
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![],
+                vec![ctx
+                    .create_time_dimension("orders.created_at", Some("day"))
+                    .unwrap()],
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![ctx.create_dimension("orders.status").unwrap()],
+                vec![ctx
+                    .create_time_dimension("orders.updated_at", Some("day"))
+                    .unwrap()],
+            ),
+            MatchState::NotMatched,
+        );
+
+        assert_eq!(
+            run_matcher(
+                &ctx,
+                &pre_agg,
+                vec![ctx.create_dimension("orders.city").unwrap()],
+                vec![ctx
+                    .create_time_dimension("orders.created_at", Some("day"))
+                    .unwrap()],
+            ),
+            MatchState::NotMatched,
+        );
     }
 }

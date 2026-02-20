@@ -9,12 +9,18 @@ cubes:
       - name: status
         type: string
         sql: status
+      - name: country
+        type: string
+        sql: city
       - name: city
         type: string
         sql: city
       - name: created_at
         type: time
         sql: created_at
+      - name: updated_at
+        type: time
+        sql: updated_at
     measures:
       - name: count
         type: count
@@ -46,3 +52,13 @@ cubes:
         dimensions:
           - status
           - city
+
+      - name: daily_countries_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - country
+        time_dimension: created_at
+        granularity: day
