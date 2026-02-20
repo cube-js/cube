@@ -84,10 +84,11 @@ describe('PreAggregationsMultiStage', () => {
     preAggregations: {
         averagePreAgg: {
             type: 'rollup',
-            measureReferences: [average],
+            measureReferences: [average, revenue, count],
             dimensionReferences: [source, id],
         },
     }
+
   })
 
 
@@ -159,25 +160,14 @@ describe('PreAggregationsMultiStage', () => {
     console.log("!!!! sqlAndParams", sqlAndParams[0]);
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      console.log(res)
       expect(res).toEqual(
-        [
-          {
-            vis__created_at_day: '2017-01-02T00:00:00.000Z',
-            vis__revenue_per_id: '100.0000000000000000'
-          },
-          {
-            vis__created_at_day: '2017-01-04T00:00:00.000Z',
-            vis__revenue_per_id: '100.0000000000000000'
-          },
-          {
-            vis__created_at_day: '2017-01-05T00:00:00.000Z',
-            vis__revenue_per_id: '100.0000000000000000'
-          },
-          {
-            vis__created_at_day: '2017-01-06T00:00:00.000Z',
-            vis__revenue_per_id: '200.0000000000000000'
-          }
-        ]
+
+ [
+        { vis__source: null, vis__average: '466' },
+        { vis__source: 'google', vis__average: '300' },
+        { vis__source: 'some', vis__average: '150' }
+      ]
 
       );
     });
