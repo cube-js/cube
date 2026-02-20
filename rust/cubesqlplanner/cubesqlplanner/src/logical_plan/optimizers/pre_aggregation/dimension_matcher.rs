@@ -302,29 +302,30 @@ mod tests {
     };
     use crate::test_fixtures::cube_bridge::MockSchema;
     use crate::test_fixtures::test_utils::TestContext;
+    use indoc::indoc;
 
     fn create_test_context() -> TestContext {
         let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml");
         TestContext::new(schema).unwrap()
     }
 
-    fn compile_pre_agg(ctx: &TestContext, pre_agg_name: &str) -> Rc<CompiledPreAggregation> {
+    fn match_pre_agg(ctx: &TestContext, pre_agg_name: &str, query_yaml: &str) -> MatchState {
         let cube_names = vec!["orders".to_string()];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
-        compiler.compile_pre_aggregation(&name).unwrap()
-    }
+        let pre_agg = compiler.compile_pre_aggregation(&name).unwrap();
 
-    fn run_matcher(
-        ctx: &TestContext,
-        pre_agg: &CompiledPreAggregation,
-        dimensions: Vec<Rc<MemberSymbol>>,
-        time_dimensions: Vec<Rc<MemberSymbol>>,
-    ) -> MatchState {
-        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), pre_agg);
+        let qp = ctx.create_query_properties(query_yaml).unwrap();
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), &pre_agg);
         matcher
-            .try_match(&dimensions, &time_dimensions, &vec![], &vec![], &vec![])
+            .try_match(
+                qp.dimensions(),
+                qp.time_dimensions(),
+                qp.dimensions_filters(),
+                qp.time_dimensions_filters(),
+                qp.segments(),
+            )
             .unwrap();
         matcher.result()
     }
@@ -332,122 +333,172 @@ mod tests {
     #[test]
     fn test_full_match_dimensions() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
-
-        let dims = vec![
-            ctx.create_dimension("orders.status").unwrap(),
-            ctx.create_dimension("orders.city").unwrap(),
-        ];
-        assert_eq!(run_matcher(&ctx, &pre_agg, dims, vec![]), MatchState::Full);
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                "},
+            ),
+            MatchState::Full,
+        );
     }
 
     #[test]
     fn test_partial_match_unused_dimension() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
-
-        let dims = vec![ctx.create_dimension("orders.status").unwrap()];
         assert_eq!(
-            run_matcher(&ctx, &pre_agg, dims, vec![]),
-            MatchState::Partial
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                "},
+            ),
+            MatchState::Partial,
         );
     }
 
     #[test]
     fn test_not_matched_missing_dimension() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
-
-        let dims = vec![ctx.create_dimension("orders.id").unwrap()];
         assert_eq!(
-            run_matcher(&ctx, &pre_agg, dims, vec![]),
-            MatchState::NotMatched
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.id
+                "},
+            ),
+            MatchState::NotMatched,
         );
     }
 
     #[test]
     fn test_time_dimension_matching() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx, "daily_countries_rollup");
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![ctx.create_dimension("orders.country").unwrap()],
-                vec![ctx
-                    .create_time_dimension("orders.created_at", Some("day"))
-                    .unwrap()],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
             ),
             MatchState::Full,
         );
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![ctx.create_dimension("orders.country").unwrap()],
-                vec![ctx
-                    .create_time_dimension("orders.created_at", Some("month"))
-                    .unwrap()],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: month
+                "},
             ),
             MatchState::Partial,
         );
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![ctx.create_dimension("orders.country").unwrap()],
-                vec![ctx
-                    .create_time_dimension("orders.created_at", Some("hour"))
-                    .unwrap()],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: hour
+                "},
             ),
             MatchState::NotMatched,
         );
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![ctx.create_dimension("orders.country").unwrap()],
-                vec![],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                "},
             ),
             MatchState::Partial,
         );
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![],
-                vec![ctx
-                    .create_time_dimension("orders.created_at", Some("day"))
-                    .unwrap()],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
             ),
             MatchState::Partial,
         );
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![ctx.create_dimension("orders.status").unwrap()],
-                vec![ctx
-                    .create_time_dimension("orders.updated_at", Some("day"))
-                    .unwrap()],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                    time_dimensions:
+                      - dimension: orders.updated_at
+                        granularity: day
+                "},
             ),
             MatchState::NotMatched,
         );
 
         assert_eq!(
-            run_matcher(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                vec![ctx.create_dimension("orders.city").unwrap()],
-                vec![ctx
-                    .create_time_dimension("orders.created_at", Some("day"))
-                    .unwrap()],
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
             ),
             MatchState::NotMatched,
         );
@@ -456,173 +507,130 @@ mod tests {
     #[test]
     fn test_reference_dimension_full_match() {
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
-
-        let dims = vec![
-            ctx.create_dimension("orders.status_ref").unwrap(),
-            ctx.create_dimension("orders.city").unwrap(),
-        ];
-        assert_eq!(run_matcher(&ctx, &pre_agg, dims, vec![]), MatchState::Full);
-    }
-
-    fn run_matcher_with_filters(
-        ctx: &TestContext,
-        pre_agg: &CompiledPreAggregation,
-        dimensions: Vec<Rc<MemberSymbol>>,
-        time_dimensions: Vec<Rc<MemberSymbol>>,
-        filters: &Vec<FilterItem>,
-        time_dimension_filters: &Vec<FilterItem>,
-    ) -> MatchState {
-        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), pre_agg);
-        matcher
-            .try_match(
-                &dimensions,
-                &time_dimensions,
-                filters,
-                time_dimension_filters,
-                &vec![],
-            )
-            .unwrap();
-        matcher.result()
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status_ref
+                      - orders.city
+                "},
+            ),
+            MatchState::Full,
+        );
     }
 
     #[test]
     fn test_compound_dimension_matching() {
         let ctx = create_test_context();
-        let dims = vec![ctx.create_dimension("orders.location_and_status").unwrap()];
+        let query = indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.location_and_status
+        "};
 
-        let pre_agg = compile_pre_agg(&ctx, "compound_dimension_rollup");
         assert_eq!(
-            run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            match_pre_agg(&ctx, "compound_dimension_rollup", query),
             MatchState::Full,
         );
 
-        let pre_agg = compile_pre_agg(&ctx, "base_dimensions_rollup");
         assert_eq!(
-            run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            match_pre_agg(&ctx, "base_dimensions_rollup", query),
             MatchState::Partial,
         );
 
-        let pre_agg = compile_pre_agg(&ctx, "mixed_dimensions_rollup");
         assert_eq!(
-            run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            match_pre_agg(&ctx, "mixed_dimensions_rollup", query),
             MatchState::Partial,
         );
     }
 
     #[test]
     fn test_filter_matching() {
-        use indoc::indoc;
-
         let ctx = create_test_context();
-        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
 
-        // equals filter on pre-agg dimension covers it → Full
-        let qp = ctx
-            .create_query_properties(indoc! {"
-                measures:
-                  - orders.count
-                dimensions:
-                  - orders.city
-                filters:
-                  - dimension: orders.status
-                    operator: equals
-                    values:
-                      - shipped
-            "})
-            .unwrap();
         assert_eq!(
-            run_matcher_with_filters(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                qp.dimensions().clone(),
-                vec![],
-                qp.dimensions_filters(),
-                qp.time_dimensions_filters(),
-            ),
-            MatchState::Full,
-        );
-
-        // non-equals filter matches but doesn't cover → Partial
-        let qp = ctx
-            .create_query_properties(indoc! {"
-                measures:
-                  - orders.count
-                dimensions:
-                  - orders.city
-                filters:
-                  - dimension: orders.status
-                    operator: contains
-                    values:
-                      - ship
-            "})
-            .unwrap();
-        assert_eq!(
-            run_matcher_with_filters(
-                &ctx,
-                &pre_agg,
-                qp.dimensions().clone(),
-                vec![],
-                qp.dimensions_filters(),
-                qp.time_dimensions_filters(),
-            ),
-            MatchState::Partial,
-        );
-
-        // filter on dimension not in pre-agg → NotMatched
-        let qp = ctx
-            .create_query_properties(indoc! {"
-                measures:
-                  - orders.count
-                dimensions:
-                  - orders.status
-                  - orders.city
-                filters:
-                  - dimension: orders.id
-                    operator: gt
-                    values:
-                      - \"5\"
-            "})
-            .unwrap();
-        assert_eq!(
-            run_matcher_with_filters(
-                &ctx,
-                &pre_agg,
-                qp.dimensions().clone(),
-                vec![],
-                qp.dimensions_filters(),
-                qp.time_dimensions_filters(),
-            ),
-            MatchState::NotMatched,
-        );
-
-        // OR group: dimensions matched but not covered → Partial
-        let qp = ctx
-            .create_query_properties(indoc! {"
-                measures:
-                  - orders.count
-                dimensions:
-                  - orders.city
-                filters:
-                  - or:
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    filters:
                       - dimension: orders.status
                         operator: equals
                         values:
                           - shipped
-                      - dimension: orders.status
-                        operator: equals
-                        values:
-                          - processing
-            "})
-            .unwrap();
+                "},
+            ),
+            MatchState::Full,
+        );
+
         assert_eq!(
-            run_matcher_with_filters(
+            match_pre_agg(
                 &ctx,
-                &pre_agg,
-                qp.dimensions().clone(),
-                vec![],
-                qp.dimensions_filters(),
-                qp.time_dimensions_filters(),
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    filters:
+                      - dimension: orders.status
+                        operator: contains
+                        values:
+                          - ship
+                "},
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                    filters:
+                      - dimension: orders.id
+                        operator: gt
+                        values:
+                          - \"5\"
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    filters:
+                      - or:
+                          - dimension: orders.status
+                            operator: equals
+                            values:
+                              - shipped
+                          - dimension: orders.status
+                            operator: equals
+                            values:
+                              - processing
+                "},
             ),
             MatchState::Partial,
         );

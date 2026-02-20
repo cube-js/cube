@@ -74,6 +74,7 @@ impl TestContext {
             .add_measure_evaluator(path.to_string())
     }
 
+    #[allow(dead_code)]
     pub fn create_time_dimension(
         &self,
         path: &str,
