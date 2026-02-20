@@ -15,6 +15,15 @@ cubes:
       - name: city
         type: string
         sql: city
+      - name: status_ref
+        type: string
+        sql: "{status}"
+      - name: location
+        type: string
+        sql: "CONCAT({city}, ', ', {country})"
+      - name: location_and_status
+        type: string
+        sql: "CONCAT({location}, ': ', {status})"
       - name: created_at
         type: time
         sql: created_at
@@ -62,3 +71,30 @@ cubes:
           - country
         time_dimension: created_at
         granularity: day
+
+      - name: compound_dimension_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - location_and_status
+
+      - name: base_dimensions_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - city
+          - country
+          - status
+
+      - name: mixed_dimensions_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - location
+          - status

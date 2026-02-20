@@ -440,4 +440,40 @@ mod tests {
             MatchState::NotMatched,
         );
     }
+
+    #[test]
+    fn test_reference_dimension_full_match() {
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "main_rollup");
+
+        let dims = vec![
+            ctx.create_dimension("orders.status_ref").unwrap(),
+            ctx.create_dimension("orders.city").unwrap(),
+        ];
+        assert_eq!(run_matcher(&ctx, &pre_agg, dims, vec![]), MatchState::Full);
+    }
+
+    #[test]
+    fn test_compound_dimension_matching() {
+        let ctx = create_test_context();
+        let dims = vec![ctx.create_dimension("orders.location_and_status").unwrap()];
+
+        let pre_agg = compile_pre_agg(&ctx, "compound_dimension_rollup");
+        assert_eq!(
+            run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            MatchState::Full,
+        );
+
+        let pre_agg = compile_pre_agg(&ctx, "base_dimensions_rollup");
+        assert_eq!(
+            run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            MatchState::Partial,
+        );
+
+        let pre_agg = compile_pre_agg(&ctx, "mixed_dimensions_rollup");
+        assert_eq!(
+            run_matcher(&ctx, &pre_agg, dims.clone(), vec![]),
+            MatchState::Partial,
+        );
+    }
 }
