@@ -52,6 +52,9 @@ cubes:
       - name: amount_per_count
         type: number
         sql: "{total_amount} / {count}"
+      - name: multi_level_measure
+        type: number
+        sql: "{amount_per_count} / {max_amount}"
     pre_aggregations:
       - name: main_rollup
         type: rollup
@@ -98,3 +101,33 @@ cubes:
         dimensions:
           - location
           - status
+
+      - name: all_base_measures_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - min_amount
+          - max_amount
+          - avg_amount
+          - unique_status_count
+        dimensions:
+          - status
+          - city
+
+      - name: calculated_measure_rollup
+        type: rollup
+        measures:
+          - amount_per_count
+        dimensions:
+          - status
+          - city
+
+      - name: mixed_measure_rollup
+        type: rollup
+        measures:
+          - amount_per_count
+          - max_amount
+        dimensions:
+          - status
+          - city
