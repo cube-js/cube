@@ -351,3 +351,24 @@ fn test_multi_level_mixed_measure_partial_no_match() {
 
     assert!(pre_aggrs.is_empty());
 }
+#[test]
+fn test_base_and_calculated_measure_full_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["base_and_calculated_measure_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.amount_per_count
+            dimensions:
+              - orders.status
+              - orders.city
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
+
+    insta::assert_snapshot!(sql);
+}

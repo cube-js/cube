@@ -133,3 +133,13 @@ cubes:
         dimensions:
           - status
           - city
+
+      - name: base_and_calculated_measure_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - amount_per_count
+        dimensions:
+          - status
+          - city
