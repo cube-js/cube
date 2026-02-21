@@ -404,6 +404,12 @@ impl PreAggregationOptimizer {
             measures: filtered_measures.clone(),
             multiplied_measures: HashSet::new(),
         };
+        // Measures are filtered to only those actually consumed during matching.
+        // This prevents calculated measures (e.g. amount_per_count) from getting a
+        // direct column reference when they should be decomposed to base measures.
+        // Dimensions are intentionally NOT filtered: unlike measures (where
+        // sum(precomputed_ratio) != sum(a)/sum(b)), extra dimension references
+        // are harmless — they're simply unused if the query doesn't select them.
         let pre_aggregation = PreAggregation::builder()
             .name(pre_aggregation.name.clone())
             .time_dimensions(pre_aggregation.time_dimensions.clone())
