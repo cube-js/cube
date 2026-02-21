@@ -1,0 +1,145 @@
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: country
+        type: string
+        sql: city
+      - name: city
+        type: string
+        sql: city
+      - name: status_ref
+        type: string
+        sql: "{status}"
+      - name: location
+        type: string
+        sql: "CONCAT({city}, ', ', {country})"
+      - name: location_and_status
+        type: string
+        sql: "CONCAT({location}, ': ', {status})"
+      - name: created_at
+        type: time
+        sql: created_at
+      - name: updated_at
+        type: time
+        sql: updated_at
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+      - name: total_amount
+        type: sum
+        sql: amount
+      - name: min_amount
+        type: min
+        sql: amount
+      - name: max_amount
+        type: max
+        sql: amount
+      - name: avg_amount
+        type: avg
+        sql: amount
+      - name: unique_status_count
+        type: count_distinct
+        sql: status
+      - name: amount_per_count
+        type: number
+        sql: "{total_amount} / {count}"
+      - name: multi_level_measure
+        type: number
+        sql: "{amount_per_count} / {max_amount}"
+    pre_aggregations:
+      - name: main_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - status
+          - city
+
+      - name: daily_countries_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - country
+        time_dimension: created_at
+        granularity: day
+
+      - name: compound_dimension_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - location_and_status
+
+      - name: base_dimensions_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - city
+          - country
+          - status
+
+      - name: mixed_dimensions_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - location
+          - status
+
+      - name: all_base_measures_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - min_amount
+          - max_amount
+          - avg_amount
+          - unique_status_count
+        dimensions:
+          - status
+          - city
+
+      - name: calculated_measure_rollup
+        type: rollup
+        measures:
+          - multi_level_measure
+        dimensions:
+          - status
+          - city
+
+      - name: mixed_measure_rollup
+        type: rollup
+        measures:
+          - amount_per_count
+          - max_amount
+        dimensions:
+          - status
+          - city
+
+      - name: base_and_calculated_measure_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - amount_per_count
+        dimensions:
+          - status
+          - city

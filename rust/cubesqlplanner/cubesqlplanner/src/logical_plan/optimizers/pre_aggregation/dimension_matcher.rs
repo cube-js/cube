@@ -293,3 +293,366 @@ impl<'a> DimensionMatcher<'a> {
         Ok(res)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::logical_plan::optimizers::pre_aggregation::{
+        PreAggregationFullName, PreAggregationsCompiler,
+    };
+    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::test_utils::TestContext;
+    use indoc::indoc;
+
+    fn create_test_context() -> TestContext {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml");
+        TestContext::new(schema).unwrap()
+    }
+
+    fn match_pre_agg(ctx: &TestContext, pre_agg_name: &str, query_yaml: &str) -> MatchState {
+        let cube_names = vec!["orders".to_string()];
+        let mut compiler =
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
+        let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
+        let pre_agg = compiler.compile_pre_aggregation(&name).unwrap();
+
+        let qp = ctx.create_query_properties(query_yaml).unwrap();
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), &pre_agg);
+        matcher
+            .try_match(
+                qp.dimensions(),
+                qp.time_dimensions(),
+                qp.dimensions_filters(),
+                qp.time_dimensions_filters(),
+                qp.segments(),
+            )
+            .unwrap();
+        matcher.result()
+    }
+
+    #[test]
+    fn test_full_match_dimensions() {
+        let ctx = create_test_context();
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                "},
+            ),
+            MatchState::Full,
+        );
+    }
+
+    #[test]
+    fn test_partial_match_unused_dimension() {
+        let ctx = create_test_context();
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                "},
+            ),
+            MatchState::Partial,
+        );
+    }
+
+    #[test]
+    fn test_not_matched_missing_dimension() {
+        let ctx = create_test_context();
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.id
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+    }
+
+    #[test]
+    fn test_time_dimension_matching() {
+        let ctx = create_test_context();
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+            ),
+            MatchState::Full,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: month
+                "},
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: hour
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                "},
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                    time_dimensions:
+                      - dimension: orders.updated_at
+                        granularity: day
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+    }
+
+    #[test]
+    fn test_reference_dimension_full_match() {
+        let ctx = create_test_context();
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status_ref
+                      - orders.city
+                "},
+            ),
+            MatchState::Full,
+        );
+    }
+
+    #[test]
+    fn test_compound_dimension_matching() {
+        let ctx = create_test_context();
+        let query = indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.location_and_status
+        "};
+
+        assert_eq!(
+            match_pre_agg(&ctx, "compound_dimension_rollup", query),
+            MatchState::Full,
+        );
+
+        assert_eq!(
+            match_pre_agg(&ctx, "base_dimensions_rollup", query),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(&ctx, "mixed_dimensions_rollup", query),
+            MatchState::Partial,
+        );
+    }
+
+    #[test]
+    fn test_filter_matching() {
+        let ctx = create_test_context();
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    filters:
+                      - dimension: orders.status
+                        operator: equals
+                        values:
+                          - shipped
+                "},
+            ),
+            MatchState::Full,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.city
+                    filters:
+                      - dimension: orders.status
+                        operator: contains
+                        values:
+                          - ship
+                "},
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                    filters:
+                      - dimension: orders.id
+                        operator: gt
+                        values:
+                          - \"5\"
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    filters:
+                      - or:
+                          - dimension: orders.status
+                            operator: equals
+                            values:
+                              - shipped
+                          - dimension: orders.status
+                            operator: equals
+                            values:
+                              - processing
+                "},
+            ),
+            MatchState::Partial,
+        );
+
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    filters:
+                      - and:
+                          - dimension: orders.status
+                            operator: equals
+                            values:
+                              - shipped
+                          - dimension: orders.city
+                            operator: equals
+                            values:
+                              - New York
+                "},
+            ),
+            MatchState::Full,
+        );
+    }
+}

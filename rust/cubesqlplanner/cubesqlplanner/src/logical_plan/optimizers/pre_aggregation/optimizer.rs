@@ -68,9 +68,14 @@ impl PreAggregationOptimizer {
         query: &Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        if self.is_schema_and_filters_match(&query.schema(), &query.filter(), pre_aggregation)? {
+        if let Some(matched_measures) =
+            self.is_schema_and_filters_match(&query.schema(), &query.filter(), pre_aggregation)?
+        {
             let mut new_query = query.as_ref().clone();
-            new_query.set_source(self.make_pre_aggregation_source(pre_aggregation)?.into());
+            new_query.set_source(
+                self.make_pre_aggregation_source(pre_aggregation, &matched_measures)?
+                    .into(),
+            );
             Ok(Some(Rc::new(new_query)))
         } else {
             Ok(None)
@@ -131,13 +136,13 @@ impl PreAggregationOptimizer {
                     resolver_multiplied_measures,
                 ) = resolver_multiplied_measures
                 {
-                    if self.is_schema_and_filters_match(
+                    if let Some(matched_measures) = self.is_schema_and_filters_match(
                         &resolver_multiplied_measures.schema,
                         &resolver_multiplied_measures.filter,
                         &pre_aggregation,
                     )? {
                         let pre_aggregation_source =
-                            self.make_pre_aggregation_source(pre_aggregation)?;
+                            self.make_pre_aggregation_source(pre_aggregation, &matched_measures)?;
 
                         let pre_aggregation_query = Query::builder()
                             .schema(resolver_multiplied_measures.schema.clone())
@@ -380,7 +385,14 @@ impl PreAggregationOptimizer {
     fn make_pre_aggregation_source(
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
+        matched_measures: &HashSet<String>,
     ) -> Result<Rc<PreAggregation>, CubeError> {
+        let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
+            .measures
+            .iter()
+            .filter(|m| matched_measures.contains(&m.full_name()))
+            .cloned()
+            .collect();
         let schema = LogicalSchema {
             time_dimensions: vec![],
             dimensions: pre_aggregation
@@ -389,14 +401,20 @@ impl PreAggregationOptimizer {
                 .cloned()
                 .chain(pre_aggregation.time_dimensions.iter().map(|d| d.clone()))
                 .collect(),
-            measures: pre_aggregation.measures.to_vec(),
+            measures: filtered_measures.clone(),
             multiplied_measures: HashSet::new(),
         };
+        // Measures are filtered to only those actually consumed during matching.
+        // This prevents calculated measures (e.g. amount_per_count) from getting a
+        // direct column reference when they should be decomposed to base measures.
+        // Dimensions are intentionally NOT filtered: unlike measures (where
+        // sum(precomputed_ratio) != sum(a)/sum(b)), extra dimension references
+        // are harmless — they're simply unused if the query doesn't select them.
         let pre_aggregation = PreAggregation::builder()
             .name(pre_aggregation.name.clone())
             .time_dimensions(pre_aggregation.time_dimensions.clone())
             .dimensions(pre_aggregation.dimensions.clone())
-            .measures(pre_aggregation.measures.clone())
+            .measures(filtered_measures)
             .schema(Rc::new(schema))
             .external(pre_aggregation.external.unwrap_or_default())
             .granularity(pre_aggregation.granularity.clone())
@@ -416,7 +434,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<bool, CubeError> {
+    ) -> Result<Option<HashSet<String>>, CubeError> {
         let helper = OptimizerHelper::new();
 
         let match_state = self.match_dimensions(
@@ -430,17 +448,16 @@ impl PreAggregationOptimizer {
 
         let all_measures = helper.all_measures(schema, filters);
         if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
-            return Ok(false);
+            return Ok(None);
         }
         if match_state == MatchState::NotMatched {
-            return Ok(false);
+            return Ok(None);
         }
-        let measures_match = self.try_match_measures(
+        self.try_match_measures(
             &all_measures,
             pre_aggregation,
             match_state == MatchState::Partial,
-        )?;
-        Ok(measures_match)
+        )
     }
 
     fn try_match_measures(
@@ -448,14 +465,14 @@ impl PreAggregationOptimizer {
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
         only_addictive: bool,
-    ) -> Result<bool, CubeError> {
-        let matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
+    ) -> Result<Option<HashSet<String>>, CubeError> {
+        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {
-                return Ok(false);
+                return Ok(None);
             }
         }
-        Ok(true)
+        Ok(Some(matcher.matched_measures().clone()))
     }
 
     fn match_dimensions(

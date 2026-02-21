@@ -2,10 +2,10 @@ use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::logical_plan::PreAggregation;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor, TimeDimensionSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::QueryProperties;
+use crate::planner::{GranularityHelper, QueryProperties};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockSchema, MockSecurityContext,
@@ -72,6 +72,30 @@ impl TestContext {
             .evaluator_compiler()
             .borrow_mut()
             .add_measure_evaluator(path.to_string())
+    }
+
+    #[allow(dead_code)]
+    pub fn create_time_dimension(
+        &self,
+        path: &str,
+        granularity: Option<&str>,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let mut compiler = self.query_tools.evaluator_compiler().borrow_mut();
+        let base_symbol = compiler.add_dimension_evaluator(path.to_string())?;
+        let granularity = granularity.map(|g| g.to_string());
+        let granularity_obj = GranularityHelper::make_granularity_obj(
+            self.query_tools.cube_evaluator().clone(),
+            &mut compiler,
+            &base_symbol.cube_name(),
+            &base_symbol.name(),
+            granularity.clone(),
+        )?;
+        Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            base_symbol,
+            granularity,
+            granularity_obj,
+            None,
+        )))
     }
 
     pub fn evaluate_symbol(&self, symbol: &Rc<MemberSymbol>) -> Result<String, CubeError> {
@@ -197,6 +221,11 @@ impl TestContext {
                 )
                 .build(),
         )
+    }
+
+    pub fn create_query_properties(&self, yaml: &str) -> Result<Rc<QueryProperties>, CubeError> {
+        let options = self.create_query_options_from_yaml(yaml);
+        QueryProperties::try_new(self.query_tools.clone(), options)
     }
 
     #[allow(dead_code)]
