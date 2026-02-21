@@ -143,7 +143,9 @@ describe('PreAggregationsMultiStage', () => {
   it('calculated measure pre-aggregation', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
-        'visitors.average'
+        'visitors.average',
+        'visitors.revenue',
+        'visitors.count'
       ],
       dimensions: [
           'visitors.source'

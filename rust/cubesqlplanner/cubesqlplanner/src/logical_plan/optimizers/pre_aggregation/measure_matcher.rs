@@ -179,4 +179,42 @@ mod tests {
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
     }
+
+    #[test]
+    fn test_matched_measures_full_match() {
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "base_and_calculated_measure_rollup");
+
+        // Full match (not only_additive) — calculated measure consumed directly
+        let mut matcher = MeasureMatcher::new(&pre_agg, false);
+        assert!(matcher
+            .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
+            .unwrap());
+        assert!(matcher
+            .matched_measures()
+            .contains("orders.amount_per_count"));
+        assert!(!matcher.matched_measures().contains("orders.count"));
+        assert!(!matcher
+            .matched_measures()
+            .contains("orders.total_amount"));
+    }
+
+    #[test]
+    fn test_matched_measures_partial_match() {
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "base_and_calculated_measure_rollup");
+
+        // Partial match (only_additive) — calculated measure decomposed to base deps
+        let mut matcher = MeasureMatcher::new(&pre_agg, true);
+        assert!(matcher
+            .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
+            .unwrap());
+        assert!(!matcher
+            .matched_measures()
+            .contains("orders.amount_per_count"));
+        assert!(matcher.matched_measures().contains("orders.count"));
+        assert!(matcher
+            .matched_measures()
+            .contains("orders.total_amount"));
+    }
 }
