@@ -120,7 +120,7 @@ cubes:
       - name: calculated_measure_rollup
         type: rollup
         measures:
-          - amount_per_count
+          - multi_level_measure
         dimensions:
           - status
           - city

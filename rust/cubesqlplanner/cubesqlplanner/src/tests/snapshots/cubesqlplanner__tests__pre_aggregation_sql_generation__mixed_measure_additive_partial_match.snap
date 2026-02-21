@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__status" "orders__status", max("orders__max_amount") "orders__max_amount" 
+FROM  orders__mixed_measure_rollup  AS "orders__mixed_measure_rollup"
+GROUP BY 1
+ORDER BY  2  DESC

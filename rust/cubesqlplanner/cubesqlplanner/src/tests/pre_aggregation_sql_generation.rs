@@ -226,3 +226,128 @@ fn test_daily_rollup_non_additive_coarser_granularity_no_match() {
 
     assert!(pre_aggrs.is_empty());
 }
+
+// --- multi_level_measure across different pre-aggregations ---
+
+#[test]
+fn test_multi_level_all_base_measures_full_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["all_base_measures_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.multi_level_measure
+            dimensions:
+              - orders.status
+              - orders.city
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_multi_level_all_base_measures_partial_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["all_base_measures_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.multi_level_measure
+            dimensions:
+              - orders.status
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_multi_level_calculated_measure_no_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["calculated_measure_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.multi_level_measure
+            dimensions:
+              - orders.status
+        "})
+        .unwrap();
+
+    assert!(pre_aggrs.is_empty());
+}
+
+#[test]
+fn test_multi_level_calculated_measure_full_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["calculated_measure_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.multi_level_measure
+            dimensions:
+              - orders.status
+              - orders.city
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "calculated_measure_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_multi_level_mixed_measure_full_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["mixed_measure_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.multi_level_measure
+            dimensions:
+              - orders.status
+              - orders.city
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "mixed_measure_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_multi_level_mixed_measure_partial_no_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["mixed_measure_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.multi_level_measure
+            dimensions:
+              - orders.status
+        "})
+        .unwrap();
+
+    assert!(pre_aggrs.is_empty());
+}

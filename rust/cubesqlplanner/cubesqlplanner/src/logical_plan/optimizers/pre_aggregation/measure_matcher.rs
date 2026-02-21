@@ -136,12 +136,12 @@ mod tests {
 
         let matcher = MeasureMatcher::new(&pre_agg, false);
         assert!(matcher
-            .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
+            .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
 
         let additive_matcher = MeasureMatcher::new(&pre_agg, true);
         assert!(!additive_matcher
-            .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
+            .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
     }
 
