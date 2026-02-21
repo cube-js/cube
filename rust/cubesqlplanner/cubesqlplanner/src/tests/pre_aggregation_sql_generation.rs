@@ -372,3 +372,25 @@ fn test_base_and_calculated_measure_full_match() {
 
     insta::assert_snapshot!(sql);
 }
+
+#[test]
+fn test_base_and_calculated_measure_parital_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["base_and_calculated_measure_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.amount_per_count
+            dimensions:
+              - orders.status
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
+    println!("SQL: {}", sql);
+
+    //insta::assert_snapshot!(sql);
+}
