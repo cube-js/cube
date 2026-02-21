@@ -194,9 +194,7 @@ mod tests {
             .matched_measures()
             .contains("orders.amount_per_count"));
         assert!(!matcher.matched_measures().contains("orders.count"));
-        assert!(!matcher
-            .matched_measures()
-            .contains("orders.total_amount"));
+        assert!(!matcher.matched_measures().contains("orders.total_amount"));
     }
 
     #[test]
@@ -213,8 +211,6 @@ mod tests {
             .matched_measures()
             .contains("orders.amount_per_count"));
         assert!(matcher.matched_measures().contains("orders.count"));
-        assert!(matcher
-            .matched_measures()
-            .contains("orders.total_amount"));
+        assert!(matcher.matched_measures().contains("orders.total_amount"));
     }
 }
