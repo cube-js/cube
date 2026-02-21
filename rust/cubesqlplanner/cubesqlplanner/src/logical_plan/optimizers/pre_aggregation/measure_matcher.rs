@@ -6,6 +6,7 @@ use std::rc::Rc;
 pub struct MeasureMatcher {
     only_addictive: bool,
     pre_aggregation_measures: HashSet<String>,
+    matched_measures: HashSet<String>,
 }
 
 impl MeasureMatcher {
@@ -18,15 +19,21 @@ impl MeasureMatcher {
         Self {
             only_addictive,
             pre_aggregation_measures,
+            matched_measures: HashSet::new(),
         }
     }
 
-    pub fn try_match(&self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+    pub fn matched_measures(&self) -> &HashSet<String> {
+        &self.matched_measures
+    }
+
+    pub fn try_match(&mut self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         match symbol.as_ref() {
             MemberSymbol::Measure(measure) => {
                 if self.pre_aggregation_measures.contains(&measure.full_name())
                     && (!self.only_addictive || measure.is_addictive())
                 {
+                    self.matched_measures.insert(measure.full_name());
                     return Ok(true);
                 }
             }
@@ -75,7 +82,7 @@ mod tests {
     fn test_measure_matching() {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "all_base_measures_rollup");
-        let matcher = MeasureMatcher::new(&pre_agg, false);
+        let mut matcher = MeasureMatcher::new(&pre_agg, false);
 
         assert!(matcher
             .try_match(&ctx.create_measure("orders.count").unwrap())
@@ -104,7 +111,7 @@ mod tests {
     fn test_measure_matching_only_additive() {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "all_base_measures_rollup");
-        let matcher = MeasureMatcher::new(&pre_agg, true);
+        let mut matcher = MeasureMatcher::new(&pre_agg, true);
 
         assert!(matcher
             .try_match(&ctx.create_measure("orders.count").unwrap())
@@ -134,12 +141,12 @@ mod tests {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "calculated_measure_rollup");
 
-        let matcher = MeasureMatcher::new(&pre_agg, false);
+        let mut matcher = MeasureMatcher::new(&pre_agg, false);
         assert!(matcher
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
 
-        let additive_matcher = MeasureMatcher::new(&pre_agg, true);
+        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true);
         assert!(!additive_matcher
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
@@ -150,7 +157,7 @@ mod tests {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "mixed_measure_rollup");
 
-        let matcher = MeasureMatcher::new(&pre_agg, false);
+        let mut matcher = MeasureMatcher::new(&pre_agg, false);
         assert!(matcher
             .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
             .unwrap());
@@ -161,7 +168,7 @@ mod tests {
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
 
-        let additive_matcher = MeasureMatcher::new(&pre_agg, true);
+        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true);
         assert!(!additive_matcher
             .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
             .unwrap());

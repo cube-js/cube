@@ -390,7 +390,6 @@ fn test_base_and_calculated_measure_parital_match() {
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
-    println!("SQL: {}", sql);
 
-    //insta::assert_snapshot!(sql);
+    insta::assert_snapshot!(sql);
 }
