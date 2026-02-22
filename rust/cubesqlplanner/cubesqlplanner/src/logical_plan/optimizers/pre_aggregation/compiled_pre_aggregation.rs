@@ -47,6 +47,7 @@ pub struct CompiledPreAggregation {
     pub measures: Vec<Rc<MemberSymbol>>,
     pub dimensions: Vec<Rc<MemberSymbol>>,
     pub time_dimensions: Vec<Rc<MemberSymbol>>,
+    pub segments: Vec<Rc<MemberSymbol>>,
     pub allow_non_strict_date_range_match: bool,
 }
 
@@ -60,6 +61,7 @@ impl Debug for CompiledPreAggregation {
             .field("measures", &self.measures)
             .field("dimensions", &self.dimensions)
             .field("time_dimensions", &self.time_dimensions)
+            .field("segments", &self.segments)
             .field(
                 "allow_non_strict_date_range_match",
                 &self.allow_non_strict_date_range_match,

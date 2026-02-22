@@ -393,3 +393,102 @@ fn test_base_and_calculated_measure_parital_match() {
 
     insta::assert_snapshot!(sql);
 }
+
+// --- Segment matching tests ---
+
+#[test]
+fn test_segment_full_match() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["segment_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+            segments:
+              - orders.high_priority
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: day
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "segment_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_segment_partial_match_unused_segment() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["segment_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: day
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "segment_rollup");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_segment_no_match_missing_in_pre_agg() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["main_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+              - orders.city
+            segments:
+              - orders.high_priority
+        "})
+        .unwrap();
+
+    assert!(pre_aggrs.is_empty());
+}
+
+#[test]
+fn test_segment_with_coarser_granularity() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["segment_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+            segments:
+              - orders.high_priority
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: month
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "segment_rollup");
+
+    insta::assert_snapshot!(sql);
+}

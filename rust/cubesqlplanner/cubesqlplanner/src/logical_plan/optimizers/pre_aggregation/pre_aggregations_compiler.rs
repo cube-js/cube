@@ -165,6 +165,16 @@ impl PreAggregationsCompiler {
         } else {
             Vec::new()
         };
+        let segments = if let Some(refs) = description.segment_references()? {
+            Self::symbols_from_ref(
+                self.query_tools.clone(),
+                &name.cube_name,
+                refs,
+                Self::check_is_segment,
+            )?
+        } else {
+            Vec::new()
+        };
         let allow_non_strict_date_range_match = description
             .static_data()
             .allow_non_strict_date_range_match
@@ -208,6 +218,7 @@ impl PreAggregationsCompiler {
             measures,
             dimensions,
             time_dimensions,
+            segments,
             allow_non_strict_date_range_match,
         });
         self.compiled_cache.insert(name.clone(), res.clone());
@@ -265,6 +276,7 @@ impl PreAggregationsCompiler {
         let measures = pre_aggrs_for_lambda[0].measures.clone();
         let dimensions = pre_aggrs_for_lambda[0].dimensions.clone();
         let time_dimensions = pre_aggrs_for_lambda[0].time_dimensions.clone();
+        let segments = pre_aggrs_for_lambda[0].segments.clone();
         let allow_non_strict_date_range_match = description
             .static_data()
             .allow_non_strict_date_range_match
@@ -282,6 +294,7 @@ impl PreAggregationsCompiler {
             measures,
             dimensions,
             time_dimensions,
+            segments,
             allow_non_strict_date_range_match,
         });
         self.compiled_cache.insert(name.clone(), res.clone());
@@ -502,6 +515,15 @@ impl PreAggregationsCompiler {
                 "Pre-aggregation time dimension must be a dimension"
             )));
         }
+        Ok(())
+    }
+
+    fn check_is_segment(symbol: &MemberSymbol) -> Result<(), CubeError> {
+        symbol.as_member_expression().map_err(|_| {
+            CubeError::user(
+                "Pre-aggregation segment reference must be a member expression".to_string(),
+            )
+        })?;
         Ok(())
     }
 }
@@ -758,5 +780,40 @@ mod tests {
 
         let result2 = PreAggregationFullName::from_string("too.many.parts");
         assert!(result2.is_err());
+    }
+
+    #[test]
+    fn test_compile_rollup_with_segments() {
+        let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["orders".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name =
+            PreAggregationFullName::new("orders".to_string(), "segment_rollup".to_string());
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        assert_eq!(compiled.name, "segment_rollup");
+        assert_eq!(compiled.cube_name, "orders");
+        assert_eq!(compiled.granularity, Some("day".to_string()));
+
+        // Check segments
+        assert_eq!(compiled.segments.len(), 1);
+        assert_eq!(
+            compiled.segments[0].full_name(),
+            "expr:orders.high_priority"
+        );
+
+        // Check measures
+        assert_eq!(compiled.measures.len(), 2);
+        let measure_names: Vec<String> = compiled.measures.iter().map(|m| m.full_name()).collect();
+        assert!(measure_names.contains(&"orders.count".to_string()));
+        assert!(measure_names.contains(&"orders.total_amount".to_string()));
+
+        // Check dimensions
+        assert_eq!(compiled.dimensions.len(), 1);
+        assert_eq!(compiled.dimensions[0].full_name(), "orders.status");
     }
 }

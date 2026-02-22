@@ -108,7 +108,9 @@ fn simple_segment_sql_evaluation() {
     let context = TestContext::new(schema).unwrap();
 
     let segment = context.create_segment("test_cube.is_active").unwrap();
-    let sql = context.evaluate_symbol(&segment.member_evaluator()).unwrap();
+    let sql = context
+        .evaluate_symbol(&segment.member_evaluator())
+        .unwrap();
     assert_eq!(sql, r#""test_cube".status = 'active'"#);
 }
 

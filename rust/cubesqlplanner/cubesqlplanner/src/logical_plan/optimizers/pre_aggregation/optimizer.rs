@@ -399,7 +399,8 @@ impl PreAggregationOptimizer {
                 .dimensions
                 .iter()
                 .cloned()
-                .chain(pre_aggregation.time_dimensions.iter().map(|d| d.clone()))
+                .chain(pre_aggregation.time_dimensions.iter().cloned())
+                .chain(pre_aggregation.segments.iter().cloned())
                 .collect(),
             measures: filtered_measures.clone(),
             multiplied_measures: HashSet::new(),
