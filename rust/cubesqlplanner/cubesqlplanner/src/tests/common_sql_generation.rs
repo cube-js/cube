@@ -128,3 +128,28 @@ fn test_simple_segment_sql() {
 
     insta::assert_snapshot!(sql);
 }
+
+#[test]
+fn test_segment_as_dimension_in_pre_aggregation_query() {
+    let schema = MockSchema::from_yaml_file("common/simple.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - customers.count
+        segments:
+          - customers.new_york
+        pre_aggregation_query: true
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with segment as dimension");
+
+    assert!(
+        !sql.contains("WHERE"),
+        "Segment should not be in WHERE clause for pre-aggregation query"
+    );
+
+    insta::assert_snapshot!(sql);
+}

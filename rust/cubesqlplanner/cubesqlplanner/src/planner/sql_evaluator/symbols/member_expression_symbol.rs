@@ -23,6 +23,7 @@ pub struct MemberExpressionSymbol {
     #[allow(dead_code)]
     definition: Option<String>,
     is_reference: bool,
+    parenthesized: bool,
 }
 
 impl MemberExpressionSymbol {
@@ -43,6 +44,7 @@ impl MemberExpressionSymbol {
             expression,
             definition,
             is_reference,
+            parenthesized: false,
         }))
     }
 
@@ -61,7 +63,17 @@ impl MemberExpressionSymbol {
                 visitor.apply(symbol, node_processor, templates)?
             }
         };
-        Ok(sql)
+        if self.parenthesized {
+            Ok(format!("({})", sql))
+        } else {
+            Ok(sql)
+        }
+    }
+
+    pub fn with_parenthesized(self: &Rc<Self>) -> Rc<Self> {
+        let mut result = self.as_ref().clone();
+        result.parenthesized = true;
+        Rc::new(result)
     }
 
     pub fn full_name(&self) -> String {
