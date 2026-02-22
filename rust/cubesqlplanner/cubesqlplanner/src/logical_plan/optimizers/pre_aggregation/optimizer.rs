@@ -415,6 +415,7 @@ impl PreAggregationOptimizer {
             .name(pre_aggregation.name.clone())
             .time_dimensions(pre_aggregation.time_dimensions.clone())
             .dimensions(pre_aggregation.dimensions.clone())
+            .segments(pre_aggregation.segments.clone())
             .measures(filtered_measures)
             .schema(Rc::new(schema))
             .external(pre_aggregation.external.unwrap_or_default())

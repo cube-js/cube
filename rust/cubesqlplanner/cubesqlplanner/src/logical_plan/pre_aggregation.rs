@@ -1,5 +1,8 @@
 use super::*;
-use crate::{plan::QualifiedColumnName, planner::sql_evaluator::MemberSymbol};
+use crate::{
+    plan::QualifiedColumnName,
+    planner::{sql_evaluator::MemberSymbol, sql_templates::PlanSqlTemplates},
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::{collections::HashMap, rc::Rc};
@@ -15,6 +18,8 @@ pub struct PreAggregation {
     dimensions: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
     time_dimensions: Vec<Rc<MemberSymbol>>,
+    #[builder(default)]
+    segments: Vec<Rc<MemberSymbol>>,
     external: bool,
     #[builder(default)]
     granularity: Option<String>,
@@ -41,6 +46,10 @@ impl PreAggregation {
 
     pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
+    }
+
+    pub fn segments(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.segments
     }
 
     pub fn external(&self) -> bool {
@@ -113,6 +122,12 @@ impl PreAggregation {
                 base_symbol.full_name(),
                 QualifiedColumnName::new(None, alias.clone()),
             );
+        }
+
+        for segment in self.segments().iter() {
+            let me = segment.as_member_expression().unwrap();
+            let alias = PlanSqlTemplates::member_alias_name(me.cube_name(), me.name(), &None);
+            res.insert(segment.full_name(), QualifiedColumnName::new(None, alias));
         }
 
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
