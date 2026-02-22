@@ -1,5 +1,6 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::logical_plan::PreAggregation;
+use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor, TimeDimensionSymbol};
@@ -72,6 +73,32 @@ impl TestContext {
             .evaluator_compiler()
             .borrow_mut()
             .add_measure_evaluator(path.to_string())
+    }
+
+    pub fn create_segment(&self, path: &str) -> Result<Rc<BaseSegment>, CubeError> {
+        let mut iter = self
+            .query_tools
+            .cube_evaluator()
+            .parse_path("segments".to_string(), path.to_string())?
+            .into_iter();
+        let cube_name = iter.next().unwrap();
+        let name = iter.next().unwrap();
+        let definition = self
+            .query_tools
+            .cube_evaluator()
+            .segment_by_path(path.to_string())?;
+        let expression = self
+            .query_tools
+            .evaluator_compiler()
+            .borrow_mut()
+            .compile_sql_call(&cube_name, definition.sql()?)?;
+        BaseSegment::try_new(
+            expression,
+            cube_name,
+            name,
+            Some(path.to_string()),
+            self.query_tools.clone(),
+        )
     }
 
     #[allow(dead_code)]
