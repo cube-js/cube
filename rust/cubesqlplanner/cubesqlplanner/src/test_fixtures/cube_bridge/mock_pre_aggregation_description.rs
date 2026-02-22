@@ -28,6 +28,8 @@ pub struct MockPreAggregationDescription {
     dimension_references: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = time_dimension_reference_opt)))]
     time_dimension_reference: Option<Rc<dyn MemberSql>>,
+    #[builder(default, setter(strip_option(fallback = segment_references_opt)))]
+    segment_references: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = rollup_references_opt)))]
     rollup_references: Option<Rc<dyn MemberSql>>,
 }
@@ -68,6 +70,14 @@ impl PreAggregationDescription for MockPreAggregationDescription {
 
     fn time_dimension_reference(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
         Ok(self.time_dimension_reference.clone())
+    }
+
+    fn has_segment_references(&self) -> Result<bool, CubeError> {
+        Ok(self.segment_references.is_some())
+    }
+
+    fn segment_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+        Ok(self.segment_references.clone())
     }
 
     fn has_rollup_references(&self) -> Result<bool, CubeError> {
