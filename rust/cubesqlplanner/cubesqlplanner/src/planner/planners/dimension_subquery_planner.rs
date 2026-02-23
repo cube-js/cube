@@ -88,6 +88,7 @@ impl DimensionSubqueryPlanner {
             dim_name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             None,
+            None,
             self.query_tools.base_tools().clone(),
         )?;
         let measure = MemberSymbol::new_member_expression(member_expression_symbol);

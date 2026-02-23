@@ -8,6 +8,7 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 pub enum SymbolPathType {
     Dimension,
     Measure,
+    Segment,
 }
 
 #[derive(Debug, Clone)]
@@ -60,9 +61,11 @@ impl SymbolPath {
             SymbolPathType::Dimension
         } else if cube_evaluator.is_measure(path_to_check.clone())? {
             SymbolPathType::Measure
+        } else if cube_evaluator.is_segment(path_to_check.clone())? {
+            SymbolPathType::Segment
         } else {
             return Err(CubeError::user(format!(
-                "Symbol path doesn't refer to a dimension or measure: {}",
+                "Symbol path doesn't refer to a dimension, measure or segment: {}",
                 path
             )));
         };

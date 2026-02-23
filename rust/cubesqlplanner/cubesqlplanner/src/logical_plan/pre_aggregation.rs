@@ -1,8 +1,5 @@
 use super::*;
-use crate::{
-    plan::QualifiedColumnName,
-    planner::{sql_evaluator::MemberSymbol, sql_templates::PlanSqlTemplates},
-};
+use crate::{plan::QualifiedColumnName, planner::sql_evaluator::MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::{collections::HashMap, rc::Rc};
@@ -125,8 +122,7 @@ impl PreAggregation {
         }
 
         for segment in self.segments().iter() {
-            let me = segment.as_member_expression().unwrap();
-            let alias = PlanSqlTemplates::member_alias_name(me.cube_name(), me.name(), &None);
+            let alias = segment.alias();
             res.insert(segment.full_name(), QualifiedColumnName::new(None, alias));
         }
 

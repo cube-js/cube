@@ -134,10 +134,12 @@ fn test_segment_as_dimension_in_pre_aggregation_query() {
     let schema = MockSchema::from_yaml_file("common/simple.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
+    // In JS, evaluatePreAggregationReferences() concatenates segments into dimensions
+    // before sending the query. So segments arrive as dimensions, not as segments.
     let query_yaml = indoc! {"
         measures:
           - customers.count
-        segments:
+        dimensions:
           - customers.new_york
         pre_aggregation_query: true
     "};

@@ -802,7 +802,6 @@ export class BaseQuery {
     } else {
       sql = this.fullKeyQueryAggregate();
     }
-    console.log('sql: ', sql);
     return this.options.totalQuery
       ? this.countAllQuery(sql)
       : sql;

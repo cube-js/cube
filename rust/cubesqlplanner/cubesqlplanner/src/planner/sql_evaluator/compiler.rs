@@ -1,6 +1,7 @@
 use super::collectors::JoinHintsCollector;
 use super::symbols::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use super::SymbolPath;
+use super::SymbolPathType;
 use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
@@ -11,6 +12,7 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::sql_evaluator::sql_call_builder::SqlCallBuilder;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -95,7 +97,14 @@ impl Compiler {
         dimension: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
-        self.add_dimension_evaluator_impl(path)
+        match path.path_type() {
+            SymbolPathType::Segment => {
+                let symbol = self.add_segment_evaluator(path.full_name().clone())?;
+                let me = symbol.as_member_expression()?;
+                Ok(MemberSymbol::new_member_expression(me.with_parenthesized()))
+            }
+            _ => self.add_dimension_evaluator_impl(path),
+        }
     }
 
     fn add_dimension_evaluator_impl(
@@ -123,11 +132,13 @@ impl Compiler {
         let member_name = path[1].clone();
         let definition = self.cube_evaluator.segment_by_path(name.clone())?;
         let sql_call = self.compile_sql_call(&cube_name, definition.sql()?)?;
+        let alias = PlanSqlTemplates::member_alias_name(&cube_name, &member_name, &None);
         let symbol = MemberExpressionSymbol::try_new(
             cube_name,
             member_name,
             MemberExpressionExpression::SqlCall(sql_call),
             None,
+            Some(alias),
             self.base_tools.clone(),
         )?;
         let result = MemberSymbol::new_member_expression(symbol);

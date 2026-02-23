@@ -153,6 +153,7 @@ impl QueryProperties {
                             name.clone(),
                             MemberExpressionExpression::SqlCall(expression_call),
                             member_expression.static_data().definition.clone(),
+                            None,
                             query_tools.base_tools().clone(),
                         )?;
                         Ok(MemberSymbol::new_member_expression(
@@ -262,6 +263,7 @@ impl QueryProperties {
                             name.clone(),
                             expression,
                             member_expression.static_data().definition.clone(),
+                            None,
                             query_tools.base_tools().clone(),
                         )?;
                         Ok(MemberSymbol::new_member_expression(member_expression_symbol))
@@ -409,26 +411,7 @@ impl QueryProperties {
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
 
-        // In pre-aggregation queries, segments become dimensions (SELECT/GROUP BY)
-        // instead of WHERE filters, so the pre-aggregation table stores both
-        // segment=true and segment=false rows for query-time filtering.
-        let (segments, dimensions) = if pre_aggregation_query {
-            let segment_dimensions: Vec<Rc<MemberSymbol>> = segments
-                .into_iter()
-                .map(|fi| match fi {
-                    FilterItem::Segment(seg) => {
-                        let expr = seg.member_evaluator().as_member_expression().unwrap();
-                        MemberSymbol::new_member_expression(expr.with_parenthesized())
-                    }
-                    _ => unreachable!(),
-                })
-                .collect();
-            let mut all_dimensions = dimensions;
-            all_dimensions.extend(segment_dimensions);
-            (Vec::new(), all_dimensions)
-        } else {
-            (segments, dimensions)
-        };
+
 
         let mut res = Self {
             measures,
