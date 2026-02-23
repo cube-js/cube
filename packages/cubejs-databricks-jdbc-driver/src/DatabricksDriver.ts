@@ -249,6 +249,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
 
     const config: DatabricksDriverConfiguration = {
+      readOnly: true,
       ...conf,
       url: cleanedUrl,
       dbType: 'databricks',
@@ -307,10 +308,6 @@ export class DatabricksDriver extends JDBCDriver {
         conf?.gcsCredentials ||
         getEnv('dbExportGCSCredentials', { dataSource }),
     };
-    if (config.readOnly === undefined) {
-      // we can set readonly to true if there is no bucket config provided
-      config.readOnly = !config.exportBucket;
-    }
 
     super(config);
     this.config = config;
@@ -912,19 +909,15 @@ export class DatabricksDriver extends JDBCDriver {
       select = `SELECT ${this.generateTableColumnsForExport(columns)} FROM (${sql})`;
     }
 
-    try {
-      await this.query(
-        `
-        CREATE TABLE ${tableFullName}_tmp
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
-        OPTIONS (escape = '"')
-        AS (${select});
-        `,
-        params,
-      );
-    } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
-    }
+    await this.query(
+      `
+      INSERT OVERWRITE DIRECTORY '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
+      USING CSV
+      OPTIONS (escape '"')
+      ${select}
+      `,
+      params,
+    );
   }
 
   /**
