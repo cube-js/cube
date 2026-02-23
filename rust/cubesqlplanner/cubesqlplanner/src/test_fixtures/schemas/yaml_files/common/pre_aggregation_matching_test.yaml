@@ -33,6 +33,8 @@ cubes:
     segments:
       - name: high_priority
         sql: "priority = 'high'"
+      - name: status_filter
+        sql: "{CUBE.status} IS NOT NULL"
     measures:
       - name: count
         type: count

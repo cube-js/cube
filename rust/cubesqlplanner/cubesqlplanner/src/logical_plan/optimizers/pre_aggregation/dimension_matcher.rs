@@ -163,7 +163,21 @@ impl<'a> DimensionMatcher<'a> {
                     }
                     Ok(MatchState::Full)
                 } else {
-                    Ok(MatchState::NotMatched)
+                    let dependencies = me.get_dependencies();
+                    if dependencies.is_empty() {
+                        Ok(MatchState::NotMatched)
+                    } else {
+                        let mut result = MatchState::Partial;
+                        for dep in dependencies {
+                            let dep_match =
+                                self.try_match_symbol(&dep, add_to_matched_dimension)?;
+                            if dep_match == MatchState::NotMatched {
+                                return Ok(MatchState::NotMatched);
+                            }
+                            result = result.combine(&dep_match);
+                        }
+                        Ok(result)
+                    }
                 }
             }
             _ => Ok(MatchState::NotMatched),
@@ -727,6 +741,74 @@ mod tests {
     fn test_segment_not_matched_missing_in_pre_agg() {
         let ctx = create_test_context();
         // Segment in query, but pre-agg without segments => NotMatched
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                    segments:
+                      - orders.high_priority
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+    }
+
+    #[test]
+    fn test_expression_segment_matched_via_dimensions() {
+        let ctx = create_test_context();
+        // status_filter depends on {CUBE.status}, status is in main_rollup dimensions
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                    segments:
+                      - orders.status_filter
+                "},
+            ),
+            MatchState::Partial,
+        );
+    }
+
+    #[test]
+    fn test_expression_segment_not_matched_missing_dependency() {
+        let ctx = create_test_context();
+        // status_filter depends on {CUBE.status}, but daily_countries_rollup has no status dimension
+        assert_eq!(
+            match_pre_agg(
+                &ctx,
+                "daily_countries_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.country
+                    segments:
+                      - orders.status_filter
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+            ),
+            MatchState::NotMatched,
+        );
+    }
+
+    #[test]
+    fn test_plain_segment_not_matched_via_dimensions() {
+        let ctx = create_test_context();
+        // high_priority has no {CUBE.x} deps, main_rollup has no segments => NotMatched
         assert_eq!(
             match_pre_agg(
                 &ctx,
