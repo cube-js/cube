@@ -6,6 +6,9 @@ cubes:
         type: number
         sql: id
         primary_key: true
+      - name: status
+        type: string
+        sql: status
       - name: created_at
         type: time
         sql: created_at
@@ -22,3 +25,31 @@ cubes:
       - name: count
         type: count
         sql: "COUNT(*)"
+      - name: total_amount
+        type: sum
+        sql: amount
+      - name: avg_amount
+        type: avg
+        sql: amount
+    pre_aggregations:
+      - name: custom_half_year_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: half_year
+
+      - name: daily_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: day
