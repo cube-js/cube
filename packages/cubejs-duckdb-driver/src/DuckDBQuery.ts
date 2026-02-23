@@ -64,6 +64,7 @@ export class DuckDBQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';
+    templates.expressions.timestamp_literal = '\'{{ value }}\'';
     return templates;
   }
 
