@@ -38,8 +38,7 @@ impl PreAggregationOptimizer {
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
             if let Some(id) = pre_aggregation_id {
-                let full_name =
-                    format!("{}.{}", pre_aggregation.cube_name, pre_aggregation.name);
+                let full_name = format!("{}.{}", pre_aggregation.cube_name, pre_aggregation.name);
                 if full_name != id {
                     continue;
                 }
