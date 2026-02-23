@@ -68,7 +68,7 @@ export class SQLServer {
 
   private getSqlInterfaceInstance(): SqlInterfaceInstance {
     if (!this.sqlInterfaceInstance) {
-      throw new Error('SQL interface is not initialized. Please configure CUBEJS_SQL_PORT or CUBEJS_PG_SQL_PORT environment variable to enable the SQL interface.');
+      throw new Error('SQL interface is not initialized. Please enable the SQL interface in your settings.');
     }
 
     return this.sqlInterfaceInstance;
