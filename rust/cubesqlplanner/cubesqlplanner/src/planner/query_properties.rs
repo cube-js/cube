@@ -411,8 +411,6 @@ impl QueryProperties {
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
 
-
-
         let mut res = Self {
             measures,
             dimensions,
