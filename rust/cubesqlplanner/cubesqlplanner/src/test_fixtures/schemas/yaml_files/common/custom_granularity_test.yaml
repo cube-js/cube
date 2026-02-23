@@ -53,3 +53,11 @@ cubes:
           - status
         time_dimension: created_at
         granularity: day
+
+      - name: custom_half_year_non_strict
+        type: rollup
+        measures:
+          - count
+        time_dimension: created_at
+        granularity: half_year
+        allow_non_strict_date_range_match: true

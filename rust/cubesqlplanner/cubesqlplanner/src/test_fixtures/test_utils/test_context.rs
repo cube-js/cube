@@ -246,6 +246,7 @@ impl TestContext {
                         .disable_external_pre_aggregations
                         .unwrap_or(false),
                 )
+                .pre_aggregation_id(yaml_options.pre_aggregation_id)
                 .build(),
         )
     }

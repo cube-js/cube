@@ -227,11 +227,7 @@ impl<'a> DimensionMatcher<'a> {
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
         let granularity = if self.pre_aggregation.allow_non_strict_date_range_match {
-            if let Some(granularity) = time_dimension.granularity_obj() {
-                granularity.min_granularity()?
-            } else {
-                time_dimension.granularity().clone()
-            }
+            time_dimension.granularity().clone()
         } else {
             time_dimension.rollup_granularity(self.query_tools.clone())?
         };

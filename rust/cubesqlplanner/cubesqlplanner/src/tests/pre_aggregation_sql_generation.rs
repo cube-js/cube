@@ -605,6 +605,28 @@ fn test_custom_granularity_non_additive_coarser_no_match() {
 }
 
 #[test]
+fn test_custom_granularity_non_strict_self_match() {
+    let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
+        .only_pre_aggregations(&["custom_half_year_non_strict"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(indoc! {"
+            measures:
+              - orders.count
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: half_year
+        "})
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "custom_half_year_non_strict");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
 fn test_segment_with_coarser_granularity() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
