@@ -233,23 +233,29 @@ impl CubeEvaluator for MockCubeEvaluator {
 
         let granularity = &path[3];
 
-        let valid_granularities = [
+        // Check custom granularities in schema first
+        if let Some(custom) = self.schema.get_granularity(&path[0], &path[1], granularity) {
+            return Ok(custom as Rc<dyn GranularityDefinition>);
+        }
+
+        // Fall back to predefined granularities
+        let predefined = [
             "second", "minute", "hour", "day", "week", "month", "quarter", "year",
         ];
 
-        if !valid_granularities.contains(&granularity.as_str()) {
-            return Err(CubeError::user(format!(
-                "Unsupported granularity: '{}'. Supported: second, minute, hour, day, week, month, quarter, year",
+        if predefined.contains(&granularity.as_str()) {
+            use crate::test_fixtures::cube_bridge::MockGranularityDefinition;
+            Ok(Rc::new(
+                MockGranularityDefinition::builder()
+                    .interval(format!("1 {}", granularity))
+                    .build(),
+            ) as Rc<dyn GranularityDefinition>)
+        } else {
+            Err(CubeError::user(format!(
+                "Granularity '{}' not found",
                 granularity
-            )));
+            )))
         }
-
-        use crate::test_fixtures::cube_bridge::MockGranularityDefinition;
-        Ok(Rc::new(
-            MockGranularityDefinition::builder()
-                .interval(granularity.clone())
-                .build(),
-        ) as Rc<dyn GranularityDefinition>)
     }
 
     fn pre_aggregations_for_cube_as_array(
@@ -306,5 +312,74 @@ impl CubeEvaluator for MockCubeEvaluator {
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+
+    fn create_custom_granularity_schema() -> MockSchema {
+        MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
+    }
+
+    fn resolve(
+        evaluator: &MockCubeEvaluator,
+        granularity: &str,
+    ) -> Result<Rc<dyn GranularityDefinition>, CubeError> {
+        evaluator.resolve_granularity(vec![
+            "orders".to_string(),
+            "created_at".to_string(),
+            "granularities".to_string(),
+            granularity.to_string(),
+        ])
+    }
+
+    #[test]
+    fn test_resolve_predefined_granularity() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "day").expect("should resolve predefined granularity");
+        assert_eq!(result.static_data().interval, "1 day");
+        assert_eq!(result.static_data().origin, None);
+        assert_eq!(result.static_data().offset, None);
+    }
+
+    #[test]
+    fn test_resolve_custom_granularity() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "half_year").expect("should resolve custom granularity");
+        assert_eq!(result.static_data().interval, "6 months");
+        assert_eq!(result.static_data().origin, Some("2024-01-01".to_string()));
+        assert_eq!(result.static_data().offset, None);
+    }
+
+    #[test]
+    fn test_resolve_custom_granularity_with_offset() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "fiscal_year").expect("should resolve custom granularity");
+        assert_eq!(result.static_data().interval, "1 year");
+        assert_eq!(result.static_data().offset, Some("1 month".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_unknown_granularity_error() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "nonexistent");
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert!(
+            err.message.contains("Granularity 'nonexistent' not found"),
+            "unexpected error: {}",
+            err.message
+        );
     }
 }

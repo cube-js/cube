@@ -59,7 +59,7 @@ impl MockDimensionDefinition {
     pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
         let yaml_def: YamlDimensionDefinition = serde_yaml::from_str(yaml)
             .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
-        Ok(yaml_def.build())
+        Ok(Rc::new(yaml_def.build().definition))
     }
 }
 

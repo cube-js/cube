@@ -1,8 +1,8 @@
 use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
-    MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockPreAggregationDescription,
-    MockSegmentDefinition,
+    MockGranularityDefinition, MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition,
+    MockPreAggregationDescription, MockSegmentDefinition,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -20,6 +20,8 @@ pub struct MockCube {
     pub dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     pub segments: HashMap<String, Rc<MockSegmentDefinition>>,
     pub pre_aggregations: Vec<(String, Rc<MockPreAggregationDescription>)>,
+    /// Outer key = dimension_name, inner key = granularity_name
+    pub granularities: HashMap<String, HashMap<String, Rc<MockGranularityDefinition>>>,
 }
 
 impl MockSchema {
@@ -106,6 +108,18 @@ impl MockSchema {
         self.cubes
             .get(cube_name)
             .and_then(|cube| cube.segments.get(segment_name).cloned())
+    }
+
+    pub fn get_granularity(
+        &self,
+        cube_name: &str,
+        dimension_name: &str,
+        granularity_name: &str,
+    ) -> Option<Rc<MockGranularityDefinition>> {
+        self.cubes
+            .get(cube_name)
+            .and_then(|cube| cube.granularities.get(dimension_name))
+            .and_then(|grans| grans.get(granularity_name).cloned())
     }
 
     pub fn get_pre_aggregation(
@@ -275,6 +289,7 @@ impl MockSchemaBuilder {
             dimensions: HashMap::new(),
             segments: HashMap::new(),
             pre_aggregations: Vec::new(),
+            granularities: HashMap::new(),
             joins: HashMap::new(),
         }
     }
@@ -309,6 +324,7 @@ pub struct MockCubeBuilder {
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
     pre_aggregations: Vec<(String, Rc<MockPreAggregationDescription>)>,
+    granularities: HashMap<String, HashMap<String, Rc<MockGranularityDefinition>>>,
     #[allow(dead_code)]
     joins: HashMap<String, MockJoinItemDefinition>,
 }
@@ -356,6 +372,19 @@ impl MockCubeBuilder {
         self
     }
 
+    pub fn add_granularity(
+        mut self,
+        dimension_name: &str,
+        granularity_name: &str,
+        definition: MockGranularityDefinition,
+    ) -> Self {
+        self.granularities
+            .entry(dimension_name.to_string())
+            .or_default()
+            .insert(granularity_name.to_string(), Rc::new(definition));
+        self
+    }
+
     #[allow(dead_code)]
     pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
         self.joins.insert(name.into(), definition);
@@ -376,6 +405,7 @@ impl MockCubeBuilder {
             dimensions: self.dimensions,
             segments: self.segments,
             pre_aggregations: self.pre_aggregations,
+            granularities: self.granularities,
         };
 
         self.schema_builder.cubes.insert(self.cube_name, cube);
@@ -538,6 +568,7 @@ impl MockViewBuilder {
             dimensions: all_dimensions,
             segments: all_segments,
             pre_aggregations: Vec::new(),
+            granularities: HashMap::new(),
         };
 
         self.schema_builder.cubes.insert(self.view_name, view_cube);
@@ -1303,5 +1334,76 @@ mod tests {
     #[should_panic(expected = "Failed to read YAML fixture")]
     fn test_from_yaml_file_not_found() {
         MockSchema::from_yaml_file("nonexistent.yaml");
+    }
+
+    #[test]
+    fn test_schema_with_granularities() {
+        use crate::test_fixtures::cube_bridge::MockGranularityDefinition;
+
+        let schema = MockSchemaBuilder::new()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "created_at",
+                MockDimensionDefinition::builder()
+                    .dimension_type("time".to_string())
+                    .sql("created_at".to_string())
+                    .build(),
+            )
+            .add_granularity(
+                "created_at",
+                "half_year",
+                MockGranularityDefinition::builder()
+                    .interval("6 months")
+                    .origin("2024-01-01")
+                    .build(),
+            )
+            .add_granularity(
+                "created_at",
+                "fiscal_year",
+                MockGranularityDefinition::builder()
+                    .interval("1 year")
+                    .offset("1 month")
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify granularity accessor
+        let half_year = schema
+            .get_granularity("orders", "created_at", "half_year")
+            .expect("half_year should exist");
+        assert_eq!(half_year.static_data().interval, "6 months");
+        assert_eq!(
+            half_year.static_data().origin,
+            Some("2024-01-01".to_string())
+        );
+
+        let fiscal_year = schema
+            .get_granularity("orders", "created_at", "fiscal_year")
+            .expect("fiscal_year should exist");
+        assert_eq!(fiscal_year.static_data().interval, "1 year");
+        assert_eq!(
+            fiscal_year.static_data().offset,
+            Some("1 month".to_string())
+        );
+
+        // Missing granularity returns None
+        assert!(schema
+            .get_granularity("orders", "created_at", "nonexistent")
+            .is_none());
+        assert!(schema
+            .get_granularity("orders", "id", "half_year")
+            .is_none());
+        assert!(schema
+            .get_granularity("nonexistent", "created_at", "half_year")
+            .is_none());
     }
 }

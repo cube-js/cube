@@ -1,0 +1,24 @@
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: created_at
+        type: time
+        sql: created_at
+        granularities:
+          - name: half_year
+            interval: "6 months"
+            origin: "2024-01-01"
+          - name: bi_weekly
+            interval: "2 weeks"
+          - name: fiscal_year
+            interval: "1 year"
+            offset: "1 month"
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
