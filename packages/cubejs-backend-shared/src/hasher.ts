@@ -158,18 +158,15 @@ class XxHasher implements Hasher {
  * @returns A new Hasher instance
  */
 export function defaultHasher(): Hasher {
-  if (HASHER_ALGORITHM === 'xxhash') {
-    return new XxHasher();
+  switch (HASHER_ALGORITHM) {
+    case 'xxhash':
+      return new XxHasher();
+    case 'sha256':
+      return new Sha256Hasher();
+    case 'sha512':
+      return new Sha512Hasher();
+    case 'md5':
+    default:
+      return new Md5Hasher();
   }
-
-  if (HASHER_ALGORITHM === 'sha256') {
-    return new Sha256Hasher();
-  }
-
-  if (HASHER_ALGORITHM === 'sha512') {
-    return new Sha512Hasher();
-  }
-
-  // Default to MD5 for backward compatibility
-  return new Md5Hasher();
 }
