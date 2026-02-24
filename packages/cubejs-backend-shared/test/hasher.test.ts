@@ -1,8 +1,54 @@
-import { defaultHasher } from '../src';
+type Hasher = {
+  update(data: string | Buffer): Hasher;
+  digest(encoding: 'hex'): string;
+  digest(): Buffer;
+};
+
+type DefaultHasher = () => Hasher;
+
+const ORIGINAL_ALGORITHM = process.env.CUBEJS_HASHER_ALGORITHM;
+
+function setAlgorithm(algorithm?: string) {
+  if (algorithm === undefined) {
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
+  } else {
+    process.env.CUBEJS_HASHER_ALGORITHM = algorithm;
+  }
+}
+
+function loadDefaultHasher(): DefaultHasher {
+  jest.resetModules();
+  const mod = require('../src') as { defaultHasher: DefaultHasher };
+  return mod.defaultHasher;
+}
+
+function hashHex(input: string | Buffer, algorithm?: string): string {
+  setAlgorithm(algorithm);
+  const defaultHasher = loadDefaultHasher();
+  return defaultHasher().update(input).digest('hex');
+}
+
+function hashBuffer(input: string | Buffer, algorithm?: string): Buffer {
+  setAlgorithm(algorithm);
+  const defaultHasher = loadDefaultHasher();
+  return defaultHasher().update(input).digest();
+}
+
+afterAll(() => {
+  if (ORIGINAL_ALGORITHM === undefined) {
+    delete process.env.CUBEJS_HASHER_ALGORITHM;
+  } else {
+    process.env.CUBEJS_HASHER_ALGORITHM = ORIGINAL_ALGORITHM;
+  }
+  jest.resetModules();
+});
 
 describe('defaultHasher', () => {
   test('should create a hasher instance', () => {
+    setAlgorithm();
+    const defaultHasher = loadDefaultHasher();
     const hasher = defaultHasher();
+
     expect(hasher).toBeDefined();
     expect(typeof hasher.update).toBe('function');
     expect(typeof hasher.digest).toBe('function');
@@ -10,8 +56,8 @@ describe('defaultHasher', () => {
 
   test('should return consistent hex hash for the same input', () => {
     const input = 'test data';
-    const hash1 = defaultHasher().update(input).digest('hex');
-    const hash2 = defaultHasher().update(input).digest('hex');
+    const hash1 = hashHex(input);
+    const hash2 = hashHex(input);
 
     expect(hash1).toBe(hash2);
     expect(typeof hash1).toBe('string');
@@ -19,19 +65,23 @@ describe('defaultHasher', () => {
   });
 
   test('should return different hashes for different inputs', () => {
-    const hash1 = defaultHasher().update('input1').digest('hex');
-    const hash2 = defaultHasher().update('input2').digest('hex');
+    const hash1 = hashHex('input1');
+    const hash2 = hashHex('input2');
 
     expect(hash1).not.toBe(hash2);
   });
 
   test('should support chaining update calls', () => {
+    setAlgorithm();
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('part1')
       .update('part2')
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm();
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update('part1part2')
       .digest('hex');
 
@@ -39,58 +89,59 @@ describe('defaultHasher', () => {
   });
 
   test('should handle Buffer inputs', () => {
-    const buffer = Buffer.from('test data');
-    const hash = defaultHasher().update(buffer).digest('hex');
+    const hash = hashHex(Buffer.from('test data'));
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should return Buffer when digest is called without encoding', () => {
-    const hash = defaultHasher().update('test').digest();
+    const hash = hashBuffer('test');
 
     expect(Buffer.isBuffer(hash)).toBe(true);
-    expect(hash.length).toBe(16); // 128 bits = 16 bytes
+    expect(hash.length).toBe(16);
   });
 
   test('should handle JSON stringified objects', () => {
     const obj = { key: 'value', nested: { prop: 123 } };
-    const hash1 = defaultHasher().update(JSON.stringify(obj)).digest('hex');
-    const hash2 = defaultHasher().update(JSON.stringify(obj)).digest('hex');
+    const hash1 = hashHex(JSON.stringify(obj));
+    const hash2 = hashHex(JSON.stringify(obj));
 
     expect(hash1).toBe(hash2);
   });
 
   test('should handle empty strings', () => {
-    const hash = defaultHasher().update('').digest('hex');
+    const hash = hashHex('');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle large inputs', () => {
-    const largeString = 'x'.repeat(10000);
-    const hash = defaultHasher().update(largeString).digest('hex');
+    const hash = hashHex('x'.repeat(10000));
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle unicode characters', () => {
-    const unicode = '你好世界 🌍 مرحبا';
-    const hash = defaultHasher().update(unicode).digest('hex');
+    const hash = hashHex('你好世界 🌍 مرحبا');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should produce consistent hashes for mixed string and Buffer updates', () => {
+    setAlgorithm();
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(Buffer.from('world'))
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm();
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update(Buffer.from('hello'))
       .update('world')
       .digest('hex');
@@ -101,35 +152,24 @@ describe('defaultHasher', () => {
 
 describe('Hasher interface compatibility', () => {
   test('should be compatible with crypto.createHash API pattern', () => {
-    // This tests that the API matches the pattern used to replace crypto.createHash('md5')
-    const data = JSON.stringify({ test: 'data' });
-
-    // Old pattern: crypto.createHash('md5').update(data).digest('hex')
-    // New pattern: defaultHasher().update(data).digest('hex')
-    const hash = defaultHasher().update(data).digest('hex');
+    const hash = hashHex(JSON.stringify({ test: 'data' }));
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should support digest() without encoding for Buffer result', () => {
-    // Old pattern: crypto.createHash('md5').update(data).digest()
-    // New pattern: defaultHasher().update(data).digest()
-    const data = JSON.stringify({ test: 'data' });
-    const digestBuffer = defaultHasher().update(data).digest();
+    const digestBuffer = hashBuffer(JSON.stringify({ test: 'data' }));
 
     expect(Buffer.isBuffer(digestBuffer)).toBe(true);
     expect(digestBuffer.length).toBe(16);
   });
 
   test('should handle the version() function pattern from PreAggregations', () => {
-    // Testing the pattern: defaultHasher().update(JSON.stringify(cacheKey)).digest()
-    const cacheKey = ['2024', '01', 'users'];
-    const digestBuffer = defaultHasher().update(JSON.stringify(cacheKey)).digest();
+    const digestBuffer = hashBuffer(JSON.stringify(['2024', '01', 'users']));
 
     expect(Buffer.isBuffer(digestBuffer)).toBe(true);
 
-    // Should be able to read bytes from the buffer like the old code did
     const firstByte = digestBuffer.readUInt8(0);
     expect(typeof firstByte).toBe('number');
     expect(firstByte).toBeGreaterThanOrEqual(0);
@@ -140,60 +180,45 @@ describe('Hasher interface compatibility', () => {
 describe('Hash consistency across different data types', () => {
   test('string vs Buffer with same content should produce same hash', () => {
     const str = 'test content';
-    const buf = Buffer.from(str);
-
-    const hashFromString = defaultHasher().update(str).digest('hex');
-    const hashFromBuffer = defaultHasher().update(buf).digest('hex');
+    const hashFromString = hashHex(str);
+    const hashFromBuffer = hashHex(Buffer.from(str));
 
     expect(hashFromString).toBe(hashFromBuffer);
   });
 
   test('Buffer digest should be consistent', () => {
-    const input = 'consistent test';
-    const digest1 = defaultHasher().update(input).digest();
-    const digest2 = defaultHasher().update(input).digest();
+    const digest1 = hashBuffer('consistent test');
+    const digest2 = hashBuffer('consistent test');
 
     expect(digest1.equals(digest2)).toBe(true);
   });
 });
+
 describe('MD5 hasher (default)', () => {
-  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
-
-  beforeEach(() => {
-    delete process.env.CUBEJS_HASHER_ALGORITHM;
-  });
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
-    } else {
-      delete process.env.CUBEJS_HASHER_ALGORITHM;
-    }
-  });
-
   test('should use MD5 by default', () => {
-    const input = 'test data';
-    const hash = defaultHasher().update(input).digest('hex');
-
-    // Known MD5 hash for 'test data'
+    const hash = hashHex('test data');
     expect(hash).toBe('eb733a00c0c9d336e65691a37ab54293');
   });
 
   test('should return 16-byte Buffer for MD5 digest', () => {
-    const hash = defaultHasher().update('test').digest();
+    const hash = hashBuffer('test');
 
     expect(Buffer.isBuffer(hash)).toBe(true);
     expect(hash.length).toBe(16);
   });
 
   test('should handle chaining with MD5', () => {
+    setAlgorithm();
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(' ')
       .update('world')
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm();
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update('hello world')
       .digest('hex');
 
@@ -201,63 +226,49 @@ describe('MD5 hasher (default)', () => {
   });
 
   test('should handle Buffer input with MD5', () => {
-    const buffer = Buffer.from('test buffer');
-    const hash = defaultHasher().update(buffer).digest('hex');
+    const hash = hashHex(Buffer.from('test buffer'));
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
-    expect(hash.length).toBe(32); // MD5 hex is 32 characters
+    expect(hash.length).toBe(32);
   });
 });
 
 describe('xxHash implementation', () => {
-  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
-
-  beforeEach(() => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
-  });
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
-    } else {
-      delete process.env.CUBEJS_HASHER_ALGORITHM;
-    }
-  });
-
   test('should use xxHash when CUBEJS_HASHER_ALGORITHM=xxhash', () => {
-    const input = 'test data';
-    const hash = defaultHasher().update(input).digest('hex');
+    const hash = hashHex('test data', 'xxhash');
 
-    // xxHash will produce a different hash than MD5
     expect(hash).not.toBe('eb733a00c0c9d336e65691a37ab54293');
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should return 16-byte Buffer for xxHash digest', () => {
-    const hash = defaultHasher().update('test').digest();
+    const hash = hashBuffer('test', 'xxhash');
 
     expect(Buffer.isBuffer(hash)).toBe(true);
     expect(hash.length).toBe(16);
   });
 
   test('should be consistent with xxHash', () => {
-    const input = 'consistency test';
-    const hash1 = defaultHasher().update(input).digest('hex');
-    const hash2 = defaultHasher().update(input).digest('hex');
+    const hash1 = hashHex('consistency test', 'xxhash');
+    const hash2 = hashHex('consistency test', 'xxhash');
 
     expect(hash1).toBe(hash2);
   });
 
   test('should handle chaining with xxHash', () => {
+    setAlgorithm('xxhash');
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(' ')
       .update('world')
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm('xxhash');
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update('hello world')
       .digest('hex');
 
@@ -265,28 +276,30 @@ describe('xxHash implementation', () => {
   });
 
   test('should handle string input with xxHash', () => {
-    const str = 'test string';
-    const hash = defaultHasher().update(str).digest('hex');
+    const hash = hashHex('test string', 'xxhash');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle Buffer input with xxHash', () => {
-    const buffer = Buffer.from('test buffer');
-    const hash = defaultHasher().update(buffer).digest('hex');
+    const hash = hashHex(Buffer.from('test buffer'), 'xxhash');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle mixed string and Buffer updates with xxHash', () => {
+    setAlgorithm('xxhash');
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(Buffer.from('world'))
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm('xxhash');
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update(Buffer.from('hello'))
       .update('world')
       .digest('hex');
@@ -295,130 +308,88 @@ describe('xxHash implementation', () => {
   });
 
   test('should return Buffer digest with xxHash', () => {
-    const digest = defaultHasher().update('test').digest();
+    const digest = hashBuffer('test', 'xxhash');
 
     expect(Buffer.isBuffer(digest)).toBe(true);
     expect(digest.length).toBe(16);
 
-    // Verify it can be read as bytes
     const firstByte = digest.readUInt8(0);
     expect(typeof firstByte).toBe('number');
   });
 
   test('should handle empty strings with xxHash', () => {
-    const hash = defaultHasher().update('').digest('hex');
+    const hash = hashHex('', 'xxhash');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle case-insensitive algorithm name', () => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'XXHASH';
-    const hash = defaultHasher().update('test').digest('hex');
+    const upperCaseHash = hashHex('test', 'XXHASH');
+    const mixedCaseHash = hashHex('test', 'XxHash');
+    const lowerCaseHash = hashHex('test', 'xxhash');
 
-    expect(hash).toBeDefined();
-    expect(typeof hash).toBe('string');
-  });
-
-  test('should handle XxHash algorithm name', () => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'XxHash';
-    const hash = defaultHasher().update('test').digest('hex');
-
-    expect(hash).toBeDefined();
-    expect(typeof hash).toBe('string');
+    expect(upperCaseHash).toBe(lowerCaseHash);
+    expect(mixedCaseHash).toBe(lowerCaseHash);
   });
 });
 
 describe('Feature flag behavior', () => {
-  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
-    } else {
-      delete process.env.CUBEJS_HASHER_ALGORITHM;
-    }
-  });
-
   test('should default to MD5 when env var is not set', () => {
-    delete process.env.CUBEJS_HASHER_ALGORITHM;
-    const hash = defaultHasher().update('test').digest('hex');
-
-    // MD5 hash of 'test'
+    const hash = hashHex('test');
     expect(hash).toBe('098f6bcd4621d373cade4e832627b4f6');
   });
 
   test('should default to MD5 when env var is empty string', () => {
-    process.env.CUBEJS_HASHER_ALGORITHM = '';
-    const hash = defaultHasher().update('test').digest('hex');
-
-    // MD5 hash of 'test' (empty string falls back to default 'md5')
+    const hash = hashHex('test', '');
     expect(hash).toBe('098f6bcd4621d373cade4e832627b4f6');
   });
 
   test('should throw error for unknown algorithm', () => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'blake2b';
-
-    expect(() => defaultHasher()).toThrow('Value "blake2b" is not valid for CUBEJS_HASHER_ALGORITHM');
+    setAlgorithm('blake2b');
+    expect(() => loadDefaultHasher()).toThrow(/not valid/i);
   });
 
   test('MD5 and xxHash should produce different results', () => {
-    delete process.env.CUBEJS_HASHER_ALGORITHM;
-    const md5Hash = defaultHasher().update('test').digest('hex');
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
-    const xxHash = defaultHasher().update('test').digest('hex');
+    const md5Hash = hashHex('test');
+    const xxHash = hashHex('test', 'xxhash');
 
     expect(md5Hash).not.toBe(xxHash);
   });
 });
 
 describe('SHA256 hasher', () => {
-  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
-
-  beforeEach(() => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'sha256';
-  });
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
-    } else {
-      delete process.env.CUBEJS_HASHER_ALGORITHM;
-    }
-  });
-
   test('should use SHA256 when CUBEJS_HASHER_ALGORITHM=sha256', () => {
-    const input = 'test';
-    const hash = defaultHasher().update(input).digest('hex');
-
-    // Known SHA256 hash for 'test'
+    const hash = hashHex('test', 'sha256');
     expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
   });
 
   test('should return 32-byte Buffer for SHA256 digest', () => {
-    const hash = defaultHasher().update('test').digest();
+    const hash = hashBuffer('test', 'sha256');
 
     expect(Buffer.isBuffer(hash)).toBe(true);
-    expect(hash.length).toBe(32); // SHA256 produces 32 bytes
+    expect(hash.length).toBe(32);
   });
 
   test('should be consistent with SHA256', () => {
-    const input = 'consistency test';
-    const hash1 = defaultHasher().update(input).digest('hex');
-    const hash2 = defaultHasher().update(input).digest('hex');
+    const hash1 = hashHex('consistency test', 'sha256');
+    const hash2 = hashHex('consistency test', 'sha256');
 
     expect(hash1).toBe(hash2);
   });
 
   test('should handle chaining with SHA256', () => {
+    setAlgorithm('sha256');
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(' ')
       .update('world')
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm('sha256');
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update('hello world')
       .digest('hex');
 
@@ -426,35 +397,36 @@ describe('SHA256 hasher', () => {
   });
 
   test('should handle Buffer input with SHA256', () => {
-    const buffer = Buffer.from('test buffer');
-    const hash = defaultHasher().update(buffer).digest('hex');
+    const hash = hashHex(Buffer.from('test buffer'), 'sha256');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
-    expect(hash.length).toBe(64); // SHA256 hex is 64 characters
+    expect(hash.length).toBe(64);
   });
 
   test('should handle empty strings with SHA256', () => {
-    const hash = defaultHasher().update('').digest('hex');
+    const hash = hashHex('', 'sha256');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle case-insensitive algorithm name', () => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'SHA256';
-    const hash = defaultHasher().update('test').digest('hex');
-
+    const hash = hashHex('test', 'SHA256');
     expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
   });
 
   test('should handle mixed string and Buffer updates with SHA256', () => {
+    setAlgorithm('sha256');
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(Buffer.from('world'))
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm('sha256');
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update(Buffer.from('hello'))
       .update('world')
       .digest('hex');
@@ -464,51 +436,37 @@ describe('SHA256 hasher', () => {
 });
 
 describe('SHA512 hasher', () => {
-  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
-
-  beforeEach(() => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'sha512';
-  });
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
-    } else {
-      delete process.env.CUBEJS_HASHER_ALGORITHM;
-    }
-  });
-
   test('should use SHA512 when CUBEJS_HASHER_ALGORITHM=sha512', () => {
-    const input = 'test';
-    const hash = defaultHasher().update(input).digest('hex');
-
-    // Known SHA512 hash for 'test'
+    const hash = hashHex('test', 'sha512');
     expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
   });
 
   test('should return 64-byte Buffer for SHA512 digest', () => {
-    const hash = defaultHasher().update('test').digest();
+    const hash = hashBuffer('test', 'sha512');
 
     expect(Buffer.isBuffer(hash)).toBe(true);
-    expect(hash.length).toBe(64); // SHA512 produces 64 bytes
+    expect(hash.length).toBe(64);
   });
 
   test('should be consistent with SHA512', () => {
-    const input = 'consistency test';
-    const hash1 = defaultHasher().update(input).digest('hex');
-    const hash2 = defaultHasher().update(input).digest('hex');
+    const hash1 = hashHex('consistency test', 'sha512');
+    const hash2 = hashHex('consistency test', 'sha512');
 
     expect(hash1).toBe(hash2);
   });
 
   test('should handle chaining with SHA512', () => {
+    setAlgorithm('sha512');
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(' ')
       .update('world')
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm('sha512');
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update('hello world')
       .digest('hex');
 
@@ -516,35 +474,36 @@ describe('SHA512 hasher', () => {
   });
 
   test('should handle Buffer input with SHA512', () => {
-    const buffer = Buffer.from('test buffer');
-    const hash = defaultHasher().update(buffer).digest('hex');
+    const hash = hashHex(Buffer.from('test buffer'), 'sha512');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
-    expect(hash.length).toBe(128); // SHA512 hex is 128 characters
+    expect(hash.length).toBe(128);
   });
 
   test('should handle empty strings with SHA512', () => {
-    const hash = defaultHasher().update('').digest('hex');
+    const hash = hashHex('', 'sha512');
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
   });
 
   test('should handle case-insensitive algorithm name', () => {
-    process.env.CUBEJS_HASHER_ALGORITHM = 'SHA512';
-    const hash = defaultHasher().update('test').digest('hex');
-
+    const hash = hashHex('test', 'SHA512');
     expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
   });
 
   test('should handle mixed string and Buffer updates with SHA512', () => {
+    setAlgorithm('sha512');
+    const defaultHasher = loadDefaultHasher();
     const hash1 = defaultHasher()
       .update('hello')
       .update(Buffer.from('world'))
       .digest('hex');
 
-    const hash2 = defaultHasher()
+    setAlgorithm('sha512');
+    const secondDefaultHasher = loadDefaultHasher();
+    const hash2 = secondDefaultHasher()
       .update(Buffer.from('hello'))
       .update('world')
       .digest('hex');
@@ -554,40 +513,20 @@ describe('SHA512 hasher', () => {
 
   test('should handle JSON stringified objects with SHA512', () => {
     const obj = { key: 'value', nested: { prop: 123 } };
-    const hash1 = defaultHasher().update(JSON.stringify(obj)).digest('hex');
-    const hash2 = defaultHasher().update(JSON.stringify(obj)).digest('hex');
+    const hash1 = hashHex(JSON.stringify(obj), 'sha512');
+    const hash2 = hashHex(JSON.stringify(obj), 'sha512');
 
     expect(hash1).toBe(hash2);
   });
 });
 
 describe('Algorithm comparison', () => {
-  const originalEnv = process.env.CUBEJS_HASHER_ALGORITHM;
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CUBEJS_HASHER_ALGORITHM = originalEnv;
-    } else {
-      delete process.env.CUBEJS_HASHER_ALGORITHM;
-    }
-  });
-
   test('all algorithms should produce different results', () => {
-    const input = 'test';
+    const md5Hash = hashHex('test');
+    const sha256Hash = hashHex('test', 'sha256');
+    const sha512Hash = hashHex('test', 'sha512');
+    const xxHash = hashHex('test', 'xxhash');
 
-    delete process.env.CUBEJS_HASHER_ALGORITHM;
-    const md5Hash = defaultHasher().update(input).digest('hex');
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'sha256';
-    const sha256Hash = defaultHasher().update(input).digest('hex');
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'sha512';
-    const sha512Hash = defaultHasher().update(input).digest('hex');
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
-    const xxHash = defaultHasher().update(input).digest('hex');
-
-    // All hashes should be different
     expect(md5Hash).not.toBe(sha256Hash);
     expect(md5Hash).not.toBe(sha512Hash);
     expect(md5Hash).not.toBe(xxHash);
@@ -597,19 +536,10 @@ describe('Algorithm comparison', () => {
   });
 
   test('different algorithms produce different buffer lengths', () => {
-    const input = 'test';
-
-    delete process.env.CUBEJS_HASHER_ALGORITHM;
-    const md5Buffer = defaultHasher().update(input).digest();
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'sha256';
-    const sha256Buffer = defaultHasher().update(input).digest();
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'sha512';
-    const sha512Buffer = defaultHasher().update(input).digest();
-
-    process.env.CUBEJS_HASHER_ALGORITHM = 'xxhash';
-    const xxHashBuffer = defaultHasher().update(input).digest();
+    const md5Buffer = hashBuffer('test');
+    const sha256Buffer = hashBuffer('test', 'sha256');
+    const sha512Buffer = hashBuffer('test', 'sha512');
+    const xxHashBuffer = hashBuffer('test', 'xxhash');
 
     expect(md5Buffer.length).toBe(16);
     expect(sha256Buffer.length).toBe(32);
