@@ -597,9 +597,10 @@ export class PreAggregations {
     };
   }
 
-  private canUsePreAggregationFn(query: BaseQuery): CanUsePreAggregationFn {
+  private canUsePreAggregationFn(query: BaseQuery, refs: PreAggregationReferences | null = null) {
     return PreAggregations.canUsePreAggregationForTransformedQueryFn(
       PreAggregations.transformQueryToCanUseForm(query),
+      refs,
     );
   }
 
@@ -607,7 +608,7 @@ export class PreAggregations {
    * Returns function to determine whether pre-aggregation can be used or not
    * for specified query, or its value for `refs` if specified.
    */
-  public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery): CanUsePreAggregationFn {
+  public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery, refs: PreAggregationReferences | null = null): CanUsePreAggregationFn | CanUsePreAggregationResult {
     /**
      * Returns an array of 2-elements arrays with the dimension and granularity
      * sorted by the concatenated dimension + granularity key.
@@ -807,7 +808,11 @@ export class PreAggregations {
         })
         : canUsePreAggregationNotAdditive;
 
-    return canUseFn;
+    if (refs) {
+      return canUseFn(refs);
+    } else {
+      return canUseFn;
+    }
   }
 
   private static squashDimensions(flattenDimensionMembers: BaseMember[]): string[] {
@@ -900,7 +905,7 @@ export class PreAggregations {
   private rollupMatchResults(): PreAggregationForQuery[] {
     const { query } = this;
 
-    const canUsePreAggregation = this.canUsePreAggregationFn(query);
+    const canUsePreAggregation = this.canUsePreAggregationFn(query) as CanUsePreAggregationFn;
 
     return R.pipe(
       R.map((cube: string) => {
