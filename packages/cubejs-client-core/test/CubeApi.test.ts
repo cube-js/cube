@@ -359,6 +359,79 @@ describe('CubeApi with Abort Signal', () => {
   });
 });
 
+describe('CubeApi cubeSql', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  const cubeSqlResponseBody = [
+    JSON.stringify({
+      schema: [
+        { name: 'status', column_type: 'String' },
+        { name: 'measure(orders_transactions.count)', column_type: 'Int64' }
+      ],
+      lastRefreshTime: '2026-02-24T00:34:01.594Z'
+    }),
+    JSON.stringify({ data: [['Cancelled', '27090'], ['Returned', '18232']] }),
+    JSON.stringify({ data: [['Shipped', '45102']] }),
+  ].join('\n');
+
+  const cubeSqlResponseBodyNoRefreshTime = [
+    JSON.stringify({
+      schema: [
+        { name: 'status', column_type: 'String' },
+      ],
+    }),
+    JSON.stringify({ data: [['Active']] }),
+  ].join('\n');
+
+  test('should parse lastRefreshTime from response', async () => {
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBody })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.cubeSql('SELECT status, measure(count) FROM orders_transactions');
+    expect(res.lastRefreshTime).toBe('2026-02-24T00:34:01.594Z');
+    expect(res.schema).toEqual([
+      { name: 'status', column_type: 'String' },
+      { name: 'measure(orders_transactions.count)', column_type: 'Int64' }
+    ]);
+    expect(res.data).toEqual([
+      ['Cancelled', '27090'],
+      ['Returned', '18232'],
+      ['Shipped', '45102'],
+    ]);
+  });
+
+  test('should omit lastRefreshTime when not present in response', async () => {
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.cubeSql('SELECT status FROM users');
+    expect(res.lastRefreshTime).toBeUndefined();
+    expect(res.schema).toEqual([{ name: 'status', column_type: 'String' }]);
+    expect(res.data).toEqual([['Active']]);
+  });
+});
+
 describe('CubeApi with baseRequestId', () => {
   afterEach(() => {
     jest.clearAllMocks();

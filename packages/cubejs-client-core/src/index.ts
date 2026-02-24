@@ -128,11 +128,13 @@ export type CubeSqlSchemaColumn = {
 export type CubeSqlResult = {
   schema: CubeSqlSchemaColumn[];
   data: (string | number | boolean | null)[][];
+  lastRefreshTime?: string;
 };
 
 export type CubeSqlStreamChunk = {
   type: 'schema';
   schema: CubeSqlSchemaColumn[];
+  lastRefreshTime?: string;
 } | {
   type: 'data';
   data: (string | number | boolean | null)[];
@@ -754,12 +756,14 @@ class CubeApi {
         const [schema, ...data] = response.error.split('\n');
 
         try {
+          const parsedSchema = JSON.parse(schema);
           return {
-            schema: JSON.parse(schema).schema,
+            schema: parsedSchema.schema,
             data: data
               .filter((d: string) => d.trim().length)
               .map((d: string) => JSON.parse(d).data)
               .reduce((a: any, b: any) => a.concat(b), []),
+            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
           };
         } catch (err) {
           throw new Error(response.error);
@@ -810,7 +814,8 @@ class CubeApi {
               if (parsed.schema) {
                 yield {
                   type: 'schema' as const,
-                  schema: parsed.schema
+                  schema: parsed.schema,
+                  ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
                 };
               } else if (parsed.data) {
                 yield {
@@ -840,7 +845,8 @@ class CubeApi {
           if (parsed.schema) {
             yield {
               type: 'schema' as const,
-              schema: parsed.schema
+              schema: parsed.schema,
+              ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
             };
           } else if (parsed.data) {
             yield {
