@@ -165,7 +165,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asBoolStrict(),
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
   hasherAlgorithm: () => {
-    const supportedHashers = ['md5', 'sha256', 'sha512', 'xxhash'];
+    const supportedHashers = ['md5', 'sha256', 'xxhash'];
     const algorithm = get('CUBEJS_HASHER_ALGORITHM')
       .default('md5')
       .asString() || 'md5';

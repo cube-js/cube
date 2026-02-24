@@ -361,14 +361,14 @@ describe('Feature flag behavior', () => {
 describe('SHA256 hasher', () => {
   test('should use SHA256 when CUBEJS_HASHER_ALGORITHM=sha256', () => {
     const hash = hashHex('test', 'sha256');
-    expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
+    expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015');
   });
 
-  test('should return 32-byte Buffer for SHA256 digest', () => {
+  test('should return 16-byte Buffer for SHA256 digest', () => {
     const hash = hashBuffer('test', 'sha256');
 
     expect(Buffer.isBuffer(hash)).toBe(true);
-    expect(hash.length).toBe(32);
+    expect(hash.length).toBe(16);
   });
 
   test('should be consistent with SHA256', () => {
@@ -401,7 +401,7 @@ describe('SHA256 hasher', () => {
 
     expect(hash).toBeDefined();
     expect(typeof hash).toBe('string');
-    expect(hash.length).toBe(64);
+    expect(hash.length).toBe(32);
   });
 
   test('should handle empty strings with SHA256', () => {
@@ -413,7 +413,7 @@ describe('SHA256 hasher', () => {
 
   test('should handle case-insensitive algorithm name', () => {
     const hash = hashHex('test', 'SHA256');
-    expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
+    expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015');
   });
 
   test('should handle mixed string and Buffer updates with SHA256', () => {
@@ -435,115 +435,24 @@ describe('SHA256 hasher', () => {
   });
 });
 
-describe('SHA512 hasher', () => {
-  test('should use SHA512 when CUBEJS_HASHER_ALGORITHM=sha512', () => {
-    const hash = hashHex('test', 'sha512');
-    expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
-  });
-
-  test('should return 64-byte Buffer for SHA512 digest', () => {
-    const hash = hashBuffer('test', 'sha512');
-
-    expect(Buffer.isBuffer(hash)).toBe(true);
-    expect(hash.length).toBe(64);
-  });
-
-  test('should be consistent with SHA512', () => {
-    const hash1 = hashHex('consistency test', 'sha512');
-    const hash2 = hashHex('consistency test', 'sha512');
-
-    expect(hash1).toBe(hash2);
-  });
-
-  test('should handle chaining with SHA512', () => {
-    setAlgorithm('sha512');
-    const defaultHasher = loadDefaultHasher();
-    const hash1 = defaultHasher()
-      .update('hello')
-      .update(' ')
-      .update('world')
-      .digest('hex');
-
-    setAlgorithm('sha512');
-    const secondDefaultHasher = loadDefaultHasher();
-    const hash2 = secondDefaultHasher()
-      .update('hello world')
-      .digest('hex');
-
-    expect(hash1).toBe(hash2);
-  });
-
-  test('should handle Buffer input with SHA512', () => {
-    const hash = hashHex(Buffer.from('test buffer'), 'sha512');
-
-    expect(hash).toBeDefined();
-    expect(typeof hash).toBe('string');
-    expect(hash.length).toBe(128);
-  });
-
-  test('should handle empty strings with SHA512', () => {
-    const hash = hashHex('', 'sha512');
-
-    expect(hash).toBeDefined();
-    expect(typeof hash).toBe('string');
-  });
-
-  test('should handle case-insensitive algorithm name', () => {
-    const hash = hashHex('test', 'SHA512');
-    expect(hash).toBe('ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff');
-  });
-
-  test('should handle mixed string and Buffer updates with SHA512', () => {
-    setAlgorithm('sha512');
-    const defaultHasher = loadDefaultHasher();
-    const hash1 = defaultHasher()
-      .update('hello')
-      .update(Buffer.from('world'))
-      .digest('hex');
-
-    setAlgorithm('sha512');
-    const secondDefaultHasher = loadDefaultHasher();
-    const hash2 = secondDefaultHasher()
-      .update(Buffer.from('hello'))
-      .update('world')
-      .digest('hex');
-
-    expect(hash1).toBe(hash2);
-  });
-
-  test('should handle JSON stringified objects with SHA512', () => {
-    const obj = { key: 'value', nested: { prop: 123 } };
-    const hash1 = hashHex(JSON.stringify(obj), 'sha512');
-    const hash2 = hashHex(JSON.stringify(obj), 'sha512');
-
-    expect(hash1).toBe(hash2);
-  });
-});
-
 describe('Algorithm comparison', () => {
   test('all algorithms should produce different results', () => {
     const md5Hash = hashHex('test');
     const sha256Hash = hashHex('test', 'sha256');
-    const sha512Hash = hashHex('test', 'sha512');
     const xxHash = hashHex('test', 'xxhash');
 
     expect(md5Hash).not.toBe(sha256Hash);
-    expect(md5Hash).not.toBe(sha512Hash);
     expect(md5Hash).not.toBe(xxHash);
-    expect(sha256Hash).not.toBe(sha512Hash);
     expect(sha256Hash).not.toBe(xxHash);
-    expect(sha512Hash).not.toBe(xxHash);
   });
 
-  test('different algorithms produce different buffer lengths', () => {
+  test('all supported algorithms produce same buffer length', () => {
     const md5Buffer = hashBuffer('test');
     const sha256Buffer = hashBuffer('test', 'sha256');
-    const sha512Buffer = hashBuffer('test', 'sha512');
     const xxHashBuffer = hashBuffer('test', 'xxhash');
 
     expect(md5Buffer.length).toBe(16);
-    expect(sha256Buffer.length).toBe(32);
-    expect(sha512Buffer.length).toBe(64);
+    expect(sha256Buffer.length).toBe(16);
     expect(xxHashBuffer.length).toBe(16);
   });
 });

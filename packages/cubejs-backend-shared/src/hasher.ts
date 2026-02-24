@@ -62,34 +62,13 @@ class Sha256Hasher implements Hasher {
   public digest(encoding: 'hex'): string;
 
   public digest(encoding?: 'hex'): Buffer | string {
+    const digest = this.hash.digest();
+    const digest128 = digest.subarray(0, 16);
+
     if (encoding === 'hex') {
-      return this.hash.digest('hex');
+      return digest128.toString('hex');
     }
-    return this.hash.digest();
-  }
-}
-
-class Sha512Hasher implements Hasher {
-  private hash: crypto.Hash;
-
-  public constructor() {
-    this.hash = crypto.createHash('sha512');
-  }
-
-  public update(data: string | Buffer): this {
-    this.hash.update(data);
-    return this;
-  }
-
-  public digest(): Buffer;
-
-  public digest(encoding: 'hex'): string;
-
-  public digest(encoding?: 'hex'): Buffer | string {
-    if (encoding === 'hex') {
-      return this.hash.digest('hex');
-    }
-    return this.hash.digest();
+    return digest128;
   }
 }
 
@@ -143,7 +122,7 @@ class XxHasher implements Hasher {
  *
  * By default, this uses MD5 hashing for backward compatibility. You can
  * choose different algorithms by setting the CUBEJS_HASHER_ALGORITHM
- * environment variable to: 'md5', 'sha256', 'sha512', or 'xxhash'.
+ * environment variable to: 'md5', 'sha256', or 'xxhash'.
  *
  * @example
  * ```typescript
@@ -163,8 +142,6 @@ export function defaultHasher(): Hasher {
       return new XxHasher();
     case 'sha256':
       return new Sha256Hasher();
-    case 'sha512':
-      return new Sha512Hasher();
     case 'md5':
     default:
       return new Md5Hasher();
