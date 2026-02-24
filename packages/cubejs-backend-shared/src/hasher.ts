@@ -114,7 +114,7 @@ class XxHasher implements Hasher {
     const hash = xxh3.xxh128(combined);
 
     if (encoding === 'hex') {
-      return hash.toString(16);
+      return hash.toString(16).padStart(32, '0');
     }
 
     /*
