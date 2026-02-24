@@ -607,11 +607,7 @@ export class PreAggregations {
    * Returns function to determine whether pre-aggregation can be used or not
    * for specified query, or its value for `refs` if specified.
    */
-  public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery, refs?: null): CanUsePreAggregationFn;
-
-  public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery, refs: PreAggregationReferences): CanUsePreAggregationResult;
-
-  public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery, refs: PreAggregationReferences | null = null): CanUsePreAggregationFn | CanUsePreAggregationResult {
+  public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery): CanUsePreAggregationFn {
     /**
      * Returns an array of 2-elements arrays with the dimension and granularity
      * sorted by the concatenated dimension + granularity key.
@@ -811,11 +807,7 @@ export class PreAggregations {
         })
         : canUsePreAggregationNotAdditive;
 
-    if (refs) {
-      return canUseFn(refs);
-    } else {
-      return canUseFn;
-    }
+    return canUseFn;
   }
 
   private static squashDimensions(flattenDimensionMembers: BaseMember[]): string[] {

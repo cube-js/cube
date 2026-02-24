@@ -77,12 +77,11 @@ describe('Pre Aggregation by filter match tests', () => {
       segments: querySegments?.map(s => `cube.${s}`),
     });
 
-    const result = PreAggregations.canUsePreAggregationForTransformedQueryFn(
+    const canUseFn = PreAggregations.canUsePreAggregationForTransformedQueryFn(
       PreAggregations.transformQueryToCanUseForm(query),
-      refs
     );
 
-    expect(result.canUse).toEqual(expecting);
+    expect(canUseFn(refs).canUse).toEqual(expecting);
   }
 
   it('1 Dimension, 1 Filter', () => testPreAggregationMatch(

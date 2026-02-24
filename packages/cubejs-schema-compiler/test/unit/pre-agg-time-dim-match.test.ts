@@ -83,12 +83,11 @@ describe('Pre Aggregation by filter match tests', () => {
       timezone: queryTimeZone,
     });
 
-    const result = PreAggregations.canUsePreAggregationForTransformedQueryFn(
+    const canUseFn = PreAggregations.canUsePreAggregationForTransformedQueryFn(
       PreAggregations.transformQueryToCanUseForm(query),
-      refs
     );
 
-    expect(result.canUse).toEqual(expecting);
+    expect(canUseFn(refs).canUse).toEqual(expecting);
   }
 
   it('1 count measure, day, day', () => testPreAggregationMatch(
