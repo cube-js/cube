@@ -156,6 +156,7 @@ describe('GraphQL Schema', () => {
         schema,
         context: {
           req,
+          res,
           apiGateway: {
             async load({ query, res: response }) {
               expect(query).toMatchSnapshot(req.body.query);
@@ -180,6 +181,7 @@ describe('GraphQL Schema', () => {
         schema,
         context: {
           req,
+          res,
           apiGateway: {
             async load({ query, res: response }) {
               expect(query).toMatchSnapshot(req.body.query);
@@ -232,6 +234,7 @@ describe('GraphQL Schema', () => {
         schema,
         context: {
           req,
+          res,
           apiGateway: {
             async load({ query, res: response }) {
               expect(query).toMatchSnapshot(req.body.query);

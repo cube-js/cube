@@ -6,7 +6,7 @@ Object {
     "cube": Array [
       Object {
         "orders": Object {
-          "count": "10",
+          "count": null,
           "status": "completed",
         },
       },
