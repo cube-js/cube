@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
 +-------------------------------------------------------+-------------------------------------------------+
 | plan_type                                             | plan                                            |
@@ -9,7 +9,6 @@ expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n       
 |                                                       |   EmptyRelation                                 |
 | logical_plan after simplify_expressions               | SAME TEXT AS ABOVE                              |
 | logical_plan after eliminate_filter                   | SAME TEXT AS ABOVE                              |
-| logical_plan after common_sub_expression_eliminate    | SAME TEXT AS ABOVE                              |
 | logical_plan after eliminate_limit                    | SAME TEXT AS ABOVE                              |
 | logical_plan after projection_drop_out                | SAME TEXT AS ABOVE                              |
 | logical_plan after filter_push_down                   | SAME TEXT AS ABOVE                              |

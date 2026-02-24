@@ -61,6 +61,11 @@ pub fn defaults() -> DatabaseVariables {
             ScalarValue::Utf8(Some("none".to_string())),
             None,
         ),
+        DatabaseVariable::system(
+            "server_version_num".to_string(),
+            ScalarValue::Utf8(Some("140002".to_string())),
+            None,
+        ),
         // Custom cubesql variables
         DatabaseVariable::user_defined(
             CUBESQL_PENALIZE_POST_PROCESSING_VAR.to_string(),

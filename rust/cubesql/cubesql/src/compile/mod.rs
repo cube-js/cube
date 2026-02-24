@@ -18453,4 +18453,125 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_server_version_num_setting() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "server_version_num_setting",
+            execute_query(
+                "select cast(setting as integer) from pg_settings where name = 'server_version_num'".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_talend_tables_and_views() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "talend_tables_and_views",
+            execute_query(
+                r#"
+                ( 
+                    select
+                        t.schemaname                  as ownerName,
+                        t.tablename                   as tableName,
+                        /*c.oid*/ cast(c.oid as bigint) as objectId, 
+                        (select n_live_tup from pg_stat_user_tables s where s.schemaname=t.schemaname and s.relname=t.tablename)  as row_count,
+                        1						as tableType
+                    from pg_tables t, pg_class c, pg_namespace n
+                    /*where clause number 1 (table where clause)*/
+                    where t.tablename=c.relname
+                        and   n.oid	   = c.relnamespace
+                        and   t.schemaname = n.nspname
+                        and t.schemaname <> 'information_schema'
+                        and t.tablename  <> 'attrep_ddl_audit'
+                        and t.tablename  <> 'attrep_heartbeat'
+                        and
+                        (
+                            (( (1=0) ) -- Explicit Inclusion
+                            or 
+                            (
+                                ( 
+                        t.schemaname LIKE 'public' and t.schemaname not like 'pg\_%' and t.tablename LIKE '%'
+                        ) -- Patterned Inclusion
+                                and not
+                                ( 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_loopback%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_changes%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_apply%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_truncation%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_audit_table'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_status'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_suspended_tables'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_history'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_cdc_%'
+                        ) -- Patterned exclusion
+                            ))
+                            and 
+                            (1=1) 
+                        )
+
+                    UNION
+
+                    select
+                        v.schemaname                  as ownerName,
+                        v.viewname                   as tableName,
+                        /*c.oid*/ cast(c.oid as bigint) as objectId, 
+                        0  as row_count,/**/ 
+                        2						as tableType
+                    from pg_views v, pg_class c, pg_namespace n
+                    /*where clause number 2 (view where clause)*/ 
+                    where v.viewname = c.relname
+                        and   n.oid	    = c.relnamespace
+                        and   v.schemaname = n.nspname
+                        and v.schemaname <> 'information_schema'
+                        and v.viewname  <> 'attrep_ddl_audit'
+                        and v.viewname  <> 'attrep_heartbeat'
+                        and
+                        (
+                            (( (1=0) ) -- Explicit Inclusion
+                            or 
+                            (
+                                ( (1=0) ) -- Patterned Inclusion
+                                and not
+                                ( (1=0) ) -- Patterned exclusion
+                            ))
+                            and 
+                            (1=1) 
+                        )
+                )
+                order by 1,2
+                "#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_encoding_to_char_column_name() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_encoding_to_char_column_name",
+            execute_query(
+                "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
