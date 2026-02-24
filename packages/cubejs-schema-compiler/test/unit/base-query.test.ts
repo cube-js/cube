@@ -1012,7 +1012,7 @@ describe('SQL Generation', () => {
               relationship: 'one_to_one'
             },
           }`
-        }).replace('sql: `${CUBE}.location = \'San Francisco\'`', 'sql: `${FILTER_PARAMS.cardsA.location.filter(\'location\')}`'),
+        }).replace(`sql: \`\${CUBE}.location = 'San Francisco'\``, `sql: \`\${FILTER_PARAMS.cardsA.location.filter('location')}\``),
         createCubeSchema({
           name: 'cardsB',
           sqlTable: 'card2_tbl',
