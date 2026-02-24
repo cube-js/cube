@@ -680,14 +680,14 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           };
 
           return results.data.map(entry => R.toPairs(entry)
-            .reduce((res, pair) => {
+            .reduce((accum, pair) => {
               let path = pair[0].split('.');
               path[0] = unCapitalize(path[0]);
               if (results.annotation.dimensions[pair[0]]?.type === 'time') {
                 path = [...path, 'value'];
               }
               return (results.annotation.timeDimensions[pair[0]] && path.length !== 3)
-                ? res : R.set(R.lensPath(path), pair[1], res);
+                ? accum : R.set(R.lensPath(path), pair[1], res);
             }, {}));
         }
       });
