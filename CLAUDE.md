@@ -112,6 +112,16 @@ yarn test
 3. **Testing**: Run relevant tests for modified packages
 4. **Linting**: Ensure code passes `yarn lint` before committing
 
+## Git
+
+Use conventional commits with these prefixes:
+- `feat:` — new features
+- `fix:` — bug fixes
+- `docs:` — documentation changes
+- `refactor:` — code refactoring
+
+Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(databricks-jdbc-driver):`.
+
 ## Common File Patterns
 
 - `*.test.ts/js`: Jest unit tests

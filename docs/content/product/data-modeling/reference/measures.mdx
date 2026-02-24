@@ -499,6 +499,133 @@ cube(`time_shift`, {
 
 </CodeTabs>
 
+### `group_by`
+
+The `group_by` parameter is used with [multi-stage measures][ref-multi-stage] to specify
+dimensions that should be used for the `GROUP BY` of the inner aggregation stage,
+*ignoring* any dimensions present in the query.
+
+This is commonly used for fixed dimension calculations — computing a measure at a fixed
+granularity regardless of the query's dimensions. For example, calculating percent of
+total or comparing individual items to a broader dataset.
+
+<CodeTabs>
+
+```yaml
+measures:
+  - name: country_revenue
+    multi_stage: true
+    sql: "{revenue}"
+    type: sum
+    group_by:
+      - country
+```
+
+```javascript
+measures: {
+  country_revenue: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `sum`,
+    group_by: [country]
+  }
+}
+```
+
+</CodeTabs>
+
+`group_by` accepts a list of dimension names from the same cube. The inner stage will
+group by *only* these dimensions, while the outer aggregation will group by the query's
+dimensions.
+
+| Parameter | Inner `GROUP BY` | Outer `GROUP BY` |
+|---|---|---|
+| `group_by` | Only the listed dimensions | Query dimensions |
+| `reduce_by` | Query dimensions minus listed | Query dimensions |
+| `add_group_by` | Query dimensions plus listed | Query dimensions |
+
+### `reduce_by`
+
+The `reduce_by` parameter is used with [multi-stage measures][ref-multi-stage] to specify
+dimensions that should be *removed* from the `GROUP BY` of the inner aggregation stage.
+
+This is commonly used for ranking calculations — computing a rank across a dimension
+while still allowing grouping by other dimensions in the query.
+
+<CodeTabs>
+
+```yaml
+measures:
+  - name: product_rank
+    multi_stage: true
+    order_by:
+      - sql: "{revenue}"
+        dir: asc
+    reduce_by:
+      - product
+    type: rank
+```
+
+```javascript
+measures: {
+  product_rank: {
+    multi_stage: true,
+    order_by: [{
+      sql: `${revenue}`,
+      dir: `asc`
+    }],
+    reduce_by: [product],
+    type: `rank`
+  }
+}
+```
+
+</CodeTabs>
+
+`reduce_by` accepts a list of dimension names. The inner stage will group by the query's
+dimensions *minus* the listed dimensions, while the outer aggregation will group by the
+query's dimensions.
+
+### `add_group_by`
+
+The `add_group_by` parameter is used with [multi-stage measures][ref-multi-stage] to
+specify dimensions that should be *added* to the `GROUP BY` of the inner aggregation
+stage, in addition to any dimensions present in the query.
+
+This is commonly used for [nested aggregate][ref-nested-aggregate] patterns — computing
+an aggregate of an aggregate. For example, averaging per-user metrics or counting how
+many groups exceed a threshold.
+
+<CodeTabs>
+
+```yaml
+measures:
+  - name: avg_user_score
+    multi_stage: true
+    sql: "{avg_score}"
+    type: avg
+    add_group_by:
+      - user_id
+```
+
+```javascript
+measures: {
+  avg_user_score: {
+    multi_stage: true,
+    sql: `${avg_score}`,
+    type: `avg`,
+    add_group_by: [user_id]
+  }
+}
+```
+
+</CodeTabs>
+
+`add_group_by` accepts a list of dimension names from the same cube. The listed
+dimensions will be included in the inner stage's `GROUP BY` but will *not* appear
+in the outer aggregation — they are used only to define the granularity at which
+the base measure is computed before the outer aggregation is applied.
+
 ### `time_shift`
 
 The `time_shift` parameter is used to configure a [time shift][ref-time-shift] for a
@@ -1058,5 +1185,6 @@ cubes:
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage]: /product/data-modeling/concepts/multi-stage-calculations
 [ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
+[ref-nested-aggregate]: /product/data-modeling/concepts/multi-stage-calculations#nested-aggregate
 [ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /product/data-modeling/reference/types-and-formats#switch

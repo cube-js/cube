@@ -15,6 +15,8 @@ pub struct PreAggregation {
     dimensions: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
     time_dimensions: Vec<Rc<MemberSymbol>>,
+    #[builder(default)]
+    segments: Vec<Rc<MemberSymbol>>,
     external: bool,
     #[builder(default)]
     granularity: Option<String>,
@@ -41,6 +43,10 @@ impl PreAggregation {
 
     pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
+    }
+
+    pub fn segments(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.segments
     }
 
     pub fn external(&self) -> bool {
@@ -113,6 +119,11 @@ impl PreAggregation {
                 base_symbol.full_name(),
                 QualifiedColumnName::new(None, alias.clone()),
             );
+        }
+
+        for segment in self.segments().iter() {
+            let alias = segment.alias();
+            res.insert(segment.full_name(), QualifiedColumnName::new(None, alias));
         }
 
         if let PreAggregationSource::Join(join) = self.source().as_ref() {

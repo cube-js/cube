@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__status" "orders__status", date_trunc('month', "orders__created_at_day") "orders__created_at_month", sum("orders__count") "orders__count" 
+FROM  orders__segment_rollup  AS "orders__segment_rollup"
+WHERE ("orders__high_priority")
+GROUP BY 1, 2
+ORDER BY  2  ASC

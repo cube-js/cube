@@ -104,3 +104,54 @@ fn test_diamond_join_over_view_sql() {
 
     insta::assert_snapshot!(sql);
 }
+
+#[test]
+fn test_simple_segment_sql() {
+    let schema = MockSchema::from_yaml_file("common/simple.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - customers.count
+        segments:
+          - customers.new_york
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with segment");
+
+    assert!(
+        sql.contains("city = 'New York'"),
+        "SQL should contain segment condition"
+    );
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_segment_as_dimension_in_pre_aggregation_query() {
+    let schema = MockSchema::from_yaml_file("common/simple.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    // In JS, evaluatePreAggregationReferences() concatenates segments into dimensions
+    // before sending the query. So segments arrive as dimensions, not as segments.
+    let query_yaml = indoc! {"
+        measures:
+          - customers.count
+        dimensions:
+          - customers.new_york
+        pre_aggregation_query: true
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with segment as dimension");
+
+    assert!(
+        !sql.contains("WHERE"),
+        "Segment should not be in WHERE clause for pre-aggregation query"
+    );
+
+    insta::assert_snapshot!(sql);
+}

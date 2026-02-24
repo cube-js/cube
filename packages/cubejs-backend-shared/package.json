@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/shared",
-  "version": "1.6.14",
+  "version": "1.6.15",
   "description": "Shared code for Cube.js backend packages",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -27,7 +27,7 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.14",
+    "@cubejs-backend/linter": "1.6.15",
     "@types/bytes": "^3.1.5",
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.7",

@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__status" "orders__status", "orders__city" "orders__city", sum("orders__avg_amount") "orders__avg_amount" 
+FROM  orders__main_rollup  AS "orders__main_rollup"
+GROUP BY 1, 2
+ORDER BY  3  DESC

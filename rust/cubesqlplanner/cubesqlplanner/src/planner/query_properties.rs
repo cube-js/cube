@@ -153,6 +153,7 @@ impl QueryProperties {
                             name.clone(),
                             MemberExpressionExpression::SqlCall(expression_call),
                             member_expression.static_data().definition.clone(),
+                            None,
                             query_tools.base_tools().clone(),
                         )?;
                         Ok(MemberSymbol::new_member_expression(
@@ -262,6 +263,7 @@ impl QueryProperties {
                             name.clone(),
                             expression,
                             member_expression.static_data().definition.clone(),
+                            None,
                             query_tools.base_tools().clone(),
                         )?;
                         Ok(MemberSymbol::new_member_expression(member_expression_symbol))

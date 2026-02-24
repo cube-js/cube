@@ -66,12 +66,20 @@ export class SQLServer {
     throw new Error('Native api gateway is not enabled');
   }
 
+  private getSqlInterfaceInstance(): SqlInterfaceInstance {
+    if (!this.sqlInterfaceInstance) {
+      throw new Error('SQL interface is not initialized. Please enable the SQL interface in your settings.');
+    }
+
+    return this.sqlInterfaceInstance;
+  }
+
   public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode, timezone?: string) {
-    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext, cacheMode, timezone);
+    await execSql(this.getSqlInterfaceInstance(), sqlQuery, stream, securityContext, cacheMode, timezone);
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
-    return sql4sql(this.sqlInterfaceInstance!, sqlQuery, disablePostProcessing, securityContext);
+    return sql4sql(this.getSqlInterfaceInstance(), sqlQuery, disablePostProcessing, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {

@@ -19,10 +19,12 @@ pub enum MemberExpressionExpression {
 pub struct MemberExpressionSymbol {
     cube_name: String,
     name: String,
+    alias: String,
     expression: MemberExpressionExpression,
     #[allow(dead_code)]
     definition: Option<String>,
     is_reference: bool,
+    parenthesized: bool,
 }
 
 impl MemberExpressionSymbol {
@@ -31,8 +33,10 @@ impl MemberExpressionSymbol {
         name: String,
         expression: MemberExpressionExpression,
         definition: Option<String>,
+        alias: Option<String>,
         _base_tools: Rc<dyn BaseTools>,
     ) -> Result<Rc<Self>, CubeError> {
+        let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
@@ -40,9 +44,11 @@ impl MemberExpressionSymbol {
         Ok(Rc::new(Self {
             cube_name,
             name,
+            alias,
             expression,
             definition,
             is_reference,
+            parenthesized: false,
         }))
     }
 
@@ -61,7 +67,17 @@ impl MemberExpressionSymbol {
                 visitor.apply(symbol, node_processor, templates)?
             }
         };
-        Ok(sql)
+        if self.parenthesized {
+            Ok(format!("({})", sql))
+        } else {
+            Ok(sql)
+        }
+    }
+
+    pub fn with_parenthesized(self: &Rc<Self>) -> Rc<Self> {
+        let mut result = self.as_ref().clone();
+        result.parenthesized = true;
+        Rc::new(result)
     }
 
     pub fn full_name(&self) -> String {
@@ -69,7 +85,7 @@ impl MemberExpressionSymbol {
     }
 
     pub fn alias(&self) -> String {
-        PlanSqlTemplates::alias_name(&self.name)
+        self.alias.clone()
     }
 
     pub fn is_reference(&self) -> bool {

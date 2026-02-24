@@ -103,6 +103,18 @@ fn count_measure_variants() {
 }
 
 #[test]
+fn simple_segment_sql_evaluation() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
+    let context = TestContext::new(schema).unwrap();
+
+    let segment = context.create_segment("test_cube.is_active").unwrap();
+    let sql = context
+        .evaluate_symbol(&segment.member_evaluator())
+        .unwrap();
+    assert_eq!(sql, r#""test_cube".status = 'active'"#);
+}
+
+#[test]
 fn composite_symbols() {
     let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
     let context = TestContext::new(schema).unwrap();
