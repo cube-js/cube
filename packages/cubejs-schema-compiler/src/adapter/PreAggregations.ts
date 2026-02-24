@@ -784,10 +784,10 @@ export class PreAggregations {
         R.all(
           (m: string) => references.measures.indexOf(m) !== -1,
           references.rollups.length > 0 ? transformedQuery.leafMeasures : transformedQuery.leafMeasuresFullPaths,
-        ) || R.all(
+        ) || (transformedQuery.isAdditive && R.all(
           m => backAliasMeasures.indexOf(m) !== -1,
           transformedQuery.measures,
-        )
+        ))
       ) && (
         dimensionsMatch(transformedQuery.sortedDimensions, true) && timeDimensionsMatch(queryTimeDimensionsList, true) ||
         dimensionsMatch(transformedQuery.ownedDimensions, false) && timeDimensionsMatch(ownedQueryTimeDimensionsList, false)
