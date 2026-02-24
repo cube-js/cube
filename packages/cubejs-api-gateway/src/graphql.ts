@@ -646,7 +646,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             type: 'RootOrderByInput'
           }),
         },
-        resolve: async (_, args, { req, apiGateway }, info) => {
+        resolve: async (_, args, { req, res, apiGateway }, info) => {
           const query = getJsonQuery(metaConfig, args, info);
 
           const results = await new Promise<any>((resolve, reject) => {
@@ -673,6 +673,13 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
 
           // TODO: Move postprocessing to native?
           parseDates(results);
+
+          if (res) {
+            res.extensions = {
+              annotation: results.annotation,
+              lastRefreshTime: results.lastRefreshTime,
+            };
+          }
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
