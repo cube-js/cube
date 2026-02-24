@@ -674,12 +674,10 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           // TODO: Move postprocessing to native?
           parseDates(results);
 
-          if (res) {
-            res.extensions = {
-              annotation: results.annotation,
-              lastRefreshTime: results.lastRefreshTime,
-            };
-          }
+          res.extensions = {
+            annotation: results.annotation,
+            lastRefreshTime: results.lastRefreshTime,
+          };
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
