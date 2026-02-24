@@ -23,7 +23,7 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate measure \'count\' in cube \'orders\'');
+        expect(e.message).toContain("Found duplicate measure 'count' in cube 'orders'");
       }
     });
 
@@ -46,7 +46,7 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate dimension \'id\' in cube \'orders\'');
+        expect(e.message).toContain("Found duplicate dimension 'id' in cube 'orders'");
       }
     });
 
@@ -71,7 +71,7 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate segment \'active\' in cube \'orders\'');
+        expect(e.message).toContain("Found duplicate segment 'active' in cube 'orders'");
       }
     });
 
@@ -102,8 +102,8 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate measure \'count\' in cube \'orders\'');
-        expect(e.message).toContain('Found duplicate measure \'total\' in cube \'orders\'');
+        expect(e.message).toContain("Found duplicate measure 'count' in cube 'orders'");
+        expect(e.message).toContain("Found duplicate measure 'total' in cube 'orders'");
       }
     });
 
@@ -142,7 +142,7 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate preAggregation.index \'status_idx\' in pre-aggregation \'main\' in cube \'orders\'');
+        expect(e.message).toContain("Found duplicate preAggregation.index 'status_idx' in pre-aggregation 'main' in cube 'orders'");
       }
     });
 
@@ -170,7 +170,7 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate cube name \'orders\'');
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
       }
     });
 
@@ -205,7 +205,7 @@ views:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate view name \'orders_view\'');
+        expect(e.message).toContain("Found duplicate view name 'orders_view'");
       }
     });
 
@@ -238,7 +238,7 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Found duplicate dimension.granularity \'fiscal_year\' in time dimension \'created_at\' in cube \'orders\'');
+        expect(e.message).toContain("Found duplicate dimension.granularity 'fiscal_year' in time dimension 'created_at' in cube 'orders'");
       }
     });
   });
