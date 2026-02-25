@@ -10,7 +10,7 @@ layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
 <SuccessBox>
 
 Semantic Layer Sync is available in Cube Cloud.
-<br/>Support for Metabase, Preset, and Superset is available on [all product tiers](https://cube.dev/pricing).
+<br/>Support for Preset and Superset is available on [all product tiers](https://cube.dev/pricing).
 <br/>Support for Tableau is available on [Enterprise and above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
@@ -19,8 +19,6 @@ Semantic Layer Sync programmatically connects a BI tool to Cube via the [SQL
 API][ref-sql-api] and creates or updates BI-specific entities that correspond to
 entities within the data model in Cube, e.g., cubes, views, measures,
 dimensions.
-
-<Diagram src="https://ucarecdn.com/f598f41c-36ec-4ed9-960f-7c902a77ed74/" />
 
 In general, here's how Cube entities match BI-specific ones:
 
@@ -40,11 +38,6 @@ on configuration and features for specific tools:
     url="semantic-layer-sync/superset"
     imageUrl="https://static.cube.dev/icons/superset.svg"
     title="Apache Superset"
-  />
-  <GridItem
-    url="semantic-layer-sync/metabase"
-    imageUrl="https://static.cube.dev/icons/metabase.svg"
-    title="Metabase"
   />
   <GridItem
     url="semantic-layer-sync/preset"
@@ -67,11 +60,8 @@ Currently, it's recommended to use the [DAX API][ref-dax-api].
 
 ## Creating syncs
 
-You can create a new sync by navigating to the <Btn>Semantic Layer Sync</Btn>
-tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>+ Create
-Sync</Btn>.
-
-<Screenshot src="https://ucarecdn.com/d4f4c753-ea8f-459b-aec2-73846da06b41/" />
+You can create a new sync by navigating to <Btn>IDE → Integrations</Btn>
+and clicking <Btn>+ Create Sync</Btn>.
 
 Follow the steps in the wizard to create a sync with any of supported BI tools.
 
@@ -170,12 +160,12 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
 
   return [
     {
-      'type': 'metabase',
-      'name': f"Metabase Sync for {department}",
+      'type': 'superset',
+      'name': f"Superset Sync for {department}",
       'config': {
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
-        'url': 'example.metabaseapp.com',
+        'url': 'superset.example.com',
         'database': f"Cube Cloud: {department}",
       }
     }
@@ -185,20 +175,20 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
 ```javascript
 module.exports = {
   semanticLayerSync: ({ securityContext }) => {
-        const department = securityContext.department
+    const department = securityContext.department
 
     return [
       {
-        type: "metabase",
-        name: `Metabase Sync for ${department}`,
+        type: "superset",
+        name: `Superset Sync for ${department}`,
         config: {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
-          url: "example.metabaseapp.com",
+          url: "superset.example.com",
           database: `Cube Cloud: ${department}`
         }
       }
-        ]
+    ]
   }
 }
 ```
@@ -372,20 +362,15 @@ can't run syncs on schedule.
 
 ### Manually
 
-You can also run a sync manually by navigating to the <Btn>Semantic Layer
-Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>Start
-Sync</Btn> next to a relevant sync. This is convenient for working in the
+You can also run a sync manually by navigating to <Btn>IDE → Integrations</Btn>
+and clicking <Btn>Start Sync</Btn> next to a relevant sync. This is convenient for working in the
 [development mode][ref-dev-mode].
-
-<Screenshot src="https://ucarecdn.com/e48cef02-cc89-466d-a293-11a04aacb116/" />
 
 ## Viewing history
 
 You can view the history of runs for a particular sync by navigating to
-the <Btn>Semantic Layer Sync</Btn> tab on the <Btn>BI Integrations</Btn> page
-and clicking <Btn>Show History</Btn> next to a relevant sync.
-
-<Screenshot src="https://ucarecdn.com/a3cc5fc8-8458-483e-999c-5654eb8072b4/" />
+<Btn>IDE → Integrations</Btn> and clicking <Btn>Show History</Btn> next to a
+relevant sync.
 
 ## Cleaning up
 
@@ -393,11 +378,6 @@ You can remove the synced assets (e.g., data sources and datasets) from BI tools
 by clicking on <Btn>...</Btn> of a respective tool and choosing <Btn>Remove synced
 assets</Btn>. It would remove the assets synced from the branch you're currently
 on, i.e., your development mode branch, shared branch, or main branch.
-
-<Screenshot
-  highlight="inset(72.5% 0.5% 5% 80% round 10px)"
-  src="https://ucarecdn.com/10770acd-a358-4b6a-98bc-6eb1bf9c0a81/"
-/>
 
 
 [ref-data-model]: /product/data-modeling/overview

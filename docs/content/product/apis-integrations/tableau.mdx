@@ -1,29 +1,32 @@
-# Semantic Layer Sync with Tableau
+---
+---
 
-This page details the support for [Tableau](https://www.tableau.com)
-in [Semantic Layer Sync](/product/apis-integrations/semantic-layer-sync).
+# Tableau
 
-<SuccessBox>
+You can connect [Tableau](https://www.tableau.com) to Cube using
+[Semantic Layer Sync][ref-sls]. It will programmatically create and
+update Tableau data sources that are connected to Cube via the
+[SQL API][ref-sql-api].
+
+<InfoBox>
 
 Semantic Layer Sync with Tableau is available on
 [Enterprise and above](https://cube.dev/pricing) product tiers.
 
-</SuccessBox>
+</InfoBox>
 
 Semantic Layer Sync works with Tableau Cloud, Tableau Desktop, and Tableau Server.
 
-## Configuration
+## Setting up Semantic Layer Sync
+
+You can create a new sync by navigating to <Btn>IDE → Integrations</Btn>
+in Cube.
 
 To create a new sync, choose either <Btn>Tableau Cloud</Btn>, <Btn>Tableau Desktop</Btn>,
-or <Btn>Tableau Server</Btn>:
-
-<Screenshot
-  highlight="inset(44% 35% 45% 20% round 10px)"
-  src="https://ucarecdn.com/36c23111-871d-4d2a-927f-877df954b090/"
-/>
+or <Btn>Tableau Server</Btn>.
 
 For Tableau Cloud and Tableau Server,
-data model is synchronized via the [Tableau API][tableau-api] which uses [personal
+the data model is synchronized via the [Tableau API][tableau-api] which uses [personal
 access tokens][tableau-pat] for authentication. You can create a new [personal access
 token][tableau-api-authentication] on the&nbsp;<Btn>My Account Settings</Btn> page.
 
@@ -101,25 +104,36 @@ When connecting a Cube Cloud data source to your Tableau workbook, you will be p
 to enter the user name and password for Cube Cloud. You can find them at the&nbsp;<Btn>SQL
 API Connection</Btn> tab on the&nbsp;<Btn>IDE → Integrations</Btn> page in Cube Cloud.
 
-## Features
-
-Syncs with Tableau Cloud and Tableau Server run automatically via the [Tableau
-API][tableau-api].
-
 ### Tableau Desktop
 
-Click <Btn>Download .tds</Btn> to download a Tableau [data source][tds] file:
-
-<Screenshot
-  highlight="inset(80% 1% 9% 5% round 10px)"
-  src="https://ucarecdn.com/4b93196e-3128-4b01-bd3f-eab8e7d8a37f/"
-/>
-
+You can download a Tableau [data source][tds] file by clicking <Btn>Download .tds</Btn>.
 In the modal window, select one or more cubes or views and click <Btn>Download
 all selected</Btn> to download a ZIP archive with Tableau data source files, one
-per cube or view. Use can open these files in Tableau to create data sources.
+per cube or view. You can open these files in Tableau to create data sources.
 
+## Authenticating users
 
+Semantic Layer Sync handles authentication automatically. When a user
+authenticates from Tableau to Cube, they are matched to a Cube user by
+their email address.
+
+For this to work, the same users that access Tableau must also exist in
+Cube. If you use an identity provider such as [Microsoft Entra ID][ref-entra]
+or [Okta][ref-okta], we recommend using [SCIM][ref-scim] for automated
+user provisioning.
+
+You can use [user attributes][ref-user-attributes] and
+[user groups][ref-user-groups] in combination with
+[data access policies][ref-dap] to control which data each user can access.
+
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
+[ref-scim]: /product/administration/sso/microsoft-entra-id/scim
+[ref-entra]: /product/administration/sso/microsoft-entra-id
+[ref-okta]: /product/administration/sso/okta
+[ref-user-attributes]: /product/administration/users-and-permissions/user-attributes
+[ref-user-groups]: /product/administration/users-and-permissions/user-groups
+[ref-dap]: /product/auth/data-access-policies
+[ref-sql-api]: /product/apis-integrations/sql-api
 [tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
 [tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
 [tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
