@@ -231,8 +231,8 @@ impl CaseSwitchDefinition {
     fn get_switch_values(&self) -> Option<Vec<String>> {
         if let CaseSwitchItem::Member(member) = &self.switch {
             if let Ok(switch_dim) = member.as_dimension() {
-                if switch_dim.dimension_type() == "switch" {
-                    return Some(switch_dim.values().clone());
+                if switch_dim.is_switch() {
+                    return Some(switch_dim.values().to_vec());
                 }
             }
         }

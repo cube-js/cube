@@ -32,7 +32,7 @@ impl SqlNode for GeoDimensionSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
-                if ev.dimension_type() == "geo" {
+                if ev.is_geo() {
                     if let (Some(latitude), Some(longitude)) = (ev.latitude(), ev.longitude()) {
                         let latitude_str = latitude.eval(
                             visitor,
