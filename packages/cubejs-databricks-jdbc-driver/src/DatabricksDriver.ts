@@ -952,7 +952,7 @@ export class DatabricksDriver extends JDBCDriver {
         INSERT OVERWRITE DIRECTORY '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
         USING CSV
         OPTIONS (escape '"')
-        AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
+        SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
       `,
       [],
     );
