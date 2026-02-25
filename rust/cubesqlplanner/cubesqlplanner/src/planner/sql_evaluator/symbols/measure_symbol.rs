@@ -1,4 +1,5 @@
 use super::common::Case;
+use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -73,7 +74,7 @@ pub struct MeasureSymbol {
     name: String,
     alias: String,
     owned_by_cube: bool,
-    measure_type: String,
+    kind: MeasureKind,
     rolling_window: Option<RollingWindow>,
     is_multi_stage: bool,
     is_reference: bool,
@@ -102,7 +103,9 @@ impl MeasureSymbol {
         owned_by_cube: bool,
         case: Option<Case>,
         pk_sqls: Vec<Rc<SqlCall>>,
-        definition: Rc<dyn MeasureDefinition>,
+        kind: MeasureKind,
+        rolling_window: Option<RollingWindow>,
+        is_multi_stage: bool,
         measure_filters: Vec<Rc<SqlCall>>,
         measure_drill_filters: Vec<Rc<SqlCall>>,
         time_shift: Option<MeasureTimeShifts>,
@@ -111,9 +114,6 @@ impl MeasureSymbol {
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Rc<Self> {
-        let measure_type = definition.static_data().measure_type.clone();
-        let rolling_window = definition.static_data().rolling_window.clone();
-        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
         Rc::new(Self {
             cube,
             name,
@@ -124,7 +124,7 @@ impl MeasureSymbol {
             case,
             pk_sqls,
             owned_by_cube,
-            measure_type,
+            kind,
             rolling_window,
             measure_filters,
             measure_drill_filters,
@@ -140,17 +140,24 @@ impl MeasureSymbol {
 
     pub fn new_unrolling(&self) -> Rc<Self> {
         if self.is_rolling_window() {
-            let measure_type = if self.is_multi_stage {
-                format!("number")
+            let kind = if self.is_multi_stage {
+                if let Some(sql) = &self.member_sql {
+                    MeasureKind::Calculated(CalculatedMeasure::new(
+                        CalculatedMeasureType::Number,
+                        sql.clone(),
+                    ))
+                } else {
+                    MeasureKind::Unknown("number".to_string())
+                }
             } else {
-                self.measure_type.clone()
+                self.kind.clone()
             };
             Rc::new(Self {
                 cube: self.cube.clone(),
                 name: self.name.clone(),
                 alias: self.alias.clone(),
                 owned_by_cube: self.owned_by_cube,
-                measure_type,
+                kind,
                 rolling_window: None,
                 is_multi_stage: false,
                 is_reference: false,
@@ -177,23 +184,27 @@ impl MeasureSymbol {
         new_measure_type: Option<String>,
         add_filters: Vec<Rc<SqlCall>>,
     ) -> Result<Rc<Self>, CubeError> {
-        let result_measure_type = if let Some(new_measure_type) = new_measure_type {
-            match self.measure_type.as_str() {
+        let current_type = self.kind.measure_type_str();
+        let (result_kind, result_type_str) = if let Some(new_measure_type) = new_measure_type {
+            match current_type {
                 "sum" | "avg" | "min" | "max" => match new_measure_type.as_str() {
                     "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx" => {}
                     _ => {
                         return Err(CubeError::user(format!(
                             "Unsupported measure type replacement for {}: {} => {}",
-                            self.name, self.measure_type, new_measure_type
+                            self.name, current_type, new_measure_type
                         )))
                     }
                 },
-                "count_distinct" | "count_distinct_approx" => match new_measure_type.as_str() {
+                "count_distinct"
+                | "count_distinct_approx"
+                | "countDistinct"
+                | "countDistinctApprox" => match new_measure_type.as_str() {
                     "count_distinct" | "count_distinct_approx" => {}
                     _ => {
                         return Err(CubeError::user(format!(
                             "Unsupported measure type replacement for {}: {} => {}",
-                            self.name, self.measure_type, new_measure_type
+                            self.name, current_type, new_measure_type
                         )))
                     }
                 },
@@ -201,18 +212,23 @@ impl MeasureSymbol {
                 _ => {
                     return Err(CubeError::user(format!(
                         "Unsupported measure type replacement for {}: {} => {}",
-                        self.name, self.measure_type, new_measure_type
+                        self.name, current_type, new_measure_type
                     )))
                 }
             }
-            new_measure_type
+            let new_kind = MeasureKind::from_type_str(
+                &new_measure_type,
+                self.member_sql.clone(),
+                self.pk_sqls.clone(),
+            );
+            (new_kind, new_measure_type)
         } else {
-            self.measure_type.clone()
+            (self.kind.clone(), current_type.to_string())
         };
 
         let mut measure_filters = self.measure_filters.clone();
         if !add_filters.is_empty() {
-            match result_measure_type.as_str() {
+            match result_type_str.as_str() {
                 "sum"
                 | "avg"
                 | "min"
@@ -223,18 +239,18 @@ impl MeasureSymbol {
                 _ => {
                     return Err(CubeError::user(format!(
                         "Unsupported additional filters for measure {} type {}",
-                        self.name, result_measure_type
+                        self.name, result_type_str
                     )))
                 }
             }
-            measure_filters.extend(add_filters.into_iter());
+            measure_filters.extend(add_filters);
         }
         Ok(Rc::new(Self {
             cube: self.cube.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
             owned_by_cube: self.owned_by_cube,
-            measure_type: result_measure_type,
+            kind: result_kind,
             rolling_window: self.rolling_window.clone(),
             is_multi_stage: self.is_multi_stage,
             is_reference: self.is_reference,
@@ -280,14 +296,11 @@ impl MeasureSymbol {
     }
 
     pub fn is_calculated(&self) -> bool {
-        Self::is_calculated_type(&self.measure_type)
+        self.kind.is_calculated()
     }
 
     pub fn is_calculated_type(measure_type: &str) -> bool {
-        match measure_type {
-            "number" | "string" | "time" | "boolean" => true,
-            _ => false,
-        }
+        CalculatedMeasureType::from_str(measure_type).is_some()
     }
 
     pub fn case(&self) -> Option<&Case> {
@@ -298,10 +311,7 @@ impl MeasureSymbol {
         if self.is_multi_stage() {
             false
         } else {
-            match self.measure_type().as_str() {
-                "sum" | "count" | "countDistinctApprox" | "min" | "max" => true,
-                _ => false,
-            }
+            self.kind.is_additive()
         }
     }
 
@@ -416,12 +426,10 @@ impl MeasureSymbol {
     }
 
     pub fn can_used_as_addictive_in_multplied(&self) -> bool {
-        if &self.measure_type == "countDistinct" || &self.measure_type == "countDistinctApprox" {
-            true
-        } else if &self.measure_type == "count" && self.member_sql.is_none() {
-            true
-        } else {
-            false
+        match &self.kind {
+            MeasureKind::Aggregated(agg) => agg.agg_type().is_distinct(),
+            MeasureKind::Count(count) => count.is_owned_by_cube(),
+            _ => false,
         }
     }
 
@@ -448,8 +456,12 @@ impl MeasureSymbol {
         deps.first().cloned()
     }
 
-    pub fn measure_type(&self) -> &String {
-        &self.measure_type
+    pub fn measure_type(&self) -> &str {
+        self.kind.measure_type_str()
+    }
+
+    pub fn kind(&self) -> &MeasureKind {
+        &self.kind
     }
 
     pub fn rolling_window(&self) -> &Option<RollingWindow> {
@@ -461,7 +473,7 @@ impl MeasureSymbol {
     }
 
     pub fn is_running_total(&self) -> bool {
-        self.measure_type() == "runningTotal"
+        matches!(&self.kind, MeasureKind::Unknown(s) if s == "runningTotal")
     }
 
     pub fn is_cumulative(&self) -> bool {
@@ -723,14 +735,16 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let measure_type = &definition.static_data().measure_type;
-        let is_calculated = MeasureSymbol::is_calculated_type(&measure_type)
-            && !definition.static_data().multi_stage.unwrap_or(false);
-
+        let measure_type_str = &definition.static_data().measure_type;
+        let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+
+        let kind = MeasureKind::from_type_str(measure_type_str, sql.clone(), pk_sqls.clone());
+        let is_calculated = kind.is_calculated() && !is_multi_stage;
+
         let owned_by_cube = if is_multi_stage {
             false
-        } else if measure_type == "count" && sql.is_none() {
+        } else if matches!(&kind, MeasureKind::Count(c) if c.is_owned_by_cube()) {
             true
         } else {
             let mut owned = false;
@@ -786,7 +800,9 @@ impl SymbolFactory for MeasureSymbolFactory {
             owned_by_cube,
             case,
             pk_sqls,
-            definition,
+            kind,
+            rolling_window,
+            is_multi_stage,
             measure_filters,
             measure_drill_filters,
             time_shifts,

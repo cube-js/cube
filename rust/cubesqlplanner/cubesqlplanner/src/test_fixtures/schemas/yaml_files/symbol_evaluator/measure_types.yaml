@@ -1,0 +1,33 @@
+cubes:
+    - name: test_cube
+      sql: "SELECT 1"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: source
+            type: string
+            sql: "{CUBE}.source"
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: status
+            type: string
+            sql: "{CUBE}.status"
+      measures:
+          - name: sum_revenue
+            type: sum
+            sql: revenue
+          - name: string_status
+            type: string
+            sql: "{CUBE.source}"
+          - name: time_last_activity
+            type: time
+            sql: "{CUBE.created_at}"
+          - name: boolean_has_revenue
+            type: boolean
+            sql: "{CUBE.sum_revenue} > 0"
+          - name: number_agg_metric
+            type: numberAgg
+            sql: "{CUBE.sum_revenue} * 100"

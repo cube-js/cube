@@ -154,7 +154,7 @@ impl BaseFilter {
                         .clone(),
                 ),
                 MemberSymbol::Measure(measure_symbol) => {
-                    Some(measure_symbol.measure_type().clone())
+                    Some(measure_symbol.measure_type().to_string())
                 }
                 _ => None,
             };
