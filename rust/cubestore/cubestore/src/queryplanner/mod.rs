@@ -561,10 +561,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
         .ok_or_else(|| {
             trace!("Table {} was not found, state: {:?}", name, self._data);
 
-            DataFusionError::Plan(format!(
-                "Table {} was not found\n{:?}",
-                name, table_path
-            ))
+            DataFusionError::Plan(format!("Table {} was not found\n{:?}", name, table_path))
         })
     }
 
