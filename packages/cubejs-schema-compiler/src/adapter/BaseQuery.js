@@ -771,7 +771,7 @@ export class BaseQuery {
     }
     const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
 
-    if (this.options.cacheMode !== 'no-cache' && !this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
+    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -844,10 +844,6 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (this.options.cacheMode === 'no-cache') {
-      return false;
-    }
-
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery?.preAggregation.external) {
