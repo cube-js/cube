@@ -47,7 +47,7 @@ export type LoadMethodOptions = {
    */
   progressCallback?(result: ProgressResult): void;
   /**
-   * Cache mode for query execution
+   * Server-side cache policy for query execution. Does not control client-side caching.
    */
   cache?: CacheMode;
   /**
@@ -733,14 +733,19 @@ class CubeApi {
   public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): Promise<CubeSqlResult> | UnsubscribeObj {
     return this.loadMethod(
       () => {
-        const request = this.request('cubesql', {
+        const cubesqlParams: Record<string, unknown> = {
           query: sqlQuery,
-          cache: options?.cache,
           method: 'POST',
           signal: options?.signal,
           fetchTimeout: options?.timeout,
           baseRequestId: options?.baseRequestId,
-        });
+        };
+
+        if (options?.cache) {
+          cubesqlParams.cache = options.cache;
+        }
+
+        const request = this.request('cubesql', cubesqlParams);
 
         return request;
       },
