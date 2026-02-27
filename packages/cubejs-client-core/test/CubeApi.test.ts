@@ -124,6 +124,46 @@ describe('CubeApi Load', () => {
     expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
   });
 
+  test('simple query + { cache: "no-cache" }', async () => {
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { cache: 'no-cache' });
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.cache).toBe('no-cache');
+  });
+
+  test('simple query + { cache: "must-revalidate" }', async () => {
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { cache: 'must-revalidate' });
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.cache).toBe('must-revalidate');
+  });
+
   test('2 queries + compact response format', async () => {
     // Create a spy on the request method
     jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({

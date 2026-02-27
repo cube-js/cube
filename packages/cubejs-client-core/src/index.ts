@@ -47,6 +47,10 @@ export type LoadMethodOptions = {
    */
   progressCallback?(result: ProgressResult): void;
   /**
+   * Cache mode for query execution
+   */
+  cache?: CacheMode;
+  /**
    * AbortSignal to cancel requests
    */
   signal?: AbortSignal;
@@ -113,10 +117,6 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * Query timeout in milliseconds
    */
   timeout?: number;
-  /**
-   * Cache mode for query execution
-   */
-  cache?: CacheMode;
 };
 
 export type CubeSqlSchemaColumn = {
@@ -577,13 +577,20 @@ class CubeApi {
    */
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions, callback?: CallableFunction, responseFormat: ResponseFormat = 'default') {
     [query, options] = this.prepareQueryOptions(query, options, responseFormat);
+
+    const params: Record<string, unknown> = {
+      query,
+      queryType: 'multi',
+      signal: options?.signal,
+      baseRequestId: options?.baseRequestId,
+    };
+
+    if (options?.cache) {
+      params.cache = options.cache;
+    }
+
     return this.loadMethod(
-      () => this.request('load', {
-        query,
-        queryType: 'multi',
-        signal: options?.signal,
-        baseRequestId: options?.baseRequestId,
-      }),
+      () => this.request('load', params),
       (response: any) => this.loadResponseInternal(response, options),
       options,
       callback
