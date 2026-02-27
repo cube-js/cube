@@ -303,11 +303,13 @@ class ApiGateway {
           schema,
           context: {
             req,
+            res,
             apiGateway: this
           },
           graphiql: getEnv('nodeEnv') !== 'production'
             ? { headerEditorEnabled: true }
             : false,
+          extensions: () => (res as any).extensions || {},
         })(req, res);
       })
     );

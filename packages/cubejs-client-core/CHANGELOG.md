@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Features
+
+- **cubejs-client:** Add lastRefreshTime to CubeSqlResult and CubeSqlStreamChunk types; enhance CubeApi to parse and return lastRefreshTime from responses ([#10425](https://github.com/cube-js/cube/issues/10425)) ([45d1278](https://github.com/cube-js/cube/commit/45d12783d80fda143ce770a95e6477f4eab3cf0a))
+
 ## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
 
 **Note:** Version bump only for package @cubejs-client/core

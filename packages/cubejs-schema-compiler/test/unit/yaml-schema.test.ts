@@ -241,6 +241,78 @@ cubes:
         expect(e.message).toContain("Found duplicate dimension.granularity 'fiscal_year' in time dimension 'created_at' in cube 'orders'");
       }
     });
+
+    it('detects duplicate folder names in views', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: category
+        sql: category
+        type: string
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+    folders:
+      - name: Details
+        includes:
+          - id
+          - status
+      - name: Details
+        includes:
+          - category
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain(
+          "Folder names must be unique within a view. Found duplicate folder 'Details' in view 'orders_view'."
+        );
+      }
+    });
+
+    it('detects duplicate dimension time shifts', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: fiscal_calendar
+    sql: "SELECT 1"
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+      - name: date
+        sql: calendar_date
+        type: time
+        time_shift:
+          - name: prior_year
+            type: prior
+            interval: 1 year
+          - name: prior_year
+            sql: "{CUBE}.prior_year_date"
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain(
+          "Time shift names must be unique within a dimension. Found duplicate time shift 'prior_year' in dimension 'date' in cube 'fiscal_calendar'."
+        );
+      }
+    });
   });
 
   it('members must be defined as arrays', async () => {

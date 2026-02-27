@@ -46,8 +46,8 @@ with nested structure:
 
 ### Reserved elements
 
-Some features of Cube Cloud (e.g., [authentication integration][ref-auth-integration]
-and [LDAP integration][ref-ldap-integration]) use the `cubeCloud` element in the security context.
+Some features of Cube Cloud (e.g., [authentication integration][ref-auth-integration])
+use the `cubeCloud` element in the security context.
 This element is reserved and should not be used for other purposes.
 
 ## Using query_rewrite
@@ -296,14 +296,13 @@ enrich the security context with additional attributes.
 ### Authentication integration
 
 When using Cube Cloud, you can enrich the security context with information about
-an authenticated user, obtained during their authentication or loaded via an
-[LDAP integration][ref-ldap-integration].
+an authenticated user, obtained during their authentication.
 
-<SuccessBox>
+<InfoBox>
 
-Authentication integration is available in Cube Cloud on [all product tiers](https://cube.dev/pricing).
+Available on [all plans](https://cube.dev/pricing).
 
-</SuccessBox>
+</InfoBox>
 
 You can enable the authentication integration by navigating to the <Btn>Settings → Configuration</Btn>
 of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</Btn> toggle.
@@ -541,7 +540,6 @@ view(`total_revenue_per_customer`, {
 [ref-devtools-playground]:
   /product/workspace/playground#editing-the-security-context
 [ref-auth-integration]: /product/auth#authentication-integration
-[ref-ldap-integration]: /product/workspace/sso#ldap-integration
 [ref-extend-context]: /product/configuration/reference/config#extend_context
 [ref-dynamic-data-modeling]: /product/data-modeling/dynamic
 [ref-multitenancy]: /product/configuration/multitenancy

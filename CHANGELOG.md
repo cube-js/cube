@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+### Bug Fixes
+
+- **cube:** Issue with calculated measures in pre-aggragations ([#10429](https://github.com/cube-js/cube/issues/10429)) ([58bfe5e](https://github.com/cube-js/cube/commit/58bfe5e567e5999aba2e75e32a662fbba652bd02))
+- **cubestore:** Don't print all tables in error message ([#10442](https://github.com/cube-js/cube/issues/10442)) ([cbf40df](https://github.com/cube-js/cube/commit/cbf40dfe113cf9a836708cd3e9e7a219d982a459))
+- **docs:** Use VERCEL_GIT_PREVIOUS_SHA for deployment checks ([7be6536](https://github.com/cube-js/cube/commit/7be65365e07cabbe745094ba4db6ac25d7b274cf))
+- **schema-compiler:** Allow no-cache queries to use pre-aggregations ([#10440](https://github.com/cube-js/cube/issues/10440)) ([22286f5](https://github.com/cube-js/cube/commit/22286f50beeddadc93bcfba0b7055b114d06a824))
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Bug Fixes
+
+- **api-gateway:** Return a clear error when SQL interface is not initialized ([#10419](https://github.com/cube-js/cube/issues/10419)) ([53e9d9e](https://github.com/cube-js/cube/commit/53e9d9e4543eda79499f004bf379b66137660b9a))
+- Cache must-revalidate fail on pre-aggregation hit ([#10432](https://github.com/cube-js/cube/issues/10432)) ([4a29a5e](https://github.com/cube-js/cube/commit/4a29a5e8e669f0ce5d9f36fdb9fb39c26fb04b1b))
+- **tesseract:** Issue with custom granularities for pre-aggregations ([#10424](https://github.com/cube-js/cube/issues/10424)) ([e79d10a](https://github.com/cube-js/cube/commit/e79d10a9569297798e44a61a31311fdf5ebd7cbb))
+- **tesseract:** Segment support in pre-aggregations ([#10422](https://github.com/cube-js/cube/issues/10422)) ([1756cdb](https://github.com/cube-js/cube/commit/1756cdbace8429cd0558353686eaf9b2a29cd13c))
+
+### Features
+
+- **cubejs-client:** Add lastRefreshTime to CubeSqlResult and CubeSqlStreamChunk types; enhance CubeApi to parse and return lastRefreshTime from responses ([#10425](https://github.com/cube-js/cube/issues/10425)) ([45d1278](https://github.com/cube-js/cube/commit/45d12783d80fda143ce770a95e6477f4eab3cf0a))
+- **cubesql:** Improve Talend compatibility ([#10430](https://github.com/cube-js/cube/issues/10430)) ([e4f39e5](https://github.com/cube-js/cube/commit/e4f39e5cc016b5c0a15a5ca74fdac197bd0d4290))
+- **databricks-driver:** Don't use temporarly tables for export bucket ([#10431](https://github.com/cube-js/cube/issues/10431)) ([5ec48ce](https://github.com/cube-js/cube/commit/5ec48ce81398cad13ef20d6358b775645fac0a70))
+- GraphQL - exponse annotation/lastRefreshTime in extensions ([#10428](https://github.com/cube-js/cube/issues/10428)) ([fb45030](https://github.com/cube-js/cube/commit/fb4503017c3949439d153fc46bae8d442bb8899d))
+
+### Reverts
+
+- Revert "feat(databricks-jdbc-driver): Support export bucket in read-only mode (#10420)" ([4c0f49a](https://github.com/cube-js/cube/commit/4c0f49a0b941ce72d7016bcf74b97a565f51dd45)), closes [#10420](https://github.com/cube-js/cube/issues/10420)
+
 ## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
 
 ### Bug Fixes

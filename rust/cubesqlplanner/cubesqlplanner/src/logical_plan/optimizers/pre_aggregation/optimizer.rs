@@ -28,6 +28,7 @@ impl PreAggregationOptimizer {
         &mut self,
         plan: Rc<Query>,
         disable_external_pre_aggregations: bool,
+        pre_aggregation_id: Option<&str>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         let cube_names = collect_cube_names_from_node(&plan)?;
         let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
@@ -36,6 +37,12 @@ impl PreAggregationOptimizer {
             compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?;
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            if let Some(id) = pre_aggregation_id {
+                let full_name = format!("{}.{}", pre_aggregation.cube_name, pre_aggregation.name);
+                if full_name != id {
+                    continue;
+                }
+            }
             let new_query = self.try_rewrite_query(plan.clone(), pre_aggregation)?;
             if new_query.is_some() {
                 return Ok(new_query);

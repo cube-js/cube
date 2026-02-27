@@ -1260,9 +1260,6 @@ module.exports = {
 
 </CodeTabs>
 
-Check [this recipe](/product/auth/recipes/sql-api-ldap) for an example of
-using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
-
 You can also check for the protocol and the authentication method as follows. This can
 be useful for handling the [NTLM][ref-ntlm] authentication in the [DAX API][ref-dax-api]:
 
@@ -1383,33 +1380,6 @@ def context_to_groups(ctx: dict) -> list[str]:
 module.exports = {
   contextToGroups: ({ securityContext }) => {
     return securityContext.groups || ['default']
-  }
-}
-```
-
-</CodeTabs>
-
-If the [user roles mapping][ref-ldap-roles-mapping] in the [LDAP integration][ref-ldap-integration]
-is configured and the [authentication integration][ref-auth-integration] is enabled,
-the `context_to_groups` option might be defined as follows:
-
-<CodeTabs>
-
-```python
-from cube import config
-
-@config('context_to_groups')
-def context_to_groups(ctx: dict) -> list[str]:
-  cloud_ctx = ctx['securityContext'].get('cubeCloud', {'groups': []})
-  return cloud_ctx.get('roles', [])
-```
-
-```javascript
-
-module.exports = {
-  contextToGroups: ({ securityContext }) => {
-    const cloud_ctx = securityContext.cubeCloud || { groups: [] }
-    return cloud_ctx.roles || []
   }
 }
 ```
@@ -1537,33 +1507,6 @@ module.exports = {
 
 </CodeTabs>
 
-If the [user roles mapping][ref-ldap-roles-mapping] in the [LDAP integration][ref-ldap-integration]
-is configured and the [authentication integration][ref-auth-integration] is enabled,
-the `context_to_roles` option might be defined as follows:
-
-<CodeTabs>
-
-```python
-from cube import config
-
-@config('context_to_roles')
-def context_to_roles(ctx: dict) -> list[str]:
-  cloud_ctx = ctx['securityContext'].get('cubeCloud', {'roles': []})
-  return cloud_ctx.get('roles', [])
-```
-
-```javascript
-
-module.exports = {
-  contextToRoles: ({ securityContext }) => {
-    const cloud_ctx = securityContext.cubeCloud || { roles: [] }
-    return cloud_ctx.roles || []
-  }
-}
-```
-
-</CodeTabs>
-
 
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
@@ -1605,8 +1548,6 @@ module.exports = {
 [ref-dap]: /product/auth/data-access-policies
 [ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
 [ref-auth-integration]: /product/auth#authentication-integration
-[ref-ldap-roles-mapping]: /product/workspace/sso#user-roles-mapping
-[ref-ldap-integration]: /product/workspace/sso#ldap-integration
 [ref-dax-api]: /product/apis-integrations/dax-api
 [ref-ntlm]: /product/auth/methods/ntlm
 [ref-environments]: /product/workspace/environments

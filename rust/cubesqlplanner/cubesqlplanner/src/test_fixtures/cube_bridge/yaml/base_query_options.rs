@@ -34,6 +34,8 @@ pub struct YamlBaseQueryOptions {
     pub cubestore_support_multistage: Option<bool>,
     #[serde(default)]
     pub disable_external_pre_aggregations: Option<bool>,
+    #[serde(default)]
+    pub pre_aggregation_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

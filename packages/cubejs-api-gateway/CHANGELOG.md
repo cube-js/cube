@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Bug Fixes
+
+- **api-gateway:** Return a clear error when SQL interface is not initialized ([#10419](https://github.com/cube-js/cube/issues/10419)) ([53e9d9e](https://github.com/cube-js/cube/commit/53e9d9e4543eda79499f004bf379b66137660b9a))
+
+### Features
+
+- GraphQL - exponse annotation/lastRefreshTime in extensions ([#10428](https://github.com/cube-js/cube/issues/10428)) ([fb45030](https://github.com/cube-js/cube/commit/fb4503017c3949439d153fc46bae8d442bb8899d))
+
 ## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

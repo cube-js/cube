@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/administration/workspace/saved-reports",
+    "destination": "/product/administration/workspace",
+    "permanent": true
+  },
+  {
     "source": "/product/administration/workspace/access-control",
     "destination": "/product/administration/users-and-permissions/custom-roles",
     "permanent": true
@@ -211,7 +216,7 @@
   },
   {
     "source": "/guides/recipes/auth/sql-api-ldap",
-    "destination": "/product/auth/methods/ldap",
+    "destination": "/product/auth/methods",
     "permanent": true
   },
   {
@@ -226,7 +231,7 @@
   },
   {
     "source": "/product/auth/recipes/sql-api-ldap",
-    "destination": "/product/auth/methods/ldap",
+    "destination": "/product/auth/methods",
     "permanent": true
   },
   {
@@ -1786,7 +1791,12 @@
   },
   {
     "source": "/product/workspace/rollup-designer",
-    "destination": "/product/administration/workspace/rollup-designer",
+    "destination": "/product/administration/workspace/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/rollup-designer",
+    "destination": "/product/administration/workspace/pre-aggregations",
     "permanent": true
   },
   {
@@ -2012,6 +2022,16 @@
   {
     "source": "/product/apis-integrations/embedding",
     "destination": "/product/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration",
+    "destination": "/product/administration/workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation",
+    "destination": "/product/presentation/dashboards",
     "permanent": true
   },
   {

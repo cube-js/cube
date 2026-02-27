@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Features
+
+- **databricks-driver:** Don't use temporarly tables for export bucket ([#10431](https://github.com/cube-js/cube/issues/10431)) ([5ec48ce](https://github.com/cube-js/cube/commit/5ec48ce81398cad13ef20d6358b775645fac0a70))
+
+### Reverts
+
+- Revert "feat(databricks-jdbc-driver): Support export bucket in read-only mode (#10420)" ([4c0f49a](https://github.com/cube-js/cube/commit/4c0f49a0b941ce72d7016bcf74b97a565f51dd45)), closes [#10420](https://github.com/cube-js/cube/issues/10420)
+
 ## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
 
 ### Features

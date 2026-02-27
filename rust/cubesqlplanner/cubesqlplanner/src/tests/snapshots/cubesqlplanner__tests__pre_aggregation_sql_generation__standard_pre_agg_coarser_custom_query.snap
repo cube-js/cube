@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__status" "orders__status", ('2024-01-01T00:00:00.000' ::timestamp + INTERVAL '6 month' * FLOOR(EXTRACT(EPOCH FROM ("orders__created_at_day" - '2024-01-01T00:00:00.000'::timestamp)) / EXTRACT(EPOCH FROM INTERVAL '6 month'))) "orders__created_at_half_year", sum("orders__count") "orders__count" 
+FROM  orders__daily_rollup  AS "orders__daily_rollup"
+GROUP BY 1, 2
+ORDER BY  2  ASC

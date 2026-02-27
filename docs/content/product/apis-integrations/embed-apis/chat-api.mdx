@@ -82,7 +82,7 @@ while (true) {
 | `input` | string | No | The user's message or question. If omitted returns current state of thread with provided chatId. |
 | `chatId` | string | No | Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__` sent as the `state.chatId` field. |
 | `sessionSettings.externalId` | string | No | Unique identifier for the external user, lowercase and without spaces. Either `externalId` or `internalId` should be provided. |
-| `sessionSettings.internalId` | string | No | Email address (or LDAP identifier if account is configured to use LDAP) of an internal Cube Cloud user. Either `externalId` or `internalId` should be provided. |
+| `sessionSettings.internalId` | string | No | Email address of an internal Cube Cloud user. Either `externalId` or `internalId` should be provided. |
 | `sessionSettings.email` | string | No | User's email address |
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
@@ -104,7 +104,7 @@ User attributes must first be configured in your Cube admin panel before they ca
 
 **Supported Fields:**
 - `externalId` (optional): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
-- `internalId` (optional): Email address (or LDAP identifier if account is configured to use LDAP) of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
+- `internalId` (optional): Email address of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
 - `email` (optional): User's email address  
 - `userAttributes` (optional): Array of key-value pairs containing user metadata. Only available with `externalId`.
 
@@ -155,7 +155,7 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
 - **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
 - **`sessionSettings`** (object, required): Session configuration for the user
   - **`externalId`** (string): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
-  - **`internalId`** (string): Email address (or LDAP identifier if account is configured to use LDAP) of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
+  - **`internalId`** (string): Email address of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
   - **`email`** (string): User's email address
   - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`.
   - **`groups`** (string[]): Array of group names for user. Not allowed with `internalId`.

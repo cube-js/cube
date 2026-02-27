@@ -96,14 +96,14 @@ export class YamlCompiler {
 
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
-        this.checkDuplicateNames(yamlObj.cubes || [], 'cube', errorsReport);
+        this.checkDuplicateNames(yamlObj.cubes || [], errorsReport, (name) => `Found duplicate cube name '${name}'.`);
 
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
           const transpiledCube = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
           transpiledFilesContent.push(transpiledCube);
         });
       } else if (key === 'views') {
-        this.checkDuplicateNames(yamlObj.views || [], 'view', errorsReport);
+        this.checkDuplicateNames(yamlObj.views || [], errorsReport, (name) => `Found duplicate view name '${name}'.`);
 
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
           const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
@@ -140,6 +140,7 @@ export class YamlCompiler {
     cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport, ctx);
 
     cubeObj.joins = cubeObj.joins || []; // For edge cases where joins are not defined/null
+
     if (!Array.isArray(cubeObj.joins)) {
       errorsReport.error('joins must be defined as array');
       cubeObj.joins = [];
@@ -320,19 +321,17 @@ export class YamlCompiler {
     return body?.expression;
   }
 
-  private checkDuplicateNames(items: any[], type: 'cube' | 'view', errorsReport: ErrorReporter) {
-    const seen = new Set<string>();
+  private checkDuplicateNames(items: any[], errorsReport: ErrorReporter, message: (name: string) => string) {
+    const names = items
+      .map(item => item?.name)
+      .filter((name): name is string => name != null);
 
-    for (const item of items) {
-      if (item?.name) {
-        if (seen.has(item.name)) {
-          errorsReport.error(
-            `Found duplicate ${type} name '${item.name}'.`
-          );
-        } else {
-          seen.add(item.name);
-        }
+    const seen = new Set<string>();
+    for (const name of names) {
+      if (seen.has(name)) {
+        errorsReport.error(message(name));
       }
+      seen.add(name);
     }
   }
 
@@ -348,29 +347,15 @@ export class YamlCompiler {
     }
 
     // Check for duplicate names
-    const names = yamlArray
-      .map(item => item?.name)
-      .filter(name => name != null);
-
-    const seen = new Set<string>();
-
-    for (const name of names) {
-      if (seen.has(name)) {
-        if (ctx.parent) {
-          errorsReport.error(
-            `Found duplicate ${memberType} '${name}' in ${ctx.parent.type} '${ctx.parent.name}' in cube '${ctx.cubeName}'.`
-          );
-        } else {
-          errorsReport.error(
-            `Member names must be unique within a cube. Found duplicate ${memberType} '${name}' in cube '${ctx.cubeName}'.`
-          );
-        }
+    this.checkDuplicateNames(yamlArray, errorsReport, (name) => {
+      if (ctx.parent) {
+        return `Found duplicate ${memberType} '${name}' in ${ctx.parent.type} '${ctx.parent.name}' in cube '${ctx.cubeName}'.`;
       }
 
-      seen.add(name);
-    }
+      return `Member names must be unique within a cube. Found duplicate ${memberType} '${name}' in cube '${ctx.cubeName}'.`;
+    });
 
-    const remapped = yamlArray.map(({ name, indexes, granularities, ...rest }) => {
+    const remapped = yamlArray.map(({ name, indexes, granularities, timeShift, ...rest }) => {
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${JSON.stringify(rest)}`);
         return {};
@@ -393,7 +378,18 @@ export class YamlCompiler {
         res[name] = { granularities, ...res[name] };
       }
 
+      if (timeShift) {
+        this.checkDuplicateNames(
+          timeShift,
+          errorsReport,
+          (shiftName) => `Time shift names must be unique within a ${memberType}. Found duplicate time shift '${shiftName}' in ${memberType} '${name}' in cube '${ctx.cubeName}'.`
+        );
+
+        res[name] = { timeShift, ...res[name] };
+      }
+
       res[name] = { ...res[name], ...rest };
+
       return res;
     });
 

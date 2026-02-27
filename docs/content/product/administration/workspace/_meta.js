@@ -2,8 +2,6 @@ export default {
   "vizard": "Chart Prototyping",
   "data-model": "Data Model",
   "visual-model": "Visual Model",
-  "saved-reports": "Saved Reports",
-  "rollup-designer": "Rollup Designer",
   "dev-mode": "Development mode",
   "environments": "Environments",
   "integrations": "Integrations",
@@ -19,6 +17,9 @@ export default {
   "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI",
-  "semantic-catalog": "Semantic Catalog",
+  "semantic-catalog": {
+    title: "Semantic Catalog",
+    display: "hidden"
+  },
   "recipes": "Recipes",
 }

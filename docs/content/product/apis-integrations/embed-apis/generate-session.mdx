@@ -30,7 +30,7 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/generate-session
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `externalId` | string | No | Unique identifier for the external user. Either `externalId` or `internalId` should be provided. |
-| `internalId` | string | No | Email address (or LDAP identifier if account is configured to use LDAP) of an internal Cube Cloud user. Either `externalId` or `internalId` should be provided. |
+| `internalId` | string | No | Email address of an internal Cube Cloud user. Either `externalId` or `internalId` should be provided. |
 | `userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `groups` | string[] | No | Array of group names for user. Not allowed with `internalId`. |
 | `securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |

@@ -6,5 +6,4 @@ export default {
   "jwt": "JSON Web Token",
   "auth0": "Auth0",
   "aws-cognito": "AWS Cognito",
-  "ldap": "SQL API with LDAP"
 }
