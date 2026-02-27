@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: sql
+---
+SELECT "cube_c".code "a_with_b_and_c__code", count(COUNT(*)) "cube_a__count" 
+FROM  table_a  AS "cube_a"
+LEFT JOIN  table_b  AS "cube_b" ON "cube_a".b_id = "cube_b".id
+LEFT JOIN  table_c  AS "cube_c" ON "cube_b".c_id = "cube_c".id
+GROUP BY 1
+ORDER BY  2  DESC

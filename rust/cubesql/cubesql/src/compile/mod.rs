@@ -5080,6 +5080,50 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_set_timezone() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_set_time_zone_custom",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIMEZONE TO 'Europe/Rome'".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_time_zone_default",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIMEZONE = DEFAULT".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_time_zone_local",
+            execute_queries_with_flags(
+                vec![
+                    "SET TIME ZONE LOCAL".to_string(),
+                    "SHOW TIMEZONE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
@@ -18207,5 +18251,327 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_case_like_naming() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CASE
+                    WHEN customer_gender LIKE '%a%' THEN true
+                    ELSE false
+                END AS has_letter_a
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender IS NOT NULL
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("set".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_set_time_zone() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        context.execute_query("SET TIME ZONE 'Europe/Rome'").await?;
+
+        // Test that time zone has been successfully applied
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            timezone: Some("Europe/Rome".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        // Test that time zone is applied with SQL push down as well
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+        "#;
+        let sql = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        assert!(sql.contains("\"Europe/Rome\""));
+
+        // Test that time zone correctly resets to default
+        context.execute_query("SET TIMEZONE TO DEFAULT").await?;
+
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        };
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_lag_lead_fn_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                order_date,
+                customer_gender,
+                LAG(customer_gender, 1) OVER (ORDER BY order_date) AS lag,
+                LEAD(customer_gender, 1) OVER (ORDER BY order_date) AS lead
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1, 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("LAG("));
+        assert!(sql.contains("LEAD("));
+        assert!(sql.contains(" OVER (ORDER BY "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_to_timestamp_date_only() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= TO_TIMESTAMP('2025-01-01', 'YYYY-MM-DD')
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("afterOrOnDate".to_string()),
+                    values: Some(vec!["2025-01-01T00:00:00.000Z".to_string()]),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_server_version_num_setting() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "server_version_num_setting",
+            execute_query(
+                "select cast(setting as integer) from pg_settings where name = 'server_version_num'".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_talend_tables_and_views() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "talend_tables_and_views",
+            execute_query(
+                r#"
+                ( 
+                    select
+                        t.schemaname                  as ownerName,
+                        t.tablename                   as tableName,
+                        /*c.oid*/ cast(c.oid as bigint) as objectId, 
+                        (select n_live_tup from pg_stat_user_tables s where s.schemaname=t.schemaname and s.relname=t.tablename)  as row_count,
+                        1						as tableType
+                    from pg_tables t, pg_class c, pg_namespace n
+                    /*where clause number 1 (table where clause)*/
+                    where t.tablename=c.relname
+                        and   n.oid	   = c.relnamespace
+                        and   t.schemaname = n.nspname
+                        and t.schemaname <> 'information_schema'
+                        and t.tablename  <> 'attrep_ddl_audit'
+                        and t.tablename  <> 'attrep_heartbeat'
+                        and
+                        (
+                            (( (1=0) ) -- Explicit Inclusion
+                            or 
+                            (
+                                ( 
+                        t.schemaname LIKE 'public' and t.schemaname not like 'pg\_%' and t.tablename LIKE '%'
+                        ) -- Patterned Inclusion
+                                and not
+                                ( 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_loopback%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_changes%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_apply%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_truncation%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_audit_table'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_status'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_suspended_tables'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_history'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_cdc_%'
+                        ) -- Patterned exclusion
+                            ))
+                            and 
+                            (1=1) 
+                        )
+
+                    UNION
+
+                    select
+                        v.schemaname                  as ownerName,
+                        v.viewname                   as tableName,
+                        /*c.oid*/ cast(c.oid as bigint) as objectId, 
+                        0  as row_count,/**/ 
+                        2						as tableType
+                    from pg_views v, pg_class c, pg_namespace n
+                    /*where clause number 2 (view where clause)*/ 
+                    where v.viewname = c.relname
+                        and   n.oid	    = c.relnamespace
+                        and   v.schemaname = n.nspname
+                        and v.schemaname <> 'information_schema'
+                        and v.viewname  <> 'attrep_ddl_audit'
+                        and v.viewname  <> 'attrep_heartbeat'
+                        and
+                        (
+                            (( (1=0) ) -- Explicit Inclusion
+                            or 
+                            (
+                                ( (1=0) ) -- Patterned Inclusion
+                                and not
+                                ( (1=0) ) -- Patterned exclusion
+                            ))
+                            and 
+                            (1=1) 
+                        )
+                )
+                order by 1,2
+                "#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_encoding_to_char_column_name() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_encoding_to_char_column_name",
+            execute_query(
+                "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

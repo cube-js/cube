@@ -8,6 +8,7 @@ import {
   MaybeCancelablePromise,
   streamToArray,
   CacheMode,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -160,7 +161,7 @@ export class QueryCache {
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
-    protected readonly logger: any,
+    protected readonly logger: LoggerFn,
     public readonly options: QueryCacheOptions
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {

@@ -3,6 +3,79 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+### Bug Fixes
+
+- **cube:** Issue with calculated measures in pre-aggragations ([#10429](https://github.com/cube-js/cube/issues/10429)) ([58bfe5e](https://github.com/cube-js/cube/commit/58bfe5e567e5999aba2e75e32a662fbba652bd02))
+- **schema-compiler:** Allow no-cache queries to use pre-aggregations ([#10440](https://github.com/cube-js/cube/issues/10440)) ([22286f5](https://github.com/cube-js/cube/commit/22286f50beeddadc93bcfba0b7055b114d06a824))
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Bug Fixes
+
+- **tesseract:** Issue with custom granularities for pre-aggregations ([#10424](https://github.com/cube-js/cube/issues/10424)) ([e79d10a](https://github.com/cube-js/cube/commit/e79d10a9569297798e44a61a31311fdf5ebd7cbb))
+- **tesseract:** Segment support in pre-aggregations ([#10422](https://github.com/cube-js/cube/issues/10422)) ([1756cdb](https://github.com/cube-js/cube/commit/1756cdbace8429cd0558353686eaf9b2a29cd13c))
+
+## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
+
+### Bug Fixes
+
+- **mssql-driver:** Use UTC timestamps in responses ([#10411](https://github.com/cube-js/cube/issues/10411)) ([4cb9f78](https://github.com/cube-js/cube/commit/4cb9f782e0ec40f055f80d48c6049b9dcc500dc6)), closes [#9488](https://github.com/cube-js/cube/issues/9488)
+- **tesseract:** Incorrect matching of calculated measures in pre-aggregations ([#10417](https://github.com/cube-js/cube/issues/10417)) ([8959b0d](https://github.com/cube-js/cube/commit/8959b0d9df6a8423ad75950f5611d2a4dfed781f))
+
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+### Features
+
+- **cubesql:** Support SQL pushdown for `LAG`/`LEAD` functions ([#10407](https://github.com/cube-js/cube/issues/10407)) ([c968656](https://github.com/cube-js/cube/commit/c968656970a90e640548e6b0165e5f1327cf150a))
+
+## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
+
+### Features
+
+- **schema-compiler:** Pass jinjaUsed flag to native transpileYaml ([#10402](https://github.com/cube-js/cube/issues/10402)) ([884811a](https://github.com/cube-js/cube/commit/884811a85ff940834722876b1570fa861f387ed5))
+- **schema-compiler:** Yaml - duplicate check for view/cube names ([#10400](https://github.com/cube-js/cube/issues/10400)) ([11a140f](https://github.com/cube-js/cube/commit/11a140f4183b8a44a8800549da22b588ecd5ac02))
+- **schema-compiler:** Yaml - validate duplicates ([#10399](https://github.com/cube-js/cube/issues/10399)) ([d711612](https://github.com/cube-js/cube/commit/d71161210cb24b4b0039c343a3f67d8fe4197f3a))
+
+### Performance Improvements
+
+- **schema-compiler:** Remove JSON.stringify in cache key hashing ([#10404](https://github.com/cube-js/cube/issues/10404)) ([6aae245](https://github.com/cube-js/cube/commit/6aae245585fc8a654a264e34eaf7a47f860d1533))
+
+## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Features
+
+- **schema-compiler:** Add join_path support in folder includes ([#10349](https://github.com/cube-js/cube/issues/10349)) ([f80ab56](https://github.com/cube-js/cube/commit/f80ab56cdc345e5d430a59f65e702f433516912d))
+
+## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
+
+### Bug Fixes
+
+- **mssql-driver:** Respect timezone for origin in custom granularities ([#10111](https://github.com/cube-js/cube/issues/10111)) ([eaa484a](https://github.com/cube-js/cube/commit/eaa484ae1f7ca3601d202fff03b44782c61b37cb))
+- **mssql-driver:** Support MS SQL dialect for Tesseract ([#10343](https://github.com/cube-js/cube/issues/10343)) ([0ec696f](https://github.com/cube-js/cube/commit/0ec696fdc726d5305a2c63a48b7b4f0be16eda83))
+- **mssql-driver:** Use parameter placeholders for Tesseract ([#10342](https://github.com/cube-js/cube/issues/10342)) ([24ed91f](https://github.com/cube-js/cube/commit/24ed91fbf807dc22aaba45795f2e630d74b9b5f4))
+
+### Features
+
+- **server-core:** Add level field for log messages ([#10337](https://github.com/cube-js/cube/issues/10337)) ([1e7dcb6](https://github.com/cube-js/cube/commit/1e7dcb614dd6537b3bb2a1f9bd04e96c2374a673))
+
 ## [1.6.6](https://github.com/cube-js/cube/compare/v1.6.5...v1.6.6) (2026-01-23)
 
 ### Bug Fixes

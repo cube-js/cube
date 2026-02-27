@@ -108,6 +108,7 @@ pub struct QueryProperties {
     query_join_hints: Rc<Vec<JoinHintItem>>,
     allow_multi_stage: bool,
     disable_external_pre_aggregations: bool,
+    pre_aggregation_id: Option<String>,
 }
 
 impl QueryProperties {
@@ -153,6 +154,7 @@ impl QueryProperties {
                             name.clone(),
                             MemberExpressionExpression::SqlCall(expression_call),
                             member_expression.static_data().definition.clone(),
+                            None,
                             query_tools.base_tools().clone(),
                         )?;
                         Ok(MemberSymbol::new_member_expression(
@@ -262,6 +264,7 @@ impl QueryProperties {
                             name.clone(),
                             expression,
                             member_expression.static_data().definition.clone(),
+                            None,
                             query_tools.base_tools().clone(),
                         )?;
                         Ok(MemberSymbol::new_member_expression(member_expression_symbol))
@@ -408,6 +411,7 @@ impl QueryProperties {
         let total_query = options.static_data().total_query.unwrap_or(false);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
+        let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
 
         let mut res = Self {
             measures,
@@ -429,6 +433,7 @@ impl QueryProperties {
             query_join_hints,
             allow_multi_stage: true,
             disable_external_pre_aggregations,
+            pre_aggregation_id,
         };
         res.apply_static_filters()?;
         Ok(Rc::new(res))
@@ -480,6 +485,7 @@ impl QueryProperties {
             query_join_hints,
             allow_multi_stage,
             disable_external_pre_aggregations,
+            pre_aggregation_id: None,
         };
         res.apply_static_filters()?;
 
@@ -749,6 +755,10 @@ impl QueryProperties {
 
     pub fn disable_external_pre_aggregations(&self) -> bool {
         self.disable_external_pre_aggregations
+    }
+
+    pub fn pre_aggregation_id(&self) -> Option<&str> {
+        self.pre_aggregation_id.as_deref()
     }
 
     pub fn all_filters(&self) -> Option<Filter> {

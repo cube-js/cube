@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
   CancelablePromise,
+  Pool,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
@@ -17,7 +18,6 @@ import {
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
-import genericPool, { Factory, Pool } from 'generic-pool';
 import path from 'path';
 
 import { SupportedDrivers } from './supported-drivers';
@@ -72,14 +72,10 @@ Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaDa
 DatabaseMetaData.prototype.getSchemasAsync = promisify(DatabaseMetaData.prototype.getSchemas);
 DatabaseMetaData.prototype.getTablesAsync = promisify(DatabaseMetaData.prototype.getTables);
 
-interface ExtendedPool extends Pool<any> {
-  _factory: Factory<any>;
-}
-
 export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
 
-  protected pool: ExtendedPool;
+  protected pool: Pool<any>;
 
   protected jdbcProps: any;
 
@@ -136,7 +132,7 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    this.pool = genericPool.createPool({
+    this.pool = new Pool('jdbc', {
       create: async () => {
         await initMvn(await this.getCustomClassPath());
 
@@ -182,7 +178,7 @@ export class JDBCDriver extends BaseDriver {
       testOnBorrow: true,
       acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
-    }) as ExtendedPool;
+    });
 
     // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
     this.pool.on('factoryCreateError', (err) => {
@@ -212,11 +208,13 @@ export class JDBCDriver extends BaseDriver {
   public async testConnection() {
     let err;
     let connection;
+
     try {
       connection = await this.pool._factory.create();
     } catch (e: any) {
       err = e.message || e;
     }
+
     if (err) {
       throw new Error(err.toString());
     } else {

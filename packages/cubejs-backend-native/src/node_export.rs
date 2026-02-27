@@ -601,7 +601,16 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let log_level_handle = options.get_value(&mut cx, "logLevel")?;
     let log_level = get_log_level_from_variable(log_level_handle, &mut cx)?;
 
-    let logger = create_logger(log_level);
+    let prod_logger_handle = options.get_value(&mut cx, "prodLogger")?;
+    let prod_logger = if prod_logger_handle.is_a::<JsBoolean, _>(&mut cx) {
+        prod_logger_handle
+            .downcast_or_throw::<JsBoolean, _>(&mut cx)?
+            .value(&mut cx)
+    } else {
+        false
+    };
+
+    let logger = create_logger(log_level, prod_logger);
     log_reroute::reroute_boxed(Box::new(logger));
 
     ReportingLogger::init(
@@ -614,7 +623,7 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 #[cfg(not(feature = "async-log"))]
-pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
+pub fn create_logger(log_level: log::Level, _prod_logger: bool) -> Box<dyn log::Log> {
     let logger = SimpleLogger::new()
         .with_level(log::Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
@@ -628,23 +637,27 @@ pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
 }
 
 #[cfg(feature = "async-log")]
-pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
-    let logger = NonBlockingLoggerBuilder::new()
+pub fn create_logger(log_level: log::Level, prod_logger: bool) -> Box<dyn log::Log> {
+    let builder = NonBlockingLoggerBuilder::new()
         .with_level(log::Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
         .with_module_level("cube_xmla", log_level.to_level_filter())
         .with_module_level("cube_xmla_engine", log_level.to_level_filter())
         .with_module_level("cubejs_native", log_level.to_level_filter())
         .with_module_level("datafusion", log::Level::Warn.to_level_filter())
-        .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
-        .build()
-        .unwrap();
+        .with_module_level("pg_srv", log::Level::Warn.to_level_filter());
+
+    let logger = if prod_logger {
+        builder.with_json().build().unwrap()
+    } else {
+        builder.build().unwrap()
+    };
 
     Box::new(logger)
 }
 
 pub fn setup_local_logger(log_level: log::Level) {
-    let logger = create_logger(log_level);
+    let logger = create_logger(log_level, false);
     log_reroute::reroute_boxed(Box::new(logger));
 
     ReportingLogger::init(

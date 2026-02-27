@@ -1,6 +1,320 @@
 import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Yaml Schema Testing', () => {
+  describe('Duplicate member detection', () => {
+    it('detects duplicate measures', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+      - name: count
+        type: count
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate measure 'count' in cube 'orders'");
+      }
+    });
+
+    it('detects duplicate dimensions', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: id
+        sql: id
+        type: number
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate dimension 'id' in cube 'orders'");
+      }
+    });
+
+    it('detects duplicate segments', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    segments:
+      - name: active
+        sql: "{CUBE}.status = 'active'"
+      - name: active
+        sql: "{CUBE}.status = 'active'"
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate segment 'active' in cube 'orders'");
+      }
+    });
+
+    it('detects multiple duplicates', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+      - name: count
+        type: count
+      - name: total
+        type: sum
+        sql: amount
+      - name: total
+        type: sum
+        sql: amount
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate measure 'count' in cube 'orders'");
+        expect(e.message).toContain("Found duplicate measure 'total' in cube 'orders'");
+      }
+    });
+
+    it('detects duplicate pre-aggregation indexes', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: main
+        measures:
+          - count
+        dimensions:
+          - status
+        indexes:
+          - name: status_idx
+            columns:
+              - status
+          - name: status_idx
+            columns:
+              - id
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate preAggregation.index 'status_idx' in pre-aggregation 'main' in cube 'orders'");
+      }
+    });
+
+    it('detects duplicate cube names', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: orders
+    sql_table: orders_v2
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
+      }
+    });
+
+    it('detects duplicate view names', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - id
+
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate view name 'orders_view'");
+      }
+    });
+
+    it('detects duplicate dimension granularities', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: created_at
+        sql: created_at
+        type: time
+        granularities:
+          - name: fiscal_year
+            interval: 1 year
+            origin: "2024-04-01"
+          - name: fiscal_year
+            interval: 1 year
+            origin: "2024-01-01"
+    measures:
+      - name: count
+        type: count
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate dimension.granularity 'fiscal_year' in time dimension 'created_at' in cube 'orders'");
+      }
+    });
+
+    it('detects duplicate folder names in views', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: category
+        sql: category
+        type: string
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+    folders:
+      - name: Details
+        includes:
+          - id
+          - status
+      - name: Details
+        includes:
+          - category
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain(
+          "Folder names must be unique within a view. Found duplicate folder 'Details' in view 'orders_view'."
+        );
+      }
+    });
+
+    it('detects duplicate dimension time shifts', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: fiscal_calendar
+    sql: "SELECT 1"
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+      - name: date
+        sql: calendar_date
+        type: time
+        time_shift:
+          - name: prior_year
+            type: prior
+            interval: 1 year
+          - name: prior_year
+            sql: "{CUBE}.prior_year_date"
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain(
+          "Time shift names must be unique within a dimension. Found duplicate time shift 'prior_year' in dimension 'date' in cube 'fiscal_calendar'."
+        );
+      }
+    });
+  });
+
   it('members must be defined as arrays', async () => {
     const { compiler } = prepareYamlCompiler(
       `

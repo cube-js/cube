@@ -34,7 +34,7 @@ import { CompilerApi, type CompilerApiOptions } from './CompilerApi';
 import { DevServer } from './DevServer';
 import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
-import { prodLogger, devLogger } from './logger';
+import { createLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
 import {
   driverDependencies,
@@ -183,10 +183,9 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
-    this.logger = opts.logger || (
-      process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL as any)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL as any)
+    this.logger = opts.logger || createLogger(
+      process.env.NODE_ENV === 'production',
+      getEnv('logLevel'),
     );
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);

@@ -1,4 +1,5 @@
 use super::common::Case;
+use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
@@ -358,6 +359,16 @@ impl MeasureSymbol {
         Ok(MemberSymbol::new_measure(Rc::new(result)))
     }
 
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        //FIXME We don't include filters and order_by here for backward compatibility
+        // because BaseQuery doesn't validate these SQL calls
+        let result = self
+            .member_sql
+            .iter()
+            .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
+        Box::new(result)
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -499,8 +510,7 @@ impl MeasureSymbol {
 }
 
 pub struct MeasureSymbolFactory {
-    cube_name: String,
-    name: String,
+    path: SymbolPath,
     sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn MeasureDefinition>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -508,26 +518,13 @@ pub struct MeasureSymbolFactory {
 
 impl MeasureSymbolFactory {
     pub fn try_new(
-        full_name: &String,
+        path: SymbolPath,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
-        let parts: Vec<&str> = full_name.split('.').collect();
-        let member_short_path = if parts.len() > 2 {
-            format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1])
-        } else {
-            full_name.clone()
-        };
-
-        let mut iter = cube_evaluator
-            .parse_path("measures".to_string(), member_short_path.clone())?
-            .into_iter();
-        let cube_name = iter.next().unwrap();
-        let name = iter.next().unwrap();
-        let definition = cube_evaluator.measure_by_path(member_short_path)?;
+        let definition = cube_evaluator.measure_by_path(path.full_name().clone())?;
         let sql = definition.sql()?;
         Ok(Self {
-            cube_name,
-            name,
+            path,
             sql,
             definition,
             cube_evaluator,
@@ -536,29 +533,9 @@ impl MeasureSymbolFactory {
 }
 
 impl SymbolFactory for MeasureSymbolFactory {
-    fn symbol_name() -> String {
-        "measure".to_string()
-    }
-    fn cube_name(&self) -> &String {
-        &self.cube_name
-    }
-
-    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
-        self.sql.clone()
-    }
-
-    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
-        if let Some(member_sql) = &self.sql {
-            Ok(member_sql.args_names().clone())
-        } else {
-            Ok(vec![])
-        }
-    }
-
     fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self {
-            cube_name,
-            name,
+            path,
             sql,
             definition,
             cube_evaluator,
@@ -567,12 +544,12 @@ impl SymbolFactory for MeasureSymbolFactory {
             cube_evaluator
                 .static_data()
                 .primary_keys
-                .get(&cube_name)
+                .get(path.cube_name())
                 .cloned()
                 .unwrap_or_else(|| vec![])
                 .into_iter()
                 .map(|primary_key| -> Result<_, CubeError> {
-                    let key_dimension_name = format!("{}.{}", cube_name, primary_key);
+                    let key_dimension_name = format!("{}.{}", path.cube_name(), primary_key);
                     let key_dimension =
                         cube_evaluator.dimension_by_path(key_dimension_name.clone())?;
                     let key_dimension_sql = if let Some(key_dimension_sql) = key_dimension.sql()? {
@@ -583,7 +560,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                             key_dimension_name
                         )))
                     }?;
-                    compiler.compile_sql_call(&cube_name, key_dimension_sql)
+                    compiler.compile_sql_call(path.cube_name(), key_dimension_sql)
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {
@@ -593,7 +570,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         let mut measure_filters = vec![];
         if let Some(filters) = definition.filters()? {
             for filter in filters.iter() {
-                let node = compiler.compile_sql_call(&cube_name, filter.sql()?)?;
+                let node = compiler.compile_sql_call(path.cube_name(), filter.sql()?)?;
                 measure_filters.push(node);
             }
         }
@@ -601,7 +578,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         let mut measure_drill_filters = vec![];
         if let Some(filters) = definition.drill_filters()? {
             for filter in filters.iter() {
-                let node = compiler.compile_sql_call(&cube_name, filter.sql()?)?;
+                let node = compiler.compile_sql_call(path.cube_name(), filter.sql()?)?;
                 measure_drill_filters.push(node);
             }
         }
@@ -609,12 +586,12 @@ impl SymbolFactory for MeasureSymbolFactory {
         let mut measure_order_by = vec![];
         if let Some(group_by) = definition.order_by()? {
             for item in group_by.iter() {
-                let node = compiler.compile_sql_call(&cube_name, item.sql()?)?;
+                let node = compiler.compile_sql_call(path.cube_name(), item.sql()?)?;
                 measure_order_by.push(MeasureOrderBy::new(node, item.dir()?));
             }
         }
         let sql = if let Some(sql) = sql {
-            Some(compiler.compile_sql_call(&cube_name, sql)?)
+            Some(compiler.compile_sql_call(path.cube_name(), sql)?)
         } else {
             None
         };
@@ -710,7 +687,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
 
         let case = if let Some(native_case) = definition.case()? {
-            Some(Case::try_new(&cube_name, native_case, compiler)?)
+            Some(Case::try_new(path.cube_name(), native_case, compiler)?)
         } else {
             None
         };
@@ -746,17 +723,38 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let is_calculated =
-            MeasureSymbol::is_calculated_type(&definition.static_data().measure_type)
-                && !definition.static_data().multi_stage.unwrap_or(false);
+        let measure_type = &definition.static_data().measure_type;
+        let is_calculated = MeasureSymbol::is_calculated_type(&measure_type)
+            && !definition.static_data().multi_stage.unwrap_or(false);
 
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
-        //TODO move owned logic to rust
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
-        let owned_by_cube = owned_by_cube && !is_multi_stage;
-        let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
-        let alias =
-            PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
+        let owned_by_cube = if is_multi_stage {
+            false
+        } else if measure_type == "count" && sql.is_none() {
+            true
+        } else {
+            let mut owned = false;
+            if let Some(sql) = &sql {
+                owned |= sql.is_owned_by_cube();
+            }
+            for sql in &measure_filters {
+                owned |= sql.is_owned_by_cube();
+            }
+            for sql in &measure_drill_filters {
+                owned |= sql.is_owned_by_cube();
+            }
+            if let Some(case) = &case {
+                owned |= case.is_owned_by_cube();
+            }
+            owned
+        };
+
+        let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
+        let alias = PlanSqlTemplates::member_alias_name(
+            cube.static_data().resolved_alias(),
+            path.symbol_name(),
+            &None,
+        );
 
         let is_view = cube.static_data().is_view.unwrap_or(false);
 
@@ -775,12 +773,12 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && group_by.is_none());
 
         let cube_symbol = compiler
-            .add_cube_table_evaluator(cube_name.clone())?
+            .add_cube_table_evaluator(path.cube_name().clone())?
             .as_cube_table()?;
 
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_symbol,
-            name,
+            path.symbol_name().clone(),
             alias,
             sql,
             is_reference,

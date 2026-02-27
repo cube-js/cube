@@ -1,0 +1,19 @@
+.link {
+}
+
+.link:hover {
+  text-decoration: none !important;
+}
+
+.code {
+  color: var(--purple_bright) !important;
+  border-color: var(--dark_05) !important;
+}
+
+:global(.dark) .code {
+  color: hsl(251, 90%, 75%) !important;
+}
+
+.link:hover .code {
+  border-color: color-mix(in srgb, var(--purple_bright) 75%, transparent) !important;
+}

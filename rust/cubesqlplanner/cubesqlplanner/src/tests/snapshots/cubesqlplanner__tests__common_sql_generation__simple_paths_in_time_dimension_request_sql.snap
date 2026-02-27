@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: sql
+---
+SELECT date_trunc('day', ("cube_c".created_at::timestamptz AT TIME ZONE 'UTC')) "cube_c__created_at_day", count(COUNT(*)) "cube_a__count" 
+FROM  table_a  AS "cube_a"
+LEFT JOIN  table_c  AS "cube_c" ON "cube_a".c_id = "cube_c".id
+GROUP BY 1
+ORDER BY  1  ASC

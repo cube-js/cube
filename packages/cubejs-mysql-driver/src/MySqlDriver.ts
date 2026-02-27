@@ -7,9 +7,9 @@
 import {
   getEnv,
   assertDataSource,
+  Pool,
 } from '@cubejs-backend/shared';
 import mysql, { ConnectionOptions, QueryOptions } from 'mysql2';
-import genericPool from 'generic-pool';
 import { promisify } from 'util';
 import {
   BaseDriver,
@@ -97,7 +97,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: MySqlDriverConfiguration;
 
-  protected readonly pool: genericPool.Pool<MySQLConnection>;
+  protected readonly pool: Pool<MySQLConnection>;
 
   /**
    * Class constructor.
@@ -145,7 +145,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       readOnly: readOnly !== undefined ? readOnly : true,
       ...restConfig,
     };
-    this.pool = genericPool.createPool({
+    this.pool = new Pool('mysql', {
       create: async () => {
         // Extract driver-specific options that mysql2 doesn't recognize
         const { readOnly: _, loadPreAggregationWithoutMetaLock: __, storeTimezone: ___, ...connectionConfig } = this.config;

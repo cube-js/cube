@@ -75,6 +75,7 @@ yarn build  # Build for production
 3. **API Gateway**: Provides REST, GraphQL, and SQL APIs
 4. **CubeSQL**: Postgres-compatible SQL interface (Rust)
 5. **CubeStore**: Distributed OLAP storage engine (Rust)
+6. **Tesseract**: Native SQL planner (Rust) located in `/rust/cubesqlplanner` - enabled via `CUBESQL_SQL_PUSH_DOWN=true` environment variable
 
 ### Package Management
 - Uses Yarn workspaces with Lerna for package management
@@ -110,6 +111,16 @@ yarn test
 2. **Building**: Use `yarn tsc` to compile TypeScript across all packages
 3. **Testing**: Run relevant tests for modified packages
 4. **Linting**: Ensure code passes `yarn lint` before committing
+
+## Git
+
+Use conventional commits with these prefixes:
+- `feat:` — new features
+- `fix:` — bug fixes
+- `docs:` — documentation changes
+- `refactor:` — code refactoring
+
+Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(databricks-jdbc-driver):`.
 
 ## Common File Patterns
 

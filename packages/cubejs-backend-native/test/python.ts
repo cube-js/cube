@@ -7,6 +7,7 @@ import * as native from '../js';
   native.setupLogger(
     ({ event }) => console.log(event),
     'trace',
+    false
   );
 
   const content = await fs.readFile(path.join(process.cwd(), 'test', 'config.py'), 'utf8');

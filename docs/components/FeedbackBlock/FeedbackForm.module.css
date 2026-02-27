@@ -1,0 +1,80 @@
+.FeedbackForm {
+  margin-top: 0.125rem;
+}
+
+.FeedbackForm > textarea {
+  border: 1px solid rgba(20, 20, 70, 0.1);
+  border-radius: 8px;
+  outline: transparent;
+  padding: 10px 12px;
+  background: transparent;
+  width: 100%;
+  color: rgba(20, 20, 70, 0.85);
+  min-height: 110px;
+  resize: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.FeedbackForm > textarea::placeholder {
+  color: rgba(20, 20, 70, 0.3);
+}
+
+.FeedbackForm__buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.Button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  padding: 0.625rem 1.5rem;
+  border: none;
+  font: inherit;
+  color: inherit;
+  background-color: transparent;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out, border 0.3s ease-in-out;
+  background-color: #fff;
+  border: 1px solid rgba(20, 20, 70, 0.1);
+  border-radius: 0.25rem;
+  color: rgba(20, 20, 70, 0.85);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.Button:hover {
+  border-color: rgba(114, 75, 239, 0.3);
+  color: rgb(114, 75, 239);
+}
+
+.Button:active {
+  background-color: rgba(114, 75, 239, 0.08);
+  border-color: rgba(114, 75, 239, 0.3);
+  color: rgb(114, 75, 239);
+}
+
+.secondary {
+  background-color: transparent;
+  border: 1px solid transparent;
+}
+
+.secondary:hover {
+  background-color: transparent;
+  color: rgb(114, 75, 239);
+}
+
+@media (max-width: 950px) {
+  .FeedbackForm {
+    margin-top: 32px;
+  }
+
+  .FeedbackForm__buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

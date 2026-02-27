@@ -2,6 +2,7 @@
 /cubesql/target
 /.idea
 upstream
+.air
 .cargo/config.toml
 dist
 node_modules

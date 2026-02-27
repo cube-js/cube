@@ -131,6 +131,7 @@ async fn get_sql(
                     .generate_sql(
                         session.server.transport.clone(),
                         Arc::new(session.state.get_load_request_meta("sql")),
+                        Arc::clone(&session.state),
                     )
                     .await?;
 

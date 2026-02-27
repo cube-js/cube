@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: sql
+---
+SELECT count(COUNT(*)) "customers__count" 
+FROM  customers  AS "customers"
+WHERE (city = 'New York')

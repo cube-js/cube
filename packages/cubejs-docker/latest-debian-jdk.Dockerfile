@@ -49,6 +49,8 @@ COPY --chown=cube:cube --from=builder /cube .
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 ENV PYTHONUNBUFFERED=1
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 RUN ln -s /cube/node_modules/.bin/cubestore-dev /usr/local/bin/cubestore-dev
 

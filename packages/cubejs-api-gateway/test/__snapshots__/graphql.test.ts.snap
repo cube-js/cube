@@ -1,5 +1,41 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`GraphQL Schema extensions should return annotation and lastRefreshTime in extensions 1`] = `
+Object {
+  "data": Object {
+    "cube": Array [
+      Object {
+        "orders": Object {
+          "count": null,
+          "status": "completed",
+        },
+      },
+    ],
+  },
+  "extensions": Object {
+    "annotation": Object {
+      "dimensions": Object {
+        "Orders.status": Object {
+          "shortTitle": "Status",
+          "title": "Orders Status",
+          "type": "string",
+        },
+      },
+      "measures": Object {
+        "Orders.count": Object {
+          "shortTitle": "Count",
+          "title": "Orders Count",
+          "type": "number",
+        },
+      },
+      "segments": Object {},
+      "timeDimensions": Object {},
+    },
+    "lastRefreshTime": "2025-06-01T12:00:00.000Z",
+  },
+}
+`;
+
 exports[`GraphQL Schema with camelCase GraphQL query 0: query CubeQuery {
   cube {
     orders {

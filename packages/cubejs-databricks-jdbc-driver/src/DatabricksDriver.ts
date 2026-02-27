@@ -5,7 +5,7 @@
  */
 
 import fetch from 'node-fetch';
-import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, LoggerFn } from '@cubejs-backend/shared';
 import {
   DatabaseStructure,
   DriverCapabilities,
@@ -329,7 +329,7 @@ export class DatabricksDriver extends JDBCDriver {
     };
   }
 
-  public override setLogger(logger: any) {
+  public override setLogger(logger: LoggerFn) {
     super.setLogger(logger);
     this.showDeprecations();
   }
@@ -480,7 +480,7 @@ export class DatabricksDriver extends JDBCDriver {
         ?.split('=')[1];
 
       if (result) {
-        this.logger('PWD Parameter Deprecation in connection string', {
+        this.logger?.('PWD Parameter Deprecation in connection string', {
           warning:
             'PWD parameter is deprecated and will be ignored in future releases. ' +
             'Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
@@ -488,7 +488,7 @@ export class DatabricksDriver extends JDBCDriver {
       }
     }
     if (this.showSparkProtocolWarn) {
-      this.logger('jdbc:spark protocol deprecation', {
+      this.logger?.('jdbc:spark protocol deprecation', {
         warning:
           'The `jdbc:spark` protocol is deprecated and will be ignored in future releases. ' +
           'Please migrate your CUBEJS_DB_DATABRICKS_URL environment variable to the ' +
@@ -912,19 +912,15 @@ export class DatabricksDriver extends JDBCDriver {
       select = `SELECT ${this.generateTableColumnsForExport(columns)} FROM (${sql})`;
     }
 
-    try {
-      await this.query(
-        `
-        CREATE TABLE ${tableFullName}_tmp
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
-        OPTIONS (escape = '"')
-        AS (${select});
-        `,
-        params,
-      );
-    } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
-    }
+    await this.query(
+      `
+        INSERT OVERWRITE DIRECTORY '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
+        USING CSV
+        OPTIONS (escape '"')
+        ${select}
+      `,
+      params,
+    );
   }
 
   /**
@@ -951,18 +947,14 @@ export class DatabricksDriver extends JDBCDriver {
    * https://docs.databricks.com/aws/en/connect/storage/gcs
    */
   private async createExternalTableFromTable(tableFullName: string, columns: ColumnInfo[]) {
-    try {
-      await this.query(
-        `
-        CREATE TABLE ${tableFullName}_tmp
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
-        OPTIONS (escape = '"')
-        AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
-        `,
-        [],
-      );
-    } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
-    }
+    await this.query(
+      `
+        INSERT OVERWRITE DIRECTORY '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
+        USING CSV
+        OPTIONS (escape '"')
+        SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
+      `,
+      [],
+    );
   }
 }

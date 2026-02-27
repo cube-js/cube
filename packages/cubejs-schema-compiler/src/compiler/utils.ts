@@ -49,6 +49,7 @@ export function camelizeCube(cube: any): unknown {
   camelizeObjectPart(cube.preAggregations, false);
   camelizeObjectPart(cube.cubes, false);
   camelizeObjectPart(cube.accessPolicy, false);
+  camelizeObjectPart(cube.folders, false);
 
   return cube;
 }

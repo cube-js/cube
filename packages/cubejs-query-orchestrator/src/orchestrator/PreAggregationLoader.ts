@@ -1,6 +1,6 @@
 import R from 'ramda';
 import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -36,7 +36,6 @@ type QueryKey = [QueryWithParams, IndexesSql, InvalidationKeys] | [QueryWithPara
 type QueryOptions = {
   queryKeyMd5: QueryKey | string;
   newVersionEntry: VersionEntry;
-  query: string;
   values: unknown[];
   requestId: string;
   buildRangeEnd?: string;
@@ -103,7 +102,7 @@ export class PreAggregationLoader {
 
   public constructor(
     private readonly driverFactory: DriverFactory,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     preAggregations: PreAggregations,
     preAggregation,
@@ -125,16 +124,7 @@ export class PreAggregationLoader {
     this.externalRefresh = options.externalRefresh;
 
     if (this.externalRefresh && this.waitForRenew) {
-      const message = 'Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.';
-      if (['production', 'test'].includes(getEnv('nodeEnv'))) {
-        throw new Error(message);
-      } else {
-        this.logger('Invalid Configuration', {
-          requestId: this.requestId,
-          warning: message,
-        });
-        this.waitForRenew = false;
-      }
+      this.waitForRenew = false;
     }
   }
 
@@ -504,10 +494,9 @@ export class PreAggregationLoader {
     );
   }
 
-  protected queryOptions(invalidationKeys: InvalidationKeys, query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
+  protected queryOptions(invalidationKeys: InvalidationKeys, _query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
     return {
       queryKeyMd5: queryKeyMd5(this.preAggregationQueryKey(invalidationKeys)),
-      query,
       values: params,
       targetTableName,
       requestId: this.requestId,

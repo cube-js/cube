@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { getEnv, getProcessUid } from '@cubejs-backend/shared';
+import { getEnv, getProcessUid, LoggerFn } from '@cubejs-backend/shared';
 import {
   QueueDriverInterface,
   QueryKey,
@@ -88,7 +88,7 @@ export class QueryQueue {
 
   protected cancelHandlers: Record<string, CancelHandlerFn>;
 
-  protected logger: any;
+  protected logger: LoggerFn;
 
   protected processUid: string;
 

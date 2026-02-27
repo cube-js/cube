@@ -36,6 +36,8 @@ RUN DEBIAN_FRONTEND=noninteractive \
 RUN yarn policies set-version v1.22.22
 
 ENV NODE_ENV=production
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
 WORKDIR /cube
 

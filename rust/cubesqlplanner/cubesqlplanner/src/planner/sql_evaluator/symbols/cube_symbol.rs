@@ -47,22 +47,6 @@ impl CubeNameSymbolFactory {
 }
 
 impl SymbolFactory for CubeNameSymbolFactory {
-    fn symbol_name() -> String {
-        "cube_name".to_string()
-    }
-
-    fn cube_name(&self) -> &String {
-        &self.cube_name
-    }
-
-    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
-        None
-    }
-
-    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
-        Ok(vec![])
-    }
-
     fn build(self, _compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self { cube_name } = self;
         Ok(MemberSymbol::new_cube_name(CubeNameSymbol::new(cube_name)))
@@ -169,25 +153,6 @@ impl CubeTableSymbolFactory {
 }
 
 impl SymbolFactory for CubeTableSymbolFactory {
-    fn symbol_name() -> String {
-        "cube_table".to_string()
-    }
-
-    fn cube_name(&self) -> &String {
-        &self.cube_name
-    }
-
-    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .sql
-            .as_ref()
-            .map_or_else(|| vec![], |sql| sql.args_names().clone()))
-    }
-
-    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
-        self.sql.clone()
-    }
-
     fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self {
             cube_name,

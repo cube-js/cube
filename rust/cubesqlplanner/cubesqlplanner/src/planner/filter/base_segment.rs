@@ -34,6 +34,7 @@ impl BaseSegment {
             name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             None,
+            None,
             query_tools.base_tools().clone(),
         )?;
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());

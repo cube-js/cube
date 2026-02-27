@@ -3058,6 +3058,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       preAggregationsSchema: ''
     });
 
+    query.buildSqlAndParams();
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
 
     const res = await testWithPreAggregation(preAggregationsDescription, query);

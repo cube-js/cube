@@ -163,6 +163,7 @@ const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
+  logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
@@ -637,6 +638,33 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Database min pool size.
+   */
+  dbMinPoolSize: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    if (process.env[keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)]) {
+      const min = parseInt(
+        `${process.env[keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)]}`,
+        10,
+      );
+      if (min < 0) {
+        throw new Error(
+          `The ${
+            keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)
+          } must be a positive number or zero.`
+        );
+      }
+
+      return min;
+    }
+
+    return undefined;
+  },
+
+  /**
    * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
@@ -749,6 +777,13 @@ const variables: Record<string, (...args: any) => any> = {
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
     .default(60 * 60 * 24)
+    .asIntPositive(),
+
+  /**
+   * Maximum time for exponential backoff for pre-aggs (in seconds)
+   */
+  preAggBackoffMaxTime: (): number => get('CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME')
+    .default(10 * 60)
     .asIntPositive(),
 
   /**
@@ -1542,6 +1577,71 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift AWS region for IAM authentication.
+   */
+  redshiftAwsRegion: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_AWS_REGION', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift provisioned cluster identifier for IAM authentication.
+   */
+  redshiftClusterIdentifier: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift Serverless workgroup name for IAM authentication.
+   */
+  redshiftWorkgroupName: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_WORKGROUP_NAME', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift IAM Assume Role ARN for cross-account access.
+   */
+  redshiftAssumeRoleArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_ASSUME_ROLE_ARN', dataSource)
+    ]
+  ),
+
+  /**
+   * Redshift IAM Assume Role External ID.
+   */
+  redshiftAssumeRoleExternalId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_REDSHIFT_ASSUME_ROLE_EXTERNAL_ID', dataSource)
     ]
   ),
 

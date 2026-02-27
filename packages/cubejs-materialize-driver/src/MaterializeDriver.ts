@@ -4,7 +4,7 @@
  * @fileoverview The `MaterializeDriver` and related types declaration.
  */
 
-import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
+import { PostgresDriver, PostgresDriverConfiguration, PgClient, type PgQueryResult } from '@cubejs-backend/postgres-driver';
 import {
   BaseDriver,
   DatabaseStructure,
@@ -15,7 +15,6 @@ import {
   StreamTableDataWithTypes,
   TableStructure
 } from '@cubejs-backend/base-driver';
-import { PoolClient, QueryResult } from 'pg';
 import { Readable } from 'stream';
 import semver from 'semver';
 
@@ -91,7 +90,7 @@ export class MaterializeDriver extends PostgresDriver {
   }
 
   protected async prepareConnection(
-    conn: PoolClient
+    conn: PgClient
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     // Support for statement_timeout is still pending. https://github.com/MaterializeInc/materialize/issues/10390
@@ -183,7 +182,7 @@ export class MaterializeDriver extends PostgresDriver {
     return sortedData.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {});
   }
 
-  protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
+  protected async* asyncFetcher<R extends unknown>(conn: PgClient, cursorId: string): AsyncGenerator<R> {
     const timeout = `${this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000} milliseconds`;
     const queryParams = {
       text: `FETCH 1000 ${cursorId} WITH (TIMEOUT='${timeout}');`,
@@ -193,7 +192,7 @@ export class MaterializeDriver extends PostgresDriver {
     let finish = false;
 
     while (!finish) {
-      const results: QueryResult<any> | undefined = await conn.query(queryParams);
+      const results: PgQueryResult<any> | undefined = await conn.query(queryParams);
       const { rows, rowCount } = results;
 
       if (rowCount === 0) {
@@ -206,11 +205,11 @@ export class MaterializeDriver extends PostgresDriver {
     }
   }
 
-  private async releaseStream(conn: PoolClient): Promise<void> {
+  private async releaseStream(conn: PgClient): Promise<void> {
     try {
       await conn.query('COMMIT;', []);
     } finally {
-      await conn.release();
+      await this.pool.release(conn);
     }
   }
 
@@ -219,7 +218,7 @@ export class MaterializeDriver extends PostgresDriver {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<ReadableStreamTableDataWithTypes> {
-    const conn = await this.pool.connect();
+    const conn = await this.pool.acquire();
     try {
       const cursorId = 'mz_cursor';
       await this.prepareConnection(conn);

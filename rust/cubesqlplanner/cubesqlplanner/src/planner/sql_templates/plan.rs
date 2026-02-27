@@ -155,7 +155,7 @@ impl PlanSqlTemplates {
         &self.driver_tools
     }
 
-    pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
+    pub fn member_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
         let suffix = if let Some(suffix) = suffix {
             format!("_{}", suffix)
         } else {

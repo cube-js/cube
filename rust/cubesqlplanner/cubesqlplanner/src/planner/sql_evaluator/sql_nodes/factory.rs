@@ -159,13 +159,23 @@ impl SqlNodesFactory {
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
+        let default_processor: Rc<dyn SqlNode> =
+            if !self.pre_aggregation_dimensions_references.is_empty() {
+                RenderReferencesSqlNode::new(
+                    evaluate_sql_processor.clone(),
+                    self.pre_aggregation_dimensions_references.clone(),
+                )
+            } else {
+                evaluate_sql_processor.clone()
+            };
+
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
             auto_prefix_processor.clone(),
             self.cube_table_processor(evaluate_sql_processor.clone()),
-            evaluate_sql_processor.clone(),
+            default_processor,
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
     }

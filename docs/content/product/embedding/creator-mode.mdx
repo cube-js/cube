@@ -1,0 +1,95 @@
+# Creator mode
+
+<InfoBox>
+  Creator mode is currently in **private preview**. To enable this feature for your account, please contact [Cube support](https://cube.dev/contact).
+</InfoBox>
+
+Creator mode enables you to embed the entire Cube application with workbooks-dashboard functionality. Users will be able to create and modify their dashboards directly within the embedded application.
+
+## How it works
+
+In creator mode, you embed the full Cube application instead of individual dashboards or chat interfaces. This provides users with the complete Cube experience, including the ability to:
+
+- Create new dashboards
+- Modify existing dashboards
+- Access all workbook and dashboard functionality
+- Build custom analytics experiences
+
+To enable creator mode, you need to pass `creatorMode: true`, `tenantId`, and `tenantName` to the [Generate Session API][ref-generate-session] when generating an embed session. The tenant ID is used to scope all content that the user creates to a specific tenant, while the tenant name is a human-readable friendly name displayed in the user interface.
+
+## Tenant ID and Name
+
+When using creator mode, you must provide both `tenantId` and `tenantName` parameters when generating a session:
+
+- **`tenantId`** – Used to scope all content (dashboards, workbooks, etc.) that users create within the embedded application to a specific tenant. This ensures proper data isolation in multi-tenant scenarios.
+- **`tenantName`** – A human-readable friendly name for the tenant that will be displayed in the user interface.
+
+## Using creator mode
+
+To use creator mode and embed an app:
+
+1. **Set the embed type to "App"** in the form
+2. **Fill in Deployment ID**, **Tenant ID**, **Tenant Name**, and either **External ID** or **Internal ID** (email)
+3. **Click "Generate Session & Embed"** — the request automatically includes `creatorMode: true` for app embeddings
+4. The app is embedded at `/embed/d/{deploymentId}/app?session={sessionId}` and displayed in the iframe
+
+Creator mode is enabled automatically when the embed type is "app"; no additional configuration is needed. The tenant ID is required to scope all dashboards and content created by the user to the specific tenant, and the tenant name will be displayed in the user interface.
+
+### Example
+
+```javascript
+const API_KEY = "YOUR_API_KEY";
+const DEPLOYMENT_ID = 32;
+const TENANT_ID = "tenant-123";
+const TENANT_NAME = "Acme Corporation";
+
+const session = await fetch(
+  "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Api-Key ${API_KEY}`,
+    },
+    body: JSON.stringify({
+      deploymentId: DEPLOYMENT_ID,
+      externalId: "user@example.com",
+      creatorMode: true,
+      tenantId: TENANT_ID,
+      tenantName: TENANT_NAME,
+    }),
+  },
+);
+
+const data = await session.json();
+const sessionId = data.sessionId;
+```
+
+### Embedding the app
+
+Use the session ID to embed the full Cube application:
+
+```html
+<iframe
+  title="Cube App"
+  src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+Replace `{deploymentId}` with your deployment ID and `{sessionId}` with the session ID returned from the Generate Session API.
+
+## Example application
+
+For a complete working example of embedding, including creator mode, check out the [cube-embedding-demo](https://github.com/cubedevinc/cube-embedding-demo) repository. This demo application provides:
+
+- A full working example of iframe embedding
+- Implementation of signed iframe embedding with session generation
+- Support for creator mode with tenant ID and tenant name
+- A React-based UI for testing embedding functionality
+- Backend server that securely handles API key authentication
+
+You can clone the repository, configure it with your Cube credentials, and run it locally to test embedding functionality or use it as a reference implementation for your own application.
+
+[ref-generate-session]: /product/apis-integrations/embed-apis/generate-session

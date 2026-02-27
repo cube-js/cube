@@ -214,10 +214,12 @@ describe('Schema Testing', () => {
 
       expect(logger.mock.calls.length).toEqual(2);
       expect(logger.mock.calls[0]).toEqual([
-        'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+        'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.',
+        {},
       ]);
       expect(logger.mock.calls[1]).toEqual([
-        'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+        'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.',
+        {},
       ]);
     });
 

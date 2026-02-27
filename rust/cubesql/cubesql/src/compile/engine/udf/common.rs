@@ -1419,11 +1419,22 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
 
             let format = postgres_datetime_format_to_iso(format.clone());
 
-            let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
+            let mut res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
                 DataFusionError::Execution(format!(
                     "Error evaluating str_to_date('{timestamp}', '{format}'): {e}"
                 ))
-            })?;
+            });
+
+            // Try parsing with date format if parsing with datetime format fails
+            if res.is_err() {
+                if let Ok(dt) = NaiveDate::parse_from_str(timestamp, &format).map(|d| {
+                    d.and_hms_opt(0, 0, 0)
+                        .expect("Unable to add zero time to naive date")
+                }) {
+                    res = Ok(dt);
+                }
+            }
+            let res = res?;
 
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
                 Some(res.and_utc().timestamp_nanos_opt().unwrap()),

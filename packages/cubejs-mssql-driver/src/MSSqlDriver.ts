@@ -20,7 +20,7 @@ import {
   TableColumnQueryResult,
   GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
-import { QueryStream } from './QueryStream';
+import { QueryStream, transformRow } from './QueryStream';
 
 // ********* Value converters ***************** //
 const numericTypes = [
@@ -63,7 +63,7 @@ const MSSqlToGenericType: Record<string, string> = {
  * MS SQL driver class.
  */
 export class MSSqlDriver extends BaseDriver implements DriverInterface {
-  private readonly connectionPool: ConnectionPool;
+  private readonly pool: ConnectionPool;
 
   private readonly initialConnectPromise: Promise<ConnectionPool>;
 
@@ -91,6 +91,11 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       maxPoolSize?: number,
 
       /**
+       * Min pool size value for the [cube]<-->[db] pool.
+       */
+      minPoolSize?: number,
+
+      /**
        * Time to wait for a response from a connection after validation
        * request before determining it as not valid. Default - 10000 ms.
        */
@@ -105,9 +110,6 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
-    /**
-     * @type {import('mssql').config}
-     */
     this.config = {
       readOnly: true,
       server: getEnv('dbHost', { dataSource }),
@@ -119,22 +121,26 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
         encrypt: getEnv('dbSsl', { dataSource }),
-        useUTC: false
+        useUTC: true
       },
       pool: {
         max:
           config.maxPoolSize ||
           getEnv('dbMaxPoolSize', { dataSource }) ||
           8,
-        min: 0,
+        min: config.minPoolSize ||
+          getEnv('dbMinPoolSize', { dataSource }) ||
+          0,
         idleTimeoutMillis: 30 * 1000,
         acquireTimeoutMillis: 20 * 1000
       },
       ...config
     };
-    const { readOnly, ...poolConfig } = this.config;
-    this.connectionPool = new ConnectionPool(poolConfig as MsSQLConfig);
-    this.initialConnectPromise = this.connectionPool.connect();
+
+    const { readOnly: _, ...poolConfig } = this.config;
+
+    this.pool = new ConnectionPool(poolConfig as MsSQLConfig);
+    this.initialConnectPromise = this.pool.connect();
   }
 
   /**
@@ -292,7 +298,10 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       // TODO time zone UTC set in driver ?
 
       cancelFn = () => request.cancel();
-      return request.query(query).then(res => res.recordset);
+      return request.query(query).then(res => {
+        res.recordset?.forEach(transformRow);
+        return res.recordset;
+      });
     });
     promise.cancel = () => cancelFn && cancelFn();
     return promise;
@@ -382,6 +391,10 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
+  }
+
+  public override async release(): Promise<void> {
+    await this.pool.close();
   }
 
   public capabilities(): DriverCapabilities {

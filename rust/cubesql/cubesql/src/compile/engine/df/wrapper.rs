@@ -14,7 +14,7 @@ use crate::{
         },
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{AuthContextRef, SessionState},
     transport::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
         SqlTemplates, TransportLoadRequestQuery, TransportService,
@@ -642,6 +642,7 @@ impl CubeScanWrapperNode {
         &self,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
     ) -> result::Result<CubeScanWrappedSqlNode, CubeError> {
         let schema = self.schema();
         let wrapped_plan = self.wrapped_plan.clone();
@@ -649,6 +650,7 @@ impl CubeScanWrapperNode {
             &self.meta,
             transport,
             load_request_meta,
+            state,
             self.clone().set_max_limit_for_node(wrapped_plan),
             true,
             Vec::new(),
@@ -920,6 +922,7 @@ impl CubeScanWrapperNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -964,6 +967,7 @@ impl CubeScanWrapperNode {
                             meta,
                             transport,
                             load_request_meta,
+                            state,
                             node,
                             can_rename_columns,
                             values,
@@ -997,6 +1001,7 @@ impl CubeScanWrapperNode {
         meta: &'ctx MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -1007,6 +1012,7 @@ impl CubeScanWrapperNode {
             meta,
             transport,
             load_request_meta,
+            state,
             node,
             can_rename_columns,
             values,
@@ -1141,6 +1147,7 @@ impl WrappedSelectNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         sql: &mut SqlQuery,
         data_source: Option<&str>,
     ) -> result::Result<HashMap<String, String>, CubeError> {
@@ -1156,6 +1163,7 @@ impl WrappedSelectNode {
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
+                state.clone(),
                 subquery.clone(),
                 true,
                 sql.values.clone(),
@@ -3100,6 +3108,7 @@ impl WrappedSelectNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -3198,6 +3207,7 @@ impl WrappedSelectNode {
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
+                state.clone(),
                 &mut sql,
                 Some(data_source),
             )
@@ -3257,6 +3267,7 @@ impl WrappedSelectNode {
                     meta,
                     transport.clone(),
                     load_request_meta.clone(),
+                    state.clone(),
                     lp.clone(),
                     true,
                     sql.values.clone(),
@@ -3402,8 +3413,14 @@ impl WrappedSelectNode {
                     .all(|member| meta.find_dimension_with_name(member).is_some())
             });
 
+        let timezone = state
+            .query_timezone
+            .read()
+            .map_err(|_| CubeError::internal("Failed to acquire timezone read lock".to_string()))?
+            .clone();
+
         let load_request = V1LoadRequestQuery {
-            timezone: None,
+            timezone,
             measures: Some(
                 aggregate
                     .iter()
@@ -3553,6 +3570,7 @@ impl WrappedSelectNode {
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
@@ -3564,6 +3582,7 @@ impl WrappedSelectNode {
                     meta,
                     transport,
                     load_request_meta,
+                    state,
                     node,
                     can_rename_columns,
                     values,
@@ -3581,6 +3600,7 @@ impl WrappedSelectNode {
             meta,
             transport.clone(),
             load_request_meta.clone(),
+            state.clone(),
             self.from.clone(),
             true,
             values.clone(),
@@ -3593,6 +3613,7 @@ impl WrappedSelectNode {
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
+                state,
                 &mut sql,
                 data_source.as_deref(),
             )

@@ -1,0 +1,96 @@
+.codeBlock {
+  margin-top: var(--space-m);
+}
+
+.tabs {
+  display: flex;
+  border-radius: 12px 12px 0 0;
+  background-color: rgba(124, 58, 237, 0.05);
+  box-shadow: inset 0px -1px 0px rgba(0, 0, 0, 0.08);
+}
+
+.tabs > div:first-child {
+  border-top-left-radius: 12px;
+}
+
+.tab {
+  padding: 10px 16px;
+  cursor: pointer;
+  line-height: 28px;
+  font-weight: 500;
+  color: var(--gray_01);
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.tab:hover {
+  color: var(--pink);
+  box-shadow: inset 0px -2.6px 0px hsl(342, 100%, 82%);
+}
+
+.selectedTab {
+  color: var(--purple_bright);
+  cursor: default;
+  background-color: var(--purple_bg_a08);
+  box-shadow: inset 0px -2.6px 0px var(--purple_bright);
+}
+
+.selectedTab:hover {
+  color: var(--purple_bright);
+  box-shadow: inset 0px -2.6px 0px var(--purple_bright);
+}
+
+.pre {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  margin-top: 0 !important;
+}
+
+.codeContent {
+  margin-top: 0 !important;
+}
+
+.codeContent > div,
+.codeContent > [data-language] {
+  margin-top: 0 !important;
+}
+
+.codeContent :global(.nextra-code) {
+  margin-top: 0 !important;
+}
+
+.codeContent figure,
+.codeContent pre {
+  margin-top: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+.codeContent pre {
+  background-color: rgba(124, 58, 237, 0.05) !important;
+  box-shadow: none !important;
+}
+
+.codeContent figure {
+  box-shadow: none !important;
+}
+
+.codeContent > div {
+  box-shadow: none !important;
+}
+
+.codeContent pre code {
+  background-color: transparent !important;
+}
+
+.codeContent pre code span {
+  background-color: transparent !important;
+}
+
+:global(.dark) .tabs {
+  background-color: rgba(124, 58, 237, 0.1);
+  box-shadow: inset 0px -1px 0px rgba(255, 255, 255, 0.15);
+}
+
+:global(.dark) .tab {
+  color: #d1d5db;
+}

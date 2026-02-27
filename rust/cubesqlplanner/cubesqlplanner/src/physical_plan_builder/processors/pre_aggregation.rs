@@ -29,7 +29,7 @@ impl PreAggregationProcessor<'_> {
         let table_name = query_tools
             .base_tools()
             .pre_aggregation_table_name(table.cube_name.clone(), name.clone())?;
-        let alias = PlanSqlTemplates::memeber_alias_name(&table.cube_name, &name, &None);
+        let alias = PlanSqlTemplates::member_alias_name(&table.cube_name, &name, &None);
         let res = SingleAliasedSource::new_from_table_reference(
             table_name,
             Rc::new(Schema::empty()),
@@ -87,7 +87,7 @@ impl PreAggregationProcessor<'_> {
             let mut select_builder = SelectBuilder::new(from);
             for dim in pre_aggregation.dimensions().iter() {
                 let name_in_table =
-                    PlanSqlTemplates::memeber_alias_name(&item.cube_alias, &dim.name(), &None);
+                    PlanSqlTemplates::member_alias_name(&item.cube_alias, &dim.name(), &None);
                 let alias = dim.alias();
                 select_builder.add_projection_reference_member(
                     &dim,
@@ -102,7 +102,7 @@ impl PreAggregationProcessor<'_> {
                     (dim.alias(), None)
                 };
 
-                let name_in_table = PlanSqlTemplates::memeber_alias_name(
+                let name_in_table = PlanSqlTemplates::member_alias_name(
                     &item.cube_alias,
                     &dim.name(),
                     &granularity,
@@ -121,7 +121,7 @@ impl PreAggregationProcessor<'_> {
                 );
             }
             for meas in pre_aggregation.measures().iter() {
-                let name_in_table = PlanSqlTemplates::memeber_alias_name(
+                let name_in_table = PlanSqlTemplates::member_alias_name(
                     &item.cube_alias,
                     &meas.name(),
                     &meas.alias_suffix(),
@@ -141,7 +141,7 @@ impl PreAggregationProcessor<'_> {
 
         let plan = QueryPlan::Union(Rc::new(Union::new(union_sources)));
         let source = SingleSource::Subquery(Rc::new(plan));
-        let alias = PlanSqlTemplates::memeber_alias_name(
+        let alias = PlanSqlTemplates::member_alias_name(
             pre_aggregation.cube_name(),
             pre_aggregation.name(),
             &None,

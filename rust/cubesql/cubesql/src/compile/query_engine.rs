@@ -350,6 +350,7 @@ pub trait QueryEngine {
         let rewrite_plan = Self::evaluate_wrapped_sql(
             self.transport_ref().clone(),
             Arc::new(state.get_load_request_meta("sql")),
+            state,
             rewrite_plan,
         )
         .await?;
@@ -363,6 +364,7 @@ pub trait QueryEngine {
     fn evaluate_wrapped_sql(
         transport_service: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
         plan: LogicalPlan,
     ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
         Box::pin(async move {
@@ -374,7 +376,11 @@ pub trait QueryEngine {
                     return Ok(LogicalPlan::Extension(Extension {
                         node: Arc::new(
                             wrapper
-                                .generate_sql(transport_service.clone(), load_request_meta.clone())
+                                .generate_sql(
+                                    transport_service.clone(),
+                                    load_request_meta.clone(),
+                                    state.clone(),
+                                )
                                 .await
                                 .map_err(|e| CompilationError::internal(e.to_string()))?,
                         ),
@@ -387,6 +393,7 @@ pub trait QueryEngine {
                     Self::evaluate_wrapped_sql(
                         transport_service.clone(),
                         load_request_meta.clone(),
+                        state.clone(),
                         input.clone(),
                     )
                     .await?,

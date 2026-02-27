@@ -8,7 +8,7 @@ use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::cube_bridge::segment_definition::SegmentDefinition;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::mock_schema::MockSchema;
-use crate::test_fixtures::cube_bridge::MockJoinGraph;
+use crate::test_fixtures::cube_bridge::{MockBaseTools, MockJoinGraph, MockSecurityContext};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -17,6 +17,7 @@ use std::rc::Rc;
 pub struct MockCubeEvaluator {
     schema: MockSchema,
     primary_keys: HashMap<String, Vec<String>>,
+    #[allow(dead_code)]
     join_graph: Option<Rc<MockJoinGraph>>,
 }
 
@@ -53,6 +54,7 @@ impl MockCubeEvaluator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn join_graph(&self) -> Option<Rc<MockJoinGraph>> {
         self.join_graph.clone()
     }
@@ -74,9 +76,9 @@ impl MockCubeEvaluator {
     ) -> Result<Vec<String>, CubeError> {
         let parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 
-        if parts.len() != 2 && parts.len() != 3 {
+        if parts.len() != 2 {
             return Err(CubeError::user(format!(
-                "Invalid path format: '{}'. Expected format: 'cube.member' or 'cube.time_dimension.granularity'",
+                "Invalid path format: '{}'. Expected format: 'cube.member'",
                 path
             )));
         }
@@ -86,31 +88,6 @@ impl MockCubeEvaluator {
 
         if self.schema.get_cube(cube_name).is_none() {
             return Err(CubeError::user(format!("Cube '{}' not found", cube_name)));
-        }
-
-        if parts.len() == 3 {
-            if path_type != "dimension" && path_type != "dimensions" {
-                return Err(CubeError::user(format!(
-                    "Granularity can only be specified for dimensions, not for {}",
-                    path_type
-                )));
-            }
-
-            if let Some(dimension) = self.schema.get_dimension(cube_name, member_name) {
-                if dimension.static_data().dimension_type != "time" {
-                    return Err(CubeError::user(format!(
-                        "Granularity can only be specified for time dimensions, but '{}' is of type '{}'",
-                        member_name,
-                        dimension.static_data().dimension_type
-                    )));
-                }
-                return Ok(parts);
-            } else {
-                return Err(CubeError::user(format!(
-                    "Dimension '{}' not found in cube '{}'",
-                    member_name, cube_name
-                )));
-            }
         }
 
         let exists = match path_type {
@@ -256,53 +233,153 @@ impl CubeEvaluator for MockCubeEvaluator {
 
         let granularity = &path[3];
 
-        let valid_granularities = [
+        // Check custom granularities in schema first
+        if let Some(custom) = self.schema.get_granularity(&path[0], &path[1], granularity) {
+            return Ok(custom as Rc<dyn GranularityDefinition>);
+        }
+
+        // Fall back to predefined granularities
+        let predefined = [
             "second", "minute", "hour", "day", "week", "month", "quarter", "year",
         ];
 
-        if !valid_granularities.contains(&granularity.as_str()) {
-            return Err(CubeError::user(format!(
-                "Unsupported granularity: '{}'. Supported: second, minute, hour, day, week, month, quarter, year",
+        if predefined.contains(&granularity.as_str()) {
+            use crate::test_fixtures::cube_bridge::MockGranularityDefinition;
+            Ok(Rc::new(
+                MockGranularityDefinition::builder()
+                    .interval(format!("1 {}", granularity))
+                    .build(),
+            ) as Rc<dyn GranularityDefinition>)
+        } else {
+            Err(CubeError::user(format!(
+                "Granularity '{}' not found",
                 granularity
-            )));
+            )))
         }
-
-        use crate::test_fixtures::cube_bridge::MockGranularityDefinition;
-        Ok(Rc::new(
-            MockGranularityDefinition::builder()
-                .interval(granularity.clone())
-                .build(),
-        ) as Rc<dyn GranularityDefinition>)
     }
 
     fn pre_aggregations_for_cube_as_array(
         &self,
-        _cube_name: String,
+        cube_name: String,
     ) -> Result<Vec<Rc<dyn PreAggregationDescription>>, CubeError> {
-        todo!("pre_aggregations_for_cube_as_array is not implemented in MockCubeEvaluator")
+        Ok(self
+            .schema
+            .get_pre_aggregations_for_cube(&cube_name)
+            .map(|pre_aggs| {
+                pre_aggs
+                    .into_iter()
+                    .map(|(_, pre_agg)| pre_agg as Rc<dyn PreAggregationDescription>)
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     fn has_pre_aggregation_description_by_name(&self) -> Result<bool, CubeError> {
-        todo!("has_pre_aggregation_description_by_name is not implemented in MockCubeEvaluator")
+        Ok(true)
     }
 
     fn pre_aggregation_description_by_name(
         &self,
-        _cube_name: String,
-        _name: String,
+        cube_name: String,
+        name: String,
     ) -> Result<Option<Rc<dyn PreAggregationDescription>>, CubeError> {
-        todo!("pre_aggregation_description_by_name is not implemented in MockCubeEvaluator")
+        Ok(self
+            .schema
+            .get_pre_aggregation(&cube_name, &name)
+            .map(|pre_agg| pre_agg as Rc<dyn PreAggregationDescription>))
     }
 
     fn evaluate_rollup_references(
         &self,
         _cube: String,
-        _sql: Rc<dyn MemberSql>,
+        sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<String>, CubeError> {
-        todo!("evaluate_rollup_references is not implemented in MockCubeEvaluator")
+        // Simple implementation for mock: extract symbol paths from compiled template
+        // For YAML schemas, rollups are already provided as strings like "visitors.for_join"
+        // which MockMemberSql parses into symbol_paths like [["visitors", "for_join"]]
+        let (_template, args) = sql.compile_template_sql(
+            Rc::new(MockBaseTools::default()),
+            Rc::new(MockSecurityContext),
+        )?;
+
+        // Convert symbol paths back to dot-separated strings
+        Ok(args
+            .symbol_paths
+            .iter()
+            .map(|path| path.join("."))
+            .collect())
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+
+    fn create_custom_granularity_schema() -> MockSchema {
+        MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
+    }
+
+    fn resolve(
+        evaluator: &MockCubeEvaluator,
+        granularity: &str,
+    ) -> Result<Rc<dyn GranularityDefinition>, CubeError> {
+        evaluator.resolve_granularity(vec![
+            "orders".to_string(),
+            "created_at".to_string(),
+            "granularities".to_string(),
+            granularity.to_string(),
+        ])
+    }
+
+    #[test]
+    fn test_resolve_predefined_granularity() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "day").expect("should resolve predefined granularity");
+        assert_eq!(result.static_data().interval, "1 day");
+        assert_eq!(result.static_data().origin, None);
+        assert_eq!(result.static_data().offset, None);
+    }
+
+    #[test]
+    fn test_resolve_custom_granularity() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "half_year").expect("should resolve custom granularity");
+        assert_eq!(result.static_data().interval, "6 months");
+        assert_eq!(result.static_data().origin, Some("2024-01-01".to_string()));
+        assert_eq!(result.static_data().offset, None);
+    }
+
+    #[test]
+    fn test_resolve_custom_granularity_with_offset() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "fiscal_year").expect("should resolve custom granularity");
+        assert_eq!(result.static_data().interval, "1 year");
+        assert_eq!(result.static_data().offset, Some("1 month".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_unknown_granularity_error() {
+        let schema = create_custom_granularity_schema();
+        let evaluator = schema.create_evaluator();
+
+        let result = resolve(&evaluator, "nonexistent");
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert!(
+            err.message.contains("Granularity 'nonexistent' not found"),
+            "unexpected error: {}",
+            err.message
+        );
     }
 }

@@ -127,6 +127,7 @@ export interface TransformConfig {
   fileContent: string;
   transpilers: string[];
   compilerId: string;
+  jinjaUsed?: boolean;
   metaData?: {
     cubeNames: string[];
     cubeSymbols: Record<string, Record<string, boolean>>;
@@ -353,9 +354,9 @@ function wrapNativeFunctionWithStream(
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
-export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
+export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel, prodLogger: boolean = false): void => {
   const native = loadNative();
-  native.setupLogger({ logger: wrapNativeFunctionWithChannelCallback(logger), logLevel });
+  native.setupLogger({ logger: wrapNativeFunctionWithChannelCallback(logger), logLevel, prodLogger });
 };
 
 /// Reset local to default implementation, which uses STDOUT
