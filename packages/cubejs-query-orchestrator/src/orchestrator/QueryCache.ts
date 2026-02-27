@@ -301,6 +301,7 @@ export class QueryCache {
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
+          skipRefreshKeyWaitForRenew: true,
         }
       );
     }
@@ -1003,19 +1004,31 @@ export class QueryCache {
         primaryQuery,
         renewCycle
       });
-      if (
-        renewalKey && (
-          !renewalThreshold ||
-          !parsedResult.time ||
-          renewedAgo > renewalThreshold * 1000 ||
-          parsedResult.renewalKey !== renewalKey
-        )
-      ) {
+      const isExpired = !renewalThreshold || !parsedResult.time || renewedAgo > renewalThreshold * 1000;
+      const isKeyMismatch = renewalKey && parsedResult.renewalKey !== renewalKey;
+
+      if (renewalKey && isExpired) {
+        // Cache is expired — must fetch new data
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           return fetchNew();
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+          fetchNew().catch(e => {
+            if (!(e instanceof ContinueWaitError)) {
+              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+            }
+          });
+        }
+      } else if (isKeyMismatch) {
+        // Key mismatch but cache is NOT expired
+        if (options.waitForRenew && renewCycle) {
+          // Background renew cycle: block on fetch
+          this.logger('Waiting for renew (key mismatch, renew cycle)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+          return fetchNew();
+        } else {
+          // User request OR non-blocking: return cached, refresh in background
+          this.logger('Renewing key in background (key mismatch, not expired)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           fetchNew().catch(e => {
             if (!(e instanceof ContinueWaitError)) {
               this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
