@@ -291,11 +291,48 @@ FROM users
 
 As with other measures, `paying_percentage` can be used with dimensions.
 
-## 5. Next Steps
+## 5. Creating a View
 
-1.  [Query format][ref-backend-query-format]
-2.  [REST API][ref-backend-restapi]
-3.  [Data model reference documentation][ref-schema-cube]
+[Views][ref-views] sit on top of cubes and create a facade of your whole data
+model, with which data consumers can interact. They are useful for defining
+metrics, managing governance, and controlling which part of the data model is
+exposed to end-users.
+
+Let's create a view that exposes our users data:
+
+<CodeTabs>
+
+```javascript
+view(`users_view`, {
+  cubes: [
+    {
+      join_path: users,
+      includes: `*`
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: users_view
+
+    cubes:
+      - join_path: users
+        includes:
+          - "*"
+```
+
+</CodeTabs>
+
+End-users query data through views in Cube. This gives you a layer of
+abstraction that makes it easier to manage changes to the underlying data
+model.
+
+## 6. Next Steps
+
+1.  [Explore][ref-explore] your data model
+2.  Use [Workbooks][ref-workbooks] to save your analysis and present it as a dashboard
 
 [ref-backend-restapi]: /product/apis-integrations/rest-api/reference
 [ref-schema-cube]: /product/data-modeling/reference/cube
@@ -306,3 +343,6 @@ As with other measures, `paying_percentage` can be used with dimensions.
 [ref-demo-deployment]: /product/deployment/cloud/deployments#demo-deployments
 [ref-apis]: /product/apis-integrations
 [ref-calculated-measures]: /product/data-modeling/concepts/calculated-members#calculated-measures
+[ref-views]: /product/data-modeling/reference/view
+[ref-explore]: /product/exploration/explore
+[ref-workbooks]: /product/exploration/workbooks
