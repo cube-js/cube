@@ -9,6 +9,7 @@
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
+[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Cube%20Guru-006BFF)](https://gurubase.io/g/cube)
 
 __Cube Core is an open-source semantic layer.__ Cube Core can be used to build embedded analytics in your applications, create your own business intelligence tool or provide context about data to AI agents. Cube Core is headless and comes with multiple APIs for embedded analytics and BI: REST, GraphQL, and SQL.
 
