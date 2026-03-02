@@ -152,13 +152,15 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
-function mutexPromise(promise: Promise<any>) {
+function mutexPromise<T>(promise: Promise<T>): Promise<T | null> {
   return promise
     .then((result) => result)
     .catch((error) => {
       if (error !== MUTEX_ERROR) {
         throw error;
       }
+
+      return null;
     });
 }
 
@@ -414,7 +416,8 @@ class CubeApi {
       return subscribeNext();
     };
 
-    const promise = requestPromise.then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
+    const promise: Promise<any> = requestPromise
+      .then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
 
     if (callback) {
       return {
