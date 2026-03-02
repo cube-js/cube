@@ -190,9 +190,9 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
               },
               orphanedTimeout: 120
             }, 1, {
-            stageQueryKey: 1,
-            requestId: 'request-id',
-            spanId: 'span-id'
+              stageQueryKey: 1,
+              requestId: 'request-id',
+              spanId: 'span-id'
             });
           } catch (e) {
             console.error(e);
