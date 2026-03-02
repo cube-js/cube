@@ -9,6 +9,7 @@
 
 import { CubeApi as CubeApiOriginal, Query } from '../src';
 import HttpTransport from '../src/HttpTransport';
+import RequestError from '../src/RequestError';
 import {
   DescriptiveQueryRequest,
   DescriptiveQueryRequestCompact,
@@ -691,5 +692,85 @@ describe('CubeApi with baseRequestId', () => {
 
     expect(requestSpy).toHaveBeenCalled();
     expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+});
+
+describe('CubeApi Mutex Cancellation', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  test('should return null for cancelled query when a newer query invalidates it', async () => {
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const mutexObj: Record<string, number> = {};
+    const query = DescriptiveQueryRequest as Query;
+
+    // Fire two concurrent loads with the same mutexObj and mutexKey.
+    // The second call overwrites mutexObj['key'] before either resolves,
+    // so the first call's checkMutex() detects a mismatch and gets cancelled.
+    const [first, second] = await Promise.all([
+      cubeApi.load(query, { mutexObj, mutexKey: 'key' }),
+      cubeApi.load(query, { mutexObj, mutexKey: 'key' }),
+    ]);
+
+    expect(first).toBeNull();
+    expect(second).toBeInstanceOf(ResultSet);
+  });
+
+  test('should return ResultSet when no mutex cancellation occurs', async () => {
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const mutexObj: Record<string, number> = {};
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { mutexObj, mutexKey: 'key' });
+
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+
+  test('should propagate non-mutex errors', async () => {
+    const errorBody = { error: 'Internal Server Error' };
+
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 500,
+        text: () => Promise.resolve(JSON.stringify(errorBody)),
+        json: () => Promise.resolve(errorBody)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const mutexObj: Record<string, number> = {};
+
+    await expect(
+      cubeApi.load(DescriptiveQueryRequest as Query, { mutexObj, mutexKey: 'key' })
+    ).rejects.toThrow(RequestError);
   });
 });
