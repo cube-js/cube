@@ -14,6 +14,7 @@ export const unsubscribeMessageSchema = z.object({
 const queryParams = z.object({
   query: z.unknown(),
   queryType: z.string().optional(),
+  cache: z.string().optional(),
 }).strict();
 
 const queryOnlyParams = z.object({
