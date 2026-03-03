@@ -1,0 +1,52 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: sql
+---
+ WITH 
+cte_0 AS (  SELECT "orders".currency "orders__currency", date_trunc('year', ("orders".date::timestamptz AT TIME ZONE 'UTC')) "orders__date_year", sum("orders".amount_usd) "orders__amount_usd" 
+  FROM  orders  AS "orders"
+  WHERE ("orders".date >= $_0_$::timestamptz AND "orders".date <= $_1_$::timestamptz) AND ("orders".currency = $_2_$)
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_1 AS (  SELECT "orders".currency "orders__currency", date_trunc('year', ("orders".date::timestamptz AT TIME ZONE 'UTC')) "orders__date_year", sum("orders".amount_eur) "orders__amount_eur" 
+  FROM  orders  AS "orders"
+  WHERE ("orders".date >= $_3_$::timestamptz AND "orders".date <= $_4_$::timestamptz) AND ("orders".currency = $_5_$)
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_2 AS (  SELECT "orders".currency "orders__currency", date_trunc('year', ("orders".date::timestamptz AT TIME ZONE 'UTC')) "orders__date_year", sum("orders".amount_gbp) "orders__amount_gbp" 
+  FROM  orders  AS "orders"
+  WHERE ("orders".date >= $_6_$::timestamptz AND "orders".date <= $_7_$::timestamptz) AND ("orders".currency = $_8_$)
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_3 AS (  SELECT "fk_aggregate_keys"."orders__currency" "orders__currency", "fk_aggregate_keys"."orders__date_year" "orders__date_year", CASE "fk_aggregate_keys"."orders__currency" WHEN 'USD' THEN "q_0"."orders__amount_usd" WHEN 'EUR' THEN "q_1"."orders__amount_eur" WHEN 'GBP' THEN "q_2"."orders__amount_gbp" ELSE "q_0"."orders__amount_usd" END "orders__amount_in_currency" 
+  FROM (SELECT DISTINCT "orders__currency" "orders__currency", "orders__date_year" "orders__date_year" 
+  FROM (SELECT DISTINCT "orders__currency" "orders__currency", "orders__date_year" "orders__date_year" 
+  FROM  cte_0  AS "cte_0"
+   UNION ALL 
+  SELECT DISTINCT "orders__currency" "orders__currency", "orders__date_year" "orders__date_year" 
+  FROM  cte_1  AS "cte_1"
+   UNION ALL 
+  SELECT DISTINCT "orders__currency" "orders__currency", "orders__date_year" "orders__date_year" 
+  FROM  cte_2  AS "cte_2") AS "pk_aggregate_keys_source") AS "fk_aggregate_keys"
+  LEFT JOIN (SELECT * 
+  FROM  cte_0  AS "cte_0") AS "q_0" ON (("fk_aggregate_keys"."orders__currency" = "q_0"."orders__currency" OR (("fk_aggregate_keys"."orders__currency" IS NULL) AND ("q_0"."orders__currency" IS NULL)))) AND (("fk_aggregate_keys"."orders__date_year" = "q_0"."orders__date_year" OR (("fk_aggregate_keys"."orders__date_year" IS NULL) AND ("q_0"."orders__date_year" IS NULL))))
+  LEFT JOIN (SELECT * 
+  FROM  cte_1  AS "cte_1") AS "q_1" ON (("fk_aggregate_keys"."orders__currency" = "q_1"."orders__currency" OR (("fk_aggregate_keys"."orders__currency" IS NULL) AND ("q_1"."orders__currency" IS NULL)))) AND (("fk_aggregate_keys"."orders__date_year" = "q_1"."orders__date_year" OR (("fk_aggregate_keys"."orders__date_year" IS NULL) AND ("q_1"."orders__date_year" IS NULL))))
+  LEFT JOIN (SELECT * 
+  FROM  cte_2  AS "cte_2") AS "q_2" ON (("fk_aggregate_keys"."orders__currency" = "q_2"."orders__currency" OR (("fk_aggregate_keys"."orders__currency" IS NULL) AND ("q_2"."orders__currency" IS NULL)))) AND (("fk_aggregate_keys"."orders__date_year" = "q_2"."orders__date_year" OR (("fk_aggregate_keys"."orders__date_year" IS NULL) AND ("q_2"."orders__date_year" IS NULL)))))
+SELECT "fk_aggregate_keys"."orders__currency" "orders__currency", "fk_aggregate_keys"."orders__date_year" "orders__date_year", "q_0"."orders__amount_usd" "orders__amount_usd", "q_1"."orders__amount_in_currency" "orders__amount_in_currency" 
+FROM (SELECT DISTINCT "orders__currency" "orders__currency", "orders__date_year" "orders__date_year" 
+FROM (SELECT "orders".currency "orders__currency", date_trunc('year', ("orders".date::timestamptz AT TIME ZONE 'UTC')) "orders__date_year" 
+FROM  orders  AS "orders"
+WHERE ("orders".date >= $_11_$::timestamptz AND "orders".date <= $_12_$::timestamptz)
+GROUP BY 1, 2
+ UNION ALL 
+SELECT DISTINCT "orders__currency" "orders__currency", "orders__date_year" "orders__date_year" 
+FROM  cte_3  AS "cte_3") AS "pk_aggregate_keys_source") AS "fk_aggregate_keys"
+LEFT JOIN (SELECT "orders".currency "orders__currency", date_trunc('year', ("orders".date::timestamptz AT TIME ZONE 'UTC')) "orders__date_year", sum("orders".amount_usd) "orders__amount_usd" 
+FROM  orders  AS "orders"
+WHERE ("orders".date >= $_9_$::timestamptz AND "orders".date <= $_10_$::timestamptz)
+GROUP BY 1, 2) AS "q_0" ON (("fk_aggregate_keys"."orders__currency" = "q_0"."orders__currency" OR (("fk_aggregate_keys"."orders__currency" IS NULL) AND ("q_0"."orders__currency" IS NULL)))) AND (("fk_aggregate_keys"."orders__date_year" = "q_0"."orders__date_year" OR (("fk_aggregate_keys"."orders__date_year" IS NULL) AND ("q_0"."orders__date_year" IS NULL))))
+LEFT JOIN (SELECT * 
+FROM  cte_3  AS "cte_3") AS "q_1" ON (("fk_aggregate_keys"."orders__currency" = "q_1"."orders__currency" OR (("fk_aggregate_keys"."orders__currency" IS NULL) AND ("q_1"."orders__currency" IS NULL)))) AND (("fk_aggregate_keys"."orders__date_year" = "q_1"."orders__date_year" OR (("fk_aggregate_keys"."orders__date_year" IS NULL) AND ("q_1"."orders__date_year" IS NULL))))
+ORDER BY  2  ASC

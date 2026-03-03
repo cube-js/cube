@@ -1,4 +1,4 @@
-use super::common::Case;
+use super::common::{AggregationType, Case};
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -147,7 +147,9 @@ impl MeasureSymbol {
                         sql.clone(),
                     ))
                 } else {
-                    MeasureKind::Unknown("number".to_string())
+                    MeasureKind::Calculated(CalculatedMeasure::new_without_sql(
+                        CalculatedMeasureType::Number,
+                    ))
                 }
             } else {
                 self.kind.clone()
@@ -220,7 +222,7 @@ impl MeasureSymbol {
                 &new_measure_type,
                 self.member_sql.clone(),
                 self.pk_sqls.clone(),
-            );
+            )?;
             (new_kind, new_measure_type)
         } else {
             (self.kind.clone(), current_type.to_string())
@@ -473,7 +475,7 @@ impl MeasureSymbol {
     }
 
     pub fn is_running_total(&self) -> bool {
-        matches!(&self.kind, MeasureKind::Unknown(s) if s == "runningTotal")
+        matches!(&self.kind, MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::RunningTotal)
     }
 
     pub fn is_cumulative(&self) -> bool {
@@ -739,7 +741,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
-        let kind = MeasureKind::from_type_str(measure_type_str, sql.clone(), pk_sqls.clone());
+        let kind = MeasureKind::from_type_str(measure_type_str, sql.clone(), pk_sqls.clone())?;
         let is_calculated = kind.is_calculated() && !is_multi_stage;
 
         let owned_by_cube = if is_multi_stage {

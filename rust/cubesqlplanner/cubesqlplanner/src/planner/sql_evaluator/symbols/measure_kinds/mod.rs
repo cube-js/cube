@@ -19,7 +19,7 @@ pub enum MeasureKind {
     Count(CountMeasure),
     Aggregated(AggregatedMeasure),
     Calculated(CalculatedMeasure),
-    Unknown(String),
+    Rank,
 }
 
 impl MeasureKind {
@@ -27,26 +27,31 @@ impl MeasureKind {
         measure_type: &str,
         member_sql: Option<Rc<SqlCall>>,
         pk_sqls: Vec<Rc<SqlCall>>,
-    ) -> Self {
+    ) -> Result<Self, CubeError> {
         if measure_type == "count" {
-            match member_sql {
+            Ok(match member_sql {
                 Some(sql) => Self::Count(CountMeasure::new(CountSql::Explicit(sql))),
                 None => Self::Count(CountMeasure::new(CountSql::Auto(pk_sqls))),
-            }
+            })
+        } else if measure_type == "rank" {
+            Ok(Self::Rank)
         } else if let Some(calc_type) = CalculatedMeasureType::from_str(measure_type) {
-            if let Some(sql) = member_sql {
+            Ok(if let Some(sql) = member_sql {
                 Self::Calculated(CalculatedMeasure::new(calc_type, sql))
             } else {
-                Self::Unknown(measure_type.to_string())
-            }
+                Self::Calculated(CalculatedMeasure::new_without_sql(calc_type))
+            })
         } else if let Ok(agg_type) = AggregationType::from_str(measure_type) {
-            if let Some(sql) = member_sql {
+            Ok(if let Some(sql) = member_sql {
                 Self::Aggregated(AggregatedMeasure::new(agg_type, sql))
             } else {
-                Self::Unknown(measure_type.to_string())
-            }
+                Self::Aggregated(AggregatedMeasure::new_without_sql(agg_type))
+            })
         } else {
-            Self::Unknown(measure_type.to_string())
+            Err(CubeError::user(format!(
+                "Unknown measure type: '{}'",
+                measure_type
+            )))
         }
     }
 
@@ -62,9 +67,9 @@ impl MeasureKind {
             Self::Count(c) => c.evaluate_sql(visitor, node_processor, query_tools, templates),
             Self::Aggregated(a) => a.evaluate_sql(visitor, node_processor, query_tools, templates),
             Self::Calculated(c) => c.evaluate_sql(visitor, node_processor, query_tools, templates),
-            Self::Unknown(type_name) => Err(CubeError::internal(format!(
-                "Unknown measure kind '{}' doesn't support direct evaluation for {}",
-                type_name, full_name
+            Self::Rank => Err(CubeError::internal(format!(
+                "Rank measure doesn't support direct evaluation for {}",
+                full_name
             ))),
         }
     }
@@ -74,7 +79,7 @@ impl MeasureKind {
             Self::Count(c) => c.get_dependencies(),
             Self::Aggregated(a) => a.get_dependencies(),
             Self::Calculated(c) => c.get_dependencies(),
-            Self::Unknown(_) => vec![],
+            Self::Rank => vec![],
         }
     }
 
@@ -83,7 +88,7 @@ impl MeasureKind {
             Self::Count(c) => c.get_dependencies_with_path(),
             Self::Aggregated(a) => a.get_dependencies_with_path(),
             Self::Calculated(c) => c.get_dependencies_with_path(),
-            Self::Unknown(_) => vec![],
+            Self::Rank => vec![],
         }
     }
 
@@ -95,7 +100,7 @@ impl MeasureKind {
             Self::Count(c) => Self::Count(c.apply_to_deps(f)?),
             Self::Aggregated(a) => Self::Aggregated(a.apply_to_deps(f)?),
             Self::Calculated(c) => Self::Calculated(c.apply_to_deps(f)?),
-            Self::Unknown(s) => Self::Unknown(s.clone()),
+            Self::Rank => Self::Rank,
         })
     }
 
@@ -104,7 +109,7 @@ impl MeasureKind {
             Self::Count(c) => c.iter_sql_calls(),
             Self::Aggregated(a) => a.iter_sql_calls(),
             Self::Calculated(c) => c.iter_sql_calls(),
-            Self::Unknown(_) => Box::new(std::iter::empty()),
+            Self::Rank => Box::new(std::iter::empty()),
         }
     }
 
@@ -113,7 +118,7 @@ impl MeasureKind {
             Self::Count(c) => c.is_owned_by_cube(),
             Self::Aggregated(a) => a.is_owned_by_cube(),
             Self::Calculated(c) => c.is_owned_by_cube(),
-            Self::Unknown(_) => false,
+            Self::Rank => false,
         }
     }
 
@@ -124,13 +129,7 @@ impl MeasureKind {
     pub fn is_additive(&self) -> bool {
         match self {
             Self::Count(_) => true,
-            Self::Aggregated(a) => matches!(
-                a.agg_type(),
-                AggregationType::Sum
-                    | AggregationType::Min
-                    | AggregationType::Max
-                    | AggregationType::CountDistinctApprox
-            ),
+            Self::Aggregated(a) => a.agg_type().is_additive(),
             _ => false,
         }
     }
@@ -140,7 +139,7 @@ impl MeasureKind {
             Self::Count(_) => "count",
             Self::Aggregated(a) => a.agg_type().as_str(),
             Self::Calculated(c) => c.calc_type().as_str(),
-            Self::Unknown(s) => s.as_str(),
+            Self::Rank => "rank",
         }
     }
 }
