@@ -448,6 +448,11 @@ class ApiGateway {
 
           await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache);
         } catch (e: any) {
+          // Quickfix for https://github.com/cube-js/cube/issues/10450,
+          // Right now, it's too complicated to fix the issue correctly, because
+          // native side control stream, without understanding that it's Express.response
+          res.removeHeader('Transfer-Encoding');
+
           this.handleError({
             e,
             query: {
