@@ -41,19 +41,6 @@ impl AggregationType {
         matches!(self, Self::CountDistinct | Self::CountDistinctApprox)
     }
 
-    pub fn sql_function_name(&self) -> &'static str {
-        match self {
-            Self::Sum => "sum",
-            Self::Avg => "avg",
-            Self::Min => "min",
-            Self::Max => "max",
-            Self::CountDistinct => "count_distinct",
-            Self::CountDistinctApprox => "count_distinct_approx",
-            Self::NumberAgg => "number_agg",
-            Self::RunningTotal => "sum",
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Sum => "sum",
@@ -163,24 +150,6 @@ mod tests {
         assert!(!AggregationType::Max.is_distinct());
         assert!(!AggregationType::NumberAgg.is_distinct());
         assert!(!AggregationType::RunningTotal.is_distinct());
-    }
-
-    #[test]
-    fn test_sql_function_name() {
-        assert_eq!(AggregationType::Sum.sql_function_name(), "sum");
-        assert_eq!(AggregationType::Avg.sql_function_name(), "avg");
-        assert_eq!(AggregationType::Min.sql_function_name(), "min");
-        assert_eq!(AggregationType::Max.sql_function_name(), "max");
-        assert_eq!(
-            AggregationType::CountDistinct.sql_function_name(),
-            "count_distinct"
-        );
-        assert_eq!(
-            AggregationType::CountDistinctApprox.sql_function_name(),
-            "count_distinct_approx"
-        );
-        assert_eq!(AggregationType::NumberAgg.sql_function_name(), "number_agg");
-        assert_eq!(AggregationType::RunningTotal.sql_function_name(), "sum");
     }
 
     #[test]
