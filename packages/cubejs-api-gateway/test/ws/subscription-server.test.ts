@@ -248,6 +248,51 @@ describe('SubscriptionServer', () => {
       );
     });
 
+    it('should forward cache param as cacheMode for load', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'load',
+        messageId: '123',
+        params: { query: { measures: ['Orders.count'] }, cache: 'no-cache' }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.load).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { measures: ['Orders.count'] },
+          cacheMode: 'no-cache',
+          connectionId: 'conn-1',
+          apiType: 'ws',
+        })
+      );
+      // cache should be remapped, not passed through as-is
+      expect(mockApiGateway.load).not.toHaveBeenCalledWith(
+        expect.objectContaining({ cache: 'no-cache' })
+      );
+    });
+
+    it('should forward cache param as cacheMode for subscribe', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'subscribe',
+        messageId: '123',
+        params: { query: { measures: ['Orders.count'] }, cache: 'no-cache' }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.subscribe).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { measures: ['Orders.count'] },
+          cacheMode: 'no-cache',
+          connectionId: 'conn-1',
+        })
+      );
+    });
+
     it('should call subscribe method correctly', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
