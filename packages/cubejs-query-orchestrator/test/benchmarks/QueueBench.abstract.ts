@@ -328,5 +328,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
     if (options.afterAll) {
       await options.afterAll();
     }
+
+    process.exit(0);
   })();
 }
