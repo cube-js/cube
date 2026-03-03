@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
+
+### Bug Fixes
+
+- **api-gateway:** Accept `cache` parameter in WebSocket requests, fix [#10451](https://github.com/cube-js/cube/issues/10451) ([#10453](https://github.com/cube-js/cube/issues/10453)) ([5e8d0eb](https://github.com/cube-js/cube/commit/5e8d0ebf96e93afe5d8e7c1a5f2ae278b1671c17))
+- **api-gateway:** Remove Transfer-Encoding header on /cubesql error responses, fix [#10450](https://github.com/cube-js/cube/issues/10450) ([#10455](https://github.com/cube-js/cube/issues/10455)) ([1b4f137](https://github.com/cube-js/cube/commit/1b4f1375233cf3064f7d9cf909f053b9fc195541))
+
 ## [1.6.18](https://github.com/cube-js/cube/compare/v1.6.17...v1.6.18) (2026-03-02)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
