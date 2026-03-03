@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/administration/sso/okta",
+    "destination": "/product/administration/sso/okta/saml",
+    "permanent": true
+  },
+  {
     "source": "/product/administration/workspace/saved-reports",
     "destination": "/product/administration/workspace",
     "permanent": true
