@@ -1,6 +1,7 @@
 //! Tests for DimensionSymbol: kind classification and helper methods
 
 use crate::planner::sql_evaluator::symbols::dimension_kinds::DimensionKind;
+use crate::planner::sql_evaluator::symbols::DimensionType;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 
@@ -17,8 +18,7 @@ fn dimension_regular_string() {
     let d = ctx.create_dimension("test_dims.name").unwrap();
     let dim = d.as_dimension().unwrap();
 
-    assert!(matches!(dim.kind(), DimensionKind::Regular(_)));
-    assert_eq!(dim.dimension_type(), "string");
+    assert!(matches!(dim.kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String));
     assert!(!dim.is_time());
     assert!(!dim.is_geo());
     assert!(!dim.is_switch());
@@ -38,8 +38,7 @@ fn dimension_regular_number() {
     let d = ctx.create_dimension("test_dims.amount").unwrap();
     let dim = d.as_dimension().unwrap();
 
-    assert!(matches!(dim.kind(), DimensionKind::Regular(_)));
-    assert_eq!(dim.dimension_type(), "number");
+    assert!(matches!(dim.kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number));
     assert!(!dim.is_time());
     assert!(!dim.is_geo());
 }
@@ -50,8 +49,7 @@ fn dimension_regular_time() {
     let d = ctx.create_dimension("test_dims.created_at").unwrap();
     let dim = d.as_dimension().unwrap();
 
-    assert!(matches!(dim.kind(), DimensionKind::Regular(_)));
-    assert_eq!(dim.dimension_type(), "time");
+    assert!(matches!(dim.kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Time));
     assert!(dim.is_time());
     assert!(!dim.is_geo());
     assert!(!dim.is_switch());
@@ -64,8 +62,7 @@ fn dimension_regular_boolean() {
     let d = ctx.create_dimension("test_dims.is_active").unwrap();
     let dim = d.as_dimension().unwrap();
 
-    assert!(matches!(dim.kind(), DimensionKind::Regular(_)));
-    assert_eq!(dim.dimension_type(), "boolean");
+    assert!(matches!(dim.kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Boolean));
     assert!(!dim.is_time());
 }
 
@@ -76,7 +73,6 @@ fn dimension_geo() {
     let dim = d.as_dimension().unwrap();
 
     assert!(matches!(dim.kind(), DimensionKind::Geo(_)));
-    assert_eq!(dim.dimension_type(), "geo");
     assert!(dim.is_geo());
     assert!(!dim.is_time());
     assert!(!dim.is_switch());
@@ -94,7 +90,6 @@ fn dimension_switch_with_sql() {
     let dim = d.as_dimension().unwrap();
 
     assert!(matches!(dim.kind(), DimensionKind::Switch(_)));
-    assert_eq!(dim.dimension_type(), "switch");
     assert!(dim.is_switch());
     assert!(!dim.is_calc_group());
     assert!(!dim.is_time());
@@ -111,7 +106,6 @@ fn dimension_calc_group() {
     let dim = d.as_dimension().unwrap();
 
     assert!(matches!(dim.kind(), DimensionKind::Switch(_)));
-    assert_eq!(dim.dimension_type(), "switch");
     assert!(dim.is_switch());
     assert!(dim.is_calc_group());
     assert_eq!(dim.values(), &["option_a", "option_b"]);
@@ -125,8 +119,7 @@ fn dimension_case() {
     let d = ctx.create_dimension("test_dims.status_label").unwrap();
     let dim = d.as_dimension().unwrap();
 
-    assert!(matches!(dim.kind(), DimensionKind::Case(_)));
-    assert_eq!(dim.dimension_type(), "string");
+    assert!(matches!(dim.kind(), DimensionKind::Case(c) if *c.dimension_type() == DimensionType::String));
     assert!(dim.is_case());
     assert!(!dim.is_time());
     assert!(!dim.is_geo());
@@ -141,8 +134,7 @@ fn dimension_sub_query() {
     let d = ctx.create_dimension("test_dims.sub_query_dim").unwrap();
     let dim = d.as_dimension().unwrap();
 
-    assert!(matches!(dim.kind(), DimensionKind::Regular(_)));
-    assert_eq!(dim.dimension_type(), "time");
+    assert!(matches!(dim.kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Time));
     assert!(dim.is_time());
     assert!(dim.is_sub_query());
 }
