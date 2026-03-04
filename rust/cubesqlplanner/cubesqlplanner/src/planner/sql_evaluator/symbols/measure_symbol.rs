@@ -87,8 +87,6 @@ pub struct MeasureSymbol {
     reduce_by: Option<Vec<Rc<MemberSymbol>>>,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
     group_by: Option<Vec<Rc<MemberSymbol>>>,
-    member_sql: Option<Rc<SqlCall>>,
-    pk_sqls: Vec<Rc<SqlCall>>,
     is_splitted_source: bool,
 }
 
@@ -97,12 +95,10 @@ impl MeasureSymbol {
         cube: Rc<CubeTableSymbol>,
         name: String,
         alias: String,
-        member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
         is_view: bool,
         owned_by_cube: bool,
         case: Option<Case>,
-        pk_sqls: Vec<Rc<SqlCall>>,
         kind: MeasureKind,
         rolling_window: Option<RollingWindow>,
         is_multi_stage: bool,
@@ -118,11 +114,9 @@ impl MeasureSymbol {
             cube,
             name,
             alias,
-            member_sql,
             is_reference,
             is_view,
             case,
-            pk_sqls,
             owned_by_cube,
             kind,
             rolling_window,
@@ -141,7 +135,7 @@ impl MeasureSymbol {
     pub fn new_unrolling(&self) -> Rc<Self> {
         if self.is_rolling_window() {
             let kind = if self.is_multi_stage {
-                if let Some(sql) = &self.member_sql {
+                if let Some(sql) = self.kind.member_sql() {
                     MeasureKind::Calculated(CalculatedMeasure::new(
                         CalculatedMeasureType::Number,
                         sql.clone(),
@@ -172,8 +166,6 @@ impl MeasureSymbol {
                 reduce_by: self.reduce_by.clone(),
                 add_group_by: self.add_group_by.clone(),
                 group_by: self.group_by.clone(),
-                member_sql: self.member_sql.clone(),
-                pk_sqls: self.pk_sqls.clone(),
                 is_splitted_source: self.is_splitted_source,
             })
         } else {
@@ -218,11 +210,7 @@ impl MeasureSymbol {
                     )))
                 }
             }
-            let new_kind = MeasureKind::from_type_str(
-                &new_measure_type,
-                self.member_sql.clone(),
-                self.pk_sqls.clone(),
-            )?;
+            let new_kind = self.kind.with_new_type(&new_measure_type)?;
             (new_kind, new_measure_type)
         } else {
             (self.kind.clone(), current_type.to_string())
@@ -265,8 +253,6 @@ impl MeasureSymbol {
             reduce_by: self.reduce_by.clone(),
             add_group_by: self.add_group_by.clone(),
             group_by: self.group_by.clone(),
-            member_sql: self.member_sql.clone(),
-            pk_sqls: self.pk_sqls.clone(),
             is_splitted_source: self.is_splitted_source,
         }))
     }
@@ -329,13 +315,7 @@ impl MeasureSymbol {
         f: &F,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let mut result = self.clone();
-        if let Some(member_sql) = &self.member_sql {
-            result.member_sql = Some(member_sql.apply_recursive(f)?);
-        }
-
-        for sql in result.pk_sqls.iter_mut() {
-            *sql = sql.apply_recursive(f)?
-        }
+        result.kind = result.kind.apply_to_deps(f)?;
 
         for sql in result.measure_filters.iter_mut() {
             *sql = sql.apply_recursive(f)?
@@ -360,20 +340,14 @@ impl MeasureSymbol {
         //FIXME We don't include filters and order_by here for backward compatibility
         // because BaseQuery doesn't validate these SQL calls
         let result = self
-            .member_sql
-            .iter()
+            .kind
+            .iter_sql_calls()
             .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
         Box::new(result)
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_symbol_deps(&mut deps);
-        }
-        for pk in self.pk_sqls.iter() {
-            pk.extract_symbol_deps(&mut deps);
-        }
+        let mut deps = self.kind.get_dependencies();
         for filter in self.measure_filters.iter() {
             filter.extract_symbol_deps(&mut deps);
         }
@@ -390,13 +364,7 @@ impl MeasureSymbol {
     }
 
     pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_symbol_deps_with_path(&mut deps);
-        }
-        for pk in self.pk_sqls.iter() {
-            pk.extract_symbol_deps_with_path(&mut deps);
-        }
+        let mut deps = self.kind.get_dependencies_with_path();
         for filter in self.measure_filters.iter() {
             filter.extract_symbol_deps_with_path(&mut deps);
         }
@@ -781,12 +749,10 @@ impl SymbolFactory for MeasureSymbolFactory {
             cube_symbol,
             path.symbol_name().clone(),
             alias,
-            sql,
             is_reference,
             is_view,
             owned_by_cube,
             case,
-            pk_sqls,
             kind,
             rolling_window,
             is_multi_stage,
@@ -809,7 +775,7 @@ impl crate::utils::debug::DebugSql for MeasureSymbol {
         }
 
         // Get base SQL
-        let base_sql = if let Some(sql) = &self.member_sql {
+        let base_sql = if let Some(sql) = self.kind.member_sql() {
             sql.debug_sql(expand_deps)
         } else {
             "".to_string()

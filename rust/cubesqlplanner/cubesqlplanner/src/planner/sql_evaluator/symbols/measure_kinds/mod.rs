@@ -142,4 +142,28 @@ impl MeasureKind {
             Self::Rank => "rank",
         }
     }
+
+    pub fn member_sql(&self) -> Option<&Rc<SqlCall>> {
+        match self {
+            Self::Count(c) => match c.sql() {
+                CountSql::Explicit(sql) => Some(sql),
+                CountSql::Auto(_) => None,
+            },
+            Self::Aggregated(a) => a.member_sql(),
+            Self::Calculated(c) => c.member_sql(),
+            Self::Rank => None,
+        }
+    }
+
+    pub fn with_new_type(&self, new_type: &str) -> Result<Self, CubeError> {
+        let member_sql = self.member_sql().cloned();
+        let pk_sqls = match self {
+            Self::Count(c) => match c.sql() {
+                CountSql::Auto(pks) => pks.clone(),
+                _ => vec![],
+            },
+            _ => vec![],
+        };
+        Self::from_type_str(new_type, member_sql, pk_sqls)
+    }
 }
