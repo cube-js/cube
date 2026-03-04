@@ -1,5 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::symbols::{AggregationType, MeasureKind};
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -43,10 +44,16 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
                 if input == "*" {
                     "1".to_string()
                 } else {
-                    if ev.measure_type() == "count"
-                        || ev.measure_type() == "countDistinct"
-                        || ev.measure_type() == "countDistinctApprox"
-                    {
+                    let is_count_like = match ev.kind() {
+                        MeasureKind::Count(_) => true,
+                        MeasureKind::Aggregated(a) => matches!(
+                            a.agg_type(),
+                            AggregationType::CountDistinct
+                                | AggregationType::CountDistinctApprox
+                        ),
+                        _ => false,
+                    };
+                    if is_count_like {
                         format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
                     } else {
                         input

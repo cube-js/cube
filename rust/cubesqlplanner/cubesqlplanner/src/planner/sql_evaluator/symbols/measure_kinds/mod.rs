@@ -221,6 +221,19 @@ impl MeasureKind {
         }
     }
 
+    pub fn pre_aggregate_wrap(&self) -> AggregateWrap<'_> {
+        match self {
+            Self::Count(_) => AggregateWrap::Function("sum"),
+            Self::Aggregated(a) => match a.agg_type() {
+                AggregationType::CountDistinctApprox => AggregateWrap::CountDistinctApprox,
+                AggregationType::Min => AggregateWrap::Function("min"),
+                AggregationType::Max => AggregateWrap::Function("max"),
+                _ => AggregateWrap::Function("sum"),
+            },
+            _ => AggregateWrap::Function("sum"),
+        }
+    }
+
     pub fn with_new_type(&self, new_type: &str) -> Result<Self, CubeError> {
         let member_sql = self.member_sql().cloned();
         let pk_sqls = match self {
