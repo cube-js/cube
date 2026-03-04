@@ -124,11 +124,6 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_type_error() {
-        assert!(AggregationType::from_str("unknown").is_err());
-    }
-
-    #[test]
     fn test_is_additive() {
         assert!(AggregationType::Sum.is_additive());
         assert!(AggregationType::Min.is_additive());

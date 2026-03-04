@@ -28,8 +28,7 @@ fn dimension_regular_string() {
     assert!(!dim.is_calc_group());
     assert!(!dim.is_sub_query());
     assert!(dim.member_sql().is_some());
-    assert!(dim.latitude().is_none());
-    assert!(dim.longitude().is_none());
+    assert!(!matches!(dim.kind(), DimensionKind::Geo(_)));
     assert!(dim.case().is_none());
     assert!(dim.values().is_empty());
 }
@@ -86,8 +85,13 @@ fn dimension_geo() {
     assert!(!dim.is_switch());
     assert!(!dim.is_case());
     assert!(!dim.is_calc_group());
-    assert!(dim.latitude().is_some());
-    assert!(dim.longitude().is_some());
+    let geo = match dim.kind() {
+        DimensionKind::Geo(g) => g,
+        _ => panic!("Expected Geo kind"),
+    };
+    // latitude and longitude are guaranteed to exist in Geo kind
+    let _ = geo.latitude();
+    let _ = geo.longitude();
     assert!(dim.member_sql().is_none());
 }
 

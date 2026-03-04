@@ -113,19 +113,6 @@ impl DimensionSymbol {
         Rc::new(new)
     }
 
-    pub fn latitude(&self) -> Option<Rc<SqlCall>> {
-        match &self.kind {
-            DimensionKind::Geo(g) => Some(g.latitude().clone()),
-            _ => None,
-        }
-    }
-
-    pub fn longitude(&self) -> Option<Rc<SqlCall>> {
-        match &self.kind {
-            DimensionKind::Geo(g) => Some(g.longitude().clone()),
-            _ => None,
-        }
-    }
 
     pub fn case(&self) -> Option<&Case> {
         match &self.kind {
