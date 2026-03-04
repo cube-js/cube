@@ -2,7 +2,7 @@
 
 use crate::planner::sql_evaluator::symbols::dimension_kinds::DimensionKind;
 use crate::planner::sql_evaluator::symbols::DimensionType;
-use crate::planner::sql_evaluator::{AggregationType, CalculatedMeasureType, CubeRef, MeasureKind};
+use crate::planner::sql_evaluator::{AggregationType, CalculatedMeasureType, MeasureKind};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::schemas::TestCompiler;
 use crate::test_fixtures::test_utils::TestContext;
