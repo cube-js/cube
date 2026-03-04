@@ -143,6 +143,44 @@ impl MeasureKind {
         }
     }
 
+    pub fn can_replace_type_with(&self, new_type: &str) -> bool {
+        match self {
+            Self::Aggregated(a) => {
+                let target_ok = matches!(
+                    new_type,
+                    "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx"
+                );
+                match a.agg_type() {
+                    AggregationType::Sum
+                    | AggregationType::Avg
+                    | AggregationType::Min
+                    | AggregationType::Max => target_ok,
+                    AggregationType::CountDistinct | AggregationType::CountDistinctApprox => {
+                        matches!(new_type, "count_distinct" | "count_distinct_approx")
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub fn supports_additional_filters(&self) -> bool {
+        match self {
+            Self::Count(_) => true,
+            Self::Aggregated(a) => matches!(
+                a.agg_type(),
+                AggregationType::Sum
+                    | AggregationType::Avg
+                    | AggregationType::Min
+                    | AggregationType::Max
+                    | AggregationType::CountDistinct
+                    | AggregationType::CountDistinctApprox
+            ),
+            _ => false,
+        }
+    }
+
     pub fn member_sql(&self) -> Option<&Rc<SqlCall>> {
         match self {
             Self::Count(c) => match c.sql() {

@@ -390,11 +390,10 @@ fn new_patched_filters_accepted_for_aggregatable_types() {
     }
 }
 
-// BUG: countDistinct/countDistinctApprox with None type change fails filter validation
-// because measure_type_str() returns camelCase ("countDistinct") but the filter
-// validation match checks snake_case ("count_distinct"). Will be fixed in US-006a.
+// Fixed: countDistinct/countDistinctApprox now correctly support filters
+// via MeasureKind::supports_additional_filters() pattern matching.
 #[test]
-fn new_patched_count_distinct_filters_bug() {
+fn new_patched_count_distinct_accepts_filters() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
@@ -404,8 +403,8 @@ fn new_patched_count_distinct_filters_bug() {
             m.as_measure()
                 .unwrap()
                 .new_patched(None, filters.clone())
-                .is_err(),
-            "BUG: {} + filters should be Ok but fails due to camelCase/snake_case mismatch",
+                .is_ok(),
+            "{} + filters should be Ok",
             path
         );
     }

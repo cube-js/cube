@@ -174,60 +174,28 @@ impl MeasureSymbol {
         new_measure_type: Option<String>,
         add_filters: Vec<Rc<SqlCall>>,
     ) -> Result<Rc<Self>, CubeError> {
-        let current_type = self.kind.measure_type_str();
-        let (result_kind, result_type_str) = if let Some(new_measure_type) = new_measure_type {
-            match current_type {
-                "sum" | "avg" | "min" | "max" => match new_measure_type.as_str() {
-                    "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx" => {}
-                    _ => {
-                        return Err(CubeError::user(format!(
-                            "Unsupported measure type replacement for {}: {} => {}",
-                            self.name, current_type, new_measure_type
-                        )))
-                    }
-                },
-                "count_distinct"
-                | "count_distinct_approx"
-                | "countDistinct"
-                | "countDistinctApprox" => match new_measure_type.as_str() {
-                    "count_distinct" | "count_distinct_approx" => {}
-                    _ => {
-                        return Err(CubeError::user(format!(
-                            "Unsupported measure type replacement for {}: {} => {}",
-                            self.name, current_type, new_measure_type
-                        )))
-                    }
-                },
-
-                _ => {
-                    return Err(CubeError::user(format!(
-                        "Unsupported measure type replacement for {}: {} => {}",
-                        self.name, current_type, new_measure_type
-                    )))
-                }
+        let result_kind = if let Some(new_measure_type) = new_measure_type {
+            if !self.kind.can_replace_type_with(&new_measure_type) {
+                return Err(CubeError::user(format!(
+                    "Unsupported measure type replacement for {}: {} => {}",
+                    self.name,
+                    self.kind.measure_type_str(),
+                    new_measure_type
+                )));
             }
-            let new_kind = self.kind.with_new_type(&new_measure_type)?;
-            (new_kind, new_measure_type)
+            self.kind.with_new_type(&new_measure_type)?
         } else {
-            (self.kind.clone(), current_type.to_string())
+            self.kind.clone()
         };
 
         let mut measure_filters = self.measure_filters.clone();
         if !add_filters.is_empty() {
-            match result_type_str.as_str() {
-                "sum"
-                | "avg"
-                | "min"
-                | "max"
-                | "count"
-                | "count_distinct"
-                | "count_distinct_approx" => {}
-                _ => {
-                    return Err(CubeError::user(format!(
-                        "Unsupported additional filters for measure {} type {}",
-                        self.name, result_type_str
-                    )))
-                }
+            if !result_kind.supports_additional_filters() {
+                return Err(CubeError::user(format!(
+                    "Unsupported additional filters for measure {} type {}",
+                    self.name,
+                    result_kind.measure_type_str()
+                )));
             }
             measure_filters.extend(add_filters);
         }
