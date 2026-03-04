@@ -36,7 +36,6 @@ pub struct DimensionSymbol {
     time_shift: Vec<CalendarDimensionTimeShift>,
     time_shift_pk_full_name: Option<String>,
     is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
-    owned_by_cube: bool,
     is_multi_stage: bool,
     is_sub_query: bool,
     propagate_filters_to_sub_query: bool,
@@ -55,7 +54,6 @@ impl DimensionSymbol {
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
         is_self_time_shift_pk: bool,
-        owned_by_cube: bool,
         is_multi_stage: bool,
         is_sub_query: bool,
         propagate_filters_to_sub_query: bool,
@@ -72,7 +70,6 @@ impl DimensionSymbol {
             time_shift,
             time_shift_pk_full_name,
             is_self_time_shift_pk,
-            owned_by_cube,
             is_multi_stage,
             is_sub_query,
             propagate_filters_to_sub_query,
@@ -166,7 +163,7 @@ impl DimensionSymbol {
     }
 
     pub fn owned_by_cube(&self) -> bool {
-        self.owned_by_cube
+        !self.is_multi_stage && !self.kind.is_switch() && self.kind.is_owned_by_cube()
     }
 
     pub fn is_multi_stage(&self) -> bool {
@@ -522,7 +519,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             time_shift,
             time_shift_pk,
             is_self_time_shift_pk,
-            owned_by_cube,
             is_multi_stage,
             is_sub_query,
             propagate_filters_to_sub_query,
