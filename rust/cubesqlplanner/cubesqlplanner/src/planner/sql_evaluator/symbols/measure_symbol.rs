@@ -289,10 +289,6 @@ impl MeasureSymbol {
         self.is_splitted_source
     }
 
-    pub fn pk_sqls(&self) -> &Vec<Rc<SqlCall>> {
-        &self.pk_sqls
-    }
-
     pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {
         &self.time_shift
     }
@@ -324,19 +320,8 @@ impl MeasureSymbol {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if let Some(member_sql) = &self.member_sql {
-            let sql = member_sql.eval(visitor, node_processor, query_tools, templates)?;
-            Ok(sql)
-        } else {
-            Err(CubeError::internal(format!(
-                "Measure {} hasn't sql evaluator",
-                self.full_name()
-            )))
-        }
-    }
-
-    pub fn has_sql(&self) -> bool {
-        self.member_sql.is_some()
+        self.kind
+            .evaluate_sql(&self.full_name(), visitor, node_processor, query_tools, templates)
     }
 
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
