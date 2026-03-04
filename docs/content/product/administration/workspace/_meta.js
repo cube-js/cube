@@ -1,6 +1,4 @@
 export default {
-  "vizard": "Chart Prototyping",
-  "data-model": "Data Model",
   "visual-model": "Visual Model",
   "dev-mode": "Development mode",
   "environments": "Environments",
