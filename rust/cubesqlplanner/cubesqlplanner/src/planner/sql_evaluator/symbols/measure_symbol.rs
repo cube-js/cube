@@ -540,7 +540,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let is_sql_is_direct_ref = sql.as_ref().map_or(false, |s| s.is_direct_reference());
+        let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
 
         let time_shifts = if let Some(time_shift_references) =
             &definition.static_data().time_shift_references

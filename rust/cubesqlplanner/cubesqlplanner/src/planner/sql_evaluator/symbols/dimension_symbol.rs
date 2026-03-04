@@ -320,7 +320,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let is_sql_direct_ref = sql.as_ref().map_or(false, |s| s.is_direct_reference());
+        let is_sql_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
 
         let case = if let Some(native_case) = definition.case()? {
             Some(Case::try_new(path.cube_name(), native_case, compiler)?)
