@@ -29,7 +29,6 @@ pub struct DimensionSymbol {
     name: String,
     kind: DimensionKind,
     alias: String,
-    definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
@@ -49,7 +48,6 @@ impl DimensionSymbol {
         alias: String,
         is_reference: bool,
         is_view: bool,
-        definition: Rc<dyn DimensionDefinition>,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
@@ -65,7 +63,6 @@ impl DimensionSymbol {
             alias,
             is_reference,
             is_view,
-            definition,
             add_group_by,
             time_shift,
             time_shift_pk_full_name,
@@ -248,10 +245,6 @@ impl DimensionSymbol {
 
     pub fn cube_name(&self) -> &String {
         self.cube.cube_name()
-    }
-
-    pub fn definition(&self) -> &Rc<dyn DimensionDefinition> {
-        &self.definition
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
@@ -514,7 +507,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             alias,
             is_reference,
             is_view,
-            definition,
             add_group_by,
             time_shift,
             time_shift_pk,
