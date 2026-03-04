@@ -1,5 +1,7 @@
 //! Tests for Compiler member evaluation
 
+use crate::planner::sql_evaluator::symbols::dimension_kinds::DimensionKind;
+use crate::planner::sql_evaluator::symbols::DimensionType;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::schemas::TestCompiler;
 use crate::test_fixtures::test_utils::TestContext;
@@ -21,7 +23,7 @@ fn test_add_dimension_evaluator_number_dimension() {
     assert_eq!(symbol.cube_name(), "visitors");
     assert_eq!(symbol.name(), "id");
     assert_eq!(symbol.get_dependencies().len(), 0);
-    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "number");
+    assert!(matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number));
 }
 
 #[test]
@@ -41,7 +43,7 @@ fn test_add_dimension_evaluator_string_dimension() {
     assert_eq!(symbol.cube_name(), "visitors");
     assert_eq!(symbol.name(), "source");
     assert_eq!(symbol.get_dependencies().len(), 0);
-    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "string");
+    assert!(matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String));
 }
 
 #[test]
@@ -95,17 +97,11 @@ fn test_add_dimension_evaluator_multiple_dimensions() {
         .unwrap();
 
     assert_eq!(id_symbol.full_name(), "visitors.id");
-    assert_eq!(id_symbol.as_dimension().unwrap().dimension_type(), "number");
+    assert!(matches!(id_symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number));
     assert_eq!(source_symbol.full_name(), "visitors.source");
-    assert_eq!(
-        source_symbol.as_dimension().unwrap().dimension_type(),
-        "string"
-    );
+    assert!(matches!(source_symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String));
     assert_eq!(created_at_symbol.full_name(), "visitors.created_at");
-    assert_eq!(
-        created_at_symbol.as_dimension().unwrap().dimension_type(),
-        "time"
-    );
+    assert!(matches!(created_at_symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Time));
     assert_eq!(id_symbol.get_dependencies().len(), 0);
     assert_eq!(source_symbol.get_dependencies().len(), 0);
     assert_eq!(created_at_symbol.get_dependencies().len(), 0);
@@ -222,7 +218,7 @@ fn test_add_auto_resolved_member_evaluator_dimension() {
     assert_eq!(symbol.cube_name(), "visitors");
     assert_eq!(symbol.name(), "source");
     assert_eq!(symbol.get_dependencies().len(), 0);
-    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "string");
+    assert!(matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String));
 }
 
 #[test]
@@ -295,7 +291,7 @@ fn test_dimension_with_cube_table_dependency() {
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.visitor_id");
     assert_eq!(symbol.cube_name(), "visitors");
-    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "number");
+    assert!(matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number));
 
     let dependencies = symbol.get_dependencies();
     assert_eq!(dependencies.len(), 1, "Should have 1 dependency on CUBE");
@@ -320,7 +316,7 @@ fn test_dimension_with_member_dependency_no_prefix() {
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.visitor_id_twice");
     assert_eq!(symbol.cube_name(), "visitors");
-    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "number");
+    assert!(matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number));
 
     let dependencies = symbol.get_dependencies();
     assert_eq!(
@@ -349,7 +345,7 @@ fn test_dimension_with_mixed_dependencies() {
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.source_concat_id");
     assert_eq!(symbol.cube_name(), "visitors");
-    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "string");
+    assert!(matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String));
 
     let dependencies = symbol.get_dependencies();
     assert_eq!(
@@ -667,9 +663,8 @@ fn test_time_dimension_with_granularity_compilation() {
         "visitors.created_at",
         "Base symbol should be visitors.created_at"
     );
-    assert_eq!(
-        base_symbol.as_dimension().unwrap().dimension_type(),
-        "time",
+    assert!(
+        matches!(base_symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Time),
         "Base dimension should be time type"
     );
 }
@@ -721,9 +716,8 @@ fn test_sql_deps_validation() {
         "visitors.created_at",
         "Base symbol should be visitors.created_at"
     );
-    assert_eq!(
-        base_symbol.as_dimension().unwrap().dimension_type(),
-        "time",
+    assert!(
+        matches!(base_symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Time),
         "Base dimension should be time type"
     );
 }
