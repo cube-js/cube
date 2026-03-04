@@ -46,11 +46,7 @@ impl SqlNode for GeoDimensionSqlNode {
                         query_tools.clone(),
                         templates,
                     )?;
-                    templates.concat_strings(&vec![
-                        latitude_str,
-                        format!("','"),
-                        longitude_str,
-                    ])?
+                    templates.concat_strings(&vec![latitude_str, format!("','"), longitude_str])?
                 } else {
                     self.input.to_sql(
                         visitor,

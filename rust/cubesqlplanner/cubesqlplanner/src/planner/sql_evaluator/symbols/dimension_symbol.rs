@@ -113,7 +113,6 @@ impl DimensionSymbol {
         Rc::new(new)
     }
 
-
     pub fn case(&self) -> Option<&Case> {
         match &self.kind {
             DimensionKind::Case(c) => Some(c.case()),

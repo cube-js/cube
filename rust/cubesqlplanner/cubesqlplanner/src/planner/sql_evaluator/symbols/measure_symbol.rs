@@ -269,8 +269,13 @@ impl MeasureSymbol {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        self.kind
-            .evaluate_sql(&self.full_name(), visitor, node_processor, query_tools, templates)
+        self.kind.evaluate_sql(
+            &self.full_name(),
+            visitor,
+            node_processor,
+            query_tools,
+            templates,
+        )
     }
 
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
