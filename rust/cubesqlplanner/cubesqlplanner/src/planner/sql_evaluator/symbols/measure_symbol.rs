@@ -73,7 +73,6 @@ pub struct MeasureSymbol {
     cube: Rc<CubeTableSymbol>,
     name: String,
     alias: String,
-    owned_by_cube: bool,
     kind: MeasureKind,
     rolling_window: Option<RollingWindow>,
     is_multi_stage: bool,
@@ -97,7 +96,6 @@ impl MeasureSymbol {
         alias: String,
         is_reference: bool,
         is_view: bool,
-        owned_by_cube: bool,
         case: Option<Case>,
         kind: MeasureKind,
         rolling_window: Option<RollingWindow>,
@@ -117,7 +115,6 @@ impl MeasureSymbol {
             is_reference,
             is_view,
             case,
-            owned_by_cube,
             kind,
             rolling_window,
             measure_filters,
@@ -152,7 +149,6 @@ impl MeasureSymbol {
                 cube: self.cube.clone(),
                 name: self.name.clone(),
                 alias: self.alias.clone(),
-                owned_by_cube: self.owned_by_cube,
                 kind,
                 rolling_window: None,
                 is_multi_stage: false,
@@ -239,7 +235,6 @@ impl MeasureSymbol {
             cube: self.cube.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
-            owned_by_cube: self.owned_by_cube,
             kind: result_kind,
             rolling_window: self.rolling_window.clone(),
             is_multi_stage: self.is_multi_stage,
@@ -389,7 +384,20 @@ impl MeasureSymbol {
     }
 
     pub fn owned_by_cube(&self) -> bool {
-        self.owned_by_cube
+        if self.is_multi_stage {
+            return false;
+        }
+        let mut owned = self.kind.is_owned_by_cube();
+        for sql in &self.measure_filters {
+            owned |= sql.is_owned_by_cube();
+        }
+        for sql in &self.measure_drill_filters {
+            owned |= sql.is_owned_by_cube();
+        }
+        if let Some(case) = &self.case {
+            owned |= case.is_owned_by_cube();
+        }
+        owned
     }
 
     pub fn is_reference(&self) -> bool {
@@ -751,7 +759,6 @@ impl SymbolFactory for MeasureSymbolFactory {
             alias,
             is_reference,
             is_view,
-            owned_by_cube,
             case,
             kind,
             rolling_window,
