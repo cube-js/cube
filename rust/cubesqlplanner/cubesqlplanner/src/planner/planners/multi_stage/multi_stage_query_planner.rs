@@ -16,6 +16,7 @@ use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::Case;
 use crate::planner::sql_evaluator::CaseSwitchDefinition;
 use crate::planner::sql_evaluator::CaseSwitchItem;
+use crate::planner::sql_evaluator::MeasureKind;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
@@ -114,12 +115,10 @@ impl MultiStageQueryPlanner {
         resolved_multi_stage_dimensions: &mut HashSet<String>,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
         let inode = if let Ok(measure) = base_member.as_measure() {
-            let member_type = if measure.measure_type() == "rank" {
-                MultiStageInodeMemberType::Rank
-            } else if !measure.is_calculated() {
-                MultiStageInodeMemberType::Aggregate
-            } else {
-                MultiStageInodeMemberType::Calculate
+            let member_type = match measure.kind() {
+                MeasureKind::Rank => MultiStageInodeMemberType::Rank,
+                MeasureKind::Calculated(_) => MultiStageInodeMemberType::Calculate,
+                _ => MultiStageInodeMemberType::Aggregate,
             };
 
             let time_shift = measure.time_shift().clone();

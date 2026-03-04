@@ -246,10 +246,6 @@ impl MeasureSymbol {
         self.kind.is_calculated()
     }
 
-    pub fn is_calculated_type(measure_type: &str) -> bool {
-        CalculatedMeasureType::from_str(measure_type).is_some()
-    }
-
     pub fn case(&self) -> Option<&Case> {
         self.case.as_ref()
     }
