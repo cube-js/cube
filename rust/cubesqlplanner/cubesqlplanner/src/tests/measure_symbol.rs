@@ -26,7 +26,6 @@ fn measure_count_properties() {
     let measure = m.as_measure().unwrap();
 
     assert!(matches!(measure.kind(), MeasureKind::Count(_)));
-    assert_eq!(measure.measure_type(), "count");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
@@ -44,7 +43,6 @@ fn measure_sum_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
     ));
-    assert_eq!(measure.measure_type(), "sum");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
@@ -62,7 +60,6 @@ fn measure_avg_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Avg
     ));
-    assert_eq!(measure.measure_type(), "avg");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -79,7 +76,6 @@ fn measure_min_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Min
     ));
-    assert_eq!(measure.measure_type(), "min");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -96,7 +92,6 @@ fn measure_max_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Max
     ));
-    assert_eq!(measure.measure_type(), "max");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -115,7 +110,6 @@ fn measure_count_distinct_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
     ));
-    assert_eq!(measure.measure_type(), "countDistinct");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -132,7 +126,6 @@ fn measure_count_distinct_approx_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinctApprox
     ));
-    assert_eq!(measure.measure_type(), "countDistinctApprox");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -149,7 +142,6 @@ fn measure_running_total_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::RunningTotal
     ));
-    assert_eq!(measure.measure_type(), "runningTotal");
     assert!(!measure.is_calculated());
     assert!(measure.is_running_total());
     assert!(!measure.is_rolling_window());
@@ -167,7 +159,6 @@ fn measure_number_agg_properties() {
         measure.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::NumberAgg
     ));
-    assert_eq!(measure.measure_type(), "numberAgg");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -184,7 +175,6 @@ fn measure_calculated_number_properties() {
         measure.kind(),
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
     ));
-    assert_eq!(measure.measure_type(), "number");
     assert!(measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
@@ -198,7 +188,6 @@ fn measure_rank_properties() {
     let measure = m.as_measure().unwrap();
 
     assert!(matches!(measure.kind(), MeasureKind::Rank));
-    assert_eq!(measure.measure_type(), "rank");
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());

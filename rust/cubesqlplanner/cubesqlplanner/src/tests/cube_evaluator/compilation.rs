@@ -1,5 +1,6 @@
 //! Tests for Compiler member evaluation
 
+use crate::planner::sql_evaluator::{AggregationType, CalculatedMeasureType, MeasureKind};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::schemas::TestCompiler;
 use crate::test_fixtures::test_utils::TestContext;
@@ -128,7 +129,10 @@ fn test_add_measure_evaluator_count_measure() {
     assert_eq!(symbol.cube_name(), "visitor_checkins");
     assert_eq!(symbol.name(), "count");
     assert_eq!(symbol.get_dependencies().len(), 0);
-    assert_eq!(symbol.as_measure().unwrap().measure_type(), "count");
+    assert!(matches!(
+        symbol.as_measure().unwrap().kind(),
+        MeasureKind::Count(_)
+    ));
 }
 
 #[test]
@@ -148,7 +152,10 @@ fn test_add_measure_evaluator_sum_measure() {
     assert_eq!(symbol.cube_name(), "visitors");
     assert_eq!(symbol.name(), "total_revenue");
     assert_eq!(symbol.get_dependencies().len(), 0);
-    assert_eq!(symbol.as_measure().unwrap().measure_type(), "sum");
+    assert!(matches!(
+        symbol.as_measure().unwrap().kind(),
+        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
+    ));
 }
 
 #[test]
@@ -198,9 +205,15 @@ fn test_add_measure_evaluator_multiple_measures() {
         .unwrap();
 
     assert_eq!(count_symbol.full_name(), "visitor_checkins.count");
-    assert_eq!(count_symbol.as_measure().unwrap().measure_type(), "count");
+    assert!(matches!(
+        count_symbol.as_measure().unwrap().kind(),
+        MeasureKind::Count(_)
+    ));
     assert_eq!(revenue_symbol.full_name(), "visitors.total_revenue");
-    assert_eq!(revenue_symbol.as_measure().unwrap().measure_type(), "sum");
+    assert!(matches!(
+        revenue_symbol.as_measure().unwrap().kind(),
+        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
+    ));
     assert_eq!(count_symbol.get_dependencies().len(), 0);
     assert_eq!(revenue_symbol.get_dependencies().len(), 0);
 }
@@ -242,7 +255,10 @@ fn test_add_auto_resolved_member_evaluator_measure() {
     assert_eq!(symbol.cube_name(), "visitors");
     assert_eq!(symbol.name(), "total_revenue");
     assert_eq!(symbol.get_dependencies().len(), 0);
-    assert_eq!(symbol.as_measure().unwrap().measure_type(), "sum");
+    assert!(matches!(
+        symbol.as_measure().unwrap().kind(),
+        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
+    ));
 }
 
 #[test]
@@ -388,7 +404,10 @@ fn test_measure_with_cube_table_dependency() {
     assert!(symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.revenue");
     assert_eq!(symbol.cube_name(), "visitors");
-    assert_eq!(symbol.as_measure().unwrap().measure_type(), "sum");
+    assert!(matches!(
+        symbol.as_measure().unwrap().kind(),
+        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
+    ));
 
     let dependencies = symbol.get_dependencies();
     assert_eq!(dependencies.len(), 1, "Should have 1 dependency on CUBE");
@@ -413,7 +432,10 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
     assert!(symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.total_revenue_per_count");
     assert_eq!(symbol.cube_name(), "visitors");
-    assert_eq!(symbol.as_measure().unwrap().measure_type(), "number");
+    assert!(matches!(
+        symbol.as_measure().unwrap().kind(),
+        MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
+    ));
 
     let dependencies = symbol.get_dependencies();
     assert_eq!(dependencies.len(), 2, "Should have 2 measure dependencies");
