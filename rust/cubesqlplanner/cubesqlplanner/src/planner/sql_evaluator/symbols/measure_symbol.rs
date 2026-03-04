@@ -540,11 +540,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let is_sql_is_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference()
-        } else {
-            false
-        };
+        let is_sql_is_direct_ref = sql.as_ref().map_or(false, |s| s.is_direct_reference());
 
         let time_shifts = if let Some(time_shift_references) =
             &definition.static_data().time_shift_references
@@ -671,18 +667,13 @@ impl SymbolFactory for MeasureSymbolFactory {
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
-        let kind = MeasureKind::from_type_str(measure_type_str, sql.clone(), pk_sqls.clone())?;
+        let kind = MeasureKind::from_type_str(measure_type_str, sql, pk_sqls)?;
         let is_calculated = kind.is_calculated() && !is_multi_stage;
 
         let owned_by_cube = if is_multi_stage {
             false
-        } else if matches!(&kind, MeasureKind::Count(c) if c.is_owned_by_cube()) {
-            true
         } else {
-            let mut owned = false;
-            if let Some(sql) = &sql {
-                owned |= sql.is_owned_by_cube();
-            }
+            let mut owned = kind.is_owned_by_cube();
             for sql in &measure_filters {
                 owned |= sql.is_owned_by_cube();
             }
