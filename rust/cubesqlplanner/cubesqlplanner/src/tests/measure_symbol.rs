@@ -1,8 +1,6 @@
 //! Tests for MeasureSymbol: kind classification, new_patched, and helper methods
 
-use crate::planner::sql_evaluator::{
-    AggregationType, CalculatedMeasureType, MeasureKind, SqlCall,
-};
+use crate::planner::sql_evaluator::{AggregationType, CalculatedMeasureType, MeasureKind, SqlCall};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;
@@ -101,9 +99,7 @@ fn measure_max_properties() {
 #[test]
 fn measure_count_distinct_properties() {
     let ctx = ctx();
-    let m = ctx
-        .create_measure("test_measures.distinct_count")
-        .unwrap();
+    let m = ctx.create_measure("test_measures.distinct_count").unwrap();
     let measure = m.as_measure().unwrap();
 
     assert!(matches!(
@@ -223,7 +219,10 @@ fn new_patched_sum_to_all_valid_targets() {
         ("max", AggregationType::Max),
         ("sum", AggregationType::Sum),
         ("count_distinct", AggregationType::CountDistinct),
-        ("count_distinct_approx", AggregationType::CountDistinctApprox),
+        (
+            "count_distinct_approx",
+            AggregationType::CountDistinctApprox,
+        ),
     ];
     for (new_type, expected_agg) in cases {
         let patched = measure
@@ -257,9 +256,7 @@ fn new_patched_avg_to_sum() {
 fn new_patched_count_distinct_family() {
     let ctx = ctx();
 
-    let cd = ctx
-        .create_measure("test_measures.distinct_count")
-        .unwrap();
+    let cd = ctx.create_measure("test_measures.distinct_count").unwrap();
     let patched = cd
         .as_measure()
         .unwrap()
@@ -304,9 +301,7 @@ fn new_patched_sum_invalid_targets() {
 #[test]
 fn new_patched_count_distinct_to_sum_error() {
     let ctx = ctx();
-    let m = ctx
-        .create_measure("test_measures.distinct_count")
-        .unwrap();
+    let m = ctx.create_measure("test_measures.distinct_count").unwrap();
     assert!(m
         .as_measure()
         .unwrap()
@@ -403,10 +398,7 @@ fn new_patched_count_distinct_filters_bug() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
-    for path in [
-        "test_measures.distinct_count",
-        "test_measures.approx_count",
-    ] {
+    for path in ["test_measures.distinct_count", "test_measures.approx_count"] {
         let m = ctx.create_measure(path).unwrap();
         assert!(
             m.as_measure()
@@ -466,9 +458,7 @@ fn new_patched_type_change_with_filters() {
 #[test]
 fn new_patched_appends_to_existing_filters() {
     let ctx = ctx();
-    let m = ctx
-        .create_measure("test_measures.filtered_total")
-        .unwrap();
+    let m = ctx.create_measure("test_measures.filtered_total").unwrap();
     let measure = m.as_measure().unwrap();
     let original_count = measure.measure_filters().len();
     assert!(original_count > 0);
