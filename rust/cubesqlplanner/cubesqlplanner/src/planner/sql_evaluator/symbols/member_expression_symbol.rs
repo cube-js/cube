@@ -2,7 +2,7 @@ use super::MemberSymbol;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
@@ -144,6 +144,15 @@ impl MemberExpressionSymbol {
             }
         }
         deps
+    }
+
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        let mut refs = vec![];
+        match &self.expression {
+            MemberExpressionExpression::SqlCall(sql_call) => sql_call.extract_cube_refs(&mut refs),
+            MemberExpressionExpression::PatchedSymbol(_) => {}
+        }
+        refs
     }
 
     pub fn cube_names_if_dimension_only_expression(

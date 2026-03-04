@@ -41,8 +41,6 @@ impl TraversalVisitor for CalcGroupDimsCollector {
                 return self.on_node_traverse(e.base_symbol(), path, &())
             }
             MemberSymbol::Measure(_) => {}
-            MemberSymbol::CubeName(_) => {}
-            MemberSymbol::CubeTable(_) => {}
             MemberSymbol::MemberExpression(_) => {}
         };
         Ok(Some(()))

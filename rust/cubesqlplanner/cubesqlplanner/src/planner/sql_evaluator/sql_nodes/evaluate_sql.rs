@@ -44,13 +44,6 @@ impl SqlNode for EvaluateSqlNode {
                 query_tools.clone(),
                 templates,
             ),
-            MemberSymbol::CubeTable(ev) => ev.evaluate_sql(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            ),
-            MemberSymbol::CubeName(ev) => ev.evaluate_sql(),
             MemberSymbol::MemberExpression(e) => {
                 let res = e.evaluate_sql(
                     visitor,

@@ -9,7 +9,7 @@ pub use count::*;
 use super::common::AggregationType;
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -117,6 +117,15 @@ impl MeasureKind {
             Self::Aggregated(a) => a.iter_sql_calls(),
             Self::Calculated(c) => c.iter_sql_calls(),
             Self::Rank => Box::new(std::iter::empty()),
+        }
+    }
+
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        match self {
+            Self::Count(c) => c.get_cube_refs(),
+            Self::Aggregated(a) => a.get_cube_refs(),
+            Self::Calculated(c) => c.get_cube_refs(),
+            Self::Rank => vec![],
         }
     }
 

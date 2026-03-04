@@ -1,6 +1,9 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
-use super::{SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem};
+use super::{
+    CubeRef, SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem,
+    SqlDependency,
+};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
@@ -150,7 +153,7 @@ impl<'a> SqlCallBuilder<'a> {
                             ));
                         let result = SqlCallDependency {
                             path: processed_path,
-                            symbol: time_dim_symbol,
+                            symbol: SqlDependency::Symbol(time_dim_symbol),
                         };
                         return Some(result);
                     } else {
@@ -163,7 +166,7 @@ impl<'a> SqlCallBuilder<'a> {
             }
             let result = SqlCallDependency {
                 path: processed_path,
-                symbol: member_symbol,
+                symbol: SqlDependency::Symbol(member_symbol),
             };
             Some(result)
         } else {
@@ -179,16 +182,24 @@ impl<'a> SqlCallBuilder<'a> {
     ) -> Result<SqlCallDependency, CubeError> {
         processed_path.push(cube_name.clone());
         if path_tail.len() == 1 {
+            let symbol = self.compiler.add_cube_name_evaluator(cube_name.clone())?;
             let result = SqlCallDependency {
-                path: processed_path,
-                symbol: self.compiler.add_cube_name_evaluator(cube_name.clone())?,
+                path: processed_path.clone(),
+                symbol: SqlDependency::CubeRef(CubeRef::Name {
+                    symbol,
+                    path: processed_path,
+                }),
             };
             return Ok(result);
         }
         if path_tail.len() == 2 && path_tail[1] == "__sql_fn" {
+            let symbol = self.compiler.add_cube_table_evaluator(cube_name.clone())?;
             let result = SqlCallDependency {
-                path: processed_path,
-                symbol: self.compiler.add_cube_table_evaluator(cube_name.clone())?,
+                path: processed_path.clone(),
+                symbol: SqlDependency::CubeRef(CubeRef::Table {
+                    symbol,
+                    path: processed_path,
+                }),
             };
             return Ok(result);
         }

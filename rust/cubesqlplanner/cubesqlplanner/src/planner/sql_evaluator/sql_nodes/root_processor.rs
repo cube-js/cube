@@ -11,8 +11,6 @@ pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
     time_dimesions_processor: Rc<dyn SqlNode>,
     measure_processor: Rc<dyn SqlNode>,
-    cube_name_processor: Rc<dyn SqlNode>,
-    cube_table_processor: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,
 }
 
@@ -21,16 +19,12 @@ impl RootSqlNode {
         dimension_processor: Rc<dyn SqlNode>,
         time_dimesions_processor: Rc<dyn SqlNode>,
         measure_processor: Rc<dyn SqlNode>,
-        cube_name_processor: Rc<dyn SqlNode>,
-        cube_table_processor: Rc<dyn SqlNode>,
         default_processor: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
             dimension_processor,
             time_dimesions_processor,
             measure_processor,
-            cube_name_processor,
-            cube_table_processor,
             default_processor,
         })
     }
@@ -41,10 +35,6 @@ impl RootSqlNode {
 
     pub fn measure_processor(&self) -> &Rc<dyn SqlNode> {
         &self.measure_processor
-    }
-
-    pub fn cube_name_processor(&self) -> &Rc<dyn SqlNode> {
-        &self.cube_name_processor
     }
 
     pub fn default_processor(&self) -> &Rc<dyn SqlNode> {
@@ -83,20 +73,6 @@ impl SqlNode for RootSqlNode {
                 node_processor.clone(),
                 templates,
             )?,
-            MemberSymbol::CubeName(_) => self.cube_name_processor.to_sql(
-                visitor,
-                node,
-                query_tools.clone(),
-                node_processor.clone(),
-                templates,
-            )?,
-            MemberSymbol::CubeTable(_) => self.cube_table_processor.to_sql(
-                visitor,
-                node,
-                query_tools.clone(),
-                node_processor.clone(),
-                templates,
-            )?,
             _ => self.default_processor.to_sql(
                 visitor,
                 node,
@@ -116,7 +92,6 @@ impl SqlNode for RootSqlNode {
         vec![
             self.dimension_processor.clone(),
             self.measure_processor.clone(),
-            self.cube_name_processor.clone(),
             self.default_processor.clone(),
         ]
     }

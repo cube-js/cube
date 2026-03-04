@@ -1,5 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
+use crate::planner::sql_evaluator::{CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -77,19 +77,23 @@ impl TraversalVisitor for JoinHintsCollector {
                     }
                 }
             }
-            MemberSymbol::CubeName(e) => {
-                if !path.is_empty() {
-                    let mut path = path.clone();
-                    path.push(e.cube_name().clone());
-                    self.hints.push(JoinHintItem::Vector(path));
-                } else {
-                    self.hints.push(JoinHintItem::Single(e.cube_name().clone()));
-                }
-            }
-            MemberSymbol::CubeTable(_) => {}
             MemberSymbol::MemberExpression(_) => {}
         };
         Ok(Some(()))
+    }
+
+    fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
+        if let CubeRef::Name { symbol, path, .. } = cube_ref {
+            if !path.is_empty() {
+                let mut path = path.clone();
+                path.push(symbol.cube_name().clone());
+                self.hints.push(JoinHintItem::Vector(path));
+            } else {
+                self.hints
+                    .push(JoinHintItem::Single(symbol.cube_name().clone()));
+            }
+        }
+        Ok(())
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
+use crate::planner::sql_evaluator::{CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -56,18 +56,21 @@ impl TraversalVisitor for CubeNamesCollector {
                     }
                 }
             }
-            MemberSymbol::CubeName(e) => {
-                if !path.is_empty() {
-                    for p in path {
-                        self.names.insert(p.clone());
-                    }
-                }
-                self.names.insert(e.cube_name().clone());
-            }
-            MemberSymbol::CubeTable(_) => {}
             MemberSymbol::MemberExpression(_) => {}
         };
         Ok(Some(()))
+    }
+
+    fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
+        if let CubeRef::Name { symbol, path, .. } = cube_ref {
+            if !path.is_empty() {
+                for p in path {
+                    self.names.insert(p.clone());
+                }
+            }
+            self.names.insert(symbol.cube_name().clone());
+        }
+        Ok(())
     }
 }
 

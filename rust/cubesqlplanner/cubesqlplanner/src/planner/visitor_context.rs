@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
-use super::sql_evaluator::{MemberSymbol, SqlCall};
+use super::sql_evaluator::{CubeRefEvaluator, MemberSymbol, SqlCall};
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::plan::Filter;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
@@ -18,6 +18,7 @@ pub struct FiltersContext {
 pub struct VisitorContext {
     query_tools: Rc<QueryTools>,
     node_processor: Rc<dyn SqlNode>,
+    cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
     filters_context: FiltersContext,
 }
@@ -35,6 +36,7 @@ impl VisitorContext {
         Self {
             query_tools,
             node_processor: nodes_factory.default_node_processor(),
+            cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters,
             filters_context,
         }
@@ -52,13 +54,18 @@ impl VisitorContext {
         Self {
             query_tools,
             node_processor: nodes_factory.default_node_processor(),
+            cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters: None,
             filters_context,
         }
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
-        SqlEvaluatorVisitor::new(query_tools, self.all_filters.clone())
+        SqlEvaluatorVisitor::new(
+            query_tools,
+            self.cube_ref_evaluator.clone(),
+            self.all_filters.clone(),
+        )
     }
 
     pub fn node_processor(&self) -> Rc<dyn SqlNode> {

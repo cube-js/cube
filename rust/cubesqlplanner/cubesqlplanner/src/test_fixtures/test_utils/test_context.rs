@@ -126,11 +126,13 @@ impl TestContext {
     }
 
     pub fn evaluate_symbol(&self, symbol: &Rc<MemberSymbol>) -> Result<String, CubeError> {
-        let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), None);
+        let nodes_factory = SqlNodesFactory::default();
+        let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
+        let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), cube_ref_evaluator, None);
         let base_tools = self.query_tools.base_tools();
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
-        let node_processor = SqlNodesFactory::default().default_node_processor();
+        let node_processor = nodes_factory.default_node_processor();
 
         visitor.apply(symbol, node_processor, &templates)
     }

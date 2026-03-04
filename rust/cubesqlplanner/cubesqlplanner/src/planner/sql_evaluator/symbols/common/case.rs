@@ -4,7 +4,7 @@ use crate::{
         case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,
         case_variant::CaseVariant, string_or_sql::StringOrSql,
     },
-    planner::sql_evaluator::{find_value_restriction, Compiler, MemberSymbol, SqlCall},
+    planner::sql_evaluator::{find_value_restriction, Compiler, CubeRef, MemberSymbol, SqlCall},
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -29,6 +29,18 @@ pub struct CaseDefinition {
 }
 
 impl CaseDefinition {
+    fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
+        for itm in self.items.iter() {
+            itm.sql.extract_cube_refs(result);
+            if let CaseLabel::Sql(sql) = &itm.label {
+                sql.extract_cube_refs(result);
+            }
+        }
+        if let CaseLabel::Sql(sql) = &self.else_label {
+            sql.extract_cube_refs(result);
+        }
+    }
+
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         for itm in self.items.iter() {
             itm.sql.extract_symbol_deps(result);
@@ -104,6 +116,13 @@ pub enum CaseSwitchItem {
 }
 
 impl CaseSwitchItem {
+    fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
+        match self {
+            CaseSwitchItem::Sql(sql_call) => sql_call.extract_cube_refs(result),
+            CaseSwitchItem::Member(_) => {}
+        }
+    }
+
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         match self {
             CaseSwitchItem::Sql(sql_call) => sql_call.extract_symbol_deps(result),
@@ -145,6 +164,16 @@ pub struct CaseSwitchDefinition {
 }
 
 impl CaseSwitchDefinition {
+    fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
+        self.switch.extract_cube_refs(result);
+        for itm in self.items.iter() {
+            itm.sql.extract_cube_refs(result);
+        }
+        if let Some(else_sql) = &self.else_sql {
+            else_sql.extract_cube_refs(result);
+        }
+    }
+
     pub fn try_new(
         cube_name: &String,
         definition: Rc<dyn NativeCaseSwitchDefinition>,
@@ -367,6 +396,13 @@ impl Case {
             ),
         };
         Ok(res)
+    }
+
+    pub fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
+        match self {
+            Case::Case(def) => def.extract_cube_refs(result),
+            Case::CaseSwitch(def) => def.extract_cube_refs(result),
+        }
     }
 
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
