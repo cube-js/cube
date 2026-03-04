@@ -14,6 +14,13 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+pub enum AggregateWrap<'a> {
+    PassThrough,
+    Function(&'a str),
+    CountDistinct,
+    CountDistinctApprox,
+}
+
 #[derive(Clone)]
 pub enum MeasureKind {
     Count(CountMeasure),
@@ -190,6 +197,27 @@ impl MeasureKind {
             Self::Aggregated(a) => a.member_sql(),
             Self::Calculated(c) => c.member_sql(),
             Self::Rank => None,
+        }
+    }
+
+    pub fn aggregate_wrap(&self, is_multiplied: bool) -> AggregateWrap<'_> {
+        match self {
+            Self::Calculated(_) => AggregateWrap::PassThrough,
+            Self::Aggregated(a) => match a.agg_type() {
+                AggregationType::NumberAgg => AggregateWrap::PassThrough,
+                AggregationType::CountDistinctApprox => AggregateWrap::CountDistinctApprox,
+                AggregationType::CountDistinct => AggregateWrap::CountDistinct,
+                AggregationType::RunningTotal => AggregateWrap::Function("sum"),
+                _ => AggregateWrap::Function(a.agg_type().as_str()),
+            },
+            Self::Count(_) => {
+                if is_multiplied {
+                    AggregateWrap::CountDistinct
+                } else {
+                    AggregateWrap::Function("count")
+                }
+            }
+            Self::Rank => AggregateWrap::PassThrough,
         }
     }
 

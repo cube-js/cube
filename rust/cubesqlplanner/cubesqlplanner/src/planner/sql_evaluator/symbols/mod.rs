@@ -16,8 +16,8 @@ pub use cube_symbol::{
 pub use dimension_kinds::DimensionKind;
 pub use dimension_symbol::*;
 pub use measure_kinds::{
-    AggregatedMeasure, CalculatedMeasure, CalculatedMeasureType, CountMeasure, CountSql,
-    MeasureKind,
+    AggregateWrap, AggregatedMeasure, CalculatedMeasure, CalculatedMeasureType, CountMeasure,
+    CountSql, MeasureKind,
 };
 pub use measure_symbol::{
     DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
