@@ -115,6 +115,6 @@ impl CalculatedMeasure {
     pub fn is_owned_by_cube(&self) -> bool {
         self.member_sql
             .as_ref()
-            .map_or(false, |sql| sql.is_owned_by_cube())
+            .is_some_and(|sql| sql.is_owned_by_cube())
     }
 }
