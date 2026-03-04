@@ -48,8 +48,7 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
                         MeasureKind::Count(_) => true,
                         MeasureKind::Aggregated(a) => matches!(
                             a.agg_type(),
-                            AggregationType::CountDistinct
-                                | AggregationType::CountDistinctApprox
+                            AggregationType::CountDistinct | AggregationType::CountDistinctApprox
                         ),
                         _ => false,
                     };
