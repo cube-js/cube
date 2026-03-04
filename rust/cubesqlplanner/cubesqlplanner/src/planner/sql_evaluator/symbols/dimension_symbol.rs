@@ -320,29 +320,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let is_sql_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference()
-        } else {
-            false
-        };
-
-        let (latitude, longitude) = if dimension_type == "geo" {
-            if let (Some(latitude_item), Some(longitude_item)) =
-                (definition.latitude()?, definition.longitude()?)
-            {
-                let latitude = compiler.compile_sql_call(path.cube_name(), latitude_item.sql()?)?;
-                let longitude =
-                    compiler.compile_sql_call(path.cube_name(), longitude_item.sql()?)?;
-                (Some(latitude), Some(longitude))
-            } else {
-                return Err(CubeError::user(format!(
-                    "Geo dimension '{}'must have latitude and longitude",
-                    path.full_name()
-                )));
-            }
-        } else {
-            (None, None)
-        };
+        let is_sql_direct_ref = sql.as_ref().map_or(false, |s| s.is_direct_reference());
 
         let case = if let Some(native_case) = definition.case()? {
             Some(Case::try_new(path.cube_name(), native_case, compiler)?)
@@ -420,12 +398,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let values = if dimension_type == "switch" {
-            definition.static_data().values.clone().unwrap_or_default()
-        } else {
-            vec![]
-        };
-
         let add_group_by =
             if let Some(add_group_by) = &definition.static_data().add_group_by_references {
                 let symbols = add_group_by
@@ -440,16 +412,24 @@ impl SymbolFactory for DimensionSymbolFactory {
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
-        // Build the appropriate DimensionKind first
         let kind = if let Some(case_val) = case {
             let dim_type = DimensionType::from_str(&dimension_type)?;
             DimensionKind::Case(CaseDimension::new(dim_type, case_val, sql))
         } else if dimension_type == "geo" {
-            DimensionKind::Geo(GeoDimension::new(
-                latitude.expect("geo latitude validated above"),
-                longitude.expect("geo longitude validated above"),
-            ))
+            if let (Some(lat_item), Some(lon_item)) =
+                (definition.latitude()?, definition.longitude()?)
+            {
+                let latitude = compiler.compile_sql_call(path.cube_name(), lat_item.sql()?)?;
+                let longitude = compiler.compile_sql_call(path.cube_name(), lon_item.sql()?)?;
+                DimensionKind::Geo(GeoDimension::new(latitude, longitude))
+            } else {
+                return Err(CubeError::user(format!(
+                    "Geo dimension '{}' must have latitude and longitude",
+                    path.full_name()
+                )));
+            }
         } else if dimension_type == "switch" {
+            let values = definition.static_data().values.clone().unwrap_or_default();
             DimensionKind::Switch(SwitchDimension::new(values, sql))
         } else {
             let dim_type = DimensionType::from_str(&dimension_type)?;
