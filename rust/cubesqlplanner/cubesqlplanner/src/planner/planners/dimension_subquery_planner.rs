@@ -83,13 +83,13 @@ impl DimensionSubqueryPlanner {
             )));
         };
 
+        let cube_symbol = self.query_tools.evaluator_compiler().borrow_mut().add_cube_table_evaluator(cube_name.clone())?;
         let member_expression_symbol = MemberExpressionSymbol::try_new(
-            cube_name.clone(),
+            cube_symbol,
             dim_name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             None,
             None,
-            self.query_tools.base_tools().clone(),
             vec![cube_name.clone()],
         )?;
         let measure = MemberSymbol::new_member_expression(member_expression_symbol);

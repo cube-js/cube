@@ -137,13 +137,13 @@ impl Compiler {
         let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
         let alias =
             PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None);
+        let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone())?;
         let symbol = MemberExpressionSymbol::try_new(
-            path.cube_name().clone(),
+            cube_symbol,
             path.symbol_name().clone(),
             MemberExpressionExpression::SqlCall(sql_call),
             None,
             Some(alias),
-            self.base_tools.clone(),
             path.path().clone(),
         )?;
         let result = MemberSymbol::new_member_expression(symbol);

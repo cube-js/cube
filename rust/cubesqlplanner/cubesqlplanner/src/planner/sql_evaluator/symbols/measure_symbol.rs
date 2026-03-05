@@ -7,7 +7,6 @@ use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
-use crate::planner::sql_evaluator::CubeTableSymbol;
 use crate::planner::sql_evaluator::{
     sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
 };
@@ -72,7 +71,6 @@ pub enum MeasureTimeShifts {
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
-    cube: Rc<CubeTableSymbol>,
     compiled_path: CompiledMemberPath,
     kind: MeasureKind,
     rolling_window: Option<RollingWindow>,
@@ -92,7 +90,6 @@ pub struct MeasureSymbol {
 
 impl MeasureSymbol {
     pub fn new(
-        cube: Rc<CubeTableSymbol>,
         compiled_path: CompiledMemberPath,
         is_reference: bool,
         is_view: bool,
@@ -109,7 +106,6 @@ impl MeasureSymbol {
         group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Rc<Self> {
         Rc::new(Self {
-            cube,
             compiled_path,
             is_reference,
             is_view,
@@ -145,7 +141,6 @@ impl MeasureSymbol {
                 self.kind.clone()
             };
             Rc::new(Self {
-                cube: self.cube.clone(),
                 compiled_path: self.compiled_path.clone(),
                 kind,
                 rolling_window: None,
@@ -198,7 +193,6 @@ impl MeasureSymbol {
             measure_filters.extend(add_filters);
         }
         Ok(Rc::new(Self {
-            cube: self.cube.clone(),
             compiled_path: self.compiled_path.clone(),
             kind: result_kind,
             rolling_window: self.rolling_window.clone(),
@@ -463,7 +457,7 @@ impl MeasureSymbol {
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        self.cube.join_map()
+        self.compiled_path.join_map()
     }
 
     pub fn name(&self) -> String {
@@ -734,15 +728,14 @@ impl SymbolFactory for MeasureSymbolFactory {
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
 
         let compiled_path = CompiledMemberPath::new(
+            cube_symbol,
             path.full_name().clone(),
-            path.cube_name().clone(),
             path.symbol_name().clone(),
             alias,
             path.path().clone(),
         );
 
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
-            cube_symbol,
             compiled_path,
             is_reference,
             is_view,

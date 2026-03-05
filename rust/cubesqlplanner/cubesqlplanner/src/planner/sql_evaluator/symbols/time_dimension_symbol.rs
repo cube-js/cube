@@ -34,8 +34,8 @@ impl TimeDimensionSymbol {
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
         let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
         let compiled_path = CompiledMemberPath::new(
+            base_symbol.compiled_path().cube().clone(),
             full_name,
-            base_symbol.cube_name().clone(),
             base_symbol.name().clone(),
             alias,
             base_symbol.path().clone(),
@@ -202,10 +202,7 @@ impl TimeDimensionSymbol {
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        match self.base_symbol.as_ref() {
-            MemberSymbol::Dimension(d) => d.join_map(),
-            _ => &None,
-        }
+        self.compiled_path.join_map()
     }
 
     pub fn is_multi_stage(&self) -> bool {

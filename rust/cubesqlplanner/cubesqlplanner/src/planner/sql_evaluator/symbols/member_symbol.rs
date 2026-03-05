@@ -86,6 +86,10 @@ impl MemberSymbol {
         self.compiled_path().path()
     }
 
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        self.compiled_path().join_map()
+    }
+
     pub fn is_multi_stage(&self) -> bool {
         match self {
             Self::Dimension(d) => d.is_multi_stage(),

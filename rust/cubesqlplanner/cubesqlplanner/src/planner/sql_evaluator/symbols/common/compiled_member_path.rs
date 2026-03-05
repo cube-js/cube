@@ -1,7 +1,10 @@
+use crate::planner::sql_evaluator::CubeTableSymbol;
+use std::rc::Rc;
+
 #[derive(Clone, Debug)]
 pub struct CompiledMemberPath {
+    cube: Rc<CubeTableSymbol>,
     full_name: String,
-    cube_name: String,
     name: String,
     alias: String,
     path: Vec<String>,
@@ -9,15 +12,15 @@ pub struct CompiledMemberPath {
 
 impl CompiledMemberPath {
     pub fn new(
+        cube: Rc<CubeTableSymbol>,
         full_name: String,
-        cube_name: String,
         name: String,
         alias: String,
         path: Vec<String>,
     ) -> Self {
         Self {
+            cube,
             full_name,
-            cube_name,
             name,
             alias,
             path,
@@ -29,7 +32,15 @@ impl CompiledMemberPath {
     }
 
     pub fn cube_name(&self) -> &String {
-        &self.cube_name
+        self.cube.cube_name()
+    }
+
+    pub fn cube(&self) -> &Rc<CubeTableSymbol> {
+        &self.cube
+    }
+
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        self.cube.join_map()
     }
 
     pub fn name(&self) -> &String {

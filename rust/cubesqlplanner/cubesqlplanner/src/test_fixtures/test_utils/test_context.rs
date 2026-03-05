@@ -87,17 +87,15 @@ impl TestContext {
             .query_tools
             .cube_evaluator()
             .segment_by_path(path.to_string())?;
-        let expression = self
-            .query_tools
-            .evaluator_compiler()
-            .borrow_mut()
-            .compile_sql_call(&cube_name, definition.sql()?)?;
+        let mut compiler = self.query_tools.evaluator_compiler().borrow_mut();
+        let expression = compiler.compile_sql_call(&cube_name, definition.sql()?)?;
+        let cube_symbol = compiler.add_cube_table_evaluator(cube_name.clone())?;
+        drop(compiler);
         BaseSegment::try_new(
             expression,
-            cube_name,
+            cube_symbol,
             name,
             Some(path.to_string()),
-            self.query_tools.clone(),
         )
     }
 

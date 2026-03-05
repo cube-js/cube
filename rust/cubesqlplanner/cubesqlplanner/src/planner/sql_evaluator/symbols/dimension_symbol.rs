@@ -12,7 +12,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{
     sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
 };
-use crate::planner::sql_evaluator::{CubeTableSymbol, TimeDimensionSymbol};
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
@@ -28,7 +28,6 @@ pub struct CalendarDimensionTimeShift {
 
 #[derive(Clone)]
 pub struct DimensionSymbol {
-    cube: Rc<CubeTableSymbol>,
     compiled_path: CompiledMemberPath,
     kind: DimensionKind,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
@@ -44,7 +43,6 @@ pub struct DimensionSymbol {
 
 impl DimensionSymbol {
     pub fn new(
-        cube: Rc<CubeTableSymbol>,
         compiled_path: CompiledMemberPath,
         kind: DimensionKind,
         is_reference: bool,
@@ -58,7 +56,6 @@ impl DimensionSymbol {
         propagate_filters_to_sub_query: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
-            cube,
             compiled_path,
             kind,
             is_reference,
@@ -242,7 +239,7 @@ impl DimensionSymbol {
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        self.cube.join_map()
+        self.compiled_path.join_map()
     }
 
     pub fn name(&self) -> String {
@@ -477,15 +474,14 @@ impl SymbolFactory for DimensionSymbolFactory {
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
 
         let compiled_path = CompiledMemberPath::new(
+            cube_symbol,
             path.full_name().clone(),
-            path.cube_name().clone(),
             path.symbol_name().clone(),
             alias,
             path.path().clone(),
         );
 
         let symbol = MemberSymbol::new_dimension(DimensionSymbol::new(
-            cube_symbol,
             compiled_path,
             kind,
             is_reference,

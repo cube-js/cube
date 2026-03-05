@@ -1,9 +1,10 @@
 use super::common::CompiledMemberPath;
 use super::MemberSymbol;
-use crate::cube_bridge::base_tools::BaseTools;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{
+    sql_nodes::SqlNode, CubeRef, CubeTableSymbol, SqlCall, SqlEvaluatorVisitor,
+};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
@@ -28,21 +29,20 @@ pub struct MemberExpressionSymbol {
 
 impl MemberExpressionSymbol {
     pub fn try_new(
-        cube_name: String,
+        cube: Rc<CubeTableSymbol>,
         name: String,
         expression: MemberExpressionExpression,
         definition: Option<String>,
         alias: Option<String>,
-        _base_tools: Rc<dyn BaseTools>,
         path: Vec<String>,
     ) -> Result<Rc<Self>, CubeError> {
-        let full_name = format!("expr:{}.{}", cube_name, name);
+        let full_name = format!("expr:{}.{}", cube.cube_name(), name);
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
-        let compiled_path = CompiledMemberPath::new(full_name, cube_name, name, alias, path);
+        let compiled_path = CompiledMemberPath::new(cube, full_name, name, alias, path);
         Ok(Rc::new(Self {
             compiled_path,
             expression,

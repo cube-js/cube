@@ -102,12 +102,7 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
     visitor.apply(node, &())?;
     let mut collected_hints = visitor.extract_result();
 
-    let join_map = match node.as_ref() {
-        MemberSymbol::Dimension(d) => d.join_map(),
-        MemberSymbol::TimeDimension(d) => d.join_map(),
-        MemberSymbol::Measure(m) => m.join_map(),
-        _ => &None,
-    };
+    let join_map = node.join_map();
 
     if let Some(join_map) = join_map {
         for hint in collected_hints.iter_mut() {

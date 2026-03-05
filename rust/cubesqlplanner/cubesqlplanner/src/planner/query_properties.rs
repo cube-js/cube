@@ -149,13 +149,13 @@ impl QueryProperties {
                                 )));
                             }
                         };
+                        let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
                         let member_expression_symbol = MemberExpressionSymbol::try_new(
-                            cube_name.clone(),
+                            cube_symbol,
                             name.clone(),
                             MemberExpressionExpression::SqlCall(expression_call),
                             member_expression.static_data().definition.clone(),
                             None,
-                            query_tools.base_tools().clone(),
                             vec![cube_name.clone()],
                         )?;
                         Ok(MemberSymbol::new_member_expression(
@@ -260,13 +260,13 @@ impl QueryProperties {
 
                             }
                         };
+                        let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
                         let member_expression_symbol = MemberExpressionSymbol::try_new(
-                            cube_name.clone(),
+                            cube_symbol,
                             name.clone(),
                             expression,
                             member_expression.static_data().definition.clone(),
                             None,
-                            query_tools.base_tools().clone(),
                             vec![cube_name.clone()],
                         )?;
                         Ok(MemberSymbol::new_member_expression(member_expression_symbol))
@@ -301,12 +301,12 @@ impl QueryProperties {
                                 .segment_by_path(member_name.clone())?;
                             let expression_evaluator = evaluator_compiler
                                 .compile_sql_call(&cube_name, definition.sql()?)?;
+                            let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
                             BaseSegment::try_new(
                                 expression_evaluator,
-                                cube_name,
+                                cube_symbol,
                                 name,
                                 Some(member_name.clone()),
-                                query_tools.clone(),
                             )
                         }
                         OptionsMember::MemberExpression(member_expression) => {
@@ -333,12 +333,12 @@ impl QueryProperties {
                                     )));
                                 }
                             };
+                            let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
                             BaseSegment::try_new(
                                 expression_evaluator,
-                                cube_name,
+                                cube_symbol,
                                 name,
                                 None,
-                                query_tools.clone(),
                             )
                         }
                     }?;
