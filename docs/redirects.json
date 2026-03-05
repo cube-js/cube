@@ -611,17 +611,17 @@
   },
   {
     "source": "/cloud/workspace/cube-ide",
-    "destination": "/product/administration/workspace/data-model",
+    "destination": "/product/data-modeling/data-model-ide",
     "permanent": true
   },
   {
     "source": "/cloud/cube-ide",
-    "destination": "/product/administration/workspace/data-model",
+    "destination": "/product/data-modeling/data-model-ide",
     "permanent": true
   },
   {
     "source": "/cloud/dev-tools/cube-ide",
-    "destination": "/product/administration/workspace/data-model",
+    "destination": "/product/data-modeling/data-model-ide",
     "permanent": true
   },
   {
@@ -1351,7 +1351,7 @@
   },
   {
     "source": "/cloud/pricing",
-    "destination": "/product/administration/deployment/pricing",
+    "destination": "/product/administration/pricing",
     "permanent": true
   },
   {
@@ -1676,7 +1676,12 @@
   },
   {
     "source": "/product/workspace/api-keys",
-    "destination": "/product/administration/workspace/api-keys",
+    "destination": "/product/administration/api-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/api-keys",
+    "destination": "/product/administration/api-keys",
     "permanent": true
   },
   {
@@ -1706,7 +1711,12 @@
   },
   {
     "source": "/product/workspace/data-model",
-    "destination": "/product/administration/workspace/data-model",
+    "destination": "/product/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/data-model",
+    "destination": "/product/data-modeling/data-model-ide",
     "permanent": true
   },
   {
@@ -1866,7 +1876,12 @@
   },
   {
     "source": "/product/workspace/vizard",
-    "destination": "/product/administration/workspace/vizard",
+    "destination": "/product/embedding/vizard",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/vizard",
+    "destination": "/product/embedding/vizard",
     "permanent": true
   },
   {
@@ -1941,7 +1956,12 @@
   },
   {
     "source": "/product/deployment/cloud/pricing",
-    "destination": "/product/administration/deployment/pricing",
+    "destination": "/product/administration/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/pricing",
+    "destination": "/product/administration/pricing",
     "permanent": true
   },
   {

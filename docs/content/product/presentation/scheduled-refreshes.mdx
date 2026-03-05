@@ -1,11 +1,95 @@
 # Scheduled Refreshes
 
 <InfoBox>
-  Scheduled refreshes are available on [Premium and Enterprise plans](https://cube.dev/pricing).
+
+Scheduled refreshes are available on [Premium and Enterprise plans](https://cube.dev/pricing).
+<br/ >Users need at least the [Explorer][ref-roles] role and Edit or Manage permission
+on the workbook to set up scheduled refreshes.
+
 </InfoBox>
 
-You can set up Cube dashboards to automatically update on a schedule. When a scheduled refresh is triggered, the widgets on the dashboard are queried in the background, refreshing Cube's in-memory cache. This warms up dashboards so they load instantly when users open them, eliminating wait times for data to load.
+Scheduled refreshes allow you to automatically refresh published dashboards on a
+recurring schedule. When a scheduled refresh runs, the dashboard widgets are
+queried in the background, refreshing Cube's in-memory cache. This warms up
+dashboards so they load instantly when users open them, eliminating wait times.
+
+You can also attach [notifications][ref-notifications] to scheduled refreshes to
+send email or Slack messages with a dashboard screenshot after each refresh.
 
 ## Accessing scheduled refreshes
 
-Access scheduled refreshes from the dashboard builder or published dashboard by clicking the calendar icon, which opens the scheduled refreshes sidebar. From this sidebar, you can create new schedules, modify existing ones, or remove schedules you no longer need.
+From the Dashboard Builder, click the calendar icon in the toolbar to open the
+scheduled refreshes sidebar. From this sidebar, you can create new schedules,
+modify existing ones, or remove schedules you no longer need.
+
+<WarningBox>
+
+The dashboard must be published before schedules can be created.
+
+</WarningBox>
+
+## Creating a schedule
+
+Click <Btn>New scheduled refresh</Btn> in the sidebar footer. A dialog opens
+with the following configuration options.
+
+### Frequency
+
+| Option | Description |
+| --- | --- |
+| Hourly | Runs every hour at the specified minute |
+| Daily | Runs once a day at the specified time |
+| Weekly | Runs on a chosen day of the week at the specified time |
+| Monthly | Runs on a chosen day of the month at the specified time |
+| Custom | Accepts a cron expression (5-part: minute hour day month weekday) |
+
+Time is specified in 12-hour format with an AM/PM selector. For Hourly
+schedules, only the minute field is shown.
+
+### Timezone
+
+Select from common timezones including UTC, US timezones, London, Paris, Berlin,
+Tokyo, Shanghai, Singapore, and Sydney. Defaults to your browser's timezone if
+it matches a common one, otherwise UTC.
+
+### Notifications
+
+You can optionally attach [notifications][ref-notifications] to a scheduled
+refresh. Click <Btn>Add notification</Btn> to expand the notification
+configuration. See the [Notifications][ref-notifications] page for details.
+
+Click <Btn>Save</Btn> to create or update the schedule.
+
+## Managing schedules
+
+The sidebar lists all existing schedules with the following information:
+
+- **Status indicator** — current state: not run yet, last run succeeded, last
+  run failed, or currently running with phase details.
+- **Schedule description** — human-readable text like "At 09:00 AM".
+- **Enable/disable toggle** — turn schedules on or off without deleting them.
+- **Next run time** — shows the next scheduled execution, or "Disabled" if the
+  schedule is off.
+
+### Actions
+
+| Action | Description |
+| --- | --- |
+| Run now | Manually trigger the schedule immediately |
+| Edit | Open the form dialog to modify the schedule |
+| Delete | Remove the schedule permanently |
+
+## Run phases
+
+When a scheduled refresh runs, it progresses through these phases:
+
+1. Initializing
+2. Fetching credentials
+3. Refreshing dashboard
+4. Generating screenshot (if notifications are configured)
+5. Sending notifications (if notifications are configured)
+
+The sidebar shows real-time status updates during execution.
+
+[ref-roles]: /product/administration/users-and-permissions/roles-and-permissions
+[ref-notifications]: /product/presentation/notifications
