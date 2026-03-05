@@ -258,6 +258,15 @@ const dimensionNumericFormatSchema = Joi.alternatives([
   customNumericFormatSchema
 ]);
 
+const MaskSchema = Joi.alternatives().try(
+  Joi.object().keys({
+    sql: Joi.func().required()
+  }),
+  Joi.number(),
+  Joi.boolean().strict(),
+  Joi.string()
+);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -270,6 +279,7 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
+  mask: MaskSchema,
   format: Joi.when('type', {
     switch: [
       { is: 'time', then: timeFormatSchema },
@@ -397,6 +407,7 @@ const BaseMeasure = {
   ),
   title: Joi.string(),
   description: Joi.string(),
+  mask: MaskSchema,
   rollingWindow: Joi.alternatives().conditional(
     Joi.ref('.type'), [
       { is: 'year_to_date', then: YearToDate },
@@ -941,6 +952,19 @@ const MemberLevelPolicySchema = Joi.object().keys({
   excludesMembers: Joi.array().items(Joi.string().required()),
 });
 
+const MemberMaskingPolicySchema = Joi.object().keys({
+  includes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(Joi.string())
+  ]),
+  excludes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(Joi.string().required())
+  ]),
+  includesMembers: Joi.array().items(Joi.string().required()),
+  excludesMembers: Joi.array().items(Joi.string().required()),
+});
+
 const RowLevelPolicySchema = Joi.object().keys({
   filters: Joi.array().items(PolicyFilterSchema, PolicyFilterConditionSchema),
   allowAll: Joi.boolean().valid(true).strict(),
@@ -951,6 +975,7 @@ const RolePolicySchema = Joi.object().keys({
   group: Joi.string(),
   groups: Joi.array().items(Joi.string()),
   memberLevel: MemberLevelPolicySchema,
+  memberMasking: MemberMaskingPolicySchema,
   rowLevel: RowLevelPolicySchema,
   conditions: Joi.array().items(Joi.object().keys({
     if: Joi.func().required(),

@@ -934,7 +934,7 @@ export class BaseQuery {
       timeDimensions: this.options.timeDimensions,
       timezone: this.options.timezone,
       joinGraph: this.joinGraph,
-      cubeEvaluator: this.cubeEvaluator,
+      cubeEvaluator: this.createMaskedCubeEvaluator(),
       securityContext: this.contextSymbols.securityContext,
       order,
       filters: this.options.filters,
@@ -3180,6 +3180,11 @@ export class BaseQuery {
   }
 
   dimensionSql(dimension) {
+    const memberPath = this.cubeEvaluator.pathFromArray([dimension.path()[0], dimension.path()[1]]);
+    if (this.options.maskedMembers && this.options.maskedMembers.includes(memberPath)) {
+      const def = dimension.dimensionDefinition();
+      return this.maskSqlForMember(dimension.path()[0], dimension.path()[1], def);
+    }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
 
@@ -3188,7 +3193,95 @@ export class BaseQuery {
   }
 
   measureSql(measure) {
+    const memberPath = this.cubeEvaluator.pathFromArray([measure.path()[0], measure.path()[1]]);
+    if (this.options.maskedMembers && this.options.maskedMembers.includes(memberPath)) {
+      const def = measure.measureDefinition();
+      // Return the mask SQL directly (bypassing aggregation wrapping)
+      return this.maskSqlForMember(measure.path()[0], measure.path()[1], def);
+    }
     return this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
+  }
+
+  maskValueToSql(value) {
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+    if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+    return 'NULL';
+  }
+
+  getDefaultMaskSql(memberType) {
+    const numericTypes = new Set(['number', 'count', 'sum', 'avg', 'min', 'max', 'countDistinct', 'count_distinct', 'countDistinctApprox', 'count_distinct_approx', 'runningTotal', 'running_total']);
+    let envValue;
+    if (memberType === 'string') {
+      envValue = getEnv('accessPolicyMaskString');
+    } else if (memberType === 'time') {
+      envValue = getEnv('accessPolicyMaskTime');
+    } else if (memberType === 'boolean') {
+      envValue = getEnv('accessPolicyMaskBoolean');
+    } else if (numericTypes.has(memberType)) {
+      envValue = getEnv('accessPolicyMaskNumber');
+    }
+    if (envValue !== undefined && envValue !== null) {
+      return this.maskValueToSql(envValue);
+    }
+    return 'NULL';
+  }
+
+  maskSqlForMember(cubeName, name, symbol) {
+    const maskDef = symbol.mask;
+    if (maskDef === undefined || maskDef === null) {
+      return this.getDefaultMaskSql(symbol.type);
+    }
+    if (typeof maskDef === 'object' && maskDef !== null && maskDef.sql) {
+      return this.autoPrefixAndEvaluateSql(cubeName, maskDef.sql);
+    }
+    return this.maskValueToSql(maskDef);
+  }
+
+  createMaskedCubeEvaluator() {
+    if (!this.options.maskedMembers || this.options.maskedMembers.length === 0) {
+      return this.cubeEvaluator;
+    }
+    const maskedSet = new Set(this.options.maskedMembers);
+    const originalEvaluator = this.cubeEvaluator;
+    const self = this;
+
+    const getMaskSqlFnForDef = (def) => {
+      const maskDef = def.mask;
+      if (maskDef === undefined || maskDef === null) {
+        const defaultSql = self.getDefaultMaskSql(def.type);
+        return () => defaultSql;
+      }
+      if (typeof maskDef === 'object' && maskDef !== null && maskDef.sql) {
+        return maskDef.sql;
+      }
+      const literal = self.maskValueToSql(maskDef);
+      return () => literal;
+    };
+
+    return new Proxy(originalEvaluator, {
+      get(target, prop) {
+        if (prop === 'dimensionByPath') {
+          return (path) => {
+            const def = target.dimensionByPath(path);
+            if (maskedSet.has(path)) {
+              return { ...def, sql: getMaskSqlFnForDef(def) };
+            }
+            return def;
+          };
+        }
+        if (prop === 'measureByPath') {
+          return (path) => {
+            const def = target.measureByPath(path);
+            if (maskedSet.has(path)) {
+              return { ...def, type: 'number', sql: getMaskSqlFnForDef(def) };
+            }
+            return def;
+          };
+        }
+        return target[prop];
+      }
+    });
   }
 
   autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {

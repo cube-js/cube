@@ -10,6 +10,7 @@ import {
   FolderMember,
   HierarchyDefinition,
   JoinDefinition,
+  MaskDefinition,
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
   type ToString,
@@ -42,6 +43,7 @@ export type DimensionDefinition = {
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
+  mask?: MaskDefinition;
 };
 
 export type TimeShiftDefinition = {
@@ -76,6 +78,7 @@ export type MeasureDefinition = {
   addGroupByReferences?: string[];
   timeShiftReferences?: TimeShiftDefinitionReference[];
   patchedFrom?: { cubeName: string; name: string };
+  mask?: MaskDefinition;
 };
 
 export type PreAggregationFilters = {
@@ -266,6 +269,17 @@ export class CubeEvaluator extends CubeSymbols {
           cube,
           policy.memberLevel.excludes || []
         ).map(memberMapper('an excludes member'));
+      }
+
+      if (policy.memberMasking) {
+        policy.memberMasking.includesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.includes || '*'
+        ).map(memberMapper('a masking includes member'));
+        policy.memberMasking.excludesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.excludes || []
+        ).map(memberMapper('a masking excludes member'));
       }
     }
   }

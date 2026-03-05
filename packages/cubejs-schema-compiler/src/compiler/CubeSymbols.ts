@@ -28,6 +28,8 @@ export type TimeshiftDefinition = {
   timeDimension?: (...args: any[]) => string;
 };
 
+export type MaskDefinition = { sql: (...args: any[]) => string } | number | boolean | string;
+
 export type CubeSymbolDefinition = {
   type?: string;
   sql?: (...args: any[]) => string;
@@ -38,6 +40,7 @@ export type CubeSymbolDefinition = {
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
+  mask?: MaskDefinition;
 };
 
 export type HierarchyDefinition = {
@@ -123,6 +126,13 @@ export type Filter =
       [key: string]: any;
     };
 
+export type MemberPolicyLevel = {
+  includes?: string | string[];
+  excludes?: string | string[];
+  includesMembers?: string[];
+  excludesMembers?: string[];
+};
+
 export type AccessPolicyDefinition = {
   role?: string;
   group?: string;
@@ -130,12 +140,8 @@ export type AccessPolicyDefinition = {
   rowLevel?: {
     filters: Filter[];
   };
-  memberLevel?: {
-    includes?: string | string[];
-    excludes?: string | string[];
-    includesMembers?: string[];
-    excludesMembers?: string[];
-  };
+  memberLevel?: MemberPolicyLevel;
+  memberMasking?: MemberPolicyLevel;
   conditions?: {
     if: Function;
   }[]

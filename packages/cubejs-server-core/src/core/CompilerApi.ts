@@ -516,6 +516,7 @@ export class CompilerApi {
   ): Promise<{ query: NormalizedQuery; denied: boolean }> {
     const compilers = await this.getCompilers({ requestId: context.requestId });
     const { cubeEvaluator } = compilers;
+    const maskedMemberPaths = new Set<string>();
 
     if (!cubeEvaluator.isRbacEnabled()) {
       return { query, denied: false };
@@ -645,9 +646,13 @@ export class CompilerApi {
         //
         //         No policy covers {a,b,c} → Access denied, empty result
         //
+        const cubeMembersInQuery = Array.from(queryMemberNames).filter(
+          memberName => memberName.startsWith(`${cubeName}.`)
+        );
+
         const policiesWithMemberAccess = userPolicies.filter((policy: any) => {
-          // If there's no memberLevel policy, all members are accessible
-          if (!policy.memberLevel) {
+          // If there's no memberLevel or memberMasking policy, all members are accessible
+          if (!policy.memberLevel && !policy.memberMasking) {
             return true;
           }
 
@@ -658,13 +663,25 @@ export class CompilerApi {
             return true;
           }
 
-          const cubeMembersInQuery = Array.from(queryMemberNames).filter(
-            memberName => memberName.startsWith(`${cubeName}.`)
-          );
+          // Check if the policy covers all queried members (via member_level OR member_masking)
+          return [...cubeMembersInQuery].every(memberName => {
+            // Check member_level access
+            if (!policy.memberLevel) {
+              // No member_level = all members accessible via member_level
+              return true;
+            }
+            const inMemberLevel = policy.memberLevel.includesMembers.includes(memberName) &&
+              !policy.memberLevel.excludesMembers.includes(memberName);
+            if (inMemberLevel) return true;
 
-          // Check if the policy grants access to all members used in the query
-          return [...cubeMembersInQuery].every(memberName => policy.memberLevel.includesMembers.includes(memberName) &&
-            !policy.memberLevel.excludesMembers.includes(memberName));
+            // Check member_masking as fallback
+            if (policy.memberMasking) {
+              return policy.memberMasking.includesMembers.includes(memberName) &&
+                !policy.memberMasking.excludesMembers.includes(memberName);
+            }
+
+            return false;
+          });
         });
 
         for (const policy of policiesWithMemberAccess) {
@@ -701,6 +718,37 @@ export class CompilerApi {
           // If we hit this condition there's no need to evaluate the rest of the policy
           return { query, denied: true };
         }
+
+        // Compute masked members: members not accessible via member_level but accessible
+        // via member_masking. These members will be included in the query with masked values.
+        if (!cubesAccessedViaView.has(cubeName)) {
+          for (const memberName of cubeMembersInQuery) {
+            let isMemberAccessible = false;
+            let isMemberMasked = false;
+
+            for (const policy of policiesWithMemberAccess) {
+              if (!policy.memberLevel) {
+                // No member_level = all members accessible
+                isMemberAccessible = true;
+                break;
+              }
+              if (policy.memberLevel.includesMembers.includes(memberName) &&
+                  !policy.memberLevel.excludesMembers.includes(memberName)) {
+                isMemberAccessible = true;
+                break;
+              }
+              if (policy.memberMasking &&
+                  policy.memberMasking.includesMembers.includes(memberName) &&
+                  !policy.memberMasking.excludesMembers.includes(memberName)) {
+                isMemberMasked = true;
+              }
+            }
+
+            if (!isMemberAccessible && isMemberMasked) {
+              maskedMemberPaths.add(memberName);
+            }
+          }
+        }
       }
     }
 
@@ -713,6 +761,11 @@ export class CompilerApi {
       query.filters = query.filters || [];
       query.filters.push(rlsFilter);
     }
+
+    if (maskedMemberPaths.size > 0) {
+      (query as any).maskedMembers = Array.from(maskedMemberPaths);
+    }
+
     return { query, denied: false };
   }
 
