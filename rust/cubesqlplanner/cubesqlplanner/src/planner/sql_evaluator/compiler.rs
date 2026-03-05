@@ -57,18 +57,15 @@ impl Compiler {
         &mut self,
         name: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
-        if self.cube_evaluator.is_measure(path.clone())? {
-            Ok(self.add_measure_evaluator(name)?)
-        } else if self.cube_evaluator.is_dimension(path.clone())? {
-            Ok(self.add_dimension_evaluator(name)?)
-        } else if self.cube_evaluator.is_segment(path.clone())? {
-            Ok(self.add_segment_evaluator(name)?)
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot resolve evaluator of member {}. Only dimensions, measures and segments can be autoresolved",
+        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        match path.path_type() {
+            SymbolPathType::Dimension => self.add_dimension_evaluator_impl(path),
+            SymbolPathType::Measure => self.add_measure_evaluator_impl(path),
+            SymbolPathType::Segment => self.add_segment_evaluator(path.full_name().clone()),
+            _ => Err(CubeError::internal(format!(
+                "Cannot auto-resolve {}. Only dimensions, measures and segments",
                 name
-            )))
+            ))),
         }
     }
 
