@@ -132,6 +132,60 @@ module.exports = {
         },
       };
     }
+    // User for masking tests - no special roles, sees only masked values
+    if (user === 'masking_viewer') {
+      if (password && password !== 'masking_viewer_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'masking_viewer',
+            userAttributes: {},
+            roles: [],
+            groups: [],
+          },
+        },
+      };
+    }
+    // User for masking tests - has full access role
+    if (user === 'masking_full') {
+      if (password && password !== 'masking_full_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'masking_full',
+            userAttributes: {},
+            roles: ['masking_full_access'],
+            groups: [],
+          },
+        },
+      };
+    }
+    // User for masking tests - has partial access + masking
+    if (user === 'masking_partial') {
+      if (password && password !== 'masking_partial_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'masking_partial',
+            userAttributes: {},
+            roles: ['masking_partial'],
+            groups: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };

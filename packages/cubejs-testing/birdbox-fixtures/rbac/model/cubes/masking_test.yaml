@@ -1,0 +1,79 @@
+cubes:
+  - name: masking_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: secret_string
+        sql: product_id
+        mask:
+          sql: "CONCAT('***', RIGHT(CAST({CUBE}.product_id AS TEXT), 2))"
+        type: string
+
+      - name: secret_number
+        sql: price
+        mask: -1
+        type: number
+
+      - name: secret_boolean
+        sql: "CASE WHEN {CUBE}.quantity > 3 THEN TRUE ELSE FALSE END"
+        mask: FALSE
+        type: boolean
+
+      - name: public_dim
+        sql: order_id
+        type: number
+
+    measures:
+      - name: count
+        mask: 12345
+        type: count
+
+      - name: count_d
+        sql: product_id
+        mask: 34567
+        type: count_distinct
+
+      - name: total_quantity
+        sql: quantity
+        type: sum
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      - role: "masking_full_access"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+      - role: "masking_partial"
+        member_level:
+          includes:
+            - id
+            - public_dim
+            - total_quantity
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+views:
+  - name: masking_view
+    cubes:
+      - join_path: masking_test
+        includes: "*"
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
