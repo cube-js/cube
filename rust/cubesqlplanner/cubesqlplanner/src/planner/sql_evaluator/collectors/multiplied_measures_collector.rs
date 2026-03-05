@@ -100,7 +100,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
                     .join
                     .static_data()
                     .multiplication_factor
-                    .get(e.cube_name())
+                    .get(&e.cube_name())
                     .unwrap_or(&false)
                     .clone();
 

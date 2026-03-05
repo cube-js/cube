@@ -36,6 +36,7 @@ impl BaseSegment {
             None,
             None,
             query_tools.base_tools().clone(),
+            vec![cube_name.clone()],
         )?;
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);

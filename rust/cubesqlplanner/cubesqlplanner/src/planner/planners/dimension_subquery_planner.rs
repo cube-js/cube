@@ -90,6 +90,7 @@ impl DimensionSubqueryPlanner {
             None,
             None,
             self.query_tools.base_tools().clone(),
+            vec![cube_name.clone()],
         )?;
         let measure = MemberSymbol::new_member_expression(member_expression_symbol);
 

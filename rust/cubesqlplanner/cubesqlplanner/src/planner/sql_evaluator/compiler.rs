@@ -61,7 +61,7 @@ impl Compiler {
         match path.path_type() {
             SymbolPathType::Dimension => self.add_dimension_evaluator_impl(path),
             SymbolPathType::Measure => self.add_measure_evaluator_impl(path),
-            SymbolPathType::Segment => self.add_segment_evaluator(path.full_name().clone()),
+            SymbolPathType::Segment => self.add_segment_evaluator_impl(path),
             _ => Err(CubeError::internal(format!(
                 "Cannot auto-resolve {}. Only dimensions, measures and segments",
                 name
@@ -98,7 +98,7 @@ impl Compiler {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
         match path.path_type() {
             SymbolPathType::Segment => {
-                let symbol = self.add_segment_evaluator(path.full_name().clone())?;
+                let symbol = self.add_segment_evaluator_impl(path)?;
                 let me = symbol.as_member_expression()?;
                 Ok(MemberSymbol::new_member_expression(me.with_parenthesized()))
             }
@@ -121,27 +121,33 @@ impl Compiler {
     }
 
     pub fn add_segment_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
-        if let Some(exists) = self.exists_member(CacheSymbolType::Segment, &name) {
+        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        self.add_segment_evaluator_impl(path)
+    }
+
+    fn add_segment_evaluator_impl(
+        &mut self,
+        path: SymbolPath,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let full_name = path.full_name().clone();
+        if let Some(exists) = self.exists_member(CacheSymbolType::Segment, &full_name) {
             return Ok(exists.clone());
         }
-        let path = self
-            .cube_evaluator
-            .parse_path("segments".to_string(), name.clone())?;
-        let cube_name = path[0].clone();
-        let member_name = path[1].clone();
-        let definition = self.cube_evaluator.segment_by_path(name.clone())?;
-        let sql_call = self.compile_sql_call(&cube_name, definition.sql()?)?;
-        let alias = PlanSqlTemplates::member_alias_name(&cube_name, &member_name, &None);
+        let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
+        let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
+        let alias =
+            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None);
         let symbol = MemberExpressionSymbol::try_new(
-            cube_name,
-            member_name,
+            path.cube_name().clone(),
+            path.symbol_name().clone(),
             MemberExpressionExpression::SqlCall(sql_call),
             None,
             Some(alias),
             self.base_tools.clone(),
+            path.path().clone(),
         )?;
         let result = MemberSymbol::new_member_expression(symbol);
-        let key = (CacheSymbolType::Segment, name);
+        let key = (CacheSymbolType::Segment, full_name);
         self.members.insert(key, result.clone());
         Ok(result)
     }

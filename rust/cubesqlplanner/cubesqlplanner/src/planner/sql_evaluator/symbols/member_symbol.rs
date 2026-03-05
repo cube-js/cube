@@ -4,6 +4,7 @@ use itertools::Itertools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::{Case, CubeRef, SqlCall};
 
+use super::common::CompiledMemberPath;
 use super::{DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, TimeDimensionSymbol};
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -34,15 +35,8 @@ impl Debug for MemberSymbol {
 
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Dimension(l0), Self::Dimension(r0)) => l0.full_name() == r0.full_name(),
-            (Self::TimeDimension(l0), Self::TimeDimension(r0)) => l0.full_name() == r0.full_name(),
-            (Self::Measure(l0), Self::Measure(r0)) => l0.full_name() == r0.full_name(),
-            (Self::MemberExpression(l0), Self::MemberExpression(r0)) => {
-                l0.full_name() == r0.full_name()
-            }
-            _ => false,
-        }
+        self.full_name() == other.full_name()
+            && std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
@@ -63,40 +57,33 @@ impl MemberSymbol {
         Rc::new(Self::TimeDimension(symbol))
     }
 
-    pub fn full_name(&self) -> String {
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
         match self {
-            Self::Dimension(d) => d.full_name(),
-            Self::TimeDimension(d) => d.full_name(),
-            Self::Measure(m) => m.full_name(),
-            Self::MemberExpression(e) => e.full_name().clone(),
+            Self::Dimension(d) => d.compiled_path(),
+            Self::TimeDimension(d) => d.compiled_path(),
+            Self::Measure(m) => m.compiled_path(),
+            Self::MemberExpression(e) => e.compiled_path(),
         }
+    }
+
+    pub fn full_name(&self) -> String {
+        self.compiled_path().full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        match self {
-            Self::Dimension(d) => d.alias(),
-            Self::TimeDimension(d) => d.alias(),
-            Self::Measure(m) => m.alias(),
-            Self::MemberExpression(e) => e.alias(),
-        }
+        self.compiled_path().alias().clone()
     }
 
     pub fn name(&self) -> String {
-        match self {
-            Self::Dimension(d) => d.name().clone(),
-            Self::TimeDimension(d) => d.name(),
-            Self::Measure(m) => m.name().clone(),
-            Self::MemberExpression(e) => e.name().clone(),
-        }
+        self.compiled_path().name().clone()
     }
 
     pub fn cube_name(&self) -> String {
-        match self {
-            Self::Dimension(d) => d.cube_name().clone(),
-            Self::TimeDimension(d) => d.cube_name(),
-            Self::Measure(m) => m.cube_name().clone(),
-            Self::MemberExpression(e) => e.cube_name().clone(),
-        }
+        self.compiled_path().cube_name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path().path()
     }
 
     pub fn is_multi_stage(&self) -> bool {

@@ -156,6 +156,7 @@ impl QueryProperties {
                             member_expression.static_data().definition.clone(),
                             None,
                             query_tools.base_tools().clone(),
+                            vec![cube_name.clone()],
                         )?;
                         Ok(MemberSymbol::new_member_expression(
                             member_expression_symbol,
@@ -266,6 +267,7 @@ impl QueryProperties {
                             member_expression.static_data().definition.clone(),
                             None,
                             query_tools.base_tools().clone(),
+                            vec![cube_name.clone()],
                         )?;
                         Ok(MemberSymbol::new_member_expression(member_expression_symbol))
                     }

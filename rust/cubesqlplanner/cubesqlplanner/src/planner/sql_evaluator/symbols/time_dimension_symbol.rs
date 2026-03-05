@@ -1,3 +1,4 @@
+use super::common::CompiledMemberPath;
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::CubeRef;
@@ -11,8 +12,7 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
-    full_name: String,
-    alias: String,
+    compiled_path: CompiledMemberPath,
     granularity: Option<String>,
     granularity_obj: Option<Granularity>,
     date_range: Option<(String, String)>,
@@ -33,12 +33,18 @@ impl TimeDimensionSymbol {
         };
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
         let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
+        let compiled_path = CompiledMemberPath::new(
+            full_name,
+            base_symbol.cube_name().clone(),
+            base_symbol.name().clone(),
+            alias,
+            base_symbol.path().clone(),
+        );
         Rc::new(Self {
             base_symbol,
-            alias,
+            compiled_path,
             granularity,
             granularity_obj,
-            full_name,
             date_range,
             alias_suffix: name_suffix,
         })
@@ -94,8 +100,12 @@ impl TimeDimensionSymbol {
         Ok(result)
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
     pub fn full_name(&self) -> String {
-        self.full_name.clone()
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias_suffix(&self) -> String {
@@ -103,7 +113,7 @@ impl TimeDimensionSymbol {
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn owned_by_cube(&self) -> bool {
@@ -184,7 +194,11 @@ impl TimeDimensionSymbol {
     }
 
     pub fn cube_name(&self) -> String {
-        self.base_symbol.cube_name()
+        self.compiled_path.cube_name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
@@ -223,7 +237,7 @@ impl TimeDimensionSymbol {
     }
 
     pub fn name(&self) -> String {
-        self.base_symbol.name()
+        self.compiled_path.name().clone()
     }
 
     pub fn date_range_granularity(

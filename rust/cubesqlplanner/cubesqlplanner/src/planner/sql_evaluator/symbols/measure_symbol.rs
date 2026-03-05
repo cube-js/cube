@@ -1,4 +1,4 @@
-use super::common::{AggregationType, Case};
+use super::common::{AggregationType, Case, CompiledMemberPath};
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -73,8 +73,7 @@ pub enum MeasureTimeShifts {
 #[derive(Clone)]
 pub struct MeasureSymbol {
     cube: Rc<CubeTableSymbol>,
-    name: String,
-    alias: String,
+    compiled_path: CompiledMemberPath,
     kind: MeasureKind,
     rolling_window: Option<RollingWindow>,
     is_multi_stage: bool,
@@ -94,8 +93,7 @@ pub struct MeasureSymbol {
 impl MeasureSymbol {
     pub fn new(
         cube: Rc<CubeTableSymbol>,
-        name: String,
-        alias: String,
+        compiled_path: CompiledMemberPath,
         is_reference: bool,
         is_view: bool,
         case: Option<Case>,
@@ -112,8 +110,7 @@ impl MeasureSymbol {
     ) -> Rc<Self> {
         Rc::new(Self {
             cube,
-            name,
-            alias,
+            compiled_path,
             is_reference,
             is_view,
             case,
@@ -149,8 +146,7 @@ impl MeasureSymbol {
             };
             Rc::new(Self {
                 cube: self.cube.clone(),
-                name: self.name.clone(),
-                alias: self.alias.clone(),
+                compiled_path: self.compiled_path.clone(),
                 kind,
                 rolling_window: None,
                 is_multi_stage: false,
@@ -180,7 +176,7 @@ impl MeasureSymbol {
             if !self.kind.can_replace_type_with(&new_measure_type) {
                 return Err(CubeError::user(format!(
                     "Unsupported measure type replacement for {}: {} => {}",
-                    self.name,
+                    self.compiled_path.name(),
                     self.kind.measure_type_str(),
                     new_measure_type
                 )));
@@ -195,7 +191,7 @@ impl MeasureSymbol {
             if !result_kind.supports_additional_filters() {
                 return Err(CubeError::user(format!(
                     "Unsupported additional filters for measure {} type {}",
-                    self.name,
+                    self.compiled_path.name(),
                     result_kind.measure_type_str()
                 )));
             }
@@ -203,8 +199,7 @@ impl MeasureSymbol {
         }
         Ok(Rc::new(Self {
             cube: self.cube.clone(),
-            name: self.name.clone(),
-            alias: self.alias.clone(),
+            compiled_path: self.compiled_path.clone(),
             kind: result_kind,
             rolling_window: self.rolling_window.clone(),
             is_multi_stage: self.is_multi_stage,
@@ -228,12 +223,16 @@ impl MeasureSymbol {
         Rc::new(new)
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
     pub fn full_name(&self) -> String {
-        format!("{}.{}", self.cube.cube_name(), self.name)
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn is_splitted_source(&self) -> bool {
@@ -459,16 +458,20 @@ impl MeasureSymbol {
         self.is_multi_stage
     }
 
-    pub fn cube_name(&self) -> &String {
-        &self.cube.cube_name()
+    pub fn cube_name(&self) -> String {
+        self.compiled_path.cube_name().clone()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
         self.cube.join_map()
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.compiled_path.name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 }
 
@@ -593,7 +596,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                         }
                     } else {
                         shifts.insert(
-                            dimension_name,
+                            dimension_name.clone(),
                             DimensionTimeShift {
                                 interval: interval.clone(),
                                 name: name.clone(),
@@ -730,10 +733,17 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
 
-        Ok(MemberSymbol::new_measure(MeasureSymbol::new(
-            cube_symbol,
+        let compiled_path = CompiledMemberPath::new(
+            path.full_name().clone(),
+            path.cube_name().clone(),
             path.symbol_name().clone(),
             alias,
+            path.path().clone(),
+        );
+
+        Ok(MemberSymbol::new_measure(MeasureSymbol::new(
+            cube_symbol,
+            compiled_path,
             is_reference,
             is_view,
             case,
