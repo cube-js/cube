@@ -67,3 +67,87 @@ impl<'a> IntoIterator for &'a JoinHints {
         self.items.iter()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    fn s(name: &str) -> JoinHintItem {
+        JoinHintItem::Single(name.to_string())
+    }
+
+    fn v(names: &[&str]) -> JoinHintItem {
+        JoinHintItem::Vector(names.iter().map(|n| n.to_string()).collect())
+    }
+
+    fn hash_of(h: &JoinHints) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        h.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn test_from_items_normalizes_and_deduplicates() {
+        let hints = JoinHints::from_items(vec![
+            s("orders"),
+            v(&["users", "orders"]),
+            s("orders"),
+            s("abc"),
+        ]);
+
+        assert_eq!(hints.len(), 3);
+        // sorted: Single comes before Vector for same content, and Singles are alphabetical
+        assert_eq!(hints.items()[0], s("abc"));
+        assert_eq!(hints.items()[1], s("orders"));
+        assert_eq!(hints.items()[2], v(&["users", "orders"]));
+
+        // Different insertion order → same result
+        let hints2 = JoinHints::from_items(vec![
+            s("abc"),
+            v(&["users", "orders"]),
+            s("orders"),
+        ]);
+        assert_eq!(hints, hints2);
+        assert_eq!(hash_of(&hints), hash_of(&hints2));
+    }
+
+    #[test]
+    fn test_insert_and_extend_preserve_invariant() {
+        let mut a = JoinHints::new();
+        assert!(a.is_empty());
+
+        a.insert(s("orders"));
+        a.insert(s("abc"));
+        a.insert(s("orders")); // duplicate
+        assert_eq!(a.len(), 2);
+        assert_eq!(a.items()[0], s("abc"));
+        assert_eq!(a.items()[1], s("orders"));
+
+        let b = JoinHints::from_items(vec![s("orders"), v(&["a", "b"]), s("zzz")]);
+        a.extend(&b);
+        assert_eq!(a.len(), 4);
+        // abc, orders, zzz (Singles sorted), then Vector
+        assert_eq!(a.items()[0], s("abc"));
+        assert_eq!(a.items()[1], s("orders"));
+        assert_eq!(a.items()[2], s("zzz"));
+        assert_eq!(a.items()[3], v(&["a", "b"]));
+    }
+
+    #[test]
+    fn test_into_items_and_into_iter() {
+        let hints = JoinHints::from_items(vec![s("b"), s("a"), v(&["x", "y"])]);
+        let cloned = hints.clone();
+
+        // into_iter
+        let collected: Vec<_> = cloned.into_iter().collect();
+        assert_eq!(collected.len(), 3);
+
+        // into_items
+        let items = hints.into_items();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0], s("a"));
+        assert_eq!(items[1], s("b"));
+    }
+}
