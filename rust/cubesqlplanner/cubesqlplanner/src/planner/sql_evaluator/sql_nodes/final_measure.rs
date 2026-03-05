@@ -1,6 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MeasureSymbol;
+use crate::planner::sql_evaluator::symbols::{AggregateWrap, MeasureSymbol};
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -32,12 +32,27 @@ impl FinalMeasureSqlNode {
         &self.input
     }
 
-    fn is_count_distinct(&self, symbol: &MeasureSymbol) -> bool {
-        symbol.measure_type() == "countDistinct"
-            || (symbol.measure_type() == "count"
-                && self
-                    .rendered_as_multiplied_measures
-                    .contains(&symbol.full_name()))
+    fn wrap_aggregate(
+        &self,
+        ev: &MeasureSymbol,
+        input: String,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        let is_multiplied = self
+            .rendered_as_multiplied_measures
+            .contains(&ev.full_name());
+        match ev.kind().aggregate_wrap(is_multiplied) {
+            AggregateWrap::PassThrough => Ok(input),
+            AggregateWrap::Function(name) => Ok(format!("{}({})", name, input)),
+            AggregateWrap::CountDistinct => templates.count_distinct(&input),
+            AggregateWrap::CountDistinctApprox => {
+                if self.count_approx_as_state {
+                    templates.hll_init(input)
+                } else {
+                    templates.count_distinct_approx(input)
+                }
+            }
+        }
     }
 }
 
@@ -59,26 +74,7 @@ impl SqlNode for FinalMeasureSqlNode {
                     node_processor.clone(),
                     templates,
                 )?;
-
-                if ev.is_calculated() || ev.measure_type() == "numberAgg" {
-                    input
-                } else if ev.measure_type() == "countDistinctApprox" {
-                    if self.count_approx_as_state {
-                        templates.hll_init(input)?
-                    } else {
-                        templates.count_distinct_approx(input)?
-                    }
-                } else if self.is_count_distinct(ev) {
-                    templates.count_distinct(&input)?
-                } else {
-                    let measure_type = if ev.measure_type() == "runningTotal" {
-                        "sum"
-                    } else {
-                        &ev.measure_type()
-                    };
-
-                    format!("{}({})", measure_type, input)
-                }
+                self.wrap_aggregate(ev, input, templates)?
             }
             _ => {
                 return Err(CubeError::internal(format!(

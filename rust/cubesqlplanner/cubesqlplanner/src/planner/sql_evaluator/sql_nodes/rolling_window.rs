@@ -1,5 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::symbols::{AggregationType, MeasureKind};
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -43,25 +44,35 @@ impl SqlNode for RollingWindowNode {
                         node_processor.clone(),
                         templates,
                     )?;
-                    if m.measure_type() == "countDistinctApprox" {
-                        templates.hll_cardinality_merge(input)?
-                    } else {
-                        if m.measure_type() == "sum"
-                            || m.measure_type() == "count"
-                            || m.measure_type() == "runningTotal"
+                    match m.kind() {
+                        MeasureKind::Aggregated(a)
+                            if a.agg_type() == AggregationType::CountDistinctApprox =>
                         {
-                            format!("sum({})", input)
-                        } else if m.measure_type() == "min" || m.measure_type() == "max" {
-                            format!("{}({})", m.measure_type(), input)
-                        } else {
-                            self.default_processor.to_sql(
+                            templates.hll_cardinality_merge(input)?
+                        }
+                        MeasureKind::Count(_) => format!("sum({})", input),
+                        MeasureKind::Aggregated(a) => match a.agg_type() {
+                            AggregationType::Sum | AggregationType::RunningTotal => {
+                                format!("sum({})", input)
+                            }
+                            AggregationType::Min | AggregationType::Max => {
+                                format!("{}({})", a.agg_type().as_str(), input)
+                            }
+                            _ => self.default_processor.to_sql(
                                 visitor,
                                 node,
                                 query_tools.clone(),
                                 node_processor,
                                 templates,
-                            )?
-                        }
+                            )?,
+                        },
+                        _ => self.default_processor.to_sql(
+                            visitor,
+                            node,
+                            query_tools.clone(),
+                            node_processor,
+                            templates,
+                        )?,
                     }
                 } else {
                     self.default_processor.to_sql(

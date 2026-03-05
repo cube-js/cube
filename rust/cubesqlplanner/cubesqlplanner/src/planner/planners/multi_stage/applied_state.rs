@@ -181,7 +181,7 @@ impl MultiStageAppliedState {
                     m.resolve_reference_chain()
                 };
                 if let Ok(dim) = symbol.as_dimension() {
-                    if dim.dimension_type() == "time" {
+                    if dim.is_time() {
                         Some(symbol)
                     } else {
                         None

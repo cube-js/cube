@@ -118,7 +118,7 @@ impl TimeDimensionSymbol {
             .into_iter()
             .map(|s| match s.as_ref() {
                 MemberSymbol::Dimension(dimension_symbol) => {
-                    if dimension_symbol.dimension_type() == "time" {
+                    if dimension_symbol.is_time() {
                         let result = Self::new(
                             s.clone(),
                             self.granularity.clone(),
