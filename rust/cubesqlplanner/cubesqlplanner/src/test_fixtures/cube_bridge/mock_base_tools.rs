@@ -121,4 +121,11 @@ impl BaseTools for MockBaseTools {
         let result = self.join_graph.build_join(hints)?;
         Ok(result as Rc<dyn JoinDefinition>)
     }
+
+    fn resolve_mask_sql(
+        &self,
+        _member_path: String,
+    ) -> Result<String, CubeError> {
+        Ok("NULL".to_string())
+    }
 }

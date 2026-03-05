@@ -40,6 +40,7 @@ impl TestContext {
             join_graph,
             Some(timezone.to_string()),
             false, // export_annotated_sql
+            None,  // masked_members
         )?;
 
         Ok(Self {

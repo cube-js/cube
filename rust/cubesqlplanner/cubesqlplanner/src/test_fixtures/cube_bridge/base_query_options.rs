@@ -67,6 +67,8 @@ pub struct MockBaseQueryOptions {
     disable_external_pre_aggregations: bool,
     #[builder(default)]
     pre_aggregation_id: Option<String>,
+    #[builder(default)]
+    masked_members: Option<Vec<String>>,
 }
 
 impl_static_data!(
@@ -85,7 +87,8 @@ impl_static_data!(
     total_query,
     cubestore_support_multistage,
     disable_external_pre_aggregations,
-    pre_aggregation_id
+    pre_aggregation_id,
+    masked_members
 );
 
 pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {

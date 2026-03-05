@@ -264,8 +264,12 @@ impl MeasureSymbol {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        let full_name = self.full_name();
+        if query_tools.is_member_masked(&full_name) {
+            return query_tools.resolve_mask_sql(&full_name);
+        }
         self.kind.evaluate_sql(
-            &self.full_name(),
+            &full_name,
             visitor,
             node_processor,
             query_tools,

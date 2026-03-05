@@ -2325,6 +2325,14 @@ const variables: Record<string, (...args: any) => any> = {
   fastReload: () => get('CUBEJS_FAST_RELOAD_ENABLED')
     .default('false')
     .asBoolStrict(),
+  accessPolicyMaskString: () => get('CUBEJS_ACCESS_POLICY_MASK_STRING')
+    .asString(),
+  accessPolicyMaskTime: () => get('CUBEJS_ACCESS_POLICY_MASK_TIME')
+    .asString(),
+  accessPolicyMaskBoolean: () => get('CUBEJS_ACCESS_POLICY_MASK_BOOLEAN')
+    .asString(),
+  accessPolicyMaskNumber: () => get('CUBEJS_ACCESS_POLICY_MASK_NUMBER')
+    .asString(),
 };
 
 type Vars = typeof variables;
