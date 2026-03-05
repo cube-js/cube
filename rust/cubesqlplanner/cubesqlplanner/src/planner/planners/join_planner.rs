@@ -1,8 +1,8 @@
 use super::CommonUtils;
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::planner::join_hints::JoinHints;
 use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlCall;

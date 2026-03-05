@@ -3,8 +3,8 @@ use super::{
     MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::logical_plan::*;
-use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::join_hints::JoinHints;
+use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;

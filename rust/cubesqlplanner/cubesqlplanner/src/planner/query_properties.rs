@@ -1,8 +1,8 @@
 use super::filter::compiler::FilterCompiler;
 use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
-use crate::planner::join_hints::JoinHints;
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_evaluator::{
     apply_static_filter_to_filter_item, apply_static_filter_to_symbol, MemberExpressionExpression,
     MemberExpressionSymbol, TimeDimensionSymbol,
@@ -149,7 +149,8 @@ impl QueryProperties {
                                 )));
                             }
                         };
-                        let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
+                        let cube_symbol =
+                            evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
                         let member_expression_symbol = MemberExpressionSymbol::try_new(
                             cube_symbol,
                             name.clone(),
@@ -301,7 +302,8 @@ impl QueryProperties {
                                 .segment_by_path(member_name.clone())?;
                             let expression_evaluator = evaluator_compiler
                                 .compile_sql_call(&cube_name, definition.sql()?)?;
-                            let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
+                            let cube_symbol =
+                                evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
                             BaseSegment::try_new(
                                 expression_evaluator,
                                 cube_symbol,
@@ -333,13 +335,9 @@ impl QueryProperties {
                                     )));
                                 }
                             };
-                            let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
-                            BaseSegment::try_new(
-                                expression_evaluator,
-                                cube_symbol,
-                                name,
-                                None,
-                            )
+                            let cube_symbol =
+                                evaluator_compiler.add_cube_table_evaluator(cube_name.clone())?;
+                            BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
                         }
                     }?;
                     Ok(FilterItem::Segment(segment))
@@ -407,7 +405,9 @@ impl QueryProperties {
         };
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
-        let query_join_hints = Rc::new(JoinHints::from_items(options.join_hints()?.unwrap_or_default()));
+        let query_join_hints = Rc::new(JoinHints::from_items(
+            options.join_hints()?.unwrap_or_default(),
+        ));
 
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);

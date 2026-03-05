@@ -200,7 +200,10 @@ impl MultipliedMeasuresQueryPlanner {
             };
             let join_hints = collect_join_hints(&measure)?;
             if cubes.iter().any(|cube| cube != key_cube_name) {
-                let measures_join = self.query_tools.join_graph().build_join(join_hints.into_items())?;
+                let measures_join = self
+                    .query_tools
+                    .join_graph()
+                    .build_join(join_hints.into_items())?;
                 if *measures_join
                     .static_data()
                     .multiplication_factor
@@ -231,9 +234,10 @@ impl MultipliedMeasuresQueryPlanner {
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
-        let source = self
-            .join_planner
-            .make_join_logical_plan_with_join_hints(measure_join_hints, subquery_dimension_queries)?;
+        let source = self.join_planner.make_join_logical_plan_with_join_hints(
+            measure_join_hints,
+            subquery_dimension_queries,
+        )?;
 
         let schema = LogicalSchema::default()
             .set_dimensions(primary_keys_dimensions.clone())

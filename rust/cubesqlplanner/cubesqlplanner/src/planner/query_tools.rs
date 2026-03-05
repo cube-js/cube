@@ -5,11 +5,11 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::planner::join_hints::JoinHints;
 use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::FilterItem;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_evaluator::collectors::collect_join_hints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
@@ -85,12 +85,7 @@ impl QueryToolsCachedData {
         if let Some(key) = self.join_hints_to_join_key.get(&hints) {
             Ok((key.clone(), self.join_key_to_join.get(key).unwrap().clone()))
         } else {
-            let join = join_fn(
-                hints
-                    .iter()
-                    .flat_map(|h| h.iter().cloned())
-                    .collect(),
-            )?;
+            let join = join_fn(hints.iter().flat_map(|h| h.iter().cloned()).collect())?;
             let join_key = Rc::new(JoinKey {
                 root: join.static_data().root.to_string(),
                 joins: join

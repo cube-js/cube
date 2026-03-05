@@ -91,12 +91,7 @@ impl TestContext {
         let expression = compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = compiler.add_cube_table_evaluator(cube_name.clone())?;
         drop(compiler);
-        BaseSegment::try_new(
-            expression,
-            cube_symbol,
-            name,
-            Some(path.to_string()),
-        )
+        BaseSegment::try_new(expression, cube_symbol, name, Some(path.to_string()))
     }
 
     #[allow(dead_code)]

@@ -1,7 +1,7 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::planner::join_hints::JoinHints;
 use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::plan::{FilterItem, QualifiedColumnName};
+use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;
 use crate::planner::sql_evaluator::{
@@ -84,7 +84,11 @@ impl DimensionSubqueryPlanner {
             )));
         };
 
-        let cube_symbol = self.query_tools.evaluator_compiler().borrow_mut().add_cube_table_evaluator(cube_name.clone())?;
+        let cube_symbol = self
+            .query_tools
+            .evaluator_compiler()
+            .borrow_mut()
+            .add_cube_table_evaluator(cube_name.clone())?;
         let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_symbol,
             dim_name.clone(),

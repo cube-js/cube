@@ -1,13 +1,13 @@
 use super::CompiledPreAggregation;
 use super::PreAggregationSource;
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::planner::join_hints::JoinHints;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
 use crate::logical_plan::PreAggregationJoinItem;
 use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::query_tools::QueryTools;

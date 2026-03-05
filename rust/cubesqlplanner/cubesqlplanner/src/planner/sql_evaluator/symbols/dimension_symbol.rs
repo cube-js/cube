@@ -9,10 +9,10 @@ use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::sql_evaluator::{
     sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
 };
-use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
