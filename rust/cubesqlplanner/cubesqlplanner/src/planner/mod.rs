@@ -2,6 +2,7 @@ pub mod base_cube;
 pub mod base_join_condition;
 pub mod base_query;
 pub mod filter;
+pub mod join_hints;
 pub mod time_dimension;
 
 pub mod params_allocator;
@@ -17,6 +18,7 @@ pub mod visitor_context;
 pub use base_cube::BaseCube;
 pub use base_join_condition::{BaseJoinCondition, SqlJoinCondition};
 pub use base_query::BaseQuery;
+pub use join_hints::JoinHints;
 pub use params_allocator::ParamsAllocator;
 pub use query_properties::{FullKeyAggregateMeasures, OrderByItem, QueryProperties};
 pub use time_dimension::*;

@@ -1,6 +1,7 @@
 use super::CompiledPreAggregation;
 use super::PreAggregationSource;
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::join_hints::JoinHints;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
@@ -342,10 +343,12 @@ impl PreAggregationsCompiler {
             .cloned()
             .chain(dimensions.iter().cloned())
             .collect_vec();
-        let pre_aggr_join_hints = collect_cube_names_from_symbols(&all_symbols)?
-            .into_iter()
-            .map(|v| JoinHintItem::Single(v))
-            .collect_vec();
+        let pre_aggr_join_hints = JoinHints::from_items(
+            collect_cube_names_from_symbols(&all_symbols)?
+                .into_iter()
+                .map(|v| JoinHintItem::Single(v))
+                .collect_vec(),
+        );
 
         let join_planner = JoinPlanner::new(self.query_tools.clone());
         let pre_aggrs_for_join = rollups
@@ -364,10 +367,12 @@ impl PreAggregationsCompiler {
                 .cloned()
                 .chain(join_pre_aggr.dimensions.iter().cloned())
                 .collect_vec();
-            let join_pre_aggr_join_hints = collect_cube_names_from_symbols(&all_symbols)?
-                .into_iter()
-                .map(|v| JoinHintItem::Single(v))
-                .collect_vec();
+            let join_pre_aggr_join_hints = JoinHints::from_items(
+                collect_cube_names_from_symbols(&all_symbols)?
+                    .into_iter()
+                    .map(|v| JoinHintItem::Single(v))
+                    .collect_vec(),
+            );
             existing_joins.append(
                 &mut join_planner.resolve_join_members_by_hints(&join_pre_aggr_join_hints)?,
             );

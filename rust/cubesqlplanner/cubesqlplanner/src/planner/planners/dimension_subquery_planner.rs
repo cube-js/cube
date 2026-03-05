@@ -1,4 +1,5 @@
 use super::{CommonUtils, QueryPlanner};
+use crate::planner::join_hints::JoinHints;
 use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::plan::{FilterItem, QualifiedColumnName};
 use crate::planner::query_tools::QueryTools;
@@ -123,7 +124,7 @@ impl DimensionSubqueryPlanner {
             false,
             false,
             false,
-            Rc::new(vec![]),
+            Rc::new(JoinHints::new()),
             true,
             self.query_properties.disable_external_pre_aggregations(),
         )?;

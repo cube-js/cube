@@ -1,4 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_evaluator::{CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -97,7 +98,7 @@ impl TraversalVisitor for JoinHintsCollector {
     }
 }
 
-pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, CubeError> {
+pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     visitor.apply(node, &())?;
     let mut collected_hints = visitor.extract_result();
@@ -123,17 +124,17 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
         }
     }
 
-    Ok(collected_hints)
+    Ok(JoinHints::from_items(collected_hints))
 }
 
 pub fn collect_join_hints_for_measures(
     measures: &Vec<Rc<MemberSymbol>>,
-) -> Result<Vec<JoinHintItem>, CubeError> {
+) -> Result<JoinHints, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     for meas in measures.iter() {
         visitor.apply(&meas, &())?;
     }
 
     let res = visitor.extract_result();
-    Ok(res)
+    Ok(JoinHints::from_items(res))
 }

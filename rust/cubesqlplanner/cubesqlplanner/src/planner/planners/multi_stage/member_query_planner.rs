@@ -4,6 +4,7 @@ use super::{
 };
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
+use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;
@@ -74,7 +75,7 @@ impl MultiStageMemberQueryPlanner {
             true,
             false,
             false,
-            Rc::new(vec![]),
+            Rc::new(JoinHints::new()),
             true,
             self.query_properties.disable_external_pre_aggregations(),
         )?;
