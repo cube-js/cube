@@ -1,7 +1,7 @@
 export default {
   "introduction": "Introduction",
   "getting-started": "Getting started",
-  "configuration": "Data Sources",
+  "configuration": "Configuration",
   "data-modeling": "Data modeling",
   "exploration": "Explore & Analyze",
   "presentation": "Present & Share",

@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+## [1.6.18](https://github.com/cube-js/cube/compare/v1.6.17...v1.6.18) (2026-03-02)
+
+### Bug Fixes
+
+- **client-core:** return null instead of undefined when query is cancelled by mutex, fix [#10261](https://github.com/cube-js/cube/issues/10261) ([#10274](https://github.com/cube-js/cube/issues/10274)) ([ea6b3e7](https://github.com/cube-js/cube/commit/ea6b3e78afc1aea7f020d44c7505ea14cfc4fe02))
+
+### Features
+
+- **client-core:** Add cache mode option to load method, thanks [@hannosgit](https://github.com/hannosgit) ([#10446](https://github.com/cube-js/cube/issues/10446)) ([aabbbc6](https://github.com/cube-js/cube/commit/aabbbc6d44408d368fd32a8f2c64b91c64d0437d))
+- **client-react:** Allow to pass cache mode as option ([#10447](https://github.com/cube-js/cube/issues/10447)) ([03e8ca5](https://github.com/cube-js/cube/commit/03e8ca53e8e92eb19a84587a475982a42261aba4))
+
 ## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
 
 **Note:** Version bump only for package @cubejs-client/core

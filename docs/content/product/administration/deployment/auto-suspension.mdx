@@ -57,15 +57,18 @@ from running.
 - [Monitoring integrations][ref-monitoring] are also suspended, which prevents
 the export of metrics and logs.
 
-When a deployment is resumed from auto-suspension:
+When a deployment is [resumed](#resuming-a-suspended-deployment) from auto-suspension:
 
 - [Data model][ref-data-model] compilation would need to be done from scratch.
 It applies to all tenants in case [multitenancy][ref-multitenancy] is set up.
-Consequently, one or more queries served after a deployment is resumed from
+Consequently, one or more requests served after a deployment is resumed from
 auto-suspension are likely to have suboptimal performance.
 - [Refresh worker][ref-refresh-worker] would need to refresh all
 pre-aggregations that became stale during the suspension, competing for the
 query queue with API instances and compromising the end-user experience.
+- Until the deployment is fully resumed, the requests will be served by transient,
+on-demand API instances with limited performance. There are no guarantees for the
+[version][ref-cube-version] of Cube these API instances will be running.
 
 ## Configuration
 
@@ -114,10 +117,11 @@ response times to be significantly longer than usual.
 [ref-deployment-prod-cluster]:
   /product/deployment/cloud/deployment-types#production-cluster
 [ref-prod-multi-cluster]: /product/deployment/cloud/deployment-types#production-multi-cluster
-[ref-deployment-pricing]: /product/deployment/cloud/pricing
+[ref-deployment-pricing]: /product/administration/pricing
 [ref-monitoring]: /product/workspace/monitoring
 [ref-data-model]: /product/data-modeling/overview
 [ref-multitenancy]: /product/configuration/multitenancy
 [self-effects]: #effects-on-experience
 [ref-refresh-worker]: /product/deployment#refresh-worker
 [ref-sls]: /product/apis-integrations/semantic-layer-sync#on-schedule
+[ref-cube-version]: /product/administration/deployment/deployments#cube-version

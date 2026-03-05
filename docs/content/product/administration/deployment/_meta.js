@@ -10,7 +10,6 @@ export default {
   "warm-up": "Deployment warm-up",
   "auto-suspension": "Auto-suspension",
   "scalability": "Scalability",
-  "pricing": "Pricing",
   "support": "Support",
   "limits": "Limits",
   "core": "Cube Core"

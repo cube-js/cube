@@ -1,4 +1,5 @@
 export default {
   "dashboards": "Dashboards",
-  "scheduled-refreshes": "Scheduled Refreshes"
+  "scheduled-refreshes": "Scheduled Refreshes",
+  "notifications": "Notifications"
 }

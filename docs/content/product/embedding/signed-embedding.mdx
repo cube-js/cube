@@ -152,36 +152,30 @@ Here's a complete HTML example that demonstrates the full flow for embedding a d
 </html>
 ```
 
-## Customizing the theme
+## Pre-setting dashboard filters via URL
 
-You can customize the embedded application theme by setting it to `light`, `dark`, or `auto` (follows system preference).
+You can pre-set dashboard filter values by adding URL parameters in the format
+`?f_<semantic_view>.<dimension>=<JSON>`. The `<semantic_view>` and `<dimension>`
+must match the internal names (not display titles) of the semantic view and
+dimension configured on the filter widget. If the filter type is omitted, it
+defaults to `equals`.
 
-**Method 1: Query parameters**
+Example:
 
-Add a `theme` parameter to the embed URL:
-
-```html
-<iframe
-  id="cube-dashboard"
-  title="Dashboard"
-  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&theme=dark"
-  width="100%"
-></iframe>
+```
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}
 ```
 
-**Method 2: PostMessage API**
+This works on both regular and published (embedded) dashboards. The filter is
+only applied if a matching filter widget for that dimension already exists on the
+dashboard.
 
-Dynamically update the theme from the parent window:
+## Customize dashboard style
 
-```javascript
-const iframe = document.getElementById('cube-dashboard');
-iframe.contentWindow.postMessage({
-  type: 'SET_THEME',
-  payload: 'dark' // 'light', 'dark', or 'auto'
-}, '*');
-```
-
-This is useful for providing theme toggles or synchronizing with your application's theme.
+You can customize the appearance of your dashboard — including background, widget
+styling, borders, titles, and fonts — using the <Btn>Styling</Btn> pane in the
+Dashboard Builder. Open your dashboard, click <Btn>Dashboard Builder</Btn> in the
+top bar, then click the gear icon to open the <Btn>Styling</Btn> panel.
 
 ## User attributes
 
@@ -217,5 +211,5 @@ For a complete working example of signed embedding, check out the [cube-embeddin
 
 You can clone the repository, configure it with your Cube credentials, and run it locally to test embedding functionality or use it as a reference implementation for your own application.
 
-[ref-api-keys]: /product/administration/workspace/api-keys
+[ref-api-keys]: /product/administration/api-keys
 [ref-generate-session]: /product/apis-integrations/embed-apis/generate-session

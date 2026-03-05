@@ -1,6 +1,4 @@
 export default {
-  "vizard": "Chart Prototyping",
-  "data-model": "Data Model",
   "visual-model": "Visual Model",
   "dev-mode": "Development mode",
   "environments": "Environments",
@@ -12,11 +10,13 @@ export default {
   "monitoring": "Monitoring Integrations",
   "audit-log": "Audit Log",
   "chats-history": "Chats History",
-  "api-keys": "API keys",
   "encryption-keys": "Encryption keys",
   "budgets": "Budgets",
   "preferences": "Preferences",
-  "cli": "CLI",
+  "cli": {
+    title: "CLI",
+    display: "hidden"
+  },
   "semantic-catalog": {
     title: "Semantic Catalog",
     display: "hidden"

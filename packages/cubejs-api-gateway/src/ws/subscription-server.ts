@@ -15,11 +15,11 @@ import type { ApiGateway } from '../gateway';
 import type { LocalSubscriptionStore } from './local-subscription-store';
 
 const methodParams: Record<string, string[]> = Object.freeze({
-  load: ['query', 'queryType'],
+  load: ['query', 'queryType', 'cache'],
   sql: ['query'],
   'dry-run': ['query'],
   meta: [],
-  subscribe: ['query', 'queryType'],
+  subscribe: ['query', 'queryType', 'cache'],
   unsubscribe: [],
 });
 
@@ -181,6 +181,11 @@ export class SubscriptionServer {
         for (const k of methodParams[message.method]) {
           collectedParams[k] = message.params[k];
         }
+      }
+
+      if (collectedParams.cache !== undefined) {
+        collectedParams.cacheMode = collectedParams.cache;
+        delete collectedParams.cache;
       }
 
       const method = message.method.replace(/[^a-z]+(.)/g, (_m, chr) => chr.toUpperCase());
