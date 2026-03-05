@@ -1351,7 +1351,7 @@
   },
   {
     "source": "/cloud/pricing",
-    "destination": "/product/administration/deployment/pricing",
+    "destination": "/product/administration/pricing",
     "permanent": true
   },
   {
@@ -1676,7 +1676,12 @@
   },
   {
     "source": "/product/workspace/api-keys",
-    "destination": "/product/administration/workspace/api-keys",
+    "destination": "/product/administration/api-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/api-keys",
+    "destination": "/product/administration/api-keys",
     "permanent": true
   },
   {
@@ -1951,7 +1956,12 @@
   },
   {
     "source": "/product/deployment/cloud/pricing",
-    "destination": "/product/administration/deployment/pricing",
+    "destination": "/product/administration/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/pricing",
+    "destination": "/product/administration/pricing",
     "permanent": true
   },
   {
