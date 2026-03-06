@@ -146,15 +146,11 @@ impl BaseFilter {
             let filters_context = context.filters_context();
             let symbol = self.member_evaluator();
             let member_type = match symbol.as_ref() {
-                MemberSymbol::Dimension(dimension_symbol) => Some(
-                    dimension_symbol
-                        .definition()
-                        .static_data()
-                        .dimension_type
-                        .clone(),
-                ),
+                MemberSymbol::Dimension(dimension_symbol) => {
+                    Some(dimension_symbol.dimension_type().to_string())
+                }
                 MemberSymbol::Measure(measure_symbol) => {
-                    Some(measure_symbol.measure_type().clone())
+                    Some(measure_symbol.measure_type().to_string())
                 }
                 _ => None,
             };

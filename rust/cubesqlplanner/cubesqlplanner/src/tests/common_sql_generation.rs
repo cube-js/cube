@@ -155,3 +155,36 @@ fn test_segment_as_dimension_in_pre_aggregation_query() {
 
     insta::assert_snapshot!(sql);
 }
+
+#[test]
+fn test_measure_switch_cross_join() {
+    let schema = MockSchema::from_yaml_file("common/calc_groups.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - orders.currency
+        measures:
+          - orders.amount_usd
+          - orders.amount_in_currency
+        time_dimensions:
+          - dimension: orders.date
+            granularity: year
+            dateRange:
+              - \"2024-01-01\"
+              - \"2026-01-01\"
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for case-switch measure");
+
+    // amount_in_currency is type "number" — a calculated measure.
+    // It must NOT be wrapped in an aggregation function like number(...).
+    assert!(
+        !sql.contains("number("),
+        "Calculated measure must not be wrapped in number() aggregation"
+    );
+
+    insta::assert_snapshot!(sql);
+}

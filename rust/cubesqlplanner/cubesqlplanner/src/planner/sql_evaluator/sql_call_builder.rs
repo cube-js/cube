@@ -132,7 +132,7 @@ impl<'a> SqlCallBuilder<'a> {
     ) -> Option<SqlCallDependency> {
         if let Ok(member_symbol) = self.build_evaluator(&current_cube_name, &path_tail[0]) {
             if let Ok(dimension) = member_symbol.as_dimension() {
-                if dimension.dimension_type() == "time" && path_tail.len() == 2 {
+                if dimension.is_time() && path_tail.len() == 2 {
                     let granularity = &path_tail[1];
                     if let Ok(Some(granularity_obj)) = GranularityHelper::make_granularity_obj(
                         self.cube_evaluator.clone(),

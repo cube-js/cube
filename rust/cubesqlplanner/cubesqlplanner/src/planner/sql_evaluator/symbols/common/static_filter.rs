@@ -19,7 +19,7 @@ pub fn find_value_restriction(
 
 pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -> Vec<String> {
     if let Ok(dim) = symbol.as_dimension() {
-        if dim.dimension_type() == "switch" {
+        if dim.is_switch() {
             if let Some(filter) = filter {
                 if let Some(values) = find_value_restriction(&filter.items, symbol) {
                     let res = dim
@@ -32,7 +32,7 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
                 }
             }
         }
-        return dim.values().clone();
+        return dim.values().to_vec();
     }
 
     vec![]

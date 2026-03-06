@@ -1,0 +1,38 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: date
+            type: time
+            sql: date
+          - name: currency
+            type: string
+            sql: currency
+      measures:
+          - name: amount_usd
+            type: sum
+            sql: amount_usd
+          - name: amount_eur
+            type: sum
+            sql: amount_eur
+          - name: amount_gbp
+            type: sum
+            sql: amount_gbp
+          - name: amount_in_currency
+            type: number
+            multi_stage: true
+            case:
+              switch: "{CUBE.currency}"
+              when:
+                - value: "USD"
+                  sql: "{CUBE.amount_usd}"
+                - value: "EUR"
+                  sql: "{CUBE.amount_eur}"
+                - value: "GBP"
+                  sql: "{CUBE.amount_gbp}"
+              else:
+                sql: "{CUBE.amount_usd}"

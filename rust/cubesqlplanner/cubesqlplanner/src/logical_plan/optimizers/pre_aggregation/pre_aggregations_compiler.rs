@@ -510,7 +510,7 @@ impl PreAggregationsCompiler {
                 "Pre-aggregation time dimension must be a dimension"
             ))
         })?;
-        if dimension.dimension_type() != "time" {
+        if !dimension.is_time() {
             return Err(CubeError::user(format!(
                 "Pre-aggregation time dimension must be a dimension"
             )));
