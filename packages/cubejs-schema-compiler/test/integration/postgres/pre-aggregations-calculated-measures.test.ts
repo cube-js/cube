@@ -281,6 +281,43 @@ describe('PreAggregationsCalulatedMeasures', () => {
     });
   });
 
+  it('rollupJoin matching with additive measures', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: [
+          'facts.count',
+          'facts.total_cost',
+        ],
+        dimensions: ['line_items.name'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+      }
+    );
+
+    const matchedPreAgg = query.preAggregations?.findPreAggregationForQuery();
+
+    const sqlAndParams = query.buildSqlAndParams();
+    expect(sqlAndParams[0]).toContain('campaigns_rollup');
+    expect(sqlAndParams[0]).toContain('facts_rollup');
+    expect(sqlAndParams[0]).toContain('li_rollup');
+    expect(matchedPreAgg).toBeDefined();
+    expect(matchedPreAgg?.preAggregationName).toEqual('combined_rollup_join');
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+
+        [
+          { li__name: null, f__count: null, f__total_cost: null },
+          { li__name: 'some', f__count: '5', f__total_cost: '15' },
+          { li__name: 'google', f__count: '1', f__total_cost: '6' }
+        ]
+
+      );
+    });
+  });
+
   it('rollupJoin matching with calculated measures through view', async () => {
     await compiler.compile();
 
