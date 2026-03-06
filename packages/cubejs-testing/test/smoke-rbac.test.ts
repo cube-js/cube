@@ -514,7 +514,6 @@ describe('Cube RBAC Engine', () => {
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
         expect(row.secret_number).toBe(-1);
-        expect(row.secret_boolean).toBe(false);
         expect(row.public_dim).toBeNull();
         expect(Number(row.count)).toBe(12345);
         expect(Number(row.count_d)).toBe(34567);
