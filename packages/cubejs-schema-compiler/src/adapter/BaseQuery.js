@@ -1019,10 +1019,19 @@ export class BaseQuery {
 
   resolveMaskSql(memberPath) {
     const [cubeName, memberName] = memberPath.split('.');
-    const symbol = this.cubeEvaluator.byPathAnyType([cubeName, memberName]);
+    let symbol = this.cubeEvaluator.byPathAnyType([cubeName, memberName]);
+    // For view members that alias an underlying cube member, look up the
+    // original cube's member definition so mask.sql with {CUBE} references
+    // resolves against the correct table.
+    let resolvedCubeName = cubeName;
+    if (symbol.aliasMember) {
+      const [origCube, origMember] = symbol.aliasMember.split('.');
+      symbol = this.cubeEvaluator.byPathAnyType([origCube, origMember]);
+      resolvedCubeName = origCube;
+    }
     return this.compilers.compiler.withQuery(
       this,
-      () => this.memberMaskSql(cubeName, memberName, symbol),
+      () => this.memberMaskSql(resolvedCubeName, memberName, symbol),
     );
   }
 
@@ -3439,7 +3448,8 @@ export class BaseQuery {
     const { mask } = symbol;
     if (mask !== undefined && mask !== null) {
       if (typeof mask === 'object' && mask.sql) {
-        return this.autoPrefixAndEvaluateSql(cubeName, mask.sql);
+        const sqlCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        return this.autoPrefixAndEvaluateSql(sqlCubeName, mask.sql);
       }
       if (typeof mask === 'number') {
         return `${mask}`;

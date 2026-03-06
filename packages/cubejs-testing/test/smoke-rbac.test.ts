@@ -497,7 +497,7 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view_masked returns masked values for default role', async () => {
+    test('masking_view_masked returns masked values including SQL mask for default role', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -505,6 +505,8 @@ describe('Cube RBAC Engine', () => {
         expect(row.public_dim).toBeNull();
         expect(Number(row.count)).toBe(12345);
         expect(Number(row.count_d)).toBe(34567);
+        // Dynamic SQL mask: CONCAT('***', RIGHT(CAST(product_id AS TEXT), 2))
+        expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
 
@@ -656,6 +658,20 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         expect(row['masking_view_masked.secret_number']).toBe(-1);
         expect(row['masking_view_masked.count']).toBe(12345);
+      }
+    });
+
+    test('view: masking_view_masked — dynamic SQL mask works through view', async () => {
+      const result = await maskingViewerClient.load({
+        dimensions: ['masking_view_masked.secret_string'],
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        // SQL mask: CONCAT('***', RIGHT(CAST(product_id AS TEXT), 2))
+        // {CUBE} in mask SQL should resolve to the underlying cube table, not the view
+        expect(row['masking_view_masked.secret_string']).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
 

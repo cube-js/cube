@@ -120,11 +120,11 @@ views:
           allow_all: true
 
   # View with its own masking policy: all members masked for "*", full access for masking_full_access
-  # Excludes members with {CUBE} references in SQL (secret_string, secret_boolean)
   - name: masking_view_masked
     cubes:
       - join_path: masking_test
         includes:
+          - secret_string
           - secret_number
           - public_dim
           - count
