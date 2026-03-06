@@ -104,11 +104,7 @@ mod tests {
         assert_eq!(hints.items()[2], v(&["users", "orders"]));
 
         // Different insertion order → same result
-        let hints2 = JoinHints::from_items(vec![
-            s("abc"),
-            v(&["users", "orders"]),
-            s("orders"),
-        ]);
+        let hints2 = JoinHints::from_items(vec![s("abc"), v(&["users", "orders"]), s("orders")]);
         assert_eq!(hints, hints2);
         assert_eq!(hash_of(&hints), hash_of(&hints2));
     }
