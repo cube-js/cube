@@ -1,4 +1,3 @@
-use super::symbols::MemberSymbol;
 use super::Compiler;
 use super::{
     CubeRef, SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem,
@@ -8,8 +7,6 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
-use crate::planner::sql_evaluator::TimeDimensionSymbol;
-use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
