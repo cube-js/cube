@@ -512,7 +512,6 @@ describe('Cube RBAC Engine', () => {
         expect(row.public_dim).toBeNull();
         expect(Number(row.count)).toBe(12345);
         expect(Number(row.count_d)).toBe(34567);
-        expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
 

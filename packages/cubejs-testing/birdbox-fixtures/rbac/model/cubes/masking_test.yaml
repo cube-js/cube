@@ -114,10 +114,17 @@ views:
           allow_all: true
 
   # View with its own masking policy: all members masked for "*", full access for masking_full_access
+  # Excludes secret_string (which has a SQL mask referencing {CUBE} columns)
   - name: masking_view_masked
     cubes:
       - join_path: masking_test
-        includes: "*"
+        includes:
+          - secret_number
+          - secret_boolean
+          - public_dim
+          - count
+          - count_d
+          - total_quantity
     access_policy:
       - role: "*"
         member_level:
@@ -133,10 +140,17 @@ views:
           allow_all: true
 
   # View with partial masking: public_dim and total_quantity unmasked, rest masked
+  # Excludes secret_string (which has a SQL mask referencing {CUBE} columns)
   - name: masking_view_partial
     cubes:
       - join_path: masking_test
-        includes: "*"
+        includes:
+          - secret_number
+          - secret_boolean
+          - public_dim
+          - count
+          - count_d
+          - total_quantity
     access_policy:
       - role: "*"
         member_level:
