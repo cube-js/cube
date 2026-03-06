@@ -695,10 +695,8 @@ export class CompilerApi {
                    !policy.memberLevel.excludesMembers.includes(memberName);
           });
           if (!hasFullAccessInAnyPolicy && policiesWithMemberAccess.length > 0) {
-            const isMaskedByAnyPolicy = policiesWithMemberAccess.some(policy =>
-              policy.memberMasking &&
-              policy.memberMasking.includesMembers.includes(memberName) &&
-              !policy.memberMasking.excludesMembers.includes(memberName)
+            const isMaskedByAnyPolicy = policiesWithMemberAccess.some(
+              (policy) => policy.memberMasking && policy.memberMasking.includesMembers.includes(memberName) && !policy.memberMasking.excludesMembers.includes(memberName)
             );
             if (isMaskedByAnyPolicy) {
               maskedMembersSet.add(memberName);
