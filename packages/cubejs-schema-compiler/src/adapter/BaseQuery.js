@@ -3436,7 +3436,7 @@ export class BaseQuery {
   }
 
   memberMaskSql(cubeName, name, symbol) {
-    const mask = symbol.mask;
+    const { mask } = symbol;
     if (mask !== undefined && mask !== null) {
       if (typeof mask === 'object' && mask.sql) {
         return this.autoPrefixAndEvaluateSql(cubeName, mask.sql);
