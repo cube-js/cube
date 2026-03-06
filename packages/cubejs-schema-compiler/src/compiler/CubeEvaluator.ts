@@ -269,6 +269,11 @@ export class CubeEvaluator extends CubeSymbols {
       }
 
       if (policy.memberMasking) {
+        if (!policy.memberLevel) {
+          errorReporter.error(
+            `accessPolicy for ${cube.name} defines memberMasking without memberLevel. memberLevel is required when memberMasking is used`
+          );
+        }
         policy.memberMasking.includesMembers = this.allMembersOrList(
           cube,
           policy.memberMasking.includes || '*'

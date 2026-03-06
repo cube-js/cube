@@ -983,7 +983,8 @@ const RolePolicySchema = Joi.object().keys({
   .nand('group', 'groups') // Cannot have both group and groups
   .nand('role', 'group') // Cannot have both role and group
   .nand('role', 'groups') // Cannot have both role and groups
-  .or('role', 'group', 'groups'); // Must have at least one
+  .or('role', 'group', 'groups') // Must have at least one
+  .with('memberMasking', 'memberLevel'); // memberMasking requires memberLevel
 
 /* *****************************
  * ATTENTION:
