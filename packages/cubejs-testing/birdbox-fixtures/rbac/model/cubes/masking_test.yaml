@@ -67,6 +67,7 @@ cubes:
           allow_all: true
 
 views:
+  # View with full access - no masking
   - name: masking_view
     cubes:
       - join_path: masking_test
@@ -74,6 +75,41 @@ views:
     access_policy:
       - role: "*"
         member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # View with its own masking policy: all members masked for "*", full access for masking_full_access
+  - name: masking_view_masked
+    cubes:
+      - join_path: masking_test
+        includes: "*"
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+      - role: "masking_full_access"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # View with partial masking: public_dim and total_quantity unmasked, rest masked
+  - name: masking_view_partial
+    cubes:
+      - join_path: masking_test
+        includes: "*"
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - public_dim
+            - total_quantity
+        member_masking:
           includes: "*"
         row_level:
           allow_all: true
