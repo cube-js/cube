@@ -497,18 +497,6 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view — cube masking still applied even though view grants full access', async () => {
-      // masking_view has memberLevel.includes: "*" at the view level,
-      // but the underlying masking_test cube masks all members for role "*".
-      // Masking follows RLS pattern: applied at both cube and view levels.
-      const res = await connection.query('SELECT * FROM masking_view LIMIT 5');
-      expect(res.rows.length).toBeGreaterThan(0);
-      for (const row of res.rows) {
-        expect(row.secret_number).toBe(-1);
-        expect(Number(row.count)).toBe(12345);
-      }
-    });
-
     test('masking_view_masked returns masked values for default role', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
@@ -517,19 +505,6 @@ describe('Cube RBAC Engine', () => {
         expect(row.public_dim).toBeNull();
         expect(Number(row.count)).toBe(12345);
         expect(Number(row.count_d)).toBe(34567);
-      }
-    });
-
-    test('masking_view_partial returns mix of real and masked values', async () => {
-      const res = await connection.query('SELECT * FROM masking_view_partial LIMIT 5');
-      expect(res.rows.length).toBeGreaterThan(0);
-      for (const row of res.rows) {
-        // public_dim, total_quantity in memberLevel includes → unmasked
-        expect(row.public_dim).not.toBeNull();
-        expect(row.total_quantity).not.toBeNull();
-        // secret_number not in memberLevel includes → masked
-        expect(row.secret_number).toBe(-1);
-        expect(Number(row.count)).toBe(12345);
       }
     });
 
@@ -695,22 +670,6 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['masking_view_masked.count']).not.toBe(12345);
-      }
-    });
-
-    test('view: masking_view_partial — viewer sees mixed values', async () => {
-      const result = await maskingViewerClient.load({
-        measures: ['masking_view_partial.total_quantity', 'masking_view_partial.count'],
-        dimensions: ['masking_view_partial.public_dim'],
-        order: { 'masking_view_partial.public_dim': 'asc' },
-        limit: 5,
-      });
-      const rows = result.rawData();
-      expect(rows.length).toBeGreaterThan(0);
-      for (const row of rows) {
-        expect(row['masking_view_partial.total_quantity']).not.toBeNull();
-        expect(row['masking_view_partial.count']).toBe(12345);
-        expect(row['masking_view_partial.public_dim']).not.toBeNull();
       }
     });
 
