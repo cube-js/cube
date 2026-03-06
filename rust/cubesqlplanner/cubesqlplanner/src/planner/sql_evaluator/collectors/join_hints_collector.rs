@@ -66,7 +66,6 @@ impl TraversalVisitor for JoinHintsCollector {
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
                     let path = node.path();
-                    println!("!!! path: {:?}", path);
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))
@@ -123,7 +122,6 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeErro
             }
         }
     }
-    println!("!!! coll_hits: {}: {:?}", node.full_name(), collected_hints);
 
     Ok(JoinHints::from_items(collected_hints))
 }
