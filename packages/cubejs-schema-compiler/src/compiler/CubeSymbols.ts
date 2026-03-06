@@ -983,7 +983,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
-          ...(resolvedMember.mask !== undefined && { mask: resolvedMember.mask }),
+          ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
@@ -996,7 +996,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
-          ...(resolvedMember.mask !== undefined && { mask: resolvedMember.mask }),
+          ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
         };
       } else if (type === 'segments') {
         memberDefinition = {

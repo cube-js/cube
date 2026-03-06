@@ -101,11 +101,18 @@ cubes:
           includes: []
 
 views:
-  # View with full access - no masking
+  # View with full access at view level - but cube masking still applies (RLS pattern)
+  # Excludes secret_string (which has a SQL mask referencing {CUBE} columns)
   - name: masking_view
     cubes:
       - join_path: masking_test
-        includes: "*"
+        includes:
+          - secret_number
+          - secret_boolean
+          - public_dim
+          - count
+          - count_d
+          - total_quantity
     access_policy:
       - role: "*"
         member_level:
