@@ -33,7 +33,6 @@ impl TraversalVisitor for MemberChildsCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        _path: &Vec<String>,
         state: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         if state.is_root {

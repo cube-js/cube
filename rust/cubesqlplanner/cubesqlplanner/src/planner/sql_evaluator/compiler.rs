@@ -59,9 +59,9 @@ impl Compiler {
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
         match path.path_type() {
-            SymbolPathType::Dimension => self.add_dimension_evaluator_impl(path),
-            SymbolPathType::Measure => self.add_measure_evaluator_impl(path),
-            SymbolPathType::Segment => self.add_segment_evaluator_impl(path),
+            SymbolPathType::Dimension => self.add_dimension_evaluator_by_path(path),
+            SymbolPathType::Measure => self.add_measure_evaluator_by_path(path),
+            SymbolPathType::Segment => self.add_segment_evaluator_by_path(path),
             _ => Err(CubeError::internal(format!(
                 "Cannot auto-resolve {}. Only dimensions, measures and segments",
                 name
@@ -74,10 +74,10 @@ impl Compiler {
         measure: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &measure)?;
-        self.add_measure_evaluator_impl(path)
+        self.add_measure_evaluator_by_path(path)
     }
 
-    fn add_measure_evaluator_impl(
+    pub fn add_measure_evaluator_by_path(
         &mut self,
         path: SymbolPath,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
@@ -98,15 +98,15 @@ impl Compiler {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
         match path.path_type() {
             SymbolPathType::Segment => {
-                let symbol = self.add_segment_evaluator_impl(path)?;
+                let symbol = self.add_segment_evaluator_by_path(path)?;
                 let me = symbol.as_member_expression()?;
                 Ok(MemberSymbol::new_member_expression(me.with_parenthesized()))
             }
-            _ => self.add_dimension_evaluator_impl(path),
+            _ => self.add_dimension_evaluator_by_path(path),
         }
     }
 
-    fn add_dimension_evaluator_impl(
+    pub fn add_dimension_evaluator_by_path(
         &mut self,
         path: SymbolPath,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
@@ -122,10 +122,10 @@ impl Compiler {
 
     pub fn add_segment_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
-        self.add_segment_evaluator_impl(path)
+        self.add_segment_evaluator_by_path(path)
     }
 
-    fn add_segment_evaluator_impl(
+    pub fn add_segment_evaluator_by_path(
         &mut self,
         path: SymbolPath,
     ) -> Result<Rc<MemberSymbol>, CubeError> {

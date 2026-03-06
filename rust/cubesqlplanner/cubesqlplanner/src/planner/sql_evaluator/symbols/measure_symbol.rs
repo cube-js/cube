@@ -339,23 +339,6 @@ impl MeasureSymbol {
         refs
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = self.kind.get_dependencies_with_path();
-        for filter in self.measure_filters.iter() {
-            filter.extract_symbol_deps_with_path(&mut deps);
-        }
-        for filter in self.measure_drill_filters.iter() {
-            filter.extract_symbol_deps_with_path(&mut deps);
-        }
-        for order in self.measure_order_by.iter() {
-            order.sql_call().extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(case) = &self.case {
-            case.extract_symbol_deps_with_path(&mut deps);
-        }
-        deps
-    }
-
     pub fn can_used_as_addictive_in_multplied(&self) -> bool {
         match &self.kind {
             MeasureKind::Aggregated(agg) => agg.agg_type().is_distinct(),

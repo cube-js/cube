@@ -58,15 +58,6 @@ impl DimensionKind {
         }
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        match self {
-            Self::Regular(r) => r.get_dependencies_with_path(),
-            Self::Geo(g) => g.get_dependencies_with_path(),
-            Self::Switch(s) => s.get_dependencies_with_path(),
-            Self::Case(c) => c.get_dependencies_with_path(),
-        }
-    }
-
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,

@@ -147,15 +147,6 @@ impl MemberSymbol {
         }
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        match self {
-            Self::Dimension(d) => d.get_dependencies_with_path(),
-            Self::TimeDimension(d) => d.get_dependencies_with_path(),
-            Self::Measure(m) => m.get_dependencies_with_path(),
-            Self::MemberExpression(e) => e.get_dependencies_with_path(),
-        }
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         match self {
             Self::Dimension(d) => d.get_cube_refs(),

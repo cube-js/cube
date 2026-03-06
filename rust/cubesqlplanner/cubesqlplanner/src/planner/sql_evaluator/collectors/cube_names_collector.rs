@@ -24,12 +24,12 @@ impl TraversalVisitor for CubeNamesCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());
@@ -43,10 +43,11 @@ impl TraversalVisitor for CubeNamesCollector {
                 }
             }
             MemberSymbol::TimeDimension(e) => {
-                return self.on_node_traverse(e.base_symbol(), path, &())
+                return self.on_node_traverse(e.base_symbol(), &())
             }
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());

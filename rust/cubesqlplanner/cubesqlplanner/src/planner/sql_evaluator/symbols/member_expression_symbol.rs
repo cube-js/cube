@@ -137,19 +137,6 @@ impl MemberExpressionSymbol {
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => {
-                sql_call.extract_symbol_deps_with_path(&mut deps)
-            }
-            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
-                deps.push((member_symbol.clone(), vec![]))
-            }
-        }
-        deps
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         let mut refs = vec![];
         match &self.expression {

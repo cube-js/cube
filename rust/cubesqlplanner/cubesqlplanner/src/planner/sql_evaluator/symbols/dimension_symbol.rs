@@ -226,10 +226,6 @@ impl DimensionSymbol {
         self.kind.get_dependencies()
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        self.kind.get_dependencies_with_path()
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         self.kind.get_cube_refs()
     }

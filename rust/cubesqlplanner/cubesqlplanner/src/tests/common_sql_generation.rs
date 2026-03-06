@@ -33,7 +33,7 @@ fn test_simple_paths_in_request_sql() {
 
     let query_yaml = indoc! {"
         measures:
-          - cube_c.cube_a.count
+          - cube_a.count
         dimensions:
           - cube_a.cube_c.code
     "};

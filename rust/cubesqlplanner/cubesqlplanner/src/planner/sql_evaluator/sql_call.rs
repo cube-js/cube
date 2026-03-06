@@ -419,25 +419,10 @@ impl SqlCall {
             .collect()
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        self.deps
-            .iter()
-            .filter_map(|d| d.symbol.as_symbol().map(|s| (s.clone(), d.path.clone())))
-            .collect()
-    }
-
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         for dep in self.deps.iter() {
             if let Some(s) = dep.symbol.as_symbol() {
                 result.push(s.clone())
-            }
-        }
-    }
-
-    pub fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        for dep in self.deps.iter() {
-            if let Some(s) = dep.symbol.as_symbol() {
-                result.push((s.clone(), dep.path.clone()))
             }
         }
     }

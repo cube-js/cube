@@ -111,48 +111,18 @@ impl<'a> SqlCallBuilder<'a> {
 
         match symbol_path.path_type() {
             SymbolPathType::Dimension => {
-                if let Some(granularity) = symbol_path.granularity().clone() {
-                    let base = self
-                        .compiler
-                        .add_dimension_evaluator(symbol_path.full_name().clone())?;
-                    let granularity_obj = GranularityHelper::make_granularity_obj(
-                        self.cube_evaluator.clone(),
-                        self.compiler,
-                        symbol_path.cube_name(),
-                        symbol_path.symbol_name(),
-                        Some(granularity.clone()),
-                    )?;
-                    if let Some(granularity_obj) = granularity_obj {
-                        let time_dim = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                            base,
-                            Some(granularity),
-                            Some(granularity_obj),
-                            None,
-                        ));
-                        Ok(SqlCallDependency {
-                            path,
-                            symbol: SqlDependency::Symbol(time_dim),
-                        })
-                    } else {
-                        Err(CubeError::user(format!(
-                            "Invalid granularity: {}",
-                            granularity
-                        )))
-                    }
-                } else {
-                    let member = self
-                        .compiler
-                        .add_dimension_evaluator(symbol_path.full_name().clone())?;
-                    Ok(SqlCallDependency {
-                        path,
-                        symbol: SqlDependency::Symbol(member),
-                    })
-                }
+                let member = self
+                    .compiler
+                    .add_dimension_evaluator_by_path(symbol_path.clone())?;
+                Ok(SqlCallDependency {
+                    path,
+                    symbol: SqlDependency::Symbol(member),
+                })
             }
             SymbolPathType::Measure => {
                 let member = self
                     .compiler
-                    .add_measure_evaluator(symbol_path.full_name().clone())?;
+                    .add_measure_evaluator_by_path(symbol_path.clone())?;
                 Ok(SqlCallDependency {
                     path,
                     symbol: SqlDependency::Symbol(member),
@@ -161,7 +131,7 @@ impl<'a> SqlCallBuilder<'a> {
             SymbolPathType::Segment => {
                 let member = self
                     .compiler
-                    .add_segment_evaluator(symbol_path.full_name().clone())?;
+                    .add_segment_evaluator_by_path(symbol_path.clone())?;
                 Ok(SqlCallDependency {
                     path,
                     symbol: SqlDependency::Symbol(member),

@@ -52,18 +52,6 @@ impl CaseDefinition {
             sql.extract_symbol_deps(result);
         }
     }
-    fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        for itm in self.items.iter() {
-            itm.sql.extract_symbol_deps_with_path(result);
-            if let CaseLabel::Sql(sql) = &itm.label {
-                sql.extract_symbol_deps_with_path(result);
-            }
-        }
-        if let CaseLabel::Sql(sql) = &self.else_label {
-            sql.extract_symbol_deps_with_path(result);
-        }
-    }
-
     fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,
@@ -127,13 +115,6 @@ impl CaseSwitchItem {
         match self {
             CaseSwitchItem::Sql(sql_call) => sql_call.extract_symbol_deps(result),
             CaseSwitchItem::Member(member_symbol) => result.push(member_symbol.clone()),
-        }
-    }
-
-    fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        match self {
-            CaseSwitchItem::Sql(sql_call) => sql_call.extract_symbol_deps_with_path(result),
-            CaseSwitchItem::Member(member_symbol) => result.push((member_symbol.clone(), vec![])),
         }
     }
 
@@ -247,16 +228,6 @@ impl CaseSwitchDefinition {
             else_sql.extract_symbol_deps(result);
         }
     }
-    fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        self.switch.extract_symbol_deps_with_path(result);
-        for itm in self.items.iter() {
-            itm.sql.extract_symbol_deps_with_path(result);
-        }
-        if let Some(else_sql) = &self.else_sql {
-            else_sql.extract_symbol_deps_with_path(result);
-        }
-    }
-
     fn get_switch_values(&self) -> Option<Vec<String>> {
         if let CaseSwitchItem::Member(member) = &self.switch {
             if let Ok(switch_dim) = member.as_dimension() {
@@ -411,13 +382,6 @@ impl Case {
             Case::CaseSwitch(def) => def.extract_symbol_deps(result),
         }
     }
-    pub fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        match self {
-            Case::Case(def) => def.extract_symbol_deps_with_path(result),
-            Case::CaseSwitch(def) => def.extract_symbol_deps_with_path(result),
-        }
-    }
-
     pub fn case_switch_dimension(&self) -> Option<Rc<MemberSymbol>> {
         if let Case::CaseSwitch(case) = &self {
             if let CaseSwitchItem::Member(member) = &case.switch {

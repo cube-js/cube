@@ -170,18 +170,6 @@ impl TimeDimensionSymbol {
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        if let Some(granularity_obj) = &self.granularity_obj {
-            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                calendar_sql.extract_symbol_deps_with_path(&mut deps);
-            }
-        }
-
-        deps.append(&mut self.base_symbol.get_dependencies_with_path());
-        deps
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         let mut refs = vec![];
         if let Some(granularity_obj) = &self.granularity_obj {

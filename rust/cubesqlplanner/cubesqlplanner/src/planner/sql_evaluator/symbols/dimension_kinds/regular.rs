@@ -45,12 +45,6 @@ impl RegularDimension {
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        self.member_sql.extract_symbol_deps_with_path(&mut deps);
-        deps
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         self.member_sql.get_cube_refs()
     }
