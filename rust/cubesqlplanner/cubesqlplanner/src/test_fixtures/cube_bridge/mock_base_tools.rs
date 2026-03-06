@@ -122,10 +122,7 @@ impl BaseTools for MockBaseTools {
         Ok(result as Rc<dyn JoinDefinition>)
     }
 
-    fn resolve_mask_sql(
-        &self,
-        _member_path: String,
-    ) -> Result<String, CubeError> {
+    fn resolve_mask_sql(&self, _member_path: String) -> Result<String, CubeError> {
         Ok("NULL".to_string())
     }
 }

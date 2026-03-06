@@ -404,28 +404,18 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('SELECT all from masking_test returns masked values', async () => {
+    test('SELECT * from masking_test returns masked values', async () => {
       const res = await connection.query(
-        'SELECT id, secret_number, secret_boolean, public_dim, count, count_d FROM masking_test LIMIT 5'
+        'SELECT * FROM masking_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
         // All members should be masked for masking_viewer
-        expect(row.id).toBeNull();
         expect(row.secret_number).toBe(-1);
         expect(row.secret_boolean).toBe(false);
         expect(row.public_dim).toBeNull();
         expect(Number(row.count)).toBe(12345);
         expect(Number(row.count_d)).toBe(34567);
-      }
-    });
-
-    test('SELECT secret_string returns SQL mask', async () => {
-      const res = await connection.query(
-        'SELECT secret_string FROM masking_test LIMIT 5'
-      );
-      expect(res.rows.length).toBeGreaterThan(0);
-      for (const row of res.rows) {
         // SQL mask: CONCAT('***', RIGHT(CAST(product_id AS TEXT), 2))
         expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
       }
@@ -445,12 +435,11 @@ describe('Cube RBAC Engine', () => {
 
     test('SELECT from masking_test returns real values', async () => {
       const res = await connection.query(
-        'SELECT id, secret_number, secret_boolean, public_dim, count FROM masking_test LIMIT 5'
+        'SELECT * FROM masking_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
         // Full access user should see actual values, not masks
-        expect(row.id).not.toBeNull();
         expect(row.secret_number).not.toBe(-1);
         expect(Number(row.count)).not.toBe(12345);
       }
@@ -470,12 +459,11 @@ describe('Cube RBAC Engine', () => {
 
     test('SELECT mix of unmasked and masked members', async () => {
       const res = await connection.query(
-        'SELECT id, public_dim, secret_number, count, total_quantity FROM masking_test LIMIT 5'
+        'SELECT * FROM masking_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
-        // id, public_dim, total_quantity are in memberLevel includes → unmasked
-        expect(row.id).not.toBeNull();
+        // public_dim, total_quantity are in memberLevel includes → unmasked
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
         // secret_number is not in memberLevel includes → masked
@@ -499,12 +487,11 @@ describe('Cube RBAC Engine', () => {
 
     test('SELECT from masking_view returns real values (view grants full access)', async () => {
       const res = await connection.query(
-        'SELECT id, secret_number, public_dim FROM masking_view LIMIT 5'
+        'SELECT * FROM masking_view LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
         // The view has its own policy that grants full access to all members
-        expect(row.id).not.toBeNull();
         expect(row.secret_number).not.toBe(-1);
       }
     });

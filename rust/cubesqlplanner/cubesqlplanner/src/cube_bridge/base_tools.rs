@@ -48,8 +48,5 @@ pub trait BaseTools {
         hints: Vec<JoinHintItem>,
     ) -> Result<Rc<dyn JoinDefinition>, CubeError>;
 
-    fn resolve_mask_sql(
-        &self,
-        member_path: String,
-    ) -> Result<String, CubeError>;
+    fn resolve_mask_sql(&self, member_path: String) -> Result<String, CubeError>;
 }

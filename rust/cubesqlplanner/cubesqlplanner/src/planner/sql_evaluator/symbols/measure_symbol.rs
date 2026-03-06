@@ -268,13 +268,8 @@ impl MeasureSymbol {
         if query_tools.is_member_masked(&full_name) {
             return query_tools.resolve_mask_sql(&full_name);
         }
-        self.kind.evaluate_sql(
-            &full_name,
-            visitor,
-            node_processor,
-            query_tools,
-            templates,
-        )
+        self.kind
+            .evaluate_sql(&full_name, visitor, node_processor, query_tools, templates)
     }
 
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
