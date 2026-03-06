@@ -680,18 +680,27 @@ export class CompilerApi {
         });
 
         // Determine which members need masking: a member is masked if no covering
-        // policy grants it full access via memberLevel
+        // policy grants it full access via memberLevel AND at least one covering
+        // policy defines memberMasking that includes the member.
+        // Masking follows the same pattern as row-level security: it is applied
+        // at both cube and view levels. When a cube is accessed through a view,
+        // both the cube's and the view's masking policies are evaluated.
         const cubeMembersInQuery = Array.from(queryMemberNames).filter(
           memberName => memberName.startsWith(`${cubeName}.`)
         );
-        if (!cubesAccessedViaView.has(cubeName)) {
-          for (const memberName of cubeMembersInQuery) {
-            const hasFullAccessInAnyPolicy = policiesWithMemberAccess.some(policy => {
-              if (!policy.memberLevel) return true;
-              return policy.memberLevel.includesMembers.includes(memberName) &&
-                     !policy.memberLevel.excludesMembers.includes(memberName);
-            });
-            if (!hasFullAccessInAnyPolicy && policiesWithMemberAccess.length > 0) {
+        for (const memberName of cubeMembersInQuery) {
+          const hasFullAccessInAnyPolicy = policiesWithMemberAccess.some(policy => {
+            if (!policy.memberLevel) return true;
+            return policy.memberLevel.includesMembers.includes(memberName) &&
+                   !policy.memberLevel.excludesMembers.includes(memberName);
+          });
+          if (!hasFullAccessInAnyPolicy && policiesWithMemberAccess.length > 0) {
+            const isMaskedByAnyPolicy = policiesWithMemberAccess.some(policy =>
+              policy.memberMasking &&
+              policy.memberMasking.includesMembers.includes(memberName) &&
+              !policy.memberMasking.excludesMembers.includes(memberName)
+            );
+            if (isMaskedByAnyPolicy) {
               maskedMembersSet.add(memberName);
             }
           }

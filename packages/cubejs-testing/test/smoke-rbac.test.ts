@@ -475,10 +475,12 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
-   * View masking tests — masking should work identically on views.
+   * View masking tests — masking follows the RLS pattern and is applied at
+   * both cube and view levels. If a cube masks a member, it stays masked
+   * even when accessed through a view that grants full access.
    *
    * Views:
-   *   masking_view                  — full access for all roles (no masking)
+   *   masking_view                  — full access at view level, but underlying cube masks for "*"
    *   masking_view_masked           — all members masked for "*"; full access for masking_full_access
    *   masking_view_partial          — public_dim + total_quantity unmasked; rest masked for "*"
    *   masking_view_over_hidden_cube — view over a cube where all members are hidden;
@@ -495,11 +497,15 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view grants full access — real values', async () => {
+    test('masking_view — cube masking still applied even though view grants full access', async () => {
+      // masking_view has memberLevel.includes: "*" at the view level,
+      // but the underlying masking_test cube masks all members for role "*".
+      // Masking follows RLS pattern: applied at both cube and view levels.
       const res = await connection.query('SELECT * FROM masking_view LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
-        expect(row.secret_number).not.toBe(-1);
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
       }
     });
 
@@ -709,7 +715,9 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    test('view: masking_view — full access view overrides cube masking', async () => {
+    test('view: masking_view — cube masking still applied through view', async () => {
+      // masking_view grants full access at view level, but the underlying
+      // cube masks all members for role "*". Masking follows RLS pattern.
       const result = await maskingViewerClient.load({
         measures: ['masking_view.count'],
         dimensions: ['masking_view.secret_number'],
@@ -718,9 +726,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        // masking_view has memberLevel includes: "*" → no masking
-        expect(row['masking_view.secret_number']).not.toBe(-1);
-        expect(row['masking_view.count']).not.toBe(12345);
+        expect(row['masking_view.secret_number']).toBe(-1);
+        expect(row['masking_view.count']).toBe(12345);
       }
     });
 
