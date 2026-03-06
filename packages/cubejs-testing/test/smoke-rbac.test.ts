@@ -478,9 +478,11 @@ describe('Cube RBAC Engine', () => {
    * View masking tests — masking should work identically on views.
    *
    * Views:
-   *   masking_view         — full access for all roles (no masking)
-   *   masking_view_masked  — all members masked for "*"; full access for masking_full_access
-   *   masking_view_partial — public_dim + total_quantity unmasked; rest masked for "*"
+   *   masking_view                  — full access for all roles (no masking)
+   *   masking_view_masked           — all members masked for "*"; full access for masking_full_access
+   *   masking_view_partial          — public_dim + total_quantity unmasked; rest masked for "*"
+   *   masking_view_over_hidden_cube — view over a cube where all members are hidden;
+   *                                   view adds masking so members become accessible through it
    */
   describe('RBAC data masking via SQL API — views (masking_viewer)', () => {
     let connection: PgClient;
@@ -526,6 +528,21 @@ describe('Cube RBAC Engine', () => {
         expect(Number(row.count)).toBe(12345);
       }
     });
+
+    test('masking_view_over_hidden_cube returns masked values for default role', async () => {
+      // The underlying cube hides all members (memberLevel.includes: []).
+      // The view re-exposes them with its own masking policy.
+      const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // public_dim, total_quantity in view memberLevel includes → unmasked
+        expect(row.public_dim).not.toBeNull();
+        expect(row.total_quantity).not.toBeNull();
+        // secret_number not in view memberLevel includes → masked
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
   });
 
   describe('RBAC data masking via SQL API — views (masking_full)', () => {
@@ -541,6 +558,17 @@ describe('Cube RBAC Engine', () => {
 
     test('masking_view_masked returns real values for masking_full_access role', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).not.toBe(-1);
+        expect(Number(row.count)).not.toBe(12345);
+      }
+    });
+
+    test('masking_view_over_hidden_cube returns real values for masking_full_access role', async () => {
+      // The underlying cube hides all members, but masking_full_access role
+      // gets full access through the view's own policy.
+      const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
         expect(row.secret_number).not.toBe(-1);
@@ -694,6 +722,39 @@ describe('Cube RBAC Engine', () => {
         // masking_view has memberLevel includes: "*" → no masking
         expect(row['masking_view.secret_number']).not.toBe(-1);
         expect(row['masking_view.count']).not.toBe(12345);
+      }
+    });
+
+    test('view over hidden cube: viewer sees masked values', async () => {
+      // Underlying cube hides all members. View re-exposes them with masking.
+      const result = await maskingViewerClient.load({
+        measures: ['masking_view_over_hidden_cube.total_quantity', 'masking_view_over_hidden_cube.count'],
+        dimensions: ['masking_view_over_hidden_cube.public_dim'],
+        order: { 'masking_view_over_hidden_cube.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        // public_dim, total_quantity in view memberLevel → real values
+        expect(row['masking_view_over_hidden_cube.total_quantity']).not.toBeNull();
+        expect(row['masking_view_over_hidden_cube.public_dim']).not.toBeNull();
+        // count not in view memberLevel → masked
+        expect(row['masking_view_over_hidden_cube.count']).toBe(12345);
+      }
+    });
+
+    test('view over hidden cube: full access sees real values', async () => {
+      const result = await maskingFullClient.load({
+        measures: ['masking_view_over_hidden_cube.count'],
+        dimensions: ['masking_view_over_hidden_cube.public_dim'],
+        order: { 'masking_view_over_hidden_cube.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_view_over_hidden_cube.count']).not.toBe(12345);
       }
     });
   });

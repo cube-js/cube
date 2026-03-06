@@ -66,6 +66,40 @@ cubes:
         row_level:
           allow_all: true
 
+  # Cube where all members are hidden by policy.
+  # Members carry mask definitions so a view can apply masking on top.
+  - name: masking_hidden_cube
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: secret_number
+        sql: price
+        mask: -1
+        type: number
+
+      - name: public_dim
+        sql: order_id
+        type: number
+
+    measures:
+      - name: count
+        mask: 12345
+        type: count
+
+      - name: total_quantity
+        sql: quantity
+        type: sum
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+
 views:
   # View with full access - no masking
   - name: masking_view
@@ -110,6 +144,29 @@ views:
             - public_dim
             - total_quantity
         member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # View over a cube where all members are hidden.
+  # The view adds its own masking policy — members that are invisible at
+  # the cube level become accessible (some masked, some real) through the view.
+  - name: masking_view_over_hidden_cube
+    cubes:
+      - join_path: masking_hidden_cube
+        includes: "*"
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - public_dim
+            - total_quantity
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+      - role: "masking_full_access"
+        member_level:
           includes: "*"
         row_level:
           allow_all: true
