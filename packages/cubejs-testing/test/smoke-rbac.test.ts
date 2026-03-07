@@ -522,6 +522,8 @@ describe('Cube RBAC Engine', () => {
         // secret_number not in view memberLevel includes → masked
         expect(row.secret_number).toBe(-1);
         expect(Number(row.count)).toBe(12345);
+        // Dynamic SQL mask on secret_string: {CUBE} resolves to underlying cube table
+        expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
   });
@@ -721,6 +723,20 @@ describe('Cube RBAC Engine', () => {
         expect(row['masking_view_over_hidden_cube.public_dim']).not.toBeNull();
         // count not in view memberLevel → masked
         expect(row['masking_view_over_hidden_cube.count']).toBe(12345);
+      }
+    });
+
+    test('view over hidden cube: dynamic SQL mask works through view', async () => {
+      const result = await maskingViewerClient.load({
+        dimensions: ['masking_view_over_hidden_cube.secret_string'],
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        // SQL mask: CONCAT('***', RIGHT(CAST(product_id AS TEXT), 2))
+        // {CUBE} in mask.sql resolves to the underlying hidden cube's table
+        expect(row['masking_view_over_hidden_cube.secret_string']).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
 

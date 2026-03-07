@@ -77,6 +77,12 @@ cubes:
         type: number
         primary_key: true
 
+      - name: secret_string
+        sql: product_id
+        mask:
+          sql: "CONCAT('***', RIGHT(CAST({CUBE}.product_id AS TEXT), 2))"
+        type: string
+
       - name: secret_number
         sql: price
         mask: -1
