@@ -52,9 +52,6 @@ fn build_query_with_member_expression(
     ctx.build_sql_from_options(options)
 }
 
-/// Base query with avg measures from both cubes through the view.
-/// This is the root cause: many_to_one_child measures get multiplied
-/// when joined with many_to_one_root.
 #[test]
 fn test_many_to_one_view_base_query() {
     let ctx = create_test_context();
@@ -69,26 +66,20 @@ fn test_many_to_one_view_base_query() {
     "};
 
     let result = ctx.build_sql(query_yaml);
-    assert!(result.is_err(), "Expected row multiplication error");
-    let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("row multiplication"),
-        "Expected 'row multiplication' in error, got: {}",
-        err
+        result.is_ok(),
+        "Should generate SQL without row multiplication error: {:?}",
+        result.err()
     );
 }
 
-/// Reproduces: member-expressions-on-views.test.js > many_to_one_view > one_sum
-/// Expression: SUM(1)
 #[test]
 fn test_many_to_one_view_one_sum() {
     let ctx = create_test_context();
     let expr = make_member_expression("one_sum", "many_to_one_view", "SUM(1)");
-    let result = build_query_with_member_expression(&ctx, expr).unwrap();
+    let _result = build_query_with_member_expression(&ctx, expr).unwrap();
 }
 
-/// Reproduces: member-expressions-on-views.test.js > many_to_one_view > root_val_sum
-/// Expression: ${many_to_one_view.root_val_sum}
 #[test]
 fn test_many_to_one_view_root_val_sum() {
     let ctx = create_test_context();
@@ -98,18 +89,13 @@ fn test_many_to_one_view_root_val_sum() {
         "{many_to_one_view.root_val_sum}",
     );
     let result = build_query_with_member_expression(&ctx, expr);
-
-    assert!(result.is_err(), "Expected row multiplication error");
-    let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("row multiplication"),
-        "Expected 'row multiplication' in error, got: {}",
-        err
+        result.is_ok(),
+        "Should generate SQL without row multiplication error: {:?}",
+        result.err()
     );
 }
 
-/// Reproduces: member-expressions-on-views.test.js > many_to_one_view > root_distinct_dim
-/// Expression: COUNT(DISTINCT ${many_to_one_view.root_test_dim})
 #[test]
 fn test_many_to_one_view_root_distinct_dim() {
     let ctx = create_test_context();
@@ -119,18 +105,13 @@ fn test_many_to_one_view_root_distinct_dim() {
         "COUNT(DISTINCT {many_to_one_view.root_test_dim})",
     );
     let result = build_query_with_member_expression(&ctx, expr);
-
-    assert!(result.is_err(), "Expected row multiplication error");
-    let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("row multiplication"),
-        "Expected 'row multiplication' in error, got: {}",
-        err
+        result.is_ok(),
+        "Should generate SQL without row multiplication error: {:?}",
+        result.err()
     );
 }
 
-/// Reproduces: member-expressions-on-views.test.js > many_to_one_view > child_val_sum
-/// Expression: ${many_to_one_view.child_val_sum}
 #[test]
 fn test_many_to_one_view_child_val_sum() {
     let ctx = create_test_context();
@@ -140,18 +121,13 @@ fn test_many_to_one_view_child_val_sum() {
         "{many_to_one_view.child_val_sum}",
     );
     let result = build_query_with_member_expression(&ctx, expr);
-
-    assert!(result.is_err(), "Expected row multiplication error");
-    let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("row multiplication"),
-        "Expected 'row multiplication' in error, got: {}",
-        err
+        result.is_ok(),
+        "Should generate SQL without row multiplication error: {:?}",
+        result.err()
     );
 }
 
-/// Reproduces: member-expressions-on-views.test.js > many_to_one_view > child_distinct_dim
-/// Expression: COUNT(DISTINCT ${many_to_one_view.child_test_dim})
 #[test]
 fn test_many_to_one_view_child_distinct_dim() {
     let ctx = create_test_context();
@@ -161,12 +137,9 @@ fn test_many_to_one_view_child_distinct_dim() {
         "COUNT(DISTINCT {many_to_one_view.child_test_dim})",
     );
     let result = build_query_with_member_expression(&ctx, expr);
-
-    assert!(result.is_err(), "Expected row multiplication error");
-    let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("row multiplication"),
-        "Expected 'row multiplication' in error, got: {}",
-        err
+        result.is_ok(),
+        "Should generate SQL without row multiplication error: {:?}",
+        result.err()
     );
 }

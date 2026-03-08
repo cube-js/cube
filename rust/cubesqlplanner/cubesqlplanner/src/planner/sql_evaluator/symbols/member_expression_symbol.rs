@@ -84,6 +84,10 @@ impl MemberExpressionSymbol {
         &self.compiled_path
     }
 
+    pub fn set_own_path(&mut self) {
+        self.compiled_path = self.compiled_path.own_path();
+    }
+
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }

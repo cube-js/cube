@@ -197,6 +197,33 @@ impl MemberSymbol {
         false
     }
 
+    /// Returns a copy of this symbol with the path reduced to just the owning cube,
+    /// stripping any join chain prefix from views or other contexts.
+    pub fn with_own_path(&self) -> Rc<Self> {
+        match self {
+            Self::Dimension(d) => {
+                let mut new = (**d).clone();
+                new.set_own_path();
+                Rc::new(Self::Dimension(Rc::new(new)))
+            }
+            Self::TimeDimension(d) => {
+                let mut new = (**d).clone();
+                new.set_own_path();
+                Rc::new(Self::TimeDimension(Rc::new(new)))
+            }
+            Self::Measure(m) => {
+                let mut new = (**m).clone();
+                new.set_own_path();
+                Rc::new(Self::Measure(Rc::new(new)))
+            }
+            Self::MemberExpression(e) => {
+                let mut new = (**e).clone();
+                new.set_own_path();
+                Rc::new(Self::MemberExpression(Rc::new(new)))
+            }
+        }
+    }
+
     pub fn owned_by_cube(&self) -> bool {
         match self {
             Self::Dimension(d) => d.owned_by_cube(),

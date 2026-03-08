@@ -54,4 +54,16 @@ impl CompiledMemberPath {
     pub fn path(&self) -> &Vec<String> {
         &self.path
     }
+
+    /// Returns a copy with the path reduced to just the owning cube,
+    /// stripping any join chain prefix from views or other contexts.
+    pub fn own_path(&self) -> Self {
+        Self {
+            cube: self.cube.clone(),
+            full_name: self.full_name.clone(),
+            name: self.name.clone(),
+            alias: self.alias.clone(),
+            path: vec![self.cube_name().clone()],
+        }
+    }
 }
