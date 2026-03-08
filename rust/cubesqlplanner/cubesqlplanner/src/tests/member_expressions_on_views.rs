@@ -28,7 +28,7 @@ fn make_member_expression(expression_name: &str, cube_name: &str, sql: &str) -> 
 fn build_query_with_member_expression(
     ctx: &TestContext,
     extra_measure: OptionsMember,
-) -> Result<String, cubenativeutils::CubeError> {
+) -> String {
     let mut measures = members_from_strings(vec![
         "many_to_one_view.root_val_avg",
         "many_to_one_view.child_val_avg",
@@ -49,7 +49,7 @@ fn build_query_with_member_expression(
             .build(),
     );
 
-    ctx.build_sql_from_options(options)
+    ctx.build_sql_from_options(options).unwrap()
 }
 
 #[test]
@@ -65,19 +65,16 @@ fn test_many_to_one_view_base_query() {
           - many_to_one_view.child_dim
     "};
 
-    let result = ctx.build_sql(query_yaml);
-    assert!(
-        result.is_ok(),
-        "Should generate SQL without row multiplication error: {:?}",
-        result.err()
-    );
+    let sql = ctx.build_sql(query_yaml).unwrap();
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
 fn test_many_to_one_view_one_sum() {
     let ctx = create_test_context();
     let expr = make_member_expression("one_sum", "many_to_one_view", "SUM(1)");
-    let _result = build_query_with_member_expression(&ctx, expr).unwrap();
+    let sql = build_query_with_member_expression(&ctx, expr);
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -88,12 +85,8 @@ fn test_many_to_one_view_root_val_sum() {
         "many_to_one_view",
         "{many_to_one_view.root_val_sum}",
     );
-    let result = build_query_with_member_expression(&ctx, expr);
-    assert!(
-        result.is_ok(),
-        "Should generate SQL without row multiplication error: {:?}",
-        result.err()
-    );
+    let sql = build_query_with_member_expression(&ctx, expr);
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -104,12 +97,8 @@ fn test_many_to_one_view_root_distinct_dim() {
         "many_to_one_view",
         "COUNT(DISTINCT {many_to_one_view.root_test_dim})",
     );
-    let result = build_query_with_member_expression(&ctx, expr);
-    assert!(
-        result.is_ok(),
-        "Should generate SQL without row multiplication error: {:?}",
-        result.err()
-    );
+    let sql = build_query_with_member_expression(&ctx, expr);
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -120,12 +109,8 @@ fn test_many_to_one_view_child_val_sum() {
         "many_to_one_view",
         "{many_to_one_view.child_val_sum}",
     );
-    let result = build_query_with_member_expression(&ctx, expr);
-    assert!(
-        result.is_ok(),
-        "Should generate SQL without row multiplication error: {:?}",
-        result.err()
-    );
+    let sql = build_query_with_member_expression(&ctx, expr);
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -136,10 +121,6 @@ fn test_many_to_one_view_child_distinct_dim() {
         "many_to_one_view",
         "COUNT(DISTINCT {many_to_one_view.child_test_dim})",
     );
-    let result = build_query_with_member_expression(&ctx, expr);
-    assert!(
-        result.is_ok(),
-        "Should generate SQL without row multiplication error: {:?}",
-        result.err()
-    );
+    let sql = build_query_with_member_expression(&ctx, expr);
+    insta::assert_snapshot!(sql);
 }

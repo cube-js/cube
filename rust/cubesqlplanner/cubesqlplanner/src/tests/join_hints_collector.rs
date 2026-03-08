@@ -155,10 +155,6 @@ fn test_many_to_one_view_build_sql() {
           - many_to_one_view.root_dim
           - many_to_one_view.child_dim
     "};
-    let result = ctx.build_sql(query);
-    match &result {
-        Ok(sql) => println!("SQL generated:\n{}", sql),
-        Err(e) => println!("Error: {}", e),
-    }
-    assert!(result.is_ok(), "Should generate SQL without row multiplication error: {:?}", result.err());
+    let sql = ctx.build_sql(query).unwrap();
+    insta::assert_snapshot!(sql);
 }

@@ -1,0 +1,27 @@
+---
+source: cubesqlplanner/src/tests/join_hints_collector.rs
+assertion_line: 159
+expression: sql
+snapshot_kind: text
+---
+SELECT "fk_aggregate_keys"."many_to_one_view__root_dim" "many_to_one_view__root_dim", "fk_aggregate_keys"."many_to_one_view__child_dim" "many_to_one_view__child_dim", "q_0"."many_to_one_root__root_val_avg" "many_to_one_view__root_val_avg", "q_1"."many_to_one_child__child_val_avg" "many_to_one_view__child_val_avg" 
+FROM (SELECT DISTINCT "many_to_one_view__root_dim" "many_to_one_view__root_dim", "many_to_one_view__child_dim" "many_to_one_view__child_dim" 
+FROM (SELECT "many_to_one_root".dim "many_to_one_view__root_dim", "many_to_one_child".dim "many_to_one_view__child_dim" 
+FROM  many_to_one_root  AS "many_to_one_root"
+LEFT JOIN  many_to_one_child  AS "many_to_one_child" ON "many_to_one_root".child_id = "many_to_one_child".id
+GROUP BY 1, 2
+ UNION ALL 
+SELECT DISTINCT "many_to_one_child_key_many_to_one_root".dim "many_to_one_view__root_dim", "many_to_one_child_key_many_to_one_child".dim "many_to_one_view__child_dim" 
+FROM  many_to_one_root  AS "many_to_one_child_key_many_to_one_root"
+LEFT JOIN  many_to_one_child  AS "many_to_one_child_key_many_to_one_child" ON "many_to_one_child_key_many_to_one_root".child_id = "many_to_one_child_key_many_to_one_child".id) AS "pk_aggregate_keys_source") AS "fk_aggregate_keys"
+LEFT JOIN (SELECT "many_to_one_root".dim "many_to_one_view__root_dim", "many_to_one_child".dim "many_to_one_view__child_dim", avg("many_to_one_root".val) "many_to_one_root__root_val_avg" 
+FROM  many_to_one_root  AS "many_to_one_root"
+LEFT JOIN  many_to_one_child  AS "many_to_one_child" ON "many_to_one_root".child_id = "many_to_one_child".id
+GROUP BY 1, 2) AS "q_0" ON (("fk_aggregate_keys"."many_to_one_view__root_dim" = "q_0"."many_to_one_view__root_dim" OR (("fk_aggregate_keys"."many_to_one_view__root_dim" IS NULL) AND ("q_0"."many_to_one_view__root_dim" IS NULL)))) AND (("fk_aggregate_keys"."many_to_one_view__child_dim" = "q_0"."many_to_one_view__child_dim" OR (("fk_aggregate_keys"."many_to_one_view__child_dim" IS NULL) AND ("q_0"."many_to_one_view__child_dim" IS NULL))))
+LEFT JOIN (SELECT "keys"."many_to_one_view__root_dim" "many_to_one_view__root_dim", "keys"."many_to_one_view__child_dim" "many_to_one_view__child_dim", avg("many_to_one_child_key_many_to_one_child".val) "many_to_one_child__child_val_avg" 
+FROM (SELECT DISTINCT "many_to_one_child_key_many_to_one_root".dim "many_to_one_view__root_dim", "many_to_one_child_key_many_to_one_child".dim "many_to_one_view__child_dim", "many_to_one_child_key_many_to_one_child".id "many_to_one_child__id" 
+FROM  many_to_one_root  AS "many_to_one_child_key_many_to_one_root"
+LEFT JOIN  many_to_one_child  AS "many_to_one_child_key_many_to_one_child" ON "many_to_one_child_key_many_to_one_root".child_id = "many_to_one_child_key_many_to_one_child".id) AS "keys"
+LEFT JOIN  many_to_one_child  AS "many_to_one_child_key_many_to_one_child" ON (("keys"."many_to_one_child__id" = "many_to_one_child_key_many_to_one_child".id))
+GROUP BY 1, 2) AS "q_1" ON (("fk_aggregate_keys"."many_to_one_view__root_dim" = "q_1"."many_to_one_view__root_dim" OR (("fk_aggregate_keys"."many_to_one_view__root_dim" IS NULL) AND ("q_1"."many_to_one_view__root_dim" IS NULL)))) AND (("fk_aggregate_keys"."many_to_one_view__child_dim" = "q_1"."many_to_one_view__child_dim" OR (("fk_aggregate_keys"."many_to_one_view__child_dim" IS NULL) AND ("q_1"."many_to_one_view__child_dim" IS NULL))))
+ORDER BY  3  DESC
