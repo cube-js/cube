@@ -4,6 +4,7 @@ use crate::planner::sql_evaluator::collectors::{
 };
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use indoc::indoc;
 
 fn s(name: &str) -> JoinHintItem {
     JoinHintItem::Single(name.to_string())
@@ -82,4 +83,82 @@ fn test_collect_join_hints_for_measures_multiple() {
     let hints = collect_join_hints_for_measures(&vec![m1, m2]).unwrap();
     assert_eq!(hints.len(), 1);
     assert_eq!(hints.items(), &[s("orders")]);
+}
+
+// --- many_to_one view tests ---
+
+fn many_to_one_ctx() -> TestContext {
+    TestContext::new(MockSchema::from_yaml_file("common/many_to_one_views.yaml")).unwrap()
+}
+
+#[test]
+fn test_join_hints_many_to_one_view_root_dim() {
+    let ctx = many_to_one_ctx();
+    let dim = ctx.create_dimension("many_to_one_view.root_dim").unwrap();
+    let hints = collect_join_hints(&dim).unwrap();
+    assert_eq!(hints.len(), 1);
+    assert_eq!(hints.items(), &[s("many_to_one_root")]);
+}
+
+#[test]
+fn test_join_hints_many_to_one_view_child_dim() {
+    let ctx = many_to_one_ctx();
+    let dim = ctx.create_dimension("many_to_one_view.child_dim").unwrap();
+    let hints = collect_join_hints(&dim).unwrap();
+    assert_eq!(hints.len(), 1);
+    assert_eq!(
+        hints.items(),
+        &[v(&["many_to_one_root", "many_to_one_child"])]
+    );
+}
+
+#[test]
+fn test_join_hints_many_to_one_view_root_measure() {
+    let ctx = many_to_one_ctx();
+    let measure = ctx.create_measure("many_to_one_view.root_val_avg").unwrap();
+    let hints = collect_join_hints(&measure).unwrap();
+    assert_eq!(hints.len(), 1);
+    assert_eq!(hints.items(), &[s("many_to_one_root")]);
+}
+
+#[test]
+fn test_join_hints_many_to_one_view_child_measure() {
+    let ctx = many_to_one_ctx();
+    let measure = ctx.create_measure("many_to_one_view.child_val_avg").unwrap();
+    let hints = collect_join_hints(&measure).unwrap();
+    assert_eq!(hints.len(), 1);
+    assert_eq!(
+        hints.items(),
+        &[v(&["many_to_one_root", "many_to_one_child"])]
+    );
+}
+
+#[test]
+fn test_join_hints_many_to_one_view_combined_measures() {
+    let ctx = many_to_one_ctx();
+    let m1 = ctx.create_measure("many_to_one_view.root_val_avg").unwrap();
+    let m2 = ctx.create_measure("many_to_one_view.child_val_avg").unwrap();
+    let hints = collect_join_hints_for_measures(&vec![m1, m2]).unwrap();
+    assert_eq!(hints.len(), 2);
+    assert!(hints.items().contains(&s("many_to_one_root")));
+    assert!(hints.items().contains(&v(&["many_to_one_root", "many_to_one_child"])));
+}
+
+#[test]
+fn test_many_to_one_view_build_sql() {
+    let ctx = many_to_one_ctx();
+    let query = indoc! {"
+        measures:
+          - many_to_one_view.root_val_avg
+          - many_to_one_view.child_val_avg
+        dimensions:
+          - many_to_one_view.root_dim
+          - many_to_one_view.child_dim
+    "};
+    let result = ctx.build_sql(query);
+    match &result {
+        Ok(sql) => println!("SQL generated:\n{}", sql),
+        Err(e) => println!("Error: {}", e),
+    }
+    assert!(result.is_ok(), "Should generate SQL without row multiplication error: {:?}", result.err());
 }

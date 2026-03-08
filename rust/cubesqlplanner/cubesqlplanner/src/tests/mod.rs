@@ -1,5 +1,6 @@
 mod common_sql_generation;
 mod cube_evaluator;
+mod cube_names_collector;
 mod dimension_symbol;
 mod join_hints_collector;
 mod measure_symbol;
