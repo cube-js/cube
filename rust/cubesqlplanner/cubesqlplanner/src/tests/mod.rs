@@ -1,3 +1,4 @@
+mod compiled_member_path;
 mod common_sql_generation;
 mod cube_evaluator;
 mod cube_names_collector;

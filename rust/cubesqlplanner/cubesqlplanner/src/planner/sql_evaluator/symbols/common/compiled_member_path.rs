@@ -16,8 +16,12 @@ impl CompiledMemberPath {
         full_name: String,
         name: String,
         alias: String,
-        path: Vec<String>,
+        mut path: Vec<String>,
     ) -> Self {
+        let cn = cube.cube_name();
+        if path.is_empty() || path.last() != Some(cn) {
+            path.push(cn.clone());
+        }
         Self {
             cube,
             full_name,
