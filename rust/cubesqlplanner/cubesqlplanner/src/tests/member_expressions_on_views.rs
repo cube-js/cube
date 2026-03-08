@@ -25,10 +25,7 @@ fn make_member_expression(expression_name: &str, cube_name: &str, sql: &str) -> 
     OptionsMember::MemberExpression(Rc::new(expr))
 }
 
-fn build_query_with_member_expression(
-    ctx: &TestContext,
-    extra_measure: OptionsMember,
-) -> String {
+fn build_query_with_member_expression(ctx: &TestContext, extra_measure: OptionsMember) -> String {
     let mut measures = members_from_strings(vec![
         "many_to_one_view.root_val_avg",
         "many_to_one_view.child_val_avg",

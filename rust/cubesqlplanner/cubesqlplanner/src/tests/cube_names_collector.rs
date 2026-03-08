@@ -59,7 +59,9 @@ fn test_cube_names_many_to_one_view_root_measure() {
 #[test]
 fn test_cube_names_many_to_one_view_child_measure() {
     let ctx = many_to_one_ctx();
-    let measure = ctx.create_measure("many_to_one_view.child_val_avg").unwrap();
+    let measure = ctx
+        .create_measure("many_to_one_view.child_val_avg")
+        .unwrap();
     let mut names = collect_cube_names(&measure).unwrap();
     names.sort();
     assert_eq!(names, vec!["many_to_one_child", "many_to_one_root"]);

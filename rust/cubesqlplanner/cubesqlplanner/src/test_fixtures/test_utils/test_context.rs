@@ -54,7 +54,9 @@ impl TestContext {
     }
 
     #[allow(dead_code)]
-    pub fn security_context(&self) -> &Rc<dyn crate::cube_bridge::security_context::SecurityContext> {
+    pub fn security_context(
+        &self,
+    ) -> &Rc<dyn crate::cube_bridge::security_context::SecurityContext> {
         &self.security_context
     }
 

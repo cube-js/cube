@@ -42,9 +42,7 @@ impl TraversalVisitor for CubeNamesCollector {
                     return Ok(None);
                 }
             }
-            MemberSymbol::TimeDimension(e) => {
-                return self.on_node_traverse(e.base_symbol(), &())
-            }
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
                     let path = node.path();

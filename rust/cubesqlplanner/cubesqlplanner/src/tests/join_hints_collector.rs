@@ -124,7 +124,9 @@ fn test_join_hints_many_to_one_view_root_measure() {
 #[test]
 fn test_join_hints_many_to_one_view_child_measure() {
     let ctx = many_to_one_ctx();
-    let measure = ctx.create_measure("many_to_one_view.child_val_avg").unwrap();
+    let measure = ctx
+        .create_measure("many_to_one_view.child_val_avg")
+        .unwrap();
     let hints = collect_join_hints(&measure).unwrap();
     assert_eq!(hints.len(), 1);
     assert_eq!(
@@ -137,11 +139,15 @@ fn test_join_hints_many_to_one_view_child_measure() {
 fn test_join_hints_many_to_one_view_combined_measures() {
     let ctx = many_to_one_ctx();
     let m1 = ctx.create_measure("many_to_one_view.root_val_avg").unwrap();
-    let m2 = ctx.create_measure("many_to_one_view.child_val_avg").unwrap();
+    let m2 = ctx
+        .create_measure("many_to_one_view.child_val_avg")
+        .unwrap();
     let hints = collect_join_hints_for_measures(&vec![m1, m2]).unwrap();
     assert_eq!(hints.len(), 2);
     assert!(hints.items().contains(&s("many_to_one_root")));
-    assert!(hints.items().contains(&v(&["many_to_one_root", "many_to_one_child"])));
+    assert!(hints
+        .items()
+        .contains(&v(&["many_to_one_root", "many_to_one_child"])));
 }
 
 #[test]
