@@ -210,7 +210,7 @@ impl MultipliedMeasuresQueryPlanner {
                     .get(key_cube_name)
                     .unwrap_or(&false)
                 {
-                    return Err(CubeError::user(format!("{}' references cubes that lead to row multiplication. Please rewrite it using sub query.", measure.full_name())));
+                    return Err(CubeError::user(format!("{}' references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.join(", "))));
                 }
                 return Ok(true);
             }

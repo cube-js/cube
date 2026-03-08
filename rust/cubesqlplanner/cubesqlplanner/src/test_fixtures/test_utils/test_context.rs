@@ -54,6 +54,11 @@ impl TestContext {
     }
 
     #[allow(dead_code)]
+    pub fn security_context(&self) -> &Rc<dyn crate::cube_bridge::security_context::SecurityContext> {
+        &self.security_context
+    }
+
+    #[allow(dead_code)]
     pub fn create_symbol(&self, member_path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
             .evaluator_compiler()
@@ -256,6 +261,18 @@ impl TestContext {
         let (sql, _) = self.build_sql_with_used_pre_aggregations(query)?;
         Ok(sql)
     }
+
+    #[allow(dead_code)]
+    pub fn build_sql_from_options(
+        &self,
+        options: Rc<dyn BaseQueryOptions>,
+    ) -> Result<String, CubeError> {
+        let request = QueryProperties::try_new(self.query_tools.clone(), options)?;
+        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), false);
+        let (sql, _) = planner.plan()?;
+        Ok(sql)
+    }
+
     pub fn build_sql_with_used_pre_aggregations(
         &self,
         query: &str,

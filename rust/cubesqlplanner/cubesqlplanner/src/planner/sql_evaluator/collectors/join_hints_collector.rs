@@ -123,6 +123,7 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeErro
         }
     }
 
+    println!("!!!! {}: {:?}", node.full_name(), collected_hints);
     Ok(JoinHints::from_items(collected_hints))
 }
 
