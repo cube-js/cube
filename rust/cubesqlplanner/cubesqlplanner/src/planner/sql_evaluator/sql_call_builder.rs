@@ -1,7 +1,7 @@
 use super::Compiler;
 use super::{
-    CubeRef, SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem,
-    SqlDependency, SymbolPath, SymbolPathType,
+    CubeRef, SqlCall, SqlCallFilterGroupItem, SqlCallFilterParamsItem, SqlDependency, SymbolPath,
+    SymbolPathType,
 };
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -94,7 +94,7 @@ impl<'a> SqlCallBuilder<'a> {
         &mut self,
         current_cube_name: &String,
         dep_path: &Vec<String>,
-    ) -> Result<SqlCallDependency, CubeError> {
+    ) -> Result<SqlDependency, CubeError> {
         assert!(!dep_path.is_empty());
 
         let symbol_path = SymbolPath::parse_parts(
@@ -111,46 +111,31 @@ impl<'a> SqlCallBuilder<'a> {
                 let member = self
                     .compiler
                     .add_dimension_evaluator_by_path(symbol_path.clone())?;
-                Ok(SqlCallDependency {
-                    path,
-                    symbol: SqlDependency::Symbol(member),
-                })
+                Ok(SqlDependency::Symbol(member))
             }
             SymbolPathType::Measure => {
                 let member = self
                     .compiler
                     .add_measure_evaluator_by_path(symbol_path.clone())?;
-                Ok(SqlCallDependency {
-                    path,
-                    symbol: SqlDependency::Symbol(member),
-                })
+                Ok(SqlDependency::Symbol(member))
             }
             SymbolPathType::Segment => {
                 let member = self
                     .compiler
                     .add_segment_evaluator_by_path(symbol_path.clone())?;
-                Ok(SqlCallDependency {
-                    path,
-                    symbol: SqlDependency::Symbol(member),
-                })
+                Ok(SqlDependency::Symbol(member))
             }
             SymbolPathType::CubeName => {
                 let symbol = self
                     .compiler
-                    .add_cube_name_evaluator(symbol_path.cube_name().clone())?;
-                Ok(SqlCallDependency {
-                    path: path.clone(),
-                    symbol: SqlDependency::CubeRef(CubeRef::Name { symbol, path }),
-                })
+                    .add_cube_name_evaluator(symbol_path.cube_name().clone(), path)?;
+                Ok(SqlDependency::CubeRef(CubeRef::Name(symbol)))
             }
             SymbolPathType::CubeTable => {
                 let symbol = self
                     .compiler
-                    .add_cube_table_evaluator(symbol_path.cube_name().clone())?;
-                Ok(SqlCallDependency {
-                    path: path.clone(),
-                    symbol: SqlDependency::CubeRef(CubeRef::Table { symbol, path }),
-                })
+                    .add_cube_table_evaluator(symbol_path.cube_name().clone(), path)?;
+                Ok(SqlDependency::CubeRef(CubeRef::Table(symbol)))
             }
         }
     }

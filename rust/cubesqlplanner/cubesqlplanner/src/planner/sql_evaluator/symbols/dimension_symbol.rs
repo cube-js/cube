@@ -471,7 +471,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             .propagate_filters_to_sub_query
             .unwrap_or(false);
 
-        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
 
         let compiled_path = CompiledMemberPath::new(
             cube_symbol,

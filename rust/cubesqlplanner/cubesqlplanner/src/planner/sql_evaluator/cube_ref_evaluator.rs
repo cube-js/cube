@@ -32,12 +32,12 @@ impl CubeRefEvaluator {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         match cube_ref {
-            CubeRef::Name { symbol, .. } => {
+            CubeRef::Name(symbol) => {
                 let name = symbol.evaluate_sql()?;
                 let alias = self.resolve_cube_alias(&name);
                 templates.quote_identifier(&alias)
             }
-            CubeRef::Table { symbol, .. } => {
+            CubeRef::Table(symbol) => {
                 if let Some(pre_agg) = self.original_sql_pre_aggregations.get(symbol.cube_name()) {
                     return Ok(pre_agg.clone());
                 }

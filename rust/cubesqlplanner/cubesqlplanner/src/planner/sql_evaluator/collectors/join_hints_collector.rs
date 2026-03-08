@@ -83,11 +83,10 @@ impl TraversalVisitor for JoinHintsCollector {
     }
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
-        if let CubeRef::Name { symbol, path, .. } = cube_ref {
-            if !path.is_empty() {
-                let mut path = path.clone();
-                path.push(symbol.cube_name().clone());
-                self.hints.push(JoinHintItem::Vector(path));
+        if let CubeRef::Name(symbol) = cube_ref {
+            let path = symbol.path();
+            if path.len() > 1 {
+                self.hints.push(JoinHintItem::Vector(path.clone()));
             } else {
                 self.hints
                     .push(JoinHintItem::Single(symbol.cube_name().clone()));

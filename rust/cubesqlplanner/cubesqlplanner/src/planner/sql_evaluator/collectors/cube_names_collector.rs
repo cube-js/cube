@@ -61,13 +61,10 @@ impl TraversalVisitor for CubeNamesCollector {
     }
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
-        if let CubeRef::Name { symbol, path, .. } = cube_ref {
-            if !path.is_empty() {
-                for p in path {
-                    self.names.insert(p.clone());
-                }
+        if let CubeRef::Name(symbol) = cube_ref {
+            for p in symbol.path() {
+                self.names.insert(p.clone());
             }
-            self.names.insert(symbol.cube_name().clone());
         }
         Ok(())
     }

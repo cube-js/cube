@@ -12,11 +12,20 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct CubeNameSymbol {
     cube_name: String,
+    path: Vec<String>,
 }
 
 impl CubeNameSymbol {
-    pub fn new(cube_name: String) -> Rc<Self> {
-        Rc::new(Self { cube_name })
+    pub fn new(cube_name: String, path: Vec<String>) -> Rc<Self> {
+        let path = Self::normalize_path(path, &cube_name);
+        Rc::new(Self { cube_name, path })
+    }
+
+    pub(crate) fn normalize_path(mut path: Vec<String>, cube_name: &str) -> Vec<String> {
+        if path.is_empty() || path.last().map(|s| s.as_str()) != Some(cube_name) {
+            path.push(cube_name.to_string());
+        }
+        path
     }
 
     pub fn evaluate_sql(&self) -> Result<String, CubeError> {
@@ -25,6 +34,9 @@ impl CubeNameSymbol {
     pub fn cube_name(&self) -> &String {
         &self.cube_name
     }
+    pub fn path(&self) -> &Vec<String> {
+        &self.path
+    }
     pub fn alias(&self) -> String {
         PlanSqlTemplates::alias_name(&self.cube_name)
     }
@@ -32,30 +44,34 @@ impl CubeNameSymbol {
 
 pub struct CubeNameSymbolFactory {
     cube_name: String,
+    path: Vec<String>,
 }
 
 impl CubeNameSymbolFactory {
     pub fn try_new(
         full_name: &String,
         _cube_evaluator: Rc<dyn CubeEvaluator>,
+        path: Vec<String>,
     ) -> Result<Self, CubeError> {
         //TODO check that cube exists
         Ok(Self {
             cube_name: full_name.clone(),
+            path,
         })
     }
 }
 
 impl CubeNameSymbolFactory {
     pub fn build(self, _compiler: &mut Compiler) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        let Self { cube_name } = self;
-        Ok(CubeNameSymbol::new(cube_name))
+        let Self { cube_name, path } = self;
+        Ok(CubeNameSymbol::new(cube_name, path))
     }
 }
 
 #[derive(Debug)]
 pub struct CubeTableSymbol {
     cube_name: String,
+    path: Vec<String>,
     member_sql: Option<Rc<SqlCall>>,
     alias: String,
     is_table_sql: bool,
@@ -65,13 +81,16 @@ pub struct CubeTableSymbol {
 impl CubeTableSymbol {
     pub fn new(
         cube_name: String,
+        path: Vec<String>,
         member_sql: Option<Rc<SqlCall>>,
         alias: String,
         is_table_sql: bool,
         join_map: Option<Vec<Vec<String>>>,
     ) -> Rc<Self> {
+        let path = CubeNameSymbol::normalize_path(path, &cube_name);
         Rc::new(Self {
             cube_name,
+            path,
             member_sql,
             alias,
             is_table_sql,
@@ -118,6 +137,10 @@ impl CubeTableSymbol {
         &self.cube_name
     }
 
+    pub fn path(&self) -> &Vec<String> {
+        &self.path
+    }
+
     pub fn alias(&self) -> String {
         self.alias.clone()
     }
@@ -129,6 +152,7 @@ impl CubeTableSymbol {
 
 pub struct CubeTableSymbolFactory {
     cube_name: String,
+    path: Vec<String>,
     sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn CubeDefinition>,
     is_table_sql: bool,
@@ -138,6 +162,7 @@ impl CubeTableSymbolFactory {
     pub fn try_new(
         cube_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
+        path: Vec<String>,
     ) -> Result<Self, CubeError> {
         let definition = cube_evaluator.cube_from_path(cube_name.clone())?;
         let table_sql = definition.sql_table()?;
@@ -146,6 +171,7 @@ impl CubeTableSymbolFactory {
         let sql = table_sql.or(sql);
         Ok(Self {
             cube_name: cube_name.clone(),
+            path,
             sql,
             definition,
             is_table_sql,
@@ -155,6 +181,7 @@ impl CubeTableSymbolFactory {
     pub fn build(self, compiler: &mut Compiler) -> Result<Rc<CubeTableSymbol>, CubeError> {
         let Self {
             cube_name,
+            path,
             sql,
             definition,
             is_table_sql,
@@ -171,6 +198,7 @@ impl CubeTableSymbolFactory {
         };
         Ok(CubeTableSymbol::new(
             cube_name,
+            path,
             sql,
             alias,
             is_table_sql,

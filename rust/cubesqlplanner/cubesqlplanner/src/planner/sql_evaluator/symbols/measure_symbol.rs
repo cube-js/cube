@@ -712,7 +712,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && add_group_by.is_none()
                 && group_by.is_none());
 
-        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
 
         let compiled_path = CompiledMemberPath::new(
             cube_symbol,

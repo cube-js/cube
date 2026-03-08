@@ -88,7 +88,7 @@ impl DimensionSubqueryPlanner {
             .query_tools
             .evaluator_compiler()
             .borrow_mut()
-            .add_cube_table_evaluator(cube_name.clone())?;
+            .add_cube_table_evaluator(cube_name.clone(), vec![])?;
         let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_symbol,
             dim_name.clone(),

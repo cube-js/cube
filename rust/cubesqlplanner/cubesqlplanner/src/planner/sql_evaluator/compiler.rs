@@ -31,8 +31,8 @@ pub struct Compiler {
     security_context: Rc<dyn SecurityContext>,
     timezone: Tz,
     members: HashMap<(CacheSymbolType, String), Rc<MemberSymbol>>,
-    cube_names: HashMap<String, Rc<CubeNameSymbol>>,
-    cube_tables: HashMap<String, Rc<CubeTableSymbol>>,
+    cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
+    cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
 }
 
 impl Compiler {
@@ -137,7 +137,7 @@ impl Compiler {
         let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
         let alias =
             PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None);
-        let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone())?;
+        let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
         let symbol = MemberExpressionSymbol::try_new(
             cube_symbol,
             path.symbol_name().clone(),
@@ -155,13 +155,17 @@ impl Compiler {
     pub fn add_cube_name_evaluator(
         &mut self,
         cube_name: String,
+        path: Vec<String>,
     ) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        if let Some(exists) = self.cube_names.get(&cube_name) {
+        let cache_key =
+            CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        if let Some(exists) = self.cube_names.get(&cache_key) {
             Ok(exists.clone())
         } else {
-            let result = CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone())?
-                .build(self)?;
-            self.cube_names.insert(cube_name, result.clone());
+            let result =
+                CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                    .build(self)?;
+            self.cube_names.insert(cache_key, result.clone());
             Ok(result)
         }
     }
@@ -169,13 +173,17 @@ impl Compiler {
     pub fn add_cube_table_evaluator(
         &mut self,
         cube_name: String,
+        path: Vec<String>,
     ) -> Result<Rc<CubeTableSymbol>, CubeError> {
-        if let Some(exists) = self.cube_tables.get(&cube_name) {
+        let cache_key =
+            CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        if let Some(exists) = self.cube_tables.get(&cache_key) {
             Ok(exists.clone())
         } else {
-            let result = CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone())?
-                .build(self)?;
-            self.cube_tables.insert(cube_name, result.clone());
+            let result =
+                CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                    .build(self)?;
+            self.cube_tables.insert(cache_key, result.clone());
             Ok(result)
         }
     }
