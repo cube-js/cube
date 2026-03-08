@@ -17,7 +17,8 @@ impl CommonUtils {
         let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
-        let evaluator = evaluator_compiler.add_cube_table_evaluator(cube_path.to_string(), vec![])?;
+        let evaluator =
+            evaluator_compiler.add_cube_table_evaluator(cube_path.to_string(), vec![])?;
         BaseCube::try_new(cube_path.to_string(), self.query_tools.clone(), evaluator)
     }
 

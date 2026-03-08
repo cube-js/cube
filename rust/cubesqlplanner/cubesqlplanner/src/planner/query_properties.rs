@@ -149,8 +149,8 @@ impl QueryProperties {
                                 )));
                             }
                         };
-                        let cube_symbol =
-                            evaluator_compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
+                        let cube_symbol = evaluator_compiler
+                            .add_cube_table_evaluator(cube_name.clone(), vec![])?;
                         let member_expression_symbol = MemberExpressionSymbol::try_new(
                             cube_symbol,
                             name.clone(),
@@ -302,8 +302,8 @@ impl QueryProperties {
                                 .segment_by_path(member_name.clone())?;
                             let expression_evaluator = evaluator_compiler
                                 .compile_sql_call(&cube_name, definition.sql()?)?;
-                            let cube_symbol =
-                                evaluator_compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
+                            let cube_symbol = evaluator_compiler
+                                .add_cube_table_evaluator(cube_name.clone(), vec![])?;
                             BaseSegment::try_new(
                                 expression_evaluator,
                                 cube_symbol,
@@ -335,8 +335,8 @@ impl QueryProperties {
                                     )));
                                 }
                             };
-                            let cube_symbol =
-                                evaluator_compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
+                            let cube_symbol = evaluator_compiler
+                                .add_cube_table_evaluator(cube_name.clone(), vec![])?;
                             BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
                         }
                     }?;

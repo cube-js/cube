@@ -1,5 +1,5 @@
-mod compiled_member_path;
 mod common_sql_generation;
+mod compiled_member_path;
 mod cube_evaluator;
 mod cube_names_collector;
 mod dimension_symbol;

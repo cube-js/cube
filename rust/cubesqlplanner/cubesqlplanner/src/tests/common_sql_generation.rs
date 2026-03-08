@@ -67,7 +67,6 @@ fn test_simple_paths_in_time_dimension_request_sql() {
         .build_sql(query_yaml)
         .expect("Should generate SQL");
 
-
     assert!(
         sql.contains(r#"ON "cube_a".c_id = "cube_c".id"#),
         "SQL should contain join condition between cube_a and cube_c"

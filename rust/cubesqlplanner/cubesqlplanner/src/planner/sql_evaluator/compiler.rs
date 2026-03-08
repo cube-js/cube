@@ -157,8 +157,7 @@ impl Compiler {
         cube_name: String,
         path: Vec<String>,
     ) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        let cache_key =
-            CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
         if let Some(exists) = self.cube_names.get(&cache_key) {
             Ok(exists.clone())
         } else {
@@ -175,8 +174,7 @@ impl Compiler {
         cube_name: String,
         path: Vec<String>,
     ) -> Result<Rc<CubeTableSymbol>, CubeError> {
-        let cache_key =
-            CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
         if let Some(exists) = self.cube_tables.get(&cache_key) {
             Ok(exists.clone())
         } else {
