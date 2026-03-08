@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::CubeTableSymbol;
+use crate::planner::sql_evaluator::{CubeNameSymbol, CubeTableSymbol};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -16,12 +16,9 @@ impl CompiledMemberPath {
         full_name: String,
         name: String,
         alias: String,
-        mut path: Vec<String>,
+        path: Vec<String>,
     ) -> Self {
-        let cn = cube.cube_name();
-        if path.is_empty() || path.last() != Some(cn) {
-            path.push(cn.clone());
-        }
+        let path = CubeNameSymbol::normalize_path(path, cube.cube_name());
         Self {
             cube,
             full_name,

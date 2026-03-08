@@ -156,7 +156,7 @@ impl SqlCall {
             )
         } else {
             Err(CubeError::internal(
-                "SqlCall::eval called for fuction that return string".to_string(),
+                "SqlCall::eval called for function that returns string".to_string(),
             ))
         }
     }
