@@ -60,8 +60,8 @@ impl CompiledMemberPath {
     }
 
     /// Returns a copy with the path reduced to just the owning cube,
-    /// stripping any join chain prefix from views or other contexts.
-    pub fn own_path(&self) -> Self {
+    /// stripping any join chain prefix (e.g. from views or cross-cube references).
+    pub fn strip_join_prefix(&self) -> Self {
         Self {
             cube: self.cube.clone(),
             full_name: self.full_name.clone(),

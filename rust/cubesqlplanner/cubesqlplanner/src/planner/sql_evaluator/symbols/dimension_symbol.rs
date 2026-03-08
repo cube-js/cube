@@ -138,8 +138,8 @@ impl DimensionSymbol {
         &self.compiled_path
     }
 
-    pub fn set_own_path(&mut self) {
-        self.compiled_path = self.compiled_path.own_path();
+    pub fn strip_join_prefix(&mut self) {
+        self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
     pub fn full_name(&self) -> String {

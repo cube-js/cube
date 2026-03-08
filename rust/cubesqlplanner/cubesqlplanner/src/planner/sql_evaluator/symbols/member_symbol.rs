@@ -198,27 +198,27 @@ impl MemberSymbol {
     }
 
     /// Returns a copy of this symbol with the path reduced to just the owning cube,
-    /// stripping any join chain prefix from views or other contexts.
-    pub fn with_own_path(&self) -> Rc<Self> {
+    /// stripping any join chain prefix (e.g. from views or cross-cube references).
+    pub fn with_stripped_join_prefix(&self) -> Rc<Self> {
         match self {
             Self::Dimension(d) => {
                 let mut new = (**d).clone();
-                new.set_own_path();
+                new.strip_join_prefix();
                 Rc::new(Self::Dimension(Rc::new(new)))
             }
             Self::TimeDimension(d) => {
                 let mut new = (**d).clone();
-                new.set_own_path();
+                new.strip_join_prefix();
                 Rc::new(Self::TimeDimension(Rc::new(new)))
             }
             Self::Measure(m) => {
                 let mut new = (**m).clone();
-                new.set_own_path();
+                new.strip_join_prefix();
                 Rc::new(Self::Measure(Rc::new(new)))
             }
             Self::MemberExpression(e) => {
                 let mut new = (**e).clone();
-                new.set_own_path();
+                new.strip_join_prefix();
                 Rc::new(Self::MemberExpression(Rc::new(new)))
             }
         }

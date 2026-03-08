@@ -187,7 +187,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            let owned_measure = measure.with_own_path();
+            let owned_measure = measure.with_stripped_join_prefix();
             let member_expression_over_dimensions_cubes =
                 if let Ok(member_expression) = owned_measure.as_member_expression() {
                     member_expression.cube_names_if_dimension_only_expression()?
