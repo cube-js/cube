@@ -892,6 +892,7 @@ impl<'a> CubeStoreParser<'a> {
 mod tests {
 
     use super::*;
+    use crate::CubeError;
     use sqlparser::ast::Statement as SQLStatement;
 
     #[test]
@@ -954,12 +955,15 @@ mod tests {
         }
     }
 
+    fn parse_queue_add(query: &str) -> Result<Statement, CubeError> {
+        let mut parser = CubeStoreParser::new(query)?;
+        Ok(parser.parse_statement()?)
+    }
+
     #[test]
-    fn parse_queue_add_options_any_order() {
+    fn parse_queue_add_options_any_order() -> Result<(), CubeError> {
         // Original order: EXCLUSIVE PRIORITY ORPHANED
-        let query = "QUEUE ADD EXCLUSIVE PRIORITY 1 ORPHANED 60 'key' 'value'";
-        let mut parser = CubeStoreParser::new(query).unwrap();
-        let res = parser.parse_statement().unwrap();
+        let res = parse_queue_add("QUEUE ADD EXCLUSIVE PRIORITY 1 ORPHANED 60 'key' 'value'")?;
         match res {
             Statement::Queue(QueueCommand::Add {
                 exclusive,
@@ -975,9 +979,7 @@ mod tests {
         }
 
         // Reversed order: PRIORITY then EXCLUSIVE
-        let query = "QUEUE ADD PRIORITY 5 EXCLUSIVE 'key' 'value'";
-        let mut parser = CubeStoreParser::new(query).unwrap();
-        let res = parser.parse_statement().unwrap();
+        let res = parse_queue_add("QUEUE ADD PRIORITY 5 EXCLUSIVE 'key' 'value'")?;
         match res {
             Statement::Queue(QueueCommand::Add {
                 exclusive,
@@ -993,9 +995,7 @@ mod tests {
         }
 
         // ORPHANED first, then PRIORITY, no EXCLUSIVE
-        let query = "QUEUE ADD ORPHANED 120 PRIORITY -3 'key' 'value'";
-        let mut parser = CubeStoreParser::new(query).unwrap();
-        let res = parser.parse_statement().unwrap();
+        let res = parse_queue_add("QUEUE ADD ORPHANED 120 PRIORITY -3 'key' 'value'")?;
         match res {
             Statement::Queue(QueueCommand::Add {
                 exclusive,
@@ -1011,9 +1011,7 @@ mod tests {
         }
 
         // No options at all
-        let query = "QUEUE ADD 'key' 'value'";
-        let mut parser = CubeStoreParser::new(query).unwrap();
-        let res = parser.parse_statement().unwrap();
+        let res = parse_queue_add("QUEUE ADD 'key' 'value'")?;
         match res {
             Statement::Queue(QueueCommand::Add {
                 exclusive,
@@ -1027,27 +1025,27 @@ mod tests {
             }
             _ => panic!("Expected QueueCommand::Add"),
         }
+
+        Ok(())
     }
 
     #[test]
-    fn parse_queue_add_duplicate_option_error() {
-        let query = "QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'";
-        let mut parser = CubeStoreParser::new(query).unwrap();
-        let res = parser.parse_statement();
+    fn parse_queue_add_duplicate_option_error() -> Result<(), CubeError> {
+        let res = parse_queue_add("QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'");
         assert!(res.is_err());
         assert!(res
             .unwrap_err()
             .to_string()
             .contains("Duplicate option: PRIORITY"));
 
-        let query = "QUEUE ADD EXCLUSIVE EXCLUSIVE 'key' 'value'";
-        let mut parser = CubeStoreParser::new(query).unwrap();
-        let res = parser.parse_statement();
+        let res = parse_queue_add("QUEUE ADD EXCLUSIVE EXCLUSIVE 'key' 'value'");
         assert!(res.is_err());
         assert!(res
             .unwrap_err()
             .to_string()
             .contains("Duplicate option: EXCLUSIVE"));
+
+        Ok(())
     }
 
     #[test]
