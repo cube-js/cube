@@ -1,7 +1,7 @@
 # Access policies
 
 Access policies provide a holistic mechanism to manage [member-level](#member-level-access),
-[row-level](#row-level-access) security, and [data masking][ref-data-masking] for
+[row-level](#row-level-access) security, and [data masking](#data-masking) for
 different user groups. You can define access control rules in data model files,
 allowing for an organized and maintainable approach to security.
 
@@ -115,6 +115,123 @@ a view that exposes a subset of rows from another view, the result set will be
 filtered by the row-level security rules of both views.
 
 </InfoBox>
+
+### Data masking
+
+With data masking, you can return masked values for restricted members instead
+of denying access entirely. Users who don't have full access to a member will
+see a transformed value (e.g., `***`, `-1`, `NULL`) rather than receiving an error.
+
+To use data masking, define a [`mask` parameter][ref-ref-mask-dim] on dimensions
+or measures, and add `member_masking` to your access policy alongside `member_level`.
+Members in `member_level` get real values; members not in `member_level` but in
+`member_masking` get masked values; members in neither are denied.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: secret_code
+        sql: secret_code
+        type: string
+        mask:
+          sql: "CONCAT('***', RIGHT({CUBE}.secret_code, 3))"
+
+      - name: revenue
+        sql: revenue
+        type: number
+        mask: -1
+
+    measures:
+      - name: count
+        type: count
+        mask: 0
+
+    access_policy:
+      - group: manager
+        member_level:
+          includes:
+            - status
+            - count
+        member_masking:
+          includes: "*"
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    secret_code: {
+      sql: `secret_code`,
+      type: `string`,
+      mask: {
+        sql: (CUBE) => `CONCAT('***', RIGHT(${CUBE}.secret_code, 3))`
+      }
+    },
+
+    revenue: {
+      sql: `revenue`,
+      type: `number`,
+      mask: -1
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+      mask: 0
+    }
+  },
+
+  access_policy: [
+    {
+      group: `manager`,
+      member_level: {
+        includes: [`status`, `count`]
+      },
+      member_masking: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+With this policy, users in the `manager` group will see:
+
+| Member | Value |
+| --- | --- |
+| `status` | Real value (full access via `member_level`) |
+| `count` | Real value (full access via `member_level`) |
+| `secret_code` | Masked via SQL: `***xyz` |
+| `revenue` | Masked: `-1` |
+
+If no `mask` is defined on a member, the default mask value is `NULL`. You can
+customize defaults with the `CUBEJS_ACCESS_POLICY_MASK_STRING`,
+`CUBEJS_ACCESS_POLICY_MASK_NUMBER`, `CUBEJS_ACCESS_POLICY_MASK_BOOLEAN`, and
+`CUBEJS_ACCESS_POLICY_MASK_TIME` environment variables.
+
+_When querying a view,_ data masking follows the same pattern as row-level
+security: masking rules from both the view and relevant cubes are applied.
+
+For more details on available parameters, check out the
+[`member_masking` reference][ref-ref-dap-masking].
 
 ## Common patterns
 
@@ -252,6 +369,60 @@ view(`deals_view`, {
 
 </CodeTabs>
 
+### Mask sensitive members
+
+You can mask sensitive members for most users while granting full access to
+privileged groups:
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders_view
+    # ...
+
+    access_policy:
+      # Default: all members masked
+      - group: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      # Admins: full access
+      - group: admin
+        member_level:
+          includes: "*"
+```
+
+```javascript
+view(`orders_view`, {
+  // ...
+
+  access_policy: [
+    {
+      // Default: all members masked
+      group: `*`,
+      member_level: {
+        includes: []
+      },
+      member_masking: {
+        includes: `*`
+      }
+    },
+    {
+      // Admins: full access
+      group: `admin`,
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
 ### Mandatory filters
 
 You can apply mandatory row-level filters to specific groups to ensure they only see data matching certain criteria:
@@ -379,5 +550,6 @@ cube(`orders`, {
 [ref-sec-ctx]: /product/auth/context
 [ref-ref-dap]: /product/data-modeling/reference/data-access-policies
 [ref-ref-dap-role]: /product/data-modeling/reference/data-access-policies#role
+[ref-ref-dap-masking]: /product/data-modeling/reference/data-access-policies#member-masking
+[ref-ref-mask-dim]: /product/data-modeling/reference/dimensions#mask
 [ref-core-data-apis]: /product/apis-integrations/core-data-apis
-[ref-data-masking]: /product/auth/data-masking
