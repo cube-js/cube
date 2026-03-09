@@ -1,6 +1,6 @@
 use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
-    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
+    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RenderReferencesType,
     RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
     UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
@@ -151,7 +151,7 @@ impl SqlNodesFactory {
     }
 
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor = EvaluateSqlNode::new();
+        let evaluate_sql_processor = MaskedSqlNode::new(EvaluateSqlNode::new());
         let auto_prefix_processor = AutoPrefixSqlNode::new(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
