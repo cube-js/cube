@@ -681,6 +681,8 @@ pub struct QueueAddPayload {
     pub value: String,
     pub priority: i64,
     pub orphaned: Option<u32>,
+    pub process_id: Option<String>,
+    pub exclusive: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -831,6 +833,7 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         path: String,
         allow_concurrency: u32,
+        caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError>;
     async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError>;
     async fn queue_result_by_path(
@@ -1103,6 +1106,8 @@ impl CacheStore for RocksCacheStore {
                         QueueItem::status_default(),
                         payload.priority,
                         payload.orphaned.clone(),
+                        payload.process_id,
+                        payload.exclusive,
                     ),
                     batch_pipe,
                 )?;
@@ -1300,6 +1305,7 @@ impl CacheStore for RocksCacheStore {
         &self,
         path: String,
         allow_concurrency: u32,
+        caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         self.write_operation_queue("queue_retrieve_by_path", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -1334,6 +1340,19 @@ impl CacheStore for RocksCacheStore {
             };
 
             if id_row.get_row().get_status() == &QueueItemStatus::Pending {
+                if id_row.get_row().get_exclusive() {
+                    match (id_row.get_row().get_process_id(), &caller_process_id) {
+                        (Some(item_process_id), Some(caller_id))
+                            if item_process_id == caller_id =>
+                        {
+                            // OK, caller matches the exclusive item owner
+                        }
+                        _ => {
+                            return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                        }
+                    }
+                }
+
                 let mut new = id_row.get_row().clone();
                 new.status = QueueItemStatus::Active;
                 // It's  important to insert heartbeat, because
@@ -1652,6 +1671,7 @@ impl CacheStore for ClusterCacheStoreClient {
         &self,
         _path: String,
         _allow_concurrency: u32,
+        _caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_retrieve_by_path was used.")
     }
@@ -2074,19 +2094,47 @@ mod tests {
         let now = Utc::now();
         let item_pending_custom_orphaned = IdRow::new(
             1,
-            QueueItem::new("1".to_string(), QueueItemStatus::Pending, 1, Some(10)),
+            QueueItem::new(
+                "1".to_string(),
+                QueueItemStatus::Pending,
+                1,
+                Some(10),
+                None,
+                false,
+            ),
         );
         let item_pending_custom_orphaned_expired = IdRow::new(
             2,
-            QueueItem::new("2".to_string(), QueueItemStatus::Pending, 1, Some(1)),
+            QueueItem::new(
+                "2".to_string(),
+                QueueItemStatus::Pending,
+                1,
+                Some(1),
+                None,
+                false,
+            ),
         );
         let item_active_custom_orphaned = IdRow::new(
             3,
-            QueueItem::new("3".to_string(), QueueItemStatus::Active, 1, Some(10)),
+            QueueItem::new(
+                "3".to_string(),
+                QueueItemStatus::Active,
+                1,
+                Some(10),
+                None,
+                false,
+            ),
         );
         let mut item_active_custom_orphaned_expired = IdRow::new(
             4,
-            QueueItem::new("4".to_string(), QueueItemStatus::Active, 1, Some(1)),
+            QueueItem::new(
+                "4".to_string(),
+                QueueItemStatus::Active,
+                1,
+                Some(1),
+                None,
+                false,
+            ),
         );
 
         assert_eq!(

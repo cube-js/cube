@@ -112,6 +112,7 @@ impl CacheCommand {
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueueCommand {
     Add {
+        exclusive: bool,
         priority: i64,
         orphaned: Option<u32>,
         key: Ident,
@@ -477,6 +478,8 @@ impl<'a> CubeStoreParser<'a> {
 
         let command = match method.as_str() {
             "add" => {
+                let exclusive = self.parse_custom_token(&"exclusive");
+
                 let priority = if self.parse_custom_token(&"priority") {
                     self.parse_integer(&"priority", true)?
                 } else {
@@ -490,6 +493,7 @@ impl<'a> CubeStoreParser<'a> {
                 };
 
                 QueueCommand::Add {
+                    exclusive,
                     priority,
                     orphaned,
                     key: self.parser.parse_identifier()?,
