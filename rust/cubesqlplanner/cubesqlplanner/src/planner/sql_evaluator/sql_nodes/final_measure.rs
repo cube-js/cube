@@ -74,7 +74,13 @@ impl SqlNode for FinalMeasureSqlNode {
                     node_processor.clone(),
                     templates,
                 )?;
-                self.wrap_aggregate(ev, input, templates)?
+                // For masked measures, use MAX aggregation so the mask literal
+                // passes through unchanged (e.g. MAX(12345) = 12345).
+                if ev.mask_sql().is_some() && query_tools.is_member_masked(&ev.full_name()) {
+                    format!("MAX({})", input)
+                } else {
+                    self.wrap_aggregate(ev, input, templates)?
+                }
             }
             _ => {
                 return Err(CubeError::internal(format!(

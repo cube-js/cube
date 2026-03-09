@@ -69,4 +69,7 @@ pub trait MeasureDefinition {
 
     #[nbridge(field, optional, vec)]
     fn order_by(&self) -> Result<Option<Vec<Rc<dyn MemberOrderBy>>>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn resolved_mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

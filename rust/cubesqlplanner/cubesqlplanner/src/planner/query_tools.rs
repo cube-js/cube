@@ -154,10 +154,6 @@ impl QueryTools {
         self.masked_members.contains(member_path)
     }
 
-    pub fn resolve_mask_sql(&self, member_path: &str) -> Result<String, CubeError> {
-        self.base_tools.resolve_mask_sql(member_path.to_string())
-    }
-
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
         &self.cube_evaluator
     }

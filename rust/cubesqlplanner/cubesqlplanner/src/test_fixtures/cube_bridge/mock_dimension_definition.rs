@@ -131,6 +131,14 @@ impl DimensionDefinition for MockDimensionDefinition {
         }
     }
 
+    fn has_resolved_mask_sql(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn resolved_mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+        Ok(None)
+    }
+
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
     }

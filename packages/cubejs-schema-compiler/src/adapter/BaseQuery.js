@@ -1017,24 +1017,6 @@ export class BaseQuery {
     return Object.keys(fromPath.measures).concat(Object.keys(fromPath.dimensions));
   }
 
-  resolveMaskSql(memberPath) {
-    const [cubeName, memberName] = memberPath.split('.');
-    let symbol = this.cubeEvaluator.byPathAnyType([cubeName, memberName]);
-    // For view members that alias an underlying cube member, look up the
-    // original cube's member definition so mask.sql with {CUBE} references
-    // resolves against the correct table.
-    let resolvedCubeName = cubeName;
-    if (symbol.aliasMember) {
-      const [origCube, origMember] = symbol.aliasMember.split('.');
-      symbol = this.cubeEvaluator.byPathAnyType([origCube, origMember]);
-      resolvedCubeName = origCube;
-    }
-    return this.compilers.compiler.withQuery(
-      this,
-      () => this.memberMaskSql(resolvedCubeName, memberName, symbol),
-    );
-  }
-
   getAllocatedParams() {
     return this.paramAllocator.getParams();
   }
