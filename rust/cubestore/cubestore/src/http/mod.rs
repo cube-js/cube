@@ -109,20 +109,31 @@ impl HttpServer {
 
         let auth_filter = warp::any()
             .and(warp::header::optional("authorization"))
-            .and_then(move |auth_header: Option<String>| {
-                let auth_service = auth_service.clone();
-                async move {
-                    let res = HttpServer::authorize(auth_service, auth_header).await;
-                    match res {
-                        Ok(user) => Ok(SqlQueryContext {
-                            user,
-                            inline_tables: InlineTables::new(),
-                            trace_obj: None,
-                        }),
-                        Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
+            .and(warp::header::optional("x-process-id"))
+            .and_then(
+                move |auth_header: Option<String>, process_id: Option<String>| {
+                    let auth_service = auth_service.clone();
+                    async move {
+                        if let Some(ref id) = process_id {
+                            if id.len() > 64 {
+                                return Err(warp::reject::custom(CubeRejection::Internal(
+                                    "x-process-id header exceeds 64 characters".to_string(),
+                                )));
+                            }
+                        }
+                        let res = HttpServer::authorize(auth_service, auth_header).await;
+                        match res {
+                            Ok(user) => Ok(SqlQueryContext {
+                                user,
+                                inline_tables: InlineTables::new(),
+                                trace_obj: None,
+                                process_id,
+                            }),
+                            Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
+                        }
                     }
-                }
-            });
+                },
+            );
 
         let context_filter = tx_to_move_filter.and(auth_filter.clone());
 
