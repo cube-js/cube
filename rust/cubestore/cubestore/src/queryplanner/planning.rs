@@ -2531,18 +2531,16 @@ pub mod tests {
         )
         .unwrap();
 
-        // Verify: with cartesian product we expect 3 * 2 = 6 partition combinations.
-        // Each combination has 2 partition ids (one from each table).
-        let total_partition_pairs: usize = assigned
+        // Only root (Orders, 3 partitions) is split; right tables (Customers, 2)
+        // are included whole.  Budget = 5 - 2 = 3, root fits in one chunk.
+        let total_partition_entries: usize = assigned
             .iter()
             .map(|(_, (partitions, _))| partitions.len())
             .sum();
-        // 6 combinations * 2 partitions each = 12 total partition entries.
         assert_eq!(
-            total_partition_pairs, 12,
-            "Expected 3*2=6 combinations with 2 partitions each = 12 total entries, got {}. \
-             Assigned: {:?}",
-            total_partition_pairs, assigned
+            total_partition_entries, 5,
+            "Expected 1 batch with 3+2=5 partitions, got {}. Assigned: {:?}",
+            total_partition_entries, assigned
         );
     }
 
@@ -2612,17 +2610,19 @@ pub mod tests {
         )
         .unwrap();
 
-        // With cartesian product: 3 * 2 * 1 = 6 combinations.
-        // Each combination has 3 partition ids (one per table).
+        // Only root (Orders, 3 partitions) is split; right tables
+        // (Customers 2 + Products 1 = 3) are whole in every batch.
+        // Budget = 5 - 3 = 2, root chunks: [0,1] and [2].
+        //   Batch 1: Orders[0,1] + Customers(2) + Products(1) = 5
+        //   Batch 2: Orders[2]   + Customers(2) + Products(1) = 4
+        // Total: 9 partition entries in 2 batches.
         let total_partition_entries: usize = assigned
             .iter()
             .map(|(_, (partitions, _))| partitions.len())
             .sum();
-        // 6 combinations * 3 partitions each = 18 total entries.
         assert_eq!(
-            total_partition_entries, 18,
-            "Expected 3*2*1=6 combinations with 3 partitions each = 18 total entries, got {}. \
-             Assigned: {:?}",
+            total_partition_entries, 9,
+            "Expected 2 batches with 5+4=9 partitions, got {}. Assigned: {:?}",
             total_partition_entries, assigned
         );
     }
