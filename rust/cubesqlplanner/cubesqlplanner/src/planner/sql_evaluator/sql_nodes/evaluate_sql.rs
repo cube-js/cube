@@ -24,6 +24,18 @@ impl SqlNode for EvaluateSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        // Data masking: if a dimension or measure is masked, return the mask SQL
+        // instead of evaluating the member's regular SQL.
+        match node.as_ref() {
+            MemberSymbol::Dimension(_) | MemberSymbol::Measure(_) => {
+                let full_name = node.full_name();
+                if query_tools.is_member_masked(&full_name) {
+                    return query_tools.resolve_mask_sql(&full_name);
+                }
+            }
+            _ => {}
+        }
+
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 let res = ev.evaluate_sql(
