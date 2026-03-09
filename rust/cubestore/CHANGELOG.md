@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
+
+### Features
+
+- **cubestore-driver:** Share process-id with Cube Store ([#10477](https://github.com/cube-js/cube/issues/10477)) ([36c4aa2](https://github.com/cube-js/cube/commit/36c4aa2736122d14098b1ca3ec15c0828b5527e4))
+
 ## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

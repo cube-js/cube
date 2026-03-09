@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
+
+### Bug Fixes
+
+- **cube:** Issue with rollup pre-aggragations matching for views ([#10474](https://github.com/cube-js/cube/issues/10474)) ([7160283](https://github.com/cube-js/cube/commit/7160283c7dac5d5696cf683b8e59418e58453821))
+- **cubesql:** Do not panic when executing `MEASURE` function ([#10472](https://github.com/cube-js/cube/issues/10472)) ([3202d51](https://github.com/cube-js/cube/commit/3202d517dce747831ff2549f30f4888b11bb005b))
+
+### Features
+
+- **backend-native:** Add `throwContinueWait` parameter to `/cubesql` API endpoint ([#10385](https://github.com/cube-js/cube/issues/10385)) ([3687c5f](https://github.com/cube-js/cube/commit/3687c5f422d6b265409a3e539fc77f37df207eb1))
+- **cubestore-driver:** Share process-id with Cube Store ([#10477](https://github.com/cube-js/cube/issues/10477)) ([36c4aa2](https://github.com/cube-js/cube/commit/36c4aa2736122d14098b1ca3ec15c0828b5527e4))
+
 ## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
 
 ### Bug Fixes
