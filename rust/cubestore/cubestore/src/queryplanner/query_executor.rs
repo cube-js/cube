@@ -1058,7 +1058,7 @@ impl ClusterSendExec {
                 .collect();
             return Ok((res, false));
         }
-        let can_be_splitted = to_multiply.len() == 1; //We can only split partitions if there’s no multiplication for join.
+        let can_be_splitted = to_multiply.len() == 1 && !has_inline_tables; //We can only split partitions if there’s no multiplication for join.
                                                       // Ordinary partitions need to be duplicated on multiple machines.
         let partitions = to_multiply
             .into_iter()
