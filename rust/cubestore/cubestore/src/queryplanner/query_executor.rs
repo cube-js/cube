@@ -979,14 +979,14 @@ impl ClusterSendExec {
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Result<Vec<(String, (Vec<PartitionWithFilters>, Vec<InlineTableId>))>, CubeError> {
-        let partitions = Self::logical_partitions(snapshots, tree)?;
-        Ok(Self::assign_nodes(config, partitions))
+        let (partitions, can_be_split) = Self::logical_partitions(snapshots, tree)?;
+        Ok(Self::assign_nodes(config, partitions, can_be_split))
     }
 
     fn logical_partitions(
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
-    ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
+    ) -> Result<(Vec<Vec<InlineCompoundPartition>>, bool), CubeError> {
         let mut to_multiply = Vec::new();
         let mut multi_partitions = HashMap::<u64, Vec<_>>::new();
         let mut has_inline_tables = false;
@@ -1048,21 +1048,23 @@ impl ClusterSendExec {
                     "Partitioned index queries aren't supported with inline tables".to_string(),
                 ));
             }
-            return Ok(Self::distribute_multi_partitions(multi_partitions, tree)
+            let res = Self::distribute_multi_partitions(multi_partitions, tree)
                 .into_iter()
                 .map(|i| {
                     i.into_iter()
                         .map(|p| InlineCompoundPartition::Partition(p))
                         .collect()
                 })
-                .collect());
+                .collect();
+            return Ok((res, false));
         }
-        // Ordinary partitions need to be duplicated on multiple machines.
+        let can_be_split = to_multiply.len() == 1 && !has_inline_tables; //We can only split partitions if there’s no multiplication for join.
+                                                                         // Ordinary partitions need to be duplicated on multiple machines.
         let partitions = to_multiply
             .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<Vec<_>>>();
-        Ok(partitions)
+        Ok((partitions, can_be_split))
     }
 
     fn distribute_multi_partitions(
@@ -1104,7 +1106,7 @@ impl ClusterSendExec {
         ps
     }
 
-    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {
+    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(IdRow<Partition>, RowRange)> {
         if ps.is_empty() {
             return Vec::new();
         }
@@ -1114,7 +1116,7 @@ impl ClusterSendExec {
         if multi_id.is_none() {
             return ps
                 .iter()
-                .map(|p| (p.get_id(), RowRange::default()))
+                .map(|p| (p.clone(), RowRange::default()))
                 .collect();
         }
         let filter = RowRange {
@@ -1129,7 +1131,7 @@ impl ClusterSendExec {
             } else {
                 filter.clone()
             };
-            r.push((p.get_id(), pf))
+            r.push((p.clone(), pf))
         }
         r
     }
@@ -1137,8 +1139,10 @@ impl ClusterSendExec {
     fn assign_nodes(
         c: &dyn ConfigObj,
         logical: Vec<Vec<InlineCompoundPartition>>,
+        can_be_split: bool,
     ) -> Vec<(String, (Vec<(u64, RowRange)>, Vec<InlineTableId>))> {
-        let mut m: HashMap<_, (Vec<(u64, RowRange)>, Vec<InlineTableId>)> = HashMap::new();
+        let mut m: HashMap<_, (Vec<(IdRow<Partition>, RowRange)>, Vec<InlineTableId>)> =
+            HashMap::new();
         for ps in &logical {
             let inline_table_ids = ps
                 .iter()
@@ -1178,7 +1182,60 @@ impl ClusterSendExec {
 
         let mut r = m.into_iter().collect_vec();
         r.sort_unstable_by(|l, r| l.0.cmp(&r.0));
-        r
+        r.into_iter()
+            .map(|(worker, data)| {
+                let splitted = Self::split_worker_partitions(c, data, can_be_split);
+                splitted.into_iter().map(move |data| (worker.clone(), data))
+            })
+            .flatten()
+            .collect_vec()
+    }
+
+    fn split_worker_partitions(
+        c: &dyn ConfigObj,
+        partitions: (Vec<(IdRow<Partition>, RowRange)>, Vec<InlineTableId>),
+        can_be_split: bool,
+    ) -> Vec<(Vec<(u64, RowRange)>, Vec<InlineTableId>)> {
+        if !can_be_split {
+            return vec![(
+                partitions
+                    .0
+                    .into_iter()
+                    .map(|(p, range)| (p.id, range))
+                    .collect_vec(),
+                partitions.1,
+            )];
+        }
+        let rows_split_threshold = c.partition_split_threshold() * c.cluster_send_split_threshold();
+        let file_size_split_threshold =
+            c.partition_size_split_threshold_bytes() * c.cluster_send_split_threshold();
+        let mut result = vec![];
+        let mut current_rows = 0;
+        let mut current_files_size = 0;
+        let mut current_chunk = vec![];
+        let (partitions, _) = partitions;
+        for (partition, range) in partitions {
+            let rows = partition.get_row().main_table_row_count();
+            let file_size = partition.get_row().file_size().unwrap_or_default();
+            if current_rows + rows > rows_split_threshold
+                || current_files_size + file_size > file_size_split_threshold
+            {
+                if !current_chunk.is_empty() {
+                    result.push((std::mem::take(&mut current_chunk), vec![]));
+                    current_rows = 0;
+                    current_files_size = 0;
+                }
+            }
+
+            current_rows += rows;
+            current_files_size += file_size;
+            current_chunk.push((partition.id, range));
+        }
+        if !current_chunk.is_empty() {
+            result.push((current_chunk, vec![]));
+        }
+
+        result
     }
 
     pub fn with_changed_schema(
@@ -1767,7 +1824,105 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Config, ConfigObjImpl};
     use datafusion::arrow::datatypes::Field;
+
+    fn make_partition(id: u64, row_count: u64, file_size: Option<u64>) -> IdRow<Partition> {
+        let mut p = Partition::new(1, None, None, None);
+        p = p.update_row_count(row_count);
+        if let Some(size) = file_size {
+            if size > 0 {
+                p = p.set_file_size(size).unwrap();
+            }
+        }
+        IdRow::new(id, p)
+    }
+
+    fn make_multi_partition(id: u64, multi_id: u64, row_count: u64) -> IdRow<Partition> {
+        let mut p = Partition::new(1, Some(multi_id), None, None);
+        p = p.update_row_count(row_count);
+        IdRow::new(id, p)
+    }
+
+    fn test_config() -> ConfigObjImpl {
+        Config::test_config_obj("split_test")
+    }
+
+    #[test]
+    fn test_split_worker_partitions_basic() {
+        let c = test_config();
+        // threshold = partition_split_threshold(20) * cluster_send_split_threshold(4) = 80 rows
+        let partitions: Vec<(IdRow<Partition>, RowRange)> = (0..10)
+            .map(|i| (make_partition(i, 30, None), RowRange::default()))
+            .collect();
+        // 10 partitions * 30 rows = 300 total, threshold = 80
+        // Chunk boundary triggers when adding next partition would exceed threshold:
+        // [0,1](60) -> adding 2 would be 90>80, flush [0,1], start [2]
+        // [2,3](60) -> adding 4 would be 90>80, flush [2,3], start [4]
+        // ... -> 5 chunks of 2 each
+        let result = ClusterSendExec::split_worker_partitions(&c, (partitions, vec![]), true);
+        assert_eq!(result.len(), 5);
+        for chunk in &result {
+            assert_eq!(chunk.0.len(), 2);
+        }
+        // All inline_table_ids should be empty
+        for (_, inline) in &result {
+            assert!(inline.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_split_worker_partitions_single_large() {
+        let c = test_config();
+        // One partition with 200 rows, threshold = 80
+        let partitions = vec![(make_partition(1, 200, None), RowRange::default())];
+        let result = ClusterSendExec::split_worker_partitions(&c, (partitions, vec![]), true);
+        // Cannot split a single partition further, should return 1 chunk
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0.len(), 1);
+        assert_eq!(result[0].0[0].0, 1);
+    }
+
+    #[test]
+    fn test_split_worker_partitions_by_file_size() {
+        let c = test_config();
+        // file_size threshold = partition_size_split_threshold_bytes(2048) * cluster_send_split_threshold(4) = 8192
+        let partitions: Vec<(IdRow<Partition>, RowRange)> = (0..4)
+            .map(|i| (make_partition(i, 1, Some(3000)), RowRange::default()))
+            .collect();
+        // 4 partitions * 3000 bytes, threshold = 8192
+        // [0,1](6000) [2,3](6000) — split after 2 because 3*3000=9000 > 8192
+        let result = ClusterSendExec::split_worker_partitions(&c, (partitions, vec![]), true);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0.len(), 2);
+        assert_eq!(result[1].0.len(), 2);
+    }
+
+    #[test]
+    fn test_split_worker_partitions_not_splittable() {
+        let c = test_config();
+        let inline_ids: Vec<InlineTableId> = vec![100, 200];
+        let partitions: Vec<(IdRow<Partition>, RowRange)> = (0..5)
+            .map(|i| (make_partition(i, 30, None), RowRange::default()))
+            .collect();
+        // can_be_split = false -> should return single chunk with inline_table_ids preserved
+        let result =
+            ClusterSendExec::split_worker_partitions(&c, (partitions, inline_ids.clone()), false);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0.len(), 5);
+        assert_eq!(result[0].1, inline_ids);
+    }
+
+    #[test]
+    fn test_split_worker_partitions_multi_partition_not_splittable() {
+        let c = test_config();
+        let partitions: Vec<(IdRow<Partition>, RowRange)> = (0..5)
+            .map(|i| (make_multi_partition(i, 42, 30), RowRange::default()))
+            .collect();
+        let result = ClusterSendExec::split_worker_partitions(&c, (partitions, vec![]), false);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0.len(), 5);
+    }
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {
