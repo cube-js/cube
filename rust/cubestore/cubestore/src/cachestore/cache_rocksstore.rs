@@ -1346,7 +1346,7 @@ impl CacheStore for RocksCacheStore {
                             "QUEUE RETRIEVE requires a process_id in the connection context (x-process-id header)".to_string(),
                         )),
                         (None, Some(_)) => {
-                            log::warn!("Incorrect queue_item with exclusive flag, empty process_id, id: {}", caller_process_id);
+                            log::warn!("Incorrect queue_item with exclusive flag, empty process_id, id: {:?}", caller_process_id);
 
                             return Ok(QueueRetrieveResponse::NotFound { pending, active })
                         }
@@ -1357,6 +1357,9 @@ impl CacheStore for RocksCacheStore {
                                 pending,
                                 active,
                             })
+                        },
+                        (None, None) => {
+                            // No process_id on item and no caller — allow retrieval
                         }
                     }
                 }

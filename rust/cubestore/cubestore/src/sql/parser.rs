@@ -220,6 +220,34 @@ pub struct CubeStoreParser<'a> {
     parser: Parser<'a>,
 }
 
+macro_rules! parse_sql_options {
+    ($self:expr, { $($name:literal => $body:expr),* $(,)? }) => {{
+        const _OPTION_COUNT: usize = { let mut n = 0usize; $( { let _ = $name; n += 1; } )* n };
+        const _: () = assert!(_OPTION_COUNT <= 32, "parse_sql_options! supports at most 32 options");
+
+        let mut __seen = [false; _OPTION_COUNT];
+        let mut __idx: usize;
+
+        loop {
+            __idx = 0;
+            $(
+                if $self.parse_custom_token($name) {
+                    if __seen[__idx] {
+                        return Err(ParserError::ParserError(format!(
+                            "Duplicate option: {}", $name.to_uppercase()
+                        )));
+                    }
+                    __seen[__idx] = true;
+                    $body;
+                    continue;
+                }
+                __idx += 1;
+            )*
+            break;
+        }
+    }};
+}
+
 impl<'a> CubeStoreParser<'a> {
     pub fn new(sql: &str) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
@@ -478,19 +506,15 @@ impl<'a> CubeStoreParser<'a> {
 
         let command = match method.as_str() {
             "add" => {
-                let exclusive = self.parse_custom_token(&"exclusive");
+                let mut exclusive = false;
+                let mut priority = 0i64;
+                let mut orphaned: Option<u32> = None;
 
-                let priority = if self.parse_custom_token(&"priority") {
-                    self.parse_integer(&"priority", true)?
-                } else {
-                    0
-                };
-
-                let orphaned = if self.parse_custom_token(&"orphaned") {
-                    Some(self.parse_integer("orphaned", false)?)
-                } else {
-                    None
-                };
+                parse_sql_options!(self, {
+                    "exclusive" => { exclusive = true },
+                    "priority" => { priority = self.parse_integer("priority", true)? },
+                    "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
+                });
 
                 QueueCommand::Add {
                     exclusive,
@@ -928,6 +952,102 @@ mod tests {
             }
             _ => {}
         }
+    }
+
+    #[test]
+    fn parse_queue_add_options_any_order() {
+        // Original order: EXCLUSIVE PRIORITY ORPHANED
+        let query = "QUEUE ADD EXCLUSIVE PRIORITY 1 ORPHANED 60 'key' 'value'";
+        let mut parser = CubeStoreParser::new(query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, 1);
+                assert_eq!(orphaned, Some(60));
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        // Reversed order: PRIORITY then EXCLUSIVE
+        let query = "QUEUE ADD PRIORITY 5 EXCLUSIVE 'key' 'value'";
+        let mut parser = CubeStoreParser::new(query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, 5);
+                assert_eq!(orphaned, None);
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        // ORPHANED first, then PRIORITY, no EXCLUSIVE
+        let query = "QUEUE ADD ORPHANED 120 PRIORITY -3 'key' 'value'";
+        let mut parser = CubeStoreParser::new(query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, -3);
+                assert_eq!(orphaned, Some(120));
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        // No options at all
+        let query = "QUEUE ADD 'key' 'value'";
+        let mut parser = CubeStoreParser::new(query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, 0);
+                assert_eq!(orphaned, None);
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+    }
+
+    #[test]
+    fn parse_queue_add_duplicate_option_error() {
+        let query = "QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'";
+        let mut parser = CubeStoreParser::new(query).unwrap();
+        let res = parser.parse_statement();
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: PRIORITY"));
+
+        let query = "QUEUE ADD EXCLUSIVE EXCLUSIVE 'key' 'value'";
+        let mut parser = CubeStoreParser::new(query).unwrap();
+        let res = parser.parse_statement();
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: EXCLUSIVE"));
     }
 
     #[test]
