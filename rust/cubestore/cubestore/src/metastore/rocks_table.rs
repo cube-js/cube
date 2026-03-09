@@ -1,3 +1,4 @@
+use crate::cachestore::LFU_INIT_VAL;
 use crate::metastore::rocks_store::TableId;
 use crate::metastore::{
     get_fixed_prefix, BatchPipe, DbTableRef, IdRow, IndexId, KeyVal, MemorySequence,
@@ -176,7 +177,7 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
                     &hash,
                     expire,
                     RocksSecondaryIndexValueTTLExtended {
-                        lfu: 0,
+                        lfu: LFU_INIT_VAL,
                         // Specify the current time as protection from LRU eviction
                         lru: Some(Utc::now()),
                         raw_size: self.raw_value_size(row),
