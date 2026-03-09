@@ -4,6 +4,16 @@
   width: 16rem; /* Match sidebar width (w-64) */
 }
 
+@media (max-width: 767px) {
+  .container {
+    width: auto;
+  }
+
+  .version {
+    display: none;
+  }
+}
+
 .logoLink {
   display: flex;
   align-items: center;
