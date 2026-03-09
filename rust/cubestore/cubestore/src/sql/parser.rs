@@ -112,6 +112,7 @@ impl CacheCommand {
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueueCommand {
     Add {
+        exclusive: bool,
         priority: i64,
         orphaned: Option<u32>,
         key: Ident,
@@ -217,6 +218,34 @@ pub enum CacheStoreCommand {
 
 pub struct CubeStoreParser<'a> {
     parser: Parser<'a>,
+}
+
+macro_rules! parse_sql_options {
+    ($self:expr, { $($name:literal => $body:expr),* $(,)? }) => {{
+        const _OPTION_COUNT: usize = { let mut n = 0usize; $( { let _ = $name; n += 1; } )* n };
+        const _: () = assert!(_OPTION_COUNT <= 32, "parse_sql_options! supports at most 32 options");
+
+        let mut __seen = [false; _OPTION_COUNT];
+        let mut __idx: usize;
+
+        loop {
+            __idx = 0;
+            $(
+                if $self.parse_custom_token($name) {
+                    if __seen[__idx] {
+                        return Err(ParserError::ParserError(format!(
+                            "Duplicate option: {}", $name.to_uppercase()
+                        )));
+                    }
+                    __seen[__idx] = true;
+                    $body;
+                    continue;
+                }
+                __idx += 1;
+            )*
+            break;
+        }
+    }};
 }
 
 impl<'a> CubeStoreParser<'a> {
@@ -477,19 +506,18 @@ impl<'a> CubeStoreParser<'a> {
 
         let command = match method.as_str() {
             "add" => {
-                let priority = if self.parse_custom_token(&"priority") {
-                    self.parse_integer(&"priority", true)?
-                } else {
-                    0
-                };
+                let mut exclusive = false;
+                let mut priority = 0i64;
+                let mut orphaned: Option<u32> = None;
 
-                let orphaned = if self.parse_custom_token(&"orphaned") {
-                    Some(self.parse_integer("orphaned", false)?)
-                } else {
-                    None
-                };
+                parse_sql_options!(self, {
+                    "exclusive" => { exclusive = true },
+                    "priority" => { priority = self.parse_integer("priority", true)? },
+                    "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
+                });
 
                 QueueCommand::Add {
+                    exclusive,
                     priority,
                     orphaned,
                     key: self.parser.parse_identifier()?,
@@ -864,10 +892,16 @@ impl<'a> CubeStoreParser<'a> {
 mod tests {
 
     use super::*;
+    use crate::CubeError;
     use sqlparser::ast::Statement as SQLStatement;
 
+    fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
+        let mut parser = CubeStoreParser::new(query)?;
+        Ok(parser.parse_statement()?)
+    }
+
     #[test]
-    fn parse_aggregate_index() {
+    fn parse_aggregate_index() -> Result<(), CubeError> {
         let query = "CREATE TABLE foo.Orders (
             id int,
             platform varchar(255),
@@ -882,21 +916,18 @@ mod tests {
             AGGREGATE INDEX aggr_index (platform, age)
             INDEX index2 (age, platform )
             ;";
-        let mut parser = CubeStoreParser::new(&query).unwrap();
-        let res = parser.parse_statement().unwrap();
+        let res = parse_stmt(query)?;
         match res {
             Statement::CreateTable {
                 indexes,
                 aggregates,
                 ..
             } => {
-                assert_eq!(aggregates.as_ref().unwrap()[0].0.value, "sum".to_string());
-                assert_eq!(aggregates.as_ref().unwrap()[0].1.value, "count".to_string());
-                assert_eq!(aggregates.as_ref().unwrap()[1].0.value, "max".to_string());
-                assert_eq!(
-                    aggregates.as_ref().unwrap()[1].1.value,
-                    "max_id".to_string()
-                );
+                let aggregates = aggregates.as_ref().expect("aggregates should be present");
+                assert_eq!(aggregates[0].0.value, "sum".to_string());
+                assert_eq!(aggregates[0].1.value, "count".to_string());
+                assert_eq!(aggregates[1].0.value, "max".to_string());
+                assert_eq!(aggregates[1].1.value, "max_id".to_string());
 
                 assert_eq!(indexes.len(), 3);
 
@@ -908,7 +939,7 @@ mod tests {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &false);
                 } else {
-                    assert!(false);
+                    panic!("Expected CreateIndex");
                 }
 
                 let ind = &indexes[1];
@@ -919,25 +950,111 @@ mod tests {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &true);
                 } else {
-                    assert!(false);
+                    panic!("Expected CreateIndex");
                 }
             }
-            _ => {}
+            _ => panic!("Expected CreateTable"),
         }
+
+        Ok(())
     }
 
     #[test]
-    fn parse_metastore_set_current() {
-        let query = "sys MeTasTore SEt_Current 1671235558783";
-        let mut parser = CubeStoreParser::new(&query).unwrap();
-        let res = parser.parse_statement().unwrap();
+    fn parse_queue_add_options_any_order() -> Result<(), CubeError> {
+        // Original order: EXCLUSIVE PRIORITY ORPHANED
+        let res = parse_stmt("QUEUE ADD EXCLUSIVE PRIORITY 1 ORPHANED 60 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, 1);
+                assert_eq!(orphaned, Some(60));
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        let res = parse_stmt("QUEUE ADD PRIORITY 5 EXCLUSIVE 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, 5);
+                assert_eq!(orphaned, None);
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        let res = parse_stmt("QUEUE ADD ORPHANED 120 PRIORITY -3 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, -3);
+                assert_eq!(orphaned, Some(120));
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        // No options at all
+        let res = parse_stmt("QUEUE ADD 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, 0);
+                assert_eq!(orphaned, None);
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_add_duplicate_option_error() -> Result<(), CubeError> {
+        let res = parse_stmt("QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'");
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: PRIORITY"));
+
+        let res = parse_stmt("QUEUE ADD EXCLUSIVE EXCLUSIVE 'key' 'value'");
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: EXCLUSIVE"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_metastore_set_current() -> Result<(), CubeError> {
+        let res = parse_stmt("sys MeTasTore SEt_Current 1671235558783")?;
         match res {
             Statement::System(SystemCommand::MetaStore(MetaStoreCommand::SetCurrent { id })) => {
                 assert_eq!(id, 1671235558783);
             }
-            _ => {
-                assert!(false)
-            }
+            _ => panic!("Expected MetaStore SetCurrent"),
         }
+
+        Ok(())
     }
 }

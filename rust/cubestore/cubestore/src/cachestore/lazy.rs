@@ -272,10 +272,11 @@ impl CacheStore for LazyRocksCacheStore {
         &self,
         path: String,
         allow_concurrency: u32,
+        caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         self.init()
             .await?
-            .queue_retrieve_by_path(path, allow_concurrency)
+            .queue_retrieve_by_path(path, allow_concurrency, caller_process_id)
             .await
     }
 
