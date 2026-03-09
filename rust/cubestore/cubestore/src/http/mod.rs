@@ -109,20 +109,31 @@ impl HttpServer {
 
         let auth_filter = warp::any()
             .and(warp::header::optional("authorization"))
-            .and_then(move |auth_header: Option<String>| {
-                let auth_service = auth_service.clone();
-                async move {
-                    let res = HttpServer::authorize(auth_service, auth_header).await;
-                    match res {
-                        Ok(user) => Ok(SqlQueryContext {
-                            user,
-                            inline_tables: InlineTables::new(),
-                            trace_obj: None,
-                        }),
-                        Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
+            .and(warp::header::optional("x-process-id"))
+            .and_then(
+                move |auth_header: Option<String>, process_id: Option<String>| {
+                    let auth_service = auth_service.clone();
+                    async move {
+                        if let Some(ref id) = process_id {
+                            if id.len() > 64 {
+                                return Err(warp::reject::custom(CubeRejection::Internal(
+                                    "x-process-id header exceeds 64 characters".to_string(),
+                                )));
+                            }
+                        }
+                        let res = HttpServer::authorize(auth_service, auth_header).await;
+                        match res {
+                            Ok(user) => Ok(SqlQueryContext {
+                                user,
+                                inline_tables: InlineTables::new(),
+                                trace_obj: None,
+                                process_id,
+                            }),
+                            Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
+                        }
                     }
-                }
-            });
+                },
+            );
 
         let context_filter = tx_to_move_filter.and(auth_filter.clone());
 
@@ -137,11 +148,13 @@ impl HttpServer {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
                 Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                    let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
+                    trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
                             Some(res) = response_rx.recv() => {
-                                trace!("Sending web socket response");
+                                trace!("Sending web socket response (process_id: {})", process_id);
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
@@ -162,7 +175,7 @@ impl HttpServer {
                                             match HttpMessage::read(msg.into_bytes()).await {
                                                 Err(e) => error!("Websocket message read error: {:?}", e),
                                                 Ok(msg) => {
-                                                    trace!("Received web socket message");
+                                                    trace!("Received web socket message (process_id: {})", process_id);
                                                     let message_id = msg.message_id;
                                                     let connection_id = msg.connection_id.clone();
                                                     // TODO use timeout instead of try send for burst control however try_send is safer for now
