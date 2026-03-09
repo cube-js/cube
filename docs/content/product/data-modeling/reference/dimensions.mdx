@@ -578,6 +578,60 @@ cube(`orders`, {
 
 </CodeTabs>
 
+### `mask`
+
+The optional `mask` parameter defines the replacement value used when the
+dimension is masked by a [data masking][ref-data-masking] access policy.
+
+The mask can be a static value (number, boolean, or string) or a SQL expression:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: secret_code
+        sql: secret_code
+        type: string
+        mask:
+          sql: "CONCAT('***', RIGHT({CUBE}.secret_code, 3))"
+
+      - name: revenue
+        sql: revenue
+        type: number
+        mask: -1
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    secret_code: {
+      sql: `secret_code`,
+      type: `string`,
+      mask: {
+        sql: (CUBE) => `CONCAT('***', RIGHT(${CUBE}.secret_code, 3))`
+      }
+    },
+
+    revenue: {
+      sql: `revenue`,
+      type: `number`,
+      mask: -1
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+If no `mask` is defined, the default mask value is `NULL`. See
+[data masking][ref-data-masking] for more details.
+
 ### `sub_query`
 
 The `sub_query` statement allows you to reference a measure in a dimension. It's
@@ -960,3 +1014,4 @@ cube(`fiscal_calendar`, {
 [ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
 [ref-cube-calendar]: /product/data-modeling/reference/cube#calendar
 [ref-measure-time-shift]: /product/data-modeling/reference/measures#time_shift
+[ref-data-masking]: /product/auth/data-masking

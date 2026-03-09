@@ -238,6 +238,55 @@ Depending on the measure [type](#type), the `sql` parameter would either:
 function according to the measure type (in case of the `avg`, `count_distinct`,
 `count_distinct_approx`, `min`, `max`, and `sum` types).
 
+### `mask`
+
+The optional `mask` parameter defines the replacement value used when the
+measure is masked by a [data masking][ref-data-masking] access policy.
+
+The mask can be a static value (number, boolean, or string):
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+        mask: 0
+
+      - name: total_revenue
+        sql: revenue
+        type: sum
+        mask: -1
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`,
+      mask: 0
+    },
+
+    total_revenue: {
+      sql: `revenue`,
+      type: `sum`,
+      mask: -1
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+If no `mask` is defined, the default mask value is `NULL`. See
+[data masking][ref-data-masking] for more details.
+
 ### `filters`
 
 If you want to add some conditions for a metric's calculation, you should use
@@ -1188,3 +1237,4 @@ cubes:
 [ref-nested-aggregate]: /product/data-modeling/concepts/multi-stage-calculations#nested-aggregate
 [ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /product/data-modeling/reference/types-and-formats#switch
+[ref-data-masking]: /product/auth/data-masking
