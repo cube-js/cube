@@ -297,14 +297,8 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("sys_cachestore_info", sys_cachestore_info),
         t("sys_metastore_healthcheck", sys_metastore_healthcheck),
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
-        t(
-            "join_multi_partition_small",
-            join_multi_partition_small,
-        ),
-        t(
-            "join_multi_partition_large",
-            join_multi_partition_large,
-        ),
+        t("join_multi_partition_small", join_multi_partition_small),
+        t("join_multi_partition_large", join_multi_partition_large),
     ];
 
     let test_list = if prefix == "migration" {
@@ -11533,11 +11527,26 @@ async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&result),
         vec![
-            vec![TableValue::String("customer_4".to_string()), TableValue::Int(2646)],
-            vec![TableValue::String("customer_3".to_string()), TableValue::Int(2562)],
-            vec![TableValue::String("customer_2".to_string()), TableValue::Int(2478)],
-            vec![TableValue::String("customer_1".to_string()), TableValue::Int(2394)],
-            vec![TableValue::String("customer_0".to_string()), TableValue::Int(2310)],
+            vec![
+                TableValue::String("customer_4".to_string()),
+                TableValue::Int(2646)
+            ],
+            vec![
+                TableValue::String("customer_3".to_string()),
+                TableValue::Int(2562)
+            ],
+            vec![
+                TableValue::String("customer_2".to_string()),
+                TableValue::Int(2478)
+            ],
+            vec![
+                TableValue::String("customer_1".to_string()),
+                TableValue::Int(2394)
+            ],
+            vec![
+                TableValue::String("customer_0".to_string()),
+                TableValue::Int(2310)
+            ],
         ]
     );
 
@@ -11549,10 +11558,7 @@ async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&total_result),
-        vec![vec![TableValue::Int(12390)]]
-    );
+    assert_eq!(to_rows(&total_result), vec![vec![TableValue::Int(12390)]]);
 }
 
 async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
@@ -11701,10 +11707,7 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&count_result),
-        vec![vec![TableValue::Int(150)]]
-    );
+    assert_eq!(to_rows(&count_result), vec![vec![TableValue::Int(150)]]);
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

@@ -1521,10 +1521,8 @@ impl ClusterSendExec {
         // Only the root (first/left-most) table can be safely split across
         // batches.  All other (right) tables must be included whole in every
         // batch, otherwise LEFT JOIN produces spurious NULLs / duplicates.
-        let right_partitions: Vec<InlineCompoundPartition> = tables[1..]
-            .iter()
-            .flat_map(|t| t.iter().cloned())
-            .collect();
+        let right_partitions: Vec<InlineCompoundPartition> =
+            tables[1..].iter().flat_map(|t| t.iter().cloned()).collect();
 
         let root = &tables[0];
         let max = config.max_joined_partitions();
