@@ -276,6 +276,10 @@ pub enum QueueRetrieveResponse {
         pending: u64,
         active: Vec<String>,
     },
+    ExclusiveAccessFailed {
+        pending: u64,
+        active: Vec<String>,
+    },
 }
 
 impl QueueRetrieveResponse {
@@ -304,7 +308,8 @@ impl QueueRetrieveResponse {
             ])],
             QueueRetrieveResponse::LockFailed { pending, active }
             | QueueRetrieveResponse::NotEnoughConcurrency { pending, active }
-            | QueueRetrieveResponse::NotFound { pending, active } => {
+            | QueueRetrieveResponse::NotFound { pending, active }
+            | QueueRetrieveResponse::ExclusiveAccessFailed { pending, active } => {
                 if extended {
                     vec![Row::new(vec![
                         TableValue::Null,

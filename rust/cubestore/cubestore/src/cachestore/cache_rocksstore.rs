@@ -1342,20 +1342,28 @@ impl CacheStore for RocksCacheStore {
             if id_row.get_row().get_status() == &QueueItemStatus::Pending {
                 if id_row.get_row().get_exclusive() {
                     match (id_row.get_row().get_process_id(), &caller_process_id) {
-                        (Some(item_process_id), Some(caller_id))
-                            if item_process_id == caller_id =>
-                        {
-                            // OK, caller matches the exclusive item owner
+                        (Some(_), None) => return Err(CubeError::user(
+                            "QUEUE RETRIEVE requires a process_id in the connection context (x-process-id header)".to_string(),
+                        )),
+                        (None, Some(_)) => {
+                            log::warn!("Incorrect queue_item with exclusive flag, empty process_id, id: {}", caller_process_id);
+
+                            return Ok(QueueRetrieveResponse::NotFound { pending, active })
                         }
-                        _ => {
-                            return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                        (Some(item_process_id), Some(caller_id)) => if item_process_id == caller_id {
+                            // OK, caller matches the exclusive item owner
+                        } else {
+                            return Ok(QueueRetrieveResponse::ExclusiveAccessFailed {
+                                pending,
+                                active,
+                            })
                         }
                     }
                 }
 
                 let mut new = id_row.get_row().clone();
                 new.status = QueueItemStatus::Active;
-                // It's  important to insert heartbeat, because
+                // It's important to insert heartbeat, because
                 // without that created datetime will be used for orphaned filtering
                 new.update_heartbeat();
 
