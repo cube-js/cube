@@ -148,11 +148,13 @@ impl HttpServer {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
                 Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                    let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
+                    trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
                             Some(res) = response_rx.recv() => {
-                                trace!("Sending web socket response");
+                                trace!("Sending web socket response (process_id: {})", process_id);
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
@@ -173,7 +175,7 @@ impl HttpServer {
                                             match HttpMessage::read(msg.into_bytes()).await {
                                                 Err(e) => error!("Websocket message read error: {:?}", e),
                                                 Ok(msg) => {
-                                                    trace!("Received web socket message");
+                                                    trace!("Received web socket message (process_id: {})", process_id);
                                                     let message_id = msg.message_id;
                                                     let connection_id = msg.connection_id.clone();
                                                     // TODO use timeout instead of try send for burst control however try_send is safer for now
