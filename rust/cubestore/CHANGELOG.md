@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.21](https://github.com/cube-js/cube/compare/v1.6.20...v1.6.21) (2026-03-10)
+
+### Features
+
+- **cubestore:** Logarithmic probabilistic increment of LFU counter ([#10478](https://github.com/cube-js/cube/issues/10478)) ([4b8ac6f](https://github.com/cube-js/cube/commit/4b8ac6ff81b0ee114cd0bc4a5e8235fe294c53a2))
+- **cubestore:** Queue - add exclusivity support ([#10479](https://github.com/cube-js/cube/issues/10479)) ([b5a0ec3](https://github.com/cube-js/cube/commit/b5a0ec32c061834af0c30bd7def9097ae27af32f))
+
 ## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
 
 ### Features

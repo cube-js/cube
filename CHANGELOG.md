@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.21](https://github.com/cube-js/cube/compare/v1.6.20...v1.6.21) (2026-03-10)
+
+### Bug Fixes
+
+- **cubesql:** Support per-column format codes (Tableau Desktop compatibility) ([#10484](https://github.com/cube-js/cube/issues/10484)) ([d6ad885](https://github.com/cube-js/cube/commit/d6ad885f384d675f25ca8405dad4ee5a559e98c3)), closes [#10418](https://github.com/cube-js/cube/issues/10418)
+
+### Features
+
+- **client-core:** Use `throwContinueWait` parameter in `cubeSql` method ([#10461](https://github.com/cube-js/cube/issues/10461)) ([53a80fd](https://github.com/cube-js/cube/commit/53a80fd159fb1655b5ac5b467414b4a5352fae90))
+- **cubesql:** Introduce `cube_cache` session variable ([#10483](https://github.com/cube-js/cube/issues/10483)) ([541aa34](https://github.com/cube-js/cube/commit/541aa3465f25cb55328249b95fa9c258c95f5e07))
+- **cubestore:** Logarithmic probabilistic increment of LFU counter ([#10478](https://github.com/cube-js/cube/issues/10478)) ([4b8ac6f](https://github.com/cube-js/cube/commit/4b8ac6ff81b0ee114cd0bc4a5e8235fe294c53a2))
+- **cubestore:** Queue - add exclusivity support ([#10479](https://github.com/cube-js/cube/issues/10479)) ([b5a0ec3](https://github.com/cube-js/cube/commit/b5a0ec32c061834af0c30bd7def9097ae27af32f))
+
 ## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
 
 ### Bug Fixes

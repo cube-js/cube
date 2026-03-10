@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.21](https://github.com/cube-js/cube/compare/v1.6.20...v1.6.21) (2026-03-10)
+
+### Features
+
+- **client-core:** Use `throwContinueWait` parameter in `cubeSql` method ([#10461](https://github.com/cube-js/cube/issues/10461)) ([53a80fd](https://github.com/cube-js/cube/commit/53a80fd159fb1655b5ac5b467414b4a5352fae90))
+
 ## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
 
 **Note:** Version bump only for package @cubejs-client/core
