@@ -1,5 +1,6 @@
 pub mod collectors;
 pub mod compiler;
+pub mod cube_ref_evaluator;
 pub mod references_builder;
 pub mod sql_call;
 mod sql_call_builder;
@@ -10,6 +11,7 @@ pub mod visitor;
 
 pub use crate::utils::debug::DebugSql;
 pub use compiler::Compiler;
+pub use cube_ref_evaluator::CubeRefEvaluator;
 pub use references_builder::ReferencesBuilder;
 pub use sql_call::*;
 pub use sql_visitor::SqlEvaluatorVisitor;

@@ -8,7 +8,9 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
 use crate::planner::sql_evaluator::CubeTableSymbol;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{
+    sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
+};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
@@ -325,6 +327,23 @@ impl MeasureSymbol {
             case.extract_symbol_deps(&mut deps);
         }
         deps
+    }
+
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        let mut refs = self.kind.get_cube_refs();
+        for filter in self.measure_filters.iter() {
+            filter.extract_cube_refs(&mut refs);
+        }
+        for filter in self.measure_drill_filters.iter() {
+            filter.extract_cube_refs(&mut refs);
+        }
+        for order in self.measure_order_by.iter() {
+            order.sql_call().extract_cube_refs(&mut refs);
+        }
+        if let Some(case) = &self.case {
+            case.extract_cube_refs(&mut refs);
+        }
+        refs
     }
 
     pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
@@ -709,9 +728,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && add_group_by.is_none()
                 && group_by.is_none());
 
-        let cube_symbol = compiler
-            .add_cube_table_evaluator(path.cube_name().clone())?
-            .as_cube_table()?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
 
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_symbol,

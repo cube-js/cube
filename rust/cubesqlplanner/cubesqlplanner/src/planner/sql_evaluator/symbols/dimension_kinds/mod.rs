@@ -11,7 +11,7 @@ pub use switch::*;
 use super::common::DimensionType;
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -85,6 +85,15 @@ impl DimensionKind {
             Self::Geo(g) => g.iter_sql_calls(),
             Self::Switch(s) => s.iter_sql_calls(),
             Self::Case(c) => c.iter_sql_calls(),
+        }
+    }
+
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        match self {
+            Self::Regular(r) => r.get_cube_refs(),
+            Self::Geo(g) => g.get_cube_refs(),
+            Self::Switch(s) => s.get_cube_refs(),
+            Self::Case(c) => c.get_cube_refs(),
         }
     }
 

@@ -1,4 +1,3 @@
-use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
@@ -10,6 +9,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct CubeNameSymbol {
     cube_name: String,
 }
@@ -46,13 +46,14 @@ impl CubeNameSymbolFactory {
     }
 }
 
-impl SymbolFactory for CubeNameSymbolFactory {
-    fn build(self, _compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
+impl CubeNameSymbolFactory {
+    pub fn build(self, _compiler: &mut Compiler) -> Result<Rc<CubeNameSymbol>, CubeError> {
         let Self { cube_name } = self;
-        Ok(MemberSymbol::new_cube_name(CubeNameSymbol::new(cube_name)))
+        Ok(CubeNameSymbol::new(cube_name))
     }
 }
 
+#[derive(Debug)]
 pub struct CubeTableSymbol {
     cube_name: String,
     member_sql: Option<Rc<SqlCall>>,
@@ -150,10 +151,8 @@ impl CubeTableSymbolFactory {
             is_table_sql,
         })
     }
-}
 
-impl SymbolFactory for CubeTableSymbolFactory {
-    fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
+    pub fn build(self, compiler: &mut Compiler) -> Result<Rc<CubeTableSymbol>, CubeError> {
         let Self {
             cube_name,
             sql,
@@ -170,13 +169,13 @@ impl SymbolFactory for CubeTableSymbolFactory {
         } else {
             PlanSqlTemplates::alias_name(&cube_name)
         };
-        Ok(MemberSymbol::new_cube_table(CubeTableSymbol::new(
+        Ok(CubeTableSymbol::new(
             cube_name,
             sql,
             alias,
             is_table_sql,
             definition.static_data().join_map.clone(),
-        )))
+        ))
     }
 }
 

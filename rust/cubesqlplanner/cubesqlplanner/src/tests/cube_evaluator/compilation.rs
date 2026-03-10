@@ -280,10 +280,6 @@ fn test_add_cube_table_evaluator() {
         .add_cube_table_evaluator("visitors".to_string())
         .unwrap();
 
-    assert!(symbol.is_cube());
-    assert!(!symbol.is_dimension());
-    assert!(!symbol.is_measure());
-    assert_eq!(symbol.full_name(), "visitors");
     assert_eq!(symbol.cube_name(), "visitors");
 }
 
@@ -298,10 +294,6 @@ fn test_add_cube_name_evaluator() {
         .add_cube_name_evaluator("visitors".to_string())
         .unwrap();
 
-    assert!(symbol.is_cube());
-    assert!(!symbol.is_dimension());
-    assert!(!symbol.is_measure());
-    assert_eq!(symbol.full_name(), "visitors");
     assert_eq!(symbol.cube_name(), "visitors");
 }
 
@@ -324,12 +316,11 @@ fn test_dimension_with_cube_table_dependency() {
     );
 
     let dependencies = symbol.get_dependencies();
-    assert_eq!(dependencies.len(), 1, "Should have 1 dependency on CUBE");
+    assert_eq!(dependencies.len(), 0, "Should have no member dependencies");
 
-    let dep = &dependencies[0];
-    assert!(dep.is_cube(), "Dependency should be a cube symbol");
-    assert_eq!(dep.full_name(), "visitors");
-    assert_eq!(dep.cube_name(), "visitors");
+    let cube_refs = symbol.get_cube_refs();
+    assert_eq!(cube_refs.len(), 1, "Should have 1 cube ref dependency");
+    assert_eq!(cube_refs[0].cube_name(), "visitors");
 }
 
 #[test]
@@ -424,12 +415,11 @@ fn test_measure_with_cube_table_dependency() {
     ));
 
     let dependencies = symbol.get_dependencies();
-    assert_eq!(dependencies.len(), 1, "Should have 1 dependency on CUBE");
+    assert_eq!(dependencies.len(), 0, "Should have no member dependencies");
 
-    let dep = &dependencies[0];
-    assert!(dep.is_cube(), "Dependency should be a cube symbol");
-    assert_eq!(dep.full_name(), "visitors");
-    assert_eq!(dep.cube_name(), "visitors");
+    let cube_refs = symbol.get_cube_refs();
+    assert_eq!(cube_refs.len(), 1, "Should have 1 cube ref dependency");
+    assert_eq!(cube_refs[0].cube_name(), "visitors");
 }
 
 #[test]

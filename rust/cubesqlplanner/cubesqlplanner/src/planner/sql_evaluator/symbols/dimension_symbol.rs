@@ -8,7 +8,9 @@ use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{
+    sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
+};
 use crate::planner::sql_evaluator::{CubeTableSymbol, TimeDimensionSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
@@ -227,6 +229,10 @@ impl DimensionSymbol {
 
     pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
         self.kind.get_dependencies_with_path()
+    }
+
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        self.kind.get_cube_refs()
     }
 
     pub fn cube_name(&self) -> &String {
@@ -462,9 +468,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             .propagate_filters_to_sub_query
             .unwrap_or(false);
 
-        let cube_symbol = compiler
-            .add_cube_table_evaluator(path.cube_name().clone())?
-            .as_cube_table()?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
 
         let symbol = MemberSymbol::new_dimension(DimensionSymbol::new(
             cube_symbol,

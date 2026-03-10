@@ -1,5 +1,6 @@
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::CubeRef;
 use crate::planner::time_dimension::Granularity;
 use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
@@ -169,6 +170,17 @@ impl TimeDimensionSymbol {
 
         deps.append(&mut self.base_symbol.get_dependencies_with_path());
         deps
+    }
+
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        let mut refs = vec![];
+        if let Some(granularity_obj) = &self.granularity_obj {
+            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
+                calendar_sql.extract_cube_refs(&mut refs);
+            }
+        }
+        refs.append(&mut self.base_symbol.get_cube_refs());
+        refs
     }
 
     pub fn cube_name(&self) -> String {
