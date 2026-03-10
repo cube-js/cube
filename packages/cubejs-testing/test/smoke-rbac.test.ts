@@ -472,6 +472,28 @@ describe('Cube RBAC Engine', () => {
         expect(Number(row.count)).toBe(12345);
       }
     });
+
+    test('masked measure grouped by real dimension returns mask per group', async () => {
+      const res = await connection.query(
+        'SELECT public_dim, count FROM masking_test GROUP BY 1 ORDER BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.public_dim).not.toBeNull();
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
+    test('masked measure grouped by masked dimension', async () => {
+      const res = await connection.query(
+        'SELECT secret_number, count FROM masking_test GROUP BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
   });
 
   /**
@@ -647,6 +669,52 @@ describe('Cube RBAC Engine', () => {
         expect(row['masking_test.total_quantity']).not.toBeNull();
         expect(row['masking_test.count']).toBe(12345);
         expect(row['masking_test.public_dim']).not.toBeNull();
+      }
+    });
+
+    test('cube: masked measure grouped by masked dimension', async () => {
+      const result = await maskingViewerClient.load({
+        measures: ['masking_test.count'],
+        dimensions: ['masking_test.secret_number'],
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.secret_number']).toBe(-1);
+        expect(row['masking_test.count']).toBe(12345);
+      }
+    });
+
+    test('cube: masked measure grouped by real dimension (partial access)', async () => {
+      const result = await maskingPartialClient.load({
+        measures: ['masking_test.count'],
+        dimensions: ['masking_test.public_dim'],
+        order: { 'masking_test.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.public_dim']).not.toBeNull();
+        expect(row['masking_test.count']).toBe(12345);
+      }
+    });
+
+    test('cube: multiple masked measures grouped by real dimension', async () => {
+      const result = await maskingPartialClient.load({
+        measures: ['masking_test.count', 'masking_test.total_quantity'],
+        dimensions: ['masking_test.public_dim'],
+        order: { 'masking_test.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.public_dim']).not.toBeNull();
+        // count is masked, total_quantity is real
+        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.total_quantity']).not.toBeNull();
       }
     });
 
