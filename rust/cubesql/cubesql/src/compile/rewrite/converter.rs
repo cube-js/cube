@@ -2099,7 +2099,7 @@ impl LanguageToLogicalPlanConverter {
                     CubeScanOptions {
                         change_user,
                         max_records,
-                        cache_mode: cache_mode.clone(),
+                        cache_mode: *cache_mode,
                         throw_continue_wait,
                     },
                     alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),

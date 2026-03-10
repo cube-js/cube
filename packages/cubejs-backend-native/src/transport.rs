@@ -379,7 +379,7 @@ impl TransportService for NodeBridgeTransport {
                 member_to_alias: None,
                 expression_params: None,
                 streaming: false,
-                cache_mode: cache_mode.clone(),
+                cache_mode,
             })?;
 
             let result = call_raw_js_with_channel_as_callback(
