@@ -27,6 +27,21 @@ impl TestContext {
     }
 
     pub fn new_with_timezone(schema: MockSchema, timezone: Tz) -> Result<Self, CubeError> {
+        Self::new_with_options(schema, timezone, None)
+    }
+
+    pub fn new_with_masked_members(
+        schema: MockSchema,
+        masked_members: Vec<String>,
+    ) -> Result<Self, CubeError> {
+        Self::new_with_options(schema, Tz::UTC, Some(masked_members))
+    }
+
+    fn new_with_options(
+        schema: MockSchema,
+        timezone: Tz,
+        masked_members: Option<Vec<String>>,
+    ) -> Result<Self, CubeError> {
         let base_tools = schema.create_base_tools()?;
         let join_graph = Rc::new(schema.create_join_graph()?);
         let evaluator = schema.create_evaluator();
@@ -40,7 +55,7 @@ impl TestContext {
             join_graph,
             Some(timezone.to_string()),
             false, // export_annotated_sql
-            None,  // masked_members
+            masked_members,
         )?;
 
         Ok(Self {

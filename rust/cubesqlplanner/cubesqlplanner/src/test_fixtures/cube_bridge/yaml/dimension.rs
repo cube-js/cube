@@ -48,6 +48,8 @@ pub struct YamlDimensionDefinition {
     time_shift: Vec<YamlTimeShiftDefinition>,
     #[serde(default)]
     granularities: Vec<YamlGranularityEntry>,
+    #[serde(default)]
+    resolved_mask_sql: Option<String>,
 }
 
 impl YamlDimensionDefinition {
@@ -91,6 +93,7 @@ impl YamlDimensionDefinition {
             .latitude_opt(self.latitude)
             .longitude_opt(self.longitude)
             .time_shift(time_shift)
+            .resolved_mask_sql_opt(self.resolved_mask_sql)
             .build();
 
         YamlDimensionBuildResult {

@@ -43,6 +43,8 @@ pub struct MockMeasureDefinition {
     drill_filters: Option<Vec<Rc<MockStructWithSqlMember>>>,
     #[builder(default)]
     order_by: Option<Vec<Rc<MockMemberOrderBy>>>,
+    #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
+    resolved_mask_sql: Option<String>,
 }
 
 impl_static_data!(
@@ -143,11 +145,14 @@ impl MeasureDefinition for MockMeasureDefinition {
     }
 
     fn has_resolved_mask_sql(&self) -> Result<bool, CubeError> {
-        Ok(false)
+        Ok(self.resolved_mask_sql.is_some())
     }
 
     fn resolved_mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
-        Ok(None)
+        match &self.resolved_mask_sql {
+            Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
+            None => Ok(None),
+        }
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
