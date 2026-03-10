@@ -35,9 +35,21 @@ impl ResultFormat {
         match self {
             ResultFormat::AllText => protocol::Format::Text,
             ResultFormat::AllBinary => protocol::Format::Binary,
-            ResultFormat::PerColumn(formats) => {
-                formats.get(idx).copied().unwrap_or(protocol::Format::Text)
-            }
+            ResultFormat::PerColumn(formats) => match formats.get(idx) {
+                Some(&fmt) => fmt,
+                // Per PG protocol, the number of format codes must equal the number of
+                // result columns. The fallback here should never be reached in practice;
+                // it is a defensive default for malformed or empty format vectors.
+                None => {
+                    log::error!(
+                        "PerColumn format index {} out of bounds (len {}), falling back to Text",
+                        idx,
+                        formats.len()
+                    );
+
+                    protocol::Format::Text
+                }
+            },
         }
     }
 }
