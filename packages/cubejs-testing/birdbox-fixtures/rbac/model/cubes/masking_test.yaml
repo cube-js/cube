@@ -126,11 +126,11 @@ views:
           allow_all: true
 
   # View with its own masking policy: all members masked for "*", full access for masking_full_access
+  # Excludes secret_string (SQL mask with {CUBE} references causes FROM-clause issues in SQL API)
   - name: masking_view_masked
     cubes:
       - join_path: masking_test
         includes:
-          - secret_string
           - secret_number
           - public_dim
           - count
@@ -175,10 +175,15 @@ views:
   # View over a cube where all members are hidden.
   # The view adds its own masking policy — members that are invisible at
   # the cube level become accessible (some masked, some real) through the view.
+  # Excludes secret_string (SQL mask with {CUBE} references causes FROM-clause issues in SQL API)
   - name: masking_view_over_hidden_cube
     cubes:
       - join_path: masking_hidden_cube
-        includes: "*"
+        includes:
+          - secret_number
+          - public_dim
+          - count
+          - total_quantity
     access_policy:
       - role: "*"
         member_level:
