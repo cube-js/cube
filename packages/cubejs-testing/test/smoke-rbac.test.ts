@@ -473,6 +473,28 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
+    test('masked MEASURE() grouped by real dimension', async () => {
+      const res = await connection.query(
+        'SELECT public_dim, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 ORDER BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.public_dim).not.toBeNull();
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
+    test('masked MEASURE() grouped by masked dimension', async () => {
+      const res = await connection.query(
+        'SELECT secret_number, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
   });
 
   /**
