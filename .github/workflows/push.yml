@@ -546,6 +546,7 @@ jobs:
       matrix:
         node-version: [ 22.x ]
         python-version: [ 3.11 ]
+        use_tesseract_sql_planner: [ true, false ]
       fail-fast: false
 
     steps:
@@ -605,6 +606,8 @@ jobs:
           chmod +x ./rust/cubestore/downloaded/latest/bin/cubestored
       - name: Run Integration smoke tests
         timeout-minutes: 30
+        env:
+          CUBEJS_TESSERACT_SQL_PLANNER: ${{ matrix.use_tesseract_sql_planner }}
         run: ./.github/actions/smoke.sh
 
   docker-image-latest-set-tag:
