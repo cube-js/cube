@@ -38,7 +38,7 @@ export class SubscriptionServer {
   ) {
   }
 
-  protected resultFn(connectionId: string, messageId: string | number | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
+  protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
       if (logNetworkUsage) {
         this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
@@ -158,7 +158,7 @@ export class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
-      const subscriptionId = String(message.messageId);
+      const subscriptionId = message.messageId;
       const baseRequestId = message.requestId || `${connectionId}-${subscriptionId}`;
       const requestId = `${baseRequestId}-span-${uuidv4()}`;
 
