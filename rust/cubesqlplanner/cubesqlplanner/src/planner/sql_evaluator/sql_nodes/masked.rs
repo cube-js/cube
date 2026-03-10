@@ -26,11 +26,19 @@ impl SqlNode for MaskedSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if let Some(mask_call) = node.mask_sql() {
-            let full_name = node.full_name();
-            if query_tools.is_member_masked(&full_name) {
-                return mask_call.eval(visitor, node_processor, query_tools, templates);
+        // Only mask dimensions (and time dimensions). Measure masking is
+        // handled by FinalMeasureSqlNode so it can skip aggregation wrapping.
+        // In ungrouped queries measures should not be masked at all.
+        match node.as_ref() {
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {
+                if let Some(mask_call) = node.mask_sql() {
+                    let full_name = node.full_name();
+                    if query_tools.is_member_masked(&full_name) {
+                        return mask_call.eval(visitor, node_processor, query_tools, templates);
+                    }
+                }
             }
+            _ => {}
         }
         self.input
             .to_sql(visitor, node, query_tools, node_processor, templates)
