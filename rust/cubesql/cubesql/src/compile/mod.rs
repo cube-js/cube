@@ -18574,4 +18574,20 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_measure_func_returns_error() -> Result<(), CubeError> {
+        let query_result = execute_query(
+            // Easiest way to test `MEASURE` execution is to call it
+            // on a system table
+            "SELECT MEASURE(relname) FROM pg_class".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let error = query_result.expect_err("Query should return an error");
+        assert!(error.to_string().contains("required to be pushed down"));
+
+        Ok(())
+    }
 }

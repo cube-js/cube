@@ -848,6 +848,7 @@ impl CacheStore for CacheStoreMock {
         &self,
         _path: String,
         _allow_concurrency: u32,
+        _caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore mock!")
     }

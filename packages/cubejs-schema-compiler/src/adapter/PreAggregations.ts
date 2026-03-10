@@ -784,9 +784,15 @@ export class PreAggregations {
       const canUse = ((
         windowGranularityMatches(references)
       ) && (
+        (references.rollups.length > 0 &&
         R.all(
           (m: string) => references.measures.indexOf(m) !== -1,
-          references.rollups.length > 0 ? transformedQuery.leafMeasures : transformedQuery.leafMeasuresFullPaths,
+          transformedQuery.leafMeasures,
+        )
+        )
+        || R.all(
+          (m: string) => references.measures.indexOf(m) !== -1,
+          transformedQuery.leafMeasuresFullPaths,
         ) || (transformedQuery.isAdditive && R.all(
           m => backAliasMeasures.indexOf(m) !== -1,
           transformedQuery.measures,

@@ -305,7 +305,7 @@ impl CacheStoreSqlService {
 
     pub async fn exec_queue_command_with_context(
         &self,
-        _context: SqlQueryContext,
+        context: SqlQueryContext,
         command: QueueCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
         let command_tag = command.as_tag_command();
@@ -323,10 +323,17 @@ impl CacheStoreSqlService {
         let (result, additional_traffic, track_time) = match command {
             QueueCommand::Add {
                 key,
+                exclusive,
                 priority,
                 orphaned,
                 value,
             } => {
+                if exclusive && context.process_id.is_none() {
+                    return Err(CubeError::user(
+                        "QUEUE ADD EXCLUSIVE requires a process_id in the connection context (x-process-id header)".to_string(),
+                    ));
+                }
+
                 let value_size = key.value.deep_size_of() + value.deep_size_of();
                 let response = self
                     .cachestore
@@ -335,6 +342,8 @@ impl CacheStoreSqlService {
                         value,
                         priority,
                         orphaned,
+                        process_id: context.process_id.clone(),
+                        exclusive,
                     })
                     .await?;
 
@@ -491,7 +500,7 @@ impl CacheStoreSqlService {
             } => {
                 let result = self
                     .cachestore
-                    .queue_retrieve_by_path(key.value, concurrency)
+                    .queue_retrieve_by_path(key.value, concurrency, context.process_id.clone())
                     .await?;
 
                 (

@@ -139,6 +139,7 @@ pub struct SqlQueryContext {
     pub user: Option<String>,
     pub inline_tables: InlineTables,
     pub trace_obj: Option<String>,
+    pub process_id: Option<String>,
 }
 
 impl SqlQueryContext {
@@ -157,6 +158,12 @@ impl SqlQueryContext {
     pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
         let mut res = self.clone();
         res.trace_obj = trace_obj;
+        res
+    }
+
+    pub fn with_process_id(&self, process_id: Option<String>) -> Self {
+        let mut res = self.clone();
+        res.process_id = process_id;
         res
     }
 }
