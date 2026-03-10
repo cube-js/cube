@@ -27,7 +27,6 @@ impl TraversalVisitor for CalcGroupDimsCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
@@ -37,9 +36,7 @@ impl TraversalVisitor for CalcGroupDimsCollector {
                     return Ok(None);
                 }
             }
-            MemberSymbol::TimeDimension(e) => {
-                return self.on_node_traverse(e.base_symbol(), path, &())
-            }
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(_) => {}
             MemberSymbol::MemberExpression(_) => {}
         };

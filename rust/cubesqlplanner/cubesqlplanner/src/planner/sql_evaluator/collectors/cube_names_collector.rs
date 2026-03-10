@@ -24,12 +24,12 @@ impl TraversalVisitor for CubeNamesCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());
@@ -42,11 +42,10 @@ impl TraversalVisitor for CubeNamesCollector {
                     return Ok(None);
                 }
             }
-            MemberSymbol::TimeDimension(e) => {
-                return self.on_node_traverse(e.base_symbol(), path, &())
-            }
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());
@@ -62,13 +61,10 @@ impl TraversalVisitor for CubeNamesCollector {
     }
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
-        if let CubeRef::Name { symbol, path, .. } = cube_ref {
-            if !path.is_empty() {
-                for p in path {
-                    self.names.insert(p.clone());
-                }
+        if let CubeRef::Name(symbol) = cube_ref {
+            for p in symbol.path() {
+                self.names.insert(p.clone());
             }
-            self.names.insert(symbol.cube_name().clone());
         }
         Ok(())
     }

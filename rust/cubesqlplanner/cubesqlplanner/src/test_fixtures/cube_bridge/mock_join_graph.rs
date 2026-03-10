@@ -353,8 +353,8 @@ impl MockJoinGraph {
     pub(crate) fn check_if_cube_multiplied(&self, cube: &str, join: &JoinEdge) -> bool {
         let relationship = &join.join.static_data().relationship;
 
-        (join.from == cube && relationship == "hasMany")
-            || (join.to == cube && relationship == "belongsTo")
+        (join.from == cube && (relationship == "hasMany" || relationship == "one_to_many"))
+            || (join.to == cube && (relationship == "belongsTo" || relationship == "many_to_one"))
     }
 
     pub(crate) fn find_multiplication_factor_for(&self, cube: &str, joins: &[JoinEdge]) -> bool {

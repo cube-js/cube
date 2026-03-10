@@ -69,15 +69,6 @@ impl CaseDimension {
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_symbol_deps_with_path(&mut deps);
-        }
-        self.case.extract_symbol_deps_with_path(&mut deps);
-        deps
-    }
-
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,

@@ -38,7 +38,6 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        path: &Vec<String>,
         _state: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
@@ -54,7 +53,7 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                 }
                 Ok(Some(()))
             }
-            MemberSymbol::TimeDimension(dim) => self.on_node_traverse(dim.base_symbol(), path, &()),
+            MemberSymbol::TimeDimension(dim) => self.on_node_traverse(dim.base_symbol(), &()),
             _ => Ok(Some(())),
         }
     }

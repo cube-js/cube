@@ -1,4 +1,5 @@
 use super::common::Case;
+use super::common::CompiledMemberPath;
 use super::dimension_kinds::{
     CaseDimension, DimensionKind, GeoDimension, RegularDimension, SwitchDimension,
 };
@@ -8,10 +9,10 @@ use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::sql_evaluator::{
     sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
 };
-use crate::planner::sql_evaluator::{CubeTableSymbol, TimeDimensionSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
@@ -27,10 +28,8 @@ pub struct CalendarDimensionTimeShift {
 
 #[derive(Clone)]
 pub struct DimensionSymbol {
-    cube: Rc<CubeTableSymbol>,
-    name: String,
+    compiled_path: CompiledMemberPath,
     kind: DimensionKind,
-    alias: String,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
@@ -44,10 +43,8 @@ pub struct DimensionSymbol {
 
 impl DimensionSymbol {
     pub fn new(
-        cube: Rc<CubeTableSymbol>,
-        name: String,
+        compiled_path: CompiledMemberPath,
         kind: DimensionKind,
-        alias: String,
         is_reference: bool,
         is_view: bool,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
@@ -59,10 +56,8 @@ impl DimensionSymbol {
         propagate_filters_to_sub_query: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
-            cube,
-            name,
+            compiled_path,
             kind,
-            alias,
             is_reference,
             is_view,
             add_group_by,
@@ -83,8 +78,8 @@ impl DimensionSymbol {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         self.kind.evaluate_sql(
-            &self.name,
-            &self.full_name(),
+            self.compiled_path.name(),
+            self.compiled_path.full_name(),
             visitor,
             node_processor,
             query_tools,
@@ -139,12 +134,20 @@ impl DimensionSymbol {
         self.time_shift_pk_full_name.clone()
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
+    pub fn strip_join_prefix(&mut self) {
+        self.compiled_path = self.compiled_path.strip_join_prefix();
+    }
+
     pub fn full_name(&self) -> String {
-        format!("{}.{}", self.cube.cube_name(), self.name)
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn owned_by_cube(&self) -> bool {
@@ -227,24 +230,24 @@ impl DimensionSymbol {
         self.kind.get_dependencies()
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        self.kind.get_dependencies_with_path()
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         self.kind.get_cube_refs()
     }
 
-    pub fn cube_name(&self) -> &String {
-        self.cube.cube_name()
+    pub fn cube_name(&self) -> String {
+        self.compiled_path.cube_name().clone()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        self.cube.join_map()
+        self.compiled_path.join_map()
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.compiled_path.name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 
     pub fn calendar_time_shift_for_interval(
@@ -468,13 +471,19 @@ impl SymbolFactory for DimensionSymbolFactory {
             .propagate_filters_to_sub_query
             .unwrap_or(false);
 
-        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+
+        let compiled_path = CompiledMemberPath::new(
+            cube_symbol,
+            path.full_name().clone(),
+            path.symbol_name().clone(),
+            alias,
+            path.path().clone(),
+        );
 
         let symbol = MemberSymbol::new_dimension(DimensionSymbol::new(
-            cube_symbol,
-            path.symbol_name().clone(),
+            compiled_path,
             kind,
-            alias,
             is_reference,
             is_view,
             add_group_by,

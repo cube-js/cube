@@ -1,4 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_evaluator::{CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -23,7 +24,6 @@ impl TraversalVisitor for JoinHintsCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         if node.is_multi_stage() {
@@ -33,10 +33,10 @@ impl TraversalVisitor for JoinHintsCollector {
                         self.apply(item, &())?;
                     }
                 }
-                for (dep, path) in dim.get_dependencies_with_path().into_iter() {
+                for dep in dim.get_dependencies().into_iter() {
                     if let Ok(dim) = dep.as_dimension() {
                         if dim.is_multi_stage() {
-                            self.on_node_traverse(&dep, &path, &())?;
+                            self.on_node_traverse(&dep, &())?;
                         }
                     }
                 }
@@ -47,6 +47,7 @@ impl TraversalVisitor for JoinHintsCollector {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))
@@ -61,11 +62,10 @@ impl TraversalVisitor for JoinHintsCollector {
                     return Ok(None);
                 }
             }
-            MemberSymbol::TimeDimension(e) => {
-                return self.on_node_traverse(e.base_symbol(), path, &())
-            }
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))
@@ -83,11 +83,10 @@ impl TraversalVisitor for JoinHintsCollector {
     }
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
-        if let CubeRef::Name { symbol, path, .. } = cube_ref {
-            if !path.is_empty() {
-                let mut path = path.clone();
-                path.push(symbol.cube_name().clone());
-                self.hints.push(JoinHintItem::Vector(path));
+        if let CubeRef::Name(symbol) = cube_ref {
+            let path = symbol.path();
+            if path.len() > 1 {
+                self.hints.push(JoinHintItem::Vector(path.clone()));
             } else {
                 self.hints
                     .push(JoinHintItem::Single(symbol.cube_name().clone()));
@@ -97,17 +96,12 @@ impl TraversalVisitor for JoinHintsCollector {
     }
 }
 
-pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, CubeError> {
+pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     visitor.apply(node, &())?;
     let mut collected_hints = visitor.extract_result();
 
-    let join_map = match node.as_ref() {
-        MemberSymbol::Dimension(d) => d.join_map(),
-        MemberSymbol::TimeDimension(d) => d.join_map(),
-        MemberSymbol::Measure(m) => m.join_map(),
-        _ => &None,
-    };
+    let join_map = node.join_map();
 
     if let Some(join_map) = join_map {
         for hint in collected_hints.iter_mut() {
@@ -128,17 +122,17 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
         }
     }
 
-    Ok(collected_hints)
+    Ok(JoinHints::from_items(collected_hints))
 }
 
 pub fn collect_join_hints_for_measures(
     measures: &Vec<Rc<MemberSymbol>>,
-) -> Result<Vec<JoinHintItem>, CubeError> {
+) -> Result<JoinHints, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     for meas in measures.iter() {
         visitor.apply(&meas, &())?;
     }
 
     let res = visitor.extract_result();
-    Ok(res)
+    Ok(JoinHints::from_items(res))
 }

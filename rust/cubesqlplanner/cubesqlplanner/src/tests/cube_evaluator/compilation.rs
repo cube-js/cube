@@ -277,7 +277,7 @@ fn test_add_cube_table_evaluator() {
 
     let symbol = test_compiler
         .compiler
-        .add_cube_table_evaluator("visitors".to_string())
+        .add_cube_table_evaluator("visitors".to_string(), vec![])
         .unwrap();
 
     assert_eq!(symbol.cube_name(), "visitors");
@@ -291,7 +291,7 @@ fn test_add_cube_name_evaluator() {
 
     let symbol = test_compiler
         .compiler
-        .add_cube_name_evaluator("visitors".to_string())
+        .add_cube_name_evaluator("visitors".to_string(), vec![])
         .unwrap();
 
     assert_eq!(symbol.cube_name(), "visitors");

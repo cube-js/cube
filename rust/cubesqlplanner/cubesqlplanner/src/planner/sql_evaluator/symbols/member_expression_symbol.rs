@@ -1,8 +1,10 @@
+use super::common::CompiledMemberPath;
 use super::MemberSymbol;
-use crate::cube_bridge::base_tools::BaseTools;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{
+    sql_nodes::SqlNode, CubeRef, CubeTableSymbol, SqlCall, SqlEvaluatorVisitor,
+};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
@@ -17,9 +19,7 @@ pub enum MemberExpressionExpression {
 
 #[derive(Clone)]
 pub struct MemberExpressionSymbol {
-    cube_name: String,
-    name: String,
-    alias: String,
+    compiled_path: CompiledMemberPath,
     expression: MemberExpressionExpression,
     #[allow(dead_code)]
     definition: Option<String>,
@@ -29,22 +29,22 @@ pub struct MemberExpressionSymbol {
 
 impl MemberExpressionSymbol {
     pub fn try_new(
-        cube_name: String,
+        cube: Rc<CubeTableSymbol>,
         name: String,
         expression: MemberExpressionExpression,
         definition: Option<String>,
         alias: Option<String>,
-        _base_tools: Rc<dyn BaseTools>,
+        path: Vec<String>,
     ) -> Result<Rc<Self>, CubeError> {
+        let full_name = format!("expr:{}.{}", cube.cube_name(), name);
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
+        let compiled_path = CompiledMemberPath::new(cube, full_name, name, alias, path);
         Ok(Rc::new(Self {
-            cube_name,
-            name,
-            alias,
+            compiled_path,
             expression,
             definition,
             is_reference,
@@ -80,12 +80,20 @@ impl MemberExpressionSymbol {
         Rc::new(result)
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
+    pub fn strip_join_prefix(&mut self) {
+        self.compiled_path = self.compiled_path.strip_join_prefix();
+    }
+
     pub fn full_name(&self) -> String {
-        format!("expr:{}.{}", self.cube_name, self.name)
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn is_reference(&self) -> bool {
@@ -133,19 +141,6 @@ impl MemberExpressionSymbol {
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => {
-                sql_call.extract_symbol_deps_with_path(&mut deps)
-            }
-            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
-                deps.push((member_symbol.clone(), vec![]))
-            }
-        }
-        deps
-    }
-
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         let mut refs = vec![];
         match &self.expression {
@@ -170,12 +165,16 @@ impl MemberExpressionSymbol {
         }
     }
 
-    pub fn cube_name(&self) -> &String {
-        &self.cube_name
+    pub fn cube_name(&self) -> String {
+        self.compiled_path.cube_name().clone()
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.compiled_path.name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 
     pub fn definition(&self) -> &Option<String> {
