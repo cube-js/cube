@@ -210,8 +210,8 @@ pub enum PortalBatch {
 
 #[derive(Debug)]
 pub struct Portal {
-    // Format which is used to return data
-    format: protocol::Format,
+    // Per-column format codes from Bind message (0=all text, 1=uniform, N=per-column)
+    formats: Vec<protocol::Format>,
     from: PortalFrom,
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
@@ -244,12 +244,12 @@ fn split_record_batch(batch: RecordBatch, mid: usize) -> (RecordBatch, Option<Re
 impl Portal {
     pub fn new(
         plan: QueryPlan,
-        format: protocol::Format,
+        formats: Vec<protocol::Format>,
         from: PortalFrom,
         span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
-            format,
+            formats,
             from,
             span_id,
             state: Some(PortalState::Prepared(PreparedState { plan })),
@@ -257,12 +257,12 @@ impl Portal {
     }
 
     pub fn new_empty(
-        format: protocol::Format,
+        formats: Vec<protocol::Format>,
         from: PortalFrom,
         span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
-            format,
+            formats,
             from,
             span_id,
             state: Some(PortalState::Empty),
@@ -271,7 +271,7 @@ impl Portal {
 
     pub fn get_description(&self) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self.state {
-            Some(PortalState::Prepared(state)) => state.plan.to_row_description(self.format),
+            Some(PortalState::Prepared(state)) => state.plan.to_row_description(&self.formats),
             Some(PortalState::InExecutionFrame(state)) => Ok(state.description.clone()),
             Some(PortalState::InExecutionStream(state)) => Ok(state.description.clone()),
             Some(PortalState::Finished(state)) => Ok(state.description.clone()),
@@ -297,10 +297,6 @@ impl Portal {
         }
     }
 
-    pub fn get_format(&self) -> protocol::Format {
-        self.format
-    }
-
     fn hand_execution_frame_state<'a>(
         &'a mut self,
         frame_state: InExecutionFrameState,
@@ -318,7 +314,10 @@ impl Portal {
                 )
                 .into());
             } else {
-                let writer = self.dataframe_to_writer(frame_state.batch)?;
+                let resolved_formats = frame_state.description.as_ref()
+                    .map(|d| d.get_formats())
+                    .unwrap_or_else(|| self.formats.clone());
+                let writer = self.dataframe_to_writer(frame_state.batch, &resolved_formats)?;
                 let num_rows = writer.num_rows() as u32;
 
                 if let Some(description) = &frame_state.description {
@@ -354,8 +353,12 @@ impl Portal {
         }
     }
 
-    fn dataframe_to_writer(&self, frame: DataFrame) -> Result<BatchWriter, ProtocolError> {
-        let mut writer = BatchWriter::new(self.get_format());
+    fn dataframe_to_writer(
+        &self,
+        frame: DataFrame,
+        formats: &[protocol::Format],
+    ) -> Result<BatchWriter, ProtocolError> {
+        let mut writer = BatchWriter::new(formats.to_vec());
 
         for row in frame.to_rows().into_iter() {
             for value in row.to_values() {
@@ -387,6 +390,7 @@ impl Portal {
         batch: RecordBatch,
         max_rows: usize,
         left: &mut usize,
+        formats: &[protocol::Format],
     ) -> Result<(Option<RecordBatch>, BatchWriter), ConnectionError> {
         let mut unused: Option<RecordBatch> = None;
 
@@ -407,7 +411,7 @@ impl Portal {
 
         let frame = batches_to_dataframe(batch_for_write.schema().as_ref(), vec![batch_for_write])?;
 
-        Ok((unused, self.dataframe_to_writer(frame)?))
+        Ok((unused, self.dataframe_to_writer(frame, formats)?))
     }
 
     fn hand_execution_stream_state<'a>(
@@ -419,12 +423,16 @@ impl Portal {
             let mut left: usize = max_rows;
             let mut num_of_rows = 0;
 
+            let resolved_formats = stream_state.description.as_ref()
+                .map(|d| d.get_formats())
+                .unwrap_or_else(|| self.formats.clone());
+
             if let Some(description) = &stream_state.description {
                 yield Ok(PortalBatch::Description(description.clone()));
             }
 
             if let Some(unused_batch) = stream_state.unused.take() {
-                let (usused_batch, batch_writer) = self.iterate_stream_batch(unused_batch, max_rows, &mut left)?;
+                let (usused_batch, batch_writer) = self.iterate_stream_batch(unused_batch, max_rows, &mut left, &resolved_formats)?;
                 stream_state.unused = usused_batch;
                 num_of_rows = batch_writer.num_rows() as u32;
 
@@ -448,7 +456,7 @@ impl Portal {
                     }
                     Some(res) => match res {
                         Ok(batch) => {
-                            let (unused_batch, writer) = self.iterate_stream_batch(batch, max_rows, &mut left)?;
+                            let (unused_batch, writer) = self.iterate_stream_batch(batch, max_rows, &mut left, &resolved_formats)?;
 
                             num_of_rows += writer.num_rows() as u32;
 
@@ -490,7 +498,7 @@ impl Portal {
                     );
                 }
                 PortalState::Prepared(state) => {
-                    let description = state.plan.to_row_description(self.format)?;
+                    let description = state.plan.to_row_description(&self.formats)?;
                     match state.plan {
                         QueryPlan::MetaOk(_, completion) => {
                             self.state = Some(PortalState::Finished(FinishedState { description }));
@@ -698,7 +706,7 @@ mod tests {
     #[tokio::test]
     async fn test_portal_legacy_dataframe_limited_more() -> Result<(), ConnectionError> {
         let mut p = Portal {
-            format: Format::Binary,
+            formats: vec![Format::Binary],
             from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
@@ -731,7 +739,7 @@ mod tests {
     #[tokio::test]
     async fn test_portal_legacy_dataframe_limited_less() -> Result<(), ConnectionError> {
         let mut p = Portal {
-            format: Format::Binary,
+            formats: vec![Format::Binary],
             from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
@@ -759,7 +767,7 @@ mod tests {
     #[tokio::test]
     async fn test_portal_legacy_dataframe_unlimited() -> Result<(), ConnectionError> {
         let mut p = Portal {
-            format: Format::Binary,
+            formats: vec![Format::Binary],
             from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
@@ -794,7 +802,7 @@ mod tests {
         let stream = ctx.read_table(table)?.execute_stream().await?;
 
         let mut portal = Portal {
-            format: Format::Binary,
+            formats: vec![Format::Binary],
             from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
                 stream,
@@ -817,7 +825,7 @@ mod tests {
         let stream = ctx.read_table(table)?.execute_stream().await?;
 
         let mut portal = Portal {
-            format: Format::Binary,
+            formats: vec![Format::Binary],
             from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
                 stream,

@@ -558,6 +558,12 @@ impl RowDescription {
     pub fn len(&self) -> usize {
         self.fields.len()
     }
+    /// Returns the resolved per-column format codes.
+    /// These account for `is_binary_supported()` — if a type doesn't support
+    /// binary encoding, the format is downgraded to Text even if Binary was requested.
+    pub fn get_formats(&self) -> Vec<Format> {
+        self.fields.iter().map(|f| f.format).collect()
+    }
 }
 
 impl Serialize for RowDescription {

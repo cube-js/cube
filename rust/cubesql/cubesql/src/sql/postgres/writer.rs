@@ -166,19 +166,20 @@ impl ToProtocolValue for ListValue {
 
 #[derive(Debug)]
 pub struct BatchWriter {
-    format: Format,
+    /// Per-column format codes. If empty, all columns use Text.
+    formats: Vec<Format>,
     // Data of whole rows
     data: BytesMut,
-    // Current row
+    // Current column index within the current row
     current: u32,
     rows: u32,
     row: BytesMut,
 }
 
 impl BatchWriter {
-    pub fn new(format: Format) -> Self {
+    pub fn new(formats: Vec<Format>) -> Self {
         Self {
-            format,
+            formats,
             data: BytesMut::new(),
             row: BytesMut::new(),
             current: 0,
@@ -186,10 +187,25 @@ impl BatchWriter {
         }
     }
 
+    /// Resolve the format for the current column.
+    /// Per PG protocol: 0 formats = all Text, 1 format = apply to all, N = per-column.
+    fn current_format(&self) -> Format {
+        match self.formats.len() {
+            0 => Format::Text,
+            1 => self.formats[0],
+            _ => self
+                .formats
+                .get(self.current as usize)
+                .copied()
+                .unwrap_or(Format::Text),
+        }
+    }
+
     pub fn write_value<T: ToProtocolValue>(&mut self, value: T) -> Result<(), ProtocolError> {
+        let format = self.current_format();
         self.current += 1;
 
-        match self.format {
+        match format {
             Format::Text => value.to_text(&mut self.row)?,
             Format::Binary => value.to_binary(&mut self.row)?,
         };
@@ -297,7 +313,7 @@ mod tests {
     async fn test_backend_writer_text_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(Format::Text);
+        let mut writer = BatchWriter::new(vec![Format::Text]);
         writer.write_value("test1".to_string())?;
         writer.write_value(true)?;
         writer.end_row()?;
@@ -325,7 +341,7 @@ mod tests {
     async fn test_backend_writer_binary_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(Format::Binary);
+        let mut writer = BatchWriter::new(vec![Format::Binary]);
         writer.write_value("test1".to_string())?;
         writer.write_value(true)?;
         writer.end_row()?;
@@ -355,7 +371,7 @@ mod tests {
         // fetch 2 in test;
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(Format::Binary);
+        let mut writer = BatchWriter::new(vec![Format::Binary]);
         writer.write_value(Decimal128Value::new(1, 5))?;
         writer.end_row()?;
 
@@ -380,7 +396,7 @@ mod tests {
     #[tokio::test]
     async fn test_backend_writer_binary_int8_array() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
-        let mut writer = BatchWriter::new(Format::Binary);
+        let mut writer = BatchWriter::new(vec![Format::Binary]);
 
         // Row 1
         let mut col = Int64Builder::new(3);
@@ -412,6 +428,187 @@ mod tests {
                 0, 0, 0, 0, 0, 0, 0, 2, 255, 255, 255, 255
             ]
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_backend_writer_per_column_format() -> Result<(), ConnectionError> {
+        // Simulates Tableau/JDBC: text for col0 (string), binary for col1 (int64), binary for col2 (f64)
+        let mut cursor = Cursor::new(vec![]);
+
+        let mut writer = BatchWriter::new(vec![Format::Text, Format::Binary, Format::Binary]);
+        // col0: text "hello" → text encoding
+        writer.write_value("hello".to_string())?;
+        // col1: int64 42 → binary encoding (8 bytes big-endian)
+        writer.write_value(42_i64)?;
+        // col2: f64 2.5 → binary encoding (8 bytes IEEE 754)
+        writer.write_value(2.5_f64)?;
+        writer.end_row()?;
+
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
+
+        let data = cursor.get_ref();
+
+        // Parse the DataRow message
+        assert_eq!(data[0], b'D'); // DataRow message type
+        let msg_len = i32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+        let field_count = i16::from_be_bytes([data[5], data[6]]);
+        assert_eq!(field_count, 3);
+
+        // Field 0: text "hello" → length 5, then ASCII bytes
+        let mut offset = 7;
+        let f0_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f0_len, 5);
+        assert_eq!(&data[offset..offset + 5], b"hello");
+        offset += 5;
+
+        // Field 1: binary int64 42 → length 8, then 8-byte big-endian
+        let f1_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f1_len, 8);
+        let int_val = i64::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        assert_eq!(int_val, 42);
+        offset += 8;
+
+        // Field 2: binary f64 2.5 → length 8, then 8-byte IEEE 754
+        let f2_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f2_len, 8);
+        let float_val = f64::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        assert_eq!(float_val, 2.5);
+
+        // Total message length should match
+        assert_eq!(msg_len as usize, data.len() - 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_backend_writer_per_column_format_multiple_rows() -> Result<(), ConnectionError> {
+        // Ensure per-column format resets correctly across rows
+        let mut cursor = Cursor::new(vec![]);
+
+        let mut writer = BatchWriter::new(vec![Format::Text, Format::Binary]);
+
+        // Row 1
+        writer.write_value("row1".to_string())?;
+        writer.write_value(100_i64)?;
+        writer.end_row()?;
+
+        // Row 2
+        writer.write_value("row2".to_string())?;
+        writer.write_value(200_i64)?;
+        writer.end_row()?;
+
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
+
+        let data = cursor.get_ref();
+
+        // Parse row 1
+        assert_eq!(data[0], b'D');
+        let mut offset = 7; // skip type(1) + len(4) + field_count(2)
+                            // col0: text "row1"
+        let f0_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f0_len, 4);
+        assert_eq!(&data[offset..offset + 4], b"row1");
+        offset += 4;
+        // col1: binary int64 100
+        let f1_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f1_len, 8);
+        let int_val = i64::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        assert_eq!(int_val, 100);
+        offset += 8;
+
+        // Parse row 2
+        assert_eq!(data[offset], b'D');
+        offset += 7; // skip type(1) + len(4) + field_count(2)
+                     // col0: text "row2" (format resets per row)
+        let f0_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f0_len, 4);
+        assert_eq!(&data[offset..offset + 4], b"row2");
+        offset += 4;
+        // col1: binary int64 200
+        let f1_len = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        offset += 4;
+        assert_eq!(f1_len, 8);
+        let int_val = i64::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        assert_eq!(int_val, 200);
 
         Ok(())
     }
