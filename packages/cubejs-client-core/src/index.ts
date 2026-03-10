@@ -379,7 +379,7 @@ class CubeApi {
         body.error = text;
       }
 
-      if (body.error === 'Continue wait') {
+      if (body.error?.includes('Continue wait')) {
         await checkMutex();
         if (options?.progressCallback) {
           options.progressCallback(new ProgressResult(body as ProgressResponse));
@@ -742,6 +742,7 @@ class CubeApi {
           signal: options?.signal,
           fetchTimeout: options?.timeout,
           baseRequestId: options?.baseRequestId,
+          throwContinueWait: true,
         };
 
         if (options?.cache) {
