@@ -17,7 +17,7 @@ use crate::{
     sql::{
         compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalBatch, PortalFrom},
+        extended::{Cursor, Portal, PortalBatch, PortalFrom, ResultFormat},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         AuthContextRef, Session, SessionState,
     },
@@ -64,21 +64,8 @@ pub enum StartupState {
 pub trait QueryPlanExt {
     fn to_row_description(
         &self,
-        result_formats: &[protocol::Format],
+        format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError>;
-}
-
-/// Resolve a per-column format from the Bind result_formats vector.
-/// Per PG protocol: 0 formats = all Text, 1 format = apply to all, N = per-column.
-fn resolve_format(result_formats: &[protocol::Format], idx: usize) -> protocol::Format {
-    match result_formats.len() {
-        0 => protocol::Format::Text,
-        1 => result_formats[0],
-        _ => result_formats
-            .get(idx)
-            .copied()
-            .unwrap_or(protocol::Format::Text),
-    }
 }
 
 impl QueryPlanExt for QueryPlan {
@@ -86,7 +73,7 @@ impl QueryPlanExt for QueryPlan {
     /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
     fn to_row_description(
         &self,
-        result_formats: &[protocol::Format],
+        format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self {
             QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _) => Ok(None),
@@ -97,7 +84,7 @@ impl QueryPlanExt for QueryPlan {
                     result.push(protocol::RowDescriptionField::new(
                         field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
-                        resolve_format(result_formats, idx),
+                        format.format_for(idx),
                     ));
                 }
 
@@ -110,7 +97,7 @@ impl QueryPlanExt for QueryPlan {
                     result.push(protocol::RowDescriptionField::new(
                         field.name().clone(),
                         df_type_to_pg_tid(field.data_type())?.to_type(),
-                        resolve_format(result_formats, idx),
+                        format.format_for(idx),
                     ));
                 }
 
@@ -950,12 +937,12 @@ impl AsyncPostgresShim {
             )
         })?;
 
-        let formats = body.result_formats.clone();
+        let format = ResultFormat::from(body.result_formats.clone());
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);
 
-                Portal::new_empty(formats, PortalFrom::Extended, span_id)
+                Portal::new_empty(format, PortalFrom::Extended, span_id)
             }
             PreparedStatement::Query { parameters, .. } => {
                 let prepared_statement =
@@ -974,12 +961,12 @@ impl AsyncPostgresShim {
                 )
                 .await?;
 
-                Portal::new(plan, formats, PortalFrom::Extended, span_id)
+                Portal::new(plan, format, PortalFrom::Extended, span_id)
             }
             PreparedStatement::Error { .. } => {
                 drop(statements_guard);
 
-                Portal::new_empty(formats, PortalFrom::Extended, span_id)
+                Portal::new_empty(format, PortalFrom::Extended, span_id)
             }
         };
 
@@ -1097,15 +1084,15 @@ impl AsyncPostgresShim {
 
                 match plan {
                     Ok(plan) => {
-                        let description =
-                            plan.to_row_description(&[Format::Text])?
-                                .and_then(|description| {
-                                    if description.len() > 0 {
-                                        Some(description)
-                                    } else {
-                                        None
-                                    }
-                                });
+                        let description = plan
+                            .to_row_description(&ResultFormat::AllText)?
+                            .and_then(|description| {
+                                if description.len() > 0 {
+                                    Some(description)
+                                } else {
+                                    None
+                                }
+                            });
 
                         (
                             PreparedStatement::Query {
@@ -1234,7 +1221,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1258,7 +1245,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1282,7 +1269,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1384,7 +1371,7 @@ impl AsyncPostgresShim {
 
                 let mut portal = Portal::new(
                     plan,
-                    vec![cursor.format],
+                    ResultFormat::from(vec![cursor.format]),
                     PortalFrom::Fetch,
                     span_id.clone(),
                 );
@@ -1482,7 +1469,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1504,7 +1491,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1543,7 +1530,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1589,7 +1576,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1633,7 +1620,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),
@@ -1655,7 +1642,7 @@ impl AsyncPostgresShim {
                 self.write_portal(
                     &mut Portal::new(
                         plan,
-                        vec![Format::Text],
+                        ResultFormat::AllText,
                         PortalFrom::Simple,
                         span_id.clone(),
                     ),

@@ -1,6 +1,7 @@
 use crate::sql::{
     dataframe::{Decimal128Value, ListValue},
     df_type_to_pg_tid,
+    postgres::extended::ResultFormat,
 };
 use bytes::{BufMut, BytesMut};
 use datafusion::arrow::{
@@ -166,8 +167,7 @@ impl ToProtocolValue for ListValue {
 
 #[derive(Debug)]
 pub struct BatchWriter {
-    /// Per-column format codes. If empty, all columns use Text.
-    formats: Vec<Format>,
+    format: ResultFormat,
     // Data of whole rows
     data: BytesMut,
     // Current column index within the current row
@@ -177,9 +177,9 @@ pub struct BatchWriter {
 }
 
 impl BatchWriter {
-    pub fn new(formats: Vec<Format>) -> Self {
+    pub fn new(format: ResultFormat) -> Self {
         Self {
-            formats,
+            format,
             data: BytesMut::new(),
             row: BytesMut::new(),
             current: 0,
@@ -187,18 +187,8 @@ impl BatchWriter {
         }
     }
 
-    /// Resolve the format for the current column.
-    /// Per PG protocol: 0 formats = all Text, 1 format = apply to all, N = per-column.
     fn current_format(&self) -> Format {
-        match self.formats.len() {
-            0 => Format::Text,
-            1 => self.formats[0],
-            _ => self
-                .formats
-                .get(self.current as usize)
-                .copied()
-                .unwrap_or(Format::Text),
-        }
+        self.format.format_for(self.current as usize)
     }
 
     pub fn write_value<T: ToProtocolValue>(&mut self, value: T) -> Result<(), ProtocolError> {
@@ -254,6 +244,7 @@ mod tests {
     use crate::sql::{
         dataframe::{Decimal128Value, ListValue},
         error::ConnectionError,
+        postgres::extended::ResultFormat,
         writer::{BatchWriter, ToProtocolValue},
     };
     use bytes::BytesMut;
@@ -313,7 +304,7 @@ mod tests {
     async fn test_backend_writer_text_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(vec![Format::Text]);
+        let mut writer = BatchWriter::new(ResultFormat::AllText);
         writer.write_value("test1".to_string())?;
         writer.write_value(true)?;
         writer.end_row()?;
@@ -341,7 +332,7 @@ mod tests {
     async fn test_backend_writer_binary_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(vec![Format::Binary]);
+        let mut writer = BatchWriter::new(ResultFormat::AllBinary);
         writer.write_value("test1".to_string())?;
         writer.write_value(true)?;
         writer.end_row()?;
@@ -371,7 +362,7 @@ mod tests {
         // fetch 2 in test;
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(vec![Format::Binary]);
+        let mut writer = BatchWriter::new(ResultFormat::AllBinary);
         writer.write_value(Decimal128Value::new(1, 5))?;
         writer.end_row()?;
 
@@ -396,7 +387,7 @@ mod tests {
     #[tokio::test]
     async fn test_backend_writer_binary_int8_array() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
-        let mut writer = BatchWriter::new(vec![Format::Binary]);
+        let mut writer = BatchWriter::new(ResultFormat::AllBinary);
 
         // Row 1
         let mut col = Int64Builder::new(3);
@@ -437,7 +428,11 @@ mod tests {
         // Simulates Tableau/JDBC: text for col0 (string), binary for col1 (int64), binary for col2 (f64)
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(vec![Format::Text, Format::Binary, Format::Binary]);
+        let mut writer = BatchWriter::new(ResultFormat::PerColumn(vec![
+            Format::Text,
+            Format::Binary,
+            Format::Binary,
+        ]));
         writer.write_value("hello".to_string())?;
         writer.write_value(42_i64)?;
         writer.write_value(2.5_f64)?;
@@ -462,7 +457,8 @@ mod tests {
         // Ensure per-column format resets correctly across rows
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(vec![Format::Text, Format::Binary]);
+        let mut writer =
+            BatchWriter::new(ResultFormat::PerColumn(vec![Format::Text, Format::Binary]));
 
         writer.write_value("row1".to_string())?;
         writer.write_value(100_i64)?;
