@@ -74,7 +74,13 @@ impl SqlNode for FinalMeasureSqlNode {
                     node_processor.clone(),
                     templates,
                 )?;
-                self.wrap_aggregate(ev, input, templates)?
+                // Masked measures: the mask literal IS the final value,
+                // skip aggregation wrapping (e.g. avoid COUNT(12345) → 500).
+                if ev.mask_sql().is_some() && query_tools.is_member_masked(&ev.full_name()) {
+                    input
+                } else {
+                    self.wrap_aggregate(ev, input, templates)?
+                }
             }
             _ => {
                 return Err(CubeError::internal(format!(
