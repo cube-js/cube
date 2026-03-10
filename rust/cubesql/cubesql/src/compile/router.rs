@@ -3,10 +3,11 @@ use crate::compile::{
     StatusFlags,
 };
 use sqlparser::ast;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::{
     compile::{
+        engine::df::scan::CacheMode,
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
         DatabaseVariable, DatabaseVariablesToUpdate,
@@ -377,7 +378,7 @@ impl QueryRouter {
             session_columns_to_update.into_iter().partition(|v| {
                 matches!(
                     v.name.to_lowercase().as_str(),
-                    "user" | "current_user" | "timezone"
+                    "user" | "current_user" | "timezone" | "cube_cache"
                 )
             });
 
@@ -406,6 +407,18 @@ impl QueryRouter {
                         }
                     };
                     self.change_timezone(timezone).await?;
+                }
+                "cube_cache" => {
+                    let cache_mode = match v.value {
+                        ScalarValue::Utf8(Some(mode)) => mode,
+                        _ => {
+                            return Err(CompilationError::user(format!(
+                                "Invalid cube_cache value: {:?}",
+                                v.value
+                            )))
+                        }
+                    };
+                    self.change_cache_mode(cache_mode).await?;
                 }
                 _ => {
                     return Err(CompilationError::user(format!(
@@ -521,6 +534,29 @@ impl QueryRouter {
         let variable = DatabaseVariable::system(
             "timezone".to_string(),
             ScalarValue::Utf8(Some(tz_name)),
+            None,
+        );
+        self.state.set_variables(vec![variable]);
+        Ok(())
+    }
+
+    async fn change_cache_mode(&self, cache_mode_str: String) -> Result<(), CompilationError> {
+        let mut cache_mode = self.state.cache_mode.write().map_err(|err| {
+            CompilationError::internal(format!("Unable to acquire cache mode lock: {}", err))
+        })?;
+        let cache_mode_value = if cache_mode_str.eq_ignore_ascii_case("default") {
+            *cache_mode = None;
+            None
+        } else {
+            let cache_mode_parsed = CacheMode::from_str(&cache_mode_str).map_err(|_| {
+                CompilationError::user(format!("Invalid value for cache mode: {}", cache_mode_str))
+            })?;
+            *cache_mode = Some(cache_mode_parsed);
+            Some(cache_mode_parsed.to_string())
+        };
+        let variable = DatabaseVariable::user_defined(
+            "cube_cache".to_string(),
+            ScalarValue::Utf8(cache_mode_value),
             None,
         );
         self.state.set_variables(vec![variable]);

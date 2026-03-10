@@ -49,7 +49,7 @@ use std::str::FromStr;
 use std::{
     any::Any,
     borrow::Cow,
-    fmt,
+    fmt::{self, Display},
     sync::Arc,
     task::{Context, Poll},
 };
@@ -80,7 +80,7 @@ impl MemberField {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum CacheMode {
     #[serde(rename = "stale-if-slow")]
     StaleIfSlow,
@@ -102,6 +102,17 @@ impl FromStr for CacheMode {
             "must-revalidate" => Ok(Self::MustRevalidate),
             "no-cache" => Ok(Self::NoCache),
             other => Err(format!("Unknown cache mode: {}", other)),
+        }
+    }
+}
+
+impl Display for CacheMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CacheMode::StaleIfSlow => write!(f, "stale-if-slow"),
+            CacheMode::StaleWhileRevalidate => write!(f, "stale-while-revalidate"),
+            CacheMode::MustRevalidate => write!(f, "must-revalidate"),
+            CacheMode::NoCache => write!(f, "no-cache"),
         }
     }
 }
