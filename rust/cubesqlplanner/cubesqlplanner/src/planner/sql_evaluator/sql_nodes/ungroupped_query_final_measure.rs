@@ -41,7 +41,11 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
                     templates,
                 )?;
 
-                if input == "*" {
+                // Masked measures: the mask literal IS the final value,
+                // skip ungrouped wrapping.
+                if ev.mask_sql().is_some() && query_tools.is_member_masked(&ev.full_name()) {
+                    input
+                } else if input == "*" {
                     "1".to_string()
                 } else {
                     let is_count_like = match ev.kind() {

@@ -410,11 +410,11 @@ describe('Cube RBAC Engine', () => {
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
-        // Dimensions should be masked
         expect(row.secret_number).toBe(-1);
         expect(row.secret_boolean).toBe(false);
         expect(row.public_dim).toBeNull();
-        // SQL mask: CONCAT('***', RIGHT(CAST(product_id AS TEXT), 2))
+        expect(Number(row.count)).toBe(12345);
+        expect(Number(row.count_d)).toBe(34567);
         expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
@@ -461,11 +461,32 @@ describe('Cube RBAC Engine', () => {
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
-        // public_dim, total_quantity are in memberLevel includes → unmasked
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
-        // secret_number is not in memberLevel includes → masked
         expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
+    test('masked MEASURE() grouped by real dimension', async () => {
+      const res = await connection.query(
+        'SELECT public_dim, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 ORDER BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.public_dim).not.toBeNull();
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
+    test('masked MEASURE() grouped by masked dimension', async () => {
+      const res = await connection.query(
+        'SELECT secret_number, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
       }
     });
 
@@ -500,6 +521,8 @@ describe('Cube RBAC Engine', () => {
       for (const row of res.rows) {
         expect(row.secret_number).toBe(-1);
         expect(row.public_dim).toBeNull();
+        expect(Number(row.count)).toBe(12345);
+        expect(Number(row.count_d)).toBe(34567);
       }
     });
 
@@ -510,6 +533,7 @@ describe('Cube RBAC Engine', () => {
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
         expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
       }
     });
   });
