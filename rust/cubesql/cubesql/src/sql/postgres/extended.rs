@@ -340,10 +340,8 @@ impl Portal {
                 )
                 .into());
             } else {
-                let resolved_format = frame_state.description.as_ref()
-                    .map(|d| ResultFormat::PerColumn(d.get_formats()))
-                    .unwrap_or_else(|| self.format.clone());
-                let writer = self.dataframe_to_writer(frame_state.batch, &resolved_format)?;
+                let format = self.get_result_format(frame_state.description.as_ref());
+                let writer = self.dataframe_to_writer(frame_state.batch, &format)?;
                 let num_rows = writer.num_rows() as u32;
 
                 if let Some(description) = &frame_state.description {
@@ -449,9 +447,7 @@ impl Portal {
             let mut left: usize = max_rows;
             let mut num_of_rows = 0;
 
-            let resolved_format = stream_state.description.as_ref()
-                .map(|d| ResultFormat::PerColumn(d.get_formats()))
-                .unwrap_or_else(|| self.format.clone());
+            let resolved_format = self.get_result_format(stream_state.description.as_ref());
 
             if let Some(description) = &stream_state.description {
                 yield Ok(PortalBatch::Description(description.clone()));
@@ -613,6 +609,14 @@ impl Portal {
                 }
             }
         }
+    }
+
+    /// Resolve the effective result format: use per-column formats from the row
+    /// description if available, otherwise fall back to the portal's format.
+    fn get_result_format(&self, description: Option<&protocol::RowDescription>) -> ResultFormat {
+        description
+            .map(|d| ResultFormat::PerColumn(d.get_formats()))
+            .unwrap_or_else(|| self.format.clone())
     }
 
     pub fn span_id(&self) -> Option<Arc<SpanId>> {
