@@ -90,15 +90,6 @@ impl MeasureKind {
         }
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        match self {
-            Self::Count(c) => c.get_dependencies_with_path(),
-            Self::Aggregated(a) => a.get_dependencies_with_path(),
-            Self::Calculated(c) => c.get_dependencies_with_path(),
-            Self::Rank => vec![],
-        }
-    }
-
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,

@@ -1,4 +1,4 @@
-use super::common::{AggregationType, Case};
+use super::common::{AggregationType, Case, CompiledMemberPath};
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -7,7 +7,6 @@ use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
-use crate::planner::sql_evaluator::CubeTableSymbol;
 use crate::planner::sql_evaluator::{
     sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
 };
@@ -72,9 +71,7 @@ pub enum MeasureTimeShifts {
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
-    cube: Rc<CubeTableSymbol>,
-    name: String,
-    alias: String,
+    compiled_path: CompiledMemberPath,
     kind: MeasureKind,
     rolling_window: Option<RollingWindow>,
     is_multi_stage: bool,
@@ -93,9 +90,7 @@ pub struct MeasureSymbol {
 
 impl MeasureSymbol {
     pub fn new(
-        cube: Rc<CubeTableSymbol>,
-        name: String,
-        alias: String,
+        compiled_path: CompiledMemberPath,
         is_reference: bool,
         is_view: bool,
         case: Option<Case>,
@@ -111,9 +106,7 @@ impl MeasureSymbol {
         group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Rc<Self> {
         Rc::new(Self {
-            cube,
-            name,
-            alias,
+            compiled_path,
             is_reference,
             is_view,
             case,
@@ -148,9 +141,7 @@ impl MeasureSymbol {
                 self.kind.clone()
             };
             Rc::new(Self {
-                cube: self.cube.clone(),
-                name: self.name.clone(),
-                alias: self.alias.clone(),
+                compiled_path: self.compiled_path.clone(),
                 kind,
                 rolling_window: None,
                 is_multi_stage: false,
@@ -180,7 +171,7 @@ impl MeasureSymbol {
             if !self.kind.can_replace_type_with(&new_measure_type) {
                 return Err(CubeError::user(format!(
                     "Unsupported measure type replacement for {}: {} => {}",
-                    self.name,
+                    self.compiled_path.name(),
                     self.kind.measure_type_str(),
                     new_measure_type
                 )));
@@ -195,16 +186,14 @@ impl MeasureSymbol {
             if !result_kind.supports_additional_filters() {
                 return Err(CubeError::user(format!(
                     "Unsupported additional filters for measure {} type {}",
-                    self.name,
+                    self.compiled_path.name(),
                     result_kind.measure_type_str()
                 )));
             }
             measure_filters.extend(add_filters);
         }
         Ok(Rc::new(Self {
-            cube: self.cube.clone(),
-            name: self.name.clone(),
-            alias: self.alias.clone(),
+            compiled_path: self.compiled_path.clone(),
             kind: result_kind,
             rolling_window: self.rolling_window.clone(),
             is_multi_stage: self.is_multi_stage,
@@ -228,12 +217,20 @@ impl MeasureSymbol {
         Rc::new(new)
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
+    pub fn strip_join_prefix(&mut self) {
+        self.compiled_path = self.compiled_path.strip_join_prefix();
+    }
+
     pub fn full_name(&self) -> String {
-        format!("{}.{}", self.cube.cube_name(), self.name)
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn is_splitted_source(&self) -> bool {
@@ -346,23 +343,6 @@ impl MeasureSymbol {
         refs
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = self.kind.get_dependencies_with_path();
-        for filter in self.measure_filters.iter() {
-            filter.extract_symbol_deps_with_path(&mut deps);
-        }
-        for filter in self.measure_drill_filters.iter() {
-            filter.extract_symbol_deps_with_path(&mut deps);
-        }
-        for order in self.measure_order_by.iter() {
-            order.sql_call().extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(case) = &self.case {
-            case.extract_symbol_deps_with_path(&mut deps);
-        }
-        deps
-    }
-
     pub fn can_used_as_addictive_in_multplied(&self) -> bool {
         match &self.kind {
             MeasureKind::Aggregated(agg) => agg.agg_type().is_distinct(),
@@ -459,16 +439,20 @@ impl MeasureSymbol {
         self.is_multi_stage
     }
 
-    pub fn cube_name(&self) -> &String {
-        &self.cube.cube_name()
+    pub fn cube_name(&self) -> String {
+        self.compiled_path.cube_name().clone()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        self.cube.join_map()
+        self.compiled_path.join_map()
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.compiled_path.name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 }
 
@@ -593,7 +577,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                         }
                     } else {
                         shifts.insert(
-                            dimension_name,
+                            dimension_name.clone(),
                             DimensionTimeShift {
                                 interval: interval.clone(),
                                 name: name.clone(),
@@ -728,12 +712,18 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && add_group_by.is_none()
                 && group_by.is_none());
 
-        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone())?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
 
-        Ok(MemberSymbol::new_measure(MeasureSymbol::new(
+        let compiled_path = CompiledMemberPath::new(
             cube_symbol,
+            path.full_name().clone(),
             path.symbol_name().clone(),
             alias,
+            path.path().clone(),
+        );
+
+        Ok(MemberSymbol::new_measure(MeasureSymbol::new(
+            compiled_path,
             is_reference,
             is_view,
             case,

@@ -54,6 +54,13 @@ impl TestContext {
     }
 
     #[allow(dead_code)]
+    pub fn security_context(
+        &self,
+    ) -> &Rc<dyn crate::cube_bridge::security_context::SecurityContext> {
+        &self.security_context
+    }
+
+    #[allow(dead_code)]
     pub fn create_symbol(&self, member_path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
             .evaluator_compiler()
@@ -87,18 +94,11 @@ impl TestContext {
             .query_tools
             .cube_evaluator()
             .segment_by_path(path.to_string())?;
-        let expression = self
-            .query_tools
-            .evaluator_compiler()
-            .borrow_mut()
-            .compile_sql_call(&cube_name, definition.sql()?)?;
-        BaseSegment::try_new(
-            expression,
-            cube_name,
-            name,
-            Some(path.to_string()),
-            self.query_tools.clone(),
-        )
+        let mut compiler = self.query_tools.evaluator_compiler().borrow_mut();
+        let expression = compiler.compile_sql_call(&cube_name, definition.sql()?)?;
+        let cube_symbol = compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
+        drop(compiler);
+        BaseSegment::try_new(expression, cube_symbol, name, Some(path.to_string()))
     }
 
     #[allow(dead_code)]
@@ -263,6 +263,18 @@ impl TestContext {
         let (sql, _) = self.build_sql_with_used_pre_aggregations(query)?;
         Ok(sql)
     }
+
+    #[allow(dead_code)]
+    pub fn build_sql_from_options(
+        &self,
+        options: Rc<dyn BaseQueryOptions>,
+    ) -> Result<String, CubeError> {
+        let request = QueryProperties::try_new(self.query_tools.clone(), options)?;
+        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), false);
+        let (sql, _) = planner.plan()?;
+        Ok(sql)
+    }
+
     pub fn build_sql_with_used_pre_aggregations(
         &self,
         query: &str,

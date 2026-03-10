@@ -31,8 +31,8 @@ pub struct Compiler {
     security_context: Rc<dyn SecurityContext>,
     timezone: Tz,
     members: HashMap<(CacheSymbolType, String), Rc<MemberSymbol>>,
-    cube_names: HashMap<String, Rc<CubeNameSymbol>>,
-    cube_tables: HashMap<String, Rc<CubeTableSymbol>>,
+    cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
+    cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
 }
 
 impl Compiler {
@@ -57,18 +57,15 @@ impl Compiler {
         &mut self,
         name: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
-        if self.cube_evaluator.is_measure(path.clone())? {
-            Ok(self.add_measure_evaluator(name)?)
-        } else if self.cube_evaluator.is_dimension(path.clone())? {
-            Ok(self.add_dimension_evaluator(name)?)
-        } else if self.cube_evaluator.is_segment(path.clone())? {
-            Ok(self.add_segment_evaluator(name)?)
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot resolve evaluator of member {}. Only dimensions, measures and segments can be autoresolved",
+        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        match path.path_type() {
+            SymbolPathType::Dimension => self.add_dimension_evaluator_by_path(path),
+            SymbolPathType::Measure => self.add_measure_evaluator_by_path(path),
+            SymbolPathType::Segment => self.add_segment_evaluator_by_path(path),
+            _ => Err(CubeError::internal(format!(
+                "Cannot auto-resolve {}. Only dimensions, measures and segments",
                 name
-            )))
+            ))),
         }
     }
 
@@ -77,10 +74,10 @@ impl Compiler {
         measure: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &measure)?;
-        self.add_measure_evaluator_impl(path)
+        self.add_measure_evaluator_by_path(path)
     }
 
-    fn add_measure_evaluator_impl(
+    pub fn add_measure_evaluator_by_path(
         &mut self,
         path: SymbolPath,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
@@ -101,15 +98,15 @@ impl Compiler {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
         match path.path_type() {
             SymbolPathType::Segment => {
-                let symbol = self.add_segment_evaluator(path.full_name().clone())?;
+                let symbol = self.add_segment_evaluator_by_path(path)?;
                 let me = symbol.as_member_expression()?;
                 Ok(MemberSymbol::new_member_expression(me.with_parenthesized()))
             }
-            _ => self.add_dimension_evaluator_impl(path),
+            _ => self.add_dimension_evaluator_by_path(path),
         }
     }
 
-    fn add_dimension_evaluator_impl(
+    pub fn add_dimension_evaluator_by_path(
         &mut self,
         path: SymbolPath,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
@@ -124,27 +121,33 @@ impl Compiler {
     }
 
     pub fn add_segment_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
-        if let Some(exists) = self.exists_member(CacheSymbolType::Segment, &name) {
+        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        self.add_segment_evaluator_by_path(path)
+    }
+
+    pub fn add_segment_evaluator_by_path(
+        &mut self,
+        path: SymbolPath,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let full_name = path.full_name().clone();
+        if let Some(exists) = self.exists_member(CacheSymbolType::Segment, &full_name) {
             return Ok(exists.clone());
         }
-        let path = self
-            .cube_evaluator
-            .parse_path("segments".to_string(), name.clone())?;
-        let cube_name = path[0].clone();
-        let member_name = path[1].clone();
-        let definition = self.cube_evaluator.segment_by_path(name.clone())?;
-        let sql_call = self.compile_sql_call(&cube_name, definition.sql()?)?;
-        let alias = PlanSqlTemplates::member_alias_name(&cube_name, &member_name, &None);
+        let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
+        let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
+        let alias =
+            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None);
+        let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
         let symbol = MemberExpressionSymbol::try_new(
-            cube_name,
-            member_name,
+            cube_symbol,
+            path.symbol_name().clone(),
             MemberExpressionExpression::SqlCall(sql_call),
             None,
             Some(alias),
-            self.base_tools.clone(),
+            path.path().clone(),
         )?;
         let result = MemberSymbol::new_member_expression(symbol);
-        let key = (CacheSymbolType::Segment, name);
+        let key = (CacheSymbolType::Segment, full_name);
         self.members.insert(key, result.clone());
         Ok(result)
     }
@@ -152,13 +155,16 @@ impl Compiler {
     pub fn add_cube_name_evaluator(
         &mut self,
         cube_name: String,
+        path: Vec<String>,
     ) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        if let Some(exists) = self.cube_names.get(&cube_name) {
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        if let Some(exists) = self.cube_names.get(&cache_key) {
             Ok(exists.clone())
         } else {
-            let result = CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone())?
-                .build(self)?;
-            self.cube_names.insert(cube_name, result.clone());
+            let result =
+                CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                    .build(self)?;
+            self.cube_names.insert(cache_key, result.clone());
             Ok(result)
         }
     }
@@ -166,13 +172,16 @@ impl Compiler {
     pub fn add_cube_table_evaluator(
         &mut self,
         cube_name: String,
+        path: Vec<String>,
     ) -> Result<Rc<CubeTableSymbol>, CubeError> {
-        if let Some(exists) = self.cube_tables.get(&cube_name) {
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        if let Some(exists) = self.cube_tables.get(&cache_key) {
             Ok(exists.clone())
         } else {
-            let result = CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone())?
-                .build(self)?;
-            self.cube_tables.insert(cube_name, result.clone());
+            let result =
+                CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                    .build(self)?;
+            self.cube_tables.insert(cache_key, result.clone());
             Ok(result)
         }
     }

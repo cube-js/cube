@@ -13,41 +13,35 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub enum CubeRef {
-    Name {
-        symbol: Rc<CubeNameSymbol>,
-        path: Vec<String>,
-    },
-    Table {
-        symbol: Rc<CubeTableSymbol>,
-        path: Vec<String>,
-    },
+    Name(Rc<CubeNameSymbol>),
+    Table(Rc<CubeTableSymbol>),
 }
 
 impl CubeRef {
     pub fn cube_name(&self) -> &String {
         match self {
-            CubeRef::Name { symbol, .. } => symbol.cube_name(),
-            CubeRef::Table { symbol, .. } => symbol.cube_name(),
+            CubeRef::Name(symbol) => symbol.cube_name(),
+            CubeRef::Table(symbol) => symbol.cube_name(),
         }
     }
 
     pub fn path(&self) -> &Vec<String> {
         match self {
-            CubeRef::Name { path, .. } => path,
-            CubeRef::Table { path, .. } => path,
+            CubeRef::Name(symbol) => symbol.path(),
+            CubeRef::Table(symbol) => symbol.path(),
         }
     }
 
     pub fn as_name(&self) -> Option<&Rc<CubeNameSymbol>> {
         match self {
-            CubeRef::Name { symbol, .. } => Some(symbol),
+            CubeRef::Name(symbol) => Some(symbol),
             _ => None,
         }
     }
 
     pub fn as_table(&self) -> Option<&Rc<CubeTableSymbol>> {
         match self {
-            CubeRef::Table { symbol, .. } => Some(symbol),
+            CubeRef::Table(symbol) => Some(symbol),
             _ => None,
         }
     }
@@ -106,12 +100,6 @@ impl SqlCallArg {
 }
 
 #[derive(Debug, Clone)]
-pub struct SqlCallDependency {
-    pub path: Vec<String>,
-    pub symbol: SqlDependency,
-}
-
-#[derive(Debug, Clone)]
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
     pub column: FilterParamsColumn,
@@ -125,7 +113,7 @@ pub struct SqlCallFilterGroupItem {
 #[derive(Clone, Debug)]
 pub struct SqlCall {
     template: SqlTemplate,
-    deps: Vec<SqlCallDependency>,
+    deps: Vec<SqlDependency>,
     filter_params: Vec<SqlCallFilterParamsItem>,
     filter_groups: Vec<SqlCallFilterGroupItem>,
     security_context: SecutityContextProps,
@@ -134,7 +122,7 @@ pub struct SqlCall {
 impl SqlCall {
     pub(super) fn new(
         template: SqlTemplate,
-        deps: Vec<SqlCallDependency>,
+        deps: Vec<SqlDependency>,
         filter_params: Vec<SqlCallFilterParamsItem>,
         filter_groups: Vec<SqlCallFilterGroupItem>,
         security_context: SecutityContextProps,
@@ -168,7 +156,7 @@ impl SqlCall {
             )
         } else {
             Err(CubeError::internal(
-                "SqlCall::eval called for fuction that return string".to_string(),
+                "SqlCall::eval called for function that returns string".to_string(),
             ))
         }
     }
@@ -213,7 +201,7 @@ impl SqlCall {
         if self.deps.is_empty() {
             true
         } else {
-            self.deps.iter().any(|dep| dep.symbol.is_cube_ref())
+            self.deps.iter().any(|dep| dep.is_cube_ref())
         }
     }
 
@@ -221,7 +209,7 @@ impl SqlCall {
         self.deps
             .iter()
             .filter_map(|dep| {
-                if let SqlDependency::CubeRef(CubeRef::Name { symbol, .. }) = &dep.symbol {
+                if let SqlDependency::CubeRef(CubeRef::Name(symbol)) = dep {
                     Some(symbol.clone())
                 } else {
                     None
@@ -266,7 +254,7 @@ impl SqlCall {
         let deps = self
             .deps
             .iter()
-            .map(|dep| match &dep.symbol {
+            .map(|dep| match dep {
                 SqlDependency::Symbol(m) => visitor.apply(m, node_processor.clone(), templates),
                 SqlDependency::CubeRef(cr) => {
                     visitor.evaluate_cube_ref(cr, node_processor.clone(), templates)
@@ -402,60 +390,35 @@ impl SqlCall {
 
     pub fn resolve_direct_reference(&self) -> Option<Rc<MemberSymbol>> {
         if self.is_direct_reference() {
-            self.deps[0].symbol.as_symbol().cloned()
+            self.deps[0].as_symbol().cloned()
         } else {
             None
         }
     }
 
     pub fn dependencies_count(&self) -> usize {
-        self.deps.iter().filter(|d| d.symbol.is_symbol()).count()
+        self.deps.iter().filter(|d| d.is_symbol()).count()
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         self.deps
             .iter()
-            .filter_map(|d| d.symbol.as_symbol().cloned())
-            .collect()
-    }
-
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        self.deps
-            .iter()
-            .filter_map(|d| d.symbol.as_symbol().map(|s| (s.clone(), d.path.clone())))
+            .filter_map(|d| d.as_symbol().cloned())
             .collect()
     }
 
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         for dep in self.deps.iter() {
-            if let Some(s) = dep.symbol.as_symbol() {
+            if let Some(s) = dep.as_symbol() {
                 result.push(s.clone())
-            }
-        }
-    }
-
-    pub fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        for dep in self.deps.iter() {
-            if let Some(s) = dep.symbol.as_symbol() {
-                result.push((s.clone(), dep.path.clone()))
             }
         }
     }
 
     pub fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
         for dep in self.deps.iter() {
-            if let SqlDependency::CubeRef(cr) = &dep.symbol {
-                let cube_ref = match cr {
-                    CubeRef::Name { symbol, .. } => CubeRef::Name {
-                        symbol: symbol.clone(),
-                        path: dep.path.clone(),
-                    },
-                    CubeRef::Table { symbol, .. } => CubeRef::Table {
-                        symbol: symbol.clone(),
-                        path: dep.path.clone(),
-                    },
-                };
-                result.push(cube_ref);
+            if let SqlDependency::CubeRef(cr) = dep {
+                result.push(cr.clone());
             }
         }
     }
@@ -466,8 +429,8 @@ impl SqlCall {
     ) -> Result<Rc<Self>, CubeError> {
         let mut result = self.clone();
         for dep in result.deps.iter_mut() {
-            if let SqlDependency::Symbol(ref s) = dep.symbol {
-                dep.symbol = SqlDependency::Symbol(s.apply_recursive(f)?);
+            if let SqlDependency::Symbol(ref s) = dep {
+                *dep = SqlDependency::Symbol(s.apply_recursive(f)?);
             }
         }
         Ok(Rc::new(result))
@@ -486,7 +449,7 @@ impl crate::utils::debug::DebugSql for SqlCall {
         let deps = self
             .deps
             .iter()
-            .map(|dep| match &dep.symbol {
+            .map(|dep| match dep {
                 SqlDependency::Symbol(s) => {
                     if expand_deps {
                         s.debug_sql(true)

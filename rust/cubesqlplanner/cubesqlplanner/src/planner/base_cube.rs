@@ -43,10 +43,7 @@ impl BaseCube {
         context: Rc<VisitorContext>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let cube_ref = CubeRef::Table {
-            symbol: self.cube_table_symbol.clone(),
-            path: vec![],
-        };
+        let cube_ref = CubeRef::Table(self.cube_table_symbol.clone());
         let visitor = context.make_visitor(context.query_tools());
         let node_processor = context.node_processor();
         visitor.evaluate_cube_ref(&cube_ref, node_processor, templates)
