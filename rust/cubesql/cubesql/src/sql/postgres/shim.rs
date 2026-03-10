@@ -17,7 +17,7 @@ use crate::{
     sql::{
         compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalBatch, PortalFrom},
+        extended::{Cursor, Portal, PortalBatch, PortalFrom, ResultFormat},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         AuthContextRef, Session, SessionState,
     },
@@ -64,7 +64,7 @@ pub enum StartupState {
 pub trait QueryPlanExt {
     fn to_row_description(
         &self,
-        required_format: protocol::Format,
+        format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError>;
 }
 
@@ -73,18 +73,18 @@ impl QueryPlanExt for QueryPlan {
     /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
     fn to_row_description(
         &self,
-        required_format: protocol::Format,
+        format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self {
             QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
-                for field in frame.get_columns() {
+                for (idx, field) in frame.get_columns().iter().enumerate() {
                     result.push(protocol::RowDescriptionField::new(
                         field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
-                        required_format,
+                        format.format_for(idx),
                     ));
                 }
 
@@ -93,11 +93,11 @@ impl QueryPlanExt for QueryPlan {
             QueryPlan::DataFusionSelect(logical_plan, _) => {
                 let mut result = vec![];
 
-                for field in logical_plan.schema().fields() {
+                for (idx, field) in logical_plan.schema().fields().iter().enumerate() {
                     result.push(protocol::RowDescriptionField::new(
                         field.name().clone(),
                         df_type_to_pg_tid(field.data_type())?.to_type(),
-                        required_format,
+                        format.format_for(idx),
                     ));
                 }
 
@@ -937,7 +937,7 @@ impl AsyncPostgresShim {
             )
         })?;
 
-        let format = body.result_formats.first().copied().unwrap_or(Format::Text);
+        let format = ResultFormat::from(body.result_formats.clone());
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);
@@ -1084,15 +1084,15 @@ impl AsyncPostgresShim {
 
                 match plan {
                     Ok(plan) => {
-                        let description =
-                            plan.to_row_description(Format::Text)?
-                                .and_then(|description| {
-                                    if description.len() > 0 {
-                                        Some(description)
-                                    } else {
-                                        None
-                                    }
-                                });
+                        let description = plan
+                            .to_row_description(&ResultFormat::AllText)?
+                            .and_then(|description| {
+                                if description.len() > 0 {
+                                    Some(description)
+                                } else {
+                                    None
+                                }
+                            });
 
                         (
                             PreparedStatement::Query {
@@ -1219,7 +1219,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1238,7 +1243,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     CancellationToken::new(),
                 )
@@ -1257,7 +1267,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     CancellationToken::new(),
                 )
@@ -1354,8 +1369,12 @@ impl AsyncPostgresShim {
                 )
                 .await?;
 
-                let mut portal =
-                    Portal::new(plan, cursor.format, PortalFrom::Fetch, span_id.clone());
+                let mut portal = Portal::new(
+                    plan,
+                    ResultFormat::from(vec![cursor.format]),
+                    PortalFrom::Fetch,
+                    span_id.clone(),
+                );
 
                 self.write_portal(&mut portal, limit, cancel).await?;
                 self.portals.insert(name.value, portal);
@@ -1448,7 +1467,12 @@ impl AsyncPostgresShim {
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1465,7 +1489,12 @@ impl AsyncPostgresShim {
                 );
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1499,7 +1528,12 @@ impl AsyncPostgresShim {
                 }?;
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1540,7 +1574,12 @@ impl AsyncPostgresShim {
                 }?;
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1579,7 +1618,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1596,7 +1640,12 @@ impl AsyncPostgresShim {
                 .await?;
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
