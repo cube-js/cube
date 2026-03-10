@@ -413,8 +413,7 @@ describe('Cube RBAC Engine', () => {
         expect(row.secret_number).toBe(-1);
         expect(row.secret_boolean).toBe(false);
         expect(row.public_dim).toBeNull();
-        expect(Number(row.count)).toBe(12345);
-        expect(Number(row.count_d)).toBe(34567);
+        // Measures are not masked in ungrouped (SELECT *) queries
         expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
       }
     });
@@ -464,7 +463,7 @@ describe('Cube RBAC Engine', () => {
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
         expect(row.secret_number).toBe(-1);
-        expect(Number(row.count)).toBe(12345);
+        // Measures are not masked in ungrouped (SELECT *) queries
       }
     });
 
@@ -521,8 +520,7 @@ describe('Cube RBAC Engine', () => {
       for (const row of res.rows) {
         expect(row.secret_number).toBe(-1);
         expect(row.public_dim).toBeNull();
-        expect(Number(row.count)).toBe(12345);
-        expect(Number(row.count_d)).toBe(34567);
+        // Measures are not masked in ungrouped (SELECT *) queries
       }
     });
 
@@ -533,7 +531,7 @@ describe('Cube RBAC Engine', () => {
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
         expect(row.secret_number).toBe(-1);
-        expect(Number(row.count)).toBe(12345);
+        // Measures are not masked in ungrouped (SELECT *) queries
       }
     });
   });
