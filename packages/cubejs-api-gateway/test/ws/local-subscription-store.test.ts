@@ -39,6 +39,7 @@ describe('LocalSubscriptionStore', () => {
     const missing = await store.getSubscription('unknown-conn', 'sub-1');
 
     expect(missing).toBeUndefined();
+    // eslint-disable-next-line dot-notation
     expect(store['connections'].size).toBe(0);
   });
 
@@ -47,6 +48,7 @@ describe('LocalSubscriptionStore', () => {
 
     await store.unsubscribe('unknown-conn', 'sub-1');
 
+    // eslint-disable-next-line dot-notation
     expect(store['connections'].size).toBe(0);
   });
 
@@ -141,6 +143,7 @@ describe('LocalSubscriptionStore', () => {
 
     await store.disconnect('conn-1');
 
+    // eslint-disable-next-line dot-notation
     expect(store['connections'].has('conn-1')).toBe(false);
   });
 
@@ -158,6 +161,7 @@ describe('LocalSubscriptionStore', () => {
 
     store.clear();
 
+    // eslint-disable-next-line dot-notation
     expect(store['connections'].size).toBe(0);
   });
 });
