@@ -438,82 +438,21 @@ mod tests {
         let mut cursor = Cursor::new(vec![]);
 
         let mut writer = BatchWriter::new(vec![Format::Text, Format::Binary, Format::Binary]);
-        // col0: text "hello" → text encoding
         writer.write_value("hello".to_string())?;
-        // col1: int64 42 → binary encoding (8 bytes big-endian)
         writer.write_value(42_i64)?;
-        // col2: f64 2.5 → binary encoding (8 bytes IEEE 754)
         writer.write_value(2.5_f64)?;
         writer.end_row()?;
 
         buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
-        let data = cursor.get_ref();
-
-        // Parse the DataRow message
-        assert_eq!(data[0], b'D'); // DataRow message type
-        let msg_len = i32::from_be_bytes([data[1], data[2], data[3], data[4]]);
-        let field_count = i16::from_be_bytes([data[5], data[6]]);
-        assert_eq!(field_count, 3);
-
-        // Field 0: text "hello" → length 5, then ASCII bytes
-        let mut offset = 7;
-        let f0_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f0_len, 5);
-        assert_eq!(&data[offset..offset + 5], b"hello");
-        offset += 5;
-
-        // Field 1: binary int64 42 → length 8, then 8-byte big-endian
-        let f1_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f1_len, 8);
-        let int_val = i64::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        assert_eq!(int_val, 42);
-        offset += 8;
-
-        // Field 2: binary f64 2.5 → length 8, then 8-byte IEEE 754
-        let f2_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f2_len, 8);
-        let float_val = f64::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        assert_eq!(float_val, 2.5);
-
-        // Total message length should match
-        assert_eq!(msg_len as usize, data.len() - 1);
+        assert_eq!(
+            cursor.get_ref()[0..],
+            vec![
+                // row: "hello" as text, 42_i64 as binary, 2.5_f64 as binary
+                68, 0, 0, 0, 39, 0, 3, 0, 0, 0, 5, 104, 101, 108, 108, 111, 0, 0, 0, 8, 0, 0, 0, 0,
+                0, 0, 0, 42, 0, 0, 0, 8, 64, 4, 0, 0, 0, 0, 0, 0
+            ]
+        );
 
         Ok(())
     }
@@ -525,90 +464,26 @@ mod tests {
 
         let mut writer = BatchWriter::new(vec![Format::Text, Format::Binary]);
 
-        // Row 1
         writer.write_value("row1".to_string())?;
         writer.write_value(100_i64)?;
         writer.end_row()?;
 
-        // Row 2
         writer.write_value("row2".to_string())?;
         writer.write_value(200_i64)?;
         writer.end_row()?;
 
         buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
-        let data = cursor.get_ref();
-
-        // Parse row 1
-        assert_eq!(data[0], b'D');
-        let mut offset = 7; // skip type(1) + len(4) + field_count(2)
-                            // col0: text "row1"
-        let f0_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f0_len, 4);
-        assert_eq!(&data[offset..offset + 4], b"row1");
-        offset += 4;
-        // col1: binary int64 100
-        let f1_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f1_len, 8);
-        let int_val = i64::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        assert_eq!(int_val, 100);
-        offset += 8;
-
-        // Parse row 2
-        assert_eq!(data[offset], b'D');
-        offset += 7; // skip type(1) + len(4) + field_count(2)
-                     // col0: text "row2" (format resets per row)
-        let f0_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f0_len, 4);
-        assert_eq!(&data[offset..offset + 4], b"row2");
-        offset += 4;
-        // col1: binary int64 200
-        let f1_len = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-        assert_eq!(f1_len, 8);
-        let int_val = i64::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        assert_eq!(int_val, 200);
+        assert_eq!(
+            cursor.get_ref()[0..],
+            vec![
+                // row 1: "row1" as text, 100_i64 as binary
+                68, 0, 0, 0, 26, 0, 2, 0, 0, 0, 4, 114, 111, 119, 49, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
+                0, 100, // row 2: "row2" as text, 200_i64 as binary
+                68, 0, 0, 0, 26, 0, 2, 0, 0, 0, 4, 114, 111, 119, 50, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
+                0, 200
+            ]
+        );
 
         Ok(())
     }
