@@ -87,6 +87,8 @@ while (true) {
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
 | `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
+| `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
+| `isDefaultBranch` | boolean | No | Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name. |
 
 <InfoBox>
 
@@ -160,6 +162,8 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
   - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`.
   - **`groups`** (string[]): Array of group names for user. Not allowed with `internalId`.
   - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
+- **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
+- **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
 
 ## Response Format
 
@@ -786,6 +790,112 @@ When an error occurs, the `result` property of the toolCall will contain an `err
 }
 ```
 
+## Abort Endpoint
+
+The Abort endpoint stops an in-progress chat stream. This is useful when the
+user cancels a request or navigates away while the agent is still generating a
+response.
+
+### Endpoint
+
+**POST**
+
+```
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/abort
+```
+
+The abort URL is derived from the Chat API URL by replacing `/stream-chat-state`
+with `/abort`.
+
+### Authentication
+
+Uses the same API key authentication as the Chat API.
+
+### Request Body
+
+- **`chatId`** (string, required): The chat thread ID to abort. This must match
+  the `chatId` of an active or recently completed chat session.
+- **`sessionSettings`** (object): Same session settings as `stream-chat-state`
+  to authenticate the request.
+  - **`externalId`** (string): Unique identifier for the external user.
+
+### Response
+
+- **`204 No Content`**: Chat streaming was aborted successfully.
+- **`403 Forbidden`**: The authenticated user does not own the specified chat
+  thread.
+- **`404 Not Found`**: The specified `chatId` does not exist.
+
+### Code Examples
+
+<CodeTabs>
+
+```bash cURL
+# Derive the abort URL from your Chat API URL by replacing /stream-chat-state with /abort
+ABORT_URL="${CHAT_API_URL/stream-chat-state/abort}"
+
+curl -X POST "$ABORT_URL" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -d '{
+    "chatId": "CHAT_ID_TO_ABORT",
+    "sessionSettings": {
+      "externalId": "user@example.com"
+    }
+  }'
+```
+
+```javascript JavaScript
+const CHAT_API_URL = 'YOUR_CHAT_API_URL';
+const ABORT_URL = CHAT_API_URL.replace(/\/stream-chat-state$/, '/abort');
+const API_KEY = 'YOUR_API_KEY';
+
+const response = await fetch(ABORT_URL, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Api-Key ${API_KEY}`
+  },
+  body: JSON.stringify({
+    chatId: 'CHAT_ID_TO_ABORT',
+    sessionSettings: {
+      externalId: 'user@example.com'
+    }
+  })
+});
+
+if (response.status === 204) {
+  console.log('Chat streaming aborted successfully');
+}
+```
+
+```python Python
+import requests
+
+CHAT_API_URL = "YOUR_CHAT_API_URL"
+ABORT_URL = CHAT_API_URL.replace("/stream-chat-state", "/abort")
+API_KEY = "YOUR_API_KEY"
+
+response = requests.post(
+    ABORT_URL,
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Api-Key {API_KEY}"
+    },
+    json={
+        "chatId": "CHAT_ID_TO_ABORT",
+        "sessionSettings": {
+            "externalId": "user@example.com"
+        }
+    }
+)
+
+if response.status_code == 204:
+    print("Chat streaming aborted successfully")
+```
+
+</CodeTabs>
+
 ## Code Examples
 
 <CodeTabs>
@@ -896,9 +1006,11 @@ for line in response.iter_lines():
 
 ## Error Handling
 
-- **401 Unauthorized**: Invalid or missing API key. Verify your API key is correct and has the necessary permissions.
+- **204 No Content**: (Abort endpoint only) Chat streaming was aborted successfully.
 - **400 Bad Request**: Invalid request body or parameters. Check required fields and data types.
-- **404 Not Found**: Agent or tenant not found. Verify the Chat API URL from your agent settings.
+- **401 Unauthorized**: Invalid or missing API key. Verify your API key is correct and has the necessary permissions.
+- **403 Forbidden**: (Abort endpoint only) The authenticated user does not own the specified chat thread.
+- **404 Not Found**: Agent, tenant, or chat thread not found. Verify the Chat API URL from your agent settings and the `chatId`.
 - **500 Internal Server Error**: Server processing error. Contact support if the issue persists.
 
 
