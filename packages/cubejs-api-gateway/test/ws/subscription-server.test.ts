@@ -65,7 +65,7 @@ describe('SubscriptionServer', () => {
 
       await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 123 }));
 
-      expect(mockSubscriptionStore.unsubscribe).toHaveBeenCalledWith('conn-1', 123);
+      expect(mockSubscriptionStore.unsubscribe).toHaveBeenCalledWith('conn-1', '123');
     });
 
     it('should accept valid load message', async () => {
@@ -95,7 +95,7 @@ describe('SubscriptionServer', () => {
       await server.processMessage('conn-1', JSON.stringify(message));
 
       expect(mockApiGateway.load).toHaveBeenCalled();
-      expect(sentMessages).toContainEqual({ messageProcessedId: 123 });
+      expect(sentMessages).toContainEqual({ messageProcessedId: '123' });
     });
 
     it('should reject invalid JSON payload', async () => {

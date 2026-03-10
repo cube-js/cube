@@ -19,20 +19,18 @@ describe('LocalSubscriptionStore', () => {
     expect(subscription?.timestamp).toBeInstanceOf(Date);
   });
 
-  it('normalizes numeric and string subscription ids to same key', async () => {
+  it('stores and retrieves subscription by string id', async () => {
     const store = new LocalSubscriptionStore();
 
-    await store.subscribe('conn-1', 123, {
+    await store.subscribe('conn-1', '123', {
       message: { method: 'load' },
       state: { answer: true }
     });
 
-    const byNumber = await store.getSubscription('conn-1', 123);
-    const byString = await store.getSubscription('conn-1', '123');
+    const result = await store.getSubscription('conn-1', '123');
 
-    expect(byNumber).toBeDefined();
-    expect(byString).toBeDefined();
-    expect(byString).toBe(byNumber);
+    expect(result).toBeDefined();
+    expect(result?.state).toEqual({ answer: true });
   });
 
   it('does not create a connection when reading missing subscription', async () => {

@@ -2,15 +2,6 @@ interface LocalSubscriptionStoreOptions {
   heartBeatInterval?: number;
 }
 
-export type SubscriptionId = string | number;
-const normalizeSubscriptionId = (subscriptionId: SubscriptionId): string => {
-  if (typeof subscriptionId === 'number') {
-    return subscriptionId.toString();
-  }
-
-  return subscriptionId;
-};
-
 export type LocalSubscriptionStoreSubscription = {
   message: any,
   state: any,
@@ -31,38 +22,35 @@ export class LocalSubscriptionStore {
     this.heartBeatInterval = options.heartBeatInterval || 60;
   }
 
-  public async getSubscription(connectionId: string, subscriptionId: SubscriptionId): Promise<LocalSubscriptionStoreSubscription | undefined> {
+  public async getSubscription(connectionId: string, subscriptionId: string): Promise<LocalSubscriptionStoreSubscription | undefined> {
     // only get subscription, do not create connection if it doesn't exist
     const connection = this.getConnection(connectionId);
     if (!connection) {
       return undefined;
     }
 
-    const normalizedSubscriptionId = normalizeSubscriptionId(subscriptionId);
-    return connection.subscriptions.get(normalizedSubscriptionId);
+    return connection.subscriptions.get(subscriptionId);
   }
 
-  public async subscribe(connectionId: string, subscriptionId: SubscriptionId, subscription) {
+  public async subscribe(connectionId: string, subscriptionId: string, subscription) {
     const connection = this.getConnectionOrCreate(connectionId);
-    const normalizedSubscriptionId = normalizeSubscriptionId(subscriptionId);
-    connection.subscriptions.set(normalizedSubscriptionId, {
+    connection.subscriptions.set(subscriptionId, {
       ...subscription,
       timestamp: new Date()
     });
   }
 
-  public async unsubscribe(connectionId: string, subscriptionId: SubscriptionId) {
+  public async unsubscribe(connectionId: string, subscriptionId: string) {
     const connection = this.getConnection(connectionId);
     if (!connection) {
       return;
     }
-    
-    const normalizedSubscriptionId = normalizeSubscriptionId(subscriptionId);
-    if (!connection.subscriptions.has(normalizedSubscriptionId)) {
+
+    if (!connection.subscriptions.has(subscriptionId)) {
       return;
     }
 
-    connection.subscriptions.delete(normalizedSubscriptionId);
+    connection.subscriptions.delete(subscriptionId);
   }
 
   public getAllSubscriptions() {
