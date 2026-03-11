@@ -51,7 +51,7 @@ pub struct YamlDimensionDefinition {
     #[serde(default)]
     mask_sql: Option<String>,
     #[serde(default)]
-    mask: Option<serde_json::Value>,
+    mask_static: Option<String>,
 }
 
 impl YamlDimensionDefinition {
@@ -96,7 +96,7 @@ impl YamlDimensionDefinition {
             .longitude_opt(self.longitude)
             .time_shift(time_shift)
             .resolved_mask_sql_opt(self.mask_sql)
-            .mask(self.mask)
+            .mask_static(self.mask_static)
             .build();
 
         YamlDimensionBuildResult {

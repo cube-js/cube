@@ -9,7 +9,7 @@ cubes:
           - name: secret_number
             type: number
             sql: price
-            mask: -1
+            mask_static: "(-1)"
           - name: public_dim
             type: string
             sql: "{CUBE}.status"
@@ -20,10 +20,10 @@ cubes:
       measures:
           - name: count
             type: count
-            mask: 12345
+            mask_static: "(12345)"
           - name: sum_revenue
             type: sum
             sql: revenue
-            mask: -1
+            mask_static: "(-1)"
           - name: real_count
             type: count

@@ -51,7 +51,8 @@ pub struct MeasureDefinitionStatic {
     pub time_shift_references: Option<Vec<TimeShiftReference>>,
     #[serde(rename = "rollingWindow")]
     pub rolling_window: Option<RollingWindow>,
-    pub mask: Option<serde_json::Value>,
+    #[serde(rename = "maskStatic")]
+    pub mask_static: Option<String>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic)]

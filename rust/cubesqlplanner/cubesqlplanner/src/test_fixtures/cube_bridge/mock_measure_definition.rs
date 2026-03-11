@@ -46,7 +46,7 @@ pub struct MockMeasureDefinition {
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
     resolved_mask_sql: Option<String>,
     #[builder(default)]
-    mask: Option<serde_json::Value>,
+    mask_static: Option<String>,
 }
 
 impl_static_data!(
@@ -60,7 +60,7 @@ impl_static_data!(
     group_by_references,
     time_shift_references,
     rolling_window,
-    mask
+    mask_static
 );
 
 impl MockMeasureDefinition {

@@ -43,7 +43,7 @@ pub struct MockDimensionDefinition {
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
     resolved_mask_sql: Option<String>,
     #[builder(default)]
-    mask: Option<serde_json::Value>,
+    mask_static: Option<String>,
 }
 
 impl_static_data!(
@@ -57,7 +57,7 @@ impl_static_data!(
     propagate_filters_to_sub_query,
     values,
     primary_key,
-    mask
+    mask_static
 );
 
 impl MockDimensionDefinition {

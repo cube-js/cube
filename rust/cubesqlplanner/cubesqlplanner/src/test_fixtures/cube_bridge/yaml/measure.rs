@@ -36,7 +36,7 @@ pub struct YamlMeasureDefinition {
     #[serde(default)]
     mask_sql: Option<String>,
     #[serde(default)]
-    mask: Option<serde_json::Value>,
+    mask_static: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,7 +107,7 @@ impl YamlMeasureDefinition {
                 .drill_filters(drill_filters)
                 .order_by(order_by)
                 .resolved_mask_sql_opt(self.mask_sql)
-                .mask(self.mask)
+                .mask_static(self.mask_static)
                 .build(),
         )
     }

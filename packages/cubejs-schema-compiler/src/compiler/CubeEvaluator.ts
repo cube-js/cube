@@ -668,14 +668,30 @@ export class CubeEvaluator extends CubeSymbols {
         members[memberName].aliasMember = aliasMember;
       }
 
-      // Expose mask.sql as a top-level maskSql getter for the Tesseract bridge,
-      // without storing it in the data model. The bridge reads maskSql as MemberSql.
-      if (members[memberName].mask && typeof members[memberName].mask === 'object' && members[memberName].mask.sql) {
-        const maskSqlFn = members[memberName].mask.sql;
-        Object.defineProperty(members[memberName], 'maskSql', {
-          get: () => maskSqlFn,
-          enumerable: false,
-        });
+      // Expose mask properties as non-enumerable getters for the Tesseract bridge,
+      // without polluting the data model serialization.
+      const memberMask = members[memberName].mask;
+      if (memberMask !== undefined && memberMask !== null) {
+        if (typeof memberMask === 'object' && memberMask.sql) {
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => memberMask.sql,
+            enumerable: false,
+          });
+        } else {
+          // Static mask: expose as maskStatic string for the bridge
+          let maskLiteral: string;
+          if (typeof memberMask === 'number') {
+            maskLiteral = `(${memberMask})`;
+          } else if (typeof memberMask === 'boolean') {
+            maskLiteral = memberMask ? '(TRUE)' : '(FALSE)';
+          } else {
+            maskLiteral = `'${String(memberMask).replace(/'/g, "''")}'`;
+          }
+          Object.defineProperty(members[memberName], 'maskStatic', {
+            get: () => maskLiteral,
+            enumerable: false,
+          });
+        }
       }
     }
   }

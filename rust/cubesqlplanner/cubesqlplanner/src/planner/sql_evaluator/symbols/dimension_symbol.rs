@@ -16,21 +16,6 @@ use crate::planner::sql_evaluator::{
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
-
-pub fn mask_json_to_sql_literal(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::Number(n) => format!("({})", n),
-        serde_json::Value::Bool(b) => {
-            if *b {
-                "(TRUE)".to_string()
-            } else {
-                "(FALSE)".to_string()
-            }
-        }
-        serde_json::Value::String(s) => format!("'{}'", s.replace('\'', "''")),
-        _ => "(NULL)".to_string(),
-    }
-}
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -357,10 +342,8 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         let mask_sql = if let Some(mask_sql) = mask_sql {
             Some(compiler.compile_sql_call(path.cube_name(), mask_sql)?)
-        } else if let Some(mask_value) = &definition.static_data().mask {
-            Some(Rc::new(SqlCall::new_literal(mask_json_to_sql_literal(
-                mask_value,
-            ))))
+        } else if let Some(mask_literal) = &definition.static_data().mask_static {
+            Some(Rc::new(SqlCall::new_literal(mask_literal.clone())))
         } else {
             None
         };
