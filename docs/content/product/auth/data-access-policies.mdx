@@ -227,6 +227,19 @@ customize defaults with the `CUBEJS_ACCESS_POLICY_MASK_STRING`,
 `CUBEJS_ACCESS_POLICY_MASK_NUMBER`, `CUBEJS_ACCESS_POLICY_MASK_BOOLEAN`, and
 `CUBEJS_ACCESS_POLICY_MASK_TIME` environment variables.
 
+<WarningBox>
+
+SQL masks (`mask: { sql: "..." }`) on measures are not applied in ungrouped
+queries (e.g., `SELECT *` via the SQL API), because SQL mask expressions
+typically reference columns that are not meaningful in a per-row context.
+Static masks (`mask: -1`, `mask: 0`) are applied in all cases.
+
+If you need to mask a measure in ungrouped queries with a dynamic expression,
+define it as a dimension with an SQL mask instead, and reference that masked
+dimension in your query.
+
+</WarningBox>
+
 _When querying a view,_ data masking follows the same pattern as row-level
 security: masking rules from both the view and relevant cubes are applied.
 
