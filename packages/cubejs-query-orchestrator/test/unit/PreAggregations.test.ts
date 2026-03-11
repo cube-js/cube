@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable global-require */
 import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
@@ -326,6 +327,134 @@ describe('PreAggregations', () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
       expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
+    });
+  });
+
+  describe('PreAggregationLoader content_version mismatch with refreshKey', () => {
+    let preAggregations: PreAggregations | null = null;
+    let loggerCalls: [string, any][];
+
+    const mockLogger: any = (msg: string, params: any) => {
+      loggerCalls.push([msg, params]);
+    };
+
+    beforeEach(async () => {
+      loggerCalls = [];
+
+      preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        mockLogger,
+        queryCache!,
+        {
+          queueOptions: () => ({
+            executionTimeout: 2,
+            concurrency: 2,
+          }),
+        },
+      );
+    });
+
+    test('content_version mismatch, recently built → background refresh, returns existing', async () => {
+      // First, build the pre-aggregation with waitForRenew
+      mockDriver!.now = Date.now();
+      const firstQuery = createBasicQuery({ renewQuery: true });
+      const { preAggregationsTablesToTempTables: firstResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(firstQuery);
+      const firstTableName = firstResult[0][1].targetTableName;
+      expect(firstTableName).toBeTruthy();
+
+      // Now change the invalidation key query to trigger a content_version mismatch.
+      // The structure stays the same (same loadSql), but the invalidation key changes.
+      const differentKey: [string, any[], Record<string, any>] = ['SELECT \'different_key\'', [], {
+        renewalThreshold: 10,
+        external: false,
+      }];
+      const secondQuery = createBasicQuery({
+        renewQuery: true,
+        cacheKeyQueries: { renewalThreshold: 21600, queries: [differentKey] },
+        preAggregations: [{ ...basicQuery.preAggregations[0], invalidateKeyQueries: [differentKey] }],
+      });
+
+      // Keep driver.now close to original (recently built, within 120s threshold)
+      mockDriver!.now = Date.now() + 5000;
+
+      loggerCalls = [];
+
+      const { preAggregationsTablesToTempTables: secondResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(secondQuery);
+
+      // Should return the existing table (not block for rebuild)
+      expect(secondResult[0][1].targetTableName).toEqual(firstTableName);
+
+      // The logger should indicate a background refresh, not a blocking wait
+      const bgRefreshMsg = loggerCalls.find(([msg]) => msg === 'Pre-aggregation recently built, refreshing in background');
+      expect(bgRefreshMsg).toBeTruthy();
+    });
+
+    test('content_version mismatch, old build → blocks on executeInQueue', async () => {
+      // First build
+      mockDriver!.now = Date.now() - 200 * 1000; // Build happened 200s ago
+      const firstQuery = createBasicQuery({ renewQuery: true });
+      await preAggregations!.loadAllPreAggregationsIfNeeded(firstQuery);
+
+      // Now change the invalidation key and set current time far ahead
+      const anotherKey: [string, any[], Record<string, any>] = ['SELECT \'another_different_key\'', [], {
+        renewalThreshold: 10,
+        external: false,
+      }];
+      const secondQuery = createBasicQuery({
+        renewQuery: true,
+        cacheKeyQueries: { renewalThreshold: 21600, queries: [anotherKey] },
+        preAggregations: [{ ...basicQuery.preAggregations[0], invalidateKeyQueries: [anotherKey] }],
+      });
+
+      // Set driver.now to current time so buildAge > 120s threshold
+      mockDriver!.now = Date.now();
+
+      loggerCalls = [];
+
+      const { preAggregationsTablesToTempTables: secondResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(secondQuery);
+
+      // Should block and return the newly built table
+      expect(secondResult[0][1].targetTableName).toBeTruthy();
+
+      // The logger should indicate it waited for renew (blocking path)
+      const waitMsg = loggerCalls.find(([msg]) => msg === 'Waiting for pre-aggregation renew');
+      expect(waitMsg).toBeTruthy();
+    });
+
+    test('content_version mismatch, waitForRenew=false → returns existing immediately, no blocking', async () => {
+      // First build with renew
+      mockDriver!.now = Date.now() - 200 * 1000;
+      const firstQuery = createBasicQuery({ renewQuery: true });
+      const { preAggregationsTablesToTempTables: firstResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(firstQuery);
+      const firstTableName = firstResult[0][1].targetTableName;
+
+      // Now load without renewQuery (waitForRenew=false) and different invalidation key
+      const yetAnotherKey: [string, any[], Record<string, any>] = ['SELECT \'yet_another_key\'', [], {
+        renewalThreshold: 10,
+        external: false,
+      }];
+      const secondQuery = createBasicQuery({
+        renewQuery: false,
+        cacheKeyQueries: { renewalThreshold: 21600, queries: [yetAnotherKey] },
+        preAggregations: [{ ...basicQuery.preAggregations[0], invalidateKeyQueries: [yetAnotherKey] }],
+      });
+
+      // Set driver.now to current time, buildAge > threshold
+      mockDriver!.now = Date.now();
+
+      loggerCalls = [];
+
+      const { preAggregationsTablesToTempTables: secondResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(secondQuery);
+
+      // Should return existing table immediately (non-blocking)
+      expect(secondResult[0][1].targetTableName).toEqual(firstTableName);
+
+      // Should NOT have a blocking wait message — waitForRenew=false never blocks
+      const waitMsg = loggerCalls.find(([msg]) => msg === 'Waiting for pre-aggregation renew');
+      expect(waitMsg).toBeFalsy();
+      const bgBlockMsg = loggerCalls.find(([msg]) => msg === 'Pre-aggregation recently built, refreshing in background');
+      expect(bgBlockMsg).toBeFalsy();
     });
   });
 
