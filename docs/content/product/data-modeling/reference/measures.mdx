@@ -243,7 +243,10 @@ function according to the measure type (in case of the `avg`, `count_distinct`,
 The optional `mask` parameter defines the replacement value used when the
 measure is masked by a [data masking][ref-data-masking] access policy.
 
-The mask can be a static value (number, boolean, or string):
+The mask can be a static value (number, boolean, or string) or a SQL expression.
+When using a SQL expression, it should be an aggregate expression (the same way
+as the measure's [`sql`](#sql) parameter for `number` type measures), because
+the mask replaces the entire measure expression including aggregation:
 
 <CodeTabs>
 
@@ -261,6 +264,12 @@ cubes:
         sql: revenue
         type: sum
         mask: -1
+
+      - name: avg_revenue
+        sql: revenue
+        type: avg
+        mask:
+          sql: "AVG(CASE WHEN {CUBE}.is_public THEN {CUBE}.revenue END)"
 ```
 
 ```javascript
@@ -277,6 +286,14 @@ cube(`orders`, {
       sql: `revenue`,
       type: `sum`,
       mask: -1
+    },
+
+    avg_revenue: {
+      sql: `revenue`,
+      type: `avg`,
+      mask: {
+        sql: `AVG(CASE WHEN ${CUBE}.is_public THEN ${CUBE}.revenue END)`
+      }
     }
   }
 })
@@ -286,6 +303,14 @@ cube(`orders`, {
 
 If no `mask` is defined, the default mask value is `NULL`. See
 [data masking][ref-data-masking] for more details.
+
+<WarningBox>
+
+SQL masks on measures are not applied in ungrouped queries (e.g., `SELECT *`
+via the SQL API). If you need dynamic masking in ungrouped mode, use a
+masked dimension instead.
+
+</WarningBox>
 
 ### `filters`
 

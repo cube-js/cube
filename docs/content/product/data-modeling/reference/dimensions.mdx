@@ -614,7 +614,7 @@ cube(`orders`, {
       sql: `secret_code`,
       type: `string`,
       mask: {
-        sql: (CUBE) => `CONCAT('***', RIGHT(${CUBE}.secret_code, 3))`
+        sql: `CONCAT('***', RIGHT(${CUBE}.secret_code, 3))`
       }
     },
 
