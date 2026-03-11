@@ -110,6 +110,211 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       expect(callbackWasExecuted).toEqual(true);
     });
 
+    describe('cacheQueryResult renewal logic', () => {
+      const renewalKeyA = QueryCache.queryCacheKey({ query: 'key-a', values: [] });
+      const renewalKeyOld = QueryCache.queryCacheKey({ query: 'key-old', values: [] });
+      const renewalKeyNew = QueryCache.queryCacheKey({ query: 'key-new', values: [] });
+
+      // Helper to seed a cache entry directly
+      const seedCache = async (cacheKey, entry) => {
+        const redisKey = cache.queryRedisKey(cacheKey);
+        await cache.getCacheDriver().set(redisKey, entry, 3600);
+      };
+
+      const callCacheQueryResult = async (
+        cacheKey,
+        cacheEntry,
+        opts: {
+          renewalThreshold?: number;
+          renewalKey?;
+          waitForRenew?: boolean;
+          requestId?: string;
+          renewCycle?: boolean;
+        }
+      ) => {
+        // cacheQueryResult hashes options.renewalKey via queryRedisKey(),
+        // and fetchNew() stores that hash in the entry. Replicate that for seeding.
+        const seededEntry = {
+          ...cacheEntry,
+          renewalKey: cacheEntry.renewalKey
+            ? cache.queryRedisKey(cacheEntry.renewalKey)
+            : cacheEntry.renewalKey,
+        };
+        await seedCache(cacheKey, seededEntry);
+
+        const fetchNewCalled = { value: false, blocked: false };
+        const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async () => {
+          fetchNewCalled.value = true;
+          return 'new-result';
+        });
+
+        try {
+          const result = await cache.cacheQueryResult(
+            'SELECT 1',
+            [],
+            cacheKey,
+            3600,
+            {
+              renewalThreshold: opts.renewalThreshold ?? 600,
+              renewalKey: opts.renewalKey,
+              waitForRenew: opts.waitForRenew ?? false,
+              requestId: opts.requestId,
+              dataSource: 'default',
+              renewCycle: opts.renewCycle,
+            }
+          );
+
+          fetchNewCalled.blocked = result === 'new-result';
+
+          return { result, fetchNewCalled: fetchNewCalled.value, blocked: fetchNewCalled.blocked };
+        } finally {
+          spy.mockRestore();
+        }
+      };
+
+      it('expired + waitForRenew: blocks on fetchNew', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'expired-wait', values: [] });
+        const entry = {
+          time: Date.now() - 700 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyA,
+        };
+
+        const { result, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyA,
+          waitForRenew: true,
+          requestId: 'req-1',
+        });
+
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+      });
+
+      it('expired + no waitForRenew: returns cached, background refresh', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'expired-no-wait', values: [] });
+        const entry = {
+          time: Date.now() - 700 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyA,
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyA,
+          waitForRenew: false,
+          requestId: 'req-2',
+        });
+
+        expect(result).toBe('cached-data');
+        expect(fetchNewCalled).toBe(true);
+        expect(blocked).toBe(false);
+      });
+
+      it('key mismatch + not expired + user request: returns cached, background refresh', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'key-mismatch-user', values: [] });
+        const entry = {
+          time: Date.now() - 100 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyOld,
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          renewCycle: false,
+          requestId: 'req-3',
+        });
+
+        expect(result).toBe('cached-data');
+        expect(fetchNewCalled).toBe(true);
+        expect(blocked).toBe(false);
+      });
+
+      it('key mismatch + not expired + renew cycle: blocks on fetchNew', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'key-mismatch-renew', values: [] });
+        const entry = {
+          time: Date.now() - 100 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyOld,
+        };
+
+        const { result, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          renewCycle: true,
+          requestId: 'req-4',
+        });
+
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+      });
+
+      it('same request + expired: returns cached, background refresh', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-expired', values: [] });
+        const entry = {
+          time: Date.now() - 700 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyOld,
+          requestId: 'req-5',
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          requestId: 'req-5',
+        });
+
+        expect(result).toBe('cached-data');
+        expect(fetchNewCalled).toBe(true);
+        expect(blocked).toBe(false);
+      });
+
+      it('same request + key mismatch only: returns cached, background refresh', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-key-mismatch', values: [] });
+        const entry = {
+          time: Date.now() - 100 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyOld,
+          requestId: 'req-6',
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          requestId: 'req-6',
+        });
+
+        expect(result).toBe('cached-data');
+        expect(fetchNewCalled).toBe(true);
+        expect(blocked).toBe(false);
+      });
+
+      it('key matches + not expired: returns cached, no fetchNew', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'key-match-fresh', values: [] });
+        const entry = {
+          time: Date.now() - 100 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyA,
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyA,
+          waitForRenew: true,
+          requestId: 'req-7',
+        });
+
+        expect(result).toBe('cached-data');
+        expect(fetchNewCalled).toBe(false);
+        expect(blocked).toBe(false);
+      });
+    });
+
     it('queryCacheKey format', () => {
       const key1 = QueryCache.queryCacheKey({
         query: 'select data',
