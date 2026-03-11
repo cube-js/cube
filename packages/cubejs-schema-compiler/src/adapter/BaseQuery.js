@@ -3447,7 +3447,7 @@ export class BaseQuery {
         return mask ? 'TRUE' : 'FALSE';
       }
       if (typeof mask === 'string') {
-        return this.escapeStringLiteral(mask);
+        return this.paramAllocator.allocateParam(mask);
       }
     }
     return this.defaultMaskSql(symbol.type);
@@ -3468,7 +3468,7 @@ export class BaseQuery {
       if (memberType === 'boolean') {
         return envMask.toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
       }
-      return this.escapeStringLiteral(envMask);
+      return this.paramAllocator.allocateParam(envMask);
     }
     return 'NULL';
   }
