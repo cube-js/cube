@@ -14,12 +14,18 @@ import {
   QueryOptions,
   ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
-import { AsyncDebounce, getEnv } from '@cubejs-backend/shared';
+import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+
+type CubeStoreCapability = 'queueExclusive';
+
+const CubeStoreCapabilityMinVersion: Record<CubeStoreCapability, string> = {
+  queueExclusive: '1.6.22',
+};
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
@@ -74,6 +80,12 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     };
     this.baseUrl = (this.config.url || `ws://${this.config.host}:${this.config.port}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
+  }
+
+  public async hasCapability(capability: CubeStoreCapability): Promise<boolean> {
+    const minVersion = CubeStoreCapabilityMinVersion[capability];
+
+    return isVersionGte(await this.connection.getCubeStoreVersion(), minVersion);
   }
 
   public async testConnection() {

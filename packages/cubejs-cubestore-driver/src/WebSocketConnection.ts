@@ -42,6 +42,8 @@ export class WebSocketConnection {
 
   private readonly connectionId: string;
 
+  private cubeStoreVersion: string | null = null;
+
   public constructor(url: string) {
     this.url = url;
     this.messageCounter = 1;
@@ -57,6 +59,10 @@ export class WebSocketConnection {
       headers['x-process-id'] = getProcessUid();
 
       const webSocket = new WebSocket(this.url, { headers }) as CubeStoreWebSocket;
+      webSocket.on('upgrade', (response: any) => {
+        this.cubeStoreVersion = response.headers['x-cubestore-version'] || null;
+      });
+
       webSocket.readyPromise = new Promise<CubeStoreWebSocket>((resolve, reject) => {
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
@@ -282,6 +288,14 @@ export class WebSocketConnection {
     const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpQuery, httpQueryOffset, connectionIdOffset);
     builder.finish(message);
     return this.sendMessage(messageId, builder.asUint8Array());
+  }
+
+  public async getCubeStoreVersion(): Promise<string> {
+    if (this.webSocket) {
+      await this.webSocket.readyPromise;
+    }
+
+    return this.cubeStoreVersion ?? '0.0.0';
   }
 
   public close() {
