@@ -147,7 +147,7 @@ impl HttpServer {
             .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                let reply = ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
                     let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
                     trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
@@ -207,7 +207,8 @@ impl HttpServer {
                             }
                         };
                     };
-                }))
+                });
+                Result::<_, Rejection>::Ok(warp::reply::with_header(reply, "X-CubeStore-Version", env!("CARGO_PKG_VERSION")))
             });
 
         let auth_filter_to_move = auth_filter.clone();
