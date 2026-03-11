@@ -668,8 +668,9 @@ export class CubeEvaluator extends CubeSymbols {
         members[memberName].aliasMember = aliasMember;
       }
 
-      // Expose mask properties as non-enumerable getters for the Tesseract bridge,
-      // without polluting the data model serialization.
+      // Expose maskSql getter for the Tesseract bridge. It normalizes both
+      // SQL masks (mask.sql) and static masks into a callable function.
+      // Non-enumerable so it doesn't pollute serialization.
       const memberMask = members[memberName].mask;
       if (memberMask !== undefined && memberMask !== null) {
         if (typeof memberMask === 'object' && memberMask.sql) {
@@ -678,7 +679,6 @@ export class CubeEvaluator extends CubeSymbols {
             enumerable: false,
           });
         } else {
-          // Static mask: expose as maskStatic string for the bridge
           let maskLiteral: string;
           if (typeof memberMask === 'number') {
             maskLiteral = `(${memberMask})`;
@@ -687,8 +687,10 @@ export class CubeEvaluator extends CubeSymbols {
           } else {
             maskLiteral = `'${String(memberMask).replace(/'/g, "''")}'`;
           }
-          Object.defineProperty(members[memberName], 'maskStatic', {
-            get: () => maskLiteral,
+          // eslint-disable-next-line no-new-func
+          const maskFn = new Function(`return \`${maskLiteral}\`;`);
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => maskFn,
             enumerable: false,
           });
         }

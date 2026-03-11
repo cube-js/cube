@@ -342,8 +342,6 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         let mask_sql = if let Some(mask_sql) = mask_sql {
             Some(compiler.compile_sql_call(path.cube_name(), mask_sql)?)
-        } else if let Some(mask_literal) = &definition.static_data().mask_static {
-            Some(Rc::new(SqlCall::new_literal(mask_literal.clone())))
         } else {
             None
         };

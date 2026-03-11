@@ -50,8 +50,6 @@ pub struct YamlDimensionDefinition {
     granularities: Vec<YamlGranularityEntry>,
     #[serde(default)]
     mask_sql: Option<String>,
-    #[serde(default)]
-    mask_static: Option<String>,
 }
 
 impl YamlDimensionDefinition {
@@ -96,7 +94,6 @@ impl YamlDimensionDefinition {
             .longitude_opt(self.longitude)
             .time_shift(time_shift)
             .resolved_mask_sql_opt(self.mask_sql)
-            .mask_static(self.mask_static)
             .build();
 
         YamlDimensionBuildResult {

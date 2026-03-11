@@ -136,16 +136,6 @@ impl SqlCall {
         }
     }
 
-    pub fn new_literal(sql: String) -> Self {
-        Self {
-            template: SqlTemplate::String(sql),
-            deps: vec![],
-            filter_params: vec![],
-            filter_groups: vec![],
-            security_context: Default::default(),
-        }
-    }
-
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,

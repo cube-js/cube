@@ -35,8 +35,6 @@ pub struct YamlMeasureDefinition {
     order_by: Vec<YamlOrderBy>,
     #[serde(default)]
     mask_sql: Option<String>,
-    #[serde(default)]
-    mask_static: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,7 +105,6 @@ impl YamlMeasureDefinition {
                 .drill_filters(drill_filters)
                 .order_by(order_by)
                 .resolved_mask_sql_opt(self.mask_sql)
-                .mask_static(self.mask_static)
                 .build(),
         )
     }
