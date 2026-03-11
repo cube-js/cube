@@ -82,7 +82,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     values.push(this.prefixKey(this.redisHash(queryKey)));
     values.push(JSON.stringify(data));
 
-    const exclusive = typeof queryKey === 'object' && queryKey.persistent && this.driver.hasCapability('queueExclusive');
+    const exclusive = queryKey.persistent && await this.driver.hasCapability('queueExclusive');
     const rows = await this.driver.query(`QUEUE ADD${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''} ? ?`, values);
     if (rows && rows.length) {
       return [

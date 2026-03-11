@@ -37,7 +37,7 @@ export function isVersionGte(version: string | null, minVersion: string): boolea
       return false;
     }
 
-    // Same numeric part — pre-release is less than no pre-release
+    // The same numeric part — pre-release is less than no pre-release
     if (a.pre && !b.pre) {
       return false;
     }

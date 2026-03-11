@@ -82,14 +82,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
 
-  public getCubeStoreVersion(): string | null {
-    return this.connection.getCubeStoreVersion();
-  }
-
-  public hasCapability(capability: CubeStoreCapability): boolean {
+  public async hasCapability(capability: CubeStoreCapability): Promise<boolean> {
     const minVersion = CubeStoreCapabilityMinVersion[capability];
 
-    return isVersionGte(this.getCubeStoreVersion(), minVersion);
+    return isVersionGte(await this.connection.getCubeStoreVersion(), minVersion);
   }
 
   public async testConnection() {
