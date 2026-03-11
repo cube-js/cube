@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 
 const version = process.env.npm_package_version;
 if (!version) {
@@ -24,4 +24,4 @@ const workspaceRoot = path.resolve(__dirname, '..');
 execSync('cargo update --workspace', { cwd: workspaceRoot, stdio: 'inherit' });
 
 const cargoLockPath = path.resolve(workspaceRoot, 'Cargo.lock');
-execSync(`git add ${cargoTomlPath} ${cargoLockPath}`, { stdio: 'inherit' });
+execFileSync('git', ['add', cargoTomlPath, cargoLockPath], { stdio: 'inherit' });
