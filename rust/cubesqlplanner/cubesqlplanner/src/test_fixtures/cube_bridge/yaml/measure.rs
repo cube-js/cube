@@ -34,7 +34,9 @@ pub struct YamlMeasureDefinition {
     #[serde(default)]
     order_by: Vec<YamlOrderBy>,
     #[serde(default)]
-    resolved_mask_sql: Option<String>,
+    mask_sql: Option<String>,
+    #[serde(default)]
+    mask: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,7 +106,8 @@ impl YamlMeasureDefinition {
                 .filters(filters)
                 .drill_filters(drill_filters)
                 .order_by(order_by)
-                .resolved_mask_sql_opt(self.resolved_mask_sql)
+                .resolved_mask_sql_opt(self.mask_sql)
+                .mask(self.mask)
                 .build(),
         )
     }

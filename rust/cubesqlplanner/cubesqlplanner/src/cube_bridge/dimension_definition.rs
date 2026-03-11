@@ -30,6 +30,7 @@ pub struct DimensionDefinitionStatic {
     pub values: Option<Vec<String>>,
     #[serde(rename = "primaryKey")]
     pub primary_key: Option<bool>,
+    pub mask: Option<serde_json::Value>,
 }
 
 #[nativebridge::native_bridge(DimensionDefinitionStatic)]
@@ -50,5 +51,5 @@ pub trait DimensionDefinition {
     fn time_shift(&self) -> Result<Option<Vec<Rc<dyn TimeShiftDefinition>>>, CubeError>;
 
     #[nbridge(field, optional)]
-    fn resolved_mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+    fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

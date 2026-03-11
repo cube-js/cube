@@ -668,26 +668,14 @@ export class CubeEvaluator extends CubeSymbols {
         members[memberName].aliasMember = aliasMember;
       }
 
-      // Normalize mask into a resolvedMaskSql function for the Tesseract bridge.
-      // Static masks (number, boolean, string) are wrapped into a no-arg function
-      // returning the SQL literal so the bridge always sees a callable MemberSql.
-      // Only set resolvedMaskSql when a mask is explicitly defined.
-      const { mask } = members[memberName];
-      if (mask !== undefined && mask !== null) {
-        if (typeof mask === 'object' && mask.sql) {
-          members[memberName].resolvedMaskSql = mask.sql;
-        } else {
-          let maskLiteral: string;
-          if (typeof mask === 'number') {
-            maskLiteral = `(${mask})`;
-          } else if (typeof mask === 'boolean') {
-            maskLiteral = mask ? '(TRUE)' : '(FALSE)';
-          } else {
-            maskLiteral = `'${String(mask).replace(/'/g, "''")}'`;
-          }
-          // eslint-disable-next-line no-new-func
-          members[memberName].resolvedMaskSql = new Function(`return \`${maskLiteral}\`;`);
-        }
+      // Expose mask.sql as a top-level maskSql getter for the Tesseract bridge,
+      // without storing it in the data model. The bridge reads maskSql as MemberSql.
+      if (members[memberName].mask && typeof members[memberName].mask === 'object' && members[memberName].mask.sql) {
+        const maskSqlFn = members[memberName].mask.sql;
+        Object.defineProperty(members[memberName], 'maskSql', {
+          get: () => maskSqlFn,
+          enumerable: false,
+        });
       }
     }
   }

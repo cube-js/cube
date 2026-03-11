@@ -1,4 +1,5 @@
 use super::common::{AggregationType, Case, CompiledMemberPath};
+use super::dimension_symbol::mask_json_to_sql_literal;
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -480,7 +481,7 @@ impl MeasureSymbolFactory {
     ) -> Result<Self, CubeError> {
         let definition = cube_evaluator.measure_by_path(path.full_name().clone())?;
         let sql = definition.sql()?;
-        let mask_sql = definition.resolved_mask_sql()?;
+        let mask_sql = definition.mask_sql()?;
         Ok(Self {
             path,
             sql,
@@ -503,6 +504,10 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let mask_sql = if let Some(mask_sql) = mask_sql {
             Some(compiler.compile_sql_call(path.cube_name(), mask_sql)?)
+        } else if let Some(mask_value) = &definition.static_data().mask {
+            Some(Rc::new(SqlCall::new_literal(mask_json_to_sql_literal(
+                mask_value,
+            ))))
         } else {
             None
         };

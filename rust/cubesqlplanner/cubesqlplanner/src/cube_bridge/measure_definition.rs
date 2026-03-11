@@ -51,6 +51,7 @@ pub struct MeasureDefinitionStatic {
     pub time_shift_references: Option<Vec<TimeShiftReference>>,
     #[serde(rename = "rollingWindow")]
     pub rolling_window: Option<RollingWindow>,
+    pub mask: Option<serde_json::Value>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic)]
@@ -71,5 +72,5 @@ pub trait MeasureDefinition {
     fn order_by(&self) -> Result<Option<Vec<Rc<dyn MemberOrderBy>>>, CubeError>;
 
     #[nbridge(field, optional)]
-    fn resolved_mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+    fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

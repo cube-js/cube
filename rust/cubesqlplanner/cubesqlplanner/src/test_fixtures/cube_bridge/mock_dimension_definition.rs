@@ -42,6 +42,8 @@ pub struct MockDimensionDefinition {
     time_shift: Option<Vec<Rc<MockTimeShiftDefinition>>>,
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
     resolved_mask_sql: Option<String>,
+    #[builder(default)]
+    mask: Option<serde_json::Value>,
 }
 
 impl_static_data!(
@@ -54,7 +56,8 @@ impl_static_data!(
     sub_query,
     propagate_filters_to_sub_query,
     values,
-    primary_key
+    primary_key,
+    mask
 );
 
 impl MockDimensionDefinition {
@@ -133,11 +136,11 @@ impl DimensionDefinition for MockDimensionDefinition {
         }
     }
 
-    fn has_resolved_mask_sql(&self) -> Result<bool, CubeError> {
+    fn has_mask_sql(&self) -> Result<bool, CubeError> {
         Ok(self.resolved_mask_sql.is_some())
     }
 
-    fn resolved_mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+    fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
         match &self.resolved_mask_sql {
             Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
             None => Ok(None),

@@ -196,7 +196,7 @@ fn masked_dimension_returns_mask_literal() {
         .create_dimension("masking_cube.secret_number")
         .unwrap();
     let sql = context.evaluate_symbol(&symbol).unwrap();
-    assert_eq!(sql, "((-1))");
+    assert_eq!(sql, "(-1)");
 }
 
 #[test]
@@ -253,7 +253,7 @@ fn masked_measure_returns_mask_literal() {
     let symbol = context.create_measure("masking_cube.count").unwrap();
     let sql = context.evaluate_symbol(&symbol).unwrap();
     // FinalMeasureSqlNode skips aggregation for masked measures
-    assert_eq!(sql, "((12345))");
+    assert_eq!(sql, "(12345)");
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn masked_sum_measure_returns_mask_literal() {
 
     let symbol = context.create_measure("masking_cube.sum_revenue").unwrap();
     let sql = context.evaluate_symbol(&symbol).unwrap();
-    assert_eq!(sql, "((-1))");
+    assert_eq!(sql, "(-1)");
 }
 
 #[test]

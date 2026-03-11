@@ -49,7 +49,9 @@ pub struct YamlDimensionDefinition {
     #[serde(default)]
     granularities: Vec<YamlGranularityEntry>,
     #[serde(default)]
-    resolved_mask_sql: Option<String>,
+    mask_sql: Option<String>,
+    #[serde(default)]
+    mask: Option<serde_json::Value>,
 }
 
 impl YamlDimensionDefinition {
@@ -93,7 +95,8 @@ impl YamlDimensionDefinition {
             .latitude_opt(self.latitude)
             .longitude_opt(self.longitude)
             .time_shift(time_shift)
-            .resolved_mask_sql_opt(self.resolved_mask_sql)
+            .resolved_mask_sql_opt(self.mask_sql)
+            .mask(self.mask)
             .build();
 
         YamlDimensionBuildResult {
