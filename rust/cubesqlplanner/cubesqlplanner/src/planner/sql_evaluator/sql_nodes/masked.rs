@@ -31,11 +31,14 @@ impl SqlNode for MaskedSqlNode {
         // In ungrouped queries measures should not be masked at all.
         match node.as_ref() {
             MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {
-                if let Some(mask_call) = node.mask_sql() {
-                    let full_name = node.full_name();
-                    if query_tools.is_member_masked(&full_name) {
-                        return mask_call.eval(visitor, node_processor, query_tools, templates);
-                    }
+                let full_name = node.full_name();
+                if query_tools.is_member_masked(&full_name) {
+                    return if let Some(mask_call) = node.mask_sql() {
+                        mask_call.eval(visitor, node_processor, query_tools, templates)
+                    } else {
+                        // Parens prevent AutoPrefixSqlNode from treating NULL as a column name
+                        Ok("(NULL)".to_string())
+                    };
                 }
             }
             _ => {}

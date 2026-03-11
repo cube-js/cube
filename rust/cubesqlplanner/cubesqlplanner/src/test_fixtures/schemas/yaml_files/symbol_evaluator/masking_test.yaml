@@ -13,7 +13,6 @@ cubes:
           - name: public_dim
             type: string
             sql: "{CUBE}.status"
-            resolved_mask_sql: "(NULL)"
           - name: secret_with_sql_mask
             type: string
             sql: "{CUBE}.secret_col"

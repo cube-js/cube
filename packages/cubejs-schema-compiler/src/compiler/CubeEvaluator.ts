@@ -671,7 +671,7 @@ export class CubeEvaluator extends CubeSymbols {
       // Normalize mask into a resolvedMaskSql function for the Tesseract bridge.
       // Static masks (number, boolean, string) are wrapped into a no-arg function
       // returning the SQL literal so the bridge always sees a callable MemberSql.
-      // Members without an explicit mask get a default NULL function.
+      // Only set resolvedMaskSql when a mask is explicitly defined.
       const { mask } = members[memberName];
       if (mask !== undefined && mask !== null) {
         if (typeof mask === 'object' && mask.sql) {
@@ -688,11 +688,6 @@ export class CubeEvaluator extends CubeSymbols {
           // eslint-disable-next-line no-new-func
           members[memberName].resolvedMaskSql = new Function(`return \`${maskLiteral}\`;`);
         }
-      } else {
-        // Default mask: NULL wrapped in parens to prevent Tesseract template
-        // compiler from interpreting it as a column reference.
-        // eslint-disable-next-line no-new-func
-        members[memberName].resolvedMaskSql = new Function('return `(NULL)`;');
       }
     }
   }
