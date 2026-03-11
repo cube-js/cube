@@ -290,6 +290,10 @@ export class WebSocketConnection {
     return this.sendMessage(messageId, builder.asUint8Array());
   }
 
+  public getCubeStoreVersion(): string | null {
+    return this.cubeStoreVersion;
+  }
+
   public close() {
     if (this.webSocket) {
       this.webSocket.close();
