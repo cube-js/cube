@@ -18,6 +18,7 @@
     "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
     "unit": "jest",
     "unit:debug": "jest --runInBand",
+    "version": "node scripts/sync-cargo-version.js",
     "postinstall": "node bin/post-install"
   },
   "files": [
