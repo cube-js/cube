@@ -488,7 +488,6 @@ describe('Cube RBAC Engine', () => {
         expect(Number(row.count)).toBe(12345);
       }
     });
-
   });
 
   /**
