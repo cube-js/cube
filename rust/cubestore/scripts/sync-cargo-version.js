@@ -20,4 +20,8 @@ if (content === updated) {
 fs.writeFileSync(cargoTomlPath, updated);
 console.log(`Updated Cargo.toml version to ${version}`);
 
-execSync(`git add ${cargoTomlPath}`, { stdio: 'inherit' });
+const workspaceRoot = path.resolve(__dirname, '..');
+execSync('cargo update --workspace', { cwd: workspaceRoot, stdio: 'inherit' });
+
+const cargoLockPath = path.resolve(workspaceRoot, 'Cargo.lock');
+execSync(`git add ${cargoTomlPath} ${cargoLockPath}`, { stdio: 'inherit' });
