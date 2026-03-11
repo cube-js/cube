@@ -33,6 +33,19 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
+                // In ungrouped queries, apply static masks (no deps) but skip
+                // SQL masks (has deps) since they reference columns that don't
+                // make sense in a per-row context.
+                if query_tools.is_member_masked(&ev.full_name()) {
+                    if let Some(mask_call) = ev.mask_sql() {
+                        if mask_call.dependencies_count() == 0 {
+                            return mask_call.eval(visitor, node_processor, query_tools, templates);
+                        }
+                    } else {
+                        return Ok("(NULL)".to_string());
+                    }
+                }
+
                 let input = self.input.to_sql(
                     visitor,
                     node,

@@ -3282,7 +3282,14 @@ export class BaseQuery {
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
       if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType) {
-        return this.memberMaskSql(cubeName, name, symbol);
+        // In ungrouped queries, only apply static masks to measures.
+        // SQL masks (mask.sql) reference columns that don't apply per-row.
+        const isMeasure = type === 'measure';
+        const isUngrouped = this.options.ungrouped;
+        const hasSqlMask = symbol.mask && typeof symbol.mask === 'object' && symbol.mask.sql;
+        if (!isMeasure || !isUngrouped || !hasSqlMask) {
+          return this.memberMaskSql(cubeName, name, symbol);
+        }
       }
 
       if (type === 'measure') {
