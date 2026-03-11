@@ -67,15 +67,6 @@ impl SqlNode for FinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
-                // Masked measures: evaluate the mask SQL directly,
-                // skip both the inner SQL evaluation and aggregation wrapping.
-                if query_tools.is_member_masked(&ev.full_name()) {
-                    return if let Some(mask_call) = ev.mask_sql() {
-                        mask_call.eval(visitor, node_processor, query_tools, templates)
-                    } else {
-                        Ok("(NULL)".to_string())
-                    };
-                }
                 let input = self.input.to_sql(
                     visitor,
                     node,
