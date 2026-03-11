@@ -1,12 +1,12 @@
 use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, OriginalSqlPreAggregationSqlNode,
-    RenderReferencesSqlNode, RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode,
-    TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
-    UngroupedQueryFinalMeasureSqlNode,
+    MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RenderReferencesType,
+    RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
+    UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::sql_evaluator::cube_ref_evaluator::CubeRefEvaluator;
 use crate::planner::sql_evaluator::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
 use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
 use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
@@ -143,6 +143,13 @@ impl SqlNodesFactory {
         self.cube_name_references.insert(key, value);
     }
 
+    pub fn cube_ref_evaluator(&self) -> CubeRefEvaluator {
+        CubeRefEvaluator::new(
+            self.cube_name_references.clone(),
+            self.original_sql_pre_aggregations.clone(),
+        )
+    }
+
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
         let evaluate_sql_processor = EvaluateSqlNode::new();
         let auto_prefix_processor = AutoPrefixSqlNode::new(
@@ -159,26 +166,23 @@ impl SqlNodesFactory {
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
+        let default_processor: Rc<dyn SqlNode> =
+            if !self.pre_aggregation_dimensions_references.is_empty() {
+                RenderReferencesSqlNode::new(
+                    evaluate_sql_processor.clone(),
+                    self.pre_aggregation_dimensions_references.clone(),
+                )
+            } else {
+                evaluate_sql_processor.clone()
+            };
+
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
-            auto_prefix_processor.clone(),
-            self.cube_table_processor(evaluate_sql_processor.clone()),
-            evaluate_sql_processor.clone(),
+            default_processor,
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
-    }
-
-    fn cube_table_processor(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        if !self.original_sql_pre_aggregations.is_empty() {
-            OriginalSqlPreAggregationSqlNode::new(
-                default,
-                self.original_sql_pre_aggregations.clone(),
-            )
-        } else {
-            default
-        }
     }
     fn add_ungrouped_measure_reference_if_needed(
         &self,

@@ -37,7 +37,7 @@ mod tests {
     };
     use crate::{
         compile::{
-            engine::df::scan::MemberField,
+            engine::df::scan::{CacheMode, MemberField},
             rewrite::rewriter::Rewriter,
             test::{get_sixteen_char_member_cube, get_string_cube_meta},
         },
@@ -18452,5 +18452,207 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ..Default::default()
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_server_version_num_setting() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "server_version_num_setting",
+            execute_query(
+                "select cast(setting as integer) from pg_settings where name = 'server_version_num'".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_talend_tables_and_views() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "talend_tables_and_views",
+            execute_query(
+                r#"
+                ( 
+                    select
+                        t.schemaname                  as ownerName,
+                        t.tablename                   as tableName,
+                        /*c.oid*/ cast(c.oid as bigint) as objectId, 
+                        (select n_live_tup from pg_stat_user_tables s where s.schemaname=t.schemaname and s.relname=t.tablename)  as row_count,
+                        1						as tableType
+                    from pg_tables t, pg_class c, pg_namespace n
+                    /*where clause number 1 (table where clause)*/
+                    where t.tablename=c.relname
+                        and   n.oid	   = c.relnamespace
+                        and   t.schemaname = n.nspname
+                        and t.schemaname <> 'information_schema'
+                        and t.tablename  <> 'attrep_ddl_audit'
+                        and t.tablename  <> 'attrep_heartbeat'
+                        and
+                        (
+                            (( (1=0) ) -- Explicit Inclusion
+                            or 
+                            (
+                                ( 
+                        t.schemaname LIKE 'public' and t.schemaname not like 'pg\_%' and t.tablename LIKE '%'
+                        ) -- Patterned Inclusion
+                                and not
+                                ( 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_loopback%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_changes%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_apply%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_truncation%'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_audit_table'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_status'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_suspended_tables'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_history'
+                        or 
+                        t.schemaname LIKE '%' and t.schemaname not like 'pg\_%' and t.tablename LIKE 'attrep_cdc_%'
+                        ) -- Patterned exclusion
+                            ))
+                            and 
+                            (1=1) 
+                        )
+
+                    UNION
+
+                    select
+                        v.schemaname                  as ownerName,
+                        v.viewname                   as tableName,
+                        /*c.oid*/ cast(c.oid as bigint) as objectId, 
+                        0  as row_count,/**/ 
+                        2						as tableType
+                    from pg_views v, pg_class c, pg_namespace n
+                    /*where clause number 2 (view where clause)*/ 
+                    where v.viewname = c.relname
+                        and   n.oid	    = c.relnamespace
+                        and   v.schemaname = n.nspname
+                        and v.schemaname <> 'information_schema'
+                        and v.viewname  <> 'attrep_ddl_audit'
+                        and v.viewname  <> 'attrep_heartbeat'
+                        and
+                        (
+                            (( (1=0) ) -- Explicit Inclusion
+                            or 
+                            (
+                                ( (1=0) ) -- Patterned Inclusion
+                                and not
+                                ( (1=0) ) -- Patterned exclusion
+                            ))
+                            and 
+                            (1=1) 
+                        )
+                )
+                order by 1,2
+                "#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_encoding_to_char_column_name() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_encoding_to_char_column_name",
+            execute_query(
+                "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_measure_func_returns_error() -> Result<(), CubeError> {
+        let query_result = execute_query(
+            // Easiest way to test `MEASURE` execution is to call it
+            // on a system table
+            "SELECT MEASURE(relname) FROM pg_class".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let error = query_result.expect_err("Query should return an error");
+        assert!(error.to_string().contains("required to be pushed down"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_set_cache_mode() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        context
+            .execute_query("SET cube_cache = 'must-revalidate'")
+            .await?;
+
+        // Test that cache mode has been successfully applied
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        };
+        let cube_scan = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan();
+        assert_eq!(cube_scan.request, expected_cube_scan);
+        assert_eq!(
+            cube_scan.options.cache_mode,
+            Some(CacheMode::MustRevalidate),
+        );
+
+        // Test that cache mode correctly resets to default
+        context.execute_query("SET cube_cache = DEFAULT").await?;
+
+        let query = r#"
+            SELECT order_date
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        "#;
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        };
+        let cube_scan = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan();
+        assert_eq!(cube_scan.request, expected_cube_scan);
+        assert_eq!(cube_scan.options.cache_mode, None,);
+
+        Ok(())
     }
 }

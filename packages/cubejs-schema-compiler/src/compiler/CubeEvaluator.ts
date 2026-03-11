@@ -318,6 +318,20 @@ export class CubeEvaluator extends CubeSymbols {
     const folders = cube.rawFolders();
     if (!folders.length) return;
 
+    const seen = new Set<string>();
+
+    for (const folder of folders) {
+      if (folder.name && seen.has(folder.name)) {
+        errorReporter.error(
+          `Folder names must be unique within a view. Found duplicate folder '${folder.name}' in view '${cube.name}'.`
+        );
+      }
+
+      if (folder.name) {
+        seen.add(folder.name);
+      }
+    }
+
     const checkMember = (memberName: string, folderName: string): ViewIncludedMember | null => {
       if (memberName.includes('.')) {
         errorReporter.error(

@@ -1,5 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::symbols::DimensionKind;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -32,31 +33,20 @@ impl SqlNode for GeoDimensionSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
-                if ev.dimension_type() == "geo" {
-                    if let (Some(latitude), Some(longitude)) = (ev.latitude(), ev.longitude()) {
-                        let latitude_str = latitude.eval(
-                            visitor,
-                            node_processor.clone(),
-                            query_tools.clone(),
-                            templates,
-                        )?;
-                        let longitude_str = longitude.eval(
-                            visitor,
-                            node_processor.clone(),
-                            query_tools.clone(),
-                            templates,
-                        )?;
-                        templates.concat_strings(&vec![
-                            latitude_str,
-                            format!("','"),
-                            longitude_str,
-                        ])?
-                    } else {
-                        return Err(CubeError::user(format!(
-                            "Geo dimension '{}' must have latitude and longitude",
-                            ev.full_name()
-                        )));
-                    }
+                if let DimensionKind::Geo(geo) = ev.kind() {
+                    let latitude_str = geo.latitude().eval(
+                        visitor,
+                        node_processor.clone(),
+                        query_tools.clone(),
+                        templates,
+                    )?;
+                    let longitude_str = geo.longitude().eval(
+                        visitor,
+                        node_processor.clone(),
+                        query_tools.clone(),
+                        templates,
+                    )?;
+                    templates.concat_strings(&vec![latitude_str, format!("','"), longitude_str])?
                 } else {
                     self.input.to_sql(
                         visitor,

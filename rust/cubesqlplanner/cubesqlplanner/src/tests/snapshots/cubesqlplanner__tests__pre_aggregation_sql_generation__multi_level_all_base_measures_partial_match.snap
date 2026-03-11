@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__status" "orders__status", sum("orders__total_amount") / sum("orders__count") / max("orders__max_amount") "orders__multi_level_measure" 
+FROM  orders__all_base_measures_rollup  AS "orders__all_base_measures_rollup"
+GROUP BY 1
+ORDER BY  2  DESC

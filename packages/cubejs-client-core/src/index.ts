@@ -47,6 +47,10 @@ export type LoadMethodOptions = {
    */
   progressCallback?(result: ProgressResult): void;
   /**
+   * Server-side cache policy for query execution. Does not control client-side caching.
+   */
+  cache?: CacheMode;
+  /**
    * AbortSignal to cancel requests
    */
   signal?: AbortSignal;
@@ -113,10 +117,6 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * Query timeout in milliseconds
    */
   timeout?: number;
-  /**
-   * Cache mode for query execution
-   */
-  cache?: CacheMode;
 };
 
 export type CubeSqlSchemaColumn = {
@@ -128,11 +128,13 @@ export type CubeSqlSchemaColumn = {
 export type CubeSqlResult = {
   schema: CubeSqlSchemaColumn[];
   data: (string | number | boolean | null)[][];
+  lastRefreshTime?: string;
 };
 
 export type CubeSqlStreamChunk = {
   type: 'schema';
   schema: CubeSqlSchemaColumn[];
+  lastRefreshTime?: string;
 } | {
   type: 'data';
   data: (string | number | boolean | null)[];
@@ -150,13 +152,15 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
-function mutexPromise(promise: Promise<any>) {
+function mutexPromise<T>(promise: Promise<T>): Promise<T | null> {
   return promise
     .then((result) => result)
     .catch((error) => {
       if (error !== MUTEX_ERROR) {
         throw error;
       }
+
+      return null;
     });
 }
 
@@ -375,7 +379,7 @@ class CubeApi {
         body.error = text;
       }
 
-      if (body.error === 'Continue wait') {
+      if (body.error?.includes('Continue wait')) {
         await checkMutex();
         if (options?.progressCallback) {
           options.progressCallback(new ProgressResult(body as ProgressResponse));
@@ -412,7 +416,8 @@ class CubeApi {
       return subscribeNext();
     };
 
-    const promise = requestPromise.then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
+    const promise: Promise<any> = requestPromise
+      .then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
 
     if (callback) {
       return {
@@ -575,13 +580,20 @@ class CubeApi {
    */
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions, callback?: CallableFunction, responseFormat: ResponseFormat = 'default') {
     [query, options] = this.prepareQueryOptions(query, options, responseFormat);
+
+    const params: Record<string, unknown> = {
+      query,
+      queryType: 'multi',
+      signal: options?.signal,
+      baseRequestId: options?.baseRequestId,
+    };
+
+    if (options?.cache) {
+      params.cache = options.cache;
+    }
+
     return this.loadMethod(
-      () => this.request('load', {
-        query,
-        queryType: 'multi',
-        signal: options?.signal,
-        baseRequestId: options?.baseRequestId,
-      }),
+      () => this.request('load', params),
       (response: any) => this.loadResponseInternal(response, options),
       options,
       callback
@@ -724,14 +736,20 @@ class CubeApi {
   public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): Promise<CubeSqlResult> | UnsubscribeObj {
     return this.loadMethod(
       () => {
-        const request = this.request('cubesql', {
+        const cubesqlParams: Record<string, unknown> = {
           query: sqlQuery,
-          cache: options?.cache,
           method: 'POST',
           signal: options?.signal,
           fetchTimeout: options?.timeout,
           baseRequestId: options?.baseRequestId,
-        });
+          throwContinueWait: true,
+        };
+
+        if (options?.cache) {
+          cubesqlParams.cache = options.cache;
+        }
+
+        const request = this.request('cubesql', cubesqlParams);
 
         return request;
       },
@@ -754,12 +772,14 @@ class CubeApi {
         const [schema, ...data] = response.error.split('\n');
 
         try {
+          const parsedSchema = JSON.parse(schema);
           return {
-            schema: JSON.parse(schema).schema,
+            schema: parsedSchema.schema,
             data: data
               .filter((d: string) => d.trim().length)
               .map((d: string) => JSON.parse(d).data)
               .reduce((a: any, b: any) => a.concat(b), []),
+            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
           };
         } catch (err) {
           throw new Error(response.error);
@@ -810,7 +830,8 @@ class CubeApi {
               if (parsed.schema) {
                 yield {
                   type: 'schema' as const,
-                  schema: parsed.schema
+                  schema: parsed.schema,
+                  ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
                 };
               } else if (parsed.data) {
                 yield {
@@ -840,7 +861,8 @@ class CubeApi {
           if (parsed.schema) {
             yield {
               type: 'schema' as const,
-              schema: parsed.schema
+              schema: parsed.schema,
+              ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
             };
           } else if (parsed.data) {
             yield {

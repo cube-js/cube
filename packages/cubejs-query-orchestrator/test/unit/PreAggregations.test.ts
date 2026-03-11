@@ -288,9 +288,9 @@ describe('PreAggregations', () => {
       );
     });
 
-    test('fail if waitForRenew is also specified', async () => {
+    test('silently degrade waitForRenew when externalRefresh is true', async () => {
       await expect(preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew))
-        .rejects.toThrowError(/Invalid configuration/);
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
     });
 
     test('fail if rollup doesn\'t already exist', async () => {
@@ -320,9 +320,10 @@ describe('PreAggregations', () => {
       );
     });
 
-    test('fail if waitForRenew is also specified', async () => {
-      await expect(preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternalWithRenew))
-        .rejects.toThrowError(/Invalid configuration/);
+    test('silently degrade waitForRenew when externalRefresh is true', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternalWithRenew);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
 
     test('load external preaggregation without communicating to the source database', async () => {

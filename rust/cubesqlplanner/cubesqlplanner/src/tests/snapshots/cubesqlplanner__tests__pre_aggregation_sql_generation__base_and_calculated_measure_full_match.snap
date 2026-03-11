@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: sql
+---
+SELECT "orders__status" "orders__status", "orders__city" "orders__city", sum("orders__amount_per_count") "orders__amount_per_count" 
+FROM  orders__base_and_calculated_measure_rollup  AS "orders__base_and_calculated_measure_rollup"
+GROUP BY 1, 2
+ORDER BY  3  DESC

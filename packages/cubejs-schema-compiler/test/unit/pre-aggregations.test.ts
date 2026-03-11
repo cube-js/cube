@@ -506,6 +506,90 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.simple');
   });
 
+  it('no-cache should still match pre-aggregations', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml(createECommerceSchema())
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders_view.count'
+      ],
+      timeDimensions: [{
+        dimension: 'orders_view.created_at',
+        granularity: 'day',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      timezone: 'America/Los_Angeles',
+      cacheMode: 'no-cache',
+    });
+
+    const queryPreAggs: any = query.preAggregations?.preAggregationsDescription();
+    expect(queryPreAggs.length).toBeGreaterThan(0);
+    expect(queryPreAggs[0].preAggregationId).toEqual('orders.orders_by_day_with_day');
+  });
+
+  it('no-cache should still use external pre-aggregations', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'orders',
+            sql_table: 'orders',
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'created_at',
+                sql: 'created_at',
+                type: 'time',
+              },
+              {
+                name: 'status',
+                sql: 'status',
+                type: 'string',
+              }
+            ],
+            preAggregations: [
+              {
+                name: 'orders_external',
+                measures: ['count'],
+                dimensions: ['status'],
+                timeDimension: 'CUBE.created_at',
+                granularity: 'day',
+                external: true,
+              },
+            ]
+          }
+        ]
+      })
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['orders.count'],
+      dimensions: ['orders.status'],
+      timeDimensions: [{
+        dimension: 'orders.created_at',
+        granularity: 'day',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      cacheMode: 'no-cache',
+      externalQueryClass: PostgresQuery,
+    });
+
+    expect(query.externalPreAggregationQuery()).toBe(true);
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    expect(preAggregationsDescription.length).toBeGreaterThan(0);
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_external');
+  });
+
   describe('rollup with multiplied measure', () => {
     let compiler;
     let cubeEvaluator;

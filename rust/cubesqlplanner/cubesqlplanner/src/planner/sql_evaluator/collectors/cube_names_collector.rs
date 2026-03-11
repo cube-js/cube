@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
+use crate::planner::sql_evaluator::{CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -24,12 +24,12 @@ impl TraversalVisitor for CubeNamesCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
-        path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());
@@ -42,11 +42,10 @@ impl TraversalVisitor for CubeNamesCollector {
                     return Ok(None);
                 }
             }
-            MemberSymbol::TimeDimension(e) => {
-                return self.on_node_traverse(e.base_symbol(), path, &())
-            }
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
+                    let path = node.path();
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());
@@ -56,18 +55,18 @@ impl TraversalVisitor for CubeNamesCollector {
                     }
                 }
             }
-            MemberSymbol::CubeName(e) => {
-                if !path.is_empty() {
-                    for p in path {
-                        self.names.insert(p.clone());
-                    }
-                }
-                self.names.insert(e.cube_name().clone());
-            }
-            MemberSymbol::CubeTable(_) => {}
             MemberSymbol::MemberExpression(_) => {}
         };
         Ok(Some(()))
+    }
+
+    fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
+        if let CubeRef::Name(symbol) = cube_ref {
+            for p in symbol.path() {
+                self.names.insert(p.clone());
+            }
+        }
+        Ok(())
     }
 }
 

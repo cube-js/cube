@@ -1,6 +1,8 @@
 mod common;
 mod cube_symbol;
+pub mod dimension_kinds;
 mod dimension_symbol;
+pub mod measure_kinds;
 mod measure_symbol;
 mod member_expression_symbol;
 mod member_symbol;
@@ -11,7 +13,12 @@ pub use common::*;
 pub use cube_symbol::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
 };
+pub use dimension_kinds::DimensionKind;
 pub use dimension_symbol::*;
+pub use measure_kinds::{
+    AggregateWrap, AggregatedMeasure, CalculatedMeasure, CalculatedMeasureType, CountMeasure,
+    CountSql, MeasureKind,
+};
 pub use measure_symbol::{
     DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
 };

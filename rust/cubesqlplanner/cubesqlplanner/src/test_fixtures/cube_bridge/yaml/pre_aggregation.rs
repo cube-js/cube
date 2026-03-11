@@ -23,7 +23,6 @@ pub struct YamlPreAggregationDefinition {
     #[serde(default)]
     time_dimension: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
     segments: Option<Vec<String>>,
     #[serde(default)]
     #[allow(dead_code)]
@@ -98,6 +97,12 @@ impl YamlPreAggregationDefinition {
             .transpose()
             .expect("Failed to build time dimension reference");
 
+        let segment_references = self
+            .segments
+            .map(|s| build_array_references(s))
+            .transpose()
+            .expect("Failed to build segment references");
+
         let rollup_references = self
             .rollups
             .map(|r| build_array_references(r))
@@ -115,6 +120,7 @@ impl YamlPreAggregationDefinition {
                 .measure_references_opt(measure_references)
                 .dimension_references_opt(dimension_references)
                 .time_dimension_reference_opt(time_dimension_reference)
+                .segment_references_opt(segment_references)
                 .rollup_references_opt(rollup_references)
                 .build(),
         )

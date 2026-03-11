@@ -1,0 +1,131 @@
+import { Layout, Navbar } from 'nextra-theme-docs'
+import { Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import localFont from 'next/font/local'
+import 'nextra-theme-docs/style.css'
+import './globals.css'
+
+const ceraPro = localFont({
+  src: [
+    {
+      path: '../fonts/CeraPro-Regular.woff2',
+      weight: '300',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Regular.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Medium.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Bold.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/CeraPro-Bold.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-cera-pro',
+})
+
+import { Footer } from '../components/Footer'
+import { LogoWithVersion } from '../components/LogoWithVersion'
+import { GetStartedButton } from '../components/GetStartedButton'
+import { AnalyticsProvider } from '../components/AnalyticsProvider'
+import { PurpleBannerWrapper } from '../components/PurpleBannerWrapper'
+import { AlgoliaSearch } from '../components/AlgoliaSearch'
+import { SearchProviderWrapper } from '../components/SearchProviderWrapper'
+
+const SlackIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+  >
+    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
+  </svg>
+)
+
+export const metadata = {
+  title: {
+    template: '%s | Cube documentation',
+    default: 'Cube documentation',
+  },
+  description: 'Cube documentation built with Nextra'
+}
+
+const navbar = (
+  <Navbar
+    logo={<LogoWithVersion />}
+    logoLink={false}
+    align="left"
+    projectLink="https://github.com/cube-js/cube"
+    chatLink="https://slack.cube.dev"
+    chatIcon={<SlackIcon />}
+  >
+    <GetStartedButton />
+  </Navbar>
+)
+
+const footer = <Footer />
+
+export default async function RootLayout({ children }) {
+  return (
+    <html
+      lang="en"
+      dir="ltr"
+      suppressHydrationWarning
+      className={ceraPro.variable}
+    >
+      <Head
+        backgroundColor={{ light: '#ffffff', dark: '#111111' }}
+        color={{
+          hue: { light: 251, dark: 342 },
+          saturation: { light: 61, dark: 69 }
+        }}
+      >
+        {process.env.NODE_ENV === 'production' && (
+          <script dangerouslySetInnerHTML={{ __html: `
+            (function(w,d,s,l,i){
+              w[l]=w[l]||[];
+              w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+              var f=d.getElementsByTagName(s)[0],
+                  j=d.createElement(s),
+                  dl=l!='dataLayer'?'&l='+l:'';
+              j.async=true;
+              j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+              f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','GTM-52W7VM2');
+          `}} />
+        )}
+      </Head>
+      <body>
+        <SearchProviderWrapper>
+          <PurpleBannerWrapper />
+          <AnalyticsProvider>
+            <Layout
+              navbar={navbar}
+              pageMap={await getPageMap()}
+              docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs"
+              footer={footer}
+              sidebar={{ defaultMenuCollapseLevel: 1 }}
+              search={<AlgoliaSearch />}
+            >
+              {children}
+            </Layout>
+          </AnalyticsProvider>
+        </SearchProviderWrapper>
+      </body>
+    </html>
+  )
+}

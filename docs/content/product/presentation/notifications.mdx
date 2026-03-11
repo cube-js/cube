@@ -1,0 +1,69 @@
+# Notifications
+
+<InfoBox>
+
+Notifications are available on [Premium and Enterprise plans](https://cube.dev/pricing).
+<br/ >Users need at least the [Explorer][ref-roles] role and Edit or Manage permission
+on the workbook to set up notifications.
+
+</InfoBox>
+
+Notifications let you send email or Slack messages with a screenshot of a
+dashboard after each [scheduled refresh][ref-scheduled-refreshes]. This is useful
+for distributing regular updates to stakeholders without requiring them to log in.
+
+## Creating a notification
+
+Notifications are configured as part of a [scheduled refresh][ref-scheduled-refreshes].
+When creating or editing a schedule, click <Btn>Add notification</Btn> to expand
+the notification configuration card.
+
+### Delivery channel
+
+Toggle between two delivery channels:
+
+- **Email** — select multiple recipients from workspace users using a searchable
+  picker with checkboxes.
+- **Slack** — select a Slack channel to post to. Requires connecting your Slack
+  workspace first (one-time OAuth flow via <Btn>Connect to Slack</Btn>). Once
+  connected, select a channel from a searchable picker.
+
+### Screenshot attachment
+
+Choose the format for the dashboard screenshot attached to the notification:
+
+- **PNG** (default)
+- **PDF**
+
+Select the format using the <Btn>Attach screenshot as</Btn> option.
+
+### Removing a notification
+
+To remove a notification from a scheduled refresh, click the X button in the
+notification card header before saving.
+
+## Email notifications
+
+Email notifications are sent to selected workspace users after a scheduled
+refresh completes. Each recipient receives a message with a link to the
+dashboard and the attached screenshot.
+
+## Slack notifications
+
+Slack notifications post a message with the dashboard screenshot to a single
+Slack channel per schedule.
+
+### Connecting Slack
+
+Before you can send Slack notifications, connect your Slack workspace:
+
+1. When configuring a notification, select <Btn>Slack</Btn> as the delivery
+   channel.
+2. Click <Btn>Connect to Slack</Btn> to start the OAuth flow.
+3. Authorize Cube to post to your Slack workspace.
+
+This is a one-time setup. Once connected, you can select any channel your Slack
+workspace has access to.
+
+[ref-roles]: /product/administration/users-and-permissions/roles-and-permissions
+[ref-scheduled-refreshes]: /product/presentation/scheduled-refreshes

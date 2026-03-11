@@ -111,11 +111,13 @@ impl YamlSchema {
             let mut cube_builder = builder.add_cube(cube.name).cube_def(cube_def);
 
             for dim_entry in cube.dimensions {
-                let dim_rc = dim_entry.definition.build();
-                let dim_def = Rc::try_unwrap(dim_rc)
-                    .ok()
-                    .expect("Rc should have single owner");
-                cube_builder = cube_builder.add_dimension(dim_entry.name, dim_def);
+                let result = dim_entry.definition.build();
+                cube_builder =
+                    cube_builder.add_dimension(dim_entry.name.clone(), result.definition);
+                for (gran_name, gran_def) in result.granularities {
+                    cube_builder =
+                        cube_builder.add_granularity(&dim_entry.name, &gran_name, gran_def);
+                }
             }
 
             for meas_entry in cube.measures {

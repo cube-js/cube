@@ -2,8 +2,6 @@ interface LocalSubscriptionStoreOptions {
   heartBeatInterval?: number;
 }
 
-export type SubscriptionId = string | number;
-
 export type LocalSubscriptionStoreSubscription = {
   message: any,
   state: any,
@@ -11,21 +9,26 @@ export type LocalSubscriptionStoreSubscription = {
 };
 
 export type LocalSubscriptionStoreConnection = {
-  subscriptions: Map<SubscriptionId, LocalSubscriptionStoreSubscription>,
+  subscriptions: Map<string, LocalSubscriptionStoreSubscription>,
   authContext?: any,
 };
 
 export class LocalSubscriptionStore {
   protected readonly connections: Map<string, LocalSubscriptionStoreConnection> = new Map();
 
-  protected readonly hearBeatInterval: number;
+  protected readonly heartBeatInterval: number;
 
   public constructor(options: LocalSubscriptionStoreOptions = {}) {
-    this.hearBeatInterval = options.heartBeatInterval || 60;
+    this.heartBeatInterval = options.heartBeatInterval || 60;
   }
 
-  public async getSubscription(connectionId: string, subscriptionId: string) {
-    const connection = this.getConnectionOrCreate(connectionId);
+  public async getSubscription(connectionId: string, subscriptionId: string): Promise<LocalSubscriptionStoreSubscription | undefined> {
+    // only get subscription, do not create connection if it doesn't exist
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      return undefined;
+    }
+
     return connection.subscriptions.get(subscriptionId);
   }
 
@@ -37,14 +40,22 @@ export class LocalSubscriptionStore {
     });
   }
 
-  public async unsubscribe(connectionId: string, subscriptionId: SubscriptionId) {
-    const connection = this.getConnectionOrCreate(connectionId);
+  public async unsubscribe(connectionId: string, subscriptionId: string) {
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      return;
+    }
+
+    if (!connection.subscriptions.has(subscriptionId)) {
+      return;
+    }
+
     connection.subscriptions.delete(subscriptionId);
   }
 
   public getAllSubscriptions() {
     const now = Date.now();
-    const staleThreshold = this.hearBeatInterval * 4 * 1000;
+    const staleThreshold = this.heartBeatInterval * 4 * 1000;
     const result: Array<{ connectionId: string } & LocalSubscriptionStoreSubscription> = [];
 
     for (const [connectionId, connection] of this.connections) {
@@ -75,15 +86,19 @@ export class LocalSubscriptionStore {
   }
 
   protected getConnectionOrCreate(connectionId: string): LocalSubscriptionStoreConnection {
-    const connect = this.connections.get(connectionId);
+    const connect = this.getConnection(connectionId);
     if (connect) {
       return connect;
     }
 
-    const connection = { subscriptions: new Map() };
+    const connection: LocalSubscriptionStoreConnection = { subscriptions: new Map<string, LocalSubscriptionStoreSubscription>() };
     this.connections.set(connectionId, connection);
 
     return connection;
+  }
+
+  protected getConnection(connectionId: string): LocalSubscriptionStoreConnection | undefined {
+    return this.connections.get(connectionId);
   }
 
   public clear() {

@@ -2,12 +2,10 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
-use crate::planner::sql_evaluator::{Case, SqlCall};
+use crate::planner::sql_evaluator::{Case, CubeRef, SqlCall};
 
-use super::{
-    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
-    TimeDimensionSymbol,
-};
+use super::common::CompiledMemberPath;
+use super::{DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, TimeDimensionSymbol};
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -15,8 +13,6 @@ pub enum MemberSymbol {
     Dimension(Rc<DimensionSymbol>),
     TimeDimension(Rc<TimeDimensionSymbol>),
     Measure(Rc<MeasureSymbol>),
-    CubeName(Rc<CubeNameSymbol>),
-    CubeTable(Rc<CubeTableSymbol>),
     MemberExpression(Rc<MemberExpressionSymbol>),
 }
 
@@ -29,8 +25,6 @@ impl Debug for MemberSymbol {
                 .field(&self.full_name())
                 .finish(),
             Self::Measure(_) => f.debug_tuple("Measure").field(&self.full_name()).finish(),
-            Self::CubeName(_) => f.debug_tuple("CubeName").field(&self.full_name()).finish(),
-            Self::CubeTable(_) => f.debug_tuple("CubeTable").field(&self.full_name()).finish(),
             Self::MemberExpression(_) => f
                 .debug_tuple("MemberExpression")
                 .field(&self.full_name())
@@ -41,17 +35,8 @@ impl Debug for MemberSymbol {
 
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Dimension(l0), Self::Dimension(r0)) => l0.full_name() == r0.full_name(),
-            (Self::TimeDimension(l0), Self::TimeDimension(r0)) => l0.full_name() == r0.full_name(),
-            (Self::Measure(l0), Self::Measure(r0)) => l0.full_name() == r0.full_name(),
-            (Self::CubeName(l0), Self::CubeName(r0)) => l0.cube_name() == r0.cube_name(),
-            (Self::CubeTable(l0), Self::CubeTable(r0)) => l0.cube_name() == r0.cube_name(),
-            (Self::MemberExpression(l0), Self::MemberExpression(r0)) => {
-                l0.full_name() == r0.full_name()
-            }
-            _ => false,
-        }
+        self.full_name() == other.full_name()
+            && std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
@@ -64,14 +49,6 @@ impl MemberSymbol {
         Rc::new(Self::Dimension(symbol))
     }
 
-    pub fn new_cube_name(symbol: Rc<CubeNameSymbol>) -> Rc<Self> {
-        Rc::new(Self::CubeName(symbol))
-    }
-
-    pub fn new_cube_table(symbol: Rc<CubeTableSymbol>) -> Rc<Self> {
-        Rc::new(Self::CubeTable(symbol))
-    }
-
     pub fn new_member_expression(symbol: Rc<MemberExpressionSymbol>) -> Rc<Self> {
         Rc::new(Self::MemberExpression(symbol))
     }
@@ -80,48 +57,37 @@ impl MemberSymbol {
         Rc::new(Self::TimeDimension(symbol))
     }
 
-    pub fn full_name(&self) -> String {
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
         match self {
-            Self::Dimension(d) => d.full_name(),
-            Self::TimeDimension(d) => d.full_name(),
-            Self::Measure(m) => m.full_name(),
-            Self::CubeName(c) => c.cube_name().clone(),
-            Self::CubeTable(c) => c.cube_name().clone(),
-            Self::MemberExpression(e) => e.full_name().clone(),
+            Self::Dimension(d) => d.compiled_path(),
+            Self::TimeDimension(d) => d.compiled_path(),
+            Self::Measure(m) => m.compiled_path(),
+            Self::MemberExpression(e) => e.compiled_path(),
         }
+    }
+
+    pub fn full_name(&self) -> String {
+        self.compiled_path().full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        match self {
-            Self::Dimension(d) => d.alias(),
-            Self::TimeDimension(d) => d.alias(),
-            Self::Measure(m) => m.alias(),
-            Self::CubeName(c) => c.alias(),
-            Self::CubeTable(c) => c.alias(),
-            Self::MemberExpression(e) => e.alias(),
-        }
+        self.compiled_path().alias().clone()
     }
 
     pub fn name(&self) -> String {
-        match self {
-            Self::Dimension(d) => d.name().clone(),
-            Self::TimeDimension(d) => d.name(),
-            Self::Measure(m) => m.name().clone(),
-            Self::CubeName(c) => c.cube_name().clone(),
-            Self::CubeTable(c) => c.cube_name().clone(),
-            Self::MemberExpression(e) => e.name().clone(),
-        }
+        self.compiled_path().name().clone()
     }
 
     pub fn cube_name(&self) -> String {
-        match self {
-            Self::Dimension(d) => d.cube_name().clone(),
-            Self::TimeDimension(d) => d.cube_name(),
-            Self::Measure(m) => m.cube_name().clone(),
-            Self::CubeName(c) => c.cube_name().clone(),
-            Self::CubeTable(c) => c.cube_name().clone(),
-            Self::MemberExpression(e) => e.cube_name().clone(),
-        }
+        self.compiled_path().cube_name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path().path()
+    }
+
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        self.compiled_path().join_map()
     }
 
     pub fn is_multi_stage(&self) -> bool {
@@ -152,10 +118,6 @@ impl MemberSymbol {
         matches!(self, Self::Dimension(_) | Self::TimeDimension(_))
     }
 
-    pub fn is_cube(&self) -> bool {
-        matches!(self, Self::CubeName(_) | Self::CubeTable(_))
-    }
-
     pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         self: &Rc<Self>,
         f: &F,
@@ -172,8 +134,6 @@ impl MemberSymbol {
             Self::Dimension(d) => d.apply_to_deps(f),
             Self::TimeDimension(d) => d.apply_to_deps(f),
             Self::Measure(m) => m.apply_to_deps(f),
-            Self::CubeName(_) => Ok(self.clone()),
-            Self::CubeTable(_) => Ok(self.clone()),
             Self::MemberExpression(e) => e.apply_to_deps(f),
         }
     }
@@ -183,20 +143,16 @@ impl MemberSymbol {
             Self::Dimension(d) => d.get_dependencies(),
             Self::TimeDimension(d) => d.get_dependencies(),
             Self::Measure(m) => m.get_dependencies(),
-            Self::CubeName(_) => vec![],
-            Self::CubeTable(_) => vec![],
             Self::MemberExpression(e) => e.get_dependencies(),
         }
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         match self {
-            Self::Dimension(d) => d.get_dependencies_with_path(),
-            Self::TimeDimension(d) => d.get_dependencies_with_path(),
-            Self::Measure(m) => m.get_dependencies_with_path(),
-            Self::CubeName(_) => vec![],
-            Self::CubeTable(_) => vec![],
-            Self::MemberExpression(e) => e.get_dependencies_with_path(),
+            Self::Dimension(d) => d.get_cube_refs(),
+            Self::TimeDimension(d) => d.get_cube_refs(),
+            Self::Measure(m) => m.get_cube_refs(),
+            Self::MemberExpression(e) => e.get_cube_refs(),
         }
     }
 
@@ -205,8 +161,6 @@ impl MemberSymbol {
             Self::Dimension(d) => d.is_reference(),
             Self::TimeDimension(d) => d.is_reference(),
             Self::Measure(m) => m.is_reference(),
-            Self::CubeName(_) => false,
-            Self::CubeTable(_) => false,
             Self::MemberExpression(e) => e.is_reference(),
         }
     }
@@ -216,8 +170,6 @@ impl MemberSymbol {
             Self::Dimension(d) => d.reference_member(),
             Self::TimeDimension(d) => d.reference_member(),
             Self::Measure(m) => m.reference_member(),
-            Self::CubeName(_) => None,
-            Self::CubeTable(_) => None,
             Self::MemberExpression(e) => e.reference_member(),
         }
     }
@@ -245,13 +197,38 @@ impl MemberSymbol {
         false
     }
 
+    /// Returns a copy of this symbol with the path reduced to just the owning cube,
+    /// stripping any join chain prefix (e.g. from views or cross-cube references).
+    pub fn with_stripped_join_prefix(&self) -> Rc<Self> {
+        match self {
+            Self::Dimension(d) => {
+                let mut new = (**d).clone();
+                new.strip_join_prefix();
+                Rc::new(Self::Dimension(Rc::new(new)))
+            }
+            Self::TimeDimension(d) => {
+                let mut new = (**d).clone();
+                new.strip_join_prefix();
+                Rc::new(Self::TimeDimension(Rc::new(new)))
+            }
+            Self::Measure(m) => {
+                let mut new = (**m).clone();
+                new.strip_join_prefix();
+                Rc::new(Self::Measure(Rc::new(new)))
+            }
+            Self::MemberExpression(e) => {
+                let mut new = (**e).clone();
+                new.strip_join_prefix();
+                Rc::new(Self::MemberExpression(Rc::new(new)))
+            }
+        }
+    }
+
     pub fn owned_by_cube(&self) -> bool {
         match self {
             Self::Dimension(d) => d.owned_by_cube(),
             Self::TimeDimension(d) => d.owned_by_cube(),
             Self::Measure(m) => m.owned_by_cube(),
-            Self::CubeName(_) => true,
-            Self::CubeTable(_) => true,
             Self::MemberExpression(_) => false,
         }
     }
@@ -281,26 +258,6 @@ impl MemberSymbol {
             Self::Measure(m) => Ok(m.clone()),
             _ => Err(CubeError::internal(format!(
                 "{} is not a measure",
-                self.full_name()
-            ))),
-        }
-    }
-
-    pub fn as_cube_table(&self) -> Result<Rc<CubeTableSymbol>, CubeError> {
-        match self {
-            Self::CubeTable(c) => Ok(c.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a cube table",
-                self.full_name()
-            ))),
-        }
-    }
-
-    pub fn as_cube_name(&self) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        match self {
-            Self::CubeName(c) => Ok(c.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a cube name",
                 self.full_name()
             ))),
         }
@@ -401,8 +358,6 @@ impl crate::utils::debug::DebugSql for MemberSymbol {
             MemberSymbol::Dimension(d) => d.debug_sql(expand_deps),
             MemberSymbol::Measure(m) => m.debug_sql(expand_deps),
             MemberSymbol::TimeDimension(t) => t.debug_sql(expand_deps),
-            MemberSymbol::CubeName(c) => c.debug_sql(expand_deps),
-            MemberSymbol::CubeTable(c) => c.debug_sql(expand_deps),
             MemberSymbol::MemberExpression(e) => e.debug_sql(expand_deps),
         }
     }

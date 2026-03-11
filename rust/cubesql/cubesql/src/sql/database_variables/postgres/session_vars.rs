@@ -61,12 +61,18 @@ pub fn defaults() -> DatabaseVariables {
             ScalarValue::Utf8(Some("none".to_string())),
             None,
         ),
-        // Custom cubesql variables
+        DatabaseVariable::system(
+            "server_version_num".to_string(),
+            ScalarValue::Utf8(Some("140002".to_string())),
+            None,
+        ),
+        // Custom cube[sql] variables
         DatabaseVariable::user_defined(
             CUBESQL_PENALIZE_POST_PROCESSING_VAR.to_string(),
             ScalarValue::Boolean(Some(false)),
             None,
         ),
+        DatabaseVariable::user_defined("cube_cache".to_string(), ScalarValue::Utf8(None), None),
     ];
 
     let variables = IntoIterator::into_iter(variables)

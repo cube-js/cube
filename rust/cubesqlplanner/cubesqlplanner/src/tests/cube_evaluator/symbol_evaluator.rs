@@ -103,6 +103,18 @@ fn count_measure_variants() {
 }
 
 #[test]
+fn simple_segment_sql_evaluation() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
+    let context = TestContext::new(schema).unwrap();
+
+    let segment = context.create_segment("test_cube.is_active").unwrap();
+    let sql = context
+        .evaluate_symbol(&segment.member_evaluator())
+        .unwrap();
+    assert_eq!(sql, r#""test_cube".status = 'active'"#);
+}
+
+#[test]
 fn composite_symbols() {
     let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
     let context = TestContext::new(schema).unwrap();
@@ -123,4 +135,50 @@ fn composite_symbols() {
         complex_measure_sql,
         r#"sum("test_cube".revenue) + avg("test_cube".revenue)/min("test_cube".revenue) - min("test_cube".revenue)"#
     );
+}
+
+#[test]
+fn string_measure() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/measure_types.yaml");
+    let context = TestContext::new(schema).unwrap();
+
+    let symbol = context.create_measure("test_cube.string_status").unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, r#""test_cube".source"#);
+}
+
+#[test]
+fn time_measure() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/measure_types.yaml");
+    let context = TestContext::new(schema).unwrap();
+
+    let symbol = context
+        .create_measure("test_cube.time_last_activity")
+        .unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, r#""test_cube".created_at"#);
+}
+
+#[test]
+fn boolean_measure() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/measure_types.yaml");
+    let context = TestContext::new(schema).unwrap();
+
+    let symbol = context
+        .create_measure("test_cube.boolean_has_revenue")
+        .unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, r#"sum("test_cube".revenue) > 0"#);
+}
+
+#[test]
+fn number_agg_measure() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/measure_types.yaml");
+    let context = TestContext::new(schema).unwrap();
+
+    let symbol = context
+        .create_measure("test_cube.number_agg_metric")
+        .unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, r#"sum("test_cube".revenue) * 100"#);
 }

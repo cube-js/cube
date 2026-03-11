@@ -76,9 +76,12 @@ impl TopLevelPlanner {
             );
             let disable_external_pre_aggregations =
                 self.request.disable_external_pre_aggregations();
-            if let Some(result) = pre_aggregation_optimizer
-                .try_optimize(plan.clone(), disable_external_pre_aggregations)?
-            {
+            let pre_aggregation_id = self.request.pre_aggregation_id();
+            if let Some(result) = pre_aggregation_optimizer.try_optimize(
+                plan.clone(),
+                disable_external_pre_aggregations,
+                pre_aggregation_id,
+            )? {
                 if pre_aggregation_optimizer.get_used_pre_aggregations().len() == 1 {
                     (
                         result,

@@ -65,6 +65,8 @@ pub struct MockBaseQueryOptions {
     cubestore_support_multistage: Option<bool>,
     #[builder(default = false)]
     disable_external_pre_aggregations: bool,
+    #[builder(default)]
+    pre_aggregation_id: Option<String>,
 }
 
 impl_static_data!(
@@ -82,7 +84,8 @@ impl_static_data!(
     pre_aggregation_query,
     total_query,
     cubestore_support_multistage,
-    disable_external_pre_aggregations
+    disable_external_pre_aggregations,
+    pre_aggregation_id
 );
 
 pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {

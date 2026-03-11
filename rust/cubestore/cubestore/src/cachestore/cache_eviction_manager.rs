@@ -16,6 +16,7 @@ use chrono::Utc;
 use datafusion::cube_ext;
 use deepsize::DeepSizeOf;
 use itertools::Itertools;
+use rand::Rng;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -114,13 +115,64 @@ impl FromStr for CacheEvictionPolicy {
             &"allkeys-lfu" => Ok(CacheEvictionPolicy::AllKeysLfu),
             &"allkeys-ttl" => Ok(CacheEvictionPolicy::AllKeysTtl),
             &"sampled-lru" => Ok(CacheEvictionPolicy::SampledLru),
-            &"sampled-lfu" => Ok(CacheEvictionPolicy::SampledLru),
+            &"sampled-lfu" => Ok(CacheEvictionPolicy::SampledLfu),
             &"sampled-ttl" => Ok(CacheEvictionPolicy::SampledTtl),
             other => Err(CubeError::user(format!(
                 "Unsupported cache eviction type: {}",
                 other
             ))),
         }
+    }
+}
+
+/// Starting at 10 instead of 0 protects newly inserted keys from immediate eviction,
+/// giving them a grace period to accumulate real access frequency before they can be
+/// considered low-frequency candidates.
+/// TODO: Implement such protection
+pub const LFU_INIT_VAL: u8 = 10;
+
+/// Decay the LFU counter based on elapsed time.
+/// Subtracts `elapsed_minutes / decay_time` from counter, saturating at 0.
+fn lfu_decay_counter(counter: u8, elapsed_minutes: u32, decay_time: u32) -> u8 {
+    if decay_time == 0 || elapsed_minutes == 0 {
+        return counter;
+    }
+
+    let decrement = elapsed_minutes / decay_time;
+    counter.saturating_sub(decrement as u8)
+}
+
+/// Logarithmic probabilistic increment of LFU counter.
+/// Higher counters have exponentially a lower probability of incrementing.
+///
+/// Expected hits needed to increment (with default log_factor=10, LFU_INIT_VAL=10):
+///
+/// | counter | base_val | p = 1/(base_val*lf+1) | avg hits to incr | cumulative hits to reach |
+/// |---------|----------|-----------------------|-------------------|--------------------------|
+/// |      10 |        0 | 1.000                 |                 1 |                       10 |
+/// |      11 |        1 | 0.0909                |                11 |                       11 |
+/// |      15 |        5 | 0.0196                |                51 |                      115 |
+/// |      20 |       10 | 0.0099                |               101 |                      470 |
+/// |      50 |       40 | 0.00249               |               401 |                    7_850 |
+/// |     100 |       90 | 0.00111               |               901 |                   40_150 |
+/// |     200 |      190 | 0.000526              |              1901 |                  179_750 |
+/// |     255 |        - | 0 (capped)            |                 - |                        - |
+///
+/// Cumulative formula: `LFU_INIT_VAL + lf * n*(n-1)/2 + n` where `n = counter - LFU_INIT_VAL`.
+/// For counter <= LFU_INIT_VAL, cumulative = counter (each step is guaranteed).
+fn lfu_log_increment(counter: u8, log_factor: u8, rng: &mut impl Rng) -> u8 {
+    if counter == 255 {
+        return 255;
+    }
+
+    let base_val = counter.saturating_sub(LFU_INIT_VAL) as f64;
+    let p = 1.0 / (base_val * log_factor as f64 + 1.0);
+    let r: f64 = rng.gen();
+
+    if r < p {
+        counter + 1
+    } else {
+        counter
     }
 }
 
@@ -153,6 +205,8 @@ pub struct CacheEvictionManager {
     eviction_proactive_size_threshold: u32,
     eviction_proactive_ttl_threshold: u32,
     compaction_trigger_size: u64,
+    // LFU configuration
+    lfu_decay_time: u32,
     // background listener to track events
     _ttl_tl_loop_join_handle: Arc<AbortingJoinHandle<()>>,
 }
@@ -222,55 +276,56 @@ impl CacheEvictionManager {
 
         let ttl_buffer_to_move = ttl_buffer.clone();
         let ttl_buffer_max_size = config.cachestore_cache_ttl_buffer_max_size();
+        let lfu_log_factor = config.cachestore_cache_lfu_log_factor();
+        let lfu_decay_time = config.cachestore_cache_lfu_decay_time();
 
-        let join_handle = cube_ext::spawn_blocking(move || loop {
-            match ttl_event_rx.blocking_recv() {
-                Some(CacheEvent::Delete { row_id }) => {
-                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                    ttl_buffer.remove(&row_id);
-                }
-                Some(CacheEvent::Lookup {
-                    row_id,
-                    key_hash,
-                    raw_size,
-                }) => {
-                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                    if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
-                        let expired_lfu = if let Some(previous_lru) =
-                            cache_data.lru.decode_value_as_opt_datetime().unwrap()
-                        {
-                            previous_lru < Utc::now() - chrono::Duration::seconds(60 * 2)
+        let join_handle = cube_ext::spawn_blocking(move || {
+            let mut rng = rand::thread_rng();
+            loop {
+                match ttl_event_rx.blocking_recv() {
+                    Some(CacheEvent::Delete { row_id }) => {
+                        let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                        ttl_buffer.remove(&row_id);
+                    }
+                    Some(CacheEvent::Lookup {
+                        row_id,
+                        key_hash,
+                        raw_size,
+                    }) => {
+                        let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                        if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
+                            let now = Utc::now();
+                            let elapsed_minutes = if let Some(previous_lru) =
+                                cache_data.lru.decode_value_as_opt_datetime().unwrap()
+                            {
+                                now.signed_duration_since(previous_lru).num_minutes().max(0) as u32
+                            } else {
+                                0
+                            };
+
+                            let decayed =
+                                lfu_decay_counter(cache_data.lfu, elapsed_minutes, lfu_decay_time);
+                            cache_data.lfu = lfu_log_increment(decayed, lfu_log_factor, &mut rng);
+                            cache_data.lru = now.encode_value_as_u32().unwrap();
                         } else {
-                            true
-                        };
-
-                        cache_data.lru = Utc::now().encode_value_as_u32().unwrap();
-
-                        if expired_lfu {
-                            cache_data.lfu = 1;
-                        } else {
-                            if cache_data.lfu < u8::MAX {
-                                cache_data.lfu += 1;
+                            if ttl_buffer.len() >= ttl_buffer_max_size {
+                                continue;
                             }
-                        }
-                    } else {
-                        if ttl_buffer.len() >= ttl_buffer_max_size {
-                            continue;
-                        }
 
-                        ttl_buffer.insert(
-                            row_id,
-                            CachePolicyData {
-                                key_hash,
-                                raw_size,
-                                lru: Utc::now().encode_value_as_u32().unwrap(),
-                                lfu: 1,
-                            },
-                        );
-                    };
-                }
-                None => {
-                    return;
+                            ttl_buffer.insert(
+                                row_id,
+                                CachePolicyData {
+                                    key_hash,
+                                    raw_size,
+                                    lru: Utc::now().encode_value_as_u32().unwrap(),
+                                    lfu: LFU_INIT_VAL,
+                                },
+                            );
+                        };
+                    }
+                    None => {
+                        return;
+                    }
                 }
             }
         });
@@ -314,6 +369,7 @@ impl CacheEvictionManager {
             eviction_proactive_ttl_threshold: config
                 .cachestore_cache_eviction_proactive_ttl_threshold(),
             compaction_trigger_size: config.cachestore_cache_compaction_trigger_size(),
+            lfu_decay_time: config.cachestore_cache_lfu_decay_time(),
             //
             _ttl_tl_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
         }
@@ -622,6 +678,7 @@ impl CacheEvictionManager {
     ) -> Result<(KeysVector, KeysVector), CubeError> {
         let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
+        let lfu_decay_time = self.lfu_decay_time;
 
         let (all_keys, stats_total_keys, stats_total_raw_size, expired_keys) = store
             .read_operation_out_of_queue("collect_allkeys_to_evict", move |db_ref| {
@@ -643,7 +700,7 @@ impl CacheEvictionManager {
                     let item = item?;
 
                     let (weight, raw_size) =
-                        Self::get_weight_and_size_by_criteria(&item, &criteria)?;
+                        Self::get_weight_and_size_by_criteria(&item, &criteria, lfu_decay_time)?;
 
                     // We need to count expired keys too for correct stats!
                     stats_total_keys += 1;
@@ -766,6 +823,7 @@ impl CacheEvictionManager {
         let eviction_batch_size = self.eviction_batch_size;
         let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
+        let lfu_decay_time = self.lfu_decay_time;
 
         let to_delete: Vec<(u64, u32)> = store
             .read_operation_out_of_queue("do_eviction_by_sampling", move |db_ref| {
@@ -787,7 +845,7 @@ impl CacheEvictionManager {
                     let item = item?;
 
                     let (weight, raw_size) =
-                        Self::get_weight_and_size_by_criteria(&item, &criteria)?;
+                        Self::get_weight_and_size_by_criteria(&item, &criteria, lfu_decay_time)?;
 
                     if let Some(ttl) = item.ttl {
                         let ready_to_delete = if ttl < now_at_start {
@@ -1101,12 +1159,23 @@ impl CacheEvictionManager {
     fn get_weight_and_size_by_criteria(
         item: &SecondaryIndexValueScanIterItem,
         criteria: &CacheEvictionWeightCriteria,
+        lfu_decay_time: u32,
     ) -> Result<(u32, u32), CubeError> {
         if let Some(extended) = &item.extended {
             let weight = match criteria {
                 CacheEvictionWeightCriteria::ByLRU => extended.lru.encode_value_as_u32()?,
                 CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
-                CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
+                CacheEvictionWeightCriteria::ByLFU => {
+                    let elapsed_minutes = if let Some(lru_dt) = extended.lru {
+                        Utc::now()
+                            .signed_duration_since(lru_dt)
+                            .num_minutes()
+                            .max(0) as u32
+                    } else {
+                        0
+                    };
+                    lfu_decay_counter(extended.lfu, elapsed_minutes, lfu_decay_time) as u32
+                }
             };
 
             Ok((weight, extended.raw_size))
@@ -1165,4 +1234,78 @@ impl CacheEvictionManager {
 #[derive(Debug)]
 pub struct TruncationBlockGuard<'a> {
     _ttl_buffer_guard: RwLockWriteGuard<'a, HashMap<u64, CachePolicyData>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lfu_decay_no_time() {
+        assert_eq!(lfu_decay_counter(50, 0, 1), 50);
+    }
+
+    #[test]
+    fn test_lfu_decay_basic() {
+        // 10 elapsed minutes / 1 decay_time = subtract 10
+        assert_eq!(lfu_decay_counter(100, 10, 1), 90);
+        // 30 elapsed / 10 decay = subtract 3
+        assert_eq!(lfu_decay_counter(50, 30, 10), 47);
+    }
+
+    #[test]
+    fn test_lfu_decay_clamps() {
+        // Saturating subtraction to 0
+        assert_eq!(lfu_decay_counter(5, 100, 1), 0);
+        assert_eq!(lfu_decay_counter(0, 10, 1), 0);
+    }
+
+    #[test]
+    fn test_lfu_decay_disabled() {
+        // decay_time=0 means decay is disabled
+        assert_eq!(lfu_decay_counter(100, 999, 0), 100);
+    }
+
+    #[test]
+    fn test_lfu_log_increment_at_max() {
+        assert_eq!(lfu_log_increment(255, 10, &mut rand::thread_rng()), 255);
+    }
+
+    #[test]
+    fn test_lfu_log_increment_low_counter() {
+        // Counters at or below LFU_INIT_VAL have base_val=0, so p=1.0 -> always increments
+        let mut rng = rand::thread_rng();
+        for counter in 0..=LFU_INIT_VAL {
+            assert_eq!(
+                lfu_log_increment(counter, 10, &mut rng),
+                counter + 1,
+                "counter {} should always increment",
+                counter
+            );
+        }
+    }
+
+    #[test]
+    fn test_lfu_log_increment_distribution() {
+        // Statistical test: counter=50, log_factor=10
+        // base_val = 50 - 5 = 45, p = 1/(45*10+1) = 1/451 ≈ 0.00222
+        // Over 10000 trials, expect ~22 increments
+        let mut increments = 0;
+        let mut rng = rand::thread_rng();
+
+        let trials = 10_000;
+        for _ in 0..trials {
+            if lfu_log_increment(50, 10, &mut rng) == 51 {
+                increments += 1;
+            }
+        }
+
+        // Expected ~22, allow wide range for randomness
+        assert!(
+            increments < 100,
+            "Expected ~22 increments out of {} trials, got {}",
+            trials,
+            increments
+        );
+    }
 }

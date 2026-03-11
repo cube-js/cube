@@ -31,6 +31,9 @@ cubes:
           - name: payments_per_order
             type: sum
             sql: "{payments} / {orders.count}"
+      segments:
+        - name: new_york
+          sql: "city = 'New York'"
 
     - name: orders
       sql: "SELECT * FROM orders"

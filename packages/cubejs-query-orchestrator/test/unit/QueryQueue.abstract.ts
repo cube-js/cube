@@ -244,11 +244,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toEqual(['10', '21', '32', '43']);
     });
 
-    const nonCubeStoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
+    const onlyLocalTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
 
-    // this works with cube store, but there is an issue with timings
-    // TODO(ovr): fix me
-    nonCubeStoreTest('orphaned', async () => {
+    test('orphaned', async () => {
       // recover if previous test broken something
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
@@ -259,7 +257,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       let result = queue.executeInQueue('delay', '111', { delay: 800, result: '1' }, 0);
       delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0)).catch(e => e);
-      delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 500, result: '3' }, 0)).catch(e => e);
+      delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 800, result: '3' }, 0)).catch(e => e);
       // orphaned timeout should be applied
       delayFn(null, 100).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
 
@@ -269,7 +267,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       result = await queue.executeInQueue('delay', '113', { delay: 900, result: '3' }, 0);
       expect(result).toBe('32');
 
-      await delayFn(null, 200);
+      await delayFn(null, 500);
       expect(cancelledQuery).toBe('114');
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
@@ -368,7 +366,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toBe('select * from bar');
     });
 
-    nonCubeStoreTest('queue driver lock obtain race condition', async () => {
+    onlyLocalTest('queue driver lock obtain race condition', async () => {
       const redisClient: any = await queue.queueDriver.createConnection();
       const redisClient2: any = await queue.queueDriver.createConnection();
       const priority = 10;
@@ -423,7 +421,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       await queue.queueDriver.release(redisClient2);
     });
 
-    nonCubeStoreTest('activated but lock is not acquired', async () => {
+    onlyLocalTest('activated but lock is not acquired', async () => {
       const redisClient = await queue.queueDriver.createConnection();
       const redisClient2 = await queue.queueDriver.createConnection();
       const priority = 10;

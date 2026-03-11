@@ -38,49 +38,12 @@ impl SqlNode for EvaluateSqlNode {
                 let res = visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
                 Ok(res)
             }
-            MemberSymbol::Measure(ev) => {
-                let res = if ev.has_sql() {
-                    ev.evaluate_sql(
-                        visitor,
-                        node_processor.clone(),
-                        query_tools.clone(),
-                        templates,
-                    )?
-                } else if ev.pk_sqls().len() > 1 {
-                    let pk_strings = ev
-                        .pk_sqls()
-                        .iter()
-                        .map(|pk| -> Result<_, CubeError> {
-                            let res = pk.eval(
-                                &visitor,
-                                node_processor.clone(),
-                                query_tools.clone(),
-                                templates,
-                            )?;
-                            templates.cast_to_string(&res)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    templates.concat_strings(&pk_strings)?
-                } else if ev.pk_sqls().len() == 1 {
-                    let pk_sql = ev.pk_sqls().first().unwrap();
-                    pk_sql.eval(
-                        &visitor,
-                        node_processor.clone(),
-                        query_tools.clone(),
-                        templates,
-                    )?
-                } else {
-                    format!("*")
-                };
-                Ok(res)
-            }
-            MemberSymbol::CubeTable(ev) => ev.evaluate_sql(
+            MemberSymbol::Measure(ev) => ev.evaluate_sql(
                 visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
             ),
-            MemberSymbol::CubeName(ev) => ev.evaluate_sql(),
             MemberSymbol::MemberExpression(e) => {
                 let res = e.evaluate_sql(
                     visitor,

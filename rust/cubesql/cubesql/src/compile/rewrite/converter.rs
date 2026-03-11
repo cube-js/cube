@@ -2081,6 +2081,13 @@ impl LanguageToLogicalPlanConverter {
                     .read()
                     .expect("failed to read lock for session cache_mode");
 
+                let throw_continue_wait = *self
+                    .cube_context
+                    .session_state
+                    .throw_continue_wait
+                    .read()
+                    .expect("failed to read lock for session throw_continue_wait");
+
                 let node = Arc::new(CubeScanNode::new(
                     Arc::new(DFSchema::new_with_metadata(
                         fields.into_iter().map(|(f, _)| f).collect(),
@@ -2092,7 +2099,8 @@ impl LanguageToLogicalPlanConverter {
                     CubeScanOptions {
                         change_user,
                         max_records,
-                        cache_mode: cache_mode.clone(),
+                        cache_mode: *cache_mode,
+                        throw_continue_wait,
                     },
                     alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
                     self.span_id.clone(),

@@ -1,8 +1,8 @@
 use super::filter::compiler::FilterCompiler;
 use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_evaluator::{
     apply_static_filter_to_filter_item, apply_static_filter_to_symbol, MemberExpressionExpression,
     MemberExpressionSymbol, TimeDimensionSymbol,
@@ -105,9 +105,10 @@ pub struct QueryProperties {
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>,
     pre_aggregation_query: bool,
     total_query: bool,
-    query_join_hints: Rc<Vec<JoinHintItem>>,
+    query_join_hints: Rc<JoinHints>,
     allow_multi_stage: bool,
     disable_external_pre_aggregations: bool,
+    pre_aggregation_id: Option<String>,
 }
 
 impl QueryProperties {
@@ -148,12 +149,15 @@ impl QueryProperties {
                                 )));
                             }
                         };
+                        let cube_symbol = evaluator_compiler
+                            .add_cube_table_evaluator(cube_name.clone(), vec![])?;
                         let member_expression_symbol = MemberExpressionSymbol::try_new(
-                            cube_name.clone(),
+                            cube_symbol,
                             name.clone(),
                             MemberExpressionExpression::SqlCall(expression_call),
                             member_expression.static_data().definition.clone(),
-                            query_tools.base_tools().clone(),
+                            None,
+                            vec![cube_name.clone()],
                         )?;
                         Ok(MemberSymbol::new_member_expression(
                             member_expression_symbol,
@@ -257,12 +261,14 @@ impl QueryProperties {
 
                             }
                         };
+                        let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
                         let member_expression_symbol = MemberExpressionSymbol::try_new(
-                            cube_name.clone(),
+                            cube_symbol,
                             name.clone(),
                             expression,
                             member_expression.static_data().definition.clone(),
-                            query_tools.base_tools().clone(),
+                            None,
+                            vec![cube_name.clone()],
                         )?;
                         Ok(MemberSymbol::new_member_expression(member_expression_symbol))
                     }
@@ -296,12 +302,13 @@ impl QueryProperties {
                                 .segment_by_path(member_name.clone())?;
                             let expression_evaluator = evaluator_compiler
                                 .compile_sql_call(&cube_name, definition.sql()?)?;
+                            let cube_symbol = evaluator_compiler
+                                .add_cube_table_evaluator(cube_name.clone(), vec![])?;
                             BaseSegment::try_new(
                                 expression_evaluator,
-                                cube_name,
+                                cube_symbol,
                                 name,
                                 Some(member_name.clone()),
-                                query_tools.clone(),
                             )
                         }
                         OptionsMember::MemberExpression(member_expression) => {
@@ -328,13 +335,9 @@ impl QueryProperties {
                                     )));
                                 }
                             };
-                            BaseSegment::try_new(
-                                expression_evaluator,
-                                cube_name,
-                                name,
-                                None,
-                                query_tools.clone(),
-                            )
+                            let cube_symbol = evaluator_compiler
+                                .add_cube_table_evaluator(cube_name.clone(), vec![])?;
+                            BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
                         }
                     }?;
                     Ok(FilterItem::Segment(segment))
@@ -402,12 +405,15 @@ impl QueryProperties {
         };
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
-        let query_join_hints = Rc::new(options.join_hints()?.unwrap_or_default());
+        let query_join_hints = Rc::new(JoinHints::from_items(
+            options.join_hints()?.unwrap_or_default(),
+        ));
 
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
+        let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
 
         let mut res = Self {
             measures,
@@ -429,6 +435,7 @@ impl QueryProperties {
             query_join_hints,
             allow_multi_stage: true,
             disable_external_pre_aggregations,
+            pre_aggregation_id,
         };
         res.apply_static_filters()?;
         Ok(Rc::new(res))
@@ -450,7 +457,7 @@ impl QueryProperties {
         ungrouped: bool,
         pre_aggregation_query: bool,
         total_query: bool,
-        query_join_hints: Rc<Vec<JoinHintItem>>,
+        query_join_hints: Rc<JoinHints>,
         allow_multi_stage: bool,
         disable_external_pre_aggregations: bool,
     ) -> Result<Rc<Self>, CubeError> {
@@ -480,6 +487,7 @@ impl QueryProperties {
             query_join_hints,
             allow_multi_stage,
             disable_external_pre_aggregations,
+            pre_aggregation_id: None,
         };
         res.apply_static_filters()?;
 
@@ -569,7 +577,7 @@ impl QueryProperties {
     }
 
     pub fn compute_join_multi_fact_groups(
-        query_join_hints: Rc<Vec<JoinHintItem>>,
+        query_join_hints: Rc<JoinHints>,
         query_tools: Rc<QueryTools>,
         measures: &Vec<Rc<MemberSymbol>>,
         dimensions: &Vec<Rc<MemberSymbol>>,
@@ -722,7 +730,7 @@ impl QueryProperties {
         self.row_limit
     }
 
-    pub fn query_join_hints(&self) -> &Rc<Vec<JoinHintItem>> {
+    pub fn query_join_hints(&self) -> &Rc<JoinHints> {
         &self.query_join_hints
     }
 
@@ -749,6 +757,10 @@ impl QueryProperties {
 
     pub fn disable_external_pre_aggregations(&self) -> bool {
         self.disable_external_pre_aggregations
+    }
+
+    pub fn pre_aggregation_id(&self) -> Option<&str> {
+        self.pre_aggregation_id.as_deref()
     }
 
     pub fn all_filters(&self) -> Option<Filter> {

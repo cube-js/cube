@@ -1,0 +1,63 @@
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: created_at
+        type: time
+        sql: created_at
+        granularities:
+          - name: half_year
+            interval: "6 months"
+            origin: "2024-01-01"
+          - name: bi_weekly
+            interval: "2 weeks"
+          - name: fiscal_year
+            interval: "1 year"
+            offset: "1 month"
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+      - name: total_amount
+        type: sum
+        sql: amount
+      - name: avg_amount
+        type: avg
+        sql: amount
+    pre_aggregations:
+      - name: custom_half_year_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: half_year
+
+      - name: daily_rollup
+        type: rollup
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: day
+
+      - name: custom_half_year_non_strict
+        type: rollup
+        measures:
+          - count
+        time_dimension: created_at
+        granularity: half_year
+        allow_non_strict_date_range_match: true

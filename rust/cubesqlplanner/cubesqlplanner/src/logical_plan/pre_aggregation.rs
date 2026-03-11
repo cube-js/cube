@@ -15,6 +15,8 @@ pub struct PreAggregation {
     dimensions: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
     time_dimensions: Vec<Rc<MemberSymbol>>,
+    #[builder(default)]
+    segments: Vec<Rc<MemberSymbol>>,
     external: bool,
     #[builder(default)]
     granularity: Option<String>,
@@ -41,6 +43,10 @@ impl PreAggregation {
 
     pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
+    }
+
+    pub fn segments(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.segments
     }
 
     pub fn external(&self) -> bool {
@@ -92,10 +98,7 @@ impl PreAggregation {
 
         for dim in self.dimensions().iter() {
             let alias = dim.alias();
-            res.insert(
-                dim.full_name(),
-                QualifiedColumnName::new(None, alias.clone()),
-            );
+            res.insert(dim.full_name(), QualifiedColumnName::new(None, alias));
         }
         for dim in self.time_dimensions().iter() {
             let (base_symbol, granularity) = if let Ok(td) = dim.as_time_dimension() {
@@ -111,18 +114,20 @@ impl PreAggregation {
             let alias = format!("{}{}", base_symbol.alias(), suffix);
             res.insert(
                 base_symbol.full_name(),
-                QualifiedColumnName::new(None, alias.clone()),
+                QualifiedColumnName::new(None, alias),
             );
+        }
+
+        for segment in self.segments().iter() {
+            let alias = segment.alias();
+            res.insert(segment.full_name(), QualifiedColumnName::new(None, alias));
         }
 
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
             for item in join.items.iter() {
                 for member in item.from_members.iter().chain(item.to_members.iter()) {
                     let alias = member.alias();
-                    res.insert(
-                        member.full_name(),
-                        QualifiedColumnName::new(None, alias.clone()),
-                    );
+                    res.insert(member.full_name(), QualifiedColumnName::new(None, alias));
                 }
             }
         }
@@ -134,10 +139,7 @@ impl PreAggregation {
             .iter()
             .map(|measure| {
                 let alias = measure.alias();
-                (
-                    measure.full_name(),
-                    QualifiedColumnName::new(None, alias.clone()),
-                )
+                (measure.full_name(), QualifiedColumnName::new(None, alias))
             })
             .collect()
     }

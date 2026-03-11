@@ -59,13 +59,15 @@ describe('SubscriptionServer', () => {
       expect(mockSubscriptionStore.unsubscribe).toHaveBeenCalledWith('conn-1', 'msg-1');
     });
 
-    it('should accept unsubscribe with numeric messageId', async () => {
+    it('should convert numeric unsubscribe id to string', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
 
       await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 123 }));
 
-      expect(mockSubscriptionStore.unsubscribe).toHaveBeenCalledWith('conn-1', 123);
+      const callArgs = mockSubscriptionStore.unsubscribe.mock.calls[0];
+      expect(typeof callArgs[1]).toBe('string');
+      expect(callArgs[1]).toBe('123');
     });
 
     it('should accept valid load message', async () => {
@@ -83,7 +85,7 @@ describe('SubscriptionServer', () => {
       expect(sentMessages).toContainEqual({ messageProcessedId: '123' });
     });
 
-    it('should accept messageId as number', async () => {
+    it('should convert numeric messageId to string', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
 
@@ -95,7 +97,10 @@ describe('SubscriptionServer', () => {
       await server.processMessage('conn-1', JSON.stringify(message));
 
       expect(mockApiGateway.load).toHaveBeenCalled();
-      expect(sentMessages).toContainEqual({ messageProcessedId: 123 });
+
+      const processedMsg = sentMessages.find((m) => m.messageProcessedId !== undefined);
+      expect(typeof processedMsg.messageProcessedId).toBe('string');
+      expect(processedMsg.messageProcessedId).toBe('123');
     });
 
     it('should reject invalid JSON payload', async () => {
@@ -244,6 +249,51 @@ describe('SubscriptionServer', () => {
         expect.objectContaining({
           connectionId: 'conn-1',
           apiType: 'ws',
+        })
+      );
+    });
+
+    it('should forward cache param as cacheMode for load', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'load',
+        messageId: '123',
+        params: { query: { measures: ['Orders.count'] }, cache: 'no-cache' }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.load).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { measures: ['Orders.count'] },
+          cacheMode: 'no-cache',
+          connectionId: 'conn-1',
+          apiType: 'ws',
+        })
+      );
+      // cache should be remapped, not passed through as-is
+      expect(mockApiGateway.load).not.toHaveBeenCalledWith(
+        expect.objectContaining({ cache: 'no-cache' })
+      );
+    });
+
+    it('should forward cache param as cacheMode for subscribe', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'subscribe',
+        messageId: '123',
+        params: { query: { measures: ['Orders.count'] }, cache: 'no-cache' }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.subscribe).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { measures: ['Orders.count'] },
+          cacheMode: 'no-cache',
+          connectionId: 'conn-1',
         })
       );
     });
