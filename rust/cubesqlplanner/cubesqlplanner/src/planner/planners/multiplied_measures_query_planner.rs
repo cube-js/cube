@@ -53,7 +53,7 @@ impl MultipliedMeasuresQueryPlanner {
                 .compute_join_multi_fact_groups_with_measures(
                     &full_key_aggregate_measures.regular_measures,
                 )?;
-            for (join, measures) in join_multi_fact_groups.iter() {
+            for (join, measures) in join_multi_fact_groups.groups() {
                 let regular_subquery_logical_plan =
                     self.regular_measures_subquery(measures, join.clone())?;
                 regular_measure_subqueries.push(regular_subquery_logical_plan);
@@ -73,18 +73,15 @@ impl MultipliedMeasuresQueryPlanner {
             let join_multi_fact_groups = self
                 .query_properties
                 .compute_join_multi_fact_groups_with_measures(&measures)?;
-            if join_multi_fact_groups.len() != 1 {
-                return Err(CubeError::internal(
-                    format!(
-                        "Expected just one multi-fact join group for aggregate measures but got multiple: {}",
-                        join_multi_fact_groups.into_iter().map(|(_, measures)| format!("({})", measures.iter().map(|m| m.full_name()).join(", "))).join(", ")
-                    )
-                ));
-            }
+            let join = join_multi_fact_groups.single_join()?.ok_or_else(|| {
+                CubeError::internal(
+                    "No join groups returned for aggregate measures".to_string(),
+                )
+            })?;
             let aggregate_subquery_logical_plan = self.aggregate_subquery_plan(
                 &cube_name,
                 &measures,
-                join_multi_fact_groups.into_iter().next().unwrap().0,
+                join,
             )?;
             aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
         }

@@ -3,6 +3,7 @@ pub mod base_join_condition;
 pub mod base_query;
 pub mod filter;
 pub mod join_hints;
+pub mod multi_fact_join_groups;
 pub mod time_dimension;
 
 pub mod params_allocator;
