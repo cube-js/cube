@@ -467,7 +467,7 @@ impl CacheStoreSqlService {
             } => {
                 let rows = self
                     .cachestore
-                    .queue_list(prefix.value, status_filter, sort_by_priority, with_payload)
+                    .queue_list(prefix.value, status_filter, sort_by_priority, with_payload, context.process_id.clone())
                     .await?;
 
                 let mut columns = vec![

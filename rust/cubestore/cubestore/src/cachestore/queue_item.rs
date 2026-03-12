@@ -229,6 +229,20 @@ impl QueueItem {
         self.exclusive
     }
 
+    /// Returns whether this item should be visible to the given caller process.
+    /// Exclusive items with a process_id are only visible to the owning process.
+    pub fn is_visible_for(&self, caller_process_id: &Option<String>) -> bool {
+        if self.exclusive {
+            match (&self.process_id, caller_process_id) {
+                (Some(item_pid), Some(caller_pid)) => item_pid == caller_pid,
+                (Some(_), None) => false,
+                _ => true,
+            }
+        } else {
+            true
+        }
+    }
+
     pub fn status_default() -> QueueItemStatus {
         QueueItemStatus::Pending
     }

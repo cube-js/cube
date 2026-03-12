@@ -110,6 +110,7 @@ async fn do_list(
             status_filter.clone(),
             true,
             false,
+            None,
         );
 
         let res = fut.await;
