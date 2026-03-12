@@ -1,6 +1,7 @@
 pub mod base_query_options;
 pub mod case;
 pub mod dimension;
+pub mod mask;
 pub mod measure;
 pub mod pre_aggregation;
 pub mod schema;
