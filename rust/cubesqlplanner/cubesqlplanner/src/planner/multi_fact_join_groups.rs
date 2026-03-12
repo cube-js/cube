@@ -1,11 +1,13 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::plan::FilterItem;
 use crate::planner::join_hints::JoinHints;
+use crate::planner::query_tools::JoinKey;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::{collect_join_hints, has_multi_stage_members};
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiFactJoinGroupsBuilder {
@@ -61,7 +63,10 @@ impl MultiFactJoinGroups {
         }
     }
 
-    pub fn builder(query_tools: Rc<QueryTools>, query_join_hints: &JoinHints) -> MultiFactJoinGroupsBuilder {
+    pub fn builder(
+        query_tools: Rc<QueryTools>,
+        query_join_hints: &JoinHints,
+    ) -> MultiFactJoinGroupsBuilder {
         MultiFactJoinGroupsBuilder {
             query_tools,
             initial_hints: query_join_hints.clone(),
@@ -70,10 +75,7 @@ impl MultiFactJoinGroups {
         }
     }
 
-    pub fn for_measures(
-        &self,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<Self, CubeError> {
+    pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         Self::from_base_hints(self.query_tools.clone(), self.base_hints.clone(), measures)
     }
 
@@ -108,16 +110,21 @@ impl MultiFactJoinGroups {
                 .collect::<Result<Vec<_>, _>>()?
         };
 
-        let groups = measures_to_join
+        let mut key_order: Vec<JoinKey> = Vec::new();
+        let mut grouped: HashMap<JoinKey, (Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)> =
+            HashMap::new();
+        for (measures, key, join) in measures_to_join {
+            if let Some(entry) = grouped.get_mut(&key) {
+                entry.1.extend(measures);
+            } else {
+                key_order.push(key.clone());
+                grouped.insert(key, (join, measures));
+            }
+        }
+        let groups: Vec<_> = key_order
             .into_iter()
-            .into_group_map_by(|(_, key, _)| key.clone())
-            .into_values()
-            .map(|group| {
-                let join = group.first().unwrap().2.clone();
-                let all_measures = group.into_iter().flat_map(|(m, _, _)| m).collect::<Vec<_>>();
-                (join, all_measures)
-            })
-            .collect_vec();
+            .map(|key| grouped.remove(&key).unwrap())
+            .collect();
 
         Ok(Self {
             query_tools,
@@ -172,13 +179,10 @@ mod tests {
         let orders_count = ctx.create_symbol("orders.count").unwrap();
         let customers_name = ctx.create_symbol("customers.name").unwrap();
 
-        let groups = MultiFactJoinGroups::builder(
-            ctx.query_tools().clone(),
-            &JoinHints::new(),
-        )
-        .add_dimensions(&[customers_name])
-        .build(&[orders_count])
-        .unwrap();
+        let groups = MultiFactJoinGroups::builder(ctx.query_tools().clone(), &JoinHints::new())
+            .add_dimensions(&[customers_name])
+            .build(&[orders_count])
+            .unwrap();
 
         assert!(!groups.is_multi_fact());
         assert_eq!(groups.num_groups(), 1);
@@ -194,13 +198,10 @@ mod tests {
         let returns_count = ctx.create_symbol("returns.count").unwrap();
         let customers_name = ctx.create_symbol("customers.name").unwrap();
 
-        let groups = MultiFactJoinGroups::builder(
-            ctx.query_tools().clone(),
-            &JoinHints::new(),
-        )
-        .add_dimensions(&[customers_name])
-        .build(&[orders_count, returns_count])
-        .unwrap();
+        let groups = MultiFactJoinGroups::builder(ctx.query_tools().clone(), &JoinHints::new())
+            .add_dimensions(&[customers_name])
+            .build(&[orders_count, returns_count])
+            .unwrap();
 
         assert!(groups.is_multi_fact());
         assert_eq!(groups.num_groups(), 2);

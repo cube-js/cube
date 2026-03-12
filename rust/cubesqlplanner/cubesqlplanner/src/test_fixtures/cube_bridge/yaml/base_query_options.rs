@@ -36,6 +36,8 @@ pub struct YamlBaseQueryOptions {
     pub disable_external_pre_aggregations: Option<bool>,
     #[serde(default)]
     pub pre_aggregation_id: Option<String>,
+    #[serde(default, rename = "joinHints")]
+    pub join_hints: Option<Vec<Vec<String>>>,
 }
 
 #[derive(Debug, Deserialize)]

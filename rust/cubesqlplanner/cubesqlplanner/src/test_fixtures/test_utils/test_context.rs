@@ -8,6 +8,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
 use crate::planner::{GranularityHelper, QueryProperties};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockSchema, MockSecurityContext,
 };
@@ -239,6 +240,19 @@ impl TestContext {
             })
             .filter(|td| !td.is_empty());
 
+        let join_hints = yaml_options.join_hints.map(|hints| {
+            hints
+                .into_iter()
+                .map(|path| {
+                    if path.len() == 1 {
+                        JoinHintItem::Single(path.into_iter().next().unwrap())
+                    } else {
+                        JoinHintItem::Vector(path)
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+
         Rc::new(
             MockBaseQueryOptions::builder()
                 .cube_evaluator(self.query_tools.cube_evaluator().clone())
@@ -251,6 +265,7 @@ impl TestContext {
                 .time_dimensions(time_dimensions)
                 .order(order)
                 .filters(filters)
+                .join_hints(join_hints)
                 .limit(yaml_options.limit)
                 .row_limit(yaml_options.row_limit)
                 .offset(yaml_options.offset)

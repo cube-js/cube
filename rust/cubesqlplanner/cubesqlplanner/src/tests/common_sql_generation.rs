@@ -236,3 +236,48 @@ fn test_measure_switch_cross_join() {
 
     insta::assert_snapshot!(sql);
 }
+
+#[test]
+fn test_query_level_join_hints() {
+    let schema = MockSchema::from_yaml_file("common/multiple_join_paths.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - A.a_id
+          - X.x_name
+        joinHints:
+          - [A, D]
+          - [D, E]
+          - [E, X]
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with join hints");
+
+    assert!(
+        sql.contains("'A' = 'D'"),
+        "SQL should use A->D join, got: {sql}"
+    );
+    assert!(
+        sql.contains("'D' = 'E'"),
+        "SQL should use D->E join, got: {sql}"
+    );
+    assert!(
+        sql.contains("'E' = 'X'"),
+        "SQL should use E->X join, got: {sql}"
+    );
+    assert!(
+        !sql.contains("'A' = 'B'"),
+        "SQL should NOT use A->B join, got: {sql}"
+    );
+    assert!(
+        !sql.contains("'B' = 'C'"),
+        "SQL should NOT use B->C join, got: {sql}"
+    );
+    assert!(
+        !sql.contains("'A' = 'F'"),
+        "SQL should NOT use A->F join, got: {sql}"
+    );
+}
