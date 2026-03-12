@@ -24,9 +24,9 @@ impl JoinHints {
     }
 
     pub fn extend(&mut self, other: &JoinHints) {
-        for item in other.items.iter() {
-            self.insert(item.clone());
-        }
+        self.items.extend(other.items.iter().cloned());
+        self.items.sort();
+        self.items.dedup();
     }
 
     pub fn is_empty(&self) -> bool {
