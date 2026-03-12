@@ -824,6 +824,7 @@ pub trait CacheStore: DIService + Send + Sync {
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
         with_payload: bool,
+        caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError>;
     // API with Path
     async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError>;
@@ -1180,6 +1181,7 @@ impl CacheStore for RocksCacheStore {
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
         with_payload: bool,
+        caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError> {
         self.read_operation_queue("queue_list", move |db_ref| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -1192,6 +1194,11 @@ impl CacheStore for RocksCacheStore {
                 let index_key = QueueItemIndexKey::ByPrefix(prefix);
                 queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?
             };
+
+            let items: Vec<IdRow<QueueItem>> = items
+                .into_iter()
+                .filter(|id_row| id_row.get_row().is_visible_for(&caller_process_id))
+                .collect();
 
             let items = if priority_sort {
                 items
@@ -1662,6 +1669,7 @@ impl CacheStore for ClusterCacheStoreClient {
         _status_filter: Option<QueueItemStatus>,
         _priority_sort: bool,
         _with_payload: bool,
+        _caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_list was used.")
     }
