@@ -10,14 +10,21 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct MultiFactJoinGroupsBuilder {
-    query_tools: Rc<QueryTools>,
+// --- MeasuresJoinHints: lightweight, no join building ---
+
+#[derive(Clone)]
+pub struct MeasureJoinHints {
+    pub measure: Rc<MemberSymbol>,
+    pub hints: JoinHints,
+}
+
+pub struct MeasuresJoinHintsBuilder {
     initial_hints: JoinHints,
     dimensions: Vec<Rc<MemberSymbol>>,
     filters: Vec<FilterItem>,
 }
 
-impl MultiFactJoinGroupsBuilder {
+impl MeasuresJoinHintsBuilder {
     pub fn add_dimensions(mut self, dims: &[Rc<MemberSymbol>]) -> Self {
         self.dimensions.extend(dims.iter().cloned());
         self
@@ -28,7 +35,7 @@ impl MultiFactJoinGroupsBuilder {
         self
     }
 
-    pub fn build(self, measures: &[Rc<MemberSymbol>]) -> Result<MultiFactJoinGroups, CubeError> {
+    pub fn build(self, measures: &[Rc<MemberSymbol>]) -> Result<MeasuresJoinHints, CubeError> {
         let mut base_hints = self.initial_hints;
 
         for sym in self.dimensions.iter() {
@@ -43,32 +50,26 @@ impl MultiFactJoinGroupsBuilder {
             base_hints.extend(&collect_join_hints(sym)?);
         }
 
-        MultiFactJoinGroups::from_base_hints(self.query_tools, base_hints, measures)
+        MeasuresJoinHints::from_base_hints(base_hints, measures)
     }
 }
 
 #[derive(Clone)]
-pub struct MultiFactJoinGroups {
-    query_tools: Rc<QueryTools>,
+pub struct MeasuresJoinHints {
     base_hints: JoinHints,
-    groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>,
+    measure_hints: Vec<MeasureJoinHints>,
 }
 
-impl MultiFactJoinGroups {
-    pub fn empty(query_tools: Rc<QueryTools>) -> Self {
+impl MeasuresJoinHints {
+    pub fn empty() -> Self {
         Self {
-            query_tools,
             base_hints: JoinHints::new(),
-            groups: vec![],
+            measure_hints: vec![],
         }
     }
 
-    pub fn builder(
-        query_tools: Rc<QueryTools>,
-        query_join_hints: &JoinHints,
-    ) -> MultiFactJoinGroupsBuilder {
-        MultiFactJoinGroupsBuilder {
-            query_tools,
+    pub fn builder(query_join_hints: &JoinHints) -> MeasuresJoinHintsBuilder {
+        MeasuresJoinHintsBuilder {
             initial_hints: query_join_hints.clone(),
             dimensions: Vec::new(),
             filters: Vec::new(),
@@ -76,11 +77,10 @@ impl MultiFactJoinGroups {
     }
 
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
-        Self::from_base_hints(self.query_tools.clone(), self.base_hints.clone(), measures)
+        Self::from_base_hints(self.base_hints.clone(), measures)
     }
 
     fn from_base_hints(
-        query_tools: Rc<QueryTools>,
         base_hints: JoinHints,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<Self, CubeError> {
@@ -91,21 +91,86 @@ impl MultiFactJoinGroups {
             }
         }
 
-        let measures_to_join = if filtered_measures.is_empty() {
-            if base_hints.is_empty() {
+        let measure_hints: Vec<MeasureJoinHints> = filtered_measures
+            .iter()
+            .map(|m| -> Result<_, CubeError> {
+                let mut hints = base_hints.clone();
+                hints.extend(&collect_join_hints(m)?);
+                Ok(MeasureJoinHints {
+                    measure: m.clone(),
+                    hints,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Self {
+            base_hints,
+            measure_hints,
+        })
+    }
+
+    pub fn base_hints(&self) -> &JoinHints {
+        &self.base_hints
+    }
+
+    pub fn measure_hints(&self) -> &[MeasureJoinHints] {
+        &self.measure_hints
+    }
+}
+
+// --- MultiFactJoinGroups: builds actual join trees ---
+
+#[derive(Clone)]
+pub struct MultiFactJoinGroups {
+    query_tools: Rc<QueryTools>,
+    measures_join_hints: MeasuresJoinHints,
+    groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>,
+}
+
+impl MultiFactJoinGroups {
+    pub fn empty(query_tools: Rc<QueryTools>) -> Self {
+        Self {
+            query_tools,
+            measures_join_hints: MeasuresJoinHints::empty(),
+            groups: vec![],
+        }
+    }
+
+    pub fn try_new(
+        query_tools: Rc<QueryTools>,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<Self, CubeError> {
+        let groups = Self::build_groups(&query_tools, &measures_join_hints)?;
+        Ok(Self {
+            query_tools,
+            measures_join_hints,
+            groups,
+        })
+    }
+
+    pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
+        let new_hints = self.measures_join_hints.for_measures(measures)?;
+        Self::try_new(self.query_tools.clone(), new_hints)
+    }
+
+    fn build_groups(
+        query_tools: &Rc<QueryTools>,
+        hints: &MeasuresJoinHints,
+    ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>, CubeError> {
+        let measures_to_join = if hints.measure_hints.is_empty() {
+            if hints.base_hints.is_empty() {
                 vec![]
             } else {
-                let (key, join) = query_tools.join_for_hints(&base_hints)?;
+                let (key, join) = query_tools.join_for_hints(&hints.base_hints)?;
                 vec![(Vec::new(), key, join)]
             }
         } else {
-            filtered_measures
+            hints
+                .measure_hints
                 .iter()
-                .map(|m| -> Result<_, CubeError> {
-                    let mut hints = base_hints.clone();
-                    hints.extend(&collect_join_hints(m)?);
-                    let (key, join) = query_tools.join_for_hints(&hints)?;
-                    Ok((vec![m.clone()], key, join))
+                .map(|mh| -> Result<_, CubeError> {
+                    let (key, join) = query_tools.join_for_hints(&mh.hints)?;
+                    Ok((vec![mh.measure.clone()], key, join))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
@@ -121,16 +186,15 @@ impl MultiFactJoinGroups {
                 grouped.insert(key, (join, measures));
             }
         }
-        let groups: Vec<_> = key_order
+
+        Ok(key_order
             .into_iter()
             .map(|key| grouped.remove(&key).unwrap())
-            .collect();
+            .collect())
+    }
 
-        Ok(Self {
-            query_tools,
-            base_hints,
-            groups,
-        })
+    pub fn measures_join_hints(&self) -> &MeasuresJoinHints {
+        &self.measures_join_hints
     }
 
     pub fn is_multi_fact(&self) -> bool {
@@ -179,10 +243,12 @@ mod tests {
         let orders_count = ctx.create_symbol("orders.count").unwrap();
         let customers_name = ctx.create_symbol("customers.name").unwrap();
 
-        let groups = MultiFactJoinGroups::builder(ctx.query_tools().clone(), &JoinHints::new())
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
             .add_dimensions(&[customers_name])
             .build(&[orders_count])
             .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert!(!groups.is_multi_fact());
         assert_eq!(groups.num_groups(), 1);
@@ -198,10 +264,12 @@ mod tests {
         let returns_count = ctx.create_symbol("returns.count").unwrap();
         let customers_name = ctx.create_symbol("customers.name").unwrap();
 
-        let groups = MultiFactJoinGroups::builder(ctx.query_tools().clone(), &JoinHints::new())
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
             .add_dimensions(&[customers_name])
             .build(&[orders_count, returns_count])
             .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert!(groups.is_multi_fact());
         assert_eq!(groups.num_groups(), 2);

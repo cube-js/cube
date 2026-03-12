@@ -8,6 +8,7 @@ use crate::logical_plan::PreAggregationJoinItem;
 use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
 use crate::planner::join_hints::JoinHints;
+use crate::planner::multi_fact_join_groups::MeasuresJoinHints;
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::query_tools::QueryTools;
@@ -180,6 +181,12 @@ impl PreAggregationsCompiler {
             .static_data()
             .allow_non_strict_date_range_match
             .unwrap_or(false);
+
+        let measures_join_hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&dimensions)
+            .add_dimensions(&time_dimensions)
+            .build(&measures)?;
+
         let rollups = if let Some(refs) = description.rollup_references()? {
             let r = self
                 .query_tools
@@ -221,6 +228,7 @@ impl PreAggregationsCompiler {
             time_dimensions,
             segments,
             allow_non_strict_date_range_match,
+            measures_join_hints,
         });
         self.compiled_cache.insert(name.clone(), res.clone());
         Ok(res)
@@ -283,6 +291,7 @@ impl PreAggregationsCompiler {
             .allow_non_strict_date_range_match
             .unwrap_or(false);
         let granularity = pre_aggrs_for_lambda[0].granularity.clone();
+        let measures_join_hints = pre_aggrs_for_lambda[0].measures_join_hints.clone();
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
 
         let static_data = description.static_data();
@@ -297,6 +306,7 @@ impl PreAggregationsCompiler {
             time_dimensions,
             segments,
             allow_non_strict_date_range_match,
+            measures_join_hints,
         });
         self.compiled_cache.insert(name.clone(), res.clone());
         Ok(res)

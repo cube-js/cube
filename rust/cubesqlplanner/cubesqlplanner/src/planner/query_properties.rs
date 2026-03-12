@@ -14,7 +14,7 @@ use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::options_member::OptionsMember;
 use crate::plan::{Filter, FilterItem};
-use crate::planner::multi_fact_join_groups::MultiFactJoinGroups;
+use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::sql_evaluator::collectors::{
     collect_multiplied_measures, has_multi_stage_members,
 };
@@ -527,16 +527,17 @@ impl QueryProperties {
                 apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
         }
 
+        let measures_join_hints = MeasuresJoinHints::builder(&self.query_join_hints)
+            .add_dimensions(&self.dimensions)
+            .add_dimensions(&self.extract_dimensions_from_order())
+            .add_dimensions(&self.time_dimensions)
+            .add_filters(&self.time_dimensions_filters)
+            .add_filters(&self.dimensions_filters)
+            .add_filters(&self.measures_filters)
+            .add_filters(&self.segments)
+            .build(&self.measures)?;
         self.multi_fact_join_groups =
-            MultiFactJoinGroups::builder(self.query_tools.clone(), &self.query_join_hints)
-                .add_dimensions(&self.dimensions)
-                .add_dimensions(&self.extract_dimensions_from_order())
-                .add_dimensions(&self.time_dimensions)
-                .add_filters(&self.time_dimensions_filters)
-                .add_filters(&self.dimensions_filters)
-                .add_filters(&self.measures_filters)
-                .add_filters(&self.segments)
-                .build(&self.measures)?;
+            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)?;
         Ok(())
     }
 
