@@ -86,6 +86,8 @@ struct YamlViewCube {
     join_path: String,
     #[serde(default)]
     includes: Option<YamlIncludes>,
+    #[serde(default)]
+    prefix: Option<bool>,
 }
 
 impl YamlSchema {
@@ -156,7 +158,9 @@ impl YamlSchema {
                     Some(YamlIncludes::List(list)) => list,
                     _ => vec![],
                 };
-                view_builder = view_builder.include_cube(view_cube.join_path, includes);
+                let prefix = view_cube.prefix.unwrap_or(false);
+                view_builder =
+                    view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
             }
 
             builder = view_builder.finish_view();

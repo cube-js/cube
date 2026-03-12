@@ -416,6 +416,7 @@ impl MockCubeBuilder {
 pub struct ViewCube {
     pub join_path: String,
     pub includes: Vec<String>,
+    pub prefix: bool,
 }
 
 pub struct MockViewBuilder {
@@ -432,6 +433,21 @@ impl MockViewBuilder {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
             includes,
+            prefix: false,
+        });
+        self
+    }
+
+    pub fn include_cube_with_prefix(
+        mut self,
+        join_path: impl Into<String>,
+        includes: Vec<String>,
+        prefix: bool,
+    ) -> Self {
+        self.view_cubes.push(ViewCube {
+            join_path: join_path.into(),
+            includes,
+            prefix,
         });
         self
     }
@@ -484,20 +500,29 @@ impl MockViewBuilder {
                     view_cube.includes.clone()
                 };
 
+                let make_view_name = |member_name: &str| -> String {
+                    if view_cube.prefix {
+                        format!("{}_{}", target_cube_name, member_name)
+                    } else {
+                        member_name.to_string()
+                    }
+                };
+
                 for member_name in &members_to_include {
                     if let Some(dimension) = source_cube.dimensions.get(member_name) {
                         let view_member_sql =
                             format!("{{{}.{}}}", view_cube.join_path, member_name);
+                        let view_name = make_view_name(member_name);
 
-                        if all_dimensions.contains_key(member_name) {
+                        if all_dimensions.contains_key(&view_name) {
                             panic!(
                                 "Duplicate member '{}' in view '{}'. Members must be unique.",
-                                member_name, self.view_name
+                                view_name, self.view_name
                             );
                         }
 
                         all_dimensions.insert(
-                            member_name.clone(),
+                            view_name,
                             Rc::new(
                                 MockDimensionDefinition::builder()
                                     .dimension_type(dimension.static_data().dimension_type.clone())
@@ -512,16 +537,17 @@ impl MockViewBuilder {
                     if let Some(measure) = source_cube.measures.get(member_name) {
                         let view_member_sql =
                             format!("{{{}.{}}}", view_cube.join_path, member_name);
+                        let view_name = make_view_name(member_name);
 
-                        if all_measures.contains_key(member_name) {
+                        if all_measures.contains_key(&view_name) {
                             panic!(
                                 "Duplicate member '{}' in view '{}'. Members must be unique.",
-                                member_name, self.view_name
+                                view_name, self.view_name
                             );
                         }
 
                         all_measures.insert(
-                            member_name.clone(),
+                            view_name,
                             Rc::new(
                                 MockMeasureDefinition::builder()
                                     .measure_type(measure.static_data().measure_type.clone())
@@ -536,16 +562,17 @@ impl MockViewBuilder {
                     if source_cube.segments.contains_key(member_name) {
                         let view_member_sql =
                             format!("{{{}.{}}}", view_cube.join_path, member_name);
+                        let view_name = make_view_name(member_name);
 
-                        if all_segments.contains_key(member_name) {
+                        if all_segments.contains_key(&view_name) {
                             panic!(
                                 "Duplicate member '{}' in view '{}'. Members must be unique.",
-                                member_name, self.view_name
+                                view_name, self.view_name
                             );
                         }
 
                         all_segments.insert(
-                            member_name.clone(),
+                            view_name,
                             Rc::new(
                                 MockSegmentDefinition::builder()
                                     .sql(view_member_sql)
