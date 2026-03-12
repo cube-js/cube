@@ -1,0 +1,24 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: sql
+---
+SELECT "fk_aggregate_keys"."customers__name" "customers__name", "q_0"."orders__count" "orders__count", "q_1"."returns__count" "returns__count" 
+FROM (SELECT DISTINCT "customers__name" "customers__name" 
+FROM (SELECT "customers".name "customers__name" 
+FROM  customers  AS "customers"
+LEFT JOIN  orders  AS "orders" ON "customers".id = "orders".customer_id
+GROUP BY 1
+ UNION ALL 
+SELECT "customers".name "customers__name" 
+FROM  customers  AS "customers"
+LEFT JOIN  returns  AS "returns" ON "customers".id = "returns".customer_id
+GROUP BY 1) AS "pk_aggregate_keys_source") AS "fk_aggregate_keys"
+LEFT JOIN (SELECT "customers".name "customers__name", count(COUNT(*)) "orders__count" 
+FROM  customers  AS "customers"
+LEFT JOIN  orders  AS "orders" ON "customers".id = "orders".customer_id
+GROUP BY 1) AS "q_0" ON (("fk_aggregate_keys"."customers__name" = "q_0"."customers__name" OR (("fk_aggregate_keys"."customers__name" IS NULL) AND ("q_0"."customers__name" IS NULL))))
+LEFT JOIN (SELECT "customers".name "customers__name", count(COUNT(*)) "returns__count" 
+FROM  customers  AS "customers"
+LEFT JOIN  returns  AS "returns" ON "customers".id = "returns".customer_id
+GROUP BY 1) AS "q_1" ON (("fk_aggregate_keys"."customers__name" = "q_1"."customers__name" OR (("fk_aggregate_keys"."customers__name" IS NULL) AND ("q_1"."customers__name" IS NULL))))
+ORDER BY  2  DESC

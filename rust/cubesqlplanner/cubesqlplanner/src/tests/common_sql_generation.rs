@@ -185,6 +185,26 @@ fn test_segment_as_dimension_in_pre_aggregation_query() {
 }
 
 #[test]
+fn test_multi_fact_two_measures_from_different_cubes() {
+    let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for multi-fact query");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
 fn test_measure_switch_cross_join() {
     let schema = MockSchema::from_yaml_file("common/calc_groups.yaml");
     let test_context = TestContext::new(schema).unwrap();
