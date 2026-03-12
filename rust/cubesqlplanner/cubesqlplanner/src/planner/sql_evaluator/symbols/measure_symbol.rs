@@ -86,6 +86,7 @@ pub struct MeasureSymbol {
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
     group_by: Option<Vec<Rc<MemberSymbol>>>,
     is_splitted_source: bool,
+    mask_sql: Option<Rc<SqlCall>>,
 }
 
 impl MeasureSymbol {
@@ -104,6 +105,7 @@ impl MeasureSymbol {
         reduce_by: Option<Vec<Rc<MemberSymbol>>>,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
+        mask_sql: Option<Rc<SqlCall>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             compiled_path,
@@ -121,6 +123,7 @@ impl MeasureSymbol {
             reduce_by,
             add_group_by,
             group_by,
+            mask_sql,
         })
     }
 
@@ -156,6 +159,7 @@ impl MeasureSymbol {
                 add_group_by: self.add_group_by.clone(),
                 group_by: self.group_by.clone(),
                 is_splitted_source: self.is_splitted_source,
+                mask_sql: self.mask_sql.clone(),
             })
         } else {
             Rc::new(self.clone())
@@ -208,6 +212,7 @@ impl MeasureSymbol {
             add_group_by: self.add_group_by.clone(),
             group_by: self.group_by.clone(),
             is_splitted_source: self.is_splitted_source,
+            mask_sql: self.mask_sql.clone(),
         }))
     }
 
@@ -247,6 +252,10 @@ impl MeasureSymbol {
 
     pub fn case(&self) -> Option<&Case> {
         self.case.as_ref()
+    }
+
+    pub fn mask_sql(&self) -> &Option<Rc<SqlCall>> {
+        &self.mask_sql
     }
 
     pub fn is_addictive(&self) -> bool {
@@ -459,6 +468,7 @@ impl MeasureSymbol {
 pub struct MeasureSymbolFactory {
     path: SymbolPath,
     sql: Option<Rc<dyn MemberSql>>,
+    mask_sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn MeasureDefinition>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
 }
@@ -470,9 +480,11 @@ impl MeasureSymbolFactory {
     ) -> Result<Self, CubeError> {
         let definition = cube_evaluator.measure_by_path(path.full_name().clone())?;
         let sql = definition.sql()?;
+        let mask_sql = definition.mask_sql()?;
         Ok(Self {
             path,
             sql,
+            mask_sql,
             definition,
             cube_evaluator,
         })
@@ -484,9 +496,17 @@ impl SymbolFactory for MeasureSymbolFactory {
         let Self {
             path,
             sql,
+            mask_sql,
             definition,
             cube_evaluator,
         } = self;
+
+        let mask_sql = if let Some(mask_sql) = mask_sql {
+            Some(compiler.compile_sql_call(path.cube_name(), mask_sql)?)
+        } else {
+            None
+        };
+
         let pk_sqls = if sql.is_none() {
             cube_evaluator
                 .static_data()
@@ -737,6 +757,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             reduce_by,
             add_group_by,
             group_by,
+            mask_sql,
         )))
     }
 }

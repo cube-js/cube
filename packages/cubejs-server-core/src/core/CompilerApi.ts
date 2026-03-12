@@ -547,6 +547,7 @@ export class CompilerApi {
     const cubeFiltersPerCubePerRole: Record<string, Record<string, any[]>> = {};
     const viewFiltersPerCubePerRole: Record<string, Record<string, any[]>> = {};
     const hasAllowAllForCube: Record<string, boolean> = {};
+    const maskedMembersSet = new Set<string>();
 
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
@@ -646,8 +647,8 @@ export class CompilerApi {
         //         No policy covers {a,b,c} → Access denied, empty result
         //
         const policiesWithMemberAccess = userPolicies.filter((policy: any) => {
-          // If there's no memberLevel policy, all members are accessible
-          if (!policy.memberLevel) {
+          // If there's no memberLevel and no memberMasking policy, all members are accessible
+          if (!policy.memberLevel && !policy.memberMasking) {
             return true;
           }
 
@@ -662,10 +663,46 @@ export class CompilerApi {
             memberName => memberName.startsWith(`${cubeName}.`)
           );
 
-          // Check if the policy grants access to all members used in the query
-          return [...cubeMembersInQuery].every(memberName => policy.memberLevel.includesMembers.includes(memberName) &&
-            !policy.memberLevel.excludesMembers.includes(memberName));
+          // A policy covers a member if it's in memberLevel includes (full access)
+          // or in memberMasking includes (masked access)
+          return [...cubeMembersInQuery].every(memberName => {
+            const hasFullAccess = !policy.memberLevel ||
+              (policy.memberLevel.includesMembers.includes(memberName) &&
+               !policy.memberLevel.excludesMembers.includes(memberName));
+            if (hasFullAccess) return true;
+
+            if (policy.memberMasking) {
+              return policy.memberMasking.includesMembers.includes(memberName) &&
+                     !policy.memberMasking.excludesMembers.includes(memberName);
+            }
+            return false;
+          });
         });
+
+        // Determine which members need masking: a member is masked if no covering
+        // policy grants it full access via memberLevel AND at least one covering
+        // policy defines memberMasking that includes the member.
+        // Masking follows the same pattern as row-level security: it is applied
+        // at both cube and view levels. When a cube is accessed through a view,
+        // both the cube's and the view's masking policies are evaluated.
+        const cubeMembersInQuery = Array.from(queryMemberNames).filter(
+          memberName => memberName.startsWith(`${cubeName}.`)
+        );
+        for (const memberName of cubeMembersInQuery) {
+          const hasFullAccessInAnyPolicy = policiesWithMemberAccess.some(policy => {
+            if (!policy.memberLevel) return true;
+            return policy.memberLevel.includesMembers.includes(memberName) &&
+                   !policy.memberLevel.excludesMembers.includes(memberName);
+          });
+          if (!hasFullAccessInAnyPolicy && policiesWithMemberAccess.length > 0) {
+            const isMaskedByAnyPolicy = policiesWithMemberAccess.some(
+              (policy) => policy.memberMasking && policy.memberMasking.includesMembers.includes(memberName) && !policy.memberMasking.excludesMembers.includes(memberName)
+            );
+            if (isMaskedByAnyPolicy) {
+              maskedMembersSet.add(memberName);
+            }
+          }
+        }
 
         for (const policy of policiesWithMemberAccess) {
           hasAccessPermission = true;
@@ -683,22 +720,17 @@ export class CompilerApi {
           });
           if (!policy?.rowLevel || policy?.rowLevel?.allowAll) {
             hasAllowAllForCube[cubeName] = true;
-            // We don't have a way to add an "all allowed" filter like `WHERE 1 = 1` or something.
-            // Instead, we'll just mark that the user has "all" access to a given cube and remove
-            // all filters later
             break;
           }
         }
 
         if (!hasAccessPermission) {
-          // This is a hack that will make sure that the query returns no result
           query.segments = query.segments || [];
           query.segments.push({
             expression: () => '1 = 0',
             cubeName: cube.name,
             name: 'rlsAccessDenied',
           } as unknown as MemberExpression);
-          // If we hit this condition there's no need to evaluate the rest of the policy
           return { query, denied: true };
         }
       }
@@ -712,6 +744,9 @@ export class CompilerApi {
     if (rlsFilter) {
       query.filters = query.filters || [];
       query.filters.push(rlsFilter);
+    }
+    if (maskedMembersSet.size > 0) {
+      query.maskedMembers = Array.from(maskedMembersSet);
     }
     return { query, denied: false };
   }
@@ -851,9 +886,15 @@ export class CompilerApi {
                !policy.memberLevel.excludesMembers.includes(item.name)) {
                 return true;
               }
-            } else {
-              // If there's no memberLevel policy, we assume that all members are visible
+            } else if (!policy.memberMasking) {
+              // If there's no memberLevel and no memberMasking policy, all members are visible
               return true;
+            }
+            if (policy.memberMasking) {
+              if (policy.memberMasking.includesMembers.includes(item.name) &&
+               !policy.memberMasking.excludesMembers.includes(item.name)) {
+                return true;
+              }
             }
           }
           return false;

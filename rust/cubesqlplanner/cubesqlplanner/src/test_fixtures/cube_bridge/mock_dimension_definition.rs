@@ -40,6 +40,8 @@ pub struct MockDimensionDefinition {
     longitude: Option<String>,
     #[builder(default)]
     time_shift: Option<Vec<Rc<MockTimeShiftDefinition>>>,
+    #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
+    resolved_mask_sql: Option<String>,
 }
 
 impl_static_data!(
@@ -127,6 +129,17 @@ impl DimensionDefinition for MockDimensionDefinition {
                     .collect();
                 Ok(Some(result))
             }
+            None => Ok(None),
+        }
+    }
+
+    fn has_mask_sql(&self) -> Result<bool, CubeError> {
+        Ok(self.resolved_mask_sql.is_some())
+    }
+
+    fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+        match &self.resolved_mask_sql {
+            Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
             None => Ok(None),
         }
     }

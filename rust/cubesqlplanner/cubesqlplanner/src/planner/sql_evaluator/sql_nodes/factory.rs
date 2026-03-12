@@ -1,6 +1,6 @@
 use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
-    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
+    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RenderReferencesType,
     RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
     UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
@@ -151,7 +151,7 @@ impl SqlNodesFactory {
     }
 
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor = EvaluateSqlNode::new();
+        let evaluate_sql_processor = MaskedSqlNode::new(EvaluateSqlNode::new());
         let auto_prefix_processor = AutoPrefixSqlNode::new(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
@@ -162,6 +162,13 @@ impl SqlNodesFactory {
 
         let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
         let measure_processor = self.final_measure_node_processor(measure_processor);
+        // Wrap the entire measure chain with MaskedSqlNode so masked measures
+        // are intercepted before aggregation/ungrouped wrapping.
+        let measure_processor = if self.ungrouped || self.ungrouped_measure {
+            MaskedSqlNode::new_ungrouped(measure_processor)
+        } else {
+            MaskedSqlNode::new(measure_processor)
+        };
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);

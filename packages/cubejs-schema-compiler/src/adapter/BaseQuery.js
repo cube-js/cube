@@ -253,6 +253,7 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
+    this.maskedMembers = new Set(this.options.maskedMembers || []);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -284,6 +285,7 @@ export class BaseQuery {
       multiStageTimeDimensions: this.options.multiStageTimeDimensions,
       subqueryJoins: this.options.subqueryJoins,
       joinHints: this.options.joinHints,
+      maskedMembers: this.options.maskedMembers,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -949,6 +951,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
+      maskedMembers: this.options.maskedMembers,
     };
 
     try {
@@ -3278,6 +3281,17 @@ export class BaseQuery {
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
+      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType) {
+        // In ungrouped queries, only apply static masks to measures.
+        // SQL masks (mask.sql) reference columns that don't apply per-row.
+        const isMeasure = type === 'measure';
+        const isUngrouped = this.options.ungrouped;
+        const hasSqlMask = symbol.mask && typeof symbol.mask === 'object' && symbol.mask.sql;
+        if (!isMeasure || !isUngrouped || !hasSqlMask) {
+          return this.memberMaskSql(cubeName, name, symbol);
+        }
+      }
+
       if (type === 'measure') {
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
@@ -3417,6 +3431,50 @@ export class BaseQuery {
     } finally {
       this.safeEvaluateSymbolContext().currentMember = parentMember;
     }
+  }
+
+  memberMaskSql(cubeName, name, symbol) {
+    const { mask } = symbol;
+    if (mask !== undefined && mask !== null) {
+      if (typeof mask === 'object' && mask.sql) {
+        const sqlCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        return this.autoPrefixAndEvaluateSql(sqlCubeName, mask.sql);
+      }
+      if (typeof mask === 'number') {
+        return `${mask}`;
+      }
+      if (typeof mask === 'boolean') {
+        return mask ? 'TRUE' : 'FALSE';
+      }
+      if (typeof mask === 'string') {
+        return this.paramAllocator.allocateParam(mask);
+      }
+    }
+    return this.defaultMaskSql(symbol.type);
+  }
+
+  defaultMaskSql(memberType) {
+    const envMasks = {
+      string: getEnv('accessPolicyMaskString'),
+      time: getEnv('accessPolicyMaskTime'),
+      boolean: getEnv('accessPolicyMaskBoolean'),
+      number: getEnv('accessPolicyMaskNumber'),
+    };
+    const envMask = envMasks[memberType];
+    if (envMask !== undefined && envMask !== null) {
+      if (memberType === 'number') {
+        return `${envMask}`;
+      }
+      if (memberType === 'boolean') {
+        return envMask.toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+      }
+      return this.paramAllocator.allocateParam(envMask);
+    }
+    return 'NULL';
+  }
+
+  escapeStringLiteral(str) {
+    return `'${str.replace(/'/g, "''")}'`;
   }
 
   autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {

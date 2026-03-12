@@ -182,3 +182,99 @@ fn number_agg_measure() {
     let sql = context.evaluate_symbol(&symbol).unwrap();
     assert_eq!(sql, r#"sum("test_cube".revenue) * 100"#);
 }
+
+#[test]
+fn masked_dimension_returns_mask_literal() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    let context = TestContext::new_with_masked_members(
+        schema,
+        vec!["masking_cube.secret_number".to_string()],
+    )
+    .unwrap();
+
+    let symbol = context
+        .create_dimension("masking_cube.secret_number")
+        .unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, "(-1)");
+}
+
+#[test]
+fn masked_dimension_with_sql_mask() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    let context = TestContext::new_with_masked_members(
+        schema,
+        vec!["masking_cube.secret_with_sql_mask".to_string()],
+    )
+    .unwrap();
+
+    let symbol = context
+        .create_dimension("masking_cube.secret_with_sql_mask")
+        .unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(
+        sql,
+        r#"CONCAT('***', RIGHT(CAST("masking_cube".secret_col AS TEXT), 2))"#
+    );
+}
+
+#[test]
+fn masked_dimension_default_null() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    let context =
+        TestContext::new_with_masked_members(schema, vec!["masking_cube.public_dim".to_string()])
+            .unwrap();
+
+    let symbol = context.create_dimension("masking_cube.public_dim").unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, "(NULL)");
+}
+
+#[test]
+fn unmasked_dimension_returns_real_sql() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    // secret_number has a mask but is NOT in the masked set
+    let context = TestContext::new(schema).unwrap();
+
+    let symbol = context
+        .create_dimension("masking_cube.secret_number")
+        .unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, r#""masking_cube".price"#);
+}
+
+#[test]
+fn masked_measure_returns_mask_literal() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    let context =
+        TestContext::new_with_masked_members(schema, vec!["masking_cube.count".to_string()])
+            .unwrap();
+
+    let symbol = context.create_measure("masking_cube.count").unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    // FinalMeasureSqlNode skips aggregation for masked measures
+    assert_eq!(sql, "(12345)");
+}
+
+#[test]
+fn masked_sum_measure_returns_mask_literal() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    let context =
+        TestContext::new_with_masked_members(schema, vec!["masking_cube.sum_revenue".to_string()])
+            .unwrap();
+
+    let symbol = context.create_measure("masking_cube.sum_revenue").unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, "(-1)");
+}
+
+#[test]
+fn unmasked_measure_returns_aggregated_sql() {
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    // real_count has no mask and is NOT in the masked set
+    let context = TestContext::new(schema).unwrap();
+
+    let symbol = context.create_measure("masking_cube.real_count").unwrap();
+    let sql = context.evaluate_symbol(&symbol).unwrap();
+    assert_eq!(sql, r#"count("masking_cube".id)"#);
+}

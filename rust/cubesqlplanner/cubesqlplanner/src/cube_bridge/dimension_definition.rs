@@ -48,4 +48,7 @@ pub trait DimensionDefinition {
 
     #[nbridge(field, vec, optional)]
     fn time_shift(&self) -> Result<Option<Vec<Rc<dyn TimeShiftDefinition>>>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

@@ -70,6 +70,15 @@ impl MemberSymbol {
         self.compiled_path().full_name().clone()
     }
 
+    pub fn mask_sql(&self) -> Option<&Rc<SqlCall>> {
+        match self {
+            Self::Dimension(d) => d.mask_sql().as_ref(),
+            Self::TimeDimension(td) => td.base_symbol().mask_sql(),
+            Self::Measure(m) => m.mask_sql().as_ref(),
+            _ => None,
+        }
+    }
+
     pub fn alias(&self) -> String {
         self.compiled_path().alias().clone()
     }

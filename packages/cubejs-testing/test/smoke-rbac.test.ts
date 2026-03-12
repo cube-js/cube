@@ -378,6 +378,410 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  /**
+   * Data masking tests via member_masking access policies.
+   *
+   * masking_test cube has dimensions and measures with mask definitions:
+   *   - secret_string: mask with SQL expression CONCAT('***', RIGHT(..., 2))
+   *   - secret_number: mask with static -1
+   *   - secret_boolean: mask with FALSE
+   *   - count measure: mask with 12345
+   *   - count_d measure: mask with 34567
+   *
+   * Three user profiles:
+   *   - masking_viewer: role "*" only → all members masked (memberLevel includes=[])
+   *   - masking_full: has masking_full_access role → full access to all members
+   *   - masking_partial: has masking_partial role → id, public_dim, total_quantity unmasked; rest masked
+   */
+  describe('RBAC data masking via SQL API (masking_viewer)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('masking_viewer', 'masking_viewer_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT * from masking_test returns masked values', async () => {
+      const res = await connection.query(
+        'SELECT * FROM masking_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).toBe(-1);
+        expect(row.secret_boolean).toBe(false);
+        expect(row.public_dim).toBeNull();
+        expect(Number(row.count)).toBe(12345);
+        expect(Number(row.count_d)).toBe(34567);
+        expect(row.secret_string).toMatch(/^\*\*\*.{1,2}$/);
+      }
+    });
+  });
+
+  describe('RBAC data masking via SQL API (masking_full)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('masking_full', 'masking_full_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT from masking_test returns real values', async () => {
+      const res = await connection.query(
+        'SELECT * FROM masking_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // Full access user should see actual values, not masks
+        expect(row.secret_number).not.toBe(-1);
+        expect(Number(row.count)).not.toBe(12345);
+      }
+    });
+  });
+
+  describe('RBAC data masking via SQL API (masking_partial)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('masking_partial', 'masking_partial_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT mix of unmasked and masked members', async () => {
+      const res = await connection.query(
+        'SELECT * FROM masking_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.public_dim).not.toBeNull();
+        expect(row.total_quantity).not.toBeNull();
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
+    test('masked MEASURE() grouped by real dimension', async () => {
+      const res = await connection.query(
+        'SELECT public_dim, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 ORDER BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.public_dim).not.toBeNull();
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+
+    test('masked MEASURE() grouped by masked dimension', async () => {
+      const res = await connection.query(
+        'SELECT secret_number, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+  });
+
+  /**
+   * View masking tests — masking follows the RLS pattern and is applied at
+   * both cube and view levels. If a cube masks a member, it stays masked
+   * even when accessed through a view that grants full access.
+   *
+   * Views:
+   *   masking_view                  — full access at view level, but underlying cube masks for "*"
+   *   masking_view_masked           — all members masked for "*"; full access for masking_full_access
+   *   masking_view_partial          — public_dim + total_quantity unmasked; rest masked for "*"
+   *   masking_view_over_hidden_cube — view over a cube where all members are hidden;
+   *                                   view adds masking so members become accessible through it
+   */
+  describe('RBAC data masking via SQL API — views (masking_viewer)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('masking_viewer', 'masking_viewer_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('masking_view_masked returns masked values for default role', async () => {
+      const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).toBe(-1);
+        expect(row.public_dim).toBeNull();
+        expect(Number(row.count)).toBe(12345);
+        expect(Number(row.count_d)).toBe(34567);
+      }
+    });
+
+    test('masking_view_over_hidden_cube returns masked values for default role', async () => {
+      const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.public_dim).not.toBeNull();
+        expect(row.total_quantity).not.toBeNull();
+        expect(row.secret_number).toBe(-1);
+        expect(Number(row.count)).toBe(12345);
+      }
+    });
+  });
+
+  describe('RBAC data masking via SQL API — views (masking_full)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('masking_full', 'masking_full_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('masking_view_masked returns real values for masking_full_access role', async () => {
+      const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).not.toBe(-1);
+        expect(Number(row.count)).not.toBe(12345);
+      }
+    });
+
+    test('masking_view_over_hidden_cube returns real values for masking_full_access role', async () => {
+      // The underlying cube hides all members, but masking_full_access role
+      // gets full access through the view's own policy.
+      const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.secret_number).not.toBe(-1);
+        expect(Number(row.count)).not.toBe(12345);
+      }
+    });
+  });
+
+  describe('RBAC data masking via REST API', () => {
+    let maskingViewerClient: CubeApi;
+    let maskingFullClient: CubeApi;
+    let maskingPartialClient: CubeApi;
+
+    const MASKING_VIEWER_TOKEN = sign({
+      auth: {
+        username: 'masking_viewer',
+        userAttributes: {},
+        roles: [],
+      },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+      expiresIn: '2 days'
+    });
+
+    const MASKING_FULL_TOKEN = sign({
+      auth: {
+        username: 'masking_full',
+        userAttributes: {},
+        roles: ['masking_full_access'],
+      },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+      expiresIn: '2 days'
+    });
+
+    const MASKING_PARTIAL_TOKEN = sign({
+      auth: {
+        username: 'masking_partial',
+        userAttributes: {},
+        roles: ['masking_partial'],
+      },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+      expiresIn: '2 days'
+    });
+
+    beforeAll(async () => {
+      maskingViewerClient = cubejs(async () => MASKING_VIEWER_TOKEN, {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+      maskingFullClient = cubejs(async () => MASKING_FULL_TOKEN, {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+      maskingPartialClient = cubejs(async () => MASKING_PARTIAL_TOKEN, {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+    });
+
+    test('cube: masking_viewer sees masked values', async () => {
+      const result = await maskingViewerClient.load({
+        measures: ['masking_test.count'],
+        dimensions: ['masking_test.secret_number'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.secret_number']).toBe(-1);
+        expect(row['masking_test.count']).toBe(12345);
+      }
+    });
+
+    test('cube: masking_full sees real values', async () => {
+      const result = await maskingFullClient.load({
+        measures: ['masking_test.count'],
+        dimensions: ['masking_test.public_dim'],
+        order: { 'masking_test.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.count']).not.toBe(12345);
+      }
+    });
+
+    test('cube: masking_partial sees mixed values', async () => {
+      const result = await maskingPartialClient.load({
+        measures: ['masking_test.total_quantity', 'masking_test.count'],
+        dimensions: ['masking_test.public_dim'],
+        order: { 'masking_test.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.total_quantity']).not.toBeNull();
+        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.public_dim']).not.toBeNull();
+      }
+    });
+
+    test('cube: masked measure grouped by masked dimension', async () => {
+      const result = await maskingViewerClient.load({
+        measures: ['masking_test.count'],
+        dimensions: ['masking_test.secret_number'],
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.secret_number']).toBe(-1);
+        expect(row['masking_test.count']).toBe(12345);
+      }
+    });
+
+    test('cube: masked measure grouped by real dimension (partial access)', async () => {
+      const result = await maskingPartialClient.load({
+        measures: ['masking_test.count'],
+        dimensions: ['masking_test.public_dim'],
+        order: { 'masking_test.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.public_dim']).not.toBeNull();
+        expect(row['masking_test.count']).toBe(12345);
+      }
+    });
+
+    test('cube: multiple masked measures grouped by real dimension', async () => {
+      const result = await maskingPartialClient.load({
+        measures: ['masking_test.count', 'masking_test.total_quantity'],
+        dimensions: ['masking_test.public_dim'],
+        order: { 'masking_test.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_test.public_dim']).not.toBeNull();
+        // count is masked, total_quantity is real
+        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.total_quantity']).not.toBeNull();
+      }
+    });
+
+    test('view: masking_view_masked — viewer sees masked values', async () => {
+      const result = await maskingViewerClient.load({
+        measures: ['masking_view_masked.count'],
+        dimensions: ['masking_view_masked.secret_number'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_view_masked.secret_number']).toBe(-1);
+        expect(row['masking_view_masked.count']).toBe(12345);
+      }
+    });
+
+    test('view: masking_view_masked — full access sees real values', async () => {
+      const result = await maskingFullClient.load({
+        measures: ['masking_view_masked.count'],
+        dimensions: ['masking_view_masked.public_dim'],
+        order: { 'masking_view_masked.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_view_masked.count']).not.toBe(12345);
+      }
+    });
+
+    test('view: masking_view — cube masking still applied through view', async () => {
+      // masking_view grants full access at view level, but the underlying
+      // cube masks all members for role "*". Masking follows RLS pattern.
+      const result = await maskingViewerClient.load({
+        measures: ['masking_view.count'],
+        dimensions: ['masking_view.secret_number'],
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_view.secret_number']).toBe(-1);
+        expect(row['masking_view.count']).toBe(12345);
+      }
+    });
+
+    test('view over hidden cube: viewer sees masked values', async () => {
+      // Underlying cube hides all members. View re-exposes them with masking.
+      const result = await maskingViewerClient.load({
+        measures: ['masking_view_over_hidden_cube.total_quantity', 'masking_view_over_hidden_cube.count'],
+        dimensions: ['masking_view_over_hidden_cube.public_dim'],
+        order: { 'masking_view_over_hidden_cube.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        // public_dim, total_quantity in view memberLevel → real values
+        expect(row['masking_view_over_hidden_cube.total_quantity']).not.toBeNull();
+        expect(row['masking_view_over_hidden_cube.public_dim']).not.toBeNull();
+        // count not in view memberLevel → masked
+        expect(row['masking_view_over_hidden_cube.count']).toBe(12345);
+      }
+    });
+
+    test('view over hidden cube: full access sees real values', async () => {
+      const result = await maskingFullClient.load({
+        measures: ['masking_view_over_hidden_cube.count'],
+        dimensions: ['masking_view_over_hidden_cube.public_dim'],
+        order: { 'masking_view_over_hidden_cube.public_dim': 'asc' },
+        limit: 5,
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['masking_view_over_hidden_cube.count']).not.toBe(12345);
+      }
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;

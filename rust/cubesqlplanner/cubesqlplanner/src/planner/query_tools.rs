@@ -16,7 +16,7 @@ use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 pub struct QueryToolsCachedData {
@@ -110,6 +110,7 @@ pub struct QueryTools {
     evaluator_compiler: Rc<RefCell<Compiler>>,
     cached_data: RefCell<QueryToolsCachedData>,
     timezone: Tz,
+    masked_members: HashSet<String>,
 }
 
 impl QueryTools {
@@ -120,6 +121,7 @@ impl QueryTools {
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
         export_annotated_sql: bool,
+        masked_members: Option<Vec<String>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -144,7 +146,12 @@ impl QueryTools {
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,
+            masked_members: masked_members.unwrap_or_default().into_iter().collect(),
         }))
+    }
+
+    pub fn is_member_masked(&self, member_path: &str) -> bool {
+        self.masked_members.contains(member_path)
     }
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {

@@ -1,5 +1,6 @@
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
+use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
 use crate::test_fixtures::cube_bridge::{MockDimensionDefinition, MockGranularityDefinition};
 use serde::Deserialize;
@@ -48,6 +49,8 @@ pub struct YamlDimensionDefinition {
     time_shift: Vec<YamlTimeShiftDefinition>,
     #[serde(default)]
     granularities: Vec<YamlGranularityEntry>,
+    #[serde(default)]
+    mask: Option<YamlMask>,
 }
 
 impl YamlDimensionDefinition {
@@ -91,6 +94,7 @@ impl YamlDimensionDefinition {
             .latitude_opt(self.latitude)
             .longitude_opt(self.longitude)
             .time_shift(time_shift)
+            .resolved_mask_sql_opt(self.mask.map(|m| m.to_sql_string()))
             .build();
 
         YamlDimensionBuildResult {

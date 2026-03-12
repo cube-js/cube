@@ -73,6 +73,8 @@ pub struct BaseQueryOptionsStatic {
     pub disable_external_pre_aggregations: bool,
     #[serde(rename = "preAggregationId")]
     pub pre_aggregation_id: Option<String>,
+    #[serde(rename = "maskedMembers")]
+    pub masked_members: Option<Vec<String>>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

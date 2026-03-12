@@ -34,6 +34,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.member$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.values$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.conditions.[0-9]+\.if$/,
+  /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.mask\.sql$/,
 ];
 
 export const transpiledFields: Set<String> = new Set<String>();

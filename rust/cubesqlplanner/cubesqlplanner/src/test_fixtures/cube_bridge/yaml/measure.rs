@@ -1,6 +1,7 @@
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::measure_definition::{RollingWindow, TimeShiftReference};
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
+use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
 use crate::test_fixtures::cube_bridge::{
     MockMeasureDefinition, MockMemberOrderBy, MockStructWithSqlMember,
 };
@@ -33,6 +34,8 @@ pub struct YamlMeasureDefinition {
     drill_filters: Vec<YamlFilter>,
     #[serde(default)]
     order_by: Vec<YamlOrderBy>,
+    #[serde(default)]
+    mask: Option<YamlMask>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,6 +105,7 @@ impl YamlMeasureDefinition {
                 .filters(filters)
                 .drill_filters(drill_filters)
                 .order_by(order_by)
+                .resolved_mask_sql_opt(self.mask.map(|m| m.to_sql_string()))
                 .build(),
         )
     }
