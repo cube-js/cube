@@ -584,4 +584,33 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_is_visible_for() {
+        // Non-exclusive item
+        let non_exclusive = QueueItem::new(
+            "prefix:key".to_string(),
+            QueueItemStatus::Pending,
+            0,
+            None,
+            Some("pid-1".to_string()),
+            false,
+        );
+        assert!(non_exclusive.is_visible_for(&None));
+        assert!(non_exclusive.is_visible_for(&Some("pid-1".to_string())));
+        assert!(non_exclusive.is_visible_for(&Some("pid-other".to_string())));
+
+        // Exclusive item with process_id
+        let exclusive = QueueItem::new(
+            "prefix:key".to_string(),
+            QueueItemStatus::Pending,
+            0,
+            None,
+            Some("pid-1".to_string()),
+            true,
+        );
+        assert!(exclusive.is_visible_for(&Some("pid-1".to_string())));
+        assert!(!exclusive.is_visible_for(&Some("pid-other".to_string())));
+        assert!(!exclusive.is_visible_for(&None));
+    }
 }

@@ -253,7 +253,13 @@ impl CacheStore for LazyRocksCacheStore {
     ) -> Result<Vec<QueueListItem>, CubeError> {
         self.init()
             .await?
-            .queue_list(prefix, status_filter, priority_sort, with_payload, caller_process_id)
+            .queue_list(
+                prefix,
+                status_filter,
+                priority_sort,
+                with_payload,
+                caller_process_id,
+            )
             .await
     }
 
