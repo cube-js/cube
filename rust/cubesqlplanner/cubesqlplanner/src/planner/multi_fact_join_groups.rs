@@ -134,6 +134,10 @@ impl MultiFactJoinGroups {
         &self.groups
     }
 
+    pub fn num_groups(&self) -> usize {
+        self.groups.len()
+    }
+
     pub fn single_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
         if self.groups.is_empty() {
             return Ok(None);
@@ -151,5 +155,55 @@ impl MultiFactJoinGroups {
             )));
         }
         Ok(Some(self.groups.first().unwrap().0.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::test_utils::TestContext;
+
+    #[test]
+    fn test_single_fact_one_group() {
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let groups = MultiFactJoinGroups::builder(
+            ctx.query_tools().clone(),
+            &JoinHints::new(),
+        )
+        .add_dimensions(&[customers_name])
+        .build(&[orders_count])
+        .unwrap();
+
+        assert!(!groups.is_multi_fact());
+        assert_eq!(groups.num_groups(), 1);
+        assert!(groups.single_join().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_multi_fact_two_groups() {
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let returns_count = ctx.create_symbol("returns.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let groups = MultiFactJoinGroups::builder(
+            ctx.query_tools().clone(),
+            &JoinHints::new(),
+        )
+        .add_dimensions(&[customers_name])
+        .build(&[orders_count, returns_count])
+        .unwrap();
+
+        assert!(groups.is_multi_fact());
+        assert_eq!(groups.num_groups(), 2);
+        assert!(groups.single_join().is_err());
     }
 }
