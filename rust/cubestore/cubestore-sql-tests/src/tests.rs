@@ -10192,6 +10192,9 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) {
 }
 
 async fn queue_list_v1(service: Box<dyn SqlClient>) {
+    let ctx_proc_a = SqlQueryContext::default().with_process_id(Some("process-a".to_string()));
+    let ctx_proc_b = SqlQueryContext::default().with_process_id(Some("process-b".to_string()));
+
     let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
         .await
@@ -10200,6 +10203,25 @@ async fn queue_list_v1(service: Box<dyn SqlClient>) {
 
     let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_2" "payload2";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+
+    // Exclusive items owned by different processes
+    let add_response = service
+        .exec_query_with_context(
+            ctx_proc_a.clone(),
+            r#"QUEUE ADD EXCLUSIVE PRIORITY 1 "STANDALONE#queue:exclusive_key_a" "payload_a";"#,
+        )
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+
+    let add_response = service
+        .exec_query_with_context(
+            ctx_proc_b.clone(),
+            r#"QUEUE ADD EXCLUSIVE PRIORITY 1 "STANDALONE#queue:exclusive_key_b" "payload_b";"#,
+        )
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -10215,7 +10237,7 @@ async fn queue_list_v1(service: Box<dyn SqlClient>) {
             &vec![Row::new(vec![
                 TableValue::String("payload1".to_string()),
                 TableValue::Null,
-                TableValue::Int(1),
+                TableValue::Int(3),
                 // list of active keys
                 TableValue::String("queue_key_1".to_string()),
                 TableValue::String("1".to_string()),
@@ -10223,6 +10245,7 @@ async fn queue_list_v1(service: Box<dyn SqlClient>) {
         );
     }
 
+    // List without process_id: should see only non-exclusive items
     let list_response = service
         .exec_query(r#"QUEUE LIST "STANDALONE#queue";"#)
         .await
@@ -10248,6 +10271,64 @@ async fn queue_list_v1(service: Box<dyn SqlClient>) {
             Row::new(vec![
                 TableValue::String("queue_key_2".to_string()),
                 TableValue::String("2".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null
+            ])
+        ]
+    );
+
+    // List as process-a: should see non-exclusive items + exclusive_key_a only
+    let list_response = service
+        .exec_query_with_context(ctx_proc_a.clone(), r#"QUEUE LIST "STANDALONE#queue";"#)
+        .await
+        .unwrap();
+    assert_eq!(
+        list_response.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("queue_key_1".to_string()),
+                TableValue::String("1".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null
+            ]),
+            Row::new(vec![
+                TableValue::String("queue_key_2".to_string()),
+                TableValue::String("2".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null
+            ]),
+            Row::new(vec![
+                TableValue::String("exclusive_key_a".to_string()),
+                TableValue::String("3".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null
+            ])
+        ]
+    );
+
+    // List as process-b: should see non-exclusive items + exclusive_key_b only
+    let list_response = service
+        .exec_query_with_context(ctx_proc_b.clone(), r#"QUEUE LIST "STANDALONE#queue";"#)
+        .await
+        .unwrap();
+    assert_eq!(
+        list_response.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("queue_key_1".to_string()),
+                TableValue::String("1".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null
+            ]),
+            Row::new(vec![
+                TableValue::String("queue_key_2".to_string()),
+                TableValue::String("2".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null
+            ]),
+            Row::new(vec![
+                TableValue::String("exclusive_key_b".to_string()),
+                TableValue::String("4".to_string()),
                 TableValue::String("pending".to_string()),
                 TableValue::Null
             ])
