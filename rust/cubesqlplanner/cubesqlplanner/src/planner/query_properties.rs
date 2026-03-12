@@ -527,18 +527,16 @@ impl QueryProperties {
                 apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
         }
 
-        self.multi_fact_join_groups = MultiFactJoinGroups::try_new(
-            self.query_tools.clone(),
-            &self.query_join_hints,
-            &self.measures,
-            &self.dimensions,
-            &self.extract_dimensions_from_order(),
-            &self.time_dimensions,
-            &self.time_dimensions_filters,
-            &self.dimensions_filters,
-            &self.measures_filters,
-            &self.segments,
-        )?;
+        self.multi_fact_join_groups =
+            MultiFactJoinGroups::builder(self.query_tools.clone(), &self.query_join_hints)
+                .add_dimensions(&self.dimensions)
+                .add_dimensions(&self.extract_dimensions_from_order())
+                .add_dimensions(&self.time_dimensions)
+                .add_filters(&self.time_dimensions_filters)
+                .add_filters(&self.dimensions_filters)
+                .add_filters(&self.measures_filters)
+                .add_filters(&self.segments)
+                .build(&self.measures)?;
         Ok(())
     }
 

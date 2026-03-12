@@ -8,6 +8,43 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
+pub struct MultiFactJoinGroupsBuilder {
+    query_tools: Rc<QueryTools>,
+    initial_hints: JoinHints,
+    dimensions: Vec<Rc<MemberSymbol>>,
+    filters: Vec<FilterItem>,
+}
+
+impl MultiFactJoinGroupsBuilder {
+    pub fn add_dimensions(mut self, dims: &[Rc<MemberSymbol>]) -> Self {
+        self.dimensions.extend(dims.iter().cloned());
+        self
+    }
+
+    pub fn add_filters(mut self, filters: &[FilterItem]) -> Self {
+        self.filters.extend(filters.iter().cloned());
+        self
+    }
+
+    pub fn build(self, measures: &[Rc<MemberSymbol>]) -> Result<MultiFactJoinGroups, CubeError> {
+        let mut base_hints = self.initial_hints;
+
+        for sym in self.dimensions.iter() {
+            base_hints.extend(&collect_join_hints(sym)?);
+        }
+
+        let mut filter_symbols = Vec::new();
+        for item in self.filters.iter() {
+            item.find_all_member_evaluators(&mut filter_symbols);
+        }
+        for sym in filter_symbols.iter() {
+            base_hints.extend(&collect_join_hints(sym)?);
+        }
+
+        MultiFactJoinGroups::from_base_hints(self.query_tools, base_hints, measures)
+    }
+}
+
 #[derive(Clone)]
 pub struct MultiFactJoinGroups {
     query_tools: Rc<QueryTools>,
@@ -24,46 +61,13 @@ impl MultiFactJoinGroups {
         }
     }
 
-    pub fn try_new(
-        query_tools: Rc<QueryTools>,
-        query_join_hints: &JoinHints,
-        measures: &[Rc<MemberSymbol>],
-        dimensions: &[Rc<MemberSymbol>],
-        order_dimensions: &[Rc<MemberSymbol>],
-        time_dimensions: &[Rc<MemberSymbol>],
-        time_dimensions_filters: &[FilterItem],
-        dimensions_filters: &[FilterItem],
-        measures_filters: &[FilterItem],
-        segments: &[FilterItem],
-    ) -> Result<Self, CubeError> {
-        let mut base_hints = query_join_hints.clone();
-
-        for sym in dimensions
-            .iter()
-            .chain(order_dimensions.iter())
-            .chain(time_dimensions.iter())
-        {
-            base_hints.extend(&collect_join_hints(sym)?);
+    pub fn builder(query_tools: Rc<QueryTools>, query_join_hints: &JoinHints) -> MultiFactJoinGroupsBuilder {
+        MultiFactJoinGroupsBuilder {
+            query_tools,
+            initial_hints: query_join_hints.clone(),
+            dimensions: Vec::new(),
+            filters: Vec::new(),
         }
-
-        let mut filter_symbols = Vec::new();
-        for filter_vec in [
-            time_dimensions_filters,
-            dimensions_filters,
-            segments,
-            // TODO This is not quite correct. Decide on how to handle it.
-            // Keeping it here just to blow up on unsupported case
-            measures_filters,
-        ] {
-            for item in filter_vec.iter() {
-                item.find_all_member_evaluators(&mut filter_symbols);
-            }
-        }
-        for sym in filter_symbols.iter() {
-            base_hints.extend(&collect_join_hints(sym)?);
-        }
-
-        Self::from_base_hints(query_tools, base_hints, measures)
     }
 
     pub fn for_measures(
