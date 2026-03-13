@@ -6,8 +6,16 @@ Object {
     "cube": Array [
       Object {
         "orders": Object {
-          "count": null,
+          "count": "10",
           "status": "completed",
+          "totalAmount": "500",
+        },
+      },
+      Object {
+        "orders": Object {
+          "count": "5",
+          "status": "pending",
+          "totalAmount": "200",
         },
       },
     ],
@@ -25,6 +33,11 @@ Object {
         "Orders.count": Object {
           "shortTitle": "Count",
           "title": "Orders Count",
+          "type": "number",
+        },
+        "Orders.totalAmount": Object {
+          "shortTitle": "Total Amount",
+          "title": "Orders Total Amount",
           "type": "number",
         },
       },
