@@ -809,3 +809,112 @@ impl PlanSqlTemplates {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSqlTemplatesRender};
+    use std::collections::HashMap;
+
+    fn plan_templates_with(extra_templates: Vec<(&str, &str)>) -> PlanSqlTemplates {
+        if extra_templates.is_empty() {
+            let driver_tools = Rc::new(MockDriverTools::new());
+            return PlanSqlTemplates::try_new(driver_tools, false).unwrap();
+        }
+        // Build a minimal template set with only what join_by_dimension_conditions needs
+        let mut t: HashMap<String, String> = HashMap::new();
+        t.insert(
+            "expressions/binary".to_string(),
+            "({{ left }} {{ op }} {{ right }})".to_string(),
+        );
+        t.insert(
+            "expressions/is_null".to_string(),
+            "({{ expr }} IS {% if negate %}NOT {% endif %}NULL)".to_string(),
+        );
+        for (k, v) in extra_templates {
+            t.insert(k.to_string(), v.to_string());
+        }
+        let render = MockSqlTemplatesRender::try_new(t).unwrap();
+        let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
+        PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_join_condition_no_null_check() {
+        let templates = plan_templates_with(vec![]);
+        let left = "t1.col".to_string();
+        let right = "t2.col".to_string();
+
+        let result = templates
+            .join_by_dimension_conditions(&left, &right, false)
+            .unwrap();
+        assert_eq!(result, "(t1.col = t2.col)");
+    }
+
+    #[test]
+    fn test_join_condition_null_check_fallback_or_is_null() {
+        // No is_not_distinct_from templates → falls back to OR (IS NULL AND IS NULL)
+        let templates = plan_templates_with(vec![]);
+        let left = "t1.col".to_string();
+        let right = "t2.col".to_string();
+
+        let result = templates
+            .join_by_dimension_conditions(&left, &right, true)
+            .unwrap();
+        assert_eq!(
+            result,
+            "(t1.col = t2.col OR ((t1.col IS NULL) AND (t2.col IS NULL)))"
+        );
+    }
+
+    #[test]
+    fn test_join_condition_null_check_binary_operator() {
+        // Postgres/BigQuery/Snowflake style: binary operator IS NOT DISTINCT FROM
+        let templates = plan_templates_with(vec![(
+            "operators/is_not_distinct_from",
+            "IS NOT DISTINCT FROM",
+        )]);
+        let left = "t1.col".to_string();
+        let right = "t2.col".to_string();
+
+        let result = templates
+            .join_by_dimension_conditions(&left, &right, true)
+            .unwrap();
+        assert_eq!(result, "(t1.col IS NOT DISTINCT FROM t2.col)");
+    }
+
+    #[test]
+    fn test_join_condition_null_check_expression_template() {
+        // ClickHouse style: function-call isNotDistinctFrom(left, right)
+        let templates = plan_templates_with(vec![(
+            "expressions/is_not_distinct_from",
+            "isNotDistinctFrom({{ left }}, {{ right }})",
+        )]);
+        let left = "t1.col".to_string();
+        let right = "t2.col".to_string();
+
+        let result = templates
+            .join_by_dimension_conditions(&left, &right, true)
+            .unwrap();
+        assert_eq!(result, "isNotDistinctFrom(t1.col, t2.col)");
+    }
+
+    #[test]
+    fn test_join_condition_binary_operator_takes_precedence_over_expression() {
+        // When both templates exist, the binary operator should be used
+        let templates = plan_templates_with(vec![
+            ("operators/is_not_distinct_from", "IS NOT DISTINCT FROM"),
+            (
+                "expressions/is_not_distinct_from",
+                "isNotDistinctFrom({{ left }}, {{ right }})",
+            ),
+        ]);
+        let left = "t1.col".to_string();
+        let right = "t2.col".to_string();
+
+        let result = templates
+            .join_by_dimension_conditions(&left, &right, true)
+            .unwrap();
+        assert_eq!(result, "(t1.col IS NOT DISTINCT FROM t2.col)");
+    }
+}
