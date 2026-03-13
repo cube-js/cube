@@ -866,8 +866,15 @@ impl ImportService for ImportServiceImpl {
     }
 
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
-        let file_size =
-            LocationHelper::location_file_size(location, self.remote_fs.clone()).await?;
+        let file_size = LocationHelper::location_file_size(
+            location,
+            self.remote_fs.clone(),
+            self.config_obj.http_location_size_max_retries(),
+            self.config_obj.http_location_size_initial_sleep_ms(),
+            self.config_obj.http_location_size_sleep_multiplier(),
+            self.config_obj.http_location_size_timeout_secs(),
+        )
+        .await?;
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
     }
 
@@ -879,33 +886,107 @@ impl ImportService for ImportServiceImpl {
 pub struct LocationHelper;
 
 impl LocationHelper {
+    async fn try_get_http_location_size(
+        location: &str,
+        timeout_secs: u64,
+    ) -> Result<Option<u64>, CubeError> {
+        let client = reqwest::ClientBuilder::new()
+            .timeout(Duration::from_secs(timeout_secs))
+            .build()?;
+        let req = client.head(location).build()?;
+
+        // S3 doesn't support HEAD for pre signed urls with GetObject command
+        if req
+            .url()
+            .domain()
+            .map(|v| v.contains("amazonaws.com"))
+            .unwrap_or(false)
+        {
+            return Ok(None);
+        }
+
+        let res = client.execute(req).await.map_err(|e| {
+            let kind = if e.is_timeout() {
+                "timeout"
+            } else if e.is_connect() {
+                "connect"
+            } else if e.is_body() {
+                "body"
+            } else if e.is_decode() {
+                "decode"
+            } else if e.is_redirect() {
+                "redirect"
+            } else if e.is_builder() {
+                "builder"
+            } else if e.is_request() {
+                "request"
+            } else {
+                "unknown"
+            };
+            CubeError::internal(format!("HTTP HEAD error (kind: {}): {}", kind, e))
+        })?;
+
+        let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
+
+        if let Some(length) = length {
+            Ok(Some(length.to_str()?.parse::<u64>()?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn get_http_location_size(
+        location: &str,
+        max_retries: u64,
+        initial_sleep_ms: u64,
+        sleep_multiplier: u64,
+        timeout_secs: u64,
+    ) -> Result<Option<u64>, CubeError> {
+        let mut retry_attempts = max_retries as i32;
+        let mut retries_sleep = Duration::from_millis(initial_sleep_ms);
+        loop {
+            retry_attempts -= 1;
+            let result = Self::try_get_http_location_size(location, timeout_secs).await;
+
+            if retry_attempts <= 0 {
+                return result;
+            }
+            match result {
+                Ok(size) => {
+                    return Ok(size);
+                }
+                Err(err) => {
+                    log::error!(
+                        "HEAD {} error: {}. Retrying {}/{}...",
+                        location,
+                        err,
+                        max_retries as i32 - retry_attempts,
+                        max_retries
+                    );
+                    sleep(retries_sleep).await;
+                    retries_sleep *= sleep_multiplier as u32;
+                }
+            }
+        }
+    }
+
     pub async fn location_file_size(
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
+        max_retries: u64,
+        initial_sleep_ms: u64,
+        sleep_multiplier: u64,
+        timeout_secs: u64,
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
-            let client = reqwest::Client::new();
-            let req = client.head(location).build()?;
-
-            // S3 doesn't support HEAD for pre signed urls with GetObject command
-            if req
-                .url()
-                .domain()
-                .map(|v| v.contains("amazonaws.com"))
-                .unwrap_or(false)
-            {
-                return Ok(None);
-            }
-
-            let res = client.execute(req).await?;
-
-            let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
-
-            if let Some(length) = length {
-                Some(length.to_str()?.parse::<u64>()?)
-            } else {
-                None
-            }
+            Self::get_http_location_size(
+                location,
+                max_retries,
+                initial_sleep_ms,
+                sleep_multiplier,
+                timeout_secs,
+            )
+            .await?
         } else if location.starts_with("temp://") {
             let remote_path = Self::temp_uploads_path(location);
             match remote_fs.list_with_metadata(remote_path).await {
