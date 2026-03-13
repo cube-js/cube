@@ -41,6 +41,7 @@
     "typescript": "~5.2.2"
   },
   "dependencies": {
+    "@node-rs/xxhash": "^1.7.6",
     "@oclif/color": "^0.1.2",
     "bytes": "^3.1.2",
     "cli-progress": "^3.9.0",
