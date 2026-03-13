@@ -471,6 +471,115 @@ describe('API Gateway', () => {
     );
   });
 
+  test('normalize inDateRange filter with relative date string', async () => {
+    const { app } = await createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        member: 'Foo.time',
+        operator: 'inDateRange',
+        values: ['last 7 days']
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        const filter = res.body.normalizedQueries[0].filters[0];
+        expect(filter.member).toBe('Foo.time');
+        expect(filter.operator).toBe('inDateRange');
+        expect(filter.values).toHaveLength(2);
+        expect(filter.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(filter.values[1]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      }
+    );
+  });
+
+  test('normalize notInDateRange filter with relative date string', async () => {
+    const { app } = await createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        member: 'Foo.time',
+        operator: 'notInDateRange',
+        values: ['this week']
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        const filter = res.body.normalizedQueries[0].filters[0];
+        expect(filter.member).toBe('Foo.time');
+        expect(filter.operator).toBe('notInDateRange');
+        expect(filter.values).toHaveLength(2);
+        expect(filter.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(filter.values[1]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      }
+    );
+  });
+
+  test('normalize inDateRange filter with explicit date array', async () => {
+    const { app } = await createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        member: 'Foo.time',
+        operator: 'inDateRange',
+        values: ['2024-01-01', '2024-01-31']
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        const filter = res.body.normalizedQueries[0].filters[0];
+        expect(filter.member).toBe('Foo.time');
+        expect(filter.operator).toBe('inDateRange');
+        expect(filter.values).toStrictEqual(['2024-01-01', '2024-01-31']);
+      }
+    );
+  });
+
+  test('normalize inDateRange filter with relative date in nested or condition', async () => {
+    const { app } = await createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        or: [{
+          member: 'Foo.time',
+          operator: 'inDateRange',
+          values: ['last 30 days']
+        }, {
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [10]
+        }]
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        const orFilter = res.body.normalizedQueries[0].filters[0].or;
+        expect(orFilter[0].member).toBe('Foo.time');
+        expect(orFilter[0].operator).toBe('inDateRange');
+        expect(orFilter[0].values).toHaveLength(2);
+        expect(orFilter[0].values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(orFilter[0].values[1]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(orFilter[1].values).toStrictEqual(['10']);
+      }
+    );
+  });
+
   test('normalize empty filters', async () => {
     const { app } = await createApiGateway();
 
