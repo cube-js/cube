@@ -3508,6 +3508,7 @@ mod tests {
                     region: "us-west-2".to_string(),
                     bucket_name: "cube-store-ci-test".to_string(),
                     sub_path: Some("high_frequency_inserts_s3".to_string()),
+                    endpoint: None,
                 };
                 c.select_workers = vec!["127.0.0.1:4306".to_string()];
                 c
@@ -3523,6 +3524,7 @@ mod tests {
                             region: "us-west-2".to_string(),
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("high_frequency_inserts_s3".to_string()),
+                            endpoint: None,
                         };
                         c
                     })
@@ -3996,6 +3998,7 @@ mod tests {
                     region: "us-west-2".to_string(),
                     bucket_name: "cube-store-ci-test".to_string(),
                     sub_path: Some("create_table_with_location_cluster".to_string()),
+                    endpoint: None,
                 };
                 c.select_workers = vec!["127.0.0.1:24306".to_string()];
                 c.metastore_bind_address = Some("127.0.0.1:25312".to_string());
@@ -4012,6 +4015,7 @@ mod tests {
                             region: "us-west-2".to_string(),
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("create_table_with_location_cluster".to_string()),
+                            endpoint: None,
                         };
                         c.metastore_remote_address = Some("127.0.0.1:25312".to_string());
                         c

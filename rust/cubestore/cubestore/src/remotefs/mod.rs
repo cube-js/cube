@@ -687,6 +687,7 @@ mod tests {
             region.clone(),
             bucket_name.clone(),
             None,
+            None,
         )?;
 
         let name_maker = NameMaker::new(Uuid::new_v4().to_string());
@@ -699,6 +700,7 @@ mod tests {
             region.clone(),
             bucket_name.clone(),
             Some("remotefs_test_subpathdir".to_string()),
+            None,
         )
         .unwrap();
 

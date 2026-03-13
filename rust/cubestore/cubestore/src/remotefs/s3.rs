@@ -49,6 +49,7 @@ impl S3RemoteFs {
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
+        endpoint: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
         // Incorrect naming for ENV variables...
         let access_key = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
@@ -67,13 +68,21 @@ impl S3RemoteFs {
                 err.to_string()
             ))
         })?;
-        let region = region.parse::<Region>().map_err(|err| {
-            CubeError::internal(format!(
-                "Failed to parse Region '{}': {}",
-                region,
-                err.to_string()
-            ))
-        })?;
+        // If endpoint is provided, create a Custom region to support GovCloud and other non-standard regions
+        let region = if let Some(ep) = &endpoint {
+            Region::Custom {
+                region: region.clone(),
+                endpoint: ep.clone(),
+            }
+        } else {
+            region.parse::<Region>().map_err(|err| {
+                CubeError::internal(format!(
+                    "Failed to parse Region '{}': {}",
+                    region,
+                    err.to_string()
+                ))
+            })?
+        };
         let bucket = Bucket::new(&bucket_name, region.clone(), credentials)?;
         let fs = Arc::new(Self {
             dir,
