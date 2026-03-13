@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.23](https://github.com/cube-js/cube/compare/v1.6.22...v1.6.23) (2026-03-13)
+
+### Features
+
+- **cubestore-driver:** Queue - use exclusive flag with new Cube Store ([#10488](https://github.com/cube-js/cube/issues/10488)) ([c6462e4](https://github.com/cube-js/cube/commit/c6462e478bcb8a8b2caccc32787e52a8b2198852))
+
 ## [1.6.22](https://github.com/cube-js/cube/compare/v1.6.21...v1.6.22) (2026-03-11)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

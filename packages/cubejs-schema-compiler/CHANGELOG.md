@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.23](https://github.com/cube-js/cube/compare/v1.6.22...v1.6.23) (2026-03-13)
+
+### Features
+
+- Data access policy masking ([#10463](https://github.com/cube-js/cube/issues/10463)) ([4b0d1bf](https://github.com/cube-js/cube/commit/4b0d1bfe49d8dbd72a9df03718793179e20ed167))
+
 ## [1.6.22](https://github.com/cube-js/cube/compare/v1.6.21...v1.6.22) (2026-03-11)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

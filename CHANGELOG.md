@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.23](https://github.com/cube-js/cube/compare/v1.6.22...v1.6.23) (2026-03-13)
+
+### Bug Fixes
+
+- **api-gateway:** Returns null for all measures except the last one, fix [#10482](https://github.com/cube-js/cube/issues/10482) ([#10495](https://github.com/cube-js/cube/issues/10495)) ([cc0b93a](https://github.com/cube-js/cube/commit/cc0b93abd9457b20140101da045cbf15f52a03db)), closes [#10428](https://github.com/cube-js/cube/issues/10428)
+
+### Features
+
+- **cubestore-driver:** Queue - use exclusive flag with new Cube Store ([#10488](https://github.com/cube-js/cube/issues/10488)) ([c6462e4](https://github.com/cube-js/cube/commit/c6462e478bcb8a8b2caccc32787e52a8b2198852))
+- **cubestore:** Filter queue_list by process_id for exclusive items ([#10490](https://github.com/cube-js/cube/issues/10490)) ([8458998](https://github.com/cube-js/cube/commit/84589988b29410f07c213b81405a824f49c599bc))
+- Data access policy masking ([#10463](https://github.com/cube-js/cube/issues/10463)) ([4b0d1bf](https://github.com/cube-js/cube/commit/4b0d1bfe49d8dbd72a9df03718793179e20ed167))
+
 ## [1.6.22](https://github.com/cube-js/cube/compare/v1.6.21...v1.6.22) (2026-03-11)
 
 **Note:** Version bump only for package cubejs
