@@ -1,4 +1,4 @@
-use crate::planner::multi_fact_join_groups::MeasuresJoinHints;
+use crate::planner::multi_fact_join_groups::MultiFactJoinGroups;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlCall};
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -50,7 +50,7 @@ pub struct CompiledPreAggregation {
     pub time_dimensions: Vec<Rc<MemberSymbol>>,
     pub segments: Vec<Rc<MemberSymbol>>,
     pub allow_non_strict_date_range_match: bool,
-    pub measures_join_hints: MeasuresJoinHints,
+    pub multi_fact_join_groups: MultiFactJoinGroups,
 }
 
 impl Debug for CompiledPreAggregation {

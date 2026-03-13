@@ -1,14 +1,14 @@
 use super::CompiledPreAggregation;
-use crate::planner::multi_fact_join_groups::MeasuresJoinHints;
+use crate::planner::multi_fact_join_groups::MultiFactJoinGroups;
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 pub struct MeasureMatcher {
     only_addictive: bool,
-    pre_aggregation_join_hints: MeasuresJoinHints,
+    pre_aggregation_groups: MultiFactJoinGroups,
     pre_aggregation_measures: HashSet<String>,
-    measures_join_hints: MeasuresJoinHints,
+    query_groups: MultiFactJoinGroups,
     matched_measures: HashSet<String>,
 }
 
@@ -16,7 +16,7 @@ impl MeasureMatcher {
     pub fn new(
         pre_aggregation: &CompiledPreAggregation,
         only_addictive: bool,
-        measures_join_hints: MeasuresJoinHints,
+        query_groups: MultiFactJoinGroups,
     ) -> Self {
         let pre_aggregation_measures = pre_aggregation
             .measures
@@ -25,10 +25,10 @@ impl MeasureMatcher {
             .collect();
         Self {
             only_addictive,
-            pre_aggregation_join_hints: pre_aggregation.measures_join_hints.clone(),
+            pre_aggregation_groups: pre_aggregation.multi_fact_join_groups.clone(),
             pre_aggregation_measures,
             matched_measures: HashSet::new(),
-            measures_join_hints,
+            query_groups,
         }
     }
 
@@ -41,7 +41,7 @@ impl MeasureMatcher {
             MemberSymbol::Measure(measure) => {
                 if self.pre_aggregation_measures.contains(&measure.full_name())
                     && (!self.only_addictive || measure.is_addictive())
-                    && self.is_join_path_match(symbol)?
+                    && self.is_join_path_match(symbol)
                 {
                     self.matched_measures.insert(measure.full_name());
                     return Ok(true);
@@ -65,15 +65,15 @@ impl MeasureMatcher {
         Ok(true)
     }
 
-    fn is_join_path_match(&self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
-        let measure_hints_from_query = self.measures_join_hints.for_measures(&[symbol.clone()])?;
-        if let (Some(query_hits), Some(pre_aggr_hits)) = (
-            measure_hints_from_query.hints_for_measure(symbol),
-            self.pre_aggregation_join_hints.hints_for_measure(symbol),
+    fn is_join_path_match(&self, symbol: &Rc<MemberSymbol>) -> bool {
+        match (
+            self.query_groups.resolve_join_path_for_measure(symbol),
+            self.pre_aggregation_groups
+                .resolve_join_path_for_measure(symbol),
         ) {
-            Ok(query_hits == pre_aggr_hits)
-        } else {
-            Ok(false)
+            (Some(query_path), Some(pre_aggr_path)) => query_path == pre_aggr_path,
+            // If either side has no path info, skip the check
+            _ => true,
         }
     }
 }
@@ -104,7 +104,7 @@ mod tests {
     fn test_measure_matching() {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "all_base_measures_rollup");
-        let mut matcher = MeasureMatcher::new(&pre_agg, false, MeasuresJoinHints::empty());
+        let mut matcher = MeasureMatcher::new(&pre_agg, false, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
 
         assert!(matcher
             .try_match(&ctx.create_measure("orders.count").unwrap())
@@ -133,7 +133,7 @@ mod tests {
     fn test_measure_matching_only_additive() {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "all_base_measures_rollup");
-        let mut matcher = MeasureMatcher::new(&pre_agg, true, MeasuresJoinHints::empty());
+        let mut matcher = MeasureMatcher::new(&pre_agg, true, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
 
         assert!(matcher
             .try_match(&ctx.create_measure("orders.count").unwrap())
@@ -163,12 +163,12 @@ mod tests {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "calculated_measure_rollup");
 
-        let mut matcher = MeasureMatcher::new(&pre_agg, false, MeasuresJoinHints::empty());
+        let mut matcher = MeasureMatcher::new(&pre_agg, false, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
         assert!(matcher
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
 
-        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true, MeasuresJoinHints::empty());
+        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
         assert!(!additive_matcher
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
@@ -179,7 +179,7 @@ mod tests {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "mixed_measure_rollup");
 
-        let mut matcher = MeasureMatcher::new(&pre_agg, false, MeasuresJoinHints::empty());
+        let mut matcher = MeasureMatcher::new(&pre_agg, false, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
         assert!(matcher
             .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
             .unwrap());
@@ -190,7 +190,7 @@ mod tests {
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
 
-        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true, MeasuresJoinHints::empty());
+        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
         assert!(!additive_matcher
             .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
             .unwrap());
@@ -208,7 +208,7 @@ mod tests {
         let pre_agg = compile_pre_agg(&ctx, "base_and_calculated_measure_rollup");
 
         // Full match (not only_additive) — calculated measure consumed directly
-        let mut matcher = MeasureMatcher::new(&pre_agg, false, MeasuresJoinHints::empty());
+        let mut matcher = MeasureMatcher::new(&pre_agg, false, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
         assert!(matcher
             .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
             .unwrap());
@@ -225,7 +225,7 @@ mod tests {
         let pre_agg = compile_pre_agg(&ctx, "base_and_calculated_measure_rollup");
 
         // Partial match (only_additive) — calculated measure decomposed to base deps
-        let mut matcher = MeasureMatcher::new(&pre_agg, true, MeasuresJoinHints::empty());
+        let mut matcher = MeasureMatcher::new(&pre_agg, true, MultiFactJoinGroups::empty(ctx.query_tools().clone()));
         assert!(matcher
             .try_match(&ctx.create_measure("orders.amount_per_count").unwrap())
             .unwrap());

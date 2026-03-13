@@ -10,8 +10,6 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-// --- MeasuresJoinHints: lightweight, no join building ---
-
 #[derive(Clone, Debug)]
 pub struct MeasureJoinHints {
     pub measure: Rc<MemberSymbol>,
