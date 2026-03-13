@@ -3,8 +3,6 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
-use crate::planner::join_hints::JoinHints;
-use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -464,22 +462,10 @@ impl PreAggregationOptimizer {
         if match_state == MatchState::NotMatched {
             return Ok(None);
         }
-        let mut measures_join_hints_builder = MeasuresJoinHints::builder(&JoinHints::new())
-            .add_dimensions(&schema.dimensions)
-            .add_dimensions(&schema.time_dimensions);
-        if let Some(all_filters) = filters.all_filters() {
-            measures_join_hints_builder =
-                measures_join_hints_builder.add_filters(&all_filters.items);
-        }
-        let query_groups = MultiFactJoinGroups::try_new(
-            self.query_tools.clone(),
-            measures_join_hints_builder.build(&[])?,
-        )?;
         let matched = self.try_match_measures(
             &all_measures,
             pre_aggregation,
             match_state == MatchState::Partial,
-            query_groups,
         )?;
         Ok(matched)
     }
@@ -489,9 +475,8 @@ impl PreAggregationOptimizer {
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
         only_addictive: bool,
-        query_groups: MultiFactJoinGroups,
     ) -> Result<Option<HashSet<String>>, CubeError> {
-        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive, query_groups);
+        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {
                 return Ok(None);
