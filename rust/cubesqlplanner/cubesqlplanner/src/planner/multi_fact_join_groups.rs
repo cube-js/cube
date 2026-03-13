@@ -132,6 +132,10 @@ pub struct MultiFactJoinGroups {
     query_tools: Rc<QueryTools>,
     measures_join_hints: MeasuresJoinHints,
     groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>,
+    /// cube_name → join path from root, computed from the first group (shared for dimensions).
+    dimension_paths: HashMap<String, Vec<String>>,
+    /// measure full_name → join path from root, computed per group.
+    measure_paths: HashMap<String, Vec<String>>,
 }
 
 impl MultiFactJoinGroups {
@@ -140,6 +144,8 @@ impl MultiFactJoinGroups {
             query_tools,
             measures_join_hints: MeasuresJoinHints::empty(),
             groups: vec![],
+            dimension_paths: HashMap::new(),
+            measure_paths: HashMap::new(),
         }
     }
 
@@ -148,10 +154,13 @@ impl MultiFactJoinGroups {
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
         let groups = Self::build_groups(&query_tools, &measures_join_hints)?;
+        let (dimension_paths, measure_paths) = Self::precompute_paths(&groups)?;
         Ok(Self {
             query_tools,
             measures_join_hints,
             groups,
+            dimension_paths,
+            measure_paths,
         })
     }
 
@@ -217,32 +226,46 @@ impl MultiFactJoinGroups {
     }
 
     /// Returns the join path from root to the dimension's cube.
-    /// Uses the first group since dimension paths are identical across all groups.
+    /// Precomputed from the first group (dimension paths are identical across all groups).
     pub fn resolve_join_path_for_dimension(
         &self,
         dimension: &Rc<MemberSymbol>,
-    ) -> Result<Option<Vec<String>>, CubeError> {
-        if self.groups.is_empty() {
-            return Ok(None);
-        }
-        let paths = Self::build_cube_paths(&*self.groups[0].0)?;
-        Ok(paths.get(&dimension.cube_name()).cloned())
+    ) -> Option<&Vec<String>> {
+        self.dimension_paths.get(&dimension.cube_name())
     }
 
     /// Returns the join path from root to the measure's cube.
-    /// Looks up the group that contains the measure.
+    /// Precomputed per measure from its group's JoinDefinition.
     pub fn resolve_join_path_for_measure(
         &self,
         measure: &Rc<MemberSymbol>,
-    ) -> Result<Option<Vec<String>>, CubeError> {
-        let full_name = measure.full_name();
-        for (join, measures) in &self.groups {
-            if measures.iter().any(|m| m.full_name() == full_name) {
-                let paths = Self::build_cube_paths(&**join)?;
-                return Ok(paths.get(&measure.cube_name()).cloned());
+    ) -> Option<&Vec<String>> {
+        self.measure_paths.get(&measure.full_name())
+    }
+
+    fn precompute_paths(
+        groups: &[(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)],
+    ) -> Result<(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>), CubeError> {
+        let dimension_paths = if groups.is_empty() {
+            HashMap::new()
+        } else {
+            Self::build_cube_paths(&*groups[0].0)?
+        };
+
+        let mut measure_paths = HashMap::new();
+        for (join, measures) in groups {
+            if measures.is_empty() {
+                continue;
+            }
+            let cube_paths = Self::build_cube_paths(&**join)?;
+            for m in measures {
+                if let Some(path) = cube_paths.get(&m.cube_name()) {
+                    measure_paths.insert(m.full_name(), path.clone());
+                }
             }
         }
-        Ok(None)
+
+        Ok((dimension_paths, measure_paths))
     }
 
     fn build_cube_paths(
@@ -349,8 +372,8 @@ mod tests {
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert_eq!(
-            groups.resolve_join_path_for_measure(&orders_count).unwrap(),
-            Some(vec!["customers".to_string(), "orders".to_string()])
+            groups.resolve_join_path_for_measure(&orders_count),
+            Some(&vec!["customers".to_string(), "orders".to_string()])
         );
     }
 
@@ -370,8 +393,8 @@ mod tests {
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert_eq!(
-            groups.resolve_join_path_for_dimension(&customers_name).unwrap(),
-            Some(vec!["customers".to_string()])
+            groups.resolve_join_path_for_dimension(&customers_name),
+            Some(&vec!["customers".to_string()])
         );
     }
 
@@ -392,20 +415,19 @@ mod tests {
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert_eq!(
-            groups.resolve_join_path_for_measure(&orders_count).unwrap(),
-            Some(vec!["customers".to_string(), "orders".to_string()])
+            groups.resolve_join_path_for_measure(&orders_count),
+            Some(&vec!["customers".to_string(), "orders".to_string()])
         );
         assert_eq!(
-            groups.resolve_join_path_for_measure(&returns_count).unwrap(),
-            Some(vec!["customers".to_string(), "returns".to_string()])
+            groups.resolve_join_path_for_measure(&returns_count),
+            Some(&vec!["customers".to_string(), "returns".to_string()])
         );
-        // Dimension path is the same from any group
         assert_eq!(
-            groups.resolve_join_path_for_dimension(&customers_name).unwrap(),
-            Some(vec!["customers".to_string()])
+            groups.resolve_join_path_for_dimension(&customers_name),
+            Some(&vec!["customers".to_string()])
         );
         // Unknown measure
         let unknown = ctx.create_symbol("customers.count").unwrap();
-        assert!(groups.resolve_join_path_for_measure(&unknown).unwrap().is_none());
+        assert!(groups.resolve_join_path_for_measure(&unknown).is_none());
     }
 }
