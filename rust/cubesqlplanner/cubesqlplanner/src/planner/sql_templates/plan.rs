@@ -462,6 +462,12 @@ impl PlanSqlTemplates {
 
                 return self.binary_expr(left_column, &is_not_distinct_from_op, right_column);
             }
+            if self.supports_is_not_distinct_from_expr() {
+                return self.render.render_template(
+                    "expressions/is_not_distinct_from",
+                    context! { left => left_column.as_str(), right => right_column.as_str() },
+                );
+            }
             format!(
                 " OR ({} AND {})",
                 self.is_null_expr(&left_column, false)?,
@@ -484,6 +490,11 @@ impl PlanSqlTemplates {
     pub fn supports_is_not_distinct_from(&self) -> bool {
         self.render
             .contains_template("operators/is_not_distinct_from")
+    }
+
+    pub fn supports_is_not_distinct_from_expr(&self) -> bool {
+        self.render
+            .contains_template("expressions/is_not_distinct_from")
     }
 
     pub fn supports_generated_time_series(
