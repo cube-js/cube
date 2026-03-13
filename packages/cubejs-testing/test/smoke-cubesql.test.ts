@@ -169,7 +169,7 @@ describe('SQL API', () => {
       const execute = () => new Promise<void>((resolve, reject) => {
         const onData = jest.fn((chunk: Buffer) => {
           const chunkStr = chunk.toString('utf-8');
-          
+
           if (isFirstChunk) {
             isFirstChunk = false;
             const json = JSON.parse(chunkStr);
@@ -201,13 +201,13 @@ describe('SQL API', () => {
       });
 
       await execute();
-      
+
       // Verify schema was sent first
       expect(schemaReceived).toBe(true);
-      
+
       // Verify empty data was sent
       expect(emptyDataReceived).toBe(true);
-      
+
       // Verify no actual rows were returned
       const dataLines = data.split('\n').filter((it) => it.trim());
       if (dataLines.length > 0) {
@@ -315,6 +315,59 @@ describe('SQL API', () => {
       it('set variable', async () => {
         expect(await generateSql(`
           SET MyVariable = 'Foo'
+        `)).toMatchSnapshot();
+      });
+    });
+
+    describe('Query convert API', () => {
+      async function generateSql(query: string) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/convert`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({
+            input: 'sql',
+            output: 'rest',
+            query,
+          }),
+        });
+        const { status, statusText } = response;
+        const body = await response.json();
+
+        // To stabilize responses
+        delete body.requestId;
+
+        return {
+          status,
+          statusText,
+          body,
+        };
+      }
+
+      it('regular query', async () => {
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders;')).toMatchSnapshot();
+      });
+
+      it('regular query with filter', async () => {
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders WHERE status = \'foo\';')).toMatchSnapshot();
+      });
+
+      it('regular query with time dimension filter', async () => {
+        expect(await generateSql(`
+          SELECT status
+          FROM Orders
+          WHERE createdAt > CAST('2024-01-01' AS DATE) and createdAt < CAST('2026-01-01' AS DATE)
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper with parameters', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = 'foo'
         `)).toMatchSnapshot();
       });
     });
