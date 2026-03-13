@@ -216,6 +216,56 @@ impl MultiFactJoinGroups {
         self.groups.len()
     }
 
+    /// Returns the join path from root to the dimension's cube.
+    /// Uses the first group since dimension paths are identical across all groups.
+    pub fn resolve_join_path_for_dimension(
+        &self,
+        dimension: &Rc<MemberSymbol>,
+    ) -> Result<Option<Vec<String>>, CubeError> {
+        if self.groups.is_empty() {
+            return Ok(None);
+        }
+        let paths = Self::build_cube_paths(&*self.groups[0].0)?;
+        Ok(paths.get(&dimension.cube_name()).cloned())
+    }
+
+    /// Returns the join path from root to the measure's cube.
+    /// Looks up the group that contains the measure.
+    pub fn resolve_join_path_for_measure(
+        &self,
+        measure: &Rc<MemberSymbol>,
+    ) -> Result<Option<Vec<String>>, CubeError> {
+        let full_name = measure.full_name();
+        for (join, measures) in &self.groups {
+            if measures.iter().any(|m| m.full_name() == full_name) {
+                let paths = Self::build_cube_paths(&**join)?;
+                return Ok(paths.get(&measure.cube_name()).cloned());
+            }
+        }
+        Ok(None)
+    }
+
+    fn build_cube_paths(
+        join: &dyn JoinDefinition,
+    ) -> Result<HashMap<String, Vec<String>>, CubeError> {
+        let root = join.static_data().root.clone();
+        let mut paths: HashMap<String, Vec<String>> = HashMap::new();
+        paths.insert(root.clone(), vec![root]);
+
+        for join_item in join.joins()? {
+            let sd = join_item.static_data();
+            let parent_path = paths
+                .get(&sd.original_from)
+                .cloned()
+                .unwrap_or_else(|| vec![sd.original_from.clone()]);
+            let mut path = parent_path;
+            path.push(sd.original_to.clone());
+            paths.insert(sd.original_to.clone(), path);
+        }
+
+        Ok(paths)
+    }
+
     pub fn single_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
         if self.groups.is_empty() {
             return Ok(None);
@@ -281,5 +331,81 @@ mod tests {
         assert!(groups.is_multi_fact());
         assert_eq!(groups.num_groups(), 2);
         assert!(groups.single_join().is_err());
+    }
+
+    #[test]
+    fn test_resolve_join_path_for_measure() {
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[customers_name])
+            .build(&[orders_count.clone()])
+            .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
+
+        assert_eq!(
+            groups.resolve_join_path_for_measure(&orders_count).unwrap(),
+            Some(vec!["customers".to_string(), "orders".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_resolve_join_path_for_dimension() {
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[customers_name.clone()])
+            .build(&[orders_count])
+            .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
+
+        assert_eq!(
+            groups.resolve_join_path_for_dimension(&customers_name).unwrap(),
+            Some(vec!["customers".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_resolve_join_paths_multi_fact() {
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let returns_count = ctx.create_symbol("returns.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[customers_name.clone()])
+            .build(&[orders_count.clone(), returns_count.clone()])
+            .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
+
+        assert_eq!(
+            groups.resolve_join_path_for_measure(&orders_count).unwrap(),
+            Some(vec!["customers".to_string(), "orders".to_string()])
+        );
+        assert_eq!(
+            groups.resolve_join_path_for_measure(&returns_count).unwrap(),
+            Some(vec!["customers".to_string(), "returns".to_string()])
+        );
+        // Dimension path is the same from any group
+        assert_eq!(
+            groups.resolve_join_path_for_dimension(&customers_name).unwrap(),
+            Some(vec!["customers".to_string()])
+        );
+        // Unknown measure
+        let unknown = ctx.create_symbol("customers.count").unwrap();
+        assert!(groups.resolve_join_path_for_measure(&unknown).unwrap().is_none());
     }
 }
