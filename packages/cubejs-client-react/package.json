@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
-    "eslint": "^7.21.0",
+    "eslint": "^9.26.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",

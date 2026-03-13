@@ -30,7 +30,7 @@
     "@babel/preset-env": "^7.3.1",
     "@types/jest": "^29",
     "babel-jest": "^29",
-    "eslint": "^7.21.0",
+    "eslint": "^9.26.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^10.0.0",
