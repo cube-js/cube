@@ -359,6 +359,7 @@ impl PreAggregationsCompiler {
                 .map(|v| JoinHintItem::Single(v))
                 .collect_vec(),
         );
+        println!("!!! pre aggr jh: {:?}", pre_aggr_join_hints);
 
         let join_planner = JoinPlanner::new(self.query_tools.clone());
         let pre_aggrs_for_join = rollups
@@ -368,6 +369,7 @@ impl PreAggregationsCompiler {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        println!("!!! pre joins {}", pre_aggrs_for_join.len());
         let target_joins = join_planner.resolve_join_members_by_hints(&pre_aggr_join_hints)?;
         let mut existing_joins = vec![];
         for join_pre_aggr in pre_aggrs_for_join.iter() {
@@ -383,9 +385,12 @@ impl PreAggregationsCompiler {
                     .map(|v| JoinHintItem::Single(v))
                     .collect_vec(),
             );
+            println!("!!! pre aggr jjjjjjj: {:?}", join_pre_aggr_join_hints);
             existing_joins.append(
                 &mut join_planner.resolve_join_members_by_hints(&join_pre_aggr_join_hints)?,
             );
+            println!("!!! existiong len: {}", existing_joins.len());
+            println!("!!! existiong : {:?}", existing_joins);
         }
 
         let not_existing_joins = target_joins
@@ -397,6 +402,8 @@ impl PreAggregationsCompiler {
             })
             .collect_vec();
 
+        println!("!!! non existing: {}", not_existing_joins.len());
+
         if not_existing_joins.is_empty() {
             return Err(CubeError::user(format!("Nothing to join in rollup join. Target joins are included in existing rollup joins")));
         }
@@ -405,6 +412,8 @@ impl PreAggregationsCompiler {
             .iter()
             .map(|item| self.make_pre_aggregation_join_item(&pre_aggrs_for_join, item))
             .collect::<Result<Vec<_>, _>>()?;
+        println!("!!! pre joins itml {}", items.len());
+
         let res = PreAggregationJoin {
             root: items[0].from.clone(),
             items,

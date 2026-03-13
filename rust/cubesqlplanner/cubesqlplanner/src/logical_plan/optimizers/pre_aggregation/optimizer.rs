@@ -4,6 +4,7 @@ use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
 use crate::planner::join_hints::JoinHints;
+use crate::planner::multi_fact_join_groups::MeasuresJoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_join_hints;
 use crate::planner::sql_evaluator::MemberSymbol;
@@ -464,16 +465,19 @@ impl PreAggregationOptimizer {
         if match_state == MatchState::NotMatched {
             return Ok(None);
         }
+        let mut measures_join_hints_builder = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&schema.dimensions)
+            .add_dimensions(&schema.time_dimensions);
+        if let Some(all_filters) = filters.all_filters() {
+            measures_join_hints_builder =
+                measures_join_hints_builder.add_filters(&all_filters.items);
+        }
         let matched = self.try_match_measures(
             &all_measures,
             pre_aggregation,
             match_state == MatchState::Partial,
+            measures_join_hints_builder.build(&[])?,
         )?;
-        if let Some(matched_measures) = &matched {
-            if !self.check_join_hints_match(schema, pre_aggregation, matched_measures)? {
-                return Ok(None);
-            }
-        }
         Ok(matched)
     }
 
@@ -482,50 +486,15 @@ impl PreAggregationOptimizer {
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
         only_addictive: bool,
+        meaasure_join_hints: MeasuresJoinHints,
     ) -> Result<Option<HashSet<String>>, CubeError> {
-        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
+        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive, meaasure_join_hints);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {
                 return Ok(None);
             }
         }
         Ok(Some(matcher.matched_measures().clone()))
-    }
-
-    /// Checks that pre-aggregation's join hints cover all joins the query needs.
-    /// Each hint item from the query must appear in the pre-aggregation's hints.
-    /// Pre-agg may have extra items (from extra dimensions) — that's fine.
-    fn check_join_hints_match(
-        &self,
-        schema: &Rc<LogicalSchema>,
-        pre_aggregation: &CompiledPreAggregation,
-        matched_measures: &HashSet<String>,
-    ) -> Result<bool, CubeError> {
-        let mut query_base_hints = JoinHints::new();
-        for sym in schema.dimensions.iter() {
-            query_base_hints.extend(&collect_join_hints(sym)?);
-        }
-        for sym in schema.time_dimensions.iter() {
-            query_base_hints.extend(&collect_join_hints(sym)?);
-        }
-
-        for pre_agg_mh in pre_aggregation.measures_join_hints.measure_hints() {
-            if !matched_measures.contains(&pre_agg_mh.measure.full_name()) {
-                continue;
-            }
-            let mut query_measure_hints = query_base_hints.clone();
-            query_measure_hints.extend(&collect_join_hints(&pre_agg_mh.measure)?);
-
-            let pre_agg_items = pre_agg_mh.hints.items();
-            let all_covered = query_measure_hints
-                .items()
-                .iter()
-                .all(|item| pre_agg_items.contains(item));
-            if !all_covered {
-                return Ok(false);
-            }
-        }
-        Ok(true)
     }
 
     fn match_dimensions(

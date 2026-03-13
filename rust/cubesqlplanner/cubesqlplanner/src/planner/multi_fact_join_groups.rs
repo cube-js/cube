@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 // --- MeasuresJoinHints: lightweight, no join building ---
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MeasureJoinHints {
     pub measure: Rc<MemberSymbol>,
     pub hints: JoinHints,
@@ -54,7 +54,7 @@ impl MeasuresJoinHintsBuilder {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
     measure_hints: Vec<MeasureJoinHints>,
@@ -115,6 +115,13 @@ impl MeasuresJoinHints {
 
     pub fn measure_hints(&self) -> &[MeasureJoinHints] {
         &self.measure_hints
+    }
+
+    pub fn hints_for_measure(&self, measure: &MemberSymbol) -> Option<JoinHints> {
+        self.measure_hints
+            .iter()
+            .find(|mh| mh.measure.full_name() == measure.full_name())
+            .map(|mh| mh.hints.clone())
     }
 }
 
