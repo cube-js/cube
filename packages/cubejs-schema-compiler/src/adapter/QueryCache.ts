@@ -1,26 +1,66 @@
-export class QueryCache {
-  private readonly storage: {};
+export interface QueryCacheInterface {
+  cache(key: any[], fn: Function): any;
+}
+
+/**
+ * Uses string concatenation (+=) instead of JSON.stringify for performance:
+ * - V8 optimizes += with ConsString (tree of string segments)
+ * - JSON.stringify builds a new flat string from scratch each time
+ * - For strings/numbers (common case), ~3x faster than JSON.stringify
+ * - Only falls back to JSON.stringify for objects/arrays
+ */
+export function fastComputeCacheKey(key: unknown): string {
+  if (Array.isArray(key)) {
+    let result = '';
+
+    for (let i = 0; i < key.length; i++) {
+      if (i > 0) {
+        result += ':';
+      }
+
+      if (typeof key[i] === 'string' || typeof key[i] === 'number') {
+        result += key[i];
+      } else if (key[i] === undefined) {
+        result += 'undefined';
+      } else if (key[i] === null) {
+        result += 'null';
+      } else if (typeof key[i] === 'function') {
+        throw new TypeError(`Function is not allowed as subkey, passed as ${key[i]}`);
+      } else {
+        result += JSON.stringify(key[i]);
+      }
+    }
+
+    return result;
+  }
+
+  if (typeof key === 'string') {
+    return key;
+  }
+
+  return JSON.stringify(key);
+}
+
+export class QueryCache implements QueryCacheInterface {
+  private readonly storage: Map<string, any>;
 
   public constructor() {
-    this.storage = {};
+    this.storage = new Map();
   }
 
   /**
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
   public cache(key: any[], fn: Function): any {
-    let keyHolder = this.storage;
-    const { length } = key;
-    for (let i = 0; i < length - 1; i++) {
-      if (!keyHolder[key[i]]) {
-        keyHolder[key[i]] = {};
-      }
-      keyHolder = keyHolder[key[i]];
+    const keyString = fastComputeCacheKey(key);
+
+    if (this.storage.has(keyString)) {
+      return this.storage.get(keyString);
     }
-    const lastKey = key[length - 1];
-    if (!keyHolder[lastKey]) {
-      keyHolder[lastKey] = fn();
-    }
-    return keyHolder[lastKey];
+
+    const result = fn();
+    this.storage.set(keyString, result);
+
+    return result;
   }
 }
