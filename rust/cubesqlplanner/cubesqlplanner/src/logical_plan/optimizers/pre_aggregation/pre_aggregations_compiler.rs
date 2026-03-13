@@ -831,4 +831,63 @@ mod tests {
         assert_eq!(compiled.dimensions.len(), 1);
         assert_eq!(compiled.dimensions[0].full_name(), "orders.status");
     }
+
+    #[test]
+    fn test_compile_rollup_join_calculated_measures() {
+        let schema = MockSchema::from_yaml_file("common/rollup_join_calculated_measures.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec![
+            "line_items".to_string(),
+            "facts".to_string(),
+            "campaigns".to_string(),
+        ];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name = PreAggregationFullName::new(
+            "line_items".to_string(),
+            "combined_rollup_join".to_string(),
+        );
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        // Check source is Join with correct structure
+        match compiled.source.as_ref() {
+            PreAggregationSource::Join(join) => {
+                // Root should be li_rollup
+                match join.root.as_ref() {
+                    PreAggregationSource::Single(table) => {
+                        assert_eq!(table.name, "li_rollup", "Root should be li_rollup");
+                    }
+                    _ => panic!("Expected Single source for root"),
+                }
+                // Should have 2 join items (line_items→facts, line_items→campaigns)
+                assert_eq!(
+                    join.items.len(),
+                    2,
+                    "Should have 2 join items, got {}",
+                    join.items.len()
+                );
+                let to_names: Vec<String> = join
+                    .items
+                    .iter()
+                    .map(|item| match item.to.as_ref() {
+                        PreAggregationSource::Single(table) => table.name.clone(),
+                        _ => panic!("Expected Single source"),
+                    })
+                    .collect();
+                assert!(
+                    to_names.contains(&"facts_rollup".to_string()),
+                    "Should join to facts_rollup, got: {:?}",
+                    to_names
+                );
+                assert!(
+                    to_names.contains(&"campaigns_rollup".to_string()),
+                    "Should join to campaigns_rollup, got: {:?}",
+                    to_names
+                );
+            }
+            _ => panic!("Expected PreAggregationSource::Join"),
+        }
+    }
 }

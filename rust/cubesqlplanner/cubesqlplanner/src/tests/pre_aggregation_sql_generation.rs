@@ -659,7 +659,7 @@ fn test_rollup_join_calculated_measures_through_view() {
     let schema = MockSchema::from_yaml_file("common/rollup_join_calculated_measures.yaml");
     let ctx = TestContext::new(schema).unwrap();
 
-    let (sql, _pre_aggrs) = ctx
+    let (sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - my_view.facts_avg_cost
@@ -669,6 +669,18 @@ fn test_rollup_join_calculated_measures_through_view() {
         "})
         .unwrap();
 
+    let pre_agg_names: Vec<_> = pre_aggrs
+        .iter()
+        .map(|pa| format!("{}.{}", pa.cube_name(), pa.name()))
+        .collect();
+    assert!(
+        pre_agg_names
+            .iter()
+            .any(|n| n == "line_items.combined_rollup_join"),
+        "Should use combined_rollup_join, got: {:?}\nSQL:\n{}",
+        pre_agg_names,
+        sql
+    );
     assert!(
         sql.contains("campaigns_rollup"),
         "SQL should reference campaigns_rollup, got:\n{}",
