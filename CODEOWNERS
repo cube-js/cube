@@ -3,8 +3,13 @@
 # someone opens a pull request.
 # *           @cube-js/core
 
-/rust/cubesql/                         @cube-js/sql-api
-/rust/cubestore/                       @cube-js/cube-store
+/rust/cubenativeutils                      @cube-js/tesseract
+/rust/cubeorchestrator                     @cube-js/tesseract
+/rust/cubenativeutils                      @cube-js/tesseract
+/rust/cubesql/                             @cube-js/sql-api
+/rust/cubenativeutils                      @cube-js/tesseract
+/rust/cubestore/                           @cube-js/cube-store
+/rust/cubestore/cubestore/src/cachestore   @cube-js/cache-store
 
 /packages/cubejs-client*/              @cube-js/client
 /packages/cubejs-playground/           @cube-js/client
@@ -25,7 +30,7 @@
 /packages/*-schema-extension/          @cube-js/schema-compiler
 
 # Doc reviewers
-/docs/      @cube-js/doc-reviewers
+/docs/      @igorlukanin
 
 # Developer Relations and Community
-/examples/  @cube-js/developer-relations-and-community
+/examples/  @igorlukanin
