@@ -1365,6 +1365,53 @@ const variables: Record<string, (...args: any) => any> = {
       .asBool()
   ),
 
+  /**
+   * ClickHouse sort collation.
+   */
+  clickhouseSortCollation: ({ dataSource }: {dataSource: string }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_CLICKHOUSE_SORT_COLLATION', dataSource)
+    ];
+    if (!val) {
+      // Default to 'en' collation
+      return 'en';
+    }
+    return val;
+  },
+
+  /**
+   * Clickhouse use collation flag.
+   */
+
+  clickhouseUseCollation: ({ dataSource }: { dataSource: string }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_CLICKHOUSE_USE_COLLATION',
+        dataSource,
+      )
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_CLICKHOUSE_USE_COLLATION',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      // Default to true
+      return true;
+    }
+  },
+
   /** ****************************************************************
    * ElasticSearch Driver                                            *
    ***************************************************************** */
