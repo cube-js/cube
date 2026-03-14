@@ -41,6 +41,18 @@ tools][ref-viz-tools]. Some of the features with partial support are listed belo
 | Nested [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api] |
 | [Custom time formats][ref-custom-time-formats] | [Playground][ref-playground] and [Workbooks][ref-workbooks] |
 
+## Personal Core Data API Token
+
+Cube users can generate a personal token to authenticate SQL API connections from
+external tools like BI dashboards, notebooks, and SQL clients. Navigate to
+<Btn>Preferences → Personal Core Data API Token</Btn> and click
+<Btn>Generate Token</Btn>.
+
+The token authenticates as that user, so all [groups][ref-groups],
+[user attributes][ref-user-attributes], and [data access policies][ref-dap]
+are applied to queries made with this token. The page also provides connection
+instructions including host, port, and database name for your deployment.
+
 ## Authentication methods
 
 Support for authentication methods differ across APIs, integrations, and [visualization
@@ -83,3 +95,6 @@ tools][ref-viz-tools]:
 [ref-playground]: /product/administration/workspace/playground
 [ref-custom-time-formats]: /product/data-modeling/reference/types-and-formats#custom-time-formats
 [ref-workbooks]: /product/exploration/workbooks
+[ref-groups]: /product/administration/users-and-permissions/user-groups
+[ref-user-attributes]: /product/administration/users-and-permissions/user-attributes
+[ref-dap]: /product/auth/data-access-policies
