@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable global-require */
-import R from 'ramda';
 import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
   FROM_PARTITION_RANGE,
   TO_PARTITION_RANGE
 } from '@cubejs-backend/shared';
-import { PreAggregationPartitionRangeLoader, PreAggregations, version } from '../../src';
+import crypto from 'crypto';
+
+import { PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version } from '../../src';
 
 class MockDriver {
   public tables: string[] = [];
@@ -123,34 +124,32 @@ describe('PreAggregations', () => {
   let mockExternalDriverFactory: (() => Promise<MockDriver>) | null = null;
   let queryCache: any = null;
 
-  const basicQuery: any = {
+  const defaultCacheKeyQuery: [string, any[], Record<string, any>] = ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
+    renewalThreshold: 10,
+    external: false,
+  }];
+
+  const createBasicQuery = (overrides: Record<string, any> = {}): any => ({
     query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
     values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
     cacheKeyQueries: {
       renewalThreshold: 21600,
-      queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
-        renewalThreshold: 10,
-        external: false,
-      }]]
+      queries: [defaultCacheKeyQuery]
     },
     preAggregations: [{
       preAggregationsSchema: 'stb_pre_aggregations',
       tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
       loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
-      invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
-        renewalThreshold: 10,
-        external: false,
-      }]]
+      invalidateKeyQueries: [defaultCacheKeyQuery],
     }],
-    requestId: 'basic'
-  };
+    requestId: 'basic',
+    ...overrides,
+  });
 
-  const basicQueryExternal = R.clone(basicQuery);
-  basicQueryExternal.preAggregations[0].external = true;
-  const basicQueryWithRenew = R.clone(basicQuery);
-  basicQueryWithRenew.renewQuery = true;
-  const basicQueryExternalWithRenew = R.clone(basicQueryExternal);
-  basicQueryExternalWithRenew.renewQuery = true;
+  const basicQuery: any = createBasicQuery();
+  const basicQueryExternal = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }] });
+  const basicQueryWithRenew = createBasicQuery({ renewQuery: true });
+  const basicQueryExternalWithRenew = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }], renewQuery: true });
 
   beforeEach(() => {
     mockDriver = new MockDriver();
@@ -167,11 +166,6 @@ describe('PreAggregations', () => {
       return driver;
     };
 
-    jest.resetModules();
-
-    // Dynamic require after resetModules to ensure fresh module state
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { QueryCache } = require('../../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       'TEST',
       mockDriverFactory as any,
@@ -179,12 +173,15 @@ describe('PreAggregations', () => {
       () => {},
       {
         cacheAndQueueDriver: 'memory',
-        queueOptions: () => ({
+        queueOptions: async () => ({
           executionTimeout: 1,
           concurrency: 2,
         }),
       },
     );
+
+    // Reset the shared in-memory cache store between tests
+    (queryCache.getCacheDriver() as LocalCacheDriver).reset();
   });
 
   describe('loadAllPreAggregationsIfNeeded', () => {
@@ -198,7 +195,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -225,7 +222,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -252,7 +249,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -279,7 +276,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -310,7 +307,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -333,6 +330,134 @@ describe('PreAggregations', () => {
     });
   });
 
+  describe('PreAggregationLoader content_version mismatch with refreshKey', () => {
+    let preAggregations: PreAggregations | null = null;
+    let loggerCalls: [string, any][];
+
+    const mockLogger: any = (msg: string, params: any) => {
+      loggerCalls.push([msg, params]);
+    };
+
+    beforeEach(async () => {
+      loggerCalls = [];
+
+      preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        mockLogger,
+        queryCache!,
+        {
+          queueOptions: () => ({
+            executionTimeout: 2,
+            concurrency: 2,
+          }),
+        },
+      );
+    });
+
+    test('content_version mismatch, recently built → background refresh, returns existing', async () => {
+      // First, build the pre-aggregation with waitForRenew
+      mockDriver!.now = Date.now();
+      const firstQuery = createBasicQuery({ renewQuery: true });
+      const { preAggregationsTablesToTempTables: firstResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(firstQuery);
+      const firstTableName = firstResult[0][1].targetTableName;
+      expect(firstTableName).toBeTruthy();
+
+      // Now change the invalidation key query to trigger a content_version mismatch.
+      // The structure stays the same (same loadSql), but the invalidation key changes.
+      const differentKey: [string, any[], Record<string, any>] = ['SELECT \'different_key\'', [], {
+        renewalThreshold: 10,
+        external: false,
+      }];
+      const secondQuery = createBasicQuery({
+        renewQuery: true,
+        cacheKeyQueries: { renewalThreshold: 21600, queries: [differentKey] },
+        preAggregations: [{ ...basicQuery.preAggregations[0], invalidateKeyQueries: [differentKey] }],
+      });
+
+      // Keep driver.now close to original (recently built, within 120s threshold)
+      mockDriver!.now = Date.now() + 5000;
+
+      loggerCalls = [];
+
+      const { preAggregationsTablesToTempTables: secondResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(secondQuery);
+
+      // Should return the existing table (not block for rebuild)
+      expect(secondResult[0][1].targetTableName).toEqual(firstTableName);
+
+      // The logger should indicate a background refresh, not a blocking wait
+      const bgRefreshMsg = loggerCalls.find(([msg]) => msg === 'Pre-aggregation recently built, refreshing in background');
+      expect(bgRefreshMsg).toBeTruthy();
+    });
+
+    test('content_version mismatch, old build → blocks on executeInQueue', async () => {
+      // First build
+      mockDriver!.now = Date.now() - 200 * 1000; // Build happened 200s ago
+      const firstQuery = createBasicQuery({ renewQuery: true });
+      await preAggregations!.loadAllPreAggregationsIfNeeded(firstQuery);
+
+      // Now change the invalidation key and set current time far ahead
+      const anotherKey: [string, any[], Record<string, any>] = ['SELECT \'another_different_key\'', [], {
+        renewalThreshold: 10,
+        external: false,
+      }];
+      const secondQuery = createBasicQuery({
+        renewQuery: true,
+        cacheKeyQueries: { renewalThreshold: 21600, queries: [anotherKey] },
+        preAggregations: [{ ...basicQuery.preAggregations[0], invalidateKeyQueries: [anotherKey] }],
+      });
+
+      // Set driver.now to current time so buildAge > 120s threshold
+      mockDriver!.now = Date.now();
+
+      loggerCalls = [];
+
+      const { preAggregationsTablesToTempTables: secondResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(secondQuery);
+
+      // Should block and return the newly built table
+      expect(secondResult[0][1].targetTableName).toBeTruthy();
+
+      // The logger should indicate it waited for renew (blocking path)
+      const waitMsg = loggerCalls.find(([msg]) => msg === 'Waiting for pre-aggregation renew');
+      expect(waitMsg).toBeTruthy();
+    });
+
+    test('content_version mismatch, waitForRenew=false → returns existing immediately, no blocking', async () => {
+      // First build with renew
+      mockDriver!.now = Date.now() - 200 * 1000;
+      const firstQuery = createBasicQuery({ renewQuery: true });
+      const { preAggregationsTablesToTempTables: firstResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(firstQuery);
+      const firstTableName = firstResult[0][1].targetTableName;
+
+      // Now load without renewQuery (waitForRenew=false) and different invalidation key
+      const yetAnotherKey: [string, any[], Record<string, any>] = ['SELECT \'yet_another_key\'', [], {
+        renewalThreshold: 10,
+        external: false,
+      }];
+      const secondQuery = createBasicQuery({
+        renewQuery: false,
+        cacheKeyQueries: { renewalThreshold: 21600, queries: [yetAnotherKey] },
+        preAggregations: [{ ...basicQuery.preAggregations[0], invalidateKeyQueries: [yetAnotherKey] }],
+      });
+
+      // Set driver.now to current time, buildAge > threshold
+      mockDriver!.now = Date.now();
+
+      loggerCalls = [];
+
+      const { preAggregationsTablesToTempTables: secondResult } = await preAggregations!.loadAllPreAggregationsIfNeeded(secondQuery);
+
+      // Should return existing table immediately (non-blocking)
+      expect(secondResult[0][1].targetTableName).toEqual(firstTableName);
+
+      // Should NOT have a blocking wait message — waitForRenew=false never blocks
+      const waitMsg = loggerCalls.find(([msg]) => msg === 'Waiting for pre-aggregation renew');
+      expect(waitMsg).toBeFalsy();
+      const bgBlockMsg = loggerCalls.find(([msg]) => msg === 'Pre-aggregation recently built, refreshing in background');
+      expect(bgBlockMsg).toBeFalsy();
+    });
+  });
+
   describe('naming_version tests', () => {
     let preAggregations: PreAggregations | null = null;
 
@@ -344,7 +469,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -395,7 +520,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -932,8 +1057,6 @@ describe('PreAggregations', () => {
       // Old implementation (before the unsigned shift fix)
       // This would hang on certain inputs, but for inputs that don't trigger the bug,
       // it should produce the same results as the new implementation
-      const crypto = require('crypto');
-
       function oldVersion(cacheKey: any): string | null {
         let result = '';
 

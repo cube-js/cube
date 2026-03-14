@@ -332,14 +332,33 @@ export class PreAggregationLoader {
         return mostRecentResult();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
-          this.logger('Waiting for pre-aggregation renew', {
-            preAggregation: this.preAggregation,
-            requestId: this.requestId,
-            queryKey: this.preAggregationQueryKey(invalidationKeys),
-            newVersionEntry
-          });
-          await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
-          return mostRecentResult();
+          const refreshKeyRenewalThreshold = (this.queryCache.options.refreshKeyRenewalThreshold || 120) * 1000;
+          const buildAge = nowTimestamp(client) - versionEntry.last_updated_at;
+
+          if (
+            versionEntry.structure_version === newVersionEntry.structure_version &&
+            buildAge < refreshKeyRenewalThreshold
+          ) {
+            this.logger('Pre-aggregation recently built, refreshing in background', {
+              preAggregation: this.preAggregation,
+              requestId: this.requestId,
+              queryKey: this.preAggregationQueryKey(invalidationKeys),
+              newVersionEntry,
+              buildAge,
+              refreshKeyRenewalThreshold,
+            });
+            this.scheduleRefresh(invalidationKeys, newVersionEntry);
+            // Falls through to return existing versionEntry
+          } else {
+            this.logger('Waiting for pre-aggregation renew', {
+              preAggregation: this.preAggregation,
+              requestId: this.requestId,
+              queryKey: this.preAggregationQueryKey(invalidationKeys),
+              newVersionEntry,
+            });
+            await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
+            return mostRecentResult();
+          }
         } else {
           this.scheduleRefresh(invalidationKeys, newVersionEntry);
         }
