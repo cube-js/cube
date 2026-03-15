@@ -277,6 +277,7 @@ export class ClickHouseQuery extends BaseQuery {
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
     delete templates.types.binary;
+    templates.expressions.is_not_distinct_from = 'isNotDistinctFrom({{ left }}, {{ right }})';
     return templates;
   }
 }
