@@ -244,6 +244,13 @@ Response:
 
 ## `{base_path}/v1/meta`
 
+<InfoBox>
+
+In Cube Cloud, consider using the [Metadata API][self-metadata-api] instead.
+It provides additional information such as data lineage.
+
+</InfoBox>
+
 Get meta-information for cubes and views defined in the data model. Information about cubes and views with `public: false` will not be returned.
 
 Response
@@ -556,7 +563,232 @@ Example response:
 ]
 ```
 
-## `/readyz`
+## Metadata API
+
+<InfoBox>
+
+Metadata API is only available in Cube Cloud.
+
+</InfoBox>
+
+These endpoints provide programmatic access to data model metadata for data
+catalogs, lineage tools, and other integrations. To access these endpoints,
+you need a JWT token which can be obtained via the
+[Control Plane API][ref-control-plane-api].
+
+### `{base_path}/v1/data-sources`
+
+Send a `GET` request to list configured data sources visible to the authenticated user.
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer TOKEN" \
+  https://example.cubecloud.dev/cubejs-api/v1/data-sources
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "data_sources": [
+      {
+        "name": "default",
+        "type": "postgres",
+        "database": "analytics",
+        "schema": "public"
+      }
+    ]
+  }
+}
+```
+
+### `{base_path}/v1/entities`
+
+Send a `GET` request to list all cubes and views in the data model. Results are
+sorted by type (cubes first), then by name.
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `offset` | Pagination offset | No |
+| `limit` | Maximum number of items to return | No |
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer TOKEN" \
+  "https://example.cubecloud.dev/cubejs-api/v1/entities?limit=10"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "entities": [
+      {
+        "type": "cube",
+        "name": "orders"
+      },
+      {
+        "type": "view",
+        "name": "orders_view"
+      }
+    ]
+  },
+  "pagination": {
+    "offset": 0,
+    "limit": 10,
+    "total": 2
+  }
+}
+```
+
+### `{base_path}/v1/entities/{name}`
+
+Send a `GET` request to get detailed metadata for a single cube or view.
+
+Path parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `name` | The cube or view name |
+
+Response includes:
+
+- `type` - Either `cube` or `view`
+- `name` - The cube or view name
+- `title` - Human-readable title
+- `description` - Description from the data model
+- `table_references` - Data lineage to source tables
+- `cube_references` - Relationships to other cubes
+- `measures` - Array of measures with `member_references` and `column_references`
+- `dimensions` - Array of dimensions with `is_primary_key` flag
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer TOKEN" \
+  https://example.cubecloud.dev/cubejs-api/v1/entities/orders
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "type": "cube",
+    "name": "orders",
+    "title": "Orders",
+    "description": "Order transactions",
+    "table_references": [
+      {
+        "schema": "public",
+        "table": "orders"
+      }
+    ],
+    "cube_references": ["customers", "products"],
+    "measures": [
+      {
+        "name": "count",
+        "title": "Count",
+        "type": "count",
+        "member_references": [],
+        "column_references": [
+          {
+            "schema": "public",
+            "table": "orders",
+            "column": "id"
+          }
+        ]
+      }
+    ],
+    "dimensions": [
+      {
+        "name": "id",
+        "title": "Id",
+        "type": "number",
+        "is_primary_key": true
+      },
+      {
+        "name": "status",
+        "title": "Status",
+        "type": "string",
+        "is_primary_key": false
+      }
+    ]
+  }
+}
+```
+
+### `{base_path}/v1/entities/all`
+
+Send a `POST` request to get detailed metadata for multiple cubes and views in one request.
+
+Request body:
+
+| Property | Type | Description | Required |
+| --- | --- | --- | --- |
+| `cubes` | `array` | Array of cube names to retrieve | No |
+| `views` | `array` | Array of view names to retrieve | No |
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `offset` | Pagination offset | No |
+| `limit` | Maximum number of items to return | No |
+
+Example request:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"cubes": ["orders"], "views": ["orders_view"]}' \
+  https://example.cubecloud.dev/cubejs-api/v1/entities/all
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "entities": [
+      {
+        "type": "cube",
+        "name": "orders",
+        "title": "Orders",
+        "measures": [...],
+        "dimensions": [...]
+      },
+      {
+        "type": "view",
+        "name": "orders_view",
+        "title": "Orders View",
+        "measures": [...],
+        "dimensions": [...]
+      }
+    ]
+  },
+  "pagination": {
+    "offset": 0,
+    "limit": 20,
+    "total": 2
+  }
+}
+```
+
+## Health checks
+
+### `/readyz`
 
 Reports if the deployment has successfully started. To do so, it will try to test
 the connection to the _default_ [data source][ref-datasources].
@@ -595,7 +827,7 @@ Keep-Alive: timeout=5
 {"health":"DOWN"}
 ```
 
-## `/livez`
+### `/livez`
 
 Reports if the deployment is still healthy. This is confirmed by testing any
 existing connections to data sources.
@@ -649,3 +881,5 @@ Keep-Alive: timeout=5
 [ref-cache-control]: /product/apis-integrations/rest-api#cache-control
 [ref-time-zone]: /product/apis-integrations/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
+[ref-control-plane-api]: /product/apis-integrations/control-plane-api
+[self-metadata-api]: #metadata-api
