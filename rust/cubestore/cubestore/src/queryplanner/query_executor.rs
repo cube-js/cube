@@ -1371,11 +1371,12 @@ impl ClusterSendExec {
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Result<Vec<(String, (Vec<PartitionWithFilters>, Vec<InlineTableId>))>, CubeError> {
-        let partitions = Self::logical_partitions(snapshots, tree)?;
+        let partitions = Self::logical_partitions(config, snapshots, tree)?;
         Ok(Self::assign_nodes(config, partitions))
     }
 
     fn logical_partitions(
+        config: &dyn ConfigObj,
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
@@ -1449,7 +1450,14 @@ impl ClusterSendExec {
                 })
                 .collect());
         }
-        // Ordinary partitions need to be duplicated on multiple machines.
+
+        // For joins (multiple tables), distribute by root table partitions
+        // instead of cartesian product to reduce combinations.
+        if to_multiply.len() > 1 {
+            return Ok(Self::distribute_join_partitions(config, to_multiply));
+        }
+
+        // Single table — no join, just return partitions as-is.
         let partitions = to_multiply
             .into_iter()
             .multi_cartesian_product()
@@ -1494,6 +1502,49 @@ impl ClusterSendExec {
         let mut ps: Vec<_> = leaves.into_values().collect();
         ps.sort_unstable_by_key(|ps| ps[0].get_id());
         ps
+    }
+
+    /// Distributes join partitions by batching all tables' partitions according
+    /// to the configured limit, instead of taking a cartesian product.
+    ///
+    /// Iterates from the last table backwards. Tables that fit entirely within
+    /// the remaining budget are included whole in every batch (preserving JOIN
+    /// correctness). When a table would exceed the limit, its partitions are
+    /// split across batches. All tables before the split point are also included
+    /// whole in every batch.
+    fn distribute_join_partitions(
+        config: &dyn ConfigObj,
+        tables: Vec<Vec<InlineCompoundPartition>>,
+    ) -> Vec<Vec<InlineCompoundPartition>> {
+        assert!(tables.len() > 1);
+
+        // Only the root (first/left-most) table can be safely split across
+        // batches.  All other (right) tables must be included whole in every
+        // batch, otherwise LEFT JOIN produces spurious NULLs / duplicates.
+        let right_partitions: Vec<InlineCompoundPartition> =
+            tables[1..].iter().flat_map(|t| t.iter().cloned()).collect();
+
+        let root = &tables[0];
+        let max = config.max_joined_partitions();
+        let right_count = right_partitions.len();
+
+        // Budget for root partitions per batch.
+        let chunk_size = if max == 0 || max <= right_count {
+            // No limit, or right tables alone exceed it — put all root in one batch.
+            root.len()
+        } else {
+            (max - right_count).max(1)
+        };
+
+        let mut batches = Vec::new();
+        for chunk in root.chunks(chunk_size) {
+            let mut batch = Vec::with_capacity(chunk.len() + right_count);
+            batch.extend(chunk.iter().cloned());
+            batch.extend(right_partitions.iter().cloned());
+            batches.push(batch);
+        }
+
+        batches
     }
 
     fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {

@@ -297,6 +297,8 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("sys_cachestore_info", sys_cachestore_info),
         t("sys_metastore_healthcheck", sys_metastore_healthcheck),
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
+        t("join_multi_partition_small", join_multi_partition_small),
+        t("join_multi_partition_large", join_multi_partition_large),
     ];
 
     let test_list = if prefix == "migration" {
@@ -354,6 +356,8 @@ lazy_static::lazy_static! {
         "unique_key_and_multi_partitions_hash_aggregate",
 
         // New tests
+        "join_multi_partition_small",
+        "join_multi_partition_large",
         "decimal_math",
         "planning_filter_multiple_in_for_decimal",
         "planning_numeric_cast",
@@ -11534,6 +11538,257 @@ async fn sys_cachestore_healthcheck(service: Box<dyn SqlClient>) {
         .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
         .await
         .unwrap();
+}
+
+async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.orders (order_id int, customer_id int, amount int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE INDEX orders_by_cid ON s.orders (customer_id)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.customers (customer_id int, customer_name text)")
+        .await
+        .unwrap();
+
+    // Insert 60 orders in batches of 10 to trigger compaction/split cycles.
+    // customer_id = id % 5 (5 distinct customers), amount = id * 7.
+    for batch in 0..6 {
+        let values: Vec<String> = (0..10)
+            .map(|i| {
+                let id = batch * 10 + i;
+                let cid = id % 5;
+                let amount = id * 7;
+                format!("({}, {}, {})", id, cid, amount)
+            })
+            .collect();
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.orders (order_id, customer_id, amount) VALUES {}",
+                values.join(", ")
+            ))
+            .await
+            .unwrap();
+    }
+
+    // Insert 10 customers in 1 batch.
+    let values: Vec<String> = (0..5)
+        .map(|cid| format!("({}, 'customer_{}')", cid, cid))
+        .collect();
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.customers (customer_id, customer_name) VALUES {}",
+            values.join(", ")
+        ))
+        .await
+        .unwrap();
+
+    // Wait for compaction/split to complete.
+    tokio::time::sleep(Duration::from_secs(4)).await;
+
+    // Per-customer sums:
+    // cid 0: ids 0,5,10,15,20,25,30,35,40,45,50,55 -> sum(i*7) = 7*(0+5+10+15+20+25+30+35+40+45+50+55) = 7*330 = 2310
+    // cid 1: ids 1,6,11,16,21,26,31,36,41,46,51,56 -> 7*(1+6+11+16+21+26+31+36+41+46+51+56) = 7*342 = 2394
+    // cid 2: ids 2,7,12,17,22,27,32,37,42,47,52,57 -> 7*354 = 2478
+    // cid 3: ids 3,8,13,18,23,28,33,38,43,48,53,58 -> 7*366 = 2562
+    // cid 4: ids 4,9,14,19,24,29,34,39,44,49,54,59 -> 7*378 = 2646
+    let result = service
+        .exec_query(
+            "SELECT customer_name, sum(amount) FROM s.orders o \
+             LEFT JOIN s.customers c ON o.customer_id = c.customer_id \
+             GROUP BY 1 ORDER BY 2 DESC",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![
+                TableValue::String("customer_4".to_string()),
+                TableValue::Int(2646)
+            ],
+            vec![
+                TableValue::String("customer_3".to_string()),
+                TableValue::Int(2562)
+            ],
+            vec![
+                TableValue::String("customer_2".to_string()),
+                TableValue::Int(2478)
+            ],
+            vec![
+                TableValue::String("customer_1".to_string()),
+                TableValue::Int(2394)
+            ],
+            vec![
+                TableValue::String("customer_0".to_string()),
+                TableValue::Int(2310)
+            ],
+        ]
+    );
+
+    // Verify total: 2310+2394+2478+2562+2646 = 12390
+    let total_result = service
+        .exec_query(
+            "SELECT sum(amount) FROM s.orders o \
+             LEFT JOIN s.customers c ON o.customer_id = c.customer_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&total_result), vec![vec![TableValue::Int(12390)]]);
+}
+
+async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.orders (order_id int, customer_id int, product_id int, amount int)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE INDEX orders_by_cid ON s.orders (customer_id)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.customers (customer_id int, customer_name text)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.products (product_id int, product_name text)")
+        .await
+        .unwrap();
+
+    // Insert 150 orders in batches of 10.
+    // customer_id = id % 3 (3 customers), product_id = id % 2 (2 products),
+    // amount = cid * 10 + pid — easy to verify per-group sums.
+    for batch in 0..15 {
+        let values: Vec<String> = (0..10)
+            .map(|i| {
+                let id = batch * 10 + i;
+                let cid = id % 3;
+                let pid = id % 2;
+                let amount = cid * 10 + pid;
+                format!("({}, {}, {}, {})", id, cid, pid, amount)
+            })
+            .collect();
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.orders (order_id, customer_id, product_id, amount) VALUES {}",
+                values.join(", ")
+            ))
+            .await
+            .unwrap();
+    }
+
+    // Insert 30 customers in batches of 10 (more than needed, extras won't match).
+    for batch in 0..3 {
+        let values: Vec<String> = (0..10)
+            .map(|i| {
+                let cid = batch * 10 + i;
+                format!("({}, 'customer_{}')", cid, cid)
+            })
+            .collect();
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.customers (customer_id, customer_name) VALUES {}",
+                values.join(", ")
+            ))
+            .await
+            .unwrap();
+    }
+
+    // Insert 20 products in 2 batches (more than needed, extras won't match).
+    for batch in 0..2 {
+        let values: Vec<String> = (0..10)
+            .map(|i| {
+                let pid = batch * 10 + i;
+                format!("({}, 'product_{}')", pid, pid)
+            })
+            .collect();
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.products (product_id, product_name) VALUES {}",
+                values.join(", ")
+            ))
+            .await
+            .unwrap();
+    }
+
+    // Wait for compaction/split to complete.
+    tokio::time::sleep(Duration::from_secs(4)).await;
+
+    // 3-table LEFT JOIN grouped by customer and product.
+    // 150 orders: cid = id%3, pid = id%2, amount = cid*10 + pid.
+    // Each (cid, pid) group has 25 rows (150/6), sum = 25 * (cid*10 + pid).
+    // (0,0): 25*0=0, (0,1): 25*1=25, (1,0): 25*10=250,
+    // (1,1): 25*11=275, (2,0): 25*20=500, (2,1): 25*21=525.
+    let result = service
+        .exec_query(
+            "SELECT customer_name, product_name, sum(amount), count(*) FROM s.orders o \
+             LEFT JOIN s.customers c ON o.customer_id = c.customer_id \
+             LEFT JOIN s.products p ON o.product_id = p.product_id \
+             GROUP BY 1, 2 ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![
+                TableValue::String("customer_0".to_string()),
+                TableValue::String("product_0".to_string()),
+                TableValue::Int(0),
+                TableValue::Int(25),
+            ],
+            vec![
+                TableValue::String("customer_0".to_string()),
+                TableValue::String("product_1".to_string()),
+                TableValue::Int(25),
+                TableValue::Int(25),
+            ],
+            vec![
+                TableValue::String("customer_1".to_string()),
+                TableValue::String("product_0".to_string()),
+                TableValue::Int(250),
+                TableValue::Int(25),
+            ],
+            vec![
+                TableValue::String("customer_1".to_string()),
+                TableValue::String("product_1".to_string()),
+                TableValue::Int(275),
+                TableValue::Int(25),
+            ],
+            vec![
+                TableValue::String("customer_2".to_string()),
+                TableValue::String("product_0".to_string()),
+                TableValue::Int(500),
+                TableValue::Int(25),
+            ],
+            vec![
+                TableValue::String("customer_2".to_string()),
+                TableValue::String("product_1".to_string()),
+                TableValue::Int(525),
+                TableValue::Int(25),
+            ],
+        ]
+    );
+
+    // Verify count - all 150 orders should be present (LEFT JOIN keeps all left rows).
+    let count_result = service
+        .exec_query(
+            "SELECT count(*) FROM s.orders o \
+             LEFT JOIN s.customers c ON o.customer_id = c.customer_id \
+             LEFT JOIN s.products p ON o.product_id = p.product_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&count_result), vec![vec![TableValue::Int(150)]]);
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

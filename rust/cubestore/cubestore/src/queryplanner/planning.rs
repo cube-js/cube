@@ -2012,7 +2012,9 @@ pub mod tests {
     use crate::metastore::multi_index::MultiPartition;
     use crate::metastore::table::{Table, TablePath};
     use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
-    use crate::queryplanner::planning::{choose_index, try_extract_cluster_send, PlanIndexStore};
+    use crate::queryplanner::planning::{
+        choose_index, try_extract_cluster_send, PlanIndexStore, Snapshot,
+    };
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
     use crate::queryplanner::serialized_plan::RowRange;
@@ -2460,6 +2462,168 @@ pub mod tests {
                     )
                 )
             ]
+        );
+    }
+
+    #[tokio::test]
+    pub async fn test_ordinary_partition_join_distribution() {
+        let mut indices = default_indices();
+
+        // Plan a join query without partitioned indices.
+        let plan = initial_plan(
+            "SELECT customer_name, order_city FROM s.Orders JOIN s.Customers \
+               ON order_customer = customer_id",
+            &indices,
+        );
+
+        let (with_index, meta) = choose_index(plan.clone(), &indices).await.unwrap();
+        let pp = pretty_printers::pp_plan(&with_index);
+        // Verify we get a join plan with ClusterSend.
+        assert!(pp.contains("Join on:"), "Expected join in plan: {}", pp);
+        assert!(
+            pp.contains("ClusterSend"),
+            "Expected ClusterSend in plan: {}",
+            pp
+        );
+
+        // Without partitions/chunks there's nothing to distribute.
+        assert!(
+            meta.multi_part_subtree.is_empty(),
+            "Expected no multi-partitions for ordinary join"
+        );
+
+        // Now add multiple ordinary partitions per index to simulate rollup join scenario.
+        // Index 3 = by_customer for Orders, Index 0 = default for Customers.
+        // Add 3 partitions for Orders (index 3).
+        for _ in 0..3 {
+            let p = Partition::new(3, None, None, None).to_active(true);
+            indices.partitions.push(p);
+        }
+        // Add 2 partitions for Customers (index 0).
+        for _ in 0..2 {
+            let p = Partition::new(0, None, None, None).to_active(true);
+            indices.partitions.push(p);
+        }
+        // Add chunks for each partition.
+        for p in 0..indices.partitions.len() {
+            indices
+                .chunks
+                .push(Chunk::new(p as u64, 123, None, None, false).set_uploaded(true));
+        }
+
+        // Plan again with partitions.
+        let (with_index, meta) = choose_index(plan, &indices).await.unwrap();
+        assert!(
+            meta.multi_part_subtree.is_empty(),
+            "Expected no multi-partitions for ordinary join"
+        );
+
+        let c = Config::test("ordinary_partition_join").update_config(|mut c| {
+            c.server_name = "router".to_string();
+            c.select_workers = vec!["worker1".to_string(), "worker2".to_string()];
+            c
+        });
+        let cs = &try_extract_cluster_send(&with_index).unwrap().snapshots;
+        let assigned = ClusterSendExec::distribute_to_workers(
+            c.config_obj().as_ref(),
+            &cs,
+            &meta.multi_part_subtree,
+        )
+        .unwrap();
+
+        // Only root (Orders, 3 partitions) is split; right tables (Customers, 2)
+        // are included whole.  Budget = 5 - 2 = 3, root fits in one chunk.
+        let total_partition_entries: usize = assigned
+            .iter()
+            .map(|(_, (partitions, _))| partitions.len())
+            .sum();
+        assert_eq!(
+            total_partition_entries, 5,
+            "Expected 1 batch with 3+2=5 partitions, got {}. Assigned: {:?}",
+            total_partition_entries, assigned
+        );
+    }
+
+    #[tokio::test]
+    pub async fn test_ordinary_partition_3_table_join_distribution() {
+        let mut indices = default_indices();
+
+        // 3-table join: Orders JOIN Customers JOIN Products
+        let plan = initial_plan(
+            "SELECT customer_name, order_city, product_name \
+               FROM s.Orders \
+               JOIN s.Customers ON order_customer = customer_id \
+               JOIN s.Products ON order_product = product_id",
+            &indices,
+        );
+
+        let (with_index, _meta) = choose_index(plan.clone(), &indices).await.unwrap();
+        let pp = pretty_printers::pp_plan(&with_index);
+        assert!(pp.contains("Join on:"), "Expected join in plan: {}", pp);
+
+        // Add partitions: Orders(3), Customers(2), Products(1).
+        // Index 3 = by_customer for Orders, Index 0 = default for Customers.
+        // For the 3-table join the planner picks indices based on join keys.
+        // We need to find which indices are actually used.
+        let cs_node = try_extract_cluster_send(&with_index).unwrap();
+
+        // Collect index IDs used in the plan.
+        let mut used_index_ids = Vec::new();
+        for union in &cs_node.snapshots {
+            for snap in union {
+                match snap {
+                    Snapshot::Index(idx) => used_index_ids.push(idx.index.get_id()),
+                    _ => {}
+                }
+            }
+        }
+
+        // Add partitions for each used index.
+        // Orders gets 3 partitions, Customers gets 2, Products gets 1.
+        let partition_counts = vec![3usize, 2, 1];
+        for (i, &count) in used_index_ids.iter().zip(partition_counts.iter()) {
+            for _ in 0..count {
+                let p = Partition::new(*i, None, None, None).to_active(true);
+                indices.partitions.push(p);
+            }
+        }
+        for p in 0..indices.partitions.len() {
+            indices
+                .chunks
+                .push(Chunk::new(p as u64, 123, None, None, false).set_uploaded(true));
+        }
+
+        // Plan again with partitions.
+        let (with_index, meta) = choose_index(plan, &indices).await.unwrap();
+        assert!(meta.multi_part_subtree.is_empty());
+
+        let c = Config::test("ordinary_3_table_join").update_config(|mut c| {
+            c.server_name = "router".to_string();
+            c.select_workers = vec!["worker1".to_string(), "worker2".to_string()];
+            c
+        });
+        let cs = &try_extract_cluster_send(&with_index).unwrap().snapshots;
+        let assigned = ClusterSendExec::distribute_to_workers(
+            c.config_obj().as_ref(),
+            &cs,
+            &meta.multi_part_subtree,
+        )
+        .unwrap();
+
+        // Only root (Orders, 3 partitions) is split; right tables
+        // (Customers 2 + Products 1 = 3) are whole in every batch.
+        // Budget = 5 - 3 = 2, root chunks: [0,1] and [2].
+        //   Batch 1: Orders[0,1] + Customers(2) + Products(1) = 5
+        //   Batch 2: Orders[2]   + Customers(2) + Products(1) = 4
+        // Total: 9 partition entries in 2 batches.
+        let total_partition_entries: usize = assigned
+            .iter()
+            .map(|(_, (partitions, _))| partitions.len())
+            .sum();
+        assert_eq!(
+            total_partition_entries, 9,
+            "Expected 2 batches with 5+4=9 partitions, got {}. Assigned: {:?}",
+            total_partition_entries, assigned
         );
     }
 
