@@ -155,10 +155,18 @@ Example response:
 }
 ```
 
-### `/api/v1/deployments/{deployment_id}/environments/{environment_id}/tokens`
+### `/api/v1/deployments/{deployment_id}/environments/{environment_id}/tokens-for-meta-sync`
 
-Send a `POST` request to create a JWT token for accessing Core Data APIs. The generated token can be used
-to authenticate requests to the [REST API][ref-rest-api] and [Metadata API][ref-metadata-api].
+Send a `POST` request to create a JWT token for accessing the
+[Metadata API][ref-metadata-api]. The generated token is scoped specifically
+to metadata endpoints (e.g., `/v1/data-sources`, `/v1/entities`) and cannot
+be used to query data via the [REST API][ref-rest-api]. This makes it suitable
+for integrations such as data catalogs and lineage tools that only need to
+read data model metadata.
+
+The [security context][ref-security-context] you provide is embedded in the
+token and controls which parts of the data model are visible, following the
+same multi-tenancy rules as regular API tokens.
 
 Path parameters:
 
@@ -171,7 +179,7 @@ Request body:
 
 | Property | Type | Description | Required |
 | --- | --- | --- | --- |
-| `security_context` | `object` | Security context to embed in the token | Yes |
+| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Controls data model visibility based on your multi-tenancy configuration. | Yes |
 | `expires_in` | `number` | Token expiration time in seconds. Default: `86400` (24 hours) | No |
 
 Example request:
@@ -185,7 +193,7 @@ curl \
     "security_context": {"tenant_id": "acme"},
     "expires_in": 3600
   }' \
-  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments/456/tokens"
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments/456/tokens-for-meta-sync"
 ```
 
 Example response:
@@ -207,3 +215,4 @@ Example response:
 [ref-deployments]: /product/administration/deployment/deployments
 [ref-environments]: /product/administration/workspace/environments
 [ref-api-keys]: /product/administration/api-keys
+[ref-security-context]: /product/auth/context
