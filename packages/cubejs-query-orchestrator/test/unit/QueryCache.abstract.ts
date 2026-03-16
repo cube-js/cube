@@ -1,23 +1,33 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
-import {CacheKey, CacheKeyItem, QueryCache, QueryCacheOptions} from '../../src';
+import { CacheKey, CacheKeyItem, QueryCache, QueryCacheOptions } from '../../src';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
   beforeAll?: () => Promise<void>,
   afterAll?: () => Promise<void>,
 };
 
+class QueryCacheOpened extends QueryCache {
+  public readonly logger = jest.fn(super.logger);
+}
+
 export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => {
   describe(`QueryQueue${name}`, () => {
-    const cache = new QueryCache(
+    const cache = new QueryCacheOpened(
       crypto.randomBytes(16).toString('hex'),
+      () => {
+        throw new Error('driverFactory is not implemented, mock should be used...');
+      },
       jest.fn(() => {
-        throw new Error('It`s not implemented mock...');
+        throw new Error('logger is not implemented, mock should be used...');
       }),
-      jest.fn(),
       options,
     );
+
+    beforeEach(() => {
+      cache.logger.mockClear();
+    });
 
     beforeAll(async () => {
       if (options?.beforeAll) {
@@ -145,7 +155,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
         const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async () => {
           fetchNewCalled.value = true;
-
           return 'new-result';
         });
 
@@ -190,6 +199,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
         expect(blocked).toBe(true);
         expect(result).toBe('new-result');
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
       });
 
       it('expired + no waitForRenew: returns cached, background refresh', async () => {
@@ -210,6 +220,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(result).toBe('cached-data');
         expect(fetchNewCalled).toBe(true);
         expect(blocked).toBe(false);
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Renewing existing key');
       });
 
       it('key mismatch + not expired + user request: returns cached, background refresh', async () => {
@@ -231,6 +242,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(result).toBe('cached-data');
         expect(fetchNewCalled).toBe(true);
         expect(blocked).toBe(false);
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Renewing existing key');
       });
 
       it('key mismatch + not expired + renew cycle: blocks on fetchNew', async () => {
@@ -251,6 +263,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
         expect(blocked).toBe(true);
         expect(result).toBe('new-result');
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
       });
 
       it('same request + expired: returns cached, background refresh', async () => {
@@ -272,6 +285,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(result).toBe('cached-data');
         expect(fetchNewCalled).toBe(true);
         expect(blocked).toBe(false);
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Same request cache hit (background refresh)');
       });
 
       it('same request + key mismatch only: returns cached, background refresh', async () => {
@@ -293,6 +307,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(result).toBe('cached-data');
         expect(fetchNewCalled).toBe(true);
         expect(blocked).toBe(false);
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Same request cache hit (background refresh)');
       });
 
       it('key matches + not expired: returns cached, no fetchNew', async () => {
@@ -313,6 +328,8 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(result).toBe('cached-data');
         expect(fetchNewCalled).toBe(false);
         expect(blocked).toBe(false);
+        expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Waiting for renew');
+        expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Renewing existing key');
       });
     });
 
