@@ -1,10 +1,11 @@
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use cubenativeutils::CubeError;
 
 use crate::cube_bridge::evaluator::CubeEvaluator;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolPathType {
     Dimension,
     Measure,
@@ -213,6 +214,26 @@ impl SymbolPath {
 
     pub fn granularity(&self) -> &Option<String> {
         &self.granularity
+    }
+}
+
+impl PartialEq for SymbolPath {
+    fn eq(&self, other: &Self) -> bool {
+        self.path_type == other.path_type
+            && self.full_name == other.full_name
+            && self.granularity == other.granularity
+            && self.path == other.path
+    }
+}
+
+impl Eq for SymbolPath {}
+
+impl Hash for SymbolPath {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.path_type.hash(state);
+        self.full_name.hash(state);
+        self.granularity.hash(state);
+        self.path.hash(state);
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregation;
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::query_tools::QueryTools;
@@ -8,7 +9,6 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
 use crate::planner::{GranularityHelper, QueryProperties};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockSchema, MockSecurityContext,
 };

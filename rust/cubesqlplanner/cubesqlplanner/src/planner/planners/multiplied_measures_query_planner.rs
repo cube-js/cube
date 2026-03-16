@@ -74,15 +74,10 @@ impl MultipliedMeasuresQueryPlanner {
                 .query_properties
                 .compute_join_multi_fact_groups_with_measures(&measures)?;
             let join = join_multi_fact_groups.single_join()?.ok_or_else(|| {
-                CubeError::internal(
-                    "No join groups returned for aggregate measures".to_string(),
-                )
+                CubeError::internal("No join groups returned for aggregate measures".to_string())
             })?;
-            let aggregate_subquery_logical_plan = self.aggregate_subquery_plan(
-                &cube_name,
-                &measures,
-                join,
-            )?;
+            let aggregate_subquery_logical_plan =
+                self.aggregate_subquery_plan(&cube_name, &measures, join)?;
             aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
         }
         if regular_measure_subqueries.is_empty() && aggregate_multiplied_subqueries.is_empty() {

@@ -88,11 +88,7 @@ mod tests {
 
     #[test]
     fn test_from_items_preserves_order() {
-        let hints = JoinHints::from_items(vec![
-            s("orders"),
-            v(&["users", "orders"]),
-            s("abc"),
-        ]);
+        let hints = JoinHints::from_items(vec![s("orders"), v(&["users", "orders"]), s("abc")]);
 
         assert_eq!(hints.len(), 3);
         assert_eq!(hints.items()[0], s("orders"));
@@ -133,7 +129,11 @@ mod tests {
         c.push(v(&["x", "abc"]));
         let d = JoinHints::from_items(vec![s("abc"), s("zzz")]);
         c.extend(&d);
-        assert_eq!(c.len(), 2, "Single after Vector ending with same name is skipped on extend");
+        assert_eq!(
+            c.len(),
+            2,
+            "Single after Vector ending with same name is skipped on extend"
+        );
         assert_eq!(c.items()[0], v(&["x", "abc"]));
         assert_eq!(c.items()[1], s("zzz"));
     }
@@ -147,7 +147,11 @@ mod tests {
 
         hints.push(v(&["users", "orders"]));
         hints.push(s("orders"));
-        assert_eq!(hints.len(), 2, "Single after Vector ending with same name is skipped");
+        assert_eq!(
+            hints.len(),
+            2,
+            "Single after Vector ending with same name is skipped"
+        );
 
         hints.push(s("abc"));
         assert_eq!(hints.len(), 3, "Different Single is added");
