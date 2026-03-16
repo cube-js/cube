@@ -310,6 +310,51 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(cache.logger.mock.calls.map(c => c[0])).toContain('Same request cache hit (background refresh)');
       });
 
+      it('same request + renewCycle + key mismatch: must block on fetchNew (not return stale cache)', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-renew-cycle', values: [] });
+        const entry = {
+          time: Date.now() - 100 * 1000,
+          result: 'stale-data',
+          renewalKey: renewalKeyOld,
+          requestId: 'req-cycle-span-1',
+        };
+
+        const { result, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          renewCycle: true,
+          requestId: 'req-cycle-span-2',
+        });
+
+        // renewCycle must always fetch fresh data even when requestId matches
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
+      });
+
+      it('same request + renewCycle + expired: must block on fetchNew', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-renew-cycle-expired', values: [] });
+        const entry = {
+          time: Date.now() - 700 * 1000,
+          result: 'stale-data',
+          renewalKey: renewalKeyOld,
+          requestId: 'req-exp-cycle-span-1',
+        };
+
+        const { result, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          renewCycle: true,
+          requestId: 'req-exp-cycle-span-2',
+        });
+
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
+      });
+
       it('key matches + not expired: returns cached, no fetchNew', async () => {
         const cacheKey = QueryCache.queryCacheKey({ query: 'key-match-fresh', values: [] });
         const entry = {
