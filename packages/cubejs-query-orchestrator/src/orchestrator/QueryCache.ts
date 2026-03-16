@@ -1030,7 +1030,7 @@ export class QueryCache {
         });
       } else if (renewalKey && (isExpired || isKeyMismatch)) {
         // Cache expired or refreshKey changed — need to refresh
-        if (options.waitForRenew && (isExpired || renewCycle)) {
+        if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           return fetchNew();
         } else {

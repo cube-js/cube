@@ -223,7 +223,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(cache.logger.mock.calls.map(c => c[0])).toContain('Renewing existing key');
       });
 
-      it('key mismatch + not expired + user request: returns cached, background refresh', async () => {
+      it('key mismatch + not expired + waitForRenew: blocks on fetchNew', async () => {
         const cacheKey = QueryCache.queryCacheKey({ query: 'key-mismatch-user', values: [] });
         const entry = {
           time: Date.now() - 100 * 1000,
@@ -231,7 +231,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           renewalKey: renewalKeyOld,
         };
 
-        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+        const { result, blocked } = await callCacheQueryResult(cacheKey, entry, {
           renewalThreshold: 600,
           renewalKey: renewalKeyNew,
           waitForRenew: true,
@@ -239,10 +239,9 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           requestId: 'req-3',
         });
 
-        expect(result).toBe('cached-data');
-        expect(fetchNewCalled).toBe(true);
-        expect(blocked).toBe(false);
-        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Renewing existing key');
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
       });
 
       it('key mismatch + not expired + renew cycle: blocks on fetchNew', async () => {
