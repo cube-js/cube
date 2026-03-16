@@ -3090,6 +3090,7 @@ mod tests {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 50;
+            c.max_joined_partitions = 10;
             c
         }).start_test(async move |services| {
             let service = services.sql_service;

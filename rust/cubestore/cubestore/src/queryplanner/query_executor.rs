@@ -1454,7 +1454,7 @@ impl ClusterSendExec {
         // For joins (multiple tables), distribute by root table partitions
         // instead of cartesian product to reduce combinations.
         if to_multiply.len() > 1 {
-            return Ok(Self::distribute_join_partitions(config, to_multiply));
+            return Self::distribute_join_partitions(config, to_multiply);
         }
 
         // Single table — no join, just return partitions as-is.
@@ -1515,7 +1515,7 @@ impl ClusterSendExec {
     fn distribute_join_partitions(
         config: &dyn ConfigObj,
         tables: Vec<Vec<InlineCompoundPartition>>,
-    ) -> Vec<Vec<InlineCompoundPartition>> {
+    ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
         assert!(tables.len() > 1);
 
         // Only the root (first/left-most) table can be safely split across
@@ -1526,25 +1526,34 @@ impl ClusterSendExec {
 
         let root = &tables[0];
         let max = config.max_joined_partitions();
-        let right_count = right_partitions.len();
+        let right_total = right_partitions.len();
+        let right_active = right_partitions
+            .iter()
+            .filter(|p| match p {
+                InlineCompoundPartition::Partition(p) => p.get_row().is_active(),
+                InlineCompoundPartition::PartitionWithInlineTables(p, _) => p.get_row().is_active(),
+                InlineCompoundPartition::InlineTables(_) => true,
+            })
+            .count();
 
         // Budget for root partitions per batch.
-        let chunk_size = if max == 0 || max <= right_count {
-            // No limit, or right tables alone exceed it — put all root in one batch.
-            root.len()
+        let chunk_size = if max == 0 || max <= right_active {
+            return Err(CubeError::user(
+            format!("Max number of right hand side join partitions limit is hit. Max limit is {}. Query requires {}. Please consider reducing right hand side join partition count and dataset size or upgrading Cube Store tier.", max, right_active)
+            ));
         } else {
-            (max - right_count).max(1)
+            (max - right_active).max(1)
         };
 
         let mut batches = Vec::new();
         for chunk in root.chunks(chunk_size) {
-            let mut batch = Vec::with_capacity(chunk.len() + right_count);
+            let mut batch = Vec::with_capacity(chunk.len() + right_total);
             batch.extend(chunk.iter().cloned());
             batch.extend(right_partitions.iter().cloned());
             batches.push(batch);
         }
 
-        batches
+        Ok(batches)
     }
 
     fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {
