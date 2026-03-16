@@ -74,9 +74,27 @@ impl GCSRemoteFs {
                 builder = builder.with_service_account_key(creds_json);
             }
         } else {
-            log::info!(
-                "[GCS] No explicit credentials — using Application Default Credentials (WIF/ADC)"
-            );
+            // Map legacy JSON aliases from the old cloud_storage implementation.
+            let mut legacy_json: Option<String> = None;
+            for var in &[
+                "SERVICE_ACCOUNT_JSON",
+                "GOOGLE_APPLICATION_CREDENTIALS_JSON",
+                "CUBESTORE_GCP_SERVICE_ACCOUNT_JSON",
+                "CUBESTORE_GCP_GOOGLE_APPLICATION_CREDENTIALS_JSON",
+            ] {
+                if let Ok(json) = std::env::var(var) {
+                    if !json.is_empty() {
+                        log::warn!("[GCS] '{}' is deprecated — use CUBESTORE_GCP_CREDENTIALS instead", var);
+                        legacy_json = Some(json);
+                        break;
+                    }
+                }
+            }
+            if let Some(json) = legacy_json {
+                builder = builder.with_service_account_key(json);
+            } else {
+                log::info!("[GCS] No explicit credentials — using Application Default Credentials (WIF/ADC)");
+            }
         }
 
         let store = builder.build().map_err(|e| {
@@ -135,9 +153,9 @@ impl RemoteFs for GCSRemoteFs {
         remote_path: String,
         expected_size: u64,
     ) -> Result<(), CubeError> {
-        // GCS list() is eventually consistent — a freshly uploaded object may not
-        // appear in list() immediately.  Use head() instead, which is strongly
-        // consistent on GCS (single-object metadata fetch, not a list scan).
+        // Use head() for a targeted single-object existence check rather than
+        // prefix listing. This avoids object_store path normalization edge cases
+        // where list() with a flat key may silently skip the object.
         let obj_path = self.gcs_path(&remote_path);
         match self.store.head(&obj_path).await {
             Ok(meta) => {
@@ -177,12 +195,26 @@ impl RemoteFs for GCSRemoteFs {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
 
-        let data = fs::read(&temp_upload_path).await.map_err(|e| {
-            CubeError::internal(format!("Failed to read {}: {}", temp_upload_path, e))
-        })?;
-        let size = data.len() as u64;
+        let size = fs::metadata(&temp_upload_path).await.map_err(|e| {
+            CubeError::internal(format!("Failed to stat {}: {}", temp_upload_path, e))
+        })?.len();
         let obj_path = self.gcs_path(&remote_path);
 
+
+        //Stream from disk - avoids buffering entire file in memory. 
+        //Pre-aggregation files can be large and this can cause OOM if buffered in memory.
+        let file = tokio::fs::File::open(&temp_upload_path).await.map_err(|e| {
+            CubeError::internal(format!("Failed to open {}: {}", temp_upload_path, e))
+        })?;
+        let stream = tokio_util::io::ReaderStream::new(file);
+        let payload = object_store::PutPayload::from_stream(stream);
+        self.store
+            .put(&obj_path, payload)
+            .await
+            .map_err(|e| {
+                CubeError::internal(format!("GCS put {} failed: {}", obj_path, e))
+            })?;
+    
         self.store
             .put(&obj_path, object_store::PutPayload::from(data))
             .await
@@ -237,17 +269,25 @@ impl RemoteFs for GCSRemoteFs {
             let get_result = self.store.get(&obj_path).await.map_err(|e| {
                 CubeError::internal(format!("GCS get {} failed: {}", obj_path, e))
             })?;
+
             let bytes: Bytes = get_result.bytes().await.map_err(|e| {
                 CubeError::internal(format!("GCS read stream {} failed: {}", obj_path, e))
             })?;
-            let size = bytes.len();
-
             let (temp_file, temp_path) =
                 cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
                     .await??
                     .into_parts();
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
-            writer.write_all(&bytes).await?;
+            // Stream to disk - avoids buffering entire object in memory. 
+            let mut stream = get_result.into_stream();
+            let mut size: usize = 0;
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk.map_err(|e| {
+                    CubeError::internal(format!("GCS read stream {} failed: {}", obj_path, e))
+                })?;
+                size += chunk.len();
+                writer.write_all(&chunk).await?;
+            }
             writer.flush().await?;
 
             local_file = cube_ext::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
@@ -352,7 +392,7 @@ impl RemoteFs for GCSRemoteFs {
                 }
             }
         }
-        let pages = (results.len() / 1_000).max(1);
+        let pages = ((results.len() + 999) / 1_000).max(1);
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             pages as i64,
             Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
@@ -474,7 +514,7 @@ impl RemoteFs for GCSRemoteFs {
                 }
             }
         }
-        let pages = (results.len() / 1_000).max(1);
+        let pages = ((results.len() + 999) / 1_000).max(1);
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             pages as i64,
             Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
