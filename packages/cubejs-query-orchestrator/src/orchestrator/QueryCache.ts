@@ -1019,8 +1019,9 @@ export class QueryCache {
         QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId);
 
       // Continue-wait cycle: result was produced by our request,
-      // refreshKey changed during execution — return cached, refresh in background
-      if (isSameRequest && (isExpired || isKeyMismatch)) {
+      // refreshKey changed during execution — return cached, refresh in background.
+      // Skip for renewCycle — it must always fetch fresh data to keep cache up-to-date.
+      if (isSameRequest && !renewCycle && (isExpired || isKeyMismatch)) {
         this.logger('Same request cache hit (background refresh)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
         fetchNew().catch(e => {
           if (!(e instanceof ContinueWaitError)) {
