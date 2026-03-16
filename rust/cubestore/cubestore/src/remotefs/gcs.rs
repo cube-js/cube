@@ -5,98 +5,51 @@ use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteF
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
-use cloud_storage::Object;
+use bytes::Bytes;
 use datafusion::cube_ext;
 use futures::StreamExt;
-use log::{debug, info};
-use regex::{NoExpand, Regex};
+use log::{debug, info, warn};
+use object_store::gcp::GoogleCloudStorageBuilder;
+use object_store::path::Path as ObjPath;
+use object_store::ObjectStore;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Once};
+use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
-use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::sync::Mutex;
-use tokio_util::codec::{BytesCodec, FramedRead};
 
-static INIT_CREDENTIALS: Once = Once::new();
-fn ensure_credentials_init() {
-    // The cloud storage library uses env vars to get access tokens.
-    // We decided CubeStore needs its own alias for it, so rewrite and hope no one read it before.
-    // TODO: switch to something that allows to configure without env vars.
-    // TODO: remove `SERVICE_ACCOUNT` completely.
-    INIT_CREDENTIALS.call_once(|| {
-        let mut creds_json = None;
-        if let Ok(c) = std::env::var("CUBESTORE_GCP_CREDENTIALS") {
-            match decode_credentials(&c) {
-                Ok(s) => creds_json = Some((s, "CUBESTORE_GCP_CREDENTIALS".to_string())),
-                Err(e) => log::error!("Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}", e),
-            }
-        }
-        let mut creds_path = match std::env::var("CUBESTORE_GCP_KEY_FILE") {
-            Ok(s) => Some((s, "CUBESTORE_GCP_KEY_FILE".to_string())),
-            Err(_) => None,
-        };
-
-        // TODO: this handles deprecated variable names, remove them.
-        for (var, is_path) in &[
-            ("SERVICE_ACCOUNT", true),
-            ("GOOGLE_APPLICATION_CREDENTIALS", true),
-            ("SERVICE_ACCOUNT_JSON", false),
-            ("GOOGLE_APPLICATION_CREDENTIALS_JSON", false),
-        ] {
-            for var in &[&format!("CUBESTORE_GCP_{}", var), *var] {
-                if let Ok(var_value) = std::env::var(&var) {
-                    let (upgrade_var, read_value) = if *is_path {
-                        ("CUBESTORE_GCP_KEY_FILE", &mut creds_path)
-                    } else {
-                        ("CUBESTORE_GCP_CREDENTIALS", &mut creds_json)
-                    };
-
-                    match read_value {
-                        None => {
-                            *read_value = Some((var_value, var.to_string()));
-                            log::warn!(
-                                "Environment variable '{}' is deprecated and will be ignored in future versions, use '{}' instead",
-                                var,
-                                upgrade_var
-                            );
-                        }
-                        Some((prev_val, prev_var)) => {
-                            if prev_val != &var_value {
-                                log::warn!(
-                                    "Values of '{}' and '{}' differ, preferring the latter",
-                                    var,
-                                    prev_var
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        match creds_json {
-            Some((v, _)) => std::env::set_var("SERVICE_ACCOUNT_JSON", v),
-            None => std::env::remove_var("SERVICE_ACCOUNT_JSON"),
-        }
-        match creds_path {
-            Some((v, _)) => std::env::set_var("SERVICE_ACCOUNT", v),
-            None => std::env::remove_var("SERVICE_ACCOUNT"),
-        }
-    })
-}
+// WIF-native GCS implementation using the `object_store` crate.
+//
+// Replaces the original `cloud_storage`-based implementation which requires
+// SERVICE_ACCOUNT or SERVICE_ACCOUNT_JSON env vars and panics without them.
+// This implementation uses GoogleCloudStorageBuilder::from_env() which supports:
+//   1. GOOGLE_APPLICATION_CREDENTIALS (key file path — backward compatible)
+//   2. GKE Workload Identity Federation via metadata server at 169.254.169.254
+//   3. gcloud CLI credentials (dev machines)
+//
+// Also accepts CUBESTORE_GCP_KEY_FILE and CUBESTORE_GCP_CREDENTIALS for
+// backward compatibility with existing deployments.
+//
+// No credentials required when running on GKE with Workload Identity configured.
+// OSS issue: https://github.com/cube-js/cube/issues/9837
 
 fn decode_credentials(creds_base64: &str) -> Result<String, CubeError> {
-    Ok(String::from_utf8(base64::decode(creds_base64)?)?)
+    // base64 = "0.13.0" uses the old decode() API (pre-0.21 Engine API)
+    let bytes = base64::decode(creds_base64)
+        .map_err(|e| CubeError::internal(format!("Failed to decode base64 credentials: {}", e)))?;
+    String::from_utf8(bytes)
+        .map_err(|e| CubeError::internal(format!("Credentials not valid UTF-8: {}", e)))
 }
 
 #[derive(Debug)]
 pub struct GCSRemoteFs {
     dir: PathBuf,
+    #[allow(dead_code)]
     bucket: String,
     sub_path: Option<String>,
+    store: Arc<dyn ObjectStore>,
     delete_mut: Mutex<()>,
 }
 
@@ -106,13 +59,62 @@ impl GCSRemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        ensure_credentials_init();
+        let mut builder = GoogleCloudStorageBuilder::from_env()
+            .with_bucket_name(&bucket_name);
+
+        if let Ok(key_file) = std::env::var("CUBESTORE_GCP_KEY_FILE") {
+            if !key_file.is_empty() {
+                log::info!("[GCS] Using CUBESTORE_GCP_KEY_FILE for authentication");
+                builder = builder.with_service_account_path(key_file);
+            }
+        } else if let Ok(creds_b64) = std::env::var("CUBESTORE_GCP_CREDENTIALS") {
+            if !creds_b64.is_empty() {
+                log::info!("[GCS] Using CUBESTORE_GCP_CREDENTIALS for authentication");
+                let creds_json = decode_credentials(&creds_b64)?;
+                builder = builder.with_service_account_key(creds_json);
+            }
+        } else {
+            log::info!(
+                "[GCS] No explicit credentials — using Application Default Credentials (WIF/ADC)"
+            );
+        }
+
+        let store = builder.build().map_err(|e| {
+            CubeError::internal(format!(
+                "Failed to initialize GCS client for bucket '{}': {}. \
+                Ensure Workload Identity is configured on this GKE node pool, \
+                or set CUBESTORE_GCP_KEY_FILE / GOOGLE_APPLICATION_CREDENTIALS.",
+                bucket_name, e
+            ))
+        })?;
+
         Ok(Arc::new(Self {
             dir,
-            bucket: bucket_name.to_string(),
+            bucket: bucket_name,
             sub_path,
+            store: Arc::new(store),
             delete_mut: Mutex::new(()),
         }))
+    }
+
+    fn gcs_path(&self, remote_path: &str) -> ObjPath {
+        match &self.sub_path {
+            Some(prefix) => ObjPath::from(format!("{}/{}", prefix, remote_path).as_str()),
+            None => ObjPath::from(remote_path),
+        }
+    }
+
+    fn strip_subpath_prefix(&self, obj_path: &str) -> String {
+        match &self.sub_path {
+            Some(prefix) => {
+                let full_prefix = format!("{}/", prefix);
+                obj_path
+                    .strip_prefix(&full_prefix)
+                    .unwrap_or(obj_path)
+                    .to_string()
+            }
+            None => obj_path.to_string(),
+        }
     }
 }
 
@@ -133,7 +135,31 @@ impl RemoteFs for GCSRemoteFs {
         remote_path: String,
         expected_size: u64,
     ) -> Result<(), CubeError> {
-        CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+        // GCS list() is eventually consistent — a freshly uploaded object may not
+        // appear in list() immediately.  Use head() instead, which is strongly
+        // consistent on GCS (single-object metadata fetch, not a list scan).
+        let obj_path = self.gcs_path(&remote_path);
+        match self.store.head(&obj_path).await {
+            Ok(meta) => {
+                if meta.size as u64 != expected_size {
+                    return Err(CubeError::internal(format!(
+                        "check_upload_file: size mismatch for {}: expected {} bytes, got {} bytes",
+                        remote_path, expected_size, meta.size
+                    )));
+                }
+                Ok(())
+            }
+            Err(object_store::Error::NotFound { .. }) => {
+                Err(CubeError::internal(format!(
+                    "check_upload_file: {} not found after upload (GCS consistency error)",
+                    remote_path
+                )))
+            }
+            Err(e) => Err(CubeError::internal(format!(
+                "check_upload_file: head({}) failed: {}",
+                remote_path, e
+            ))),
+        }
     }
 
     async fn upload_file(
@@ -150,19 +176,20 @@ impl RemoteFs for GCSRemoteFs {
         );
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        let file = File::open(temp_upload_path.clone()).await?;
-        let stream = FramedRead::new(file, BytesCodec::new());
-        let stream = stream.map(|r| r.map(|b| b.to_vec()));
-        Object::create_streamed(
-            self.bucket.as_str(),
-            stream,
-            None,
-            self.gcs_path(&remote_path).as_str(),
-            "application/octet-stream",
-        )
-        .await?;
 
-        let size = fs::metadata(temp_upload_path.clone()).await?.len();
+        let data = fs::read(&temp_upload_path).await.map_err(|e| {
+            CubeError::internal(format!("Failed to read {}: {}", temp_upload_path, e))
+        })?;
+        let size = data.len() as u64;
+        let obj_path = self.gcs_path(&remote_path);
+
+        self.store
+            .put(&obj_path, object_store::PutPayload::from(data))
+            .await
+            .map_err(|e| {
+                CubeError::internal(format!("GCS put {} failed: {}", obj_path, e))
+            })?;
+
         self.check_upload_file(remote_path.clone(), size).await?;
 
         let local_path = self.dir.as_path().join(&remote_path);
@@ -176,8 +203,11 @@ impl RemoteFs for GCSRemoteFs {
                         e
                     ))
                 })?;
-            fs::rename(&temp_upload_path, local_path.clone()).await?;
+            fs::rename(&temp_upload_path, local_path.clone()).await.map_err(|e| {
+                CubeError::internal(format!("Rename temp file failed: {}", e))
+            })?;
         }
+
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         Ok(fs::metadata(local_path).await?.len())
     }
@@ -202,23 +232,22 @@ impl RemoteFs for GCSRemoteFs {
             );
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
+
+            let obj_path = self.gcs_path(&remote_path);
+            let get_result = self.store.get(&obj_path).await.map_err(|e| {
+                CubeError::internal(format!("GCS get {} failed: {}", obj_path, e))
+            })?;
+            let bytes: Bytes = get_result.bytes().await.map_err(|e| {
+                CubeError::internal(format!("GCS read stream {} failed: {}", obj_path, e))
+            })?;
+            let size = bytes.len();
+
             let (temp_file, temp_path) =
                 cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
                     .await??
                     .into_parts();
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
-            let mut stream = Object::download_streamed(
-                self.bucket.as_str(),
-                self.gcs_path(&remote_path).as_str(),
-            )
-            .await?;
-
-            let mut c = 0;
-            while let Some(byte) = stream.next().await {
-                // TODO it might be very slow
-                writer.write_all(&[byte?]).await?;
-                c += 1;
-            }
+            writer.write_all(&bytes).await?;
             writer.flush().await?;
 
             local_file = cube_ext::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
@@ -231,7 +260,7 @@ impl RemoteFs for GCSRemoteFs {
                 "Downloaded {} ({:?}) ({} bytes)",
                 remote_path,
                 time.elapsed()?,
-                c
+                size
             );
         }
         Ok(local_file.into_os_string().into_string().unwrap())
@@ -247,8 +276,21 @@ impl RemoteFs for GCSRemoteFs {
         );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
-        Object::delete(self.bucket.as_str(), self.gcs_path(&remote_path).as_str()).await?;
-        info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
+
+        let obj_path = self.gcs_path(&remote_path);
+        match self.store.delete(&obj_path).await {
+            Ok(_) => {}
+            Err(object_store::Error::NotFound { .. }) => {
+                debug!("GCS object already gone: {}", obj_path);
+            }
+            Err(e) => {
+                return Err(CubeError::internal(format!(
+                    "GCS delete {} failed: {}",
+                    obj_path, e
+                )))
+            }
+        }
+        info!("Deleted {} ({:?})", remote_path, time.elapsed()?);
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
         let local = self.dir.as_path().join(remote_path);
@@ -262,24 +304,182 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        let leading_subpath = self.leading_subpath_regex();
-        self.list_with_metadata_and_map(remote_prefix, |obj: Object| {
-            Self::object_key_to_remote_path(&leading_subpath, &obj.name)
-        })
-        .await
+        // CubeStore calls list() to either:
+        //   A) Check existence of a root-level pointer file:
+        //      "cachestore-current", "metastore-current" → ends with "current"
+        //      "cachestore-XYZ-logs"                     → ends with "logs"
+        //   B) Enumerate all snapshots: "cachestore-", "metastore-" → ends with "-"
+        //
+        // For A: use head() — direct metadata fetch, strongly consistent on GCS.
+        //        object_store::list() with prefix "cachestore-current" may not return
+        //        the flat object because GCS list uses a delimiter and object_store
+        //        normalises the path, causing the flat file to be silently skipped.
+        // For B: use list(prefix) as normal.
+        let is_pointer_file =
+            remote_prefix.ends_with("current") || remote_prefix.ends_with("logs");
+
+        if is_pointer_file {
+            let obj_path = self.gcs_path(&remote_prefix);
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
+            );
+            match self.store.head(&obj_path).await {
+                Ok(_) => return Ok(vec![remote_prefix]),
+                Err(object_store::Error::NotFound { .. }) => return Ok(vec![]),
+                Err(e) => {
+                    return Err(CubeError::internal(format!(
+                        "GCS list (head for pointer {}) failed: {}",
+                        remote_prefix, e
+                    )))
+                }
+            }
+        }
+
+        let obj_path = self.gcs_path(&remote_prefix);
+        let path_str = obj_path.as_ref();
+        let prefix_opt = if path_str.is_empty() { None } else { Some(obj_path.clone()) };
+
+        let mut stream = self.store.list(prefix_opt.as_ref());
+        let mut results = Vec::new();
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(meta) => {
+                    results.push(self.strip_subpath_prefix(meta.location.as_ref()));
+                }
+                Err(e) => {
+                    return Err(CubeError::internal(format!("GCS list failed: {}", e)))
+                }
+            }
+        }
+        let pages = (results.len() / 1_000).max(1);
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages as i64,
+            Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
+        );
+        Ok(results)
     }
 
     async fn list_with_metadata(
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let leading_subpath = self.leading_subpath_regex();
-        self.list_with_metadata_and_map(remote_prefix, |obj: Object| RemoteFile {
-            remote_path: Self::object_key_to_remote_path(&leading_subpath, &obj.name),
-            updated: obj.updated,
-            file_size: obj.size,
-        })
-        .await
+        // Three call patterns from CubeStore:
+        //
+        // 1. Root-level pointer file: "cachestore-current", "metastore-current"
+        //    → ends with "current" or "logs", no slash.
+        //    Use head() — strongly consistent, avoids list() path normalisation bug.
+        //
+        // 2. Exact file inside a snapshot folder: "cachestore-XYZ/CURRENT"
+        //    → contains a slash.
+        //    List the parent folder and filter by exact filename. Avoids head()
+        //    which can be slow when called for many files in parallel.
+        //
+        // 3. Folder/prefix scan: "cachestore-1772823222184" or "cachestore-"
+        //    → no slash, does not end with "current"/"logs".
+        //    Use list(prefix) directly.
+
+        let is_root_pointer =
+            !remote_prefix.contains('/') &&
+            (remote_prefix.ends_with("current") || remote_prefix.ends_with("logs"));
+
+        // ── Case 1: Root-level pointer file ──────────────────────────────────
+        if is_root_pointer {
+            let obj_path = self.gcs_path(&remote_prefix);
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
+            );
+            match self.store.head(&obj_path).await {
+                Ok(meta) => {
+                    return Ok(vec![RemoteFile {
+                        remote_path: remote_prefix,
+                        updated: meta.last_modified,
+                        file_size: meta.size as u64,
+                    }]);
+                }
+                Err(object_store::Error::NotFound { .. }) => {
+                    warn!(
+                        "[GCS] list_with_metadata: pointer file not found (just uploaded?): {}",
+                        remote_prefix
+                    );
+                    return Ok(vec![]);
+                }
+                Err(e) => {
+                    return Err(CubeError::internal(format!(
+                        "GCS list_with_metadata (head for {}) failed: {}",
+                        remote_prefix, e
+                    )));
+                }
+            }
+        }
+
+        let obj_path = self.gcs_path(&remote_prefix);
+        let path_str = obj_path.as_ref();
+
+        // ── Case 2: Exact file inside a snapshot folder ───────────────────────
+        if path_str.contains('/') {
+            let slash_pos = path_str.rfind('/').unwrap();
+            let folder = &path_str[..=slash_pos];    // "cachestore-XYZ/"
+            let file_name = &path_str[slash_pos + 1..]; // "MANIFEST-000487"
+            let folder_path = ObjPath::from(folder);
+
+            let mut stream = self.store.list(Some(&folder_path));
+            let mut results = Vec::new();
+            while let Some(item) = stream.next().await {
+                match item {
+                    Ok(meta) => {
+                        let key = self.strip_subpath_prefix(meta.location.as_ref());
+                        if key.ends_with(&format!("/{}", file_name)) || key == remote_prefix {
+                            results.push(RemoteFile {
+                                remote_path: key,
+                                updated: meta.last_modified,
+                                file_size: meta.size as u64,
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        return Err(CubeError::internal(format!(
+                            "GCS list_with_metadata (folder scan for {}) failed: {}",
+                            remote_prefix, e
+                        )))
+                    }
+                }
+            }
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
+            );
+            return Ok(results);
+        }
+
+        // ── Case 3: Folder/prefix scan ────────────────────────────────────────
+        let prefix_opt = if path_str.is_empty() { None } else { Some(obj_path.clone()) };
+        let mut stream = self.store.list(prefix_opt.as_ref());
+        let mut results = Vec::new();
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(meta) => {
+                    results.push(RemoteFile {
+                        remote_path: self.strip_subpath_prefix(meta.location.as_ref()),
+                        updated: meta.last_modified,
+                        file_size: meta.size as u64,
+                    });
+                }
+                Err(e) => {
+                    return Err(CubeError::internal(format!(
+                        "GCS list_with_metadata failed: {}",
+                        e
+                    )))
+                }
+            }
+        }
+        let pages = (results.len() / 1_000).max(1);
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages as i64,
+            Some(&vec!["operation:list".to_string(), "driver:gcs".to_string()]),
+        );
+        Ok(results)
     }
 
     async fn local_path(&self) -> Result<String, CubeError> {
@@ -293,69 +493,5 @@ impl RemoteFs for GCSRemoteFs {
     }
 }
 
-// TODO: Make a faster implementation
 #[async_trait]
 impl ExtendedRemoteFs for GCSRemoteFs {}
-
-struct LeadingSubpath(Regex);
-
-impl GCSRemoteFs {
-    fn leading_subpath_regex(&self) -> LeadingSubpath {
-        LeadingSubpath(Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap())
-    }
-
-    fn object_key_to_remote_path(leading_subpath: &LeadingSubpath, obj_name: &String) -> String {
-        leading_subpath
-            .0
-            .replace(&obj_name, NoExpand(""))
-            .to_string()
-    }
-
-    async fn list_with_metadata_and_map<T, F>(
-        &self,
-        remote_prefix: String,
-        f: F,
-    ) -> Result<Vec<T>, CubeError>
-    where
-        F: FnMut(Object) -> T + Copy,
-    {
-        let prefix = self.gcs_path(&remote_prefix);
-        let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
-        let result = list
-            .map(|objects| -> Result<Vec<T>, CubeError> {
-                Ok(objects?.into_iter().map(f).collect())
-            })
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect::<Vec<_>>();
-        let mut pages_count = result.len() / 1_000;
-        if result.len() % 1_000 > 0 {
-            pages_count += 1;
-        }
-        if pages_count > 100 {
-            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
-        }
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            pages_count as i64,
-            Some(&vec![
-                "operation:list".to_string(),
-                "driver:gcs".to_string(),
-            ]),
-        );
-        Ok(result)
-    }
-
-    fn gcs_path(&self, remote_path: &str) -> String {
-        format!(
-            "{}/{}",
-            self.sub_path
-                .as_ref()
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "".to_string()),
-            remote_path
-        )
-    }
-}
