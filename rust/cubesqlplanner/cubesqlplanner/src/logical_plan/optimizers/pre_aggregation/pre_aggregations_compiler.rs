@@ -353,7 +353,7 @@ impl PreAggregationsCompiler {
         Ok(())
     }
 
-    fn join_hints_from_pre_aggreagation(&self, symbols: &Vec<Rc<MemberSymbol>>) -> JoinHints {
+    fn join_hints_from_pre_aggregation(&self, symbols: &Vec<Rc<MemberSymbol>>) -> JoinHints {
         let mut result = JoinHints::new();
         for symbol in symbols {
             let path = symbol.path();
@@ -376,7 +376,7 @@ impl PreAggregationsCompiler {
             .cloned()
             .chain(all_dimensions.iter().cloned())
             .collect_vec();
-        let pre_aggr_join_hints = self.join_hints_from_pre_aggreagation(&all_symbols);
+        let pre_aggr_join_hints = self.join_hints_from_pre_aggregation(&all_symbols);
 
         let join_planner = JoinPlanner::new(self.query_tools.clone());
         let pre_aggrs_for_join = rollups
@@ -397,7 +397,7 @@ impl PreAggregationsCompiler {
                 .chain(join_pre_aggr.time_dimensions.iter().cloned())
                 .chain(join_pre_aggr.segments.iter().cloned())
                 .collect_vec();
-            let join_pre_aggr_join_hints = self.join_hints_from_pre_aggreagation(&all_symbols);
+            let join_pre_aggr_join_hints = self.join_hints_from_pre_aggregation(&all_symbols);
             let mut existing =
                 join_planner.resolve_join_members_by_hints(&join_pre_aggr_join_hints)?;
             existing_joins.append(&mut existing);
