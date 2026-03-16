@@ -490,11 +490,14 @@ impl PreAggregationOptimizer {
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .build(measures)?;
-        let query_groups =
-            MultiFactJoinGroups::try_new(self.query_tools.clone(), query_hints)?;
+        let query_groups = MultiFactJoinGroups::try_new(self.query_tools.clone(), query_hints)?;
         let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
 
-        for dim in schema.dimensions.iter().chain(schema.time_dimensions.iter()) {
+        for dim in schema
+            .dimensions
+            .iter()
+            .chain(schema.time_dimensions.iter())
+        {
             let query_path = query_groups.resolve_join_path_for_dimension(dim);
             let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_dimension(dim);
             match (query_path, pre_aggr_path) {

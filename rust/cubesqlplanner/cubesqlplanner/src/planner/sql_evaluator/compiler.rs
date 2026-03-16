@@ -219,7 +219,8 @@ impl Compiler {
         full_name: &String,
     ) -> Option<Rc<MemberSymbol>> {
         let key = (symbol_type, full_name.clone());
-        self.members.get(&key).cloned()
+        //self.members.get(&key).cloned()
+        None
     }
 
     fn validate_and_cache_result(

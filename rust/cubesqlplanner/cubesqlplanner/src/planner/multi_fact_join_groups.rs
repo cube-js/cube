@@ -229,7 +229,8 @@ impl MultiFactJoinGroups {
         &self,
         dimension: &Rc<MemberSymbol>,
     ) -> Option<&Vec<String>> {
-        self.dimension_paths.get(&dimension.cube_name())
+        self.dimension_paths
+            .get(&dimension.clone().resolve_reference_chain().cube_name())
     }
 
     /// Returns the join path from root to the measure's cube.
@@ -238,7 +239,8 @@ impl MultiFactJoinGroups {
         &self,
         measure: &Rc<MemberSymbol>,
     ) -> Option<&Vec<String>> {
-        self.measure_paths.get(&measure.full_name())
+        self.measure_paths
+            .get(&measure.clone().resolve_reference_chain().full_name())
     }
 
     fn precompute_paths(

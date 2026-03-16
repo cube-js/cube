@@ -1,5 +1,6 @@
 use super::CompiledPreAggregation;
 use super::PreAggregationSource;
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
@@ -353,6 +354,18 @@ impl PreAggregationsCompiler {
         Ok(())
     }
 
+    fn join_hints_from_pre_aggreagation(&self, symbols: &Vec<Rc<MemberSymbol>>) -> JoinHints {
+        let mut result = JoinHints::new();
+        for symbol in symbols {
+            let path = symbol.path();
+            if path.len() == 1 {
+                result.push(JoinHintItem::Single(path[0].clone()));
+            } else {
+                result.push(JoinHintItem::Vector(path.clone()));
+            }
+        }
+        result
+    }
     fn build_join_source(
         &mut self,
         measures: &Vec<Rc<MemberSymbol>>,
@@ -364,8 +377,7 @@ impl PreAggregationsCompiler {
             .cloned()
             .chain(all_dimensions.iter().cloned())
             .collect_vec();
-        let pre_aggr_join_hints =
-            JoinHints::from_items(collect_cube_join_hint_items_from_symbols(&all_symbols)?);
+        let pre_aggr_join_hints = self.join_hints_from_pre_aggreagation(&all_symbols);
 
         let join_planner = JoinPlanner::new(self.query_tools.clone());
         let pre_aggrs_for_join = rollups
@@ -386,11 +398,10 @@ impl PreAggregationsCompiler {
                 .chain(join_pre_aggr.time_dimensions.iter().cloned())
                 .chain(join_pre_aggr.segments.iter().cloned())
                 .collect_vec();
-            let join_pre_aggr_join_hints =
-                JoinHints::from_items(collect_cube_join_hint_items_from_symbols(&all_symbols)?);
-            existing_joins.append(
-                &mut join_planner.resolve_join_members_by_hints(&join_pre_aggr_join_hints)?,
-            );
+            let join_pre_aggr_join_hints = self.join_hints_from_pre_aggreagation(&all_symbols);
+            let mut existing =
+                join_planner.resolve_join_members_by_hints(&join_pre_aggr_join_hints)?;
+            existing_joins.append(&mut existing);
         }
 
         let not_existing_joins = target_joins
