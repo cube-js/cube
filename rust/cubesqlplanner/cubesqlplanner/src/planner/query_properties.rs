@@ -781,7 +781,7 @@ impl QueryProperties {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self
-                    .compute_join_multi_fact_groups_with_measures(&[m.clone()])?
+                    .compute_join_multi_fact_groups_with_measures(std::slice::from_ref(m))?
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
                 for item in collect_multiplied_measures(m, join)? {

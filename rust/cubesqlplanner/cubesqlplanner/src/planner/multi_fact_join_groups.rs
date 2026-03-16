@@ -366,7 +366,7 @@ mod tests {
 
         let hints = MeasuresJoinHints::builder(&JoinHints::new())
             .add_dimensions(&[customers_name])
-            .build(&[orders_count.clone()])
+            .build(std::slice::from_ref(&orders_count))
             .unwrap();
 
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
@@ -386,7 +386,7 @@ mod tests {
         let customers_name = ctx.create_symbol("customers.name").unwrap();
 
         let hints = MeasuresJoinHints::builder(&JoinHints::new())
-            .add_dimensions(&[customers_name.clone()])
+            .add_dimensions(std::slice::from_ref(&customers_name))
             .build(&[orders_count])
             .unwrap();
 
@@ -408,7 +408,7 @@ mod tests {
         let customers_name = ctx.create_symbol("customers.name").unwrap();
 
         let hints = MeasuresJoinHints::builder(&JoinHints::new())
-            .add_dimensions(&[customers_name.clone()])
+            .add_dimensions(std::slice::from_ref(&customers_name))
             .build(&[orders_count.clone(), returns_count.clone()])
             .unwrap();
 
