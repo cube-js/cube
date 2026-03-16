@@ -169,7 +169,7 @@ impl RemoteFs for GCSRemoteFs {
             }
             Err(object_store::Error::NotFound { .. }) => {
                 Err(CubeError::internal(format!(
-                    "check_upload_file: {} not found after upload (GCS consistency error)",
+                    "check_upload_file: {} not found during post-upload verification",
                     remote_path
                 )))
             }
@@ -210,13 +210,6 @@ impl RemoteFs for GCSRemoteFs {
         let payload = object_store::PutPayload::from_stream(stream);
         self.store
             .put(&obj_path, payload)
-            .await
-            .map_err(|e| {
-                CubeError::internal(format!("GCS put {} failed: {}", obj_path, e))
-            })?;
-    
-        self.store
-            .put(&obj_path, object_store::PutPayload::from(data))
             .await
             .map_err(|e| {
                 CubeError::internal(format!("GCS put {} failed: {}", obj_path, e))
@@ -270,9 +263,6 @@ impl RemoteFs for GCSRemoteFs {
                 CubeError::internal(format!("GCS get {} failed: {}", obj_path, e))
             })?;
 
-            let bytes: Bytes = get_result.bytes().await.map_err(|e| {
-                CubeError::internal(format!("GCS read stream {} failed: {}", obj_path, e))
-            })?;
             let (temp_file, temp_path) =
                 cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
                     .await??
