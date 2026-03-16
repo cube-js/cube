@@ -345,6 +345,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   if (!this.bucket) {
     throw new Error('Unload is not configured');
   }
+  // Delete stale files from any previous export for this table prefix
+  // to prevent prefix listing from picking up files from failed/concurrent runs.
+  const [staleFiles] = await this.bucket.getFiles({ prefix: `${table}-` });
+  await Promise.all(staleFiles.map(f => f.delete().catch(() => {}))); 
 
   const destination = this.bucket.file(`${table}-*.parquet`);
   const [schema, tableName] = table.split('.');
@@ -356,7 +360,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   const urls = files.map(file => `gs://${bucketName}/${file.name}`);
 
   return {
-    exportBucketCsvEscapeSymbol: this.options.exportBucketCsvEscapeSymbol,
     parquetFile: urls,
   };
 }
