@@ -1012,6 +1012,7 @@ export class QueryCache {
         primaryQuery,
         renewCycle
       });
+
       const isExpired = !renewalThreshold || !parsedResult.time || renewedAgo > renewalThreshold * 1000;
       const isKeyMismatch = renewalKey && parsedResult.renewalKey !== renewalKey;
       const isSameRequest = options.requestId && parsedResult.requestId &&
@@ -1020,15 +1021,15 @@ export class QueryCache {
       // Continue-wait cycle: result was produced by our request,
       // refreshKey changed during execution — return cached, refresh in background
       if (isSameRequest && (isExpired || isKeyMismatch)) {
-        this.logger('Same request cache hit, background refresh', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+        this.logger('Same request cache hit (background refresh)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
         fetchNew().catch(e => {
           if (!(e instanceof ContinueWaitError)) {
             this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           }
         });
-      } else if (renewalKey && isExpired) {
-        // Cache expired — must fetch new data
-        if (options.waitForRenew) {
+      } else if (renewalKey && (isExpired || isKeyMismatch)) {
+        // Cache expired or refreshKey changed — need to refresh
+        if (options.waitForRenew && (isExpired || renewCycle)) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           return fetchNew();
         } else {
@@ -1039,20 +1040,8 @@ export class QueryCache {
             }
           });
         }
-      } else if (isKeyMismatch) {
-        // Key mismatch but NOT expired — key changed but data is still fresh by time
-        if (options.waitForRenew && renewCycle) {
-          this.logger('Waiting for renew (key mismatch, renew cycle)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          return fetchNew();
-        } else {
-          this.logger('Background refresh (key mismatch)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          fetchNew().catch(e => {
-            if (!(e instanceof ContinueWaitError)) {
-              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-            }
-          });
-        }
       }
+
       this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
         this.memoryCache.set(redisKey, parsedResult);
