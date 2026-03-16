@@ -407,6 +407,12 @@ export class QueryCache {
     return key;
   }
 
+  public static extractRequestUUID(requestId: string): string {
+    const idx = requestId.lastIndexOf('-span-');
+
+    return idx !== -1 ? requestId.substring(0, idx) : requestId;
+  }
+
   protected static replaceAll(replaceThis, withThis, inThis) {
     withThis = withThis.replace(/\$/g, '$$$$');
     return inThis.replace(
@@ -1008,7 +1014,8 @@ export class QueryCache {
       });
       const isExpired = !renewalThreshold || !parsedResult.time || renewedAgo > renewalThreshold * 1000;
       const isKeyMismatch = renewalKey && parsedResult.renewalKey !== renewalKey;
-      const isSameRequest = options.requestId && parsedResult.requestId === options.requestId;
+      const isSameRequest = options.requestId && parsedResult.requestId &&
+        QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId);
 
       // Continue-wait cycle: result was produced by our request,
       // refreshKey changed during execution — return cached, refresh in background

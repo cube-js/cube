@@ -258,14 +258,14 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           time: Date.now() - 700 * 1000,
           result: 'cached-data',
           renewalKey: renewalKeyOld,
-          requestId: 'req-5',
+          requestId: 'abc-123-span-1',
         };
 
         const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
           renewalThreshold: 600,
           renewalKey: renewalKeyNew,
           waitForRenew: true,
-          requestId: 'req-5',
+          requestId: 'abc-123-span-2',
         });
 
         expect(result).toBe('cached-data');
@@ -279,14 +279,14 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           time: Date.now() - 100 * 1000,
           result: 'cached-data',
           renewalKey: renewalKeyOld,
-          requestId: 'req-6',
+          requestId: 'conn-456-sub-789-span-aaa',
         };
 
         const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
           renewalThreshold: 600,
           renewalKey: renewalKeyNew,
           waitForRenew: true,
-          requestId: 'req-6',
+          requestId: 'conn-456-sub-789-span-bbb',
         });
 
         expect(result).toBe('cached-data');
