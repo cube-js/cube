@@ -245,6 +245,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (tableData.rowStream) {
       await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);
+    } else if (tableData.parquetFile) {
+      await this.importParquetFile(tableData, table, columns, indexes, aggregations, queryTracingObj);
     } else if (tableData.csvFile) {
       await this.importCsvFile(tableData, table, columns, indexes, aggregations, queryTracingObj);
     } else if (tableData.streamingSource) {
@@ -293,6 +295,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       await this.dropTable(table);
       throw e;
     }
+  }
+
+  private async importParquetFile(tableData: any, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
+    const files = Array.isArray(tableData.parquetFile) ? tableData.parquetFile : [tableData.parquetFile];
+    const columnNames = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`).join(', ');
+    const locationsClause = files.map((f: string) => `'${f}'`).join(', ');
+    const createTableSql = `CREATE TABLE ${table} (${columnNames}) ${indexes} ${aggregations} WITH (input_format = 'parquet') LOCATION ${locationsClause}`;
+    await this.query(createTableSql, [], queryTracingObj);
   }
 
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
