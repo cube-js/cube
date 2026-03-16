@@ -19,7 +19,7 @@ impl JoinHints {
             if let Some(last) = self.items.last() {
                 let redundant = match last {
                     JoinHintItem::Single(s) => s == name,
-                    JoinHintItem::Vector(v) => v.last().map_or(false, |s| s == name),
+                    JoinHintItem::Vector(v) => v.last() == Some(name),
                 };
                 if redundant {
                     return;
