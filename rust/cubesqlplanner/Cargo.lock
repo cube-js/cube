@@ -285,6 +285,7 @@ dependencies = [
  "convert_case 0.7.1",
  "cubeclient",
  "cubenativeutils",
+ "indexmap",
  "indoc",
  "insta",
  "itertools",
