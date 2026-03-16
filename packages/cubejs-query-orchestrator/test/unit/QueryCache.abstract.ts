@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
-import { QueryCache, QueryCacheOptions } from '../../src';
+import {CacheKey, CacheKeyItem, QueryCache, QueryCacheOptions} from '../../src';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
   beforeAll?: () => Promise<void>,
@@ -115,8 +115,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const renewalKeyOld = QueryCache.queryCacheKey({ query: 'key-old', values: [] });
       const renewalKeyNew = QueryCache.queryCacheKey({ query: 'key-new', values: [] });
 
-      // Helper to seed a cache entry directly
-      const seedCache = async (cacheKey, entry) => {
+      const seedCache = async (cacheKey: CacheKey, entry: CacheKeyItem) => {
         const redisKey = cache.queryRedisKey(cacheKey);
         await cache.getCacheDriver().set(redisKey, entry, 3600);
       };
@@ -143,8 +142,10 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         await seedCache(cacheKey, seededEntry);
 
         const fetchNewCalled = { value: false, blocked: false };
+
         const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async () => {
           fetchNewCalled.value = true;
+
           return 'new-result';
         });
 
