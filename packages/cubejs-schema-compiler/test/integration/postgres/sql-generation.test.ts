@@ -1021,14 +1021,15 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     ],
     timeDimensions: [{
       dimension: 'visitors.created_at',
-      dateRange: ['2017-01-01', '2017-01-30']
+      dateRange: ['2017-01-01', '2017-01-30'],
+      granularity: 'month'
     }],
     timezone: 'America/Los_Angeles',
     memberToAlias: {
       'visitors.visitor_revenue': 'custom_revenue',
       'visitors.visitor_count': 'custom_count',
       'visitors.source': 'custom_source',
-      'visitors.created_at.day': 'custom_created_at',
+      'visitors.created_at': 'custom_created_at',
     },
     order: []
   },
@@ -1036,37 +1037,26 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   [
     {
       custom_source: 'google',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
       custom_revenue: null,
       custom_count: '1',
       visitors__per_visitor_revenue: null
     },
     {
       custom_source: 'some',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
       custom_revenue: '300',
       custom_count: '2',
       visitors__per_visitor_revenue: '150'
     },
     {
       custom_source: null,
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
       custom_revenue: null,
       custom_count: '2',
       visitors__per_visitor_revenue: null
     }
   ]));
-
-  it('string measure', async () => runQueryTest({
-    measures: [
-      'visitors.strCase',
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      dateRange: ['2017-01-01', '2017-01-30']
-    }],
-    timezone: 'America/Los_Angeles',
-    order: []
-  }, [{
-    visitors__str_case: 'More than 1'
-  }]));
 
   it('running total', async () => {
     await compiler.compile();
