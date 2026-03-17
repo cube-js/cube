@@ -61,6 +61,7 @@ impl QueueResult {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum QueueResultRocksIndex {
     ByPath = 1,
+    ByExternalId = 2,
 }
 pub struct QueueResultRocksTable<'a> {
     db: crate::metastore::DbTableRef<'a>,
@@ -101,12 +102,16 @@ impl<'a> BaseRocksTable for QueueResultRocksTable<'a> {
 }
 
 rocks_table_new!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
-    vec![Box::new(QueueResultRocksIndex::ByPath)]
+    vec![
+        Box::new(QueueResultRocksIndex::ByPath),
+        Box::new(QueueResultRocksIndex::ByExternalId),
+    ]
 });
 
 #[derive(Hash, Clone, Debug)]
 pub enum QueueResultIndexKey {
     ByPath(String),
+    ByExternalId(String),
 }
 
 base_rocks_secondary_index!(QueueResult, QueueResultRocksIndex);
@@ -115,24 +120,30 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
     fn typed_key_by(&self, row: &QueueResult) -> QueueResultIndexKey {
         match self {
             QueueResultRocksIndex::ByPath => QueueResultIndexKey::ByPath(row.get_path().clone()),
+            QueueResultRocksIndex::ByExternalId => {
+                QueueResultIndexKey::ByExternalId(row.get_external_id().clone().unwrap_or_default())
+            }
         }
     }
 
     fn key_to_bytes(&self, key: &QueueResultIndexKey) -> Vec<u8> {
         match key {
             QueueResultIndexKey::ByPath(s) => s.as_bytes().to_vec(),
+            QueueResultIndexKey::ByExternalId(s) => s.as_bytes().to_vec(),
         }
     }
 
     fn is_unique(&self) -> bool {
         match self {
             QueueResultRocksIndex::ByPath => false,
+            QueueResultRocksIndex::ByExternalId => true,
         }
     }
 
     fn version(&self) -> u32 {
         match self {
             QueueResultRocksIndex::ByPath => 1,
+            QueueResultRocksIndex::ByExternalId => 1,
         }
     }
 
@@ -146,5 +157,12 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+
+    fn should_index_row(&self, row: &QueueResult) -> bool {
+        match self {
+            QueueResultRocksIndex::ByExternalId => row.external_id.is_some(),
+            _ => true,
+        }
     }
 }

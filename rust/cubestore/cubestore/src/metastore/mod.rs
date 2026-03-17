@@ -178,6 +178,10 @@ macro_rules! base_rocks_secondary_index {
             fn get_expire(&self, row: &$table) -> Option<chrono::DateTime<chrono::Utc>> {
                 RocksSecondaryIndex::get_expire(self, row)
             }
+
+            fn should_index_row(&self, row: &$table) -> bool {
+                RocksSecondaryIndex::should_index_row(self, row)
+            }
         }
     };
 }

@@ -357,6 +357,7 @@ pub(crate) enum QueueItemRocksIndex {
     ByPath = 1,
     ByPrefixAndStatus = 2,
     ByPrefix = 3,
+    ByExternalId = 4,
 }
 
 pub struct QueueItemRocksTable<'a> {
@@ -402,6 +403,7 @@ rocks_table_new!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
         Box::new(QueueItemRocksIndex::ByPath),
         Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
         Box::new(QueueItemRocksIndex::ByPrefix),
+        Box::new(QueueItemRocksIndex::ByExternalId),
     ]
 });
 
@@ -410,6 +412,7 @@ pub enum QueueItemIndexKey {
     ByPath(String),
     ByPrefixAndStatus(String, QueueItemStatus),
     ByPrefix(String),
+    ByExternalId(String),
 }
 
 base_rocks_secondary_index!(QueueItem, QueueItemRocksIndex);
@@ -425,6 +428,9 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
             QueueItemRocksIndex::ByPrefix => {
                 QueueItemIndexKey::ByPrefix(row.get_prefix().clone().unwrap_or("".to_string()))
             }
+            QueueItemRocksIndex::ByExternalId => {
+                QueueItemIndexKey::ByExternalId(row.get_external_id().clone().unwrap_or_default())
+            }
         }
     }
 
@@ -432,6 +438,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
         match key {
             QueueItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
             QueueItemIndexKey::ByPrefix(s) => s.as_bytes().to_vec(),
+            QueueItemIndexKey::ByExternalId(s) => s.as_bytes().to_vec(),
             QueueItemIndexKey::ByPrefixAndStatus(prefix, s) => {
                 let mut r = Vec::with_capacity(prefix.len() + 1);
                 r.extend_from_slice(&prefix.as_bytes());
@@ -452,6 +459,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
             QueueItemRocksIndex::ByPath => true,
             QueueItemRocksIndex::ByPrefixAndStatus => false,
             QueueItemRocksIndex::ByPrefix => false,
+            QueueItemRocksIndex::ByExternalId => true,
         }
     }
 
@@ -460,6 +468,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
             QueueItemRocksIndex::ByPath => 1,
             QueueItemRocksIndex::ByPrefixAndStatus => 2,
             QueueItemRocksIndex::ByPrefix => 1,
+            QueueItemRocksIndex::ByExternalId => 1,
         }
     }
 
@@ -473,6 +482,13 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+
+    fn should_index_row(&self, row: &QueueItem) -> bool {
+        match self {
+            QueueItemRocksIndex::ByExternalId => row.external_id.is_some(),
+            _ => true,
+        }
     }
 }
 

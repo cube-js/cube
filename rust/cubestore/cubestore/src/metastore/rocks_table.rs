@@ -150,6 +150,13 @@ pub trait BaseRocksSecondaryIndex<T>: Debug {
     fn version(&self) -> u32;
 
     fn value_version(&self) -> RocksSecondaryIndexValueVersion;
+
+    /// Returns whether this index should store an entry for the given row.
+    /// Default is true. Override to skip indexing rows (e.g. when the indexed
+    /// field is None).
+    fn should_index_row(&self, _row: &T) -> bool {
+        true
+    }
 }
 
 pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
@@ -226,6 +233,10 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
     fn get_expire(&self, _row: &T) -> Option<DateTime<Utc>> {
         None
     }
+
+    fn should_index_row(&self, _row: &T) -> bool {
+        true
+    }
 }
 
 impl<T, I> BaseRocksSecondaryIndex<T> for I
@@ -266,6 +277,10 @@ where
 
     fn value_version(&self) -> RocksSecondaryIndexValueVersion {
         RocksSecondaryIndex::value_version(self)
+    }
+
+    fn should_index_row(&self, row: &T) -> bool {
+        RocksSecondaryIndex::should_index_row(self, row)
     }
 }
 
@@ -1129,7 +1144,9 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let mut res = Vec::with_capacity(indexes.len());
 
         for index in indexes.iter() {
-            res.push(self.index_key_val(row, row_id, index));
+            if index.should_index_row(row) {
+                res.push(self.index_key_val(row, row_id, index));
+            }
         }
 
         Ok(res)
@@ -1155,13 +1172,18 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn delete_index_row(&self, row: &Self::T, row_id: u64) -> Result<Vec<KeyVal>, CubeError> {
         let mut res = Vec::new();
         for index in Self::indexes().iter() {
-            let hash = index.key_hash(&row);
-            let key =
-                RowKey::SecondaryIndex(Self::index_id(index.get_id()), hash.to_be_bytes(), row_id);
-            res.push(KeyVal {
-                key: key.to_bytes(),
-                val: vec![],
-            });
+            if index.should_index_row(row) {
+                let hash = index.key_hash(&row);
+                let key = RowKey::SecondaryIndex(
+                    Self::index_id(index.get_id()),
+                    hash.to_be_bytes(),
+                    row_id,
+                );
+                res.push(KeyVal {
+                    key: key.to_bytes(),
+                    val: vec![],
+                });
+            }
         }
 
         Ok(res)
