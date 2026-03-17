@@ -48,6 +48,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
             Field::new("extra", DataType::Utf8, true),
             Field::new("process_id", DataType::Utf8, true),
             Field::new("exclusive", DataType::Boolean, false),
+            Field::new("external_id", DataType::Utf8, true),
         ]
     }
 
@@ -132,6 +133,13 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                     items
                         .iter()
                         .map(|row| Some(row.item.get_row().get_exclusive())),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(StringArray::from_iter(
+                    items
+                        .iter()
+                        .map(|row| row.item.get_row().get_external_id().clone()),
                 ))
             }),
         ]

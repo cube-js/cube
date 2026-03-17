@@ -90,6 +90,8 @@ pub struct QueueItem {
     pub(crate) process_id: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) exclusive: bool,
+    #[serde(default)]
+    pub(crate) external_id: Option<String>,
 }
 
 impl RocksEntity for QueueItem {
@@ -140,6 +142,7 @@ impl QueueItem {
         orphaned: Option<u32>,
         process_id: Option<String>,
         exclusive: bool,
+        external_id: Option<String>,
     ) -> Self {
         let (prefix, key) = QueueItem::parse_path(path);
         let created = Utc::now();
@@ -164,6 +167,7 @@ impl QueueItem {
             created,
             process_id,
             exclusive,
+            external_id,
         }
     }
 
@@ -227,6 +231,10 @@ impl QueueItem {
 
     pub fn get_exclusive(&self) -> bool {
         self.exclusive
+    }
+
+    pub fn get_external_id(&self) -> &Option<String> {
+        &self.external_id
     }
 
     /// Returns whether this item should be visible to the given caller process.
@@ -483,6 +491,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority0_2 = QueueItem::new(
             "2".to_string(),
@@ -491,6 +500,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority0_3 = QueueItem::new(
             "3".to_string(),
@@ -499,6 +509,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority10_4 = QueueItem::new(
             "4".to_string(),
@@ -507,6 +518,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority0_5 = QueueItem::new(
             "5".to_string(),
@@ -515,6 +527,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority_n5_6 = QueueItem::new(
             "6".to_string(),
@@ -523,6 +536,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
 
         // Force timestamps to be distinct (on systems that are too fast or have low clock resolution)
@@ -595,6 +609,7 @@ mod tests {
             None,
             Some("pid-1".to_string()),
             false,
+            None,
         );
         assert!(non_exclusive.is_visible_for(&None));
         assert!(non_exclusive.is_visible_for(&Some("pid-1".to_string())));
@@ -608,6 +623,7 @@ mod tests {
             None,
             Some("pid-1".to_string()),
             true,
+            None,
         );
         assert!(exclusive.is_visible_for(&Some("pid-1".to_string())));
         assert!(!exclusive.is_visible_for(&Some("pid-other".to_string())));

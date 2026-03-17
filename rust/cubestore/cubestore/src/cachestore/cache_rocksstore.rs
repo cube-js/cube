@@ -683,6 +683,7 @@ pub struct QueueAddPayload {
     pub orphaned: Option<u32>,
     pub process_id: Option<String>,
     pub exclusive: bool,
+    pub external_id: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -1109,6 +1110,7 @@ impl CacheStore for RocksCacheStore {
                         payload.orphaned.clone(),
                         payload.process_id,
                         payload.exclusive,
+                        payload.external_id,
                     ),
                     batch_pipe,
                 )?;
@@ -1419,12 +1421,13 @@ impl CacheStore for RocksCacheStore {
             if let Some(item_row) = item_row {
                 let path = item_row.get_row().get_path();
                 let id = item_row.get_id();
+                let external_id = item_row.get_row().get_external_id().clone();
 
                 queue_item_tbl.delete_row(item_row, batch_pipe)?;
                 queue_item_payload_tbl.try_delete(id, batch_pipe)?;
 
                 if let Some(result) = result {
-                    let queue_result = QueueResult::new(path.clone(), result);
+                    let queue_result = QueueResult::new(path.clone(), result, external_id);
                     let result_schema = QueueResultRocksTable::new(db_ref.clone());
                     // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
                     let result_row = result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
@@ -2120,6 +2123,7 @@ mod tests {
                 Some(10),
                 None,
                 false,
+                None,
             ),
         );
         let item_pending_custom_orphaned_expired = IdRow::new(
@@ -2131,6 +2135,7 @@ mod tests {
                 Some(1),
                 None,
                 false,
+                None,
             ),
         );
         let item_active_custom_orphaned = IdRow::new(
@@ -2142,6 +2147,7 @@ mod tests {
                 Some(10),
                 None,
                 false,
+                None,
             ),
         );
         let mut item_active_custom_orphaned_expired = IdRow::new(
@@ -2153,6 +2159,7 @@ mod tests {
                 Some(1),
                 None,
                 false,
+                None,
             ),
         );
 

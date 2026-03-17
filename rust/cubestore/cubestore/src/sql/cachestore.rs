@@ -327,6 +327,7 @@ impl CacheStoreSqlService {
                 priority,
                 orphaned,
                 value,
+                external_id,
             } => {
                 if exclusive && context.process_id.is_none() {
                     return Err(CubeError::user(
@@ -344,6 +345,7 @@ impl CacheStoreSqlService {
                         orphaned,
                         process_id: context.process_id.clone(),
                         exclusive,
+                        external_id,
                     })
                     .await?;
 

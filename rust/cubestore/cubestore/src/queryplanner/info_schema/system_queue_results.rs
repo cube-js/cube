@@ -35,6 +35,7 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
             ),
             Field::new("deleted", DataType::Boolean, false),
             Field::new("value", DataType::Utf8, false),
+            Field::new("external_id", DataType::Utf8, true),
         ]
     }
 
@@ -67,6 +68,13 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
             Box::new(|items| {
                 Arc::new(StringArray::from_iter_values(
                     items.iter().map(|row| row.get_row().get_value().clone()),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(StringArray::from_iter(
+                    items
+                        .iter()
+                        .map(|row| row.get_row().get_external_id().clone()),
                 ))
             }),
         ]

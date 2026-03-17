@@ -117,6 +117,7 @@ pub enum QueueCommand {
         orphaned: Option<u32>,
         key: Ident,
         value: String,
+        external_id: Option<String>,
     },
     Get {
         key: QueueKey,
@@ -509,11 +510,13 @@ impl<'a> CubeStoreParser<'a> {
                 let mut exclusive = false;
                 let mut priority = 0i64;
                 let mut orphaned: Option<u32> = None;
+                let mut external_id: Option<String> = None;
 
                 parse_sql_options!(self, {
                     "exclusive" => { exclusive = true },
                     "priority" => { priority = self.parse_integer("priority", true)? },
                     "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
+                    "external_id" => { external_id = Some(self.parser.parse_literal_string()?) },
                 });
 
                 QueueCommand::Add {
@@ -522,6 +525,7 @@ impl<'a> CubeStoreParser<'a> {
                     orphaned,
                     key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
+                    external_id,
                 }
             }
             "cancel" => QueueCommand::Cancel {

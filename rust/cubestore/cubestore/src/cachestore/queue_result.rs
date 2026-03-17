@@ -16,6 +16,8 @@ pub struct QueueResult {
     pub(crate) deleted: bool,
     #[serde(with = "ts_seconds")]
     pub(crate) expire: DateTime<Utc>,
+    #[serde(default)]
+    pub(crate) external_id: Option<String>,
 }
 
 impl RocksEntity for QueueResult {
@@ -25,12 +27,13 @@ impl RocksEntity for QueueResult {
 }
 
 impl QueueResult {
-    pub fn new(path: String, value: String) -> Self {
+    pub fn new(path: String, value: String, external_id: Option<String>) -> Self {
         QueueResult {
             path,
             value,
             deleted: false,
             expire: Utc::now() + Duration::minutes(5),
+            external_id,
         }
     }
 
@@ -48,6 +51,10 @@ impl QueueResult {
 
     pub fn is_deleted(&self) -> bool {
         self.deleted
+    }
+
+    pub fn get_external_id(&self) -> &Option<String> {
+        &self.external_id
     }
 }
 
