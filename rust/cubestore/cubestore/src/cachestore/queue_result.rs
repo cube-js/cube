@@ -1,5 +1,4 @@
-use crate::cachestore::queue_item::QueueItemRocksIndex;
-use crate::cachestore::{QueueItem, QueueKey};
+use crate::cachestore::QueueKey;
 use crate::metastore::{
     BaseRocksTable, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId,
     TableInfo,

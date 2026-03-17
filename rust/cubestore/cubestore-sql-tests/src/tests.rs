@@ -281,6 +281,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             queue_multiple_result_blocking,
         ),
         t("queue_custom_orphaned", queue_custom_orphaned),
+        t("queue_result_by_external_id", queue_result_by_external_id),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
@@ -340,6 +341,7 @@ lazy_static::lazy_static! {
         "limit_pushdown_unique_key",
         "queue_ack_then_result_v2",
         "queue_custom_orphaned",
+        "queue_result_by_external_id",
         "queue_full_workflow_v1",
         "queue_full_workflow_v2",
         "queue_heartbeat_by_id",
@@ -11502,6 +11504,58 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
             TableValue::String("1".to_string()),
         ]),]
     );
+}
+
+async fn queue_result_by_external_id(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(
+            r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-123' "STANDALONE#queue:123456789" "payload123456789";"#,
+        )
+        .await
+        .unwrap();
+
+    let ack_result = service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:123456789" "result:123456789""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "unknown-ext-id""#)
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 0);
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:123456789".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
+
+    // Second call should return empty (result deleted after first retrieval)
+    let result = service
+        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 0);
 }
 
 async fn sys_cachestore_info(service: Box<dyn SqlClient>) {
