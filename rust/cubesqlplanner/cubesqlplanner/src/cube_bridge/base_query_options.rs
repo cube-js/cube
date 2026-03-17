@@ -11,6 +11,7 @@ use cubenativeutils::wrappers::{NativeArray, NativeContextHolder, NativeObjectHa
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -75,6 +76,8 @@ pub struct BaseQueryOptionsStatic {
     pub pre_aggregation_id: Option<String>,
     #[serde(rename = "maskedMembers")]
     pub masked_members: Option<Vec<String>>,
+    #[serde(rename = "memberToAlias", default)]
+    pub member_to_alias: Option<HashMap<String, String>>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]
