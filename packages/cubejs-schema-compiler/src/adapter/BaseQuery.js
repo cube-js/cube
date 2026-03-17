@@ -952,6 +952,7 @@ export class BaseQuery {
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       maskedMembers: this.options.maskedMembers,
+      memberToAlias: this.options.memberToAlias,
     };
 
     try {
