@@ -18,34 +18,55 @@ use std::rc::Rc;
 
 /// Test context providing query tools and symbol creation helpers
 pub struct TestContext {
+    schema: MockSchema,
     query_tools: Rc<QueryTools>,
     security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext>,
 }
 
 impl TestContext {
     pub fn new(schema: MockSchema) -> Result<Self, CubeError> {
-        Self::new_with_timezone(schema, Tz::UTC)
+        Self::new_with_options(schema, Tz::UTC, None, None, false)
     }
 
+    #[allow(dead_code)]
     pub fn new_with_timezone(schema: MockSchema, timezone: Tz) -> Result<Self, CubeError> {
-        Self::new_with_options(schema, timezone, None)
+        Self::new_with_options(schema, timezone, None, None, false)
     }
 
     pub fn new_with_masked_members(
         schema: MockSchema,
         masked_members: Vec<String>,
     ) -> Result<Self, CubeError> {
-        Self::new_with_options(schema, Tz::UTC, Some(masked_members))
+        Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false)
+    }
+
+    fn for_options(&self, options: &dyn BaseQueryOptions) -> Result<Self, CubeError> {
+        let static_data = options.static_data();
+        let timezone = static_data
+            .timezone
+            .as_deref()
+            .and_then(|tz| tz.parse::<Tz>().ok())
+            .unwrap_or(Tz::UTC);
+
+        Self::new_with_options(
+            self.schema.clone(),
+            timezone,
+            static_data.masked_members.clone(),
+            static_data.member_to_alias.clone(),
+            static_data.export_annotated_sql,
+        )
     }
 
     fn new_with_options(
         schema: MockSchema,
         timezone: Tz,
         masked_members: Option<Vec<String>>,
+        member_to_alias: Option<std::collections::HashMap<String, String>>,
+        export_annotated_sql: bool,
     ) -> Result<Self, CubeError> {
         let base_tools = schema.create_base_tools()?;
         let join_graph = Rc::new(schema.create_join_graph()?);
-        let evaluator = schema.create_evaluator();
+        let evaluator = schema.clone().create_evaluator();
         let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =
             Rc::new(MockSecurityContext);
 
@@ -55,11 +76,13 @@ impl TestContext {
             Rc::new(base_tools),
             join_graph,
             Some(timezone.to_string()),
-            false, // export_annotated_sql
+            export_annotated_sql,
             masked_members,
+            member_to_alias,
         )?;
 
         Ok(Self {
+            schema,
             query_tools,
             security_context,
         })
@@ -312,8 +335,9 @@ impl TestContext {
         query: &str,
     ) -> Result<(String, Vec<Rc<PreAggregation>>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml(query);
-        let request = QueryProperties::try_new(self.query_tools.clone(), options.clone())?;
-        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), false);
+        let ctx = self.for_options(options.as_ref())?;
+        let request = QueryProperties::try_new(ctx.query_tools.clone(), options)?;
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
         planner.plan()
     }
 }

@@ -18,7 +18,7 @@ impl TestCompiler {
     pub fn new_with_timezone(evaluator: Rc<MockCubeEvaluator>, timezone: Tz) -> Self {
         let base_tools = Rc::new(MockBaseTools::default());
         let security_context = Rc::new(MockSecurityContext);
-        let compiler = Compiler::new(evaluator, base_tools, security_context, timezone);
+        let compiler = Compiler::new(evaluator, base_tools, security_context, timezone, None);
 
         Self { compiler }
     }

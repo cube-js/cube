@@ -41,6 +41,10 @@ pub struct YamlBaseQueryOptions {
     pub join_hints: Option<Vec<Vec<String>>>,
     #[serde(default, rename = "memberToAlias")]
     pub member_to_alias: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub timezone: Option<String>,
+    #[serde(default, rename = "maskedMembers")]
+    pub masked_members: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]

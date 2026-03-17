@@ -23,6 +23,7 @@ pub struct Compiler {
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
     timezone: Tz,
+    member_to_alias: Option<HashMap<String, String>>,
     members: HashMap<SymbolPath, Rc<MemberSymbol>>,
     cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
     cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
@@ -34,12 +35,14 @@ impl Compiler {
         base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
+        member_to_alias: Option<HashMap<String, String>>,
     ) -> Self {
         Self {
             cube_evaluator,
             security_context,
             base_tools,
             timezone,
+            member_to_alias,
             members: HashMap::new(),
             cube_names: HashMap::new(),
             cube_tables: HashMap::new(),
@@ -189,6 +192,10 @@ impl Compiler {
 
     pub fn timezone(&self) -> Tz {
         self.timezone.clone()
+    }
+
+    pub fn member_to_alias(&self) -> &Option<HashMap<String, String>> {
+        &self.member_to_alias
     }
 
     pub fn compile_sql_call(

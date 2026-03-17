@@ -13,7 +13,7 @@ use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -42,6 +42,7 @@ impl QueryTools {
         timezone_name: Option<String>,
         export_annotated_sql: bool,
         masked_members: Option<Vec<String>>,
+        member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -56,6 +57,7 @@ impl QueryTools {
             base_tools.clone(),
             security_context.clone(),
             timezone.clone(),
+            member_to_alias,
         )));
         Ok(Rc::new(Self {
             cube_evaluator,
