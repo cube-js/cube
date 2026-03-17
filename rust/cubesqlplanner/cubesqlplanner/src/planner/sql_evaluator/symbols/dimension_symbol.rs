@@ -387,16 +387,15 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
-        let alias =
-            compiler
-                .alias_for_member(path.full_name())
-                .unwrap_or_else(|| {
-                    PlanSqlTemplates::member_alias_name(
-                        cube.static_data().resolved_alias(),
-                        path.symbol_name(),
-                        &None,
-                    )
-                });
+        let alias = compiler
+            .alias_for_member(path.full_name())
+            .unwrap_or_else(|| {
+                PlanSqlTemplates::member_alias_name(
+                    cube.static_data().resolved_alias(),
+                    path.symbol_name(),
+                    &None,
+                )
+            });
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
