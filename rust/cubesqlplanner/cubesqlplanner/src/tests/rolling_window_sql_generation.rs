@@ -25,7 +25,6 @@ fn test_rolling_window_trailing_unbounded_no_granularity() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for trailing unbounded");
 
-    // trailing: unbounded means no lower time bound — only upper bound should exist
     assert!(
         !sql.contains(">= $_0_$"),
         "Trailing unbounded should not have a lower time bound (>=), got: {sql}"
@@ -56,7 +55,6 @@ fn test_rolling_window_leading_unbounded_no_granularity() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for leading unbounded");
 
-    // leading: unbounded means no upper time bound — only lower bound should exist
     assert!(
         !sql.contains("<= $_1_$"),
         "Leading unbounded should not have an upper time bound (<=), got: {sql}"
@@ -83,7 +81,6 @@ fn test_rolling_window_both_unbounded_no_granularity() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for both unbounded");
 
-    // both unbounded means no time bounds at all
     assert!(
         !sql.contains(">= $_0_$"),
         "Both unbounded should not have a lower time bound (>=), got: {sql}"
@@ -115,8 +112,6 @@ fn test_rolling_window_trailing_unbounded_with_granularity() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for trailing unbounded with granularity");
 
-    // With granularity, trailing: unbounded should not have a lower time bound
-    // in either the WHERE clause or the JOIN ON condition
     assert!(
         !sql.contains(">= \"time_series\".\"date_from\""),
         "JOIN should not have lower bound with trailing unbounded, got: {sql}"
