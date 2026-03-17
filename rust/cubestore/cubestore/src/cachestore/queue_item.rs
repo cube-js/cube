@@ -90,7 +90,7 @@ pub struct QueueItem {
     pub(crate) process_id: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) exclusive: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) external_id: Option<String>,
 }
 

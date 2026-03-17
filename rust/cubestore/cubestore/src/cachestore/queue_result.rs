@@ -16,7 +16,7 @@ pub struct QueueResult {
     pub(crate) deleted: bool,
     #[serde(with = "ts_seconds")]
     pub(crate) expire: DateTime<Utc>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) external_id: Option<String>,
 }
 
