@@ -280,6 +280,7 @@ impl TestContext {
                         .unwrap_or(false),
                 )
                 .pre_aggregation_id(yaml_options.pre_aggregation_id)
+                .member_to_alias(yaml_options.member_to_alias)
                 .build(),
         )
     }

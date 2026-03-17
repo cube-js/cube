@@ -3,6 +3,43 @@ use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
 #[test]
+fn test_member_to_alias() {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {r#"
+        measures:
+          - visitors.count
+        dimensions:
+          - visitors.source
+        time_dimensions:
+          - dimension: visitors.created_at
+            granularity: day
+        memberToAlias:
+          visitors.count: "custom_count"
+          visitors.source: "custom_source"
+          visitors.created_at: "custom_created_at"
+    "#};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with custom aliases");
+
+    assert!(
+        sql.contains("custom_count"),
+        "SQL should contain custom alias for measure, got: {sql}"
+    );
+    assert!(
+        sql.contains("custom_source"),
+        "SQL should contain custom alias for dimension, got: {sql}"
+    );
+    assert!(
+        sql.contains("custom_created_at"),
+        "SQL should contain custom alias for time dimension base, got: {sql}"
+    );
+}
+
+#[test]
 fn test_simple_join_sql() {
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
     let test_context = TestContext::new(schema).unwrap();

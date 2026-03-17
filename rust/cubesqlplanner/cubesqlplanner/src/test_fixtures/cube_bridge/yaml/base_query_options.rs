@@ -1,6 +1,7 @@
 use crate::cube_bridge::base_query_options::{FilterItem, OrderByItem, TimeDimension};
 use serde::de;
 use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct YamlBaseQueryOptions {
@@ -38,6 +39,8 @@ pub struct YamlBaseQueryOptions {
     pub pre_aggregation_id: Option<String>,
     #[serde(default, rename = "joinHints")]
     pub join_hints: Option<Vec<Vec<String>>>,
+    #[serde(default, rename = "memberToAlias")]
+    pub member_to_alias: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
