@@ -1,0 +1,24 @@
+---
+source: cubesqlplanner/src/tests/rolling_window_sql_generation.rs
+expression: sql
+---
+ WITH 
+time_series AS (  SELECT date_from::timestamp AS "date_from",
+  date_to::timestamp AS "date_to" 
+  FROM(
+      VALUES ('2025-10-07T00:00:00.000', '2025-10-07T23:59:59.999'), ('2025-10-08T00:00:00.000', '2025-10-08T23:59:59.999')) AS dates (date_from, date_to)),
+cte_1 AS (  SELECT date_trunc('day', ("test_cube".created_at::timestamptz AT TIME ZONE 'UTC')) "test_cube__created_at_day", sum("test_cube".val) "test_cube__val" 
+  FROM  test_data  AS "test_cube"
+  WHERE (("test_cube".created_at::timestamptz AT TIME ZONE 'UTC') <= (SELECT max("date_to") "value" 
+  FROM time_series))
+  GROUP BY 1
+  ORDER BY  1  ASC),
+cte_2 AS (  SELECT "time_series"."date_from" "test_cube__created_at_day", sum("rolling_source"."test_cube__val") "test_cube__val" 
+  FROM  time_series  AS "time_series"
+  LEFT JOIN  cte_1  AS "rolling_source" ON "rolling_source"."test_cube__created_at_day" <= "time_series"."date_to"
+  GROUP BY 1
+  ORDER BY  1  ASC)
+SELECT "fk_aggregate"."test_cube__created_at_day" "test_cube__created_at_day", "fk_aggregate"."test_cube__val" "test_cube__val" 
+FROM (SELECT * 
+FROM  cte_2  AS "cte_2") AS "fk_aggregate"
+ORDER BY  1  ASC

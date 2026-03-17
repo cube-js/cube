@@ -30,12 +30,12 @@ fn test_rolling_window_trailing_unbounded_no_granularity() {
         !sql.contains(">= $_0_$"),
         "Trailing unbounded should not have a lower time bound (>=), got: {sql}"
     );
-    // Without granularity there's no time_series CTE, so the upper bound
-    // must use a parameter directly, not a subquery from time_series
     assert!(
         !sql.contains("time_series"),
         "Without granularity should not reference time_series CTE, got: {sql}"
     );
+
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -61,6 +61,8 @@ fn test_rolling_window_leading_unbounded_no_granularity() {
         !sql.contains("<= $_1_$"),
         "Leading unbounded should not have an upper time bound (<=), got: {sql}"
     );
+
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -90,6 +92,8 @@ fn test_rolling_window_both_unbounded_no_granularity() {
         !sql.contains("<= $_1_$"),
         "Both unbounded should not have an upper time bound (<=), got: {sql}"
     );
+
+    insta::assert_snapshot!(sql);
 }
 
 #[test]
@@ -117,4 +121,6 @@ fn test_rolling_window_trailing_unbounded_with_granularity() {
         !sql.contains(">= \"time_series\".\"date_from\""),
         "JOIN should not have lower bound with trailing unbounded, got: {sql}"
     );
+
+    insta::assert_snapshot!(sql);
 }

@@ -321,14 +321,13 @@ impl MultiStageAppliedState {
 
         if trailing_unbounded && leading_unbounded {
             // Both unbounded — remove the date range filter entirely
-            self.time_dimensions_filters
-                .retain(|item| match item {
-                    FilterItem::Item(itm) => {
-                        !(&itm.member_name() == member_name
-                            && matches!(itm.filter_operator(), FilterOperator::InDateRange))
-                    }
-                    _ => true,
-                });
+            self.time_dimensions_filters.retain(|item| match item {
+                FilterItem::Item(itm) => {
+                    !(&itm.member_name() == member_name
+                        && matches!(itm.filter_operator(), FilterOperator::InDateRange))
+                }
+                _ => true,
+            });
         } else if trailing_unbounded {
             // Remove lower bound: InDateRange(from, to) → BeforeOrOnDate(to)
             self.time_dimensions_filters = self

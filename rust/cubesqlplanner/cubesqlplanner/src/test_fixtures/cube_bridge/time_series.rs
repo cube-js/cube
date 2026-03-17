@@ -18,9 +18,8 @@ pub fn generate_time_series(
     let start = parse_date(&date_range[0])?;
     let end = parse_date(&date_range[1])?;
 
-    let snap = snap_fn(granularity).ok_or_else(|| {
-        CubeError::user(format!("Unsupported time granularity: {granularity}"))
-    })?;
+    let snap = snap_fn(granularity)
+        .ok_or_else(|| CubeError::user(format!("Unsupported time granularity: {granularity}")))?;
     let advance = advance_fn(granularity).unwrap();
     let period_end = period_end_fn(granularity).unwrap();
 
@@ -123,8 +122,7 @@ fn parse_date(s: &str) -> Result<NaiveDateTime, CubeError> {
     NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
         .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S"))
         .or_else(|_| {
-            NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
+            NaiveDate::parse_from_str(s, "%Y-%m-%d").map(|d| d.and_hms_opt(0, 0, 0).unwrap())
         })
         .map_err(|_| CubeError::internal(format!("Cannot parse date: '{s}'")))
 }
@@ -153,8 +151,14 @@ mod tests {
     fn test_day() {
         let r = generate_time_series("day", &["2025-10-07".into(), "2025-10-09".into()]).unwrap();
         assert_eq!(r.len(), 3);
-        assert_eq!(r[0], vec!["2025-10-07T00:00:00.000", "2025-10-07T23:59:59.999"]);
-        assert_eq!(r[2], vec!["2025-10-09T00:00:00.000", "2025-10-09T23:59:59.999"]);
+        assert_eq!(
+            r[0],
+            vec!["2025-10-07T00:00:00.000", "2025-10-07T23:59:59.999"]
+        );
+        assert_eq!(
+            r[2],
+            vec!["2025-10-09T00:00:00.000", "2025-10-09T23:59:59.999"]
+        );
     }
 
     #[test]
@@ -177,7 +181,8 @@ mod tests {
 
     #[test]
     fn test_quarter() {
-        let r = generate_time_series("quarter", &["2025-01-15".into(), "2025-07-10".into()]).unwrap();
+        let r =
+            generate_time_series("quarter", &["2025-01-15".into(), "2025-07-10".into()]).unwrap();
         assert_eq!(r.len(), 3);
         assert_eq!(r[0][0], "2025-01-01T00:00:00.000");
         assert_eq!(r[0][1], "2025-03-31T23:59:59.999");
@@ -188,13 +193,26 @@ mod tests {
     fn test_year() {
         let r = generate_time_series("year", &["2024-06-15".into(), "2025-03-10".into()]).unwrap();
         assert_eq!(r.len(), 2);
-        assert_eq!(r[0], vec!["2024-01-01T00:00:00.000", "2024-12-31T23:59:59.999"]);
-        assert_eq!(r[1], vec!["2025-01-01T00:00:00.000", "2025-12-31T23:59:59.999"]);
+        assert_eq!(
+            r[0],
+            vec!["2024-01-01T00:00:00.000", "2024-12-31T23:59:59.999"]
+        );
+        assert_eq!(
+            r[1],
+            vec!["2025-01-01T00:00:00.000", "2025-12-31T23:59:59.999"]
+        );
     }
 
     #[test]
     fn test_hour() {
-        let r = generate_time_series("hour", &["2025-10-07T10:30:00.000".into(), "2025-10-07T12:15:00.000".into()]).unwrap();
+        let r = generate_time_series(
+            "hour",
+            &[
+                "2025-10-07T10:30:00.000".into(),
+                "2025-10-07T12:15:00.000".into(),
+            ],
+        )
+        .unwrap();
         assert_eq!(r.len(), 3);
         assert_eq!(r[0][0], "2025-10-07T10:00:00.000");
         assert_eq!(r[0][1], "2025-10-07T10:59:59.999");
@@ -202,6 +220,9 @@ mod tests {
 
     #[test]
     fn test_unsupported() {
-        assert!(generate_time_series("millennium", &["2025-01-01".into(), "2025-01-02".into()]).is_err());
+        assert!(
+            generate_time_series("millennium", &["2025-01-01".into(), "2025-01-02".into()])
+                .is_err()
+        );
     }
 }
