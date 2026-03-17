@@ -85,3 +85,30 @@ fn test_rolling_window_both_unbounded_no_granularity() {
         "Both unbounded should not have an upper time bound (<=), got: {sql}"
     );
 }
+
+#[test]
+fn test_rolling_window_trailing_unbounded_with_granularity() {
+    let test_context = create_context();
+
+    let query_yaml = indoc! {r#"
+        measures:
+          - test_cube.val
+        time_dimensions:
+          - dimension: test_cube.created_at
+            granularity: day
+            dateRange:
+              - "2025-10-07"
+              - "2025-10-08"
+    "#};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for trailing unbounded with granularity");
+
+    // With granularity, trailing: unbounded should not have a lower time bound
+    // in either the WHERE clause or the JOIN ON condition
+    assert!(
+        !sql.contains(">= \"time_series\".\"date_from\""),
+        "JOIN should not have lower bound with trailing unbounded, got: {sql}"
+    );
+}
