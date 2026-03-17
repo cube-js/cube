@@ -710,11 +710,16 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
 
         let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
-        let alias = PlanSqlTemplates::member_alias_name(
-            cube.static_data().resolved_alias(),
-            path.symbol_name(),
-            &None,
-        );
+        let alias =
+            compiler
+                .alias_for_member(path.full_name())
+                .unwrap_or_else(|| {
+                    PlanSqlTemplates::member_alias_name(
+                        cube.static_data().resolved_alias(),
+                        path.symbol_name(),
+                        &None,
+                    )
+                });
 
         let is_view = cube.static_data().is_view.unwrap_or(false);
 

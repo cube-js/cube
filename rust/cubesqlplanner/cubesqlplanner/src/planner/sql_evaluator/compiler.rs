@@ -130,10 +130,11 @@ impl Compiler {
             return Ok(exists.clone());
         }
         let full_name = path.full_name().clone();
-        let definition = self.cube_evaluator.segment_by_path(full_name)?;
+        let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
         let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
-        let alias =
-            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None);
+        let alias = self.alias_for_member(&full_name).unwrap_or_else(|| {
+            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None)
+        });
         let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
         let symbol = MemberExpressionSymbol::try_new(
             cube_symbol,
@@ -194,8 +195,10 @@ impl Compiler {
         self.timezone.clone()
     }
 
-    pub fn member_to_alias(&self) -> &Option<HashMap<String, String>> {
-        &self.member_to_alias
+    pub fn alias_for_member(&self, full_name: &str) -> Option<String> {
+        self.member_to_alias
+            .as_ref()
+            .and_then(|m| m.get(full_name).cloned())
     }
 
     pub fn compile_sql_call(
