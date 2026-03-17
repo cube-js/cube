@@ -30,6 +30,12 @@ fn test_rolling_window_trailing_unbounded_no_granularity() {
         !sql.contains(">= $_0_$"),
         "Trailing unbounded should not have a lower time bound (>=), got: {sql}"
     );
+    // Without granularity there's no time_series CTE, so the upper bound
+    // must use a parameter directly, not a subquery from time_series
+    assert!(
+        !sql.contains("time_series"),
+        "Without granularity should not reference time_series CTE, got: {sql}"
+    );
 }
 
 #[test]

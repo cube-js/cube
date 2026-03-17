@@ -474,9 +474,11 @@ impl MultiStageQueryPlanner {
                 }
 
                 if time_dimensions.is_empty() {
+                    let base_state =
+                        self.replace_date_range_for_rolling_window(&rolling_window, state.clone());
                     let rolling_base = self.add_rolling_window_base(
                         member.clone(),
-                        state.clone(),
+                        base_state,
                         ungrouped,
                         descriptions,
                     )?;
@@ -696,6 +698,29 @@ impl MultiStageQueryPlanner {
         } else {
             Ok(None)
         }
+    }
+
+    /// Adjust date range filters for rolling window when there's no granularity.
+    /// Without granularity there's no time_series CTE, so we replace InDateRange
+    /// with BeforeOrOnDate/AfterOrOnDate that use parameters directly.
+    fn replace_date_range_for_rolling_window(
+        &self,
+        rolling_window: &RollingWindow,
+        state: Rc<MultiStageAppliedState>,
+    ) -> Rc<MultiStageAppliedState> {
+        let mut new_state = state.clone_state();
+        for filter_item in state.time_dimensions_filters() {
+            if let FilterItem::Item(filter) = filter_item {
+                if matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+                    new_state.replace_date_range_for_rolling_window_without_granularity(
+                        &filter.member_name(),
+                        &rolling_window.trailing,
+                        &rolling_window.leading,
+                    );
+                }
+            }
+        }
+        Rc::new(new_state)
     }
 
     fn make_rolling_base_state(
