@@ -304,6 +304,8 @@ impl TestContext {
                 )
                 .pre_aggregation_id(yaml_options.pre_aggregation_id)
                 .member_to_alias(yaml_options.member_to_alias)
+                .masked_members(yaml_options.masked_members)
+                .timezone(yaml_options.timezone)
                 .build(),
         )
     }
