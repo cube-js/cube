@@ -40,6 +40,8 @@ fn test_subquery_dimension_used_in_filter() {
         !where_clause.contains("sum(\"customer_orders\""),
         "WHERE clause must not contain raw aggregate from CustomerOrders, got: {where_clause}"
     );
+
+    insta::assert_snapshot!(sql);
 }
 
 #[test]

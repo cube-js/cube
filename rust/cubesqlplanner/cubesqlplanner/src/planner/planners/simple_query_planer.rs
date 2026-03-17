@@ -58,7 +58,9 @@ impl SimpleQueryPlanner {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
             collect_sub_query_dimensions_from_symbols(
-                &self.query_properties.all_members(false),
+                &self
+                    .query_properties
+                    .get_member_symbols(true, true, true, true, &vec![]),
                 &self.join_planner,
                 &join,
             )?
