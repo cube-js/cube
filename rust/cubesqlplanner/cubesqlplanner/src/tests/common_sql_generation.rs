@@ -318,3 +318,45 @@ fn test_query_level_join_hints() {
         "SQL should NOT use A->F join, got: {sql}"
     );
 }
+
+#[test]
+fn test_segment_with_subquery_dimension_in_view() {
+    let schema = MockSchema::from_yaml_file("common/segments_in_view.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - accountOverview.count
+        segments:
+          - accountOverview.hasNoTickets
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for segment with subquery dimension in view");
+
+    insta::assert_snapshot!(sql);
+}
+
+#[test]
+fn test_segment_with_subquery_dimension_in_view_with_dimension() {
+    let schema = MockSchema::from_yaml_file("common/segments_in_view.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - accountOverview.count
+        segments:
+          - accountOverview.hasNoTickets
+        dimensions:
+          - accountOverview.region
+        order:
+          - id: accountOverview.region
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for segment with subquery dimension in view with dimension");
+
+    insta::assert_snapshot!(sql);
+}
