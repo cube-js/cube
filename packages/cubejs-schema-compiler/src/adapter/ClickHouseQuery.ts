@@ -278,6 +278,15 @@ export class ClickHouseQuery extends BaseQuery {
     delete templates.types.interval;
     delete templates.types.binary;
     templates.expressions.is_not_distinct_from = 'isNotDistinctFrom({{ left }}, {{ right }})';
+
+    templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+
     return templates;
   }
 }
