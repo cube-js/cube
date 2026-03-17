@@ -412,7 +412,7 @@ pub enum QueueItemIndexKey {
     ByPath(String),
     ByPrefixAndStatus(String, QueueItemStatus),
     ByPrefix(String),
-    ByExternalId(String),
+    ByExternalId(Option<String>),
 }
 
 base_rocks_secondary_index!(QueueItem, QueueItemRocksIndex);
@@ -429,7 +429,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
                 QueueItemIndexKey::ByPrefix(row.get_prefix().clone().unwrap_or("".to_string()))
             }
             QueueItemRocksIndex::ByExternalId => {
-                QueueItemIndexKey::ByExternalId(row.get_external_id().clone().unwrap_or_default())
+                QueueItemIndexKey::ByExternalId(row.get_external_id().clone())
             }
         }
     }
@@ -438,7 +438,9 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
         match key {
             QueueItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
             QueueItemIndexKey::ByPrefix(s) => s.as_bytes().to_vec(),
-            QueueItemIndexKey::ByExternalId(s) => s.as_bytes().to_vec(),
+            QueueItemIndexKey::ByExternalId(s) => {
+                s.as_deref().unwrap_or("__null__").as_bytes().to_vec()
+            }
             QueueItemIndexKey::ByPrefixAndStatus(prefix, s) => {
                 let mut r = Vec::with_capacity(prefix.len() + 1);
                 r.extend_from_slice(&prefix.as_bytes());
@@ -486,7 +488,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
 
     fn should_index_row(&self, row: &QueueItem) -> bool {
         match self {
-            QueueItemRocksIndex::ByExternalId => row.external_id.is_some(),
+            Self::ByExternalId => row.external_id.is_some(),
             _ => true,
         }
     }

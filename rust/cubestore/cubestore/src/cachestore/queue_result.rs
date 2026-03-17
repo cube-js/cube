@@ -1,4 +1,5 @@
-use crate::cachestore::QueueKey;
+use crate::cachestore::queue_item::QueueItemRocksIndex;
+use crate::cachestore::{QueueItem, QueueKey};
 use crate::metastore::{
     BaseRocksTable, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId,
     TableInfo,
@@ -111,7 +112,7 @@ rocks_table_new!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
 #[derive(Hash, Clone, Debug)]
 pub enum QueueResultIndexKey {
     ByPath(String),
-    ByExternalId(String),
+    ByExternalId(Option<String>),
 }
 
 base_rocks_secondary_index!(QueueResult, QueueResultRocksIndex);
@@ -121,7 +122,7 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
         match self {
             QueueResultRocksIndex::ByPath => QueueResultIndexKey::ByPath(row.get_path().clone()),
             QueueResultRocksIndex::ByExternalId => {
-                QueueResultIndexKey::ByExternalId(row.get_external_id().clone().unwrap_or_default())
+                QueueResultIndexKey::ByExternalId(row.get_external_id().clone())
             }
         }
     }
@@ -129,7 +130,9 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
     fn key_to_bytes(&self, key: &QueueResultIndexKey) -> Vec<u8> {
         match key {
             QueueResultIndexKey::ByPath(s) => s.as_bytes().to_vec(),
-            QueueResultIndexKey::ByExternalId(s) => s.as_bytes().to_vec(),
+            QueueResultIndexKey::ByExternalId(s) => {
+                s.as_deref().unwrap_or("__null__").as_bytes().to_vec()
+            }
         }
     }
 
@@ -161,7 +164,7 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
 
     fn should_index_row(&self, row: &QueueResult) -> bool {
         match self {
-            QueueResultRocksIndex::ByExternalId => row.external_id.is_some(),
+            Self::ByExternalId => row.external_id.is_some(),
             _ => true,
         }
     }
