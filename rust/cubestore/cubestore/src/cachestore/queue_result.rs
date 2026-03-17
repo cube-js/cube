@@ -82,6 +82,14 @@ impl<'a> QueueResultRocksTable<'a> {
             QueueKey::ById(id) => self.get_row(id),
         }
     }
+
+    pub fn get_row_by_external_id(
+        &self,
+        external_id: String,
+    ) -> Result<Option<IdRow<QueueResult>>, CubeError> {
+        let index_key = QueueResultIndexKey::ByExternalId(Some(external_id));
+        self.get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByExternalId)
+    }
 }
 
 impl<'a> BaseRocksTable for QueueResultRocksTable<'a> {

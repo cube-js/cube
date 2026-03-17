@@ -155,6 +155,9 @@ pub enum QueueCommand {
     Result {
         key: Ident,
     },
+    ResultByExternalId {
+        key: Ident,
+    },
     ResultBlocking {
         key: QueueKey,
         timeout: u64,
@@ -179,6 +182,7 @@ impl QueueCommand {
             QueueCommand::MergeExtra { .. } => "merge_extra",
             QueueCommand::Retrieve { .. } => "retrieve",
             QueueCommand::Result { .. } => "result",
+            QueueCommand::ResultByExternalId { .. } => "result_by_external_id",
             QueueCommand::ResultBlocking { .. } => "result_blocking",
             QueueCommand::Truncate { .. } => "truncate",
         }
@@ -625,6 +629,9 @@ impl<'a> CubeStoreParser<'a> {
                 }
             }
             "result" => QueueCommand::Result {
+                key: self.parser.parse_identifier()?,
+            },
+            "result_by_external_id" => QueueCommand::ResultByExternalId {
                 key: self.parser.parse_identifier()?,
             },
             "result_blocking" => {

@@ -842,6 +842,10 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         path: String,
     ) -> Result<Option<QueueResultResponse>, CubeError>;
+    async fn queue_result_by_external_id(
+        &self,
+        external_id: String,
+    ) -> Result<Option<QueueResultResponse>, CubeError>;
     async fn queue_result_blocking(
         &self,
         key: QueueKey,
@@ -1465,6 +1469,31 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
+    async fn queue_result_by_external_id(
+        &self,
+        external_id: String,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        self.write_operation_queue("queue_result_by_external_id", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            let queue_result = result_schema.get_row_by_external_id(external_id)?;
+
+            if let Some(queue_result) = queue_result {
+                if queue_result.get_row().is_deleted() {
+                    Ok(None)
+                } else {
+                    Self::queue_result_ready_to_delete_impl(
+                        &result_schema,
+                        batch_pipe,
+                        queue_result,
+                    )
+                }
+            } else {
+                Ok(None)
+            }
+        })
+        .await
+    }
+
     async fn queue_result_blocking(
         &self,
         key: QueueKey,
@@ -1707,6 +1736,15 @@ impl CacheStore for ClusterCacheStoreClient {
         _path: String,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_result_by_path was used.")
+    }
+
+    async fn queue_result_by_external_id(
+        &self,
+        _external_id: String,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        panic!(
+            "CacheStore cannot be used on the worker node! queue_result_by_external_id was used."
+        )
     }
 
     async fn queue_result_blocking(
