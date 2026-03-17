@@ -1696,6 +1696,24 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     visitors__created_at_day: '2017-01-10T00:00:00.000Z',
   }]));
 
+  it('rolling window with unbounded without time dimension', async () => runQueryTest({
+    measures: [
+      'visitors.countRollingUnbounded',
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
+        dateRange: ['2017-01-05', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [{
+    visitors__count_rolling_unbounded: '6'
+  }]));
+
   it('two rolling windows with two time dimension granularities', async () => runQueryTest({
     measures: [
       'visitors.countRollingUnbounded',
