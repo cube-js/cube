@@ -371,6 +371,7 @@ pub struct SqlTemplates {
 pub struct AliasedColumn {
     pub expr: String,
     pub alias: String,
+    pub data_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -379,6 +380,7 @@ pub struct TemplateColumn {
     pub alias: String,
     pub aliased: String,
     pub index: usize,
+    pub data_type: String,
 }
 
 impl SqlTemplates {
@@ -528,6 +530,7 @@ impl SqlTemplates {
                     alias: c.alias.to_string(),
                     aliased: self.alias_expr(&c.expr, &c.alias)?,
                     index: i + 1,
+                    data_type: c.data_type,
                 })
             })
             .collect::<Result<Vec<_>, _>>()
@@ -762,10 +765,11 @@ impl SqlTemplates {
         expr: String,
         asc: bool,
         nulls_first: bool,
+        data_type: String,
     ) -> Result<String, CubeError> {
         self.render_template(
             "expressions/sort",
-            context! { expr => expr, asc => asc, nulls_first => nulls_first },
+            context! { expr => expr, asc => asc, nulls_first => nulls_first, data_type => data_type },
         )
     }
 

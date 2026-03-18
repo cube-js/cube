@@ -168,7 +168,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
             { visitors__created_at_day: '2017-01-02T00:00:00.000', visitors__visitor_count: '1' },
             { visitors__created_at_day: '2017-01-04T00:00:00.000', visitors__visitor_count: '1' },
             { visitors__created_at_day: '2017-01-05T00:00:00.000', visitors__visitor_count: '1' },
-            { visitors__created_at_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' }
+            { visitors__created_at_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' },
+            { visitors__created_at_day: '2017-01-07T00:00:00.000', visitors__visitor_count: '1' }
           ]
         );
       });
@@ -229,7 +230,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
       expect(res).toEqual(
         [
           { visitors__status: 'Approved', visitors__visitor_count: '2' },
-          { visitors__status: 'Canceled', visitors__visitor_count: '4' }
+          { visitors__status: 'Canceled', visitors__visitor_count: '5' }
         ]
       );
     });
@@ -299,6 +300,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
         expect(res).toEqual(
           [
             { visitors__enabled_source: 'google', visitors__visitor_count: '1' },
+            { visitors__enabled_source: 'Gork', visitors__visitor_count: '1' },
             { visitors__enabled_source: 'some', visitors__visitor_count: '2' },
             { visitors__enabled_source: null, visitors__visitor_count: '3' },
           ]
@@ -338,7 +340,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
         { visitors__created_at: '2016-09-06T16:00:00.000' },
         { visitors__created_at: '2017-01-04T16:00:00.000' },
         { visitors__created_at: '2017-01-05T16:00:00.000' },
-        { visitors__created_at: '2017-01-06T16:00:00.000' }
+        { visitors__created_at: '2017-01-06T16:00:00.000' },
+        { visitors__created_at: '2017-01-07T16:00:00.000' }
       ],
       [{ visitors__created_at: '2017-01-06T16:00:00.000' }],
       [
@@ -347,7 +350,10 @@ describe('ClickHouse DataSchemaCompiler', () => {
         { visitors__created_at: '2017-01-04T16:00:00.000' },
         { visitors__created_at: '2017-01-05T16:00:00.000' }
       ],
-      [{ visitors__created_at: '2017-01-06T16:00:00.000' }]
+      [
+        { visitors__created_at: '2017-01-06T16:00:00.000' },
+        { visitors__created_at: '2017-01-07T16:00:00.000' }
+      ]
     ];
     ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
       const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
@@ -377,6 +383,41 @@ describe('ClickHouse DataSchemaCompiler', () => {
       return true;
     });
   }
+  it('collation in order by', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+      cube('visitors', {
+        sql: \`
+        select * from visitors
+        \`,
+
+        dimensions: {
+          source: {
+            type: 'string',
+            sql: 'source'
+          }
+        }
+      })
+    `);
+    await compiler.compile();
+
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source',
+        desc: false
+      }],
+      timezone: 'America/Los_Angeles'
+    });
+    logSqlAndParams(query);
+
+    const sqlAndParams = query.buildSqlAndParams();
+    const res = await dbRunner.testQuery(sqlAndParams);
+    const sql = sqlAndParams[0];
+    expect(sql).toMatch('ORDER BY `visitors__source` ASC COLLATE \'en\'');
+
+    expect(res).toEqual([{ visitors__source: 'google' }, { visitors__source: 'Gork' }, { visitors__source: 'some' }, { visitors__source: null }]);
+  });
 
   it('export import', () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
