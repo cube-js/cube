@@ -230,6 +230,10 @@ impl MeasureKind {
                 AggregationType::Max => AggregateWrap::Function("max"),
                 _ => AggregateWrap::Function("sum"),
             },
+            Self::Calculated(c) => match c.calc_type() {
+                CalculatedMeasureType::Number => AggregateWrap::Function("sum"),
+                _ => AggregateWrap::Function("max"),
+            },
             _ => AggregateWrap::Function("sum"),
         }
     }

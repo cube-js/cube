@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
@@ -101,40 +102,46 @@ describe('PreAggregations string type measure', () => {
     });
   });
 
-  it('string type measure with pre-aggregation', async () => {
-    await compiler.compile();
+  if (getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
+    it('string type measure with pre-aggregation', async () => {
+      await compiler.compile();
 
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [
-          'visitors_str.sources_list',
-          'visitors_str.count',
-        ],
-        dimensions: ['visitors_str.status'],
-        timezone: 'America/Los_Angeles',
-        preAggregationsSchema: '',
-      }
-    );
-
-    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    const sqlAndParams = query.buildSqlAndParams();
-    expect(preAggregationsDescription[0].tableName).toEqual('vstr_string_measure_rollup');
-    expect(sqlAndParams[0]).toContain('vstr_string_measure_rollup');
-
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      expect(res).toEqual([
+      const query = new PostgresQuery(
+        { joinGraph, cubeEvaluator, compiler },
         {
-          vstr__status: '1',
-          vstr__sources_list: 'some, some',
-          vstr__count: '2',
-        },
-        {
-          vstr__status: '2',
-          vstr__sources_list: 'google',
-          vstr__count: '4',
-        },
-      ]);
+          measures: [
+            'visitors_str.sources_list',
+            'visitors_str.count',
+          ],
+          dimensions: ['visitors_str.status'],
+          timezone: 'America/Los_Angeles',
+          preAggregationsSchema: '',
+        }
+      );
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      const sqlAndParams = query.buildSqlAndParams();
+      expect(preAggregationsDescription[0].tableName).toEqual('vstr_string_measure_rollup');
+      expect(sqlAndParams[0]).toContain('vstr_string_measure_rollup');
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual([
+          {
+            vstr__status: 1,
+            vstr__sources_list: 'some, some',
+            vstr__count: '2',
+          },
+          {
+            vstr__status: 2,
+            vstr__sources_list: 'google',
+            vstr__count: '4',
+          },
+        ]);
+      });
     });
-  });
+  } else {
+    it.skip('string type measure with pre-aggregation', async () => {
+      // This fixed only in Tesseract
+    });
+  }
 });

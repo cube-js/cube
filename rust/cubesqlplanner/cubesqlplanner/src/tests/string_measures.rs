@@ -65,11 +65,7 @@ fn test_string_measure_with_pre_aggregation() {
         .build_sql_with_used_pre_aggregations(query_yaml)
         .expect("Should generate SQL");
 
-    assert_eq!(
-        pre_aggrs.len(),
-        1,
-        "Should use one pre-aggregation"
-    );
+    assert_eq!(pre_aggrs.len(), 1, "Should use one pre-aggregation");
     assert_eq!(pre_aggrs[0].name(), "string_measure_rollup");
 
     assert!(
