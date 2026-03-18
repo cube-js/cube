@@ -1,0 +1,13 @@
+---
+source: cubesql/e2e/tests/postgres.rs
+assertion_line: 297
+expression: "self.print_query_result(res, with_description, true).await"
+---
++---+------+
+| q | s    |
++---+------+
+| 1 | 2473 |
+| 2 | 2525 |
+| 3 | 2609 |
+| 4 | 2393 |
++---+------+
