@@ -35,6 +35,7 @@ mod mock_sql_templates_render;
 mod mock_sql_utils;
 mod mock_struct_with_sql_member;
 mod mock_timeshift_definition;
+pub mod time_series;
 
 pub use base_query_options::{members_from_strings, MockBaseQueryOptions};
 pub use mock_base_tools::MockBaseTools;

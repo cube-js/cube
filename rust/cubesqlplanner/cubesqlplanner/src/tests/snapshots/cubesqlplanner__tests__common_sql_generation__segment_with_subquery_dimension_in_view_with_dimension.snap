@@ -1,0 +1,14 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: sql
+---
+SELECT "accounts".region "account_overview__region", count("accounts".id) "account_overview__count" 
+FROM  accounts  AS "accounts"
+LEFT JOIN (SELECT "accounts".id "accounts__id", count("tickets".id) "ticket_count" 
+FROM  accounts  AS "accounts"
+LEFT JOIN  tickets  AS "tickets" ON "accounts".id = "tickets".account_id
+GROUP BY 1
+ORDER BY  2  DESC) AS "Accounts_ticketCount_subquery" ON (("Accounts_ticketCount_subquery"."accounts__id" = "accounts".id))
+WHERE (("Accounts_ticketCount_subquery"."ticket_count" = 0))
+GROUP BY 1
+ORDER BY  1  ASC

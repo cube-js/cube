@@ -7,5 +7,6 @@ mod join_hints_collector;
 mod measure_symbol;
 mod member_expressions_on_views;
 mod pre_aggregation_sql_generation;
+mod rolling_window_sql_generation;
 mod subquery_dimensions;
 mod utils;

@@ -1,0 +1,48 @@
+cubes:
+  - name: Accounts
+    sql: "SELECT * FROM accounts"
+    joins:
+      - name: Tickets
+        relationship: one_to_many
+        sql: "{CUBE}.id = {Tickets.accountId}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: region
+        type: string
+        sql: "{CUBE}.region"
+      - name: ticketCount
+        type: number
+        sql: "{Tickets.count}"
+        sub_query: true
+    segments:
+      - name: hasNoTickets
+        sql: "({ticketCount} = 0)"
+    measures:
+      - name: count
+        type: count
+
+  - name: Tickets
+    sql: "SELECT * FROM tickets"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: accountId
+        type: number
+        sql: "{CUBE}.account_id"
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: accountOverview
+    cubes:
+      - join_path: Accounts
+        includes:
+          - hasNoTickets
+          - count
+          - region

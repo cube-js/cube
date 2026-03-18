@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/rolling_window_sql_generation.rs
+expression: sql
+---
+ WITH 
+cte_0 AS (  SELECT sum("test_cube".val) "test_cube__val_leading" 
+  FROM  test_data  AS "test_cube"
+  WHERE ("test_cube".created_at >= $_0_$::timestamptz))
+SELECT "fk_aggregate"."test_cube__val_leading" "test_cube__val_leading" 
+FROM (SELECT * 
+FROM  cte_0  AS "cte_0") AS "fk_aggregate"

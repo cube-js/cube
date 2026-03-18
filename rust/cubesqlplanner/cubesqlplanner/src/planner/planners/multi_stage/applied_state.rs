@@ -303,6 +303,84 @@ impl MultiStageAppliedState {
         false
     }
 
+    /// Replace InDateRange filter with bounded version for rolling window without granularity.
+    /// Unlike `replace_regular_date_range_filter` which uses time_series CTE references,
+    /// this keeps parameter-based filters suitable for queries without a time_series CTE.
+    pub fn replace_date_range_for_rolling_window_without_granularity(
+        &mut self,
+        member_name: &String,
+        trailing: &Option<String>,
+        leading: &Option<String>,
+    ) {
+        let trailing_unbounded = trailing.as_deref() == Some("unbounded");
+        let leading_unbounded = leading.as_deref() == Some("unbounded");
+
+        if !trailing_unbounded && !leading_unbounded {
+            return;
+        }
+
+        if trailing_unbounded && leading_unbounded {
+            // Both unbounded — remove the date range filter entirely
+            self.time_dimensions_filters.retain(|item| match item {
+                FilterItem::Item(itm) => {
+                    !(&itm.member_name() == member_name
+                        && matches!(itm.filter_operator(), FilterOperator::InDateRange))
+                }
+                _ => true,
+            });
+        } else if trailing_unbounded {
+            // Remove lower bound: InDateRange(from, to) → BeforeOrOnDate(to)
+            self.time_dimensions_filters = self
+                .time_dimensions_filters
+                .iter()
+                .map(|item| match item {
+                    FilterItem::Item(itm)
+                        if &itm.member_name() == member_name
+                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
+                    {
+                        let values = itm.values();
+                        let to_value = if values.len() >= 2 {
+                            vec![values[1].clone()]
+                        } else {
+                            values.clone()
+                        };
+                        FilterItem::Item(itm.change_operator(
+                            FilterOperator::BeforeOrOnDate,
+                            to_value,
+                            itm.use_raw_values(),
+                        ))
+                    }
+                    other => other.clone(),
+                })
+                .collect();
+        } else {
+            // leading unbounded: remove upper bound: InDateRange(from, to) → AfterOrOnDate(from)
+            self.time_dimensions_filters = self
+                .time_dimensions_filters
+                .iter()
+                .map(|item| match item {
+                    FilterItem::Item(itm)
+                        if &itm.member_name() == member_name
+                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
+                    {
+                        let values = itm.values();
+                        let from_value = if !values.is_empty() {
+                            vec![values[0].clone()]
+                        } else {
+                            values.clone()
+                        };
+                        FilterItem::Item(itm.change_operator(
+                            FilterOperator::AfterOrOnDate,
+                            from_value,
+                            itm.use_raw_values(),
+                        ))
+                    }
+                    other => other.clone(),
+                })
+                .collect();
+        }
+    }
+
     pub fn replace_regular_date_range_filter(
         &mut self,
         member_name: &String,

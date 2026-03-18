@@ -546,11 +546,16 @@ impl MockViewBuilder {
                             );
                         }
 
+                        let original_type = &measure.static_data().measure_type;
+                        let view_type = match original_type.as_str() {
+                            "number" | "string" | "time" | "boolean" => original_type.clone(),
+                            _ => "number".to_string(),
+                        };
                         all_measures.insert(
                             view_name,
                             Rc::new(
                                 MockMeasureDefinition::builder()
-                                    .measure_type(measure.static_data().measure_type.clone())
+                                    .measure_type(view_type)
                                     .sql(view_member_sql)
                                     .build(),
                             ),

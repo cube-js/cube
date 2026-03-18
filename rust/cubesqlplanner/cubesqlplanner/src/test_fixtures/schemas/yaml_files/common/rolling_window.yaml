@@ -1,0 +1,24 @@
+cubes:
+  - name: test_cube
+    sql: "SELECT * FROM test_data"
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+    measures:
+      - name: val
+        type: sum
+        sql: val
+        rolling_window:
+          trailing: unbounded
+      - name: val_leading
+        type: sum
+        sql: val
+        rolling_window:
+          leading: unbounded
+      - name: val_both
+        type: sum
+        sql: val
+        rolling_window:
+          trailing: unbounded
+          leading: unbounded
