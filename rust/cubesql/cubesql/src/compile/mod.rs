@@ -18655,4 +18655,46 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_distinct_time_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT DISTINCT
+                DATE_TRUNC('day', order_date) AS month
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= '2025-01-01'::date AND order_date < '2025-02-01'::date
+            LIMIT 5
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2025-01-01T00:00:00.000Z".to_string(),
+                        "2025-01-31T23:59:59.999Z".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                limit: Some(5),
+                ..Default::default()
+            }
+        )
+    }
 }
