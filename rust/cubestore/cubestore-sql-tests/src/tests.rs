@@ -11210,8 +11210,9 @@ async fn queue_ack_then_result_v2_with_external_id(service: Box<dyn SqlClient>) 
         );
     }
 
+    // RESULT_BY_EXTERNAL_ID returns result and marks it for deletion
     let result = service
-        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
         .await
         .unwrap();
     assert_eq!(
@@ -11228,8 +11229,19 @@ async fn queue_ack_then_result_v2_with_external_id(service: Box<dyn SqlClient>) 
             TableValue::String("success".to_string())
         ]),]
     );
+    let result = service
+        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:5555".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
 
-    // second call should not return anything, because first call should mark result as ready to delete
+    // RESULT by path should also return empty (already marked as deleted)
     let result = service
         .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
         .await
@@ -11245,33 +11257,6 @@ async fn queue_ack_then_result_v2_with_external_id(service: Box<dyn SqlClient>) 
         .unwrap();
     assert_queue_result_blocking_columns(&result);
     assert_eq!(result.get_rows().len(), 1);
-
-    // Also verify RESULT_BY_EXTERNAL_ID works
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
-        .await
-        .unwrap();
-    assert_eq!(
-        result.get_columns(),
-        &vec![
-            Column::new("payload".to_string(), ColumnType::String, 0),
-            Column::new("type".to_string(), ColumnType::String, 1),
-        ]
-    );
-    assert_eq!(
-        result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:5555".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
-    );
-
-    // Second RESULT_BY_EXTERNAL_ID should return empty
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
-        .await
-        .unwrap();
-    assert_eq!(result.get_rows().len(), 0);
 }
 
 async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
@@ -11644,7 +11629,6 @@ async fn queue_result_by_external_id(service: Box<dyn SqlClient>) {
         .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
         .await
         .unwrap();
-
     assert_eq!(
         result.get_columns(),
         &vec![
@@ -11666,7 +11650,13 @@ async fn queue_result_by_external_id(service: Box<dyn SqlClient>) {
         .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
         .await
         .unwrap();
-    assert_eq!(result.get_rows().len(), 0);
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:123456789".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
 }
 
 async fn sys_cachestore_info(service: Box<dyn SqlClient>) {

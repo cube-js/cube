@@ -551,6 +551,7 @@ impl CacheStoreSqlService {
                     .cachestore
                     .queue_result_by_external_id(key.value)
                     .await?;
+
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
                 } else {

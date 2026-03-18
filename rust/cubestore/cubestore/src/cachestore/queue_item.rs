@@ -13,6 +13,11 @@ use std::sync::Arc;
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
 
+// We use ${uuidv4()}-span-${u32}, it's 36 + 6 + 8 = 50, let's limit to 96
+pub const QUEUE_ITEM_PROCESS_ID_MAX_LEN: usize = 96;
+// We use ${uuidv4()}, it's 36, let's limit to 48
+pub const QUEUE_ITEM_EXTERNAL_ID_MAX_LEN: usize = 48;
+
 fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value> {
     match (a, b) {
         (mut root @ serde_json::Value::Object(_), serde_json::Value::Object(b)) => {
