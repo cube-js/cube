@@ -4,7 +4,7 @@ mod cube_evaluator;
 mod cube_names_collector;
 mod date_filters;
 mod dimension_symbol;
-mod filter_to_sql;
+mod filter;
 mod join_hints_collector;
 mod measure_symbol;
 mod member_expressions_on_views;
