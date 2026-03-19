@@ -300,7 +300,29 @@ fn test_lte_filter() {
     assert_filter(&result, r#"("visitors".id <= $_0_$::numeric)"#, &["100"]);
 }
 
-// ── like operators ──────────────────────────────────────────────────────────
+#[test]
+fn test_gt_string_no_cast() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: gt
+            values:
+              - abc
+    "});
+    assert_filter(&result, r#"("visitors".source > $_0_$)"#, &["abc"]);
+}
+
+#[test]
+fn test_lte_string_no_cast() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: lte
+            values:
+              - zzz
+    "});
+    assert_filter(&result, r#"("visitors".source <= $_0_$)"#, &["zzz"]);
+}
 
 #[test]
 fn test_contains_filter() {
