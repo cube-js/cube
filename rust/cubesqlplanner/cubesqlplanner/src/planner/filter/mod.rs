@@ -1,6 +1,7 @@
 pub mod base_filter;
 pub mod base_segment;
 pub mod compiler;
+pub mod filter_op;
 pub mod filter_operator;
 
 pub use base_filter::BaseFilter;

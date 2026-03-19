@@ -1,3 +1,4 @@
+use super::filter_op::TypedFilter;
 use super::filter_operator::FilterOperator;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::planner::query_tools::QueryTools;
@@ -29,6 +30,10 @@ pub struct BaseFilter {
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
     use_raw_values: bool,
+    // FIXME: temporary Option during migration from legacy filter_operator+values to TypedFilter.
+    // Once all operators are migrated, remove Option and legacy fields (filter_operator, values, use_raw_values).
+    #[allow(dead_code)]
+    typed_filter: Option<TypedFilter>,
 }
 
 impl PartialEq for BaseFilter {
@@ -59,6 +64,7 @@ impl BaseFilter {
             filter_operator,
             values,
             use_raw_values: false,
+            typed_filter: None,
         }))
     }
 
@@ -75,6 +81,7 @@ impl BaseFilter {
             filter_operator,
             values,
             use_raw_values,
+            typed_filter: None,
         })
     }
 
