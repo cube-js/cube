@@ -39,10 +39,13 @@ fn test_member_to_alias() {
     );
 }
 
-#[test]
-fn test_simple_join_sql() {
+#[cfg(feature = "integration-postgres")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_simple_join_sql() {
+    use crate::test_fixtures::test_utils::IntegrationTestContext;
+
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
-    let test_context = TestContext::new(schema).unwrap();
+    let ctx = IntegrationTestContext::new(schema, "diamond_tables.sql").await;
 
     let query_yaml = indoc! {"
         measures:
@@ -51,16 +54,8 @@ fn test_simple_join_sql() {
           - cube_c.code
     "};
 
-    let sql = test_context
-        .build_sql(query_yaml)
-        .expect("Should generate SQL for simple join");
-
-    assert!(
-        sql.contains(r#"ON "cube_a".c_id = "cube_c".id"#),
-        "SQL should contain join condition between cube_a and cube_c"
-    );
-
-    insta::assert_snapshot!(sql);
+    let result = ctx.execute_query(query_yaml).await;
+    insta::assert_snapshot!(result);
 }
 
 #[test]

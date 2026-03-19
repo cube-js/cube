@@ -28,7 +28,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
       - name: total_value
         type: sum
         sql: value
@@ -59,7 +58,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
       - name: max_amount
         type: max
         sql: amount
@@ -83,7 +81,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
       - name: total_items
         type: sum
         sql: item_count
