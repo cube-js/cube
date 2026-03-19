@@ -2,7 +2,7 @@ use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
-fn build(filter_yaml: &str) -> String {
+fn build(filter_yaml: &str) -> (String, Vec<String>) {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let ctx = TestContext::new(schema).unwrap();
 
@@ -11,33 +11,45 @@ fn build(filter_yaml: &str) -> String {
         .expect("Should generate filter SQL")
 }
 
+fn assert_filter(result: &(String, Vec<String>), expected_sql: &str, expected_params: &[&str]) {
+    assert_eq!(result.0, expected_sql, "SQL mismatch");
+    let params: Vec<&str> = result.1.iter().map(|s| s.as_str()).collect();
+    assert_eq!(
+        params, expected_params,
+        "Params mismatch for SQL: {}",
+        result.0
+    );
+}
+
+// ── equals ──────────────────────────────────────────────────────────────────
+
 #[test]
 fn test_equals_string() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: equals
             values:
               - google
     "});
-    assert_eq!(sql, r#"("visitors".source = $_0_$)"#);
+    assert_filter(&result, r#"("visitors".source = $_0_$)"#, &["google"]);
 }
 
 #[test]
 fn test_equals_number() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.id
             operator: equals
             values:
               - \"42\"
     "});
-    assert_eq!(sql, r#"("visitors".id = $_0_$)"#);
+    assert_filter(&result, r#"("visitors".id = $_0_$)"#, &["42"]);
 }
 
 #[test]
 fn test_equals_multiple_values() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: equals
@@ -45,39 +57,46 @@ fn test_equals_multiple_values() {
               - google
               - facebook
     "});
-    assert_eq!(sql, r#"("visitors".source IN ($_0_$, $_1_$))"#);
+    assert_filter(
+        &result,
+        r#"("visitors".source IN ($_0_$, $_1_$))"#,
+        &["google", "facebook"],
+    );
 }
 
 #[test]
 fn test_equals_null() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: equals
             values:
               -
     "});
-    assert_eq!(sql, r#"("visitors".source IS NULL)"#);
+    assert_filter(&result, r#"("visitors".source IS NULL)"#, &[]);
 }
+
+// ── notEquals ───────────────────────────────────────────────────────────────
 
 #[test]
 fn test_not_equals_string() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notEquals
             values:
               - google
     "});
-    assert_eq!(
-        sql,
-        r#"("visitors".source <> $_0_$ OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"("visitors".source <> $_0_$ OR "visitors".source IS NULL)"#,
+        &["google"],
     );
 }
 
 #[test]
 fn test_not_equals_multiple_values() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notEquals
@@ -85,29 +104,30 @@ fn test_not_equals_multiple_values() {
               - google
               - facebook
     "});
-    assert_eq!(
-        sql,
-        r#"("visitors".source NOT IN ($_0_$, $_1_$) OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"("visitors".source NOT IN ($_0_$, $_1_$) OR "visitors".source IS NULL)"#,
+        &["google", "facebook"],
     );
 }
 
 #[test]
 fn test_not_equals_null() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notEquals
             values:
               -
     "});
-    assert_eq!(sql, r#"("visitors".source IS NOT NULL)"#);
+    assert_filter(&result, r#"("visitors".source IS NOT NULL)"#, &[]);
 }
 
 // ── in / notIn ──────────────────────────────────────────────────────────────
 
 #[test]
 fn test_in_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: in
@@ -116,12 +136,16 @@ fn test_in_filter() {
               - facebook
               - twitter
     "});
-    assert_eq!(sql, r#"("visitors".source IN ($_0_$, $_1_$, $_2_$))"#);
+    assert_filter(
+        &result,
+        r#"("visitors".source IN ($_0_$, $_1_$, $_2_$))"#,
+        &["google", "facebook", "twitter"],
+    );
 }
 
 #[test]
 fn test_in_with_null() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: in
@@ -129,15 +153,16 @@ fn test_in_with_null() {
               - google
               -
     "});
-    assert_eq!(
-        sql,
-        r#"("visitors".source IN ($_0_$) OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"("visitors".source IN ($_0_$) OR "visitors".source IS NULL)"#,
+        &["google"],
     );
 }
 
 #[test]
 fn test_not_in_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notIn
@@ -145,15 +170,16 @@ fn test_not_in_filter() {
               - google
               - facebook
     "});
-    assert_eq!(
-        sql,
-        r#"("visitors".source NOT IN ($_0_$, $_1_$) OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"("visitors".source NOT IN ($_0_$, $_1_$) OR "visitors".source IS NULL)"#,
+        &["google", "facebook"],
     );
 }
 
 #[test]
 fn test_not_in_with_null() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notIn
@@ -161,167 +187,188 @@ fn test_not_in_with_null() {
               - google
               -
     "});
-    assert_eq!(sql, r#"("visitors".source NOT IN ($_0_$))"#);
+    assert_filter(
+        &result,
+        r#"("visitors".source NOT IN ($_0_$))"#,
+        &["google"],
+    );
 }
 
 // ── set / notSet ────────────────────────────────────────────────────────────
 
 #[test]
 fn test_set_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: set
     "});
-    assert_eq!(sql, r#"("visitors".source IS NOT NULL)"#);
+    assert_filter(&result, r#"("visitors".source IS NOT NULL)"#, &[]);
 }
 
 #[test]
 fn test_not_set_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notSet
     "});
-    assert_eq!(sql, r#"("visitors".source IS NULL)"#);
+    assert_filter(&result, r#"("visitors".source IS NULL)"#, &[]);
 }
 
 // ── comparison operators ────────────────────────────────────────────────────
 
 #[test]
 fn test_gt_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.id
             operator: gt
             values:
               - \"100\"
     "});
-    assert_eq!(sql, r#"("visitors".id > $_0_$)"#);
+    assert_filter(&result, r#"("visitors".id > $_0_$)"#, &["100"]);
 }
 
 #[test]
 fn test_gte_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.id
             operator: gte
             values:
               - \"100\"
     "});
-    assert_eq!(sql, r#"("visitors".id >= $_0_$)"#);
+    assert_filter(&result, r#"("visitors".id >= $_0_$)"#, &["100"]);
 }
 
 #[test]
 fn test_lt_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.id
             operator: lt
             values:
               - \"100\"
     "});
-    assert_eq!(sql, r#"("visitors".id < $_0_$)"#);
+    assert_filter(&result, r#"("visitors".id < $_0_$)"#, &["100"]);
 }
 
 #[test]
 fn test_lte_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.id
             operator: lte
             values:
               - \"100\"
     "});
-    assert_eq!(sql, r#"("visitors".id <= $_0_$)"#);
+    assert_filter(&result, r#"("visitors".id <= $_0_$)"#, &["100"]);
 }
 
 // ── like operators ──────────────────────────────────────────────────────────
 
 #[test]
 fn test_contains_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: contains
             values:
               - goo
     "});
-    assert_eq!(sql, r#"(("visitors".source ILIKE '%' || $_0_$|| '%'))"#);
+    assert_filter(
+        &result,
+        r#"(("visitors".source ILIKE '%' || $_0_$|| '%'))"#,
+        &["goo"],
+    );
 }
 
 #[test]
 fn test_not_contains_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notContains
             values:
               - goo
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source NOT ILIKE '%' || $_0_$|| '%') OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source NOT ILIKE '%' || $_0_$|| '%') OR "visitors".source IS NULL)"#,
+        &["goo"],
     );
 }
 
 #[test]
 fn test_starts_with_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: startsWith
             values:
               - goo
     "});
-    assert_eq!(sql, r#"(("visitors".source ILIKE $_0_$|| '%'))"#);
+    assert_filter(
+        &result,
+        r#"(("visitors".source ILIKE $_0_$|| '%'))"#,
+        &["goo"],
+    );
 }
 
 #[test]
 fn test_not_starts_with_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notStartsWith
             values:
               - goo
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source NOT ILIKE $_0_$|| '%') OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source NOT ILIKE $_0_$|| '%') OR "visitors".source IS NULL)"#,
+        &["goo"],
     );
 }
 
 #[test]
 fn test_ends_with_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: endsWith
             values:
               - gle
     "});
-    assert_eq!(sql, r#"(("visitors".source ILIKE '%' || $_0_$))"#);
+    assert_filter(
+        &result,
+        r#"(("visitors".source ILIKE '%' || $_0_$))"#,
+        &["gle"],
+    );
 }
 
 #[test]
 fn test_not_ends_with_filter() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notEndsWith
             values:
               - gle
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source NOT ILIKE '%' || $_0_$) OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source NOT ILIKE '%' || $_0_$) OR "visitors".source IS NULL)"#,
+        &["gle"],
     );
 }
 
+// ── contains with multiple values ───────────────────────────────────────────
+
 #[test]
 fn test_contains_multiple_values() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: contains
@@ -329,15 +376,16 @@ fn test_contains_multiple_values() {
               - goo
               - face
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source ILIKE '%' || $_0_$|| '%' OR "visitors".source ILIKE '%' || $_1_$|| '%'))"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source ILIKE '%' || $_0_$|| '%' OR "visitors".source ILIKE '%' || $_1_$|| '%'))"#,
+        &["goo", "face"],
     );
 }
 
 #[test]
 fn test_not_contains_multiple_values() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - dimension: visitors.source
             operator: notContains
@@ -345,15 +393,18 @@ fn test_not_contains_multiple_values() {
               - goo
               - face
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source NOT ILIKE '%' || $_0_$|| '%' AND "visitors".source NOT ILIKE '%' || $_1_$|| '%') OR "visitors".source IS NULL)"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source NOT ILIKE '%' || $_0_$|| '%' AND "visitors".source NOT ILIKE '%' || $_1_$|| '%') OR "visitors".source IS NULL)"#,
+        &["goo", "face"],
     );
 }
 
+// ── filter groups (OR / AND) ────────────────────────────────────────────────
+
 #[test]
 fn test_or_filter_group() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - or:
               - dimension: visitors.source
@@ -365,15 +416,16 @@ fn test_or_filter_group() {
                 values:
                   - facebook
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source = $_0_$) OR ("visitors".source = $_1_$))"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source = $_0_$) OR ("visitors".source = $_1_$))"#,
+        &["google", "facebook"],
     );
 }
 
 #[test]
 fn test_and_filter_group() {
-    let sql = build(indoc! {"
+    let result = build(indoc! {"
         filters:
           - and:
               - dimension: visitors.source
@@ -385,15 +437,17 @@ fn test_and_filter_group() {
                 values:
                   - \"100\"
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source = $_0_$) AND ("visitors".id > $_1_$))"#
+    assert_filter(
+        &result,
+        r#"(("visitors".source = $_0_$) AND ("visitors".id > $_1_$))"#,
+        &["google", "100"],
     );
 }
 
 #[test]
 fn test_nested_and_or_groups() {
-    let sql = build(indoc! {"
+    // AND(OR(eq, eq), OR(AND(gt, contains), lt), set)
+    let result = build(indoc! {"
         filters:
           - and:
               - or:
@@ -422,9 +476,10 @@ fn test_nested_and_or_groups() {
               - dimension: visitors.source
                 operator: set
     "});
-    assert_eq!(
-        sql,
-        r#"((("visitors".source = $_0_$) OR ("visitors".source = $_1_$)) AND ((("visitors".id > $_2_$) AND (("visitors".source ILIKE '%' || $_3_$|| '%'))) OR ("visitors".id < $_4_$)) AND ("visitors".source IS NOT NULL))"#
+    assert_filter(
+        &result,
+        r#"((("visitors".source = $_0_$) OR ("visitors".source = $_1_$)) AND ((("visitors".id > $_2_$) AND (("visitors".source ILIKE '%' || $_3_$|| '%'))) OR ("visitors".id < $_4_$)) AND ("visitors".source IS NOT NULL))"#,
+        &["google", "facebook", "100", "goo", "10"],
     );
 }
 
@@ -432,7 +487,7 @@ fn test_nested_and_or_groups() {
 
 #[test]
 fn test_in_date_range_date_only() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: inDateRange
@@ -440,15 +495,16 @@ fn test_in_date_range_date_only() {
               - "2024-01-01"
               - "2024-12-31"
     "#});
-    assert_eq!(
-        sql,
-        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#
+    assert_filter(
+        &result,
+        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
+        &["2024-01-01T00:00:00.000", "2024-12-31T23:59:59.999"],
     );
 }
 
 #[test]
 fn test_in_date_range_full_timestamp() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: inDateRange
@@ -456,15 +512,16 @@ fn test_in_date_range_full_timestamp() {
               - "2024-01-01T10:00:00.000"
               - "2024-06-15T18:30:00.000"
     "#});
-    assert_eq!(
-        sql,
-        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#
+    assert_filter(
+        &result,
+        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
+        &["2024-01-01T10:00:00.000", "2024-06-15T18:30:00.000"],
     );
 }
 
 #[test]
 fn test_not_in_date_range() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: notInDateRange
@@ -472,63 +529,80 @@ fn test_not_in_date_range() {
               - "2024-01-01"
               - "2024-12-31"
     "#});
-    assert_eq!(
-        sql,
-        r#"("visitors".created_at < $_0_$::timestamptz OR "visitors".created_at > $_1_$::timestamptz)"#
+    assert_filter(
+        &result,
+        r#"("visitors".created_at < $_0_$::timestamptz OR "visitors".created_at > $_1_$::timestamptz)"#,
+        &["2024-01-01T00:00:00.000", "2024-12-31T23:59:59.999"],
     );
 }
 
 #[test]
 fn test_before_date() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: beforeDate
             values:
               - "2024-06-01"
     "#});
-    assert_eq!(sql, r#"("visitors".created_at < $_0_$::timestamptz)"#);
+    assert_filter(
+        &result,
+        r#"("visitors".created_at < $_0_$::timestamptz)"#,
+        &["2024-06-01T00:00:00.000"],
+    );
 }
 
 #[test]
 fn test_before_or_on_date() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: beforeOrOnDate
             values:
               - "2024-06-01"
     "#});
-    assert_eq!(sql, r#"("visitors".created_at <= $_0_$::timestamptz)"#);
+    assert_filter(
+        &result,
+        r#"("visitors".created_at <= $_0_$::timestamptz)"#,
+        &["2024-06-01T00:00:00.000"],
+    );
 }
 
 #[test]
 fn test_after_date() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: afterDate
             values:
               - "2024-06-01"
     "#});
-    assert_eq!(sql, r#"("visitors".created_at > $_0_$::timestamptz)"#);
+    assert_filter(
+        &result,
+        r#"("visitors".created_at > $_0_$::timestamptz)"#,
+        &["2024-06-01T00:00:00.000"],
+    );
 }
 
 #[test]
 fn test_after_or_on_date() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         filters:
           - dimension: visitors.created_at
             operator: afterOrOnDate
             values:
               - "2024-06-01"
     "#});
-    assert_eq!(sql, r#"("visitors".created_at >= $_0_$::timestamptz)"#);
+    assert_filter(
+        &result,
+        r#"("visitors".created_at >= $_0_$::timestamptz)"#,
+        &["2024-06-01T00:00:00.000"],
+    );
 }
 
 #[test]
 fn test_time_dimension_date_range() {
-    let sql = build(indoc! {r#"
+    let result = build(indoc! {r#"
         time_dimensions:
           - dimension: visitors.created_at
             granularity: day
@@ -536,8 +610,9 @@ fn test_time_dimension_date_range() {
               - "2024-01-01"
               - "2024-12-31"
     "#});
-    assert_eq!(
-        sql,
-        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#
+    assert_filter(
+        &result,
+        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
+        &["2024-01-01T00:00:00.000", "2024-12-31T23:59:59.999"],
     );
 }

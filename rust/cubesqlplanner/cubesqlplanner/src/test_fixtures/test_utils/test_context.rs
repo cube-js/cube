@@ -1,12 +1,9 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregation;
-<<<<<<< HEAD
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregationSource, PreAggregationTable};
-=======
 use crate::plan::Filter;
->>>>>>> 8039f4fe8d (base filters tests)
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
@@ -349,7 +346,6 @@ impl TestContext {
         planner.plan()
     }
 
-<<<<<<< HEAD
     #[cfg(feature = "integration-postgres")]
     pub async fn try_execute_pg(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
         let options = self.create_query_options_from_yaml(query_yaml);
@@ -545,8 +541,7 @@ impl TestContext {
             result = result.replace(&placeholder, &format!("'{}'", escaped));
         }
         result
-=======
-    pub fn build_filter_sql(&self, yaml: &str) -> Result<String, CubeError> {
+    pub fn build_filter_sql(&self, yaml: &str) -> Result<(String, Vec<String>), CubeError> {
         let props = self.create_query_properties(yaml)?;
 
         let filter = Filter {
@@ -569,8 +564,9 @@ impl TestContext {
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
 
-        filter.to_sql(&templates, context)
->>>>>>> 8039f4fe8d (base filters tests)
+        let sql = filter.to_sql(&templates, context)?;
+        let params = self.query_tools.get_allocated_params();
+        Ok((sql, params))
     }
 }
 
