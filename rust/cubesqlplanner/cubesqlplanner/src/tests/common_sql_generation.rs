@@ -175,8 +175,8 @@ async fn test_diamond_join_over_direct_path_sql() {
     }
 }
 
-#[test]
-fn test_simple_segment_sql() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_simple_segment_sql() {
     let schema = MockSchema::from_yaml_file("common/simple.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -196,11 +196,13 @@ fn test_simple_segment_sql() {
         "SQL should contain segment condition"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "simple_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_segment_as_dimension_in_pre_aggregation_query() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_as_dimension_in_pre_aggregation_query() {
     let schema = MockSchema::from_yaml_file("common/simple.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -223,7 +225,9 @@ fn test_segment_as_dimension_in_pre_aggregation_query() {
         "Segment should not be in WHERE clause for pre-aggregation query"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "simple_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[test]

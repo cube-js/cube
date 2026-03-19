@@ -1,12 +1,3 @@
-use super::pg_service;
-use tokio_postgres::Client;
-
-pub async fn connect_and_seed(seed_file: &str) -> Client {
-    let client = pg_service::connect().await;
-    pg_service::run_seed(&client, seed_file).await;
-    client
-}
-
 pub fn format_query_results(messages: &[tokio_postgres::SimpleQueryMessage]) -> String {
     let mut columns: Vec<String> = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
