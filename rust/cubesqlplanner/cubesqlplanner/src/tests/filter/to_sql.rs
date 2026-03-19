@@ -76,6 +76,40 @@ fn test_equals_null() {
     assert_filter(&result, r#"("visitors".source IS NULL)"#, &[]);
 }
 
+#[test]
+fn test_equals_values_with_null() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: equals
+            values:
+              - google
+              -
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".source IN ($_0_$) OR "visitors".source IS NULL)"#,
+        &["google"],
+    );
+}
+
+#[test]
+fn test_not_equals_values_with_null() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: notEquals
+            values:
+              - google
+              -
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".source NOT IN ($_0_$))"#,
+        &["google"],
+    );
+}
+
 // ── notEquals ───────────────────────────────────────────────────────────────
 
 #[test]
