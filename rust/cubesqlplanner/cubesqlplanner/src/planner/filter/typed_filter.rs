@@ -6,11 +6,13 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 use super::base_filter::FilterType;
+use super::operators::equality::EqualityOp;
 use super::operators::nullability::NullabilityOp;
 use super::FilterOperator;
 
 #[derive(Clone, Debug)]
 pub enum FilterOp {
+    Equality(EqualityOp),
     Nullability(NullabilityOp),
 }
 
@@ -38,9 +40,11 @@ impl TypedFilter {
             evaluate_with_context(&self.member_evaluator, context.clone(), plan_templates)?;
 
         match &self.op {
+            FilterOp::Equality(op) => op.to_sql(&member_sql, &self.query_tools, plan_templates),
             FilterOp::Nullability(op) => op.to_sql(&member_sql, plan_templates),
         }
     }
+
 }
 
 #[derive(Default)]
@@ -78,6 +82,19 @@ impl TypedFilterBuilder {
         self
     }
 
+    fn resolve_member_type(member_evaluator: &Rc<MemberSymbol>) -> Option<String> {
+        let symbol = if let Ok(td) = member_evaluator.as_time_dimension() {
+            td.base_symbol().clone()
+        } else {
+            member_evaluator.clone()
+        };
+        match symbol.as_ref() {
+            MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
+            MemberSymbol::Measure(m) => Some(m.measure_type().to_string()),
+            _ => None,
+        }
+    }
+
     // FIXME: return TypedFilter directly once all operators are migrated from BaseFilter
     pub fn build(self) -> Result<Option<TypedFilter>, CubeError> {
         let query_tools = self
@@ -92,9 +109,17 @@ impl TypedFilterBuilder {
         let operator = self
             .operator
             .ok_or_else(|| CubeError::internal("operator is required".to_string()))?;
-        let _values = self.values.unwrap_or_default();
+        let values = self.values.unwrap_or_default();
+
+        let member_type = Self::resolve_member_type(&member_evaluator);
 
         let op = match operator {
+            FilterOperator::Equal => {
+                FilterOp::Equality(EqualityOp::new(false, values, member_type))
+            }
+            FilterOperator::NotEqual => {
+                FilterOp::Equality(EqualityOp::new(true, values, member_type))
+            }
             FilterOperator::Set => FilterOp::Nullability(NullabilityOp::new(false)),
             FilterOperator::NotSet => FilterOp::Nullability(NullabilityOp::new(true)),
             _ => return Ok(None),
