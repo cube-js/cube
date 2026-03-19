@@ -1,3 +1,4 @@
+pub mod comparison;
 pub mod equality;
 mod filter_sql_context;
 pub mod in_list;

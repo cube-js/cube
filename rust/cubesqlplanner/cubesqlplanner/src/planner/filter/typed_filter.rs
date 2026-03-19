@@ -6,6 +6,7 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 use super::base_filter::FilterType;
+use super::operators::comparison::{ComparisonKind, ComparisonOp};
 use super::operators::equality::EqualityOp;
 use super::operators::in_list::InListOp;
 use super::operators::nullability::NullabilityOp;
@@ -14,6 +15,7 @@ use super::FilterOperator;
 
 #[derive(Clone, Debug)]
 pub enum FilterOp {
+    Comparison(ComparisonOp),
     Equality(EqualityOp),
     InList(InListOp),
     Nullability(NullabilityOp),
@@ -49,6 +51,7 @@ impl TypedFilter {
         };
 
         match &self.op {
+            FilterOp::Comparison(op) => op.to_sql(&ctx),
             FilterOp::Equality(op) => op.to_sql(&ctx),
             FilterOp::InList(op) => op.to_sql(&ctx),
             FilterOp::Nullability(op) => op.to_sql(&ctx),
@@ -105,6 +108,15 @@ impl TypedFilterBuilder {
         }
     }
 
+    fn first_non_null_value(values: &[Option<String>]) -> Result<String, CubeError> {
+        values
+            .iter()
+            .find_map(|v| v.as_ref().cloned())
+            .ok_or_else(|| {
+                CubeError::user("Expected one parameter but nothing found".to_string())
+            })
+    }
+
     // FIXME: return TypedFilter directly once all operators are migrated from BaseFilter
     pub fn build(self) -> Result<Option<TypedFilter>, CubeError> {
         let query_tools = self
@@ -142,6 +154,17 @@ impl TypedFilterBuilder {
             }
             FilterOperator::In => FilterOp::InList(InListOp::new(false, values, member_type)),
             FilterOperator::NotIn => FilterOp::InList(InListOp::new(true, values, member_type)),
+            FilterOperator::Gt | FilterOperator::Gte | FilterOperator::Lt | FilterOperator::Lte => {
+                let kind = match operator {
+                    FilterOperator::Gt => ComparisonKind::Gt,
+                    FilterOperator::Gte => ComparisonKind::Gte,
+                    FilterOperator::Lt => ComparisonKind::Lt,
+                    FilterOperator::Lte => ComparisonKind::Lte,
+                    _ => unreachable!(),
+                };
+                let value = Self::first_non_null_value(&values)?;
+                FilterOp::Comparison(ComparisonOp::new(kind, value, member_type))
+            }
             FilterOperator::Set => FilterOp::Nullability(NullabilityOp::new(false)),
             FilterOperator::NotSet => FilterOp::Nullability(NullabilityOp::new(true)),
             _ => return Ok(None),
