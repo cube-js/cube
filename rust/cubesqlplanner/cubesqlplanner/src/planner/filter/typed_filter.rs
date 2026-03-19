@@ -124,11 +124,21 @@ impl TypedFilterBuilder {
         let member_type = Self::resolve_member_type(&member_evaluator);
 
         let op = match operator {
-            FilterOperator::Equal => {
-                FilterOp::Equality(EqualityOp::new(false, values, member_type))
-            }
-            FilterOperator::NotEqual => {
-                FilterOp::Equality(EqualityOp::new(true, values, member_type))
+            FilterOperator::Equal | FilterOperator::NotEqual => {
+                let negated = matches!(operator, FilterOperator::NotEqual);
+                let has_null = values.iter().any(|v| v.is_none());
+                if values.len() > 1 {
+                    FilterOp::InList(InListOp::new(negated, values, member_type))
+                } else if has_null {
+                    // equals null → IS NULL, notEquals null → IS NOT NULL
+                    FilterOp::Nullability(NullabilityOp::new(!negated))
+                } else if let Some(Some(value)) = values.into_iter().next() {
+                    FilterOp::Equality(EqualityOp::new(negated, value, member_type))
+                } else {
+                    return Err(CubeError::user(
+                        "Expected at least one value for equals/notEquals filter".to_string(),
+                    ));
+                }
             }
             FilterOperator::In => FilterOp::InList(InListOp::new(false, values, member_type)),
             FilterOperator::NotIn => FilterOp::InList(InListOp::new(true, values, member_type)),
