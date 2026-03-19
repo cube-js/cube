@@ -24,10 +24,16 @@ typed-builder = "0.21.2"
 indoc = "2.0.7"
 
 
+[features]
+integration-postgres = []
+
 [dev-dependencies]
 petgraph = "0.6"
 serde_yaml = "0.9"
 insta = "1.34"
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+tokio-postgres = "0.7"
 
 [dependencies.neon]
 version = "=1"

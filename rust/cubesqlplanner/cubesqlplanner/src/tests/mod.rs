@@ -3,6 +3,8 @@ mod compiled_member_path;
 mod cube_evaluator;
 mod cube_names_collector;
 mod dimension_symbol;
+#[cfg(feature = "integration-postgres")]
+mod integration_postgres;
 mod join_hints_collector;
 mod measure_symbol;
 mod member_expressions_on_views;

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration_postgres.rs
+assertion_line: 20
+expression: result
+snapshot_kind: text
+---
+EXECUTION ERROR: ERROR (42803): aggregate function calls cannot be nested
