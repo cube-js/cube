@@ -342,6 +342,23 @@ impl TestContext {
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
         planner.plan()
     }
+
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute_pg(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
+        let client = super::pg_service::connect().await;
+        super::pg_service::run_seed(&client, seed_file).await;
+        let sql = self.build_sql(query_yaml).expect("Failed to build SQL");
+        let messages = client
+            .simple_query(&sql)
+            .await
+            .unwrap_or_else(|e| panic!("SQL execution failed:\n{}\n\nError: {}", sql, e));
+        Some(super::integration_context::format_query_results(&messages))
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute_pg(&self, _query_yaml: &str, _seed_file: &str) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(test)]

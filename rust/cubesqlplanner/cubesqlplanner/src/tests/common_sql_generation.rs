@@ -39,13 +39,10 @@ fn test_member_to_alias() {
     );
 }
 
-#[cfg(feature = "integration-postgres")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_simple_join_sql() {
-    use crate::test_fixtures::test_utils::IntegrationTestContext;
-
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
-    let ctx = IntegrationTestContext::new(schema, "diamond_tables.sql").await;
+    let test_context = TestContext::new(schema).unwrap();
 
     let query_yaml = indoc! {"
         measures:
@@ -54,18 +51,19 @@ async fn test_simple_join_sql() {
           - cube_c.code
     "};
 
-    let result = ctx.execute_query(query_yaml).await;
-    insta::assert_snapshot!(result);
+    test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for simple join");
+
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[cfg(feature = "integration-postgres")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_simple_paths_in_request_sql() {
-    use crate::test_fixtures::test_utils::IntegrationTestContext;
-
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
-    let test_context = TestContext::new(schema.clone()).unwrap();
-    let ctx = IntegrationTestContext::new(schema, "diamond_tables.sql").await;
+    let test_context = TestContext::new(schema).unwrap();
 
     let query_yaml = indoc! {"
         measures:
@@ -83,18 +81,15 @@ async fn test_simple_paths_in_request_sql() {
         "SQL should contain join condition between cube_a and cube_c"
     );
 
-    let result = ctx.execute_query(query_yaml).await;
-    insta::assert_snapshot!(result);
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[cfg(feature = "integration-postgres")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_simple_paths_in_time_dimension_request_sql() {
-    use crate::test_fixtures::test_utils::IntegrationTestContext;
-
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
-    let test_context = TestContext::new(schema.clone()).unwrap();
-    let ctx = IntegrationTestContext::new(schema, "diamond_tables.sql").await;
+    let test_context = TestContext::new(schema).unwrap();
 
     let query_yaml = indoc! {"
         measures:
@@ -113,18 +108,15 @@ async fn test_simple_paths_in_time_dimension_request_sql() {
         "SQL should contain join condition between cube_a and cube_c"
     );
 
-    let result = ctx.execute_query(query_yaml).await;
-    insta::assert_snapshot!(result);
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[cfg(feature = "integration-postgres")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_diamond_join_over_view_sql() {
-    use crate::test_fixtures::test_utils::IntegrationTestContext;
-
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
-    let test_context = TestContext::new(schema.clone()).unwrap();
-    let ctx = IntegrationTestContext::new(schema, "diamond_tables.sql").await;
+    let test_context = TestContext::new(schema).unwrap();
 
     let query_yaml = indoc! {"
         measures:
@@ -147,18 +139,15 @@ async fn test_diamond_join_over_view_sql() {
         "SQL should contain join condition between cube_b and cube_c"
     );
 
-    let result = ctx.execute_query(query_yaml).await;
-    insta::assert_snapshot!(result);
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[cfg(feature = "integration-postgres")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_diamond_join_over_direct_path_sql() {
-    use crate::test_fixtures::test_utils::IntegrationTestContext;
-
     let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
-    let test_context = TestContext::new(schema.clone()).unwrap();
-    let ctx = IntegrationTestContext::new(schema, "diamond_tables.sql").await;
+    let test_context = TestContext::new(schema).unwrap();
 
     let query_yaml = indoc! {"
         measures:
@@ -181,8 +170,9 @@ async fn test_diamond_join_over_direct_path_sql() {
         "SQL should contain join condition between cube_b and cube_c"
     );
 
-    let result = ctx.execute_query(query_yaml).await;
-    insta::assert_snapshot!(result);
+    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[test]

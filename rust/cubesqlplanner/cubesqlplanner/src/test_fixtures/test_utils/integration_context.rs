@@ -1,41 +1,13 @@
 use super::pg_service;
-use super::TestContext;
-use crate::test_fixtures::cube_bridge::MockSchema;
 use tokio_postgres::Client;
 
-pub struct IntegrationTestContext {
-    test_context: TestContext,
-    client: Client,
+pub async fn connect_and_seed(seed_file: &str) -> Client {
+    let client = pg_service::connect().await;
+    pg_service::run_seed(&client, seed_file).await;
+    client
 }
 
-impl IntegrationTestContext {
-    pub async fn new(schema: MockSchema, seed_file: &str) -> Self {
-        let client = pg_service::connect().await;
-        pg_service::run_seed(&client, seed_file).await;
-        let test_context = TestContext::new(schema).expect("Failed to create TestContext");
-        Self {
-            test_context,
-            client,
-        }
-    }
-
-    pub async fn execute_query(&self, query_yaml: &str) -> String {
-        let sql = self
-            .test_context
-            .build_sql(query_yaml)
-            .expect("Failed to build SQL");
-
-        let messages = self
-            .client
-            .simple_query(&sql)
-            .await
-            .unwrap_or_else(|e| panic!("SQL execution failed:\n{}\n\nError: {}", sql, e));
-
-        format_query_results(&messages)
-    }
-}
-
-fn format_query_results(messages: &[tokio_postgres::SimpleQueryMessage]) -> String {
+pub fn format_query_results(messages: &[tokio_postgres::SimpleQueryMessage]) -> String {
     let mut columns: Vec<String> = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
 
@@ -61,7 +33,6 @@ fn format_query_results(messages: &[tokio_postgres::SimpleQueryMessage]) -> Stri
         return "(empty result)".to_string();
     }
 
-    // Calculate column widths
     let mut widths: Vec<usize> = columns.iter().map(|c| c.len()).collect();
     for row in &rows {
         for (i, val) in row.iter().enumerate() {
