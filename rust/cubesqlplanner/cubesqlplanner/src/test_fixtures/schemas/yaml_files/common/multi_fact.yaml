@@ -22,7 +22,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
 
   - name: orders
     sql: "SELECT * FROM orders"
@@ -43,7 +42,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
       - name: total_amount
         type: sum
         sql: amount
@@ -67,7 +65,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
       - name: total_refund
         type: sum
         sql: refund_amount
