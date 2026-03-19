@@ -179,13 +179,27 @@ impl BaseFilter {
         context: Rc<VisitorContext>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        // FIXME: filter_params_columns requires special handling (to_sql_for_filter_params)
-        // that TypedFilter doesn't support yet. Fall back to legacy for those cases.
         if let Some(typed) = &self.typed_filter {
             let filters_context = context.filters_context();
-            if filters_context.filter_params_columns.is_empty() {
-                return typed.to_sql(context, plan_templates);
+            if !filters_context.filter_params_columns.is_empty() {
+                let symbol = self.member_evaluator();
+                let symbol_to_match = if let Ok(time_dim) = symbol.as_time_dimension() {
+                    time_dim.base_symbol().clone().resolve_reference_chain()
+                } else {
+                    symbol.clone().resolve_reference_chain()
+                };
+                if let Some(filter_params_column) = filters_context
+                    .filter_params_columns
+                    .get(&symbol_to_match.full_name())
+                {
+                    return typed.to_sql_for_filter_params(
+                        filter_params_column,
+                        plan_templates,
+                        filters_context,
+                    );
+                }
             }
+            return typed.to_sql(context, plan_templates);
         }
 
         if matches!(self.filter_operator, FilterOperator::MeasureFilter) {
