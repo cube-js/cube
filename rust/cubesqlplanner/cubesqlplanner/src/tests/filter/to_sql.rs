@@ -32,6 +32,22 @@ fn test_equals_number() {
 }
 
 #[test]
+fn test_equals_boolean() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.is_active
+            operator: equals
+            values:
+              - \"true\"
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".is_active = $_0_$::boolean)"#,
+        &["true"],
+    );
+}
+
+#[test]
 fn test_equals_multiple_values() {
     let result = build(indoc! {"
         filters:

@@ -22,3 +22,20 @@ cubes:
         rolling_window:
           trailing: unbounded
           leading: unbounded
+      - name: val_bounded
+        type: sum
+        sql: val
+        rolling_window:
+          trailing: 3 day
+          leading: 1 day
+      - name: val_trailing_bounded
+        type: sum
+        sql: val
+        rolling_window:
+          trailing: 7 day
+      - name: val_to_date
+        type: sum
+        sql: val
+        rolling_window:
+          type: to_date
+          granularity: month

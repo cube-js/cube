@@ -61,6 +61,9 @@ cubes:
             type: geo
             latitude: latitude
             longitude: longitude
+          - name: is_active
+            type: boolean
+            sql: is_active
           - name: questionMark
             type: string
             sql: "replace('some string question string ? ?? ???', 'string', 'with some ? ?? ???')"
