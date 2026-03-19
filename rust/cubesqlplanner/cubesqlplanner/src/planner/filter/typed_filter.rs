@@ -88,6 +88,7 @@ impl TypedFilter {
             query_tools: &self.query_tools,
             plan_templates,
             use_db_time_zone: !filters_context.use_local_tz,
+            use_raw_values: self.use_raw_values,
         };
 
         self.dispatch_to_sql(&ctx)
@@ -108,6 +109,7 @@ impl TypedFilter {
                     query_tools: &self.query_tools,
                     plan_templates,
                     use_db_time_zone,
+                    use_raw_values: self.use_raw_values,
                 };
                 self.dispatch_to_sql(&ctx)
             }
@@ -119,6 +121,7 @@ impl TypedFilter {
                             query_tools: &self.query_tools,
                             plan_templates,
                             use_db_time_zone,
+                            use_raw_values: self.use_raw_values,
                         };
                         let from = self
                             .values

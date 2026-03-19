@@ -596,6 +596,25 @@ impl TestContext {
         let params = self.query_tools.get_allocated_params();
         Ok((sql, params))
     }
+
+    pub fn build_base_filter_sql(
+        &self,
+        base_filter: &Rc<crate::planner::filter::base_filter::BaseFilter>,
+    ) -> Result<(String, Vec<String>), CubeError> {
+        let nodes_factory = SqlNodesFactory::default();
+        let context = Rc::new(VisitorContext::new(
+            self.query_tools.clone(),
+            &nodes_factory,
+            None,
+        ));
+        let base_tools = self.query_tools.base_tools();
+        let driver_tools = base_tools.driver_tools(false)?;
+        let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
+
+        let sql = base_filter.to_sql(context, &templates)?;
+        let params = self.query_tools.get_allocated_params();
+        Ok((sql, params))
+    }
 }
 
 #[cfg(test)]

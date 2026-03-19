@@ -9,6 +9,7 @@ pub struct FilterSqlContext<'a> {
     pub query_tools: &'a Rc<QueryTools>,
     pub plan_templates: &'a PlanSqlTemplates,
     pub use_db_time_zone: bool,
+    pub use_raw_values: bool,
 }
 
 impl<'a> FilterSqlContext<'a> {
@@ -50,11 +51,17 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     pub fn allocate_timestamp_param(&self, value: &str) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.to_string());
+        }
         let placeholder = self.query_tools.allocate_param(value);
         self.plan_templates.time_stamp_cast(placeholder)
     }
 
     pub fn format_and_allocate_from_date(&self, value: &str) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.to_string());
+        }
         let precision = self.plan_templates.timestamp_precision()?;
         let formatted = QueryDateTimeHelper::format_from_date(value, precision)?;
         let with_tz = self.apply_db_time_zone(formatted)?;
@@ -62,6 +69,9 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     pub fn format_and_allocate_to_date(&self, value: &str) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.to_string());
+        }
         let precision = self.plan_templates.timestamp_precision()?;
         let formatted = QueryDateTimeHelper::format_to_date(value, precision)?;
         let with_tz = self.apply_db_time_zone(formatted)?;

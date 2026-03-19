@@ -1,5 +1,6 @@
 mod to_sql;
 mod to_sql_timezone;
+mod use_raw_values;
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
