@@ -28,7 +28,7 @@ fn test_equals_number() {
             values:
               - \"42\"
     "});
-    assert_filter(&result, r#"("visitors".id = $_0_$)"#, &["42"]);
+    assert_filter(&result, r#"("visitors".id = $_0_$::numeric)"#, &["42"]);
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn test_gt_filter() {
             values:
               - \"100\"
     "});
-    assert_filter(&result, r#"("visitors".id > $_0_$)"#, &["100"]);
+    assert_filter(&result, r#"("visitors".id > $_0_$::numeric)"#, &["100"]);
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn test_gte_filter() {
             values:
               - \"100\"
     "});
-    assert_filter(&result, r#"("visitors".id >= $_0_$)"#, &["100"]);
+    assert_filter(&result, r#"("visitors".id >= $_0_$::numeric)"#, &["100"]);
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn test_lt_filter() {
             values:
               - \"100\"
     "});
-    assert_filter(&result, r#"("visitors".id < $_0_$)"#, &["100"]);
+    assert_filter(&result, r#"("visitors".id < $_0_$::numeric)"#, &["100"]);
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn test_lte_filter() {
             values:
               - \"100\"
     "});
-    assert_filter(&result, r#"("visitors".id <= $_0_$)"#, &["100"]);
+    assert_filter(&result, r#"("visitors".id <= $_0_$::numeric)"#, &["100"]);
 }
 
 // ── like operators ──────────────────────────────────────────────────────────
@@ -423,7 +423,7 @@ fn test_and_filter_group() {
     "});
     assert_filter(
         &result,
-        r#"(("visitors".source = $_0_$) AND ("visitors".id > $_1_$))"#,
+        r#"(("visitors".source = $_0_$) AND ("visitors".id > $_1_$::numeric))"#,
         &["google", "100"],
     );
 }
@@ -462,7 +462,7 @@ fn test_nested_and_or_groups() {
     "});
     assert_filter(
         &result,
-        r#"((("visitors".source = $_0_$) OR ("visitors".source = $_1_$)) AND ((("visitors".id > $_2_$) AND (("visitors".source ILIKE '%' || $_3_$|| '%'))) OR ("visitors".id < $_4_$)) AND ("visitors".source IS NOT NULL))"#,
+        r#"((("visitors".source = $_0_$) OR ("visitors".source = $_1_$)) AND ((("visitors".id > $_2_$::numeric) AND (("visitors".source ILIKE '%' || $_3_$|| '%'))) OR ("visitors".id < $_4_$::numeric)) AND ("visitors".source IS NOT NULL))"#,
         &["google", "facebook", "100", "goo", "10"],
     );
 }

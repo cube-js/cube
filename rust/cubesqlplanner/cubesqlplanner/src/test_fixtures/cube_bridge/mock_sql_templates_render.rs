@@ -372,11 +372,11 @@ impl MockSqlTemplatesRender {
         );
         templates.insert(
             "tesseract/bool_param_cast".to_string(),
-            "{{ expr }}".to_string(),
+            "{{ expr }}::boolean".to_string(),
         );
         templates.insert(
             "tesseract/number_param_cast".to_string(),
-            "{{ expr }}".to_string(),
+            "{{ expr }}::numeric".to_string(),
         );
 
         // Filters - based on BaseQuery.js:4398-4414
