@@ -1,4 +1,4 @@
-use super::filter_op::TypedFilter;
+use super::typed_filter::TypedFilter;
 use super::filter_operator::FilterOperator;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::planner::query_tools::QueryTools;
@@ -52,11 +52,16 @@ impl BaseFilter {
         filter_operator: FilterOperator,
         values: Option<Vec<Option<String>>>,
     ) -> Result<Rc<Self>, CubeError> {
-        let values = if let Some(values) = values {
-            values
-        } else {
-            vec![]
-        };
+        let values = values.unwrap_or_default();
+
+        let typed_filter = TypedFilter::builder()
+            .query_tools(query_tools.clone())
+            .member_evaluator(member_evaluator.clone())
+            .filter_type(filter_type.clone())
+            .operator(filter_operator.clone())
+            .values(Some(values.clone()))
+            .build()?;
+
         Ok(Rc::new(Self {
             query_tools,
             member_evaluator,
@@ -64,7 +69,7 @@ impl BaseFilter {
             filter_operator,
             values,
             use_raw_values: false,
-            typed_filter: None,
+            typed_filter,
         }))
     }
 
@@ -147,6 +152,10 @@ impl BaseFilter {
         context: Rc<VisitorContext>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        if let Some(typed) = &self.typed_filter {
+            return typed.to_sql(context, plan_templates);
+        }
+
         if matches!(self.filter_operator, FilterOperator::MeasureFilter) {
             self.measure_filter_where(context, plan_templates)
         } else {
