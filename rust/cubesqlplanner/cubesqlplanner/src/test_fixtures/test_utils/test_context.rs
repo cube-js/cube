@@ -345,8 +345,7 @@ impl TestContext {
 
     #[cfg(feature = "integration-postgres")]
     pub async fn try_execute_pg(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
-        let client = super::pg_service::connect().await;
-        super::pg_service::run_seed(&client, seed_file).await;
+        let client = super::pg_service::connect_and_seed(seed_file).await;
 
         let options = self.create_query_options_from_yaml(query_yaml);
         let ctx = self.for_options(options.as_ref()).expect("Failed to create context");

@@ -38,15 +38,21 @@ async fn init_pg() -> PgInstance {
     }
 }
 
-pub async fn connect() -> Client {
+fn db_name_from_seed(seed_file: &str) -> String {
+    seed_file
+        .trim_end_matches(".sql")
+        .replace(|c: char| !c.is_ascii_alphanumeric(), "_")
+}
+
+async fn connect_to(db_name: &str) -> Client {
     let pg = PG_INSTANCE.get_or_init(|| init_pg()).await;
     let conn_str = format!(
-        "host={} port={} user=postgres password=postgres dbname=postgres",
-        pg.host, pg.port
+        "host={} port={} user=postgres password=postgres dbname={}",
+        pg.host, pg.port, db_name
     );
     let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
         .await
-        .expect("Failed to connect to Postgres");
+        .unwrap_or_else(|e| panic!("Failed to connect to {}: {}", db_name, e));
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
@@ -57,24 +63,39 @@ pub async fn connect() -> Client {
     client
 }
 
-pub async fn run_seed(client: &Client, seed_file: &str) {
-    let pg = PG_INSTANCE.get().expect("PG not initialized");
+pub async fn connect_and_seed(seed_file: &str) -> Client {
+    let pg = PG_INSTANCE.get_or_init(|| init_pg()).await;
+    let db_name = db_name_from_seed(seed_file);
+
     let mut seeded = pg.seeded.lock().await;
-    if seeded.contains_key(seed_file) {
-        return;
+    if !seeded.contains_key(seed_file) {
+        let admin = connect_to("postgres").await;
+        admin
+            .execute(&format!("DROP DATABASE IF EXISTS \"{db_name}\""), &[])
+            .await
+            .unwrap_or_else(|e| panic!("Failed to drop database {}: {}", db_name, e));
+        admin
+            .execute(&format!("CREATE DATABASE \"{db_name}\""), &[])
+            .await
+            .unwrap_or_else(|e| panic!("Failed to create database {}: {}", db_name, e));
+        drop(admin);
+
+        let client = connect_to(&db_name).await;
+        let seed_path = format!(
+            "{}/src/test_fixtures/schemas/yaml_files/seeds/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            seed_file
+        );
+        let sql = std::fs::read_to_string(&seed_path)
+            .unwrap_or_else(|e| panic!("Failed to read seed file {}: {}", seed_path, e));
+        client
+            .batch_execute(&sql)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to execute seed SQL from {}: {}", seed_file, e));
+
+        seeded.insert(seed_file.to_string(), ());
     }
+    drop(seeded);
 
-    let seed_path = format!(
-        "{}/src/test_fixtures/schemas/yaml_files/seeds/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        seed_file
-    );
-    let sql = std::fs::read_to_string(&seed_path)
-        .unwrap_or_else(|e| panic!("Failed to read seed file {}: {}", seed_path, e));
-    client
-        .batch_execute(&sql)
-        .await
-        .unwrap_or_else(|e| panic!("Failed to execute seed SQL from {}: {}", seed_file, e));
-
-    seeded.insert(seed_file.to_string(), ());
+    connect_to(&db_name).await
 }
