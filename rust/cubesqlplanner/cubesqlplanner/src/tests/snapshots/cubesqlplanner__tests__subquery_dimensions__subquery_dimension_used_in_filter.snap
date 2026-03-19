@@ -1,13 +1,7 @@
 ---
 source: cubesqlplanner/src/tests/subquery_dimensions.rs
-expression: sql
+expression: result
 ---
-SELECT sum("sales".amount) "sales__total_amount" 
-FROM  sales  AS "sales"
-LEFT JOIN  customers  AS "customers" ON "sales".customer_id = "customers".id
-LEFT JOIN (SELECT "customers".id "customers__id", sum("customer_orders".amount) "total_spend" 
-FROM  customers  AS "customers"
-LEFT JOIN  customer_orders  AS "customer_orders" ON "customers".id = "customer_orders".customer_id
-GROUP BY 1
-ORDER BY  2  DESC) AS "Customers_totalSpend_subquery" ON (("Customers_totalSpend_subquery"."customers__id" = "customers".id))
-WHERE ("Customers_totalSpend_subquery"."total_spend" > $_0_$)
+sales__total_amount
+-------------------
+800.00

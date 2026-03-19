@@ -445,7 +445,7 @@ impl MockSqlTemplatesRender {
         templates.insert("quotes/escape".to_string(), "\"\"".to_string());
 
         // Params - based on BaseQuery.js:4421-4423
-        templates.insert("params/param".to_string(), "?".to_string());
+        templates.insert("params/param".to_string(), "${{ param_index + 1 }}".to_string());
 
         // Join types - based on BaseQuery.js:4424-4427
         templates.insert("join_types/inner".to_string(), "INNER".to_string());
@@ -857,8 +857,8 @@ mod tests {
         let render = MockSqlTemplatesRender::default_templates();
 
         assert_eq!(
-            render.render_template("params/param", context! {}).unwrap(),
-            "?"
+            render.render_template("params/param", context! { param_index => 0 }).unwrap(),
+            "$1"
         );
     }
 

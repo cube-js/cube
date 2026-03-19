@@ -1,4 +1,4 @@
-pub fn format_query_results(messages: &[tokio_postgres::SimpleQueryMessage]) -> String {
+pub fn format_simple_query_results(messages: &[tokio_postgres::SimpleQueryMessage]) -> String {
     let mut columns: Vec<String> = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
 

@@ -347,12 +347,42 @@ impl TestContext {
     pub async fn try_execute_pg(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
         let client = super::pg_service::connect().await;
         super::pg_service::run_seed(&client, seed_file).await;
-        let sql = self.build_sql(query_yaml).expect("Failed to build SQL");
+
+        let options = self.create_query_options_from_yaml(query_yaml);
+        let ctx = self.for_options(options.as_ref()).expect("Failed to create context");
+        let request = QueryProperties::try_new(ctx.query_tools.clone(), options)
+            .expect("Failed to create query properties");
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
+        let (raw_sql, _) = planner.plan().expect("Failed to plan query");
+
+        let templates = ctx
+            .query_tools
+            .plan_sql_templates(false)
+            .expect("Failed to get SQL templates");
+        let (sql, params) = ctx
+            .query_tools
+            .build_sql_and_params(&raw_sql, true, &templates)
+            .expect("Failed to build SQL and params");
+
+        // Inline params into SQL for simple_query execution
+        let mut final_sql = sql.clone();
+        for (i, param) in params.iter().enumerate().rev() {
+            let placeholder = format!("${}", i + 1);
+            let escaped = param.replace('\'', "''");
+            final_sql = final_sql.replace(&placeholder, &format!("'{}'", escaped));
+        }
+
         let messages = client
-            .simple_query(&sql)
+            .simple_query(&final_sql)
             .await
-            .unwrap_or_else(|e| panic!("SQL execution failed:\n{}\n\nError: {}", sql, e));
-        Some(super::integration_context::format_query_results(&messages))
+            .unwrap_or_else(|e| {
+                panic!(
+                    "SQL execution failed:\n{}\nParams: {:?}\n\nError: {}",
+                    final_sql, params, e
+                )
+            });
+
+        Some(super::integration_context::format_simple_query_results(&messages))
     }
 
     #[cfg(not(feature = "integration-postgres"))]

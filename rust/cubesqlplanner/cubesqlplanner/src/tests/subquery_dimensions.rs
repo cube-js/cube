@@ -2,8 +2,8 @@ use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
-#[test]
-fn test_subquery_dimension_used_in_filter() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_dimension_used_in_filter() {
     let schema = MockSchema::from_yaml_file("common/subquery_dimensions.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -41,11 +41,16 @@ fn test_subquery_dimension_used_in_filter() {
         "WHERE clause must not contain raw aggregate from CustomerOrders, got: {where_clause}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "subquery_dimensions_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_subquery_dimension_in_projection() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_dimension_in_projection() {
     let schema = MockSchema::from_yaml_file("common/subquery_dimensions.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -73,5 +78,10 @@ fn test_subquery_dimension_in_projection() {
         "Outer SELECT must not contain raw aggregate from CustomerOrders, got: {sql}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "subquery_dimensions_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
