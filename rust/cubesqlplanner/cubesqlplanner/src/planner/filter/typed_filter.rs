@@ -1,21 +1,23 @@
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
+use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 use super::base_filter::FilterType;
+use super::operators::nullability::NullabilityOp;
 use super::FilterOperator;
 
 #[derive(Clone, Debug)]
-pub enum FilterOp {}
+pub enum FilterOp {
+    Nullability(NullabilityOp),
+}
 
 #[derive(Clone)]
 pub struct TypedFilter {
     #[allow(dead_code)]
     query_tools: Rc<QueryTools>,
-    #[allow(dead_code)]
     member_evaluator: Rc<MemberSymbol>,
     #[allow(dead_code)]
     filter_type: FilterType,
@@ -29,10 +31,15 @@ impl TypedFilter {
 
     pub fn to_sql(
         &self,
-        _context: Rc<VisitorContext>,
-        _plan_templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        match self.op {}
+        let member_sql =
+            evaluate_with_context(&self.member_evaluator, context.clone(), plan_templates)?;
+
+        match &self.op {
+            FilterOp::Nullability(op) => op.to_sql(&member_sql, plan_templates),
+        }
     }
 }
 
@@ -73,20 +80,31 @@ impl TypedFilterBuilder {
 
     // FIXME: return TypedFilter directly once all operators are migrated from BaseFilter
     pub fn build(self) -> Result<Option<TypedFilter>, CubeError> {
-        let _query_tools = self
+        let query_tools = self
             .query_tools
             .ok_or_else(|| CubeError::internal("query_tools is required".to_string()))?;
-        let _member_evaluator = self
+        let member_evaluator = self
             .member_evaluator
             .ok_or_else(|| CubeError::internal("member_evaluator is required".to_string()))?;
-        let _filter_type = self
+        let filter_type = self
             .filter_type
             .ok_or_else(|| CubeError::internal("filter_type is required".to_string()))?;
-        let _operator = self
+        let operator = self
             .operator
             .ok_or_else(|| CubeError::internal("operator is required".to_string()))?;
         let _values = self.values.unwrap_or_default();
 
-        Ok(None)
+        let op = match operator {
+            FilterOperator::Set => FilterOp::Nullability(NullabilityOp::new(false)),
+            FilterOperator::NotSet => FilterOp::Nullability(NullabilityOp::new(true)),
+            _ => return Ok(None),
+        };
+
+        Ok(Some(TypedFilter {
+            query_tools,
+            member_evaluator,
+            filter_type,
+            op,
+        }))
     }
 }
