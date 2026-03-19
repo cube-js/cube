@@ -1,3 +1,4 @@
+use super::{FilterOperationSql, FilterSqlContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -16,39 +17,6 @@ impl EqualityOp {
             negated,
             values,
             member_type,
-        }
-    }
-
-    pub fn to_sql(
-        &self,
-        member_sql: &str,
-        query_tools: &Rc<QueryTools>,
-        plan_templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        let has_null = self.values.iter().any(|v| v.is_none());
-        let need_null_check = if self.negated { !has_null } else { has_null };
-
-        if self.values.len() > 1 {
-            let allocated =
-                self.allocate_and_cast_values(query_tools, plan_templates)?;
-            if self.negated {
-                plan_templates.not_in_where(member_sql.to_string(), allocated, need_null_check)
-            } else {
-                plan_templates.in_where(member_sql.to_string(), allocated, need_null_check)
-            }
-        } else if has_null {
-            if self.negated {
-                plan_templates.set_where(member_sql.to_string())
-            } else {
-                plan_templates.not_set_where(member_sql.to_string())
-            }
-        } else {
-            let param = self.first_param(query_tools, plan_templates)?;
-            if self.negated {
-                plan_templates.not_equals(member_sql.to_string(), param, need_null_check)
-            } else {
-                plan_templates.equals(member_sql.to_string(), param, need_null_check)
-            }
         }
     }
 
@@ -95,6 +63,40 @@ impl EqualityOp {
             Some("boolean") => plan_templates.bool_param_cast(value),
             Some("number") => plan_templates.number_param_cast(value),
             _ => Ok(value.to_string()),
+        }
+    }
+}
+
+impl FilterOperationSql for EqualityOp {
+    fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
+        let has_null = self.values.iter().any(|v| v.is_none());
+        let need_null_check = if self.negated { !has_null } else { has_null };
+
+        if self.values.len() > 1 {
+            let allocated =
+                self.allocate_and_cast_values(ctx.query_tools, ctx.plan_templates)?;
+            if self.negated {
+                ctx.plan_templates
+                    .not_in_where(ctx.member_sql.to_string(), allocated, need_null_check)
+            } else {
+                ctx.plan_templates
+                    .in_where(ctx.member_sql.to_string(), allocated, need_null_check)
+            }
+        } else if has_null {
+            if self.negated {
+                ctx.plan_templates.set_where(ctx.member_sql.to_string())
+            } else {
+                ctx.plan_templates.not_set_where(ctx.member_sql.to_string())
+            }
+        } else {
+            let param = self.first_param(ctx.query_tools, ctx.plan_templates)?;
+            if self.negated {
+                ctx.plan_templates
+                    .not_equals(ctx.member_sql.to_string(), param, need_null_check)
+            } else {
+                ctx.plan_templates
+                    .equals(ctx.member_sql.to_string(), param, need_null_check)
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ use std::rc::Rc;
 use super::base_filter::FilterType;
 use super::operators::equality::EqualityOp;
 use super::operators::nullability::NullabilityOp;
+use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::FilterOperator;
 
 #[derive(Clone, Debug)]
@@ -39,9 +40,15 @@ impl TypedFilter {
         let member_sql =
             evaluate_with_context(&self.member_evaluator, context.clone(), plan_templates)?;
 
+        let ctx = FilterSqlContext {
+            member_sql: &member_sql,
+            query_tools: &self.query_tools,
+            plan_templates,
+        };
+
         match &self.op {
-            FilterOp::Equality(op) => op.to_sql(&member_sql, &self.query_tools, plan_templates),
-            FilterOp::Nullability(op) => op.to_sql(&member_sql, plan_templates),
+            FilterOp::Equality(op) => op.to_sql(&ctx),
+            FilterOp::Nullability(op) => op.to_sql(&ctx),
         }
     }
 
