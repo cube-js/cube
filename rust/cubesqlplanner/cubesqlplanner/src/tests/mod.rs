@@ -11,4 +11,5 @@ mod pre_aggregation_sql_generation;
 mod rolling_window_sql_generation;
 mod string_measures;
 mod subquery_dimensions;
+mod filter_to_sql;
 mod utils;
