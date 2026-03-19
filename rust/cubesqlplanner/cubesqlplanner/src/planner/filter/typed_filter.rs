@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use super::base_filter::FilterType;
 use super::operators::equality::EqualityOp;
+use super::operators::in_list::InListOp;
 use super::operators::nullability::NullabilityOp;
 use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::FilterOperator;
@@ -14,6 +15,7 @@ use super::FilterOperator;
 #[derive(Clone, Debug)]
 pub enum FilterOp {
     Equality(EqualityOp),
+    InList(InListOp),
     Nullability(NullabilityOp),
 }
 
@@ -48,6 +50,7 @@ impl TypedFilter {
 
         match &self.op {
             FilterOp::Equality(op) => op.to_sql(&ctx),
+            FilterOp::InList(op) => op.to_sql(&ctx),
             FilterOp::Nullability(op) => op.to_sql(&ctx),
         }
     }
@@ -127,6 +130,8 @@ impl TypedFilterBuilder {
             FilterOperator::NotEqual => {
                 FilterOp::Equality(EqualityOp::new(true, values, member_type))
             }
+            FilterOperator::In => FilterOp::InList(InListOp::new(false, values, member_type)),
+            FilterOperator::NotIn => FilterOp::InList(InListOp::new(true, values, member_type)),
             FilterOperator::Set => FilterOp::Nullability(NullabilityOp::new(false)),
             FilterOperator::NotSet => FilterOp::Nullability(NullabilityOp::new(true)),
             _ => return Ok(None),
