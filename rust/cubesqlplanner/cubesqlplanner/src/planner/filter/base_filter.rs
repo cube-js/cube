@@ -79,6 +79,21 @@ impl BaseFilter {
         values: Vec<Option<String>>,
         use_raw_values: bool,
     ) -> Rc<Self> {
+        let base_builder = match &self.typed_filter {
+            Some(tf) => tf.to_builder(),
+            None => TypedFilter::builder()
+                .query_tools(self.query_tools.clone())
+                .member_evaluator(self.member_evaluator.clone())
+                .filter_type(self.filter_type.clone()),
+        };
+        let typed_filter = base_builder
+            .operator(filter_operator.clone())
+            .values(Some(values.clone()))
+            .use_raw_values(use_raw_values)
+            .build()
+            .ok()
+            .flatten();
+
         Rc::new(Self {
             query_tools: self.query_tools.clone(),
             member_evaluator: self.member_evaluator.clone(),
@@ -86,7 +101,7 @@ impl BaseFilter {
             filter_operator,
             values,
             use_raw_values,
-            typed_filter: None,
+            typed_filter,
         })
     }
 

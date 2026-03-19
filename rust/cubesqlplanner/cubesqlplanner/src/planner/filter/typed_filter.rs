@@ -16,6 +16,7 @@ use super::operators::rolling_window::RegularRollingWindowOp;
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::FilterOperator;
+use crate::planner::GranularityHelper;
 
 #[derive(Clone, Debug)]
 pub enum FilterOp {
@@ -42,6 +43,13 @@ pub struct TypedFilter {
 impl TypedFilter {
     pub fn builder() -> TypedFilterBuilder {
         TypedFilterBuilder::default()
+    }
+
+    pub fn to_builder(&self) -> TypedFilterBuilder {
+        TypedFilter::builder()
+            .query_tools(self.query_tools.clone())
+            .member_evaluator(self.member_evaluator.clone())
+            .filter_type(self.filter_type.clone())
     }
 
     pub fn to_sql(
@@ -117,6 +125,14 @@ impl TypedFilterBuilder {
     pub fn values(mut self, v: Option<Vec<Option<String>>>) -> Self {
         self.values = v;
         self
+    }
+
+    fn resolve_member_evaluator(member_evaluator: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
+        if let Ok(td) = member_evaluator.as_time_dimension() {
+            td.base_symbol().clone()
+        } else {
+            member_evaluator.clone()
+        }
     }
 
     fn resolve_member_type(member_evaluator: &Rc<MemberSymbol>) -> Option<String> {
@@ -223,6 +239,43 @@ impl TypedFilterBuilder {
             FilterOperator::AfterOrOnDate => {
                 let value = Self::first_non_null_value(&values)?;
                 FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::AfterOrOn, value))
+            }
+            FilterOperator::RegularRollingWindowDateRange => {
+                let trailing = values.get(2).and_then(|v| v.clone());
+                let leading = values.get(3).and_then(|v| v.clone());
+                FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(trailing, leading))
+            }
+            FilterOperator::ToDateRollingWindowDateRange => {
+                let granularity_name = values
+                    .get(2)
+                    .and_then(|v| v.as_ref())
+                    .ok_or_else(|| {
+                        CubeError::user(
+                            "Granularity required for to_date rolling window".to_string(),
+                        )
+                    })?
+                    .clone();
+
+                let resolved = Self::resolve_member_evaluator(&member_evaluator);
+                let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &resolved.cube_name(),
+                    &resolved.name(),
+                    Some(granularity_name.clone()),
+                )?
+                .ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "Rolling window granularity '{}' is not found in time dimension '{}'",
+                        granularity_name,
+                        resolved.name()
+                    ))
+                })?;
+
+                FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(granularity_obj))
             }
             _ => return Ok(None),
         };
