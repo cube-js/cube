@@ -13,6 +13,7 @@ use super::operators::date_single::{DateSingleKind, DateSingleOp};
 use super::operators::equality::EqualityOp;
 use super::operators::in_list::InListOp;
 use super::operators::like::LikeOp;
+use super::operators::measure_filter::MeasureFilterOp;
 use super::operators::nullability::NullabilityOp;
 use super::operators::rolling_window::RegularRollingWindowOp;
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
@@ -28,6 +29,7 @@ pub enum FilterOp {
     Equality(EqualityOp),
     InList(InListOp),
     Like(LikeOp),
+    MeasureFilter(MeasureFilterOp),
     Nullability(NullabilityOp),
     RegularRollingWindow(RegularRollingWindowOp),
     ToDateRollingWindow(ToDateRollingWindowOp),
@@ -64,6 +66,15 @@ impl TypedFilter {
         context: Rc<VisitorContext>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        if let FilterOp::MeasureFilter(op) = &self.op {
+            return op.to_sql(
+                &self.member_evaluator,
+                &self.query_tools,
+                &context,
+                plan_templates,
+            );
+        }
+
         let resolved = if let Ok(td) = self.member_evaluator.as_time_dimension() {
             td.base_symbol().clone()
         } else {
@@ -145,6 +156,9 @@ impl TypedFilter {
             FilterOp::Equality(op) => op.to_sql(ctx),
             FilterOp::InList(op) => op.to_sql(ctx),
             FilterOp::Like(op) => op.to_sql(ctx),
+            FilterOp::MeasureFilter(_) => {
+                unreachable!("MeasureFilter is handled in TypedFilter::to_sql")
+            }
             FilterOp::Nullability(op) => op.to_sql(ctx),
             FilterOp::RegularRollingWindow(op) => op.to_sql(ctx),
             FilterOp::ToDateRollingWindow(op) => op.to_sql(ctx),
@@ -374,7 +388,7 @@ impl TypedFilterBuilder {
                     values.iter().filter_map(|v| v.clone()).collect();
                 FilterOp::Like(LikeOp::new(true, true, false, non_null_values, member_type))
             }
-            FilterOperator::MeasureFilter => return Ok(None),
+            FilterOperator::MeasureFilter => FilterOp::MeasureFilter(MeasureFilterOp::new()),
         };
 
         Ok(Some(TypedFilter {
