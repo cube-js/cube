@@ -11,8 +11,6 @@ fn build(filter_yaml: &str) -> String {
         .expect("Should generate filter SQL")
 }
 
-// ── equals ──────────────────────────────────────────────────────────────────
-
 #[test]
 fn test_equals_string() {
     let sql = build(indoc! {"
@@ -62,7 +60,6 @@ fn test_equals_null() {
     assert_eq!(sql, r#"("visitors".source IS NULL)"#);
 }
 
-// ── notEquals ───────────────────────────────────────────────────────────────
 
 #[test]
 fn test_not_equals_string() {
@@ -329,8 +326,6 @@ fn test_not_ends_with_filter() {
     );
 }
 
-// ── contains with multiple values ───────────────────────────────────────────
-
 #[test]
 fn test_contains_multiple_values() {
     let sql = build(indoc! {"
@@ -362,8 +357,6 @@ fn test_not_contains_multiple_values() {
         r#"(("visitors".source NOT ILIKE '%' || $_0_$|| '%' AND "visitors".source NOT ILIKE '%' || $_1_$|| '%') OR "visitors".source IS NULL)"#
     );
 }
-
-// ── filter groups (OR / AND) ────────────────────────────────────────────────
 
 #[test]
 fn test_or_filter_group() {
