@@ -427,3 +427,117 @@ fn test_nested_and_or_groups() {
         r#"((("visitors".source = $_0_$) OR ("visitors".source = $_1_$)) AND ((("visitors".id > $_2_$) AND (("visitors".source ILIKE '%' || $_3_$|| '%'))) OR ("visitors".id < $_4_$)) AND ("visitors".source IS NOT NULL))"#
     );
 }
+
+// ── date operators ──────────────────────────────────────────────────────────
+
+#[test]
+fn test_in_date_range_date_only() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: inDateRange
+            values:
+              - "2024-01-01"
+              - "2024-12-31"
+    "#});
+    assert_eq!(
+        sql,
+        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#
+    );
+}
+
+#[test]
+fn test_in_date_range_full_timestamp() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: inDateRange
+            values:
+              - "2024-01-01T10:00:00.000"
+              - "2024-06-15T18:30:00.000"
+    "#});
+    assert_eq!(
+        sql,
+        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#
+    );
+}
+
+#[test]
+fn test_not_in_date_range() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: notInDateRange
+            values:
+              - "2024-01-01"
+              - "2024-12-31"
+    "#});
+    assert_eq!(
+        sql,
+        r#"("visitors".created_at < $_0_$::timestamptz OR "visitors".created_at > $_1_$::timestamptz)"#
+    );
+}
+
+#[test]
+fn test_before_date() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: beforeDate
+            values:
+              - "2024-06-01"
+    "#});
+    assert_eq!(sql, r#"("visitors".created_at < $_0_$::timestamptz)"#);
+}
+
+#[test]
+fn test_before_or_on_date() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: beforeOrOnDate
+            values:
+              - "2024-06-01"
+    "#});
+    assert_eq!(sql, r#"("visitors".created_at <= $_0_$::timestamptz)"#);
+}
+
+#[test]
+fn test_after_date() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: afterDate
+            values:
+              - "2024-06-01"
+    "#});
+    assert_eq!(sql, r#"("visitors".created_at > $_0_$::timestamptz)"#);
+}
+
+#[test]
+fn test_after_or_on_date() {
+    let sql = build(indoc! {r#"
+        filters:
+          - dimension: visitors.created_at
+            operator: afterOrOnDate
+            values:
+              - "2024-06-01"
+    "#});
+    assert_eq!(sql, r#"("visitors".created_at >= $_0_$::timestamptz)"#);
+}
+
+#[test]
+fn test_time_dimension_date_range() {
+    let sql = build(indoc! {r#"
+        time_dimensions:
+          - dimension: visitors.created_at
+            granularity: day
+            dateRange:
+              - "2024-01-01"
+              - "2024-12-31"
+    "#});
+    assert_eq!(
+        sql,
+        r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#
+    );
+}
