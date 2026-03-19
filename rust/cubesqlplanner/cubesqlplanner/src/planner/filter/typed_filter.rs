@@ -358,35 +358,32 @@ impl TypedFilterBuilder {
 
                 FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(granularity_obj))
             }
-            FilterOperator::Contains => {
+            FilterOperator::Contains
+            | FilterOperator::NotContains
+            | FilterOperator::StartsWith
+            | FilterOperator::NotStartsWith
+            | FilterOperator::EndsWith
+            | FilterOperator::NotEndsWith => {
+                let has_null = values.iter().any(|v| v.is_none());
                 let non_null_values: Vec<String> =
                     values.iter().filter_map(|v| v.clone()).collect();
-                FilterOp::Like(LikeOp::new(false, true, true, non_null_values, member_type))
-            }
-            FilterOperator::NotContains => {
-                let non_null_values: Vec<String> =
-                    values.iter().filter_map(|v| v.clone()).collect();
-                FilterOp::Like(LikeOp::new(true, true, true, non_null_values, member_type))
-            }
-            FilterOperator::StartsWith => {
-                let non_null_values: Vec<String> =
-                    values.iter().filter_map(|v| v.clone()).collect();
-                FilterOp::Like(LikeOp::new(false, false, true, non_null_values, member_type))
-            }
-            FilterOperator::NotStartsWith => {
-                let non_null_values: Vec<String> =
-                    values.iter().filter_map(|v| v.clone()).collect();
-                FilterOp::Like(LikeOp::new(true, false, true, non_null_values, member_type))
-            }
-            FilterOperator::EndsWith => {
-                let non_null_values: Vec<String> =
-                    values.iter().filter_map(|v| v.clone()).collect();
-                FilterOp::Like(LikeOp::new(false, true, false, non_null_values, member_type))
-            }
-            FilterOperator::NotEndsWith => {
-                let non_null_values: Vec<String> =
-                    values.iter().filter_map(|v| v.clone()).collect();
-                FilterOp::Like(LikeOp::new(true, true, false, non_null_values, member_type))
+                let (negated, start_wild, end_wild) = match operator {
+                    FilterOperator::Contains => (false, true, true),
+                    FilterOperator::NotContains => (true, true, true),
+                    FilterOperator::StartsWith => (false, false, true),
+                    FilterOperator::NotStartsWith => (true, false, true),
+                    FilterOperator::EndsWith => (false, true, false),
+                    FilterOperator::NotEndsWith => (true, true, false),
+                    _ => unreachable!(),
+                };
+                FilterOp::Like(LikeOp::new(
+                    negated,
+                    start_wild,
+                    end_wild,
+                    non_null_values,
+                    has_null,
+                    member_type,
+                ))
             }
             FilterOperator::MeasureFilter => FilterOp::MeasureFilter(MeasureFilterOp::new()),
         };

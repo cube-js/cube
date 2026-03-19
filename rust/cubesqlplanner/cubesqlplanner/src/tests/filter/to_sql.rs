@@ -434,6 +434,42 @@ fn test_not_contains_multiple_values() {
     );
 }
 
+// ── like with null ──────────────────────────────────────────────────────────
+
+#[test]
+fn test_contains_with_null() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: contains
+            values:
+              - goo
+              -
+    "});
+    assert_filter(
+        &result,
+        r#"(("visitors".source ILIKE '%' || $_0_$|| '%') OR "visitors".source IS NULL)"#,
+        &["goo"],
+    );
+}
+
+#[test]
+fn test_not_contains_with_null() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: notContains
+            values:
+              - goo
+              -
+    "});
+    assert_filter(
+        &result,
+        r#"(("visitors".source NOT ILIKE '%' || $_0_$|| '%'))"#,
+        &["goo"],
+    );
+}
+
 // ── filter groups (OR / AND) ────────────────────────────────────────────────
 
 #[test]

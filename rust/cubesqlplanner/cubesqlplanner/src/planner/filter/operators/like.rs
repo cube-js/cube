@@ -7,6 +7,7 @@ pub struct LikeOp {
     start_wild: bool,
     end_wild: bool,
     values: Vec<String>,
+    has_null: bool,
     member_type: Option<String>,
 }
 
@@ -16,6 +17,7 @@ impl LikeOp {
         start_wild: bool,
         end_wild: bool,
         values: Vec<String>,
+        has_null: bool,
         member_type: Option<String>,
     ) -> Self {
         Self {
@@ -23,6 +25,7 @@ impl LikeOp {
             start_wild,
             end_wild,
             values,
+            has_null,
             member_type,
         }
     }
@@ -44,8 +47,8 @@ impl FilterOperationSql for LikeOp {
             .collect::<Result<Vec<_>, _>>()?;
 
         let logical_symbol = if self.negated { " AND " } else { " OR " };
-        // negated like always adds OR IS NULL check (values never contain null)
-        let null_check = if self.negated {
+        let need_null_check = if self.negated { !self.has_null } else { self.has_null };
+        let null_check = if need_null_check {
             ctx.plan_templates
                 .or_is_null_check(ctx.member_sql.to_string())?
         } else {
