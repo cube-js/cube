@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+assertion_line: 358
+expression: result
+snapshot_kind: text
+---
+account_overview__count
+-----------------------
+2

@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+assertion_line: 386
+expression: result
+snapshot_kind: text
+---
+account_overview__region | account_overview__count
+-------------------------+------------------------
+EU                       | 1                      
+US                       | 1

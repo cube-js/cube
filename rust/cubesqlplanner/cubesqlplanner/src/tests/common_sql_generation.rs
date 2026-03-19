@@ -252,8 +252,8 @@ async fn test_multi_fact_two_measures_from_different_cubes() {
     }
 }
 
-#[test]
-fn test_measure_switch_cross_join() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_switch_cross_join() {
     let schema = MockSchema::from_yaml_file("common/calc_groups.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -282,7 +282,12 @@ fn test_measure_switch_cross_join() {
         "Calculated measure must not be wrapped in number() aggregation"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "calc_groups_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[test]
@@ -330,8 +335,8 @@ fn test_query_level_join_hints() {
     );
 }
 
-#[test]
-fn test_segment_with_subquery_dimension_in_view() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_with_subquery_dimension_in_view() {
     let schema = MockSchema::from_yaml_file("common/segments_in_view.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -342,15 +347,20 @@ fn test_segment_with_subquery_dimension_in_view() {
           - accountOverview.hasNoTickets
     "};
 
-    let sql = test_context
+    test_context
         .build_sql(query_yaml)
         .expect("Should generate SQL for segment with subquery dimension in view");
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "segments_in_view_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_segment_with_subquery_dimension_in_view_with_dimension() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_with_subquery_dimension_in_view_with_dimension() {
     let schema = MockSchema::from_yaml_file("common/segments_in_view.yaml");
     let test_context = TestContext::new(schema).unwrap();
 
@@ -365,9 +375,14 @@ fn test_segment_with_subquery_dimension_in_view_with_dimension() {
           - id: accountOverview.region
     "};
 
-    let sql = test_context
+    test_context
         .build_sql(query_yaml)
         .expect("Should generate SQL for segment with subquery dimension in view with dimension");
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "segments_in_view_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }

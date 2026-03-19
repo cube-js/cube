@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+assertion_line: 289
+expression: result
+snapshot_kind: text
+---
+orders__currency | orders__date_year   | orders__amount_usd | orders__amount_in_currency
+-----------------+---------------------+--------------------+---------------------------
+EUR              | 2024-01-01 00:00:00 | 0.00               | 150.00                    
+USD              | 2024-01-01 00:00:00 | 300.00             | 300.00                    
+EUR              | 2025-01-01 00:00:00 | 0.00               | 250.00                    
+GBP              | 2025-01-01 00:00:00 | 0.00               | 300.00                    
+USD              | 2025-01-01 00:00:00 | 350.00             | 350.00
