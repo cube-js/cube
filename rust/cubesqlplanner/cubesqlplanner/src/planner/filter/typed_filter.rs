@@ -32,11 +32,12 @@ pub enum FilterOp {
 
 #[derive(Clone)]
 pub struct TypedFilter {
-    #[allow(dead_code)]
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
-    #[allow(dead_code)]
     filter_type: FilterType,
+    operator: FilterOperator,
+    values: Vec<Option<String>>,
+    use_raw_values: bool,
     op: FilterOp,
 }
 
@@ -50,6 +51,9 @@ impl TypedFilter {
             .query_tools(self.query_tools.clone())
             .member_evaluator(self.member_evaluator.clone())
             .filter_type(self.filter_type.clone())
+            .operator(self.operator.clone())
+            .values(Some(self.values.clone()))
+            .use_raw_values(self.use_raw_values)
     }
 
     pub fn to_sql(
@@ -172,6 +176,7 @@ impl TypedFilterBuilder {
             .operator
             .ok_or_else(|| CubeError::internal("operator is required".to_string()))?;
         let values = self.values.unwrap_or_default();
+        let values_snapshot = values.clone();
 
         let member_type = Self::resolve_member_type(&member_evaluator);
 
@@ -284,6 +289,9 @@ impl TypedFilterBuilder {
             query_tools,
             member_evaluator,
             filter_type,
+            operator,
+            values: values_snapshot,
+            use_raw_values: self.use_raw_values,
             op,
         }))
     }

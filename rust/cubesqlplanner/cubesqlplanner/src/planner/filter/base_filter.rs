@@ -118,8 +118,20 @@ impl BaseFilter {
     }
 
     pub fn with_member_evaluator(&self, member_evaluator: Rc<MemberSymbol>) -> Rc<Self> {
+        let typed_filter = self
+            .typed_filter
+            .as_ref()
+            .and_then(|tf| {
+                tf.to_builder()
+                    .member_evaluator(member_evaluator.clone())
+                    .build()
+                    .ok()
+                    .flatten()
+            });
+
         let mut result = self.clone();
         result.member_evaluator = member_evaluator;
+        result.typed_filter = typed_filter;
         Rc::new(result)
     }
 
