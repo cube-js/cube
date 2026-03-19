@@ -7,6 +7,8 @@ use std::rc::Rc;
 
 use super::base_filter::FilterType;
 use super::operators::comparison::{ComparisonKind, ComparisonOp};
+use super::operators::date_range::{DateRangeKind, DateRangeOp};
+use super::operators::date_single::{DateSingleKind, DateSingleOp};
 use super::operators::equality::EqualityOp;
 use super::operators::in_list::InListOp;
 use super::operators::nullability::NullabilityOp;
@@ -16,6 +18,8 @@ use super::FilterOperator;
 #[derive(Clone, Debug)]
 pub enum FilterOp {
     Comparison(ComparisonOp),
+    DateRange(DateRangeOp),
+    DateSingle(DateSingleOp),
     Equality(EqualityOp),
     InList(InListOp),
     Nullability(NullabilityOp),
@@ -41,17 +45,25 @@ impl TypedFilter {
         context: Rc<VisitorContext>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let member_sql =
-            evaluate_with_context(&self.member_evaluator, context.clone(), plan_templates)?;
+        let resolved = if let Ok(td) = self.member_evaluator.as_time_dimension() {
+            td.base_symbol().clone()
+        } else {
+            self.member_evaluator.clone()
+        };
+        let member_sql = evaluate_with_context(&resolved, context.clone(), plan_templates)?;
 
+        let filters_context = context.filters_context();
         let ctx = FilterSqlContext {
             member_sql: &member_sql,
             query_tools: &self.query_tools,
             plan_templates,
+            use_db_time_zone: !filters_context.use_local_tz,
         };
 
         match &self.op {
             FilterOp::Comparison(op) => op.to_sql(&ctx),
+            FilterOp::DateRange(op) => op.to_sql(&ctx),
+            FilterOp::DateSingle(op) => op.to_sql(&ctx),
             FilterOp::Equality(op) => op.to_sql(&ctx),
             FilterOp::InList(op) => op.to_sql(&ctx),
             FilterOp::Nullability(op) => op.to_sql(&ctx),
@@ -167,6 +179,39 @@ impl TypedFilterBuilder {
             }
             FilterOperator::Set => FilterOp::Nullability(NullabilityOp::new(false)),
             FilterOperator::NotSet => FilterOp::Nullability(NullabilityOp::new(true)),
+            FilterOperator::InDateRange | FilterOperator::NotInDateRange => {
+                let from = Self::first_non_null_value(&values)?;
+                let to = values
+                    .get(1)
+                    .and_then(|v| v.as_ref().cloned())
+                    .ok_or_else(|| {
+                        CubeError::user(
+                            "2 arguments expected for date range".to_string(),
+                        )
+                    })?;
+                let kind = if matches!(operator, FilterOperator::InDateRange) {
+                    DateRangeKind::InRange
+                } else {
+                    DateRangeKind::NotInRange
+                };
+                FilterOp::DateRange(DateRangeOp::new(kind, from, to))
+            }
+            FilterOperator::BeforeDate => {
+                let value = Self::first_non_null_value(&values)?;
+                FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::Before, value))
+            }
+            FilterOperator::BeforeOrOnDate => {
+                let value = Self::first_non_null_value(&values)?;
+                FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::BeforeOrOn, value))
+            }
+            FilterOperator::AfterDate => {
+                let value = Self::first_non_null_value(&values)?;
+                FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::After, value))
+            }
+            FilterOperator::AfterOrOnDate => {
+                let value = Self::first_non_null_value(&values)?;
+                FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::AfterOrOn, value))
+            }
             _ => return Ok(None),
         };
 
