@@ -12,6 +12,7 @@ use super::operators::date_range::{DateRangeKind, DateRangeOp};
 use super::operators::date_single::{DateSingleKind, DateSingleOp};
 use super::operators::equality::EqualityOp;
 use super::operators::in_list::InListOp;
+use super::operators::like::LikeOp;
 use super::operators::nullability::NullabilityOp;
 use super::operators::rolling_window::RegularRollingWindowOp;
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
@@ -26,6 +27,7 @@ pub enum FilterOp {
     DateSingle(DateSingleOp),
     Equality(EqualityOp),
     InList(InListOp),
+    Like(LikeOp),
     Nullability(NullabilityOp),
     RegularRollingWindow(RegularRollingWindowOp),
     ToDateRollingWindow(ToDateRollingWindowOp),
@@ -142,6 +144,7 @@ impl TypedFilter {
             FilterOp::DateSingle(op) => op.to_sql(ctx),
             FilterOp::Equality(op) => op.to_sql(ctx),
             FilterOp::InList(op) => op.to_sql(ctx),
+            FilterOp::Like(op) => op.to_sql(ctx),
             FilterOp::Nullability(op) => op.to_sql(ctx),
             FilterOp::RegularRollingWindow(op) => op.to_sql(ctx),
             FilterOp::ToDateRollingWindow(op) => op.to_sql(ctx),
@@ -341,7 +344,37 @@ impl TypedFilterBuilder {
 
                 FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(granularity_obj))
             }
-            _ => return Ok(None),
+            FilterOperator::Contains => {
+                let non_null_values: Vec<String> =
+                    values.iter().filter_map(|v| v.clone()).collect();
+                FilterOp::Like(LikeOp::new(false, true, true, non_null_values, member_type))
+            }
+            FilterOperator::NotContains => {
+                let non_null_values: Vec<String> =
+                    values.iter().filter_map(|v| v.clone()).collect();
+                FilterOp::Like(LikeOp::new(true, true, true, non_null_values, member_type))
+            }
+            FilterOperator::StartsWith => {
+                let non_null_values: Vec<String> =
+                    values.iter().filter_map(|v| v.clone()).collect();
+                FilterOp::Like(LikeOp::new(false, false, true, non_null_values, member_type))
+            }
+            FilterOperator::NotStartsWith => {
+                let non_null_values: Vec<String> =
+                    values.iter().filter_map(|v| v.clone()).collect();
+                FilterOp::Like(LikeOp::new(true, false, true, non_null_values, member_type))
+            }
+            FilterOperator::EndsWith => {
+                let non_null_values: Vec<String> =
+                    values.iter().filter_map(|v| v.clone()).collect();
+                FilterOp::Like(LikeOp::new(false, true, false, non_null_values, member_type))
+            }
+            FilterOperator::NotEndsWith => {
+                let non_null_values: Vec<String> =
+                    values.iter().filter_map(|v| v.clone()).collect();
+                FilterOp::Like(LikeOp::new(true, true, false, non_null_values, member_type))
+            }
+            FilterOperator::MeasureFilter => return Ok(None),
         };
 
         Ok(Some(TypedFilter {
