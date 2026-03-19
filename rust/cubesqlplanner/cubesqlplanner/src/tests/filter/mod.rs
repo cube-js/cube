@@ -1,3 +1,4 @@
+mod partition_range;
 mod to_sql;
 mod to_sql_timezone;
 mod use_raw_values;
