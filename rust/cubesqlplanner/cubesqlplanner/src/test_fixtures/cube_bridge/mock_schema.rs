@@ -213,6 +213,36 @@ impl MockSchema {
         Ok(result)
     }
 
+    pub fn create_base_tools_with_driver(
+        &self,
+        driver_tools: MockDriverTools,
+    ) -> Result<MockBaseTools, CubeError> {
+        let join_graph = Rc::new(self.create_join_graph()?);
+        let driver_tools = Rc::new(driver_tools);
+
+        let mut cube_members = HashMap::new();
+        for (cube_name, cube) in &self.cubes {
+            let mut members = Vec::new();
+            for dim_name in cube.dimensions.keys() {
+                members.push(format!("{}.{}", cube_name, dim_name));
+            }
+            for measure_name in cube.measures.keys() {
+                members.push(format!("{}.{}", cube_name, measure_name));
+            }
+            for segment_name in cube.segments.keys() {
+                members.push(format!("{}.{}", cube_name, segment_name));
+            }
+            cube_members.insert(cube_name.clone(), members);
+        }
+
+        let result = MockBaseTools::builder()
+            .join_graph(join_graph)
+            .driver_tools(driver_tools)
+            .cube_members(cube_members)
+            .build();
+        Ok(result)
+    }
+
     #[allow(dead_code)]
     pub fn create_evaluator_with_primary_keys(
         self,

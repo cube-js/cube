@@ -13,7 +13,7 @@ use crate::planner::top_level_planner::TopLevelPlanner;
 use crate::planner::{GranularityHelper, QueryProperties, VisitorContext};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
-    members_from_strings, MockBaseQueryOptions, MockSchema, MockSecurityContext,
+    members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
 };
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -29,6 +29,34 @@ pub struct TestContext {
 impl TestContext {
     pub fn new(schema: MockSchema) -> Result<Self, CubeError> {
         Self::new_with_options(schema, Tz::UTC, None, None, false)
+    }
+
+    #[allow(dead_code)]
+    pub fn new_with_base_tools(
+        schema: MockSchema,
+        base_tools: MockBaseTools,
+    ) -> Result<Self, CubeError> {
+        let join_graph = Rc::new(schema.create_join_graph()?);
+        let evaluator = schema.clone().create_evaluator();
+        let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =
+            Rc::new(MockSecurityContext);
+
+        let query_tools = QueryTools::try_new(
+            evaluator,
+            security_context.clone(),
+            Rc::new(base_tools),
+            join_graph,
+            Some(Tz::UTC.to_string()),
+            false,
+            None,
+            None,
+        )?;
+
+        Ok(Self {
+            schema,
+            query_tools,
+            security_context,
+        })
     }
 
     #[allow(dead_code)]

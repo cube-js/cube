@@ -17,6 +17,7 @@ pub struct MockDriverTools {
     timezone: String,
     timestamp_precision: u32,
     sql_templates: Rc<MockSqlTemplatesRender>,
+    visible_in_db_time_zone: bool,
 }
 
 impl MockDriverTools {
@@ -25,6 +26,7 @@ impl MockDriverTools {
             timezone: "UTC".to_string(),
             timestamp_precision: 3,
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
+            visible_in_db_time_zone: false,
         }
     }
 
@@ -34,6 +36,7 @@ impl MockDriverTools {
             timezone,
             timestamp_precision: 3,
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
+            visible_in_db_time_zone: false,
         }
     }
 
@@ -43,7 +46,14 @@ impl MockDriverTools {
             timezone: "UTC".to_string(),
             timestamp_precision: 3,
             sql_templates: Rc::new(sql_templates),
+            visible_in_db_time_zone: false,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_visible_in_db_time_zone(mut self) -> Self {
+        self.visible_in_db_time_zone = true;
+        self
     }
 }
 
