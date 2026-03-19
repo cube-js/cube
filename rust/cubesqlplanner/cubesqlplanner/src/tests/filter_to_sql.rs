@@ -60,7 +60,6 @@ fn test_equals_null() {
     assert_eq!(sql, r#"("visitors".source IS NULL)"#);
 }
 
-
 #[test]
 fn test_not_equals_string() {
     let sql = build(indoc! {"
@@ -117,10 +116,7 @@ fn test_in_filter() {
               - facebook
               - twitter
     "});
-    assert_eq!(
-        sql,
-        r#"("visitors".source IN ($_0_$, $_1_$, $_2_$))"#
-    );
+    assert_eq!(sql, r#"("visitors".source IN ($_0_$, $_1_$, $_2_$))"#);
 }
 
 #[test]
@@ -251,10 +247,7 @@ fn test_contains_filter() {
             values:
               - goo
     "});
-    assert_eq!(
-        sql,
-        r#"(("visitors".source ILIKE '%' || $_0_$|| '%'))"#
-    );
+    assert_eq!(sql, r#"(("visitors".source ILIKE '%' || $_0_$|| '%'))"#);
 }
 
 #[test]
@@ -395,5 +388,42 @@ fn test_and_filter_group() {
     assert_eq!(
         sql,
         r#"(("visitors".source = $_0_$) AND ("visitors".id > $_1_$))"#
+    );
+}
+
+#[test]
+fn test_nested_and_or_groups() {
+    let sql = build(indoc! {"
+        filters:
+          - and:
+              - or:
+                  - dimension: visitors.source
+                    operator: equals
+                    values:
+                      - google
+                  - dimension: visitors.source
+                    operator: equals
+                    values:
+                      - facebook
+              - or:
+                  - and:
+                      - dimension: visitors.id
+                        operator: gt
+                        values:
+                          - \"100\"
+                      - dimension: visitors.source
+                        operator: contains
+                        values:
+                          - goo
+                  - dimension: visitors.id
+                    operator: lt
+                    values:
+                      - \"10\"
+              - dimension: visitors.source
+                operator: set
+    "});
+    assert_eq!(
+        sql,
+        r#"((("visitors".source = $_0_$) OR ("visitors".source = $_1_$)) AND ((("visitors".id > $_2_$) AND (("visitors".source ILIKE '%' || $_3_$|| '%'))) OR ("visitors".id < $_4_$)) AND ("visitors".source IS NOT NULL))"#
     );
 }
