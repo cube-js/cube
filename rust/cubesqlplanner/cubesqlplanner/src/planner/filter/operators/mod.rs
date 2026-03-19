@@ -5,5 +5,7 @@ pub mod equality;
 mod filter_sql_context;
 pub mod in_list;
 pub mod nullability;
+pub mod rolling_window;
+pub mod to_date_rolling_window;
 
 pub use filter_sql_context::{FilterOperationSql, FilterSqlContext};

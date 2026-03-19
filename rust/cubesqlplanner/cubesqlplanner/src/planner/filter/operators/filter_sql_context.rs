@@ -1,5 +1,5 @@
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::QueryDateTimeHelper;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -73,6 +73,87 @@ impl<'a> FilterSqlContext<'a> {
             self.plan_templates.in_db_time_zone(value)
         } else {
             Ok(value)
+        }
+    }
+
+    pub fn convert_tz(&self, field: &str) -> Result<String, CubeError> {
+        self.plan_templates.convert_tz(field.to_string())
+    }
+
+    pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {
+        let from_expr = format!(
+            "min({})",
+            self.plan_templates.quote_identifier("date_from")?
+        );
+        let to_expr = format!(
+            "max({})",
+            self.plan_templates.quote_identifier("date_to")?
+        );
+        let from_expr = self.plan_templates.series_bounds_cast(&from_expr)?;
+        let to_expr = self.plan_templates.series_bounds_cast(&to_expr)?;
+        let alias = "value".to_string();
+        let time_series_cte_name = "time_series".to_string();
+
+        let from_column = TemplateProjectionColumn {
+            expr: from_expr.clone(),
+            alias: alias.clone(),
+            aliased: self.plan_templates.column_aliased(&from_expr, &alias)?,
+        };
+        let to_column = TemplateProjectionColumn {
+            expr: to_expr.clone(),
+            alias: alias.clone(),
+            aliased: self.plan_templates.column_aliased(&to_expr, &alias)?,
+        };
+
+        let from = self.plan_templates.select(
+            vec![],
+            &time_series_cte_name,
+            vec![from_column],
+            None,
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            false,
+        )?;
+        let to = self.plan_templates.select(
+            vec![],
+            &time_series_cte_name,
+            vec![to_column],
+            None,
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            false,
+        )?;
+        Ok((format!("({})", from), format!("({})", to)))
+    }
+
+    pub fn extend_date_range_bound(
+        &self,
+        date: String,
+        interval: &Option<String>,
+        is_sub: bool,
+    ) -> Result<Option<String>, CubeError> {
+        match interval {
+            Some(interval) if interval != "unbounded" => {
+                if is_sub {
+                    Ok(Some(
+                        self.plan_templates
+                            .subtract_interval(date, interval.clone())?,
+                    ))
+                } else {
+                    Ok(Some(
+                        self.plan_templates
+                            .add_interval(date, interval.clone())?,
+                    ))
+                }
+            }
+            Some(_) => Ok(None), // unbounded
+            None => Ok(Some(date)),
         }
     }
 }

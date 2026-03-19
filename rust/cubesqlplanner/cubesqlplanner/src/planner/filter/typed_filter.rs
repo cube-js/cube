@@ -12,6 +12,8 @@ use super::operators::date_single::{DateSingleKind, DateSingleOp};
 use super::operators::equality::EqualityOp;
 use super::operators::in_list::InListOp;
 use super::operators::nullability::NullabilityOp;
+use super::operators::rolling_window::RegularRollingWindowOp;
+use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::FilterOperator;
 
@@ -23,6 +25,8 @@ pub enum FilterOp {
     Equality(EqualityOp),
     InList(InListOp),
     Nullability(NullabilityOp),
+    RegularRollingWindow(RegularRollingWindowOp),
+    ToDateRollingWindow(ToDateRollingWindowOp),
 }
 
 #[derive(Clone)]
@@ -67,6 +71,8 @@ impl TypedFilter {
             FilterOp::Equality(op) => op.to_sql(&ctx),
             FilterOp::InList(op) => op.to_sql(&ctx),
             FilterOp::Nullability(op) => op.to_sql(&ctx),
+            FilterOp::RegularRollingWindow(op) => op.to_sql(&ctx),
+            FilterOp::ToDateRollingWindow(op) => op.to_sql(&ctx),
         }
     }
 
@@ -79,6 +85,7 @@ pub struct TypedFilterBuilder {
     filter_type: Option<FilterType>,
     operator: Option<FilterOperator>,
     values: Option<Vec<Option<String>>>,
+    use_raw_values: bool,
 }
 
 impl TypedFilterBuilder {
@@ -99,6 +106,11 @@ impl TypedFilterBuilder {
 
     pub fn operator(mut self, v: FilterOperator) -> Self {
         self.operator = Some(v);
+        self
+    }
+
+    pub fn use_raw_values(mut self, v: bool) -> Self {
+        self.use_raw_values = v;
         self
     }
 
