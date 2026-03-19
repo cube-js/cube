@@ -1,15 +1,19 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregation;
+<<<<<<< HEAD
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregationSource, PreAggregationTable};
+=======
+use crate::plan::Filter;
+>>>>>>> 8039f4fe8d (base filters tests)
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor, TimeDimensionSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{GranularityHelper, QueryProperties};
+use crate::planner::{GranularityHelper, QueryProperties, VisitorContext};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockSchema, MockSecurityContext,
@@ -345,6 +349,7 @@ impl TestContext {
         planner.plan()
     }
 
+<<<<<<< HEAD
     #[cfg(feature = "integration-postgres")]
     pub async fn try_execute_pg(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
         let options = self.create_query_options_from_yaml(query_yaml);
@@ -540,6 +545,32 @@ impl TestContext {
             result = result.replace(&placeholder, &format!("'{}'", escaped));
         }
         result
+=======
+    pub fn build_filter_sql(&self, yaml: &str) -> Result<String, CubeError> {
+        let props = self.create_query_properties(yaml)?;
+
+        let filter = Filter {
+            items: props
+                .dimensions_filters()
+                .iter()
+                .chain(props.time_dimensions_filters().iter())
+                .chain(props.measures_filters().iter())
+                .cloned()
+                .collect(),
+        };
+
+        let nodes_factory = SqlNodesFactory::default();
+        let context = Rc::new(VisitorContext::new(
+            self.query_tools.clone(),
+            &nodes_factory,
+            None,
+        ));
+        let base_tools = self.query_tools.base_tools();
+        let driver_tools = base_tools.driver_tools(false)?;
+        let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
+
+        filter.to_sql(&templates, context)
+>>>>>>> 8039f4fe8d (base filters tests)
     }
 }
 
