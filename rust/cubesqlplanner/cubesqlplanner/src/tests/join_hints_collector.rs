@@ -150,8 +150,8 @@ fn test_join_hints_many_to_one_view_combined_measures() {
         .contains(&v(&["many_to_one_root", "many_to_one_child"])));
 }
 
-#[test]
-fn test_many_to_one_view_build_sql() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_many_to_one_view_build_sql() {
     let ctx = many_to_one_ctx();
     let query = indoc! {"
         measures:
@@ -161,6 +161,9 @@ fn test_many_to_one_view_build_sql() {
           - many_to_one_view.root_dim
           - many_to_one_view.child_dim
     "};
-    let sql = ctx.build_sql(query).unwrap();
-    insta::assert_snapshot!(sql);
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "many_to_one_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }

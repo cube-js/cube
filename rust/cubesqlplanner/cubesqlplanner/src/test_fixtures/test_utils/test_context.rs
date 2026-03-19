@@ -345,9 +345,23 @@ impl TestContext {
 
     #[cfg(feature = "integration-postgres")]
     pub async fn try_execute_pg(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
+        let options = self.create_query_options_from_yaml(query_yaml);
+        self.try_execute_pg_from_options(options, seed_file).await
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute_pg(&self, _query_yaml: &str, _seed_file: &str) -> Option<String> {
+        None
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute_pg_from_options(
+        &self,
+        options: Rc<dyn BaseQueryOptions>,
+        seed_file: &str,
+    ) -> Option<String> {
         let client = super::pg_service::connect_and_seed(seed_file).await;
 
-        let options = self.create_query_options_from_yaml(query_yaml);
         let ctx = self.for_options(options.as_ref()).expect("Failed to create context");
         let request = QueryProperties::try_new(ctx.query_tools.clone(), options)
             .expect("Failed to create query properties");
@@ -363,13 +377,7 @@ impl TestContext {
             .build_sql_and_params(&raw_sql, true, &templates)
             .expect("Failed to build SQL and params");
 
-        // Inline params into SQL for simple_query execution
-        let mut final_sql = sql.clone();
-        for (i, param) in params.iter().enumerate().rev() {
-            let placeholder = format!("${}", i + 1);
-            let escaped = param.replace('\'', "''");
-            final_sql = final_sql.replace(&placeholder, &format!("'{}'", escaped));
-        }
+        let final_sql = Self::inline_params(&sql, &params);
 
         let messages = client
             .simple_query(&final_sql)
@@ -385,8 +393,22 @@ impl TestContext {
     }
 
     #[cfg(not(feature = "integration-postgres"))]
-    pub async fn try_execute_pg(&self, _query_yaml: &str, _seed_file: &str) -> Option<String> {
+    pub async fn try_execute_pg_from_options(
+        &self,
+        _options: Rc<dyn BaseQueryOptions>,
+        _seed_file: &str,
+    ) -> Option<String> {
         None
+    }
+
+    fn inline_params(sql: &str, params: &[String]) -> String {
+        let mut result = sql.to_string();
+        for (i, param) in params.iter().enumerate().rev() {
+            let placeholder = format!("${}", i + 1);
+            let escaped = param.replace('\'', "''");
+            result = result.replace(&placeholder, &format!("'{}'", escaped));
+        }
+        result
     }
 }
 
