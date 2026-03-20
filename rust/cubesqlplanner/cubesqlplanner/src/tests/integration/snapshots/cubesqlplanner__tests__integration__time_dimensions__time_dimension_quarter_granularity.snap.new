@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/time_dimensions.rs
+assertion_line: 71
+expression: result
+snapshot_kind: text
+---
+orders__created_at_quarter | orders__count
+---------------------------+--------------
+2024-01-01 00:00:00        | 8            
+2024-04-01 00:00:00        | 1
