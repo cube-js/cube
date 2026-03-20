@@ -436,6 +436,200 @@ view(`orders_view`, {
 
 </CodeTabs>
 
+### Conditional data masking
+
+When masking rules depend on data values from joined cubes rather than just
+user groups, you can embed the conditional logic directly in the [`mask` SQL
+expression][ref-ref-mask-dim]. The `CASE WHEN` expression in the mask evaluates
+at query time, selectively revealing or masking the value based on related data
+and [user attributes][ref-sec-ctx].
+
+In the following example, an `eligibility_profile` cube is joined to a `client`
+cube. The `address_line_1` dimension uses a `CASE WHEN` mask expression to
+conditionally show the real value based on the client's `data_security_field`
+and `region_lock_data` columns, as well as the user's `data_region` attribute:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: client
+    sql_table: clients
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: data_security_field
+        sql: data_security_field
+        type: string
+
+      - name: region_lock_data
+        sql: region_lock_data
+        type: number
+
+  - name: eligibility_profile
+    sql_table: eligibility_profiles
+
+    joins:
+      - name: client
+        sql: "{CUBE}.client_id = {client.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: address_line_1
+        sql: address_line_1
+        type: string
+        mask:
+          sql: >
+            CASE
+              WHEN {client.data_security_field} IN ('RESEARCH', 'DEMO')
+                THEN {CUBE}.address_line_1
+              WHEN '{{ COMPILE_CONTEXT.securityContext.access_group }}'
+                = 'sensitive_data_access'
+                AND {client.region_lock_data} = 0
+                THEN {CUBE}.address_line_1
+              WHEN {client.data_security_field}
+                = '{{ COMPILE_CONTEXT.securityContext.data_region }}'
+                THEN {CUBE}.address_line_1
+              ELSE '***MASKED***'
+            END
+
+    access_policy:
+      - group: sensitive_data_access
+        member_level:
+          excludes:
+            - address_line_1
+        member_masking:
+          includes: "*"
+
+      - group: very_sensitive_data_access
+        member_level:
+          excludes:
+            - address_line_1
+        member_masking:
+          includes: "*"
+```
+
+```javascript
+cube(`client`, {
+  sql_table: `clients`,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    data_security_field: {
+      sql: `data_security_field`,
+      type: `string`
+    },
+
+    region_lock_data: {
+      sql: `region_lock_data`,
+      type: `number`
+    }
+  }
+})
+
+cube(`eligibility_profile`, {
+  sql_table: `eligibility_profiles`,
+
+  joins: {
+    client: {
+      sql: `${CUBE}.client_id = ${client.id}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    address_line_1: {
+      sql: `address_line_1`,
+      type: `string`,
+      mask: {
+        sql: `CASE
+          WHEN ${client.data_security_field} IN ('RESEARCH', 'DEMO')
+            THEN ${CUBE}.address_line_1
+          WHEN '${COMPILE_CONTEXT.securityContext.access_group}'
+            = 'sensitive_data_access'
+            AND ${client.region_lock_data} = 0
+            THEN ${CUBE}.address_line_1
+          WHEN ${client.data_security_field}
+            = '${COMPILE_CONTEXT.securityContext.data_region}'
+            THEN ${CUBE}.address_line_1
+          ELSE '***MASKED***'
+        END`
+      }
+    }
+  },
+
+  access_policy: [
+    {
+      group: `sensitive_data_access`,
+      member_level: {
+        excludes: [`address_line_1`]
+      },
+      member_masking: {
+        includes: `*`
+      }
+    },
+    {
+      group: `very_sensitive_data_access`,
+      member_level: {
+        excludes: [`address_line_1`]
+      },
+      member_masking: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+Both groups have full access to all members except `address_line_1`, which is
+placed in `member_masking` so it returns the mask SQL result instead of being
+denied. The `CASE WHEN` expression in the mask evaluates as follows:
+
+| Condition | Result |
+| --- | --- |
+| `data_security_field` is `'RESEARCH'` or `'DEMO'` | Real value shown |
+| User is in `sensitive_data_access` and `region_lock_data` is `0` | Real value shown |
+| `data_security_field` matches the user's `data_region` | Real value shown |
+| None of the above | `'***MASKED***'` |
+
+The second condition uses
+[`COMPILE_CONTEXT`][ref-compile-ctx]`.securityContext.access_group` to apply
+the `region_lock_data` check only for the `sensitive_data_access` group. At
+model compilation time, Cube substitutes the user's `access_group` attribute
+into the SQL, so users in `very_sensitive_data_access` skip that branch
+entirely.
+
+<InfoBox>
+
+`COMPILE_CONTEXT` is evaluated once per
+[`context_to_app_id`][ref-config-ctx-to-app-id] key. Make sure
+`context_to_app_id` produces distinct keys for each combination of security
+context values used in your mask SQL expressions.
+
+</InfoBox>
+
 ### Mandatory filters
 
 You can apply mandatory row-level filters to specific groups to ensure they only see data matching certain criteria:
@@ -566,3 +760,5 @@ cube(`orders`, {
 [ref-ref-dap-masking]: /product/data-modeling/reference/data-access-policies#member-masking
 [ref-ref-mask-dim]: /product/data-modeling/reference/dimensions#mask
 [ref-core-data-apis]: /product/apis-integrations/core-data-apis
+[ref-compile-ctx]: /product/data-modeling/reference/context-variables#compile_context
+[ref-config-ctx-to-app-id]: /product/configuration/reference/config#context_to_app_id
