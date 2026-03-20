@@ -1,0 +1,65 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+      segments:
+          - name: sf_customers
+            sql: "{CUBE}.city = 'San Francisco'"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: amount
+            type: number
+            sql: amount
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: avg_amount
+            type: avg
+            sql: amount
+          - name: min_amount
+            type: min
+            sql: amount
+          - name: max_amount
+            type: max
+            sql: amount
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"

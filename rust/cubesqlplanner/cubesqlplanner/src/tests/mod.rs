@@ -13,3 +13,5 @@ mod rolling_window_sql_generation;
 mod string_measures;
 mod subquery_dimensions;
 mod utils;
+
+mod integration;
