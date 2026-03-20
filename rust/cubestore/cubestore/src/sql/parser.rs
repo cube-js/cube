@@ -153,7 +153,7 @@ pub enum QueueCommand {
         extended: bool,
     },
     Result {
-        key: Ident,
+        key: QueueKey,
     },
     ResultByExternalId {
         key: Ident,
@@ -629,7 +629,7 @@ impl<'a> CubeStoreParser<'a> {
                 }
             }
             "result" => QueueCommand::Result {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "result_by_external_id" => QueueCommand::ResultByExternalId {
                 key: self.parser.parse_identifier()?,

@@ -839,10 +839,7 @@ pub trait CacheStore: DIService + Send + Sync {
         caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError>;
     async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError>;
-    async fn queue_result_by_path(
-        &self,
-        path: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError>;
+    async fn queue_result(&self, key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError>;
     async fn queue_result_by_external_id(
         &self,
         external_id: String,
@@ -1479,12 +1476,8 @@ impl CacheStore for RocksCacheStore {
         .await
     }
 
-    async fn queue_result_by_path(
-        &self,
-        path: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.lookup_queue_result_by_key(QueueKey::ByPath(path))
-            .await
+    async fn queue_result(&self, key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError> {
+        self.lookup_queue_result_by_key(key).await
     }
 
     async fn queue_result_by_external_id(
@@ -1751,11 +1744,8 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
     }
 
-    async fn queue_result_by_path(
-        &self,
-        _path: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_result_by_path was used.")
+    async fn queue_result(&self, _key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_result was used.")
     }
 
     async fn queue_result_by_external_id(

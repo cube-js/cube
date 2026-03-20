@@ -527,7 +527,7 @@ impl CacheStoreSqlService {
                 )
             }
             QueueCommand::Result { key } => {
-                let ack_result = self.cachestore.queue_result_by_path(key.value).await?;
+                let ack_result = self.cachestore.queue_result(key).await?;
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
                 } else {
