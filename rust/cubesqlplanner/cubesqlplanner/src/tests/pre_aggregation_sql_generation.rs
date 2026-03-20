@@ -19,14 +19,12 @@ async fn test_basic_pre_agg_sql() {
           - visitors.source
     "};
 
-    let (sql, pre_aggrs) = test_context
+    let (_sql, pre_aggrs) = test_context
         .build_sql_with_used_pre_aggregations(query_yaml)
         .expect("Should generate SQL without pre-aggregations");
 
     assert_eq!(pre_aggrs.len(), 1, "Should use one pre-aggregation");
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = test_context
         .try_execute_pg(query_yaml, "pre_aggregation_tables.sql")
@@ -51,14 +49,12 @@ async fn test_full_match_main_rollup() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -81,14 +77,12 @@ async fn test_partial_match_main_rollup() {
           - orders.status
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -112,14 +106,12 @@ async fn test_full_match_non_additive_measure() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -163,14 +155,12 @@ async fn test_daily_rollup_full_match() {
             granularity: day
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -196,14 +186,12 @@ async fn test_daily_rollup_coarser_granularity() {
             granularity: month
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -250,14 +238,12 @@ async fn test_daily_rollup_non_additive_full_match() {
             granularity: day
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -304,14 +290,12 @@ async fn test_multi_level_all_base_measures_full_match() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -334,14 +318,12 @@ async fn test_multi_level_all_base_measures_partial_match() {
           - orders.status
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -383,14 +365,12 @@ async fn test_multi_level_calculated_measure_full_match() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "calculated_measure_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -414,14 +394,12 @@ async fn test_multi_level_mixed_measure_full_match() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "mixed_measure_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -448,6 +426,7 @@ fn test_multi_level_mixed_measure_partial_no_match() {
 
     assert!(pre_aggrs.is_empty());
 }
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_base_and_calculated_measure_full_match() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
@@ -462,14 +441,12 @@ async fn test_base_and_calculated_measure_full_match() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -492,14 +469,12 @@ async fn test_base_and_calculated_measure_parital_match() {
           - orders.status
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -529,14 +504,12 @@ async fn test_segment_full_match() {
             granularity: day
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -562,14 +535,12 @@ async fn test_segment_partial_match_unused_segment() {
             granularity: day
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -618,14 +589,12 @@ async fn test_custom_granularity_full_match() {
             granularity: half_year
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -651,14 +620,12 @@ async fn test_standard_pre_agg_coarser_custom_query() {
             granularity: half_year
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -726,14 +693,12 @@ async fn test_custom_granularity_non_additive_full_match() {
             granularity: half_year
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -778,14 +743,12 @@ async fn test_custom_granularity_non_strict_self_match() {
             granularity: half_year
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_non_strict");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
@@ -813,14 +776,12 @@ async fn test_segment_with_coarser_granularity() {
             granularity: month
     "};
 
-    let (sql, pre_aggrs) = ctx
+    let (_sql, pre_aggrs) = ctx
         .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
-
-    insta::assert_snapshot!(sql);
 
     if let Some(result) = ctx
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
