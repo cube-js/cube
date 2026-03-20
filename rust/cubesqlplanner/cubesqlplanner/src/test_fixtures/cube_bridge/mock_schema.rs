@@ -170,6 +170,7 @@ impl MockSchema {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 
+    #[allow(dead_code)]
     pub fn create_base_tools(&self) -> Result<MockBaseTools, CubeError> {
         self.create_base_tools_with_timezone("UTC".to_string())
     }

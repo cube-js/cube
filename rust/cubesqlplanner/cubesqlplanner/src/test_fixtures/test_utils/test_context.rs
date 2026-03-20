@@ -531,6 +531,7 @@ impl TestContext {
         None
     }
 
+    #[cfg(feature = "integration-postgres")]
     fn inline_params(sql: &str, params: &[String]) -> String {
         let mut result = sql.to_string();
         for (i, param) in params.iter().enumerate().rev() {
