@@ -311,12 +311,12 @@ impl MultiStageAppliedState {
         member_name: &String,
         trailing: &Option<String>,
         leading: &Option<String>,
-    ) {
+    ) -> Result<(), CubeError> {
         let trailing_unbounded = trailing.as_deref() == Some("unbounded");
         let leading_unbounded = leading.as_deref() == Some("unbounded");
 
         if !trailing_unbounded && !leading_unbounded {
-            return;
+            return Ok(());
         }
 
         if trailing_unbounded && leading_unbounded {
@@ -330,10 +330,9 @@ impl MultiStageAppliedState {
             });
         } else if trailing_unbounded {
             // Remove lower bound: InDateRange(from, to) → BeforeOrOnDate(to)
-            self.time_dimensions_filters = self
-                .time_dimensions_filters
-                .iter()
-                .map(|item| match item {
+            let mut new_filters = Vec::new();
+            for item in self.time_dimensions_filters.iter() {
+                match item {
                     FilterItem::Item(itm)
                         if &itm.member_name() == member_name
                             && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
@@ -344,21 +343,21 @@ impl MultiStageAppliedState {
                         } else {
                             values.clone()
                         };
-                        FilterItem::Item(itm.change_operator(
+                        new_filters.push(FilterItem::Item(itm.change_operator(
                             FilterOperator::BeforeOrOnDate,
                             to_value,
                             itm.use_raw_values(),
-                        ))
+                        )?));
                     }
-                    other => other.clone(),
-                })
-                .collect();
+                    other => new_filters.push(other.clone()),
+                }
+            }
+            self.time_dimensions_filters = new_filters;
         } else {
             // leading unbounded: remove upper bound: InDateRange(from, to) → AfterOrOnDate(from)
-            self.time_dimensions_filters = self
-                .time_dimensions_filters
-                .iter()
-                .map(|item| match item {
+            let mut new_filters = Vec::new();
+            for item in self.time_dimensions_filters.iter() {
+                match item {
                     FilterItem::Item(itm)
                         if &itm.member_name() == member_name
                             && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
@@ -369,16 +368,18 @@ impl MultiStageAppliedState {
                         } else {
                             values.clone()
                         };
-                        FilterItem::Item(itm.change_operator(
+                        new_filters.push(FilterItem::Item(itm.change_operator(
                             FilterOperator::AfterOrOnDate,
                             from_value,
                             itm.use_raw_values(),
-                        ))
+                        )?));
                     }
-                    other => other.clone(),
-                })
-                .collect();
+                    other => new_filters.push(other.clone()),
+                }
+            }
+            self.time_dimensions_filters = new_filters;
         }
+        Ok(())
     }
 
     pub fn replace_regular_date_range_filter(
@@ -386,7 +387,7 @@ impl MultiStageAppliedState {
         member_name: &String,
         left_interval: Option<String>,
         right_interval: Option<String>,
-    ) {
+    ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
         let values = vec![left_interval.clone(), right_interval.clone()];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
@@ -396,14 +397,15 @@ impl MultiStageAppliedState {
             None,
             &values,
             &None,
-        );
+        )?;
+        Ok(())
     }
 
     pub fn replace_to_date_date_range_filter(
         &mut self,
         member_name: &String,
         granularity: &String,
-    ) {
+    ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
         let values = vec![Some(granularity.clone())];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
@@ -413,7 +415,8 @@ impl MultiStageAppliedState {
             None,
             &values,
             &None,
-        );
+        )?;
+        Ok(())
     }
 
     pub fn replace_range_in_date_filter(
@@ -421,7 +424,7 @@ impl MultiStageAppliedState {
         member_name: &String,
         new_from: String,
         new_to: String,
-    ) {
+    ) -> Result<(), CubeError> {
         let operator = FilterOperator::InDateRange;
         let replacement_values = vec![Some(new_from), Some(new_to)];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
@@ -431,7 +434,8 @@ impl MultiStageAppliedState {
             None,
             &vec![],
             &Some(replacement_values),
-        );
+        )?;
+        Ok(())
     }
 
     pub fn replace_range_to_subquery_in_date_filter(
@@ -439,7 +443,7 @@ impl MultiStageAppliedState {
         member_name: &String,
         new_from: String,
         new_to: String,
-    ) {
+    ) -> Result<(), CubeError> {
         let operator = FilterOperator::InDateRange;
         let replacement_values = vec![Some(new_from), Some(new_to)];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
@@ -449,7 +453,8 @@ impl MultiStageAppliedState {
             Some(true),
             &vec![],
             &Some(replacement_values),
-        );
+        )?;
+        Ok(())
     }
 
     fn change_date_range_filter_impl(
@@ -460,7 +465,7 @@ impl MultiStageAppliedState {
         use_raw_values: Option<bool>,
         additional_values: &Vec<Option<String>>,
         replacement_values: &Option<Vec<Option<String>>>,
-    ) -> Vec<FilterItem> {
+    ) -> Result<Vec<FilterItem>, CubeError> {
         let mut result = Vec::new();
         for item in filters.iter() {
             match item {
@@ -474,7 +479,7 @@ impl MultiStageAppliedState {
                             use_raw_values,
                             additional_values,
                             replacement_values,
-                        ),
+                        )?,
                     )));
                     result.push(new_group);
                 }
@@ -489,7 +494,7 @@ impl MultiStageAppliedState {
                         };
                         values.extend(additional_values.iter().cloned());
                         let use_raw_values = use_raw_values.unwrap_or(itm.use_raw_values());
-                        itm.change_operator(operator.clone(), values, use_raw_values)
+                        itm.change_operator(operator.clone(), values, use_raw_values)?
                     } else {
                         itm.clone()
                     };
@@ -498,7 +503,7 @@ impl MultiStageAppliedState {
                 FilterItem::Segment(segment) => result.push(FilterItem::Segment(segment.clone())),
             }
         }
-        result
+        Ok(result)
     }
 }
 

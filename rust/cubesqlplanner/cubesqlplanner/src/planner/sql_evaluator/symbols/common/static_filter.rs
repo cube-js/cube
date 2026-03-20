@@ -81,7 +81,7 @@ pub fn apply_static_filter_to_filter_item(
             *item = item.with_member_evaluator(apply_static_filter_to_symbol(
                 &item.raw_member_evaluator(),
                 filters,
-            )?);
+            )?)?;
         }
         FilterItem::Segment(item) => {
             *item = item.with_member_evaluator(apply_static_filter_to_symbol(

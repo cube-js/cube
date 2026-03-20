@@ -475,7 +475,7 @@ impl MultiStageQueryPlanner {
 
                 if time_dimensions.is_empty() {
                     let base_state =
-                        self.replace_date_range_for_rolling_window(&rolling_window, state.clone());
+                        self.replace_date_range_for_rolling_window(&rolling_window, state.clone())?;
                     let rolling_base = self.add_rolling_window_base(
                         member.clone(),
                         base_state,
@@ -707,7 +707,7 @@ impl MultiStageQueryPlanner {
         &self,
         rolling_window: &RollingWindow,
         state: Rc<MultiStageAppliedState>,
-    ) -> Rc<MultiStageAppliedState> {
+    ) -> Result<Rc<MultiStageAppliedState>, CubeError> {
         let mut new_state = state.clone_state();
         for filter_item in state.time_dimensions_filters() {
             if let FilterItem::Item(filter) = filter_item {
@@ -716,11 +716,11 @@ impl MultiStageQueryPlanner {
                         &filter.member_name(),
                         &rolling_window.trailing,
                         &rolling_window.leading,
-                    );
+                    )?;
                 }
             }
         }
-        Rc::new(new_state)
+        Ok(Rc::new(new_state))
     }
 
     fn make_rolling_base_state(
@@ -763,13 +763,13 @@ impl MultiStageQueryPlanner {
         new_state.set_dimensions(dimensions);
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity);
+            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity)?;
         } else {
             new_state.replace_regular_date_range_filter(
                 &time_dimension_base_name,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
-            );
+            )?;
         }
 
         Ok((Rc::new(new_state), new_time_dimension))

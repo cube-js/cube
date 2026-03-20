@@ -61,6 +61,30 @@ impl TypedFilter {
             .use_raw_values(self.use_raw_values)
     }
 
+    pub fn query_tools(&self) -> &Rc<QueryTools> {
+        &self.query_tools
+    }
+
+    pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
+        &self.member_evaluator
+    }
+
+    pub fn filter_type(&self) -> &FilterType {
+        &self.filter_type
+    }
+
+    pub fn operator(&self) -> &FilterOperator {
+        &self.operator
+    }
+
+    pub fn values(&self) -> &Vec<Option<String>> {
+        &self.values
+    }
+
+    pub fn use_raw_values(&self) -> bool {
+        self.use_raw_values
+    }
+
     pub fn to_sql(
         &self,
         context: Rc<VisitorContext>,
@@ -240,8 +264,7 @@ impl TypedFilterBuilder {
             })
     }
 
-    // FIXME: return TypedFilter directly once all operators are migrated from BaseFilter
-    pub fn build(self) -> Result<Option<TypedFilter>, CubeError> {
+    pub fn build(self) -> Result<TypedFilter, CubeError> {
         let query_tools = self
             .query_tools
             .ok_or_else(|| CubeError::internal("query_tools is required".to_string()))?;
@@ -391,7 +414,7 @@ impl TypedFilterBuilder {
             FilterOperator::MeasureFilter => FilterOp::MeasureFilter(MeasureFilterOp::new()),
         };
 
-        Ok(Some(TypedFilter {
+        Ok(TypedFilter {
             query_tools,
             member_evaluator,
             filter_type,
@@ -399,6 +422,6 @@ impl TypedFilterBuilder {
             values: values_snapshot,
             use_raw_values: self.use_raw_values,
             op,
-        }))
+        })
     }
 }

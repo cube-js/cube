@@ -34,14 +34,16 @@ fn test_in_date_range_use_raw_values() {
     )
     .unwrap();
 
-    let raw_filter = filter.change_operator(
-        FilterOperator::InDateRange,
-        vec![
-            Some("(SELECT min(df) FROM cte)".to_string()),
-            Some("(SELECT max(dt) FROM cte)".to_string()),
-        ],
-        true,
-    );
+    let raw_filter = filter
+        .change_operator(
+            FilterOperator::InDateRange,
+            vec![
+                Some("(SELECT min(df) FROM cte)".to_string()),
+                Some("(SELECT max(dt) FROM cte)".to_string()),
+            ],
+            true,
+        )
+        .unwrap();
 
     let result = ctx.build_base_filter_sql(&raw_filter).unwrap();
     assert_raw(
@@ -67,14 +69,16 @@ fn test_not_in_date_range_use_raw_values() {
     )
     .unwrap();
 
-    let raw_filter = filter.change_operator(
-        FilterOperator::NotInDateRange,
-        vec![
-            Some("(SELECT min(df) FROM cte)".to_string()),
-            Some("(SELECT max(dt) FROM cte)".to_string()),
-        ],
-        true,
-    );
+    let raw_filter = filter
+        .change_operator(
+            FilterOperator::NotInDateRange,
+            vec![
+                Some("(SELECT min(df) FROM cte)".to_string()),
+                Some("(SELECT max(dt) FROM cte)".to_string()),
+            ],
+            true,
+        )
+        .unwrap();
 
     let result = ctx.build_base_filter_sql(&raw_filter).unwrap();
     assert_raw(
@@ -100,11 +104,13 @@ fn test_before_or_on_date_use_raw_values() {
     )
     .unwrap();
 
-    let raw_filter = filter.change_operator(
-        FilterOperator::BeforeOrOnDate,
-        vec![Some("(SELECT max(dt) FROM cte)".to_string())],
-        true,
-    );
+    let raw_filter = filter
+        .change_operator(
+            FilterOperator::BeforeOrOnDate,
+            vec![Some("(SELECT max(dt) FROM cte)".to_string())],
+            true,
+        )
+        .unwrap();
 
     let result = ctx.build_base_filter_sql(&raw_filter).unwrap();
     assert_raw(
@@ -130,11 +136,13 @@ fn test_after_or_on_date_use_raw_values() {
     )
     .unwrap();
 
-    let raw_filter = filter.change_operator(
-        FilterOperator::AfterOrOnDate,
-        vec![Some("(SELECT min(df) FROM cte)".to_string())],
-        true,
-    );
+    let raw_filter = filter
+        .change_operator(
+            FilterOperator::AfterOrOnDate,
+            vec![Some("(SELECT min(df) FROM cte)".to_string())],
+            true,
+        )
+        .unwrap();
 
     let result = ctx.build_base_filter_sql(&raw_filter).unwrap();
     assert_raw(
