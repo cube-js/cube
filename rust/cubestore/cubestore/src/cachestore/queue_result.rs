@@ -78,7 +78,10 @@ impl<'a> QueueResultRocksTable<'a> {
                 let index_key = QueueResultIndexKey::ByPath(path);
                 self.get_single_opt_row_by_index_reverse(&index_key, &QueueResultRocksIndex::ByPath)
             }
-            QueueKey::ById(id) => self.get_row(id),
+            QueueKey::ById(id) => match self.get_row(id)? {
+                Some(row) if row.get_row().get_expire() < &Utc::now() => Ok(None),
+                other => Ok(other),
+            },
         }
     }
 
