@@ -50,7 +50,7 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
   return `${prefix}${showRestParams ? `\n${restParams}` : ''}`;
 };
 
-export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { error, warning, ...restParams }: LoggerFnParams): void => {
+export const devLogger = (filterByLevel: LogLevel) => (type: string, { error, warning, ...restParams }: LoggerFnParams): void => {
   const logWarning = () => console.log(
     `${withColor(type, colors.yellow)}: ${format({ ...restParams, allSqlLines: true, showRestParams: true })} \n${withColor(warning || '', colors.yellow)}`
   );
@@ -76,7 +76,7 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
         break;
       }
     }
-    // falls through, trick from 90x, levels inheritance
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'info': {
       if (!error && !warning && [
         'Executing SQL',
@@ -91,14 +91,14 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
         break;
       }
     }
-    // falls through, trick from 90x, levels inheritance
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'warn': {
       if (!error && warning) {
         logWarning();
         break;
       }
     }
-    // falls through, trick from 90x, levels inheritance
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'error': {
       if (error) {
         logError();
@@ -108,7 +108,7 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
   }
 };
 
-export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string, params: LoggerFnParams): void => {
+export const prodLogger = (filterByLevel: LogLevel) => (message: string, params: LoggerFnParams): void => {
   const { error, warning } = params;
 
   if (!params.level) {
@@ -140,7 +140,7 @@ export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string
         break;
       }
     }
-    // falls through, trick from 90x, levels inheritance
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'info':
       if ([
         'REST API Request',
@@ -148,14 +148,14 @@ export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string
         logMessage();
         break;
       }
-    // falls through, trick from 90x, levels inheritance
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'warn': {
       if (!error && warning) {
         logMessage();
         break;
       }
     }
-    // falls through, trick from 90x, levels inheritance
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'error': {
       if (error) {
         logMessage();
@@ -166,6 +166,19 @@ export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string
 };
 
 export const createLogger = (production: boolean, filterByLevel: LogLevel = 'info'): LoggerFn => {
+  switch (filterByLevel.toLowerCase()) {
+    case 'trace':
+    case 'info':
+    case 'warn':
+    case 'error':
+      break;
+    // not used, but let's allow
+    case 'debug':
+      break;
+    default:
+      throw new Error(`Invalid log level: ${filterByLevel}`);
+  }
+
   if (production) {
     return prodLogger(filterByLevel);
   } else {
