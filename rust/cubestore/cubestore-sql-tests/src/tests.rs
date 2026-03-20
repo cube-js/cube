@@ -10695,14 +10695,21 @@ async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(
         .await?;
     assert_queue_add_columns(&add_response);
 
-    let ack_result = service.exec_query(r#"QUEUE ACK 1 "result:12345""#).await?;
+    let id = match &add_response.get_rows()[0].values()[0] {
+        TableValue::String(s) => s.clone(),
+        other => panic!("Expected string id, got: {:?}", other),
+    };
+
+    let ack_result = service
+        .exec_query(&format!(r#"QUEUE ACK {} "result:12345""#, id))
+        .await?;
     assert_eq!(
         ack_result.get_rows(),
         &vec![Row::new(vec![TableValue::Boolean(true)])]
     );
 
     // QUEUE RESULT by id (v2 read-many semantics) — returns result
-    let result = service.exec_query(r#"QUEUE RESULT 1"#).await?;
+    let result = service.exec_query(&format!("QUEUE RESULT {}", id)).await?;
     assert_eq!(
         result.get_columns(),
         &vec![
@@ -10713,13 +10720,13 @@ async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![
-            TableValue::String("result:6666".to_string()),
+            TableValue::String("result:12345".to_string()),
             TableValue::String("success".to_string())
         ]),]
     );
 
     // second call by id should still return result (read-many, not consume-once)
-    let result = service.exec_query(r#"QUEUE RESULT 1"#).await?;
+    let result = service.exec_query(&format!("QUEUE RESULT {}", id)).await?;
     assert_eq!(result.get_rows().len(), 1);
 
     // by path (v1 consume-once) should also still work and consume the result
@@ -10735,7 +10742,7 @@ async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(
     assert_eq!(result.get_rows().len(), 0);
 
     // but id-based lookup still returns (read-many semantics)
-    let result = service.exec_query(r#"QUEUE RESULT 1"#).await?;
+    let result = service.exec_query(&format!("QUEUE RESULT {}", id)).await?;
     assert_eq!(result.get_rows().len(), 1);
 
     Ok(())
