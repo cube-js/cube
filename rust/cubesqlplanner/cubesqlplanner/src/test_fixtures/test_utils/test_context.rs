@@ -569,6 +569,8 @@ impl TestContext {
             result = result.replace(&placeholder, &format!("'{}'", escaped));
         }
         result
+    }
+
     pub fn build_filter_sql(&self, yaml: &str) -> Result<(String, Vec<String>), CubeError> {
         let props = self.create_query_properties(yaml)?;
 
