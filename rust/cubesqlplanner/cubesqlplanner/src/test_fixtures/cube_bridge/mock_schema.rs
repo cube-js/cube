@@ -171,8 +171,15 @@ impl MockSchema {
     }
 
     pub fn create_base_tools(&self) -> Result<MockBaseTools, CubeError> {
+        self.create_base_tools_with_timezone("UTC".to_string())
+    }
+
+    pub fn create_base_tools_with_timezone(
+        &self,
+        timezone: String,
+    ) -> Result<MockBaseTools, CubeError> {
         let join_graph = Rc::new(self.create_join_graph()?);
-        let driver_tools = Rc::new(MockDriverTools::new());
+        let driver_tools = Rc::new(MockDriverTools::with_timezone(timezone));
 
         // Build cube_members map from schema
         let mut cube_members = HashMap::new();

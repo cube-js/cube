@@ -64,7 +64,7 @@ impl TestContext {
         member_to_alias: Option<std::collections::HashMap<String, String>>,
         export_annotated_sql: bool,
     ) -> Result<Self, CubeError> {
-        let base_tools = schema.create_base_tools()?;
+        let base_tools = schema.create_base_tools_with_timezone(timezone.to_string())?;
         let join_graph = Rc::new(schema.create_join_graph()?);
         let evaluator = schema.clone().create_evaluator();
         let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =

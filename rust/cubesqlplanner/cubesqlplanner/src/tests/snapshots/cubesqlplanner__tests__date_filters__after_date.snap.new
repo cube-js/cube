@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/date_filters.rs
+assertion_line: 131
+expression: result
+snapshot_kind: text
+---
+(empty result)
