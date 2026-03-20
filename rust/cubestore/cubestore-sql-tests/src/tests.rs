@@ -1128,23 +1128,22 @@ async fn in_list_with_union(service: Box<dyn SqlClient>) -> Result<(), CubeError
     Ok(())
 }
 
-async fn numeric_cast_setup(service: &dyn SqlClient) -> &'static str {
-    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+async fn numeric_cast_setup(service: &dyn SqlClient) -> Result<&'static str, CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
 
     service
         .exec_query("CREATE TABLE foo.managers (id text, department_id int)")
-        .await
-        .unwrap();
+        .await?;
 
     service.exec_query(
             "INSERT INTO foo.managers (id, department_id) VALUES ('a', 1), ('b', 3), ('c', 3), ('d', 5)"
-        ).await.unwrap();
+        ).await?;
 
-    ("SELECT count(*) from foo.managers WHERE department_id in ('3', '5')") as _
+    Ok(("SELECT count(*) from foo.managers WHERE department_id in ('3', '5')") as _)
 }
 
 async fn numeric_cast(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    let query = numeric_cast_setup(service.as_ref()).await;
+    let query = numeric_cast_setup(service.as_ref()).await?;
 
     let result = service.exec_query(query).await?;
 
@@ -1153,7 +1152,7 @@ async fn numeric_cast(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
 }
 
 async fn planning_numeric_cast(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    let query = numeric_cast_setup(service.as_ref()).await;
+    let query = numeric_cast_setup(service.as_ref()).await?;
 
     // Check that we're casting '3' to int and not department_id to Utf8, with our Cube-specific type_coercion changes in DF.
     let plans = service.plan_query(query).await?;
@@ -6603,78 +6602,78 @@ async fn float_order(s: Box<dyn SqlClient>) -> Result<(), CubeError> {
 
 async fn date_add(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     let check_fun = |name, t, i, expected| {
-        let expected = timestamp_from_string(expected).unwrap();
         let service = &service;
         async move {
+            let expected = timestamp_from_string(expected)?;
             let actual = service
                 .exec_query(&format!(
                     "SELECT {}(CAST('{}' as TIMESTAMP), INTERVAL '{}')",
                     name, t, i
                 ))
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(to_rows(&actual), rows(&[expected]));
+            Ok::<_, CubeError>(())
         }
     };
     let check_adds_to = |t, i, expected| check_fun("DATE_ADD", t, i, expected);
     let check_subs_to = |t, i, expected| check_fun("DATE_SUB", t, i, expected);
 
-    check_adds_to("2021-01-01T00:00:00Z", "1 second", "2021-01-01T00:00:01Z").await;
-    check_adds_to("2021-01-01T00:00:00Z", "1 minute", "2021-01-01T00:01:00Z").await;
-    check_adds_to("2021-01-01T00:00:00Z", "1 hour", "2021-01-01T01:00:00Z").await;
-    check_adds_to("2021-01-01T00:00:00Z", "1 day", "2021-01-02T00:00:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 second", "2021-01-01T00:00:01Z").await?;
+    check_adds_to("2021-01-01T00:00:00Z", "1 minute", "2021-01-01T00:01:00Z").await?;
+    check_adds_to("2021-01-01T00:00:00Z", "1 hour", "2021-01-01T01:00:00Z").await?;
+    check_adds_to("2021-01-01T00:00:00Z", "1 day", "2021-01-02T00:00:00Z").await?;
 
     check_adds_to(
         "2021-01-01T00:00:00Z",
         "1 day 1 hour 1 minute 1 second",
         "2021-01-02T01:01:01Z",
     )
-    .await;
+    .await?;
     check_subs_to(
         "2021-01-02T01:01:01Z",
         "1 day 1 hour 1 minute 1 second",
         "2021-01-01T00:00:00Z",
     )
-    .await;
+    .await?;
 
-    check_adds_to("2021-01-01T00:00:00Z", "1 month", "2021-02-01T00:00:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 month", "2021-02-01T00:00:00Z").await?;
 
-    check_adds_to("2021-01-01T00:00:00Z", "1 year", "2022-01-01T00:00:00Z").await;
-    check_subs_to("2022-01-01T00:00:00Z", "1 year", "2021-01-01T00:00:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 year", "2022-01-01T00:00:00Z").await?;
+    check_subs_to("2022-01-01T00:00:00Z", "1 year", "2021-01-01T00:00:00Z").await?;
 
-    check_adds_to("2021-01-01T00:00:00Z", "13 month", "2022-02-01T00:00:00Z").await;
-    check_subs_to("2022-02-01T00:00:00Z", "13 month", "2021-01-01T00:00:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "13 month", "2022-02-01T00:00:00Z").await?;
+    check_subs_to("2022-02-01T00:00:00Z", "13 month", "2021-01-01T00:00:00Z").await?;
 
-    check_adds_to("2021-01-01T23:59:00Z", "1 minute", "2021-01-02T00:00:00Z").await;
-    check_subs_to("2021-01-02T00:00:00Z", "1 minute", "2021-01-01T23:59:00Z").await;
+    check_adds_to("2021-01-01T23:59:00Z", "1 minute", "2021-01-02T00:00:00Z").await?;
+    check_subs_to("2021-01-02T00:00:00Z", "1 minute", "2021-01-01T23:59:00Z").await?;
 
-    check_adds_to("2021-12-01T00:00:00Z", "1 month", "2022-01-01T00:00:00Z").await;
-    check_subs_to("2022-01-01T00:00:00Z", "1 month", "2021-12-01T00:00:00Z").await;
+    check_adds_to("2021-12-01T00:00:00Z", "1 month", "2022-01-01T00:00:00Z").await?;
+    check_subs_to("2022-01-01T00:00:00Z", "1 month", "2021-12-01T00:00:00Z").await?;
 
-    check_adds_to("2021-12-31T00:00:00Z", "1 day", "2022-01-01T00:00:00Z").await;
-    check_subs_to("2022-01-01T00:00:00Z", "1 day", "2021-12-31T00:00:00Z").await;
+    check_adds_to("2021-12-31T00:00:00Z", "1 day", "2022-01-01T00:00:00Z").await?;
+    check_subs_to("2022-01-01T00:00:00Z", "1 day", "2021-12-31T00:00:00Z").await?;
 
     // Feb 29 on leap and non-leap years.
-    check_adds_to("2020-02-29T00:00:00Z", "1 day", "2020-03-01T00:00:00Z").await;
-    check_subs_to("2020-03-01T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+    check_adds_to("2020-02-29T00:00:00Z", "1 day", "2020-03-01T00:00:00Z").await?;
+    check_subs_to("2020-03-01T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await?;
 
-    check_adds_to("2020-02-28T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
-    check_subs_to("2020-02-29T00:00:00Z", "1 day", "2020-02-28T00:00:00Z").await;
+    check_adds_to("2020-02-28T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await?;
+    check_subs_to("2020-02-29T00:00:00Z", "1 day", "2020-02-28T00:00:00Z").await?;
 
-    check_adds_to("2021-02-28T00:00:00Z", "1 day", "2021-03-01T00:00:00Z").await;
-    check_subs_to("2021-03-01T00:00:00Z", "1 day", "2021-02-28T00:00:00Z").await;
+    check_adds_to("2021-02-28T00:00:00Z", "1 day", "2021-03-01T00:00:00Z").await?;
+    check_subs_to("2021-03-01T00:00:00Z", "1 day", "2021-02-28T00:00:00Z").await?;
 
-    check_adds_to("2020-02-29T00:00:00Z", "1 year", "2021-02-28T00:00:00Z").await;
-    check_subs_to("2020-02-29T00:00:00Z", "1 year", "2019-02-28T00:00:00Z").await;
+    check_adds_to("2020-02-29T00:00:00Z", "1 year", "2021-02-28T00:00:00Z").await?;
+    check_subs_to("2020-02-29T00:00:00Z", "1 year", "2019-02-28T00:00:00Z").await?;
 
-    check_adds_to("2020-01-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
-    check_subs_to("2020-03-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_adds_to("2020-01-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await?;
+    check_subs_to("2020-03-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await?;
 
-    check_adds_to("2020-01-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
-    check_subs_to("2020-03-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_adds_to("2020-01-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await?;
+    check_subs_to("2020-03-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await?;
 
-    check_adds_to("2021-01-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
-    check_subs_to("2021-03-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
+    check_adds_to("2021-01-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await?;
+    check_subs_to("2021-03-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await?;
 
     // Nulls.
     let r = service
@@ -6761,17 +6760,17 @@ async fn date_add(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
 
 async fn date_bin(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     let check_fn = |interval, source, origin, expected| {
-        let expected = timestamp_from_string(expected).unwrap();
         let service = &service;
         async move {
+            let expected = timestamp_from_string(expected)?;
             let actual = service
                 .exec_query(&format!(
                     "SELECT DATE_BIN(INTERVAL '{}', CAST('{}' as TIMESTAMP), CAST('{}' as TIMESTAMP))",
                     interval, source, origin
                 ))
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(to_rows(&actual), rows(&[expected]));
+            Ok::<_, CubeError>(())
         }
     };
 
@@ -6782,91 +6781,91 @@ async fn date_bin(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         "2024-01-01T01:00:00Z",
         "2024-01-01T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "1 month",
         "2023-11-21T01:00:00Z",
         "2024-01-01T01:00:00Z",
         "2023-11-01T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "1 month",
         "2024-02-21T01:00:00Z",
         "2024-01-01T01:00:00Z",
         "2024-02-01T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "2 month",
         "2024-04-25T01:00:00Z",
         "2024-01-20T01:00:00Z",
         "2024-03-20T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "2 month",
         "2024-04-15T01:00:00Z",
         "2024-01-20T01:00:00Z",
         "2024-03-20T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "2 month",
         "2024-05-25T01:00:00Z",
         "2024-01-20T01:00:00Z",
         "2024-05-20T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "2 month",
         "2024-05-15T01:00:00Z",
         "2024-01-20T01:00:00Z",
         "2024-03-20T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "2 month",
         "2023-11-25T01:00:00Z",
         "2024-01-20T01:00:00Z",
         "2023-11-20T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "2 month",
         "2023-11-15T01:00:00Z",
         "2024-01-20T01:00:00Z",
         "2023-09-20T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "10 day",
         "2024-01-25T01:00:00Z",
         "2024-01-01T01:00:00Z",
         "2024-01-21T01:00:00Z",
     )
-    .await;
+    .await?;
     check_fn(
         "10 day 2 hour 5 minute 10 second",
         "2024-01-15T01:00:00Z",
         "2024-01-01T01:00:00Z",
         "2024-01-11T03:05:10.000Z",
     )
-    .await;
+    .await?;
     check_fn(
         "10 day 2 hour 5 minute 10 second",
         "2024-01-30T01:00:00Z",
         "2024-01-01T01:00:00Z",
         "2024-01-21T05:10:20.000Z",
     )
-    .await;
+    .await?;
     check_fn(
         "10 day 2 hour 5 minute 10 second",
         "2023-12-30T01:00:00Z",
         "2024-01-01T01:00:00Z",
         "2023-12-21T22:54:50.000Z",
     )
-    .await;
+    .await?;
 
     // Nulls
     let r = service
@@ -7308,7 +7307,7 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         .exec_query("SELECT i / z FROM s.t")
         .await
         .err()
-        .unwrap();
+        .expect("expected error");
     assert_eq!(
         r.elide_backtrace(),
         CubeError::internal(
@@ -7324,22 +7323,20 @@ async fn panic_worker(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
-async fn filter_multiple_in_for_decimal_setup(service: &dyn SqlClient) -> &'static str {
-    service.exec_query("CREATE SCHEMA s").await.unwrap();
-    service
-        .exec_query("CREATE TABLE s.t(i decimal)")
-        .await
-        .unwrap();
+async fn filter_multiple_in_for_decimal_setup(
+    service: &dyn SqlClient,
+) -> Result<&'static str, CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service.exec_query("CREATE TABLE s.t(i decimal)").await?;
     service
         .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
-        .await
-        .unwrap();
+        .await?;
 
-    ("SELECT count(*) FROM s.t WHERE i in ('2', '3')") as _
+    Ok(("SELECT count(*) FROM s.t WHERE i in ('2', '3')") as _)
 }
 
 async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    let query = filter_multiple_in_for_decimal_setup(service.as_ref()).await;
+    let query = filter_multiple_in_for_decimal_setup(service.as_ref()).await?;
 
     let r = service.exec_query(query).await?;
 
@@ -7350,7 +7347,7 @@ async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) -> Result<(
 async fn planning_filter_multiple_in_for_decimal(
     service: Box<dyn SqlClient>,
 ) -> Result<(), CubeError> {
-    let query = filter_multiple_in_for_decimal_setup(service.as_ref()).await;
+    let query = filter_multiple_in_for_decimal_setup(service.as_ref()).await?;
 
     // Verify we're casting '2' and '3' to decimal type and not casting i to Utf8, with Cube-specific DF comparison coercion changes.
     let plans = service.plan_query(query).await?;
@@ -10849,8 +10846,8 @@ async fn queue_heartbeat_by_path(service: Box<dyn SqlClient>) -> Result<(), Cube
         .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
         .await?;
 
-    let row = res.get_rows().first().unwrap();
-    match row.values().first().unwrap() {
+    let row = res.get_rows().first().expect("empty result");
+    match row.values().first().expect("empty row") {
         TableValue::Timestamp(_) => {}
         other => panic!("heartbeat must be a timestamp type, actual: {:?}", other),
     }
@@ -10873,8 +10870,8 @@ async fn queue_heartbeat_by_id(service: Box<dyn SqlClient>) -> Result<(), CubeEr
         .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
         .await?;
 
-    let row = res.get_rows().first().unwrap();
-    match row.values().first().unwrap() {
+    let row = res.get_rows().first().expect("empty result");
+    match row.values().first().expect("empty row") {
         TableValue::Timestamp(_) => {}
         other => panic!("heartbeat must be a timestamp type, actual: {:?}", other),
     }
