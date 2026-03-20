@@ -68,13 +68,15 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
     return;
   }
 
+  // eslint-disable-next-line default-case
   switch (filterByLevel.toLowerCase()) {
     case 'trace': {
       if (!error && !warning) {
         logDetails(true);
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance
     case 'info': {
       if (!error && !warning && [
         'Executing SQL',
@@ -86,23 +88,23 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
         'Streaming successfully completed',
       ].includes(type)) {
         logDetails();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance
     case 'warn': {
       if (!error && warning) {
         logWarning();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance
     case 'error': {
       if (error) {
         logError();
+        break;
       }
-      break;
     }
-    default:
-      throw new Error(`Unknown log level: ${filterByLevel}`);
   }
 };
 
@@ -130,34 +132,36 @@ export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string
     }));
   };
 
+  // eslint-disable-next-line default-case
   switch (filterByLevel.toLowerCase()) {
     case 'trace': {
       if (!error && !warning) {
         logMessage();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance
     case 'info':
       if ([
         'REST API Request',
       ].includes(message)) {
         logMessage();
+        break;
       }
-      break;
+    // falls through, trick from 90x, levels inheritance
     case 'warn': {
       if (!error && warning) {
         logMessage();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance
     case 'error': {
       if (error) {
         logMessage();
+        break;
       }
-      break;
     }
-    default:
-      throw new Error(`Unknown log level: ${filterByLevel}`);
   }
 };
 
