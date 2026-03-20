@@ -1,18 +1,18 @@
-use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::ContainerAsync;
 use testcontainers_modules::postgres::Postgres;
-use tokio::sync::{Mutex, OnceCell};
+use tokio::sync::OnceCell;
 use tokio_postgres::{Client, NoTls};
 
 struct PgInstance {
     _container: ContainerAsync<Postgres>,
     host: String,
     port: u16,
-    seeded: Mutex<HashMap<String, ()>>,
 }
 
 static PG_INSTANCE: OnceCell<PgInstance> = OnceCell::const_new();
+static DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 async fn init_pg() -> PgInstance {
     let container = Postgres::default()
@@ -34,14 +34,7 @@ async fn init_pg() -> PgInstance {
         _container: container,
         host,
         port,
-        seeded: Mutex::new(HashMap::new()),
     }
-}
-
-fn db_name_from_seed(seed_file: &str) -> String {
-    seed_file
-        .trim_end_matches(".sql")
-        .replace(|c: char| !c.is_ascii_alphanumeric(), "_")
 }
 
 async fn connect_to(db_name: &str) -> Client {
@@ -64,38 +57,29 @@ async fn connect_to(db_name: &str) -> Client {
 }
 
 pub async fn connect_and_seed(seed_file: &str) -> Client {
-    let pg = PG_INSTANCE.get_or_init(|| init_pg()).await;
-    let db_name = db_name_from_seed(seed_file);
+    let _ = PG_INSTANCE.get_or_init(|| init_pg()).await;
+    let id = DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let db_name = format!("test_{}", id);
 
-    let mut seeded = pg.seeded.lock().await;
-    if !seeded.contains_key(seed_file) {
-        let admin = connect_to("postgres").await;
-        admin
-            .execute(&format!("DROP DATABASE IF EXISTS \"{db_name}\""), &[])
-            .await
-            .unwrap_or_else(|e| panic!("Failed to drop database {}: {}", db_name, e));
-        admin
-            .execute(&format!("CREATE DATABASE \"{db_name}\""), &[])
-            .await
-            .unwrap_or_else(|e| panic!("Failed to create database {}: {}", db_name, e));
-        drop(admin);
+    let admin = connect_to("postgres").await;
+    admin
+        .execute(&format!("CREATE DATABASE \"{db_name}\""), &[])
+        .await
+        .unwrap_or_else(|e| panic!("Failed to create database {}: {}", db_name, e));
+    drop(admin);
 
-        let client = connect_to(&db_name).await;
-        let seed_path = format!(
-            "{}/src/test_fixtures/schemas/yaml_files/seeds/{}",
-            env!("CARGO_MANIFEST_DIR"),
-            seed_file
-        );
-        let sql = std::fs::read_to_string(&seed_path)
-            .unwrap_or_else(|e| panic!("Failed to read seed file {}: {}", seed_path, e));
-        client
-            .batch_execute(&sql)
-            .await
-            .unwrap_or_else(|e| panic!("Failed to execute seed SQL from {}: {}", seed_file, e));
+    let client = connect_to(&db_name).await;
+    let seed_path = format!(
+        "{}/src/test_fixtures/schemas/yaml_files/seeds/{}",
+        env!("CARGO_MANIFEST_DIR"),
+        seed_file
+    );
+    let sql = std::fs::read_to_string(&seed_path)
+        .unwrap_or_else(|e| panic!("Failed to read seed file {}: {}", seed_path, e));
+    client
+        .batch_execute(&sql)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to execute seed SQL from {}: {}", seed_file, e));
 
-        seeded.insert(seed_file.to_string(), ());
-    }
-    drop(seeded);
-
-    connect_to(&db_name).await
+    client
 }
