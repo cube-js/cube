@@ -57,7 +57,6 @@ async fn connect_to(db_name: &str) -> Client {
 }
 
 pub async fn connect_and_seed(seed_file: &str) -> Client {
-    let _ = PG_INSTANCE.get_or_init(|| init_pg()).await;
     let id = DB_COUNTER.fetch_add(1, Ordering::Relaxed);
     let db_name = format!("test_{}", id);
 
