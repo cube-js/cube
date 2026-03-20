@@ -4,6 +4,6 @@ expression: result
 ---
 customers__city | orders__count | orders__unique_customers | returns__count | returns__unique_customers
 ----------------+---------------+--------------------------+----------------+--------------------------
-Boston          | 2             | 1                        | 2              | 1                        
+Boston          | 3             | 1                        | 2              | 1                        
 Chicago         | 0             | 0                        | 2              | 1                        
-New York        | 4             | 2                        | 1              | 1
+New York        | 5             | 2                        | 1              | 1

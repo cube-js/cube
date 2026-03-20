@@ -4,5 +4,5 @@ expression: result
 ---
 customers__name | orders__count | orders__total_amount | returns__count | returns__total_refund
 ----------------+---------------+----------------------+----------------+----------------------
-Alice           | 3             | 350.00               | 1              | 100.00               
+Alice           | 4             | 425.00               | 1              | 100.00               
 Diana           | 1             | 400.00               | 0              | NULL

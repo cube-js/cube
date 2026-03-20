@@ -4,7 +4,7 @@ expression: result
 ---
 customers__name | orders__count | returns__count
 ----------------+---------------+---------------
-Alice           | 3             | 1             
-Bob             | 2             | 2             
+Alice           | 4             | 1             
+Bob             | 3             | 2             
 Charlie         | 0             | 2             
 Diana           | 1             | 0

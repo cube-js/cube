@@ -4,4 +4,4 @@ expression: result
 ---
 orders__count | orders__total_amount | returns__count | returns__total_refund
 --------------+----------------------+----------------+----------------------
-6             | 1150.00              | 5              | 330.00
+8             | 1375.00              | 5              | 330.00

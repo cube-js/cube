@@ -4,7 +4,7 @@ expression: result
 ---
 customers__name | orders__total_amount | returns__total_refund
 ----------------+----------------------+----------------------
-Alice           | 350.00               | 100.00               
-Bob             | 400.00               | 130.00               
+Alice           | 425.00               | 100.00               
+Bob             | 550.00               | 130.00               
 Charlie         | NULL                 | 100.00               
 Diana           | 400.00               | NULL

@@ -44,7 +44,9 @@ INSERT INTO orders (id, customer_id, status, amount, created_at) VALUES
     (3, 1, 'pending',    50.00, '2025-03-03 09:00:00'),
     (4, 2, 'completed', 300.00, '2025-03-04 14:00:00'),
     (5, 2, 'pending',   100.00, '2025-03-05 10:00:00'),
-    (6, 4, 'completed', 400.00, '2025-03-06 08:00:00');
+    (6, 4, 'completed', 400.00, '2025-03-06 08:00:00'),
+    (7, 1, 'pending',    75.00, '2025-03-07 11:00:00'),
+    (8, 2, 'completed', 150.00, '2025-03-08 09:00:00');
 
 INSERT INTO returns (id, customer_id, reason, refund_amount, created_at) VALUES
     (1, 1, 'defective',  100.00, '2025-03-05 10:00:00'),

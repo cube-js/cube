@@ -191,3 +191,45 @@ async fn test_multi_fact_three_fact_tables() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_hub_measure_by_fact_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - customers.count
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_hub_and_fact_measures() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - customers.count
+          - orders.count
+          - orders.total_amount
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

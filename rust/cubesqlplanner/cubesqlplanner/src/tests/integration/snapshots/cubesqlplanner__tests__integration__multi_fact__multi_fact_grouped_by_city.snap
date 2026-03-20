@@ -4,6 +4,6 @@ expression: result
 ---
 customers__city | orders__count | returns__count
 ----------------+---------------+---------------
-Boston          | 2             | 2             
+Boston          | 3             | 2             
 Chicago         | 0             | 2             
-New York        | 4             | 1
+New York        | 5             | 1
