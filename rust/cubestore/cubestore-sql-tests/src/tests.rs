@@ -272,6 +272,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("queue_ack_then_result_v1", queue_ack_then_result_v1),
         t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t(
+            "queue_ack_then_result_v2_by_id",
+            queue_ack_then_result_v2_by_id,
+        ),
+        t(
             "queue_ack_then_result_v2_with_external_id",
             queue_ack_then_result_v2_with_external_id,
         ),
@@ -344,6 +348,7 @@ lazy_static::lazy_static! {
         "dimension_only_queries_for_stream_table",
         "limit_pushdown_unique_key",
         "queue_ack_then_result_v2",
+        "queue_ack_then_result_v2_by_id",
         "queue_ack_then_result_v2_with_external_id",
         "queue_custom_orphaned",
         "queue_result_by_external_id",
@@ -10681,6 +10686,58 @@ async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) -> Result<(), Cub
         .await?;
     assert_queue_result_blocking_columns(&result);
     assert_eq!(result.get_rows().len(), 1);
+    Ok(())
+}
+
+async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:12345" "payload1";"#)
+        .await?;
+    assert_queue_add_columns(&add_response);
+
+    let ack_result = service.exec_query(r#"QUEUE ACK 1 "result:12345""#).await?;
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // QUEUE RESULT by id (v2 read-many semantics) — returns result
+    let result = service.exec_query(r#"QUEUE RESULT 1"#).await?;
+    assert_eq!(
+        result.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:6666".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
+
+    // second call by id should still return result (read-many, not consume-once)
+    let result = service.exec_query(r#"QUEUE RESULT 1"#).await?;
+    assert_eq!(result.get_rows().len(), 1);
+
+    // by path (v1 consume-once) should also still work and consume the result
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:12345""#)
+        .await?;
+    assert_eq!(result.get_rows().len(), 1);
+
+    // after path-based consume, path lookup returns nothing
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:12345""#)
+        .await?;
+    assert_eq!(result.get_rows().len(), 0);
+
+    // but id-based lookup still returns (read-many semantics)
+    let result = service.exec_query(r#"QUEUE RESULT 1"#).await?;
+    assert_eq!(result.get_rows().len(), 1);
+
     Ok(())
 }
 
