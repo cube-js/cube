@@ -73,16 +73,18 @@ impl<'a> QueueResultRocksTable<'a> {
     }
 
     pub fn get_row_by_key(&self, key: QueueKey) -> Result<Option<IdRow<QueueResult>>, CubeError> {
-        match key {
+        let row = match key {
             QueueKey::ByPath(path) => {
                 let index_key = QueueResultIndexKey::ByPath(path);
-                self.get_single_opt_row_by_index_reverse(&index_key, &QueueResultRocksIndex::ByPath)
+                self.get_single_opt_row_by_index_reverse(
+                    &index_key,
+                    &QueueResultRocksIndex::ByPath,
+                )?
             }
-            QueueKey::ById(id) => match self.get_row(id)? {
-                Some(row) if row.get_row().get_expire() < &Utc::now() => Ok(None),
-                other => Ok(other),
-            },
-        }
+            QueueKey::ById(id) => self.get_row(id)?,
+        };
+
+        Ok(row.filter(|r| r.get_row().get_expire() >= &Utc::now()))
     }
 
     pub fn get_row_by_external_id(

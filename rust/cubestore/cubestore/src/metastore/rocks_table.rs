@@ -813,17 +813,16 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             )));
         }
 
-        let id = if let Some(id) = if reverse {
+        let to_fetch = if reverse {
             row_ids.last()
         } else {
             row_ids.first()
-        } {
-            id.clone()
-        } else {
+        };
+        let Some(id) = to_fetch else {
             return Ok(None);
         };
 
-        if let Some(row) = self.get_row(id)? {
+        if let Some(row) = self.get_row(*id)? {
             Ok(Some(row))
         } else {
             let index = self.get_index_by_id(BaseRocksSecondaryIndex::get_id(secondary_index));
