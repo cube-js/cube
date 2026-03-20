@@ -9,8 +9,8 @@ fn build(filter_yaml: &str) -> (String, Vec<String>) {
 
 fn build_with_visible_tz(filter_yaml: &str) -> (String, Vec<String>) {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
-    let driver =
-        MockDriverTools::with_timezone("America/Los_Angeles".to_string()).with_visible_in_db_time_zone();
+    let driver = MockDriverTools::with_timezone("America/Los_Angeles".to_string())
+        .with_visible_in_db_time_zone();
     let base_tools = schema.create_base_tools_with_driver(driver).unwrap();
     let ctx = TestContext::new_with_base_tools(schema, base_tools).unwrap();
 
@@ -21,16 +21,14 @@ fn build_with_visible_tz(filter_yaml: &str) -> (String, Vec<String>) {
 
 #[test]
 fn test_in_date_range_from_partition_range() {
-    let result = build(
-        indoc! {r#"
+    let result = build(indoc! {r#"
             filters:
               - dimension: visitors.created_at
                 operator: inDateRange
                 values:
                   - "__FROM_PARTITION_RANGE"
                   - "2024-12-31"
-        "#},
-    );
+        "#});
     // __FROM_PARTITION_RANGE skips formatting and tz conversion but still gets allocated + cast
     assert_filter(
         &result,
@@ -41,16 +39,14 @@ fn test_in_date_range_from_partition_range() {
 
 #[test]
 fn test_in_date_range_to_partition_range() {
-    let result = build(
-        indoc! {r#"
+    let result = build(indoc! {r#"
             filters:
               - dimension: visitors.created_at
                 operator: inDateRange
                 values:
                   - "2024-01-01"
                   - "__TO_PARTITION_RANGE"
-        "#},
-    );
+        "#});
     assert_filter(
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
@@ -60,16 +56,14 @@ fn test_in_date_range_to_partition_range() {
 
 #[test]
 fn test_in_date_range_both_partition_range() {
-    let result = build(
-        indoc! {r#"
+    let result = build(indoc! {r#"
             filters:
               - dimension: visitors.created_at
                 operator: inDateRange
                 values:
                   - "__FROM_PARTITION_RANGE"
                   - "__TO_PARTITION_RANGE"
-        "#},
-    );
+        "#});
     assert_filter(
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
@@ -79,16 +73,14 @@ fn test_in_date_range_both_partition_range() {
 
 #[test]
 fn test_not_in_date_range_partition_range() {
-    let result = build(
-        indoc! {r#"
+    let result = build(indoc! {r#"
             filters:
               - dimension: visitors.created_at
                 operator: notInDateRange
                 values:
                   - "__FROM_PARTITION_RANGE"
                   - "__TO_PARTITION_RANGE"
-        "#},
-    );
+        "#});
     assert_filter(
         &result,
         r#"("visitors".created_at < $_0_$::timestamptz OR "visitors".created_at > $_1_$::timestamptz)"#,
@@ -98,15 +90,13 @@ fn test_not_in_date_range_partition_range() {
 
 #[test]
 fn test_before_date_partition_range() {
-    let result = build(
-        indoc! {r#"
+    let result = build(indoc! {r#"
             filters:
               - dimension: visitors.created_at
                 operator: beforeDate
                 values:
                   - "__TO_PARTITION_RANGE"
-        "#},
-    );
+        "#});
     assert_filter(
         &result,
         r#"("visitors".created_at < $_0_$::timestamptz)"#,
@@ -116,15 +106,13 @@ fn test_before_date_partition_range() {
 
 #[test]
 fn test_after_or_on_date_partition_range() {
-    let result = build(
-        indoc! {r#"
+    let result = build(indoc! {r#"
             filters:
               - dimension: visitors.created_at
                 operator: afterOrOnDate
                 values:
                   - "__FROM_PARTITION_RANGE"
-        "#},
-    );
+        "#});
     assert_filter(
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz)"#,

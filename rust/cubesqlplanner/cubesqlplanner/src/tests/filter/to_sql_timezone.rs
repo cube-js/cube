@@ -28,10 +28,7 @@ fn test_in_date_range_applies_in_db_time_zone() {
     assert_filter(
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
-        &[
-            "2024-01-01T08:00:00.000",
-            "2025-01-01T07:59:59.999",
-        ],
+        &["2024-01-01T08:00:00.000", "2025-01-01T07:59:59.999"],
     );
 }
 

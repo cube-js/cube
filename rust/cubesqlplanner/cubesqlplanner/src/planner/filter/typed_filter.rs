@@ -169,10 +169,7 @@ impl TypedFilter {
                     _ => self
                         .values
                         .iter()
-                        .filter_map(|v| {
-                            v.as_ref()
-                                .map(|v| self.query_tools.allocate_param(v))
-                        })
+                        .filter_map(|v| v.as_ref().map(|v| self.query_tools.allocate_param(v)))
                         .collect::<Vec<_>>(),
                 };
                 callback.call(&args)
@@ -252,9 +249,7 @@ impl TypedFilterBuilder {
         values
             .iter()
             .find_map(|v| v.as_ref().cloned())
-            .ok_or_else(|| {
-                CubeError::user("Expected one parameter but nothing found".to_string())
-            })
+            .ok_or_else(|| CubeError::user("Expected one parameter but nothing found".to_string()))
     }
 
     pub fn build(self) -> Result<TypedFilter, CubeError> {
@@ -313,9 +308,7 @@ impl TypedFilterBuilder {
                     .get(1)
                     .and_then(|v| v.as_ref().cloned())
                     .ok_or_else(|| {
-                        CubeError::user(
-                            "2 arguments expected for date range".to_string(),
-                        )
+                        CubeError::user("2 arguments expected for date range".to_string())
                     })?;
                 let kind = if matches!(operator, FilterOperator::InDateRange) {
                     DateRangeKind::InRange

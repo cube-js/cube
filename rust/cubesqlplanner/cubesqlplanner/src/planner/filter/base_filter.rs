@@ -85,7 +85,12 @@ impl BaseFilter {
     }
 
     pub fn time_dimension_symbol(&self) -> Option<Rc<MemberSymbol>> {
-        if self.typed_filter.member_evaluator().as_time_dimension().is_ok() {
+        if self
+            .typed_filter
+            .member_evaluator()
+            .as_time_dimension()
+            .is_ok()
+        {
             Some(self.typed_filter.member_evaluator().clone())
         } else {
             None
@@ -138,8 +143,7 @@ impl BaseFilter {
         let filters_context = context.filters_context();
         if !filters_context.filter_params_columns.is_empty() {
             let symbol_to_match =
-                resolve_base_symbol(self.typed_filter.member_evaluator())
-                    .resolve_reference_chain();
+                resolve_base_symbol(self.typed_filter.member_evaluator()).resolve_reference_chain();
             if let Some(filter_params_column) = filters_context
                 .filter_params_columns
                 .get(&symbol_to_match.full_name())

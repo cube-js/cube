@@ -108,10 +108,7 @@ impl<'a> FilterSqlContext<'a> {
             "min({})",
             self.plan_templates.quote_identifier("date_from")?
         );
-        let to_expr = format!(
-            "max({})",
-            self.plan_templates.quote_identifier("date_to")?
-        );
+        let to_expr = format!("max({})", self.plan_templates.quote_identifier("date_to")?);
         let from_expr = self.plan_templates.series_bounds_cast(&from_expr)?;
         let to_expr = self.plan_templates.series_bounds_cast(&to_expr)?;
         let alias = "value".to_string();
@@ -170,8 +167,7 @@ impl<'a> FilterSqlContext<'a> {
                     ))
                 } else {
                     Ok(Some(
-                        self.plan_templates
-                            .add_interval(date, interval.clone())?,
+                        self.plan_templates.add_interval(date, interval.clone())?,
                     ))
                 }
             }

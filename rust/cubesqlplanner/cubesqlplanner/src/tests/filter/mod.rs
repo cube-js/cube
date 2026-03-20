@@ -15,11 +15,7 @@ pub fn build_filter(schema_file: &str, filter_yaml: &str) -> (String, Vec<String
         .expect("Should generate filter SQL")
 }
 
-pub fn assert_filter(
-    result: &(String, Vec<String>),
-    expected_sql: &str,
-    expected_params: &[&str],
-) {
+pub fn assert_filter(result: &(String, Vec<String>), expected_sql: &str, expected_params: &[&str]) {
     assert_eq!(result.0, expected_sql, "SQL mismatch");
     let params: Vec<&str> = result.1.iter().map(|s| s.as_str()).collect();
     assert_eq!(
