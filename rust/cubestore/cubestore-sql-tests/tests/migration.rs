@@ -60,7 +60,9 @@ fn main() {
         r.block_on(Config::run_migration_test(
             &test_name,
             |services| async move {
-                test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service))).await;
+                test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service)))
+                    .await
+                    .unwrap();
             },
         ));
     });
