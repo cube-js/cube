@@ -369,48 +369,66 @@ fn test_multi_level_calculated_measure_no_match() {
     assert!(pre_aggrs.is_empty());
 }
 
-#[test]
-fn test_multi_level_calculated_measure_full_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_level_calculated_measure_full_match() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["calculated_measure_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.multi_level_measure
+        dimensions:
+          - orders.status
+          - orders.city
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.multi_level_measure
-            dimensions:
-              - orders.status
-              - orders.city
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "calculated_measure_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("multi_level_calculated_measure_full_match_pg_result", result);
+    }
 }
 
-#[test]
-fn test_multi_level_mixed_measure_full_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_level_mixed_measure_full_match() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["mixed_measure_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.multi_level_measure
+        dimensions:
+          - orders.status
+          - orders.city
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.multi_level_measure
-            dimensions:
-              - orders.status
-              - orders.city
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "mixed_measure_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("multi_level_mixed_measure_full_match_pg_result", result);
+    }
 }
 
 #[test]
@@ -461,77 +479,104 @@ async fn test_base_and_calculated_measure_full_match() {
     }
 }
 
-#[test]
-fn test_base_and_calculated_measure_parital_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_base_and_calculated_measure_parital_match() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["base_and_calculated_measure_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.amount_per_count
+        dimensions:
+          - orders.status
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.amount_per_count
-            dimensions:
-              - orders.status
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("base_and_calculated_measure_parital_match_pg_result", result);
+    }
 }
 
 // --- Segment matching tests ---
 
-#[test]
-fn test_segment_full_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_full_match() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        segments:
+          - orders.high_priority
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.count
-            dimensions:
-              - orders.status
-            segments:
-              - orders.high_priority
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: day
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("segment_full_match_pg_result", result);
+    }
 }
 
-#[test]
-fn test_segment_partial_match_unused_segment() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_partial_match_unused_segment() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.count
-            dimensions:
-              - orders.status
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: day
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("segment_partial_match_unused_segment_pg_result", result);
+    }
 }
 
 #[test]
@@ -557,52 +602,70 @@ fn test_segment_no_match_missing_in_pre_agg() {
 
 // --- Custom granularity pre-aggregation tests ---
 
-#[test]
-fn test_custom_granularity_full_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_custom_granularity_full_match() {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: half_year
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.count
-            dimensions:
-              - orders.status
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: half_year
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("custom_granularity_full_match_pg_result", result);
+    }
 }
 
-#[test]
-fn test_standard_pre_agg_coarser_custom_query() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_standard_pre_agg_coarser_custom_query() {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["daily_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: half_year
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.count
-            dimensions:
-              - orders.status
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: half_year
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("standard_pre_agg_coarser_custom_query_pg_result", result);
+    }
 }
 
 #[test]
@@ -647,28 +710,37 @@ fn test_custom_pre_agg_finer_standard_query_no_match() {
     assert!(pre_aggrs.is_empty());
 }
 
-#[test]
-fn test_custom_granularity_non_additive_full_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_custom_granularity_non_additive_full_match() {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.avg_amount
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: half_year
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.avg_amount
-            dimensions:
-              - orders.status
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: half_year
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("custom_granularity_non_additive_full_match_pg_result", result);
+    }
 }
 
 #[test]
@@ -692,52 +764,70 @@ fn test_custom_granularity_non_additive_coarser_no_match() {
     assert!(pre_aggrs.is_empty());
 }
 
-#[test]
-fn test_custom_granularity_non_strict_self_match() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_custom_granularity_non_strict_self_match() {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_non_strict"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: half_year
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.count
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: half_year
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_non_strict");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("custom_granularity_non_strict_self_match_pg_result", result);
+    }
 }
 
-#[test]
-fn test_segment_with_coarser_granularity() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_with_coarser_granularity() {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
     let ctx = TestContext::new(schema).unwrap();
 
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        segments:
+          - orders.high_priority
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+    "};
+
     let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
-            measures:
-              - orders.count
-            dimensions:
-              - orders.status
-            segments:
-              - orders.high_priority
-            time_dimensions:
-              - dimension: orders.created_at
-                granularity: month
-        "})
+        .build_sql_with_used_pre_aggregations(query_yaml)
         .unwrap();
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("segment_with_coarser_granularity_pg_result", result);
+    }
 }
 
 // --- rollupJoin with calculated measures through view ---

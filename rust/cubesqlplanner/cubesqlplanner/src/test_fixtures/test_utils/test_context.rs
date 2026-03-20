@@ -364,15 +364,16 @@ impl TestContext {
     ) -> Option<String> {
         let client = super::pg_service::connect_and_seed(seed_file).await;
 
-        let ctx = self.for_options(options.as_ref()).expect("Failed to create context");
+        let ctx = self
+            .for_options(options.as_ref())
+            .expect("Failed to create context");
         let request = QueryProperties::try_new(ctx.query_tools.clone(), options)
             .expect("Failed to create query properties");
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
         if !pre_aggregations.is_empty() {
-            self.create_pre_agg_tables(&client, &pre_aggregations)
-                .await;
+            self.create_pre_agg_tables(&client, &pre_aggregations).await;
         }
 
         let templates = ctx
@@ -386,17 +387,16 @@ impl TestContext {
 
         let final_sql = Self::inline_params(&sql, &params);
 
-        let messages = client
-            .simple_query(&final_sql)
-            .await
-            .unwrap_or_else(|e| {
-                panic!(
-                    "SQL execution failed:\n{}\nParams: {:?}\n\nError: {}",
-                    final_sql, params, e
-                )
-            });
+        let messages = client.simple_query(&final_sql).await.unwrap_or_else(|e| {
+            panic!(
+                "SQL execution failed:\n{}\nParams: {:?}\n\nError: {:?}",
+                final_sql, params, e
+            )
+        });
 
-        Some(super::integration_context::format_simple_query_results(&messages))
+        Some(super::integration_context::format_simple_query_results(
+            &messages,
+        ))
     }
 
     #[cfg(feature = "integration-postgres")]
@@ -409,19 +409,16 @@ impl TestContext {
             let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
             let yaml = Self::build_pre_agg_query_yaml(pre_agg);
 
-            let pa_ctx = Self::new_with_options(
-                self.schema.clone(),
-                Tz::UTC,
-                None,
-                None,
-                false,
-            )
-            .expect("Failed to create pre-agg context");
+            let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false)
+                .expect("Failed to create pre-agg context");
 
             let (raw_sql, _) = pa_ctx
                 .build_sql_with_used_pre_aggregations(&yaml)
                 .unwrap_or_else(|e| {
-                    panic!("Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}", yaml, e)
+                    panic!(
+                        "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
+                        yaml, e
+                    )
                 });
 
             let templates = pa_ctx
@@ -436,10 +433,8 @@ impl TestContext {
 
             for table in &tables {
                 let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
-                let table_name = PlanSqlTemplates::alias_name(&format!(
-                    "{}.{}",
-                    table.cube_name, name
-                ));
+                let table_name =
+                    PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
 
                 client
                     .batch_execute(&format!(
@@ -486,24 +481,23 @@ impl TestContext {
             }
         }
 
-        let dims: Vec<String> = pre_agg.dimensions().iter().map(|d| d.full_name()).collect();
+        // Segments go into dimensions
+        // Segments in pre-aggregation are stored as MemberExpression with "expr:" prefix
+        let dims: Vec<String> = pre_agg
+            .dimensions()
+            .iter()
+            .map(|d| d.full_name())
+            .chain(pre_agg.segments().iter().map(|s| {
+                s.full_name()
+                    .strip_prefix("expr:")
+                    .unwrap_or(&s.full_name())
+                    .to_string()
+            }))
+            .collect();
         if !dims.is_empty() {
             yaml.push_str("dimensions:\n");
             for d in &dims {
                 yaml.push_str(&format!("  - {}\n", d));
-            }
-        }
-
-        // Segments in pre-aggregation are stored as MemberExpression with "expr:" prefix
-        let segments: Vec<String> = pre_agg
-            .segments()
-            .iter()
-            .map(|s| s.full_name().strip_prefix("expr:").unwrap_or(&s.full_name()).to_string())
-            .collect();
-        if !segments.is_empty() {
-            yaml.push_str("segments:\n");
-            for s in &segments {
-                yaml.push_str(&format!("  - {}\n", s));
             }
         }
 
