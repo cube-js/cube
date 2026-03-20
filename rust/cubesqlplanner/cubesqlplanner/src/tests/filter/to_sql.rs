@@ -656,7 +656,7 @@ fn test_before_or_on_date() {
     assert_filter(
         &result,
         r#"("visitors".created_at <= $_0_$::timestamptz)"#,
-        &["2024-06-01T00:00:00.000"],
+        &["2024-06-01T23:59:59.999"],
     );
 }
 
@@ -672,7 +672,7 @@ fn test_after_date() {
     assert_filter(
         &result,
         r#"("visitors".created_at > $_0_$::timestamptz)"#,
-        &["2024-06-01T00:00:00.000"],
+        &["2024-06-01T23:59:59.999"],
     );
 }
 
