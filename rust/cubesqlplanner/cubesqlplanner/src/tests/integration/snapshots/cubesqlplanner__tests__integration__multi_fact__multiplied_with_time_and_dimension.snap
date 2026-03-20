@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | orders__created_at_month | orders__count | returns__count
+----------------+--------------------------+---------------+---------------
+Boston          | 2025-03-01 00:00:00      | 3             | 2             
+New York        | 2025-03-01 00:00:00      | 5             | 1             
+Chicago         | NULL                     | 0             | 2

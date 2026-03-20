@@ -233,3 +233,225 @@ async fn test_multiplied_hub_and_fact_measures() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_segment() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        segments:
+          - orders.completed_orders
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_measure_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        filters:
+          - member: orders.count
+            operator: gt
+            values:
+              - \"1\"
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_time_granularity() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_time_and_daterange() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+            dateRange:
+              - \"2025-03-01\"
+              - \"2025-03-05\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_time_and_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+        filters:
+          - dimension: customers.city
+            operator: equals
+            values:
+              - New York
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_time_and_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.city
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_full_combo() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - \"2025-03-01\"
+              - \"2025-03-31\"
+        segments:
+          - orders.completed_orders
+        filters:
+          - dimension: customers.city
+            operator: equals
+            values:
+              - New York
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_with_order_and_limit() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        order:
+          - id: orders.count
+            desc: true
+        row_limit: \"2\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_non_multiplied_multi_join() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+        dimensions:
+          - customers.name
+          - customers.city
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

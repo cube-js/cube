@@ -51,6 +51,9 @@ cubes:
           - name: unique_customers
             type: count_distinct
             sql: customer_id
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"
 
     - name: returns
       sql: "SELECT * FROM returns"
