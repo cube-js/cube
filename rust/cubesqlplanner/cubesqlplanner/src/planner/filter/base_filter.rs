@@ -13,6 +13,7 @@ pub enum FilterType {
     Measure,
 }
 
+// TODO: temporary compatibility proxy — collapse into TypedFilter and update FilterItem consumers
 #[derive(Clone)]
 pub struct BaseFilter {
     typed_filter: TypedFilter,
