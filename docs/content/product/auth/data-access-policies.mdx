@@ -436,6 +436,201 @@ view(`orders_view`, {
 
 </CodeTabs>
 
+### Conditional masking using data-driven rules
+
+Sometimes masking decisions depend on both database column values (e.g., from a joined cube)
+and user security context attributes. Since `member_masking` does not support `filters`,
+you can encode the entire conditional reveal logic directly in `mask.sql` using a `CASE WHEN`
+expression. The policy's `member_masking` always applies the mask expression; the expression
+itself decides at SQL execution time whether to return the real value or a placeholder.
+
+The example below shows two groups with different rules for revealing `address_line_1`:
+
+- **Sensitive Data Access**: reveal the real value when `client.data_security_field` is
+  `RESEARCH` or `DEMO`, _or_ when `region_lock_data = 0`, _or_ when
+  `client.data_security_field` matches the user's `data_region` attribute.
+  Otherwise return a placeholder.
+- **Very Sensitive Data Access**: same conditions but without the `region_lock_data = 0`
+  bypass.
+
+Because the two groups share a single `address_line_1` dimension, the mask SQL reads the
+user's group membership from `SECURITY_CONTEXT` at query time to conditionally include the
+`region_lock_data` branch:
+
+<CodeTabs>
+
+```yaml
+# YAML supports data-driven CASE WHEN masks, but complex JavaScript logic
+# (e.g. checking SECURITY_CONTEXT.groups) requires the JavaScript format below.
+# This simplified YAML version applies the same mask SQL to both groups.
+cubes:
+  - name: client
+    sql_table: public.clients
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: data_security_field
+        sql: data_security_field
+        type: string
+
+  - name: eligibility_profile
+    sql_table: public.eligibility_profiles
+    joins:
+      - name: client
+        sql: "{CUBE}.client_id = {client.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: region_lock_data
+        sql: region_lock_data
+        type: number
+      - name: address_line_1
+        sql: address_line_1
+        type: string
+        # Custom mask SQL encodes the conditional reveal logic entirely in SQL.
+        # Both groups always receive this expression (via member_masking);
+        # the CASE WHEN decides at execution time whether to show the real value.
+        mask:
+          sql: >
+            CASE
+              WHEN {client.data_security_field} IN ('RESEARCH', 'DEMO')
+                THEN {CUBE}.address_line_1
+              WHEN {CUBE}.region_lock_data = 0
+                THEN {CUBE}.address_line_1
+              ELSE '***'
+            END
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: []
+      - group: Sensitive Data Access
+        member_level:
+          includes: "*"
+        member_masking:
+          includes:
+            - address_line_1
+        row_level:
+          allow_all: true
+      - group: Very Sensitive Data Access
+        member_level:
+          includes: "*"
+        member_masking:
+          includes:
+            - address_line_1
+        row_level:
+          allow_all: true
+```
+
+```javascript
+cube(`client`, {
+  sql_table: `public.clients`,
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    data_security_field: { sql: `data_security_field`, type: `string` },
+  },
+});
+
+cube(`eligibility_profile`, {
+  sql_table: `public.eligibility_profiles`,
+  joins: {
+    client: {
+      sql: `${CUBE}.client_id = ${client}.id`,
+      relationship: `many_to_one`,
+    },
+  },
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    region_lock_data: { sql: `region_lock_data`, type: `number` },
+
+    address_line_1: {
+      sql: `address_line_1`,
+      type: `string`,
+      // Custom mask SQL encodes the conditional reveal logic entirely in SQL.
+      // Both groups always receive this expression (via member_masking in their
+      // policies); the CASE WHEN decides at execution time whether to show the
+      // real value or a placeholder based on the joined client data and the
+      // user's security context attributes.
+      mask: {
+        sql: (CUBE, client, SECURITY_CONTEXT) => {
+          // SECURITY_CONTEXT.groups is proxied — .unsafeValue() retrieves the
+          // actual array from the JWT so we can branch the generated SQL.
+          const groups = SECURITY_CONTEXT.groups.unsafeValue();
+          const isSensitiveGroup =
+            Array.isArray(groups) &&
+            groups.includes(`Sensitive Data Access`);
+
+          return `
+            CASE
+              -- Both groups: research / demo data always reveals the real value
+              WHEN ${client.data_security_field} IN ('RESEARCH', 'DEMO')
+                THEN ${CUBE}.address_line_1
+
+              -- Sensitive Data Access only: region_lock = 0 reveals the real value
+              ${isSensitiveGroup
+                ? `WHEN ${CUBE}.region_lock_data = 0
+                THEN ${CUBE}.address_line_1`
+                : ``}
+
+              -- Both groups: data_security_field matches the user's assigned region
+              -- SECURITY_CONTEXT.data_region.filter() produces a safe parameterized
+              -- SQL condition: "client_alias.data_security_field = $1"
+              WHEN ${SECURITY_CONTEXT.data_region.filter(client.data_security_field)}
+                THEN ${CUBE}.address_line_1
+
+              ELSE '***'
+            END
+          `;
+        },
+      },
+    },
+  },
+
+  access_policy: [
+    // Default: deny all access
+    { group: `*`, member_level: { includes: [] } },
+
+    // Sensitive Data Access: all members visible; address_line_1 goes through
+    // the mask SQL which conditionally reveals the real value, including the
+    // region_lock_data = 0 bypass.
+    {
+      group: `Sensitive Data Access`,
+      member_level: { includes: `*` },
+      member_masking: { includes: [`address_line_1`] },
+      row_level: { allow_all: true },
+    },
+
+    // Very Sensitive Data Access: same structure, but the mask SQL omits the
+    // region_lock_data = 0 bypass because SECURITY_CONTEXT.groups will not
+    // include 'Sensitive Data Access' for these users.
+    {
+      group: `Very Sensitive Data Access`,
+      member_level: { includes: `*` },
+      member_masking: { includes: [`address_line_1`] },
+      row_level: { allow_all: true },
+    },
+  ],
+});
+```
+
+</CodeTabs>
+
+<InfoBox>
+
+`member_masking` always applies the `mask.sql` expression — the SQL itself decides whether to
+reveal the real value. This makes `mask.sql` the right place to encode any logic that depends
+on database column values from joined cubes (which cannot be evaluated outside of a SQL query).
+
+User attributes from the security context (e.g., `data_region`, `groups`) are injected at
+query time. Use `.filter(column)` for safe parameterized comparisons and `.unsafeValue()` only
+when you need the raw value for JavaScript branching (not for direct SQL interpolation).
+
+</InfoBox>
+
 ### Mandatory filters
 
 You can apply mandatory row-level filters to specific groups to ensure they only see data matching certain criteria:
