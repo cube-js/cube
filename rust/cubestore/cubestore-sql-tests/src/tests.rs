@@ -10470,6 +10470,18 @@ fn assert_queue_add_columns(response: &Arc<DataFrame>) {
     );
 }
 
+fn assert_queue_add_and_get_id(response: &Arc<DataFrame>) -> Result<String, CubeError> {
+    assert_queue_add_columns(response);
+
+    match &response.get_rows()[0].values()[0] {
+        TableValue::String(s) => Ok(s.clone()),
+        other => Err(CubeError::internal(format!(
+            "Expected string id, got: {:?}",
+            other
+        ))),
+    }
+}
+
 fn assert_queue_retrieve_columns(response: &Arc<DataFrame>) {
     assert_eq!(
         response.get_columns(),
@@ -10627,9 +10639,11 @@ async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) -> Result<(), Cub
     let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
         .await?;
-    assert_queue_add_columns(&add_response);
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
-    let ack_result = service.exec_query(r#"QUEUE ACK 1 "result:5555""#).await?;
+    let ack_result = service
+        .exec_query(&format!(r#"QUEUE ACK {} "result:5555""#, id))
+        .await?;
     assert_eq!(
         ack_result.get_rows(),
         &vec![Row::new(vec![TableValue::Boolean(true)])]
@@ -10637,7 +10651,9 @@ async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) -> Result<(), Cub
 
     // double ack for result, should be restricted
     {
-        let ack_result = service.exec_query(r#"QUEUE ACK 1 "result:5555""#).await?;
+        let ack_result = service
+            .exec_query(&format!(r#"QUEUE ACK {} "result:5555""#, id))
+            .await?;
         assert_eq!(
             ack_result.get_rows(),
             &vec![Row::new(vec![TableValue::Boolean(false)])]
@@ -10682,7 +10698,7 @@ async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) -> Result<(), Cub
 
     // should return, because we use id
     let result = service
-        .exec_query(r#"QUEUE RESULT_BLOCKING 1000 1"#)
+        .exec_query(&format!("QUEUE RESULT_BLOCKING 1000 {}", id))
         .await?;
     assert_queue_result_blocking_columns(&result);
     assert_eq!(result.get_rows().len(), 1);
@@ -10693,12 +10709,7 @@ async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(
     let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:12345" "payload1";"#)
         .await?;
-    assert_queue_add_columns(&add_response);
-
-    let id = match &add_response.get_rows()[0].values()[0] {
-        TableValue::String(s) => s.clone(),
-        other => panic!("Expected string id, got: {:?}", other),
-    };
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
     let ack_result = service
         .exec_query(&format!(r#"QUEUE ACK {} "result:12345""#, id))
@@ -10756,9 +10767,11 @@ async fn queue_ack_then_result_v2_with_external_id(
             r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-5555' "STANDALONE#queue:5555" "payload1";"#,
         )
         .await?;
-    assert_queue_add_columns(&add_response);
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
-    let ack_result = service.exec_query(r#"QUEUE ACK 1 "result:5555""#).await?;
+    let ack_result = service
+        .exec_query(&format!(r#"QUEUE ACK {} "result:5555""#, id))
+        .await?;
     assert_eq!(
         ack_result.get_rows(),
         &vec![Row::new(vec![TableValue::Boolean(true)])]
@@ -10766,7 +10779,9 @@ async fn queue_ack_then_result_v2_with_external_id(
 
     // double ack for result, should be restricted
     {
-        let ack_result = service.exec_query(r#"QUEUE ACK 1 "result:5555""#).await?;
+        let ack_result = service
+            .exec_query(&format!(r#"QUEUE ACK {} "result:5555""#, id))
+            .await?;
         assert_eq!(
             ack_result.get_rows(),
             &vec![Row::new(vec![TableValue::Boolean(false)])]
@@ -10821,7 +10836,7 @@ async fn queue_ack_then_result_v2_with_external_id(
 
     // should return, because we use id
     let result = service
-        .exec_query(r#"QUEUE RESULT_BLOCKING 1000 1"#)
+        .exec_query(&format!("QUEUE RESULT_BLOCKING 1000 {}", id))
         .await?;
     assert_queue_result_blocking_columns(&result);
     assert_eq!(result.get_rows().len(), 1);
@@ -10919,16 +10934,19 @@ async fn queue_heartbeat_by_path(service: Box<dyn SqlClient>) -> Result<(), Cube
 }
 
 async fn queue_heartbeat_by_id(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await?;
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
     let res = service
         .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
         .await?;
     assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Null,]),]);
 
-    service.exec_query(r#"QUEUE HEARTBEAT 1;"#).await?;
+    service
+        .exec_query(&format!("QUEUE HEARTBEAT {};", id))
+        .await?;
 
     let res = service
         .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
@@ -10996,13 +11014,14 @@ async fn queue_merge_extra_by_path(service: Box<dyn SqlClient>) -> Result<(), Cu
 }
 
 async fn queue_merge_extra_by_id(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await?;
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
     // extra must be empty after creation
     {
-        let res = service.exec_query(r#"QUEUE GET 1;"#).await?;
+        let res = service.exec_query(&format!("QUEUE GET {};", id)).await?;
         assert_eq!(
             res.get_columns(),
             &vec![
@@ -11020,12 +11039,12 @@ async fn queue_merge_extra_by_id(service: Box<dyn SqlClient>) -> Result<(), Cube
     }
 
     service
-        .exec_query(r#"QUEUE MERGE_EXTRA 1 '{"first": true}';"#)
+        .exec_query(&format!(r#"QUEUE MERGE_EXTRA {} '{{"first": true}}';"#, id))
         .await?;
 
     // extra should contains first field
     {
-        let res = service.exec_query(r#"QUEUE GET 1;"#).await?;
+        let res = service.exec_query(&format!("QUEUE GET {};", id)).await?;
         assert_eq!(
             res.get_columns(),
             &vec![
