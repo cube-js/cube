@@ -5,7 +5,8 @@ use indoc::indoc;
 
 fn build_with_visible_tz(filter_yaml: &str) -> (String, Vec<String>) {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
-    let driver = MockDriverTools::new().with_visible_in_db_time_zone();
+    let driver = MockDriverTools::with_timezone("America/Los_Angeles".to_string())
+        .with_visible_in_db_time_zone();
     let base_tools = schema.create_base_tools_with_driver(driver).unwrap();
     let ctx = TestContext::new_with_base_tools(schema, base_tools).unwrap();
 
@@ -28,8 +29,8 @@ fn test_in_date_range_applies_in_db_time_zone() {
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
         &[
-            "db_tz(2024-01-01T00:00:00.000)",
-            "db_tz(2024-12-31T23:59:59.999)",
+            "2024-01-01T08:00:00.000",
+            "2025-01-01T07:59:59.999",
         ],
     );
 }
@@ -46,7 +47,7 @@ fn test_before_date_applies_in_db_time_zone() {
     assert_filter(
         &result,
         r#"("visitors".created_at < $_0_$::timestamptz)"#,
-        &["db_tz(2024-06-01T00:00:00.000)"],
+        &["2024-06-01T07:00:00.000"],
     );
 }
 

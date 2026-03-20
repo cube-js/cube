@@ -9,7 +9,8 @@ fn build(filter_yaml: &str) -> (String, Vec<String>) {
 
 fn build_with_visible_tz(filter_yaml: &str) -> (String, Vec<String>) {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
-    let driver = MockDriverTools::new().with_visible_in_db_time_zone();
+    let driver =
+        MockDriverTools::with_timezone("America/Los_Angeles".to_string()).with_visible_in_db_time_zone();
     let base_tools = schema.create_base_tools_with_driver(driver).unwrap();
     let ctx = TestContext::new_with_base_tools(schema, base_tools).unwrap();
 
@@ -144,7 +145,7 @@ fn test_partition_range_skips_db_timezone() {
               - "__FROM_PARTITION_RANGE"
               - "__TO_PARTITION_RANGE"
     "#});
-    // Regular dates get db_tz() wrapping, but partition range values must NOT
+    // Regular dates get tz conversion, but partition range values must NOT
     assert_filter(
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
@@ -162,11 +163,11 @@ fn test_partition_range_mixed_with_regular_date_and_tz() {
               - "__FROM_PARTITION_RANGE"
               - "2024-12-31"
     "#});
-    // FROM: partition range — no db_tz wrapping, no formatting
-    // TO: regular date — gets formatted and db_tz wrapped
+    // FROM: partition range — no tz conversion, no formatting
+    // TO: regular date — gets formatted and tz-converted
     assert_filter(
         &result,
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
-        &["__FROM_PARTITION_RANGE", "db_tz(2024-12-31T23:59:59.999)"],
+        &["__FROM_PARTITION_RANGE", "2025-01-01T07:59:59.999"],
     );
 }
