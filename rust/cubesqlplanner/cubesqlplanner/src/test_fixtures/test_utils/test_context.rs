@@ -494,7 +494,12 @@ impl TestContext {
             }
         }
 
-        let segments: Vec<String> = pre_agg.segments().iter().map(|s| s.full_name()).collect();
+        // Segments in pre-aggregation are stored as MemberExpression with "expr:" prefix
+        let segments: Vec<String> = pre_agg
+            .segments()
+            .iter()
+            .map(|s| s.full_name().strip_prefix("expr:").unwrap_or(&s.full_name()).to_string())
+            .collect();
         if !segments.is_empty() {
             yaml.push_str("segments:\n");
             for s in &segments {

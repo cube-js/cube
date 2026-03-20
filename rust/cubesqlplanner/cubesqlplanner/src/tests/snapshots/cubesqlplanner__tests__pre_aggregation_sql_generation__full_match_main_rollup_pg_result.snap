@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: result
+---
+orders__status | orders__city | orders__count | orders__total_amount
+---------------+--------------+---------------+---------------------
+completed      | New York     | 2             | 150.00              
+pending        | New York     | 2             | 260.00              
+completed      | Boston       | 2             | 375.00              
+pending        | Boston       | 1             | 150.00              
+completed      | Chicago      | 1             | 400.00              
+cancelled      | Chicago      | 1             | 25.00               
+pending        | Chicago      | 1             | 175.00

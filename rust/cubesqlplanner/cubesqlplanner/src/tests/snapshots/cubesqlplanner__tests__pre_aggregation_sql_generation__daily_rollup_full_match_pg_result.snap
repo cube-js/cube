@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: result
+---
+orders__country | orders__created_at_day | orders__count
+----------------+------------------------+--------------
+New York        | 2025-01-10 00:00:00    | 2            
+New York        | 2025-01-11 00:00:00    | 1            
+Boston          | 2025-01-31 00:00:00    | 1            
+Boston          | 2025-02-01 00:00:00    | 2            
+Chicago         | 2025-02-15 00:00:00    | 1            
+Chicago         | 2025-03-01 00:00:00    | 2            
+New York        | 2025-03-02 00:00:00    | 1
