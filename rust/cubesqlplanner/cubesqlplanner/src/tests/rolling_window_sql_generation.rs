@@ -152,8 +152,8 @@ async fn test_rolling_window_trailing_unbounded_with_granularity() {
     }
 }
 
-#[test]
-fn test_rolling_window_bounded_no_granularity() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_bounded_no_granularity() {
     let test_context = create_context();
 
     let query_yaml = indoc! {r#"
@@ -180,11 +180,16 @@ fn test_rolling_window_bounded_no_granularity() {
         "Should use parameterized date range on created_at, got: {sql}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "rolling_window_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_rolling_window_bounded_with_granularity() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_bounded_with_granularity() {
     let test_context = create_context();
 
     let query_yaml = indoc! {r#"
@@ -215,11 +220,16 @@ fn test_rolling_window_bounded_with_granularity() {
         "Should apply convert_tz, got: {sql}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "rolling_window_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_rolling_window_trailing_bounded_no_granularity() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_trailing_bounded_no_granularity() {
     let test_context = create_context();
 
     let query_yaml = indoc! {r#"
@@ -251,11 +261,16 @@ fn test_rolling_window_trailing_bounded_no_granularity() {
         "Without granularity should not have interval arithmetic, got: {sql}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "rolling_window_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_rolling_window_trailing_bounded_with_granularity() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_trailing_bounded_with_granularity() {
     let test_context = create_context();
 
     let query_yaml = indoc! {r#"
@@ -286,11 +301,16 @@ fn test_rolling_window_trailing_bounded_with_granularity() {
         "Should apply convert_tz, got: {sql}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "rolling_window_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
-#[test]
-fn test_rolling_window_to_date_with_granularity() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_to_date_with_granularity() {
     let test_context = create_context();
 
     let query_yaml = indoc! {r#"
@@ -317,5 +337,10 @@ fn test_rolling_window_to_date_with_granularity() {
         "Should apply convert_tz, got: {sql}"
     );
 
-    insta::assert_snapshot!(sql);
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "rolling_window_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
