@@ -489,7 +489,8 @@ impl BaseFilter {
         _member_type: &Option<String>,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let value = self.first_timestamp_param(use_db_time_zone, false, plan_templates)?;
+        let value =
+            self.first_timestamp_param_as_to_date(use_db_time_zone, false, plan_templates)?;
 
         plan_templates.lte(member_sql.to_string(), value)
     }
@@ -502,7 +503,8 @@ impl BaseFilter {
         _member_type: &Option<String>,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let value = self.first_timestamp_param(use_db_time_zone, false, plan_templates)?;
+        let value =
+            self.first_timestamp_param_as_to_date(use_db_time_zone, false, plan_templates)?;
 
         plan_templates.gt(member_sql.to_string(), value)
     }
@@ -1000,6 +1002,33 @@ impl BaseFilter {
             }
         }
     }
+
+    fn first_timestamp_param_as_to_date(
+        &self,
+        use_db_time_zone: bool,
+        as_date_time: bool,
+        plan_templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        if self.values.is_empty() {
+            Err(CubeError::user(format!(
+                "Expected at least one parameter but nothing found"
+            )))
+        } else {
+            if let Some(value) = &self.values[0] {
+                self.allocate_timestamp_param(
+                    &self.to_date_in_db_time_zone(value, use_db_time_zone, plan_templates)?,
+                    as_date_time,
+                    plan_templates,
+                )
+            } else {
+                Err(CubeError::user(format!(
+                    "Arguments for timestamp parameter for operator {} is not valid",
+                    self.filter_operator().to_string()
+                )))
+            }
+        }
+    }
+
 
     fn is_need_null_chek(&self, is_not: bool) -> bool {
         let contains_null = self.does_values_contain_null();

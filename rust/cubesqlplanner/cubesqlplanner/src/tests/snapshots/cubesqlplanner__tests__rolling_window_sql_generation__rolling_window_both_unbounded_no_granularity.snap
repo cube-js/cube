@@ -1,8 +1,6 @@
 ---
 source: cubesqlplanner/src/tests/rolling_window_sql_generation.rs
-assertion_line: 107
 expression: result
-snapshot_kind: text
 ---
 test_cube__val_both
 -------------------

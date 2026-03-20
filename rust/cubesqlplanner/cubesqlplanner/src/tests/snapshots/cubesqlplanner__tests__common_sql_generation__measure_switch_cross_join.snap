@@ -1,8 +1,6 @@
 ---
 source: cubesqlplanner/src/tests/common_sql_generation.rs
-assertion_line: 289
 expression: result
-snapshot_kind: text
 ---
 orders__currency | orders__date_year   | orders__amount_usd | orders__amount_in_currency
 -----------------+---------------------+--------------------+---------------------------

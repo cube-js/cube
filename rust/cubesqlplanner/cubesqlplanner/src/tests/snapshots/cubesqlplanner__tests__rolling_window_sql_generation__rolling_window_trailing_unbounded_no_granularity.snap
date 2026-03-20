@@ -1,9 +1,7 @@
 ---
 source: cubesqlplanner/src/tests/rolling_window_sql_generation.rs
-assertion_line: 72
 expression: result
-snapshot_kind: text
 ---
-test_cube__val_leading
-----------------------
-180.00
+test_cube__val
+--------------
+150.00
