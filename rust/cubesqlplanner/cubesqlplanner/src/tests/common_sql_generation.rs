@@ -55,7 +55,10 @@ async fn test_simple_join_sql() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for simple join");
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -81,7 +84,10 @@ async fn test_simple_paths_in_request_sql() {
         "SQL should contain join condition between cube_a and cube_c"
     );
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -108,7 +114,10 @@ async fn test_simple_paths_in_time_dimension_request_sql() {
         "SQL should contain join condition between cube_a and cube_c"
     );
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -139,7 +148,10 @@ async fn test_diamond_join_over_view_sql() {
         "SQL should contain join condition between cube_b and cube_c"
     );
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -170,7 +182,10 @@ async fn test_diamond_join_over_direct_path_sql() {
         "SQL should contain join condition between cube_b and cube_c"
     );
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "diamond_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -196,7 +211,10 @@ async fn test_simple_segment_sql() {
         "SQL should contain segment condition"
     );
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "simple_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "simple_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -225,7 +243,10 @@ async fn test_segment_as_dimension_in_pre_aggregation_query() {
         "Segment should not be in WHERE clause for pre-aggregation query"
     );
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "simple_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "simple_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -247,7 +268,10 @@ async fn test_multi_fact_two_measures_from_different_cubes() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for multi-fact query");
 
-    if let Some(result) = test_context.try_execute_pg(query_yaml, "multi_fact_tables.sql").await {
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "multi_fact_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }

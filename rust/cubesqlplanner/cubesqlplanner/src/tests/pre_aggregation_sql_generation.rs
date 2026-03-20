@@ -329,7 +329,10 @@ async fn test_multi_level_all_base_measures_partial_match() {
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_level_all_base_measures_partial_match_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_level_all_base_measures_partial_match_pg_result",
+            result
+        );
     }
 }
 
@@ -376,7 +379,10 @@ async fn test_multi_level_calculated_measure_full_match() {
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_level_calculated_measure_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_level_calculated_measure_full_match_pg_result",
+            result
+        );
     }
 }
 
@@ -480,7 +486,10 @@ async fn test_base_and_calculated_measure_parital_match() {
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("base_and_calculated_measure_parital_match_pg_result", result);
+        insta::assert_snapshot!(
+            "base_and_calculated_measure_parital_match_pg_result",
+            result
+        );
     }
 }
 
@@ -704,7 +713,10 @@ async fn test_custom_granularity_non_additive_full_match() {
         .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("custom_granularity_non_additive_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "custom_granularity_non_additive_full_match_pg_result",
+            result
+        );
     }
 }
 

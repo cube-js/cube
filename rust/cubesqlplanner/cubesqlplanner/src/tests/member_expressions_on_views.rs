@@ -65,7 +65,10 @@ async fn test_many_to_one_view_base_query() {
 
     ctx.build_sql(query_yaml).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query_yaml, "many_to_one_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "many_to_one_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }

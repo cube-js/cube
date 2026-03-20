@@ -25,7 +25,6 @@ async fn test_rolling_window_trailing_unbounded_no_granularity() {
         .build_sql(query_yaml)
         .expect("Should generate SQL for trailing unbounded");
 
-
     assert!(
         !sql.contains(">= $_0_$"),
         "Trailing unbounded should not have a lower time bound (>=), got: {sql}"
