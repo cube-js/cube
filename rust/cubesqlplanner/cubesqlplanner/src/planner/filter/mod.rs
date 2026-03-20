@@ -8,3 +8,4 @@ pub mod typed_filter;
 pub use base_filter::BaseFilter;
 pub use base_segment::BaseSegment;
 pub use filter_operator::FilterOperator;
+pub use typed_filter::resolve_base_symbol;

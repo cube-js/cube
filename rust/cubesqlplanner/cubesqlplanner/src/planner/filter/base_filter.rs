@@ -1,5 +1,5 @@
 use super::filter_operator::FilterOperator;
-use super::typed_filter::TypedFilter;
+use super::typed_filter::{resolve_base_symbol, TypedFilter};
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
@@ -63,12 +63,7 @@ impl BaseFilter {
     }
 
     pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
-        let me = self.typed_filter.member_evaluator();
-        if let Ok(time_dimension) = me.as_time_dimension() {
-            time_dimension.base_symbol().clone()
-        } else {
-            me.clone()
-        }
+        resolve_base_symbol(self.typed_filter.member_evaluator())
     }
 
     pub fn raw_member_evaluator(&self) -> Rc<MemberSymbol> {
@@ -141,12 +136,9 @@ impl BaseFilter {
     ) -> Result<String, CubeError> {
         let filters_context = context.filters_context();
         if !filters_context.filter_params_columns.is_empty() {
-            let symbol = self.member_evaluator();
-            let symbol_to_match = if let Ok(time_dim) = symbol.as_time_dimension() {
-                time_dim.base_symbol().clone().resolve_reference_chain()
-            } else {
-                symbol.clone().resolve_reference_chain()
-            };
+            let symbol_to_match =
+                resolve_base_symbol(self.typed_filter.member_evaluator())
+                    .resolve_reference_chain();
             if let Some(filter_params_column) = filters_context
                 .filter_params_columns
                 .get(&symbol_to_match.full_name())

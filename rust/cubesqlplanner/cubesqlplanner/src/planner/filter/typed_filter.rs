@@ -21,6 +21,15 @@ use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::FilterOperator;
 use crate::planner::GranularityHelper;
 
+/// Resolves TimeDimension to its base dimension symbol; returns as-is for other kinds.
+pub fn resolve_base_symbol(symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
+    if let Ok(td) = symbol.as_time_dimension() {
+        td.base_symbol().clone()
+    } else {
+        symbol.clone()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum FilterOp {
     Comparison(ComparisonOp),
@@ -99,11 +108,7 @@ impl TypedFilter {
             );
         }
 
-        let resolved = if let Ok(td) = self.member_evaluator.as_time_dimension() {
-            td.base_symbol().clone()
-        } else {
-            self.member_evaluator.clone()
-        };
+        let resolved = resolve_base_symbol(&self.member_evaluator);
         let member_sql = evaluate_with_context(&resolved, context.clone(), plan_templates)?;
 
         let filters_context = context.filters_context();
@@ -234,20 +239,8 @@ impl TypedFilterBuilder {
         self
     }
 
-    fn resolve_member_evaluator(member_evaluator: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
-        if let Ok(td) = member_evaluator.as_time_dimension() {
-            td.base_symbol().clone()
-        } else {
-            member_evaluator.clone()
-        }
-    }
-
     fn resolve_member_type(member_evaluator: &Rc<MemberSymbol>) -> Option<String> {
-        let symbol = if let Ok(td) = member_evaluator.as_time_dimension() {
-            td.base_symbol().clone()
-        } else {
-            member_evaluator.clone()
-        };
+        let symbol = resolve_base_symbol(member_evaluator);
         match symbol.as_ref() {
             MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
             MemberSymbol::Measure(m) => Some(m.measure_type().to_string()),
@@ -363,7 +356,7 @@ impl TypedFilterBuilder {
                     })?
                     .clone();
 
-                let resolved = Self::resolve_member_evaluator(&member_evaluator);
+                let resolved = resolve_base_symbol(&member_evaluator);
                 let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
                 let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
