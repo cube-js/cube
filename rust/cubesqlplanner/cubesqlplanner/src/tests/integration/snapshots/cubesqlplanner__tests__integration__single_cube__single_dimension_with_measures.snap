@@ -6,4 +6,4 @@ orders__status | orders__count | orders__total_amount
 ---------------+---------------+---------------------
 cancelled      | 1             | 25.00               
 completed      | 5             | 1250.00             
-pending        | 2             | 125.00
+pending        | 3             | 165.00

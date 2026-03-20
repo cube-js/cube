@@ -1,8 +1,6 @@
 ---
 source: cubesqlplanner/src/tests/integration/time_dimensions.rs
-assertion_line: 28
 expression: result
-snapshot_kind: text
 ---
 orders__created_at_day | orders__count | orders__total_amount
 -----------------------+---------------+---------------------

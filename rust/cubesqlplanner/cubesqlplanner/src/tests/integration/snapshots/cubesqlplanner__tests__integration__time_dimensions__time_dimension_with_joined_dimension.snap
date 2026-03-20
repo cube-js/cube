@@ -1,8 +1,6 @@
 ---
 source: cubesqlplanner/src/tests/integration/time_dimensions.rs
-assertion_line: 165
 expression: result
-snapshot_kind: text
 ---
 customers__city | orders__created_at_month | orders__count
 ----------------+--------------------------+--------------
