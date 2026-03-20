@@ -1,8 +1,6 @@
 ---
 source: cubesqlplanner/src/tests/date_filters.rs
-assertion_line: 81
 expression: result
-snapshot_kind: text
 ---
 visitors__created_at
 --------------------

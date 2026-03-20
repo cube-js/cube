@@ -1,6 +1,8 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregation;
+#[cfg(feature = "integration-postgres")]
+use crate::logical_plan::{PreAggregationSource, PreAggregationTable};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
@@ -366,7 +368,12 @@ impl TestContext {
         let request = QueryProperties::try_new(ctx.query_tools.clone(), options)
             .expect("Failed to create query properties");
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
-        let (raw_sql, _) = planner.plan().expect("Failed to plan query");
+        let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
+
+        if !pre_aggregations.is_empty() {
+            self.create_pre_agg_tables(&client, &pre_aggregations)
+                .await;
+        }
 
         let templates = ctx
             .query_tools
@@ -390,6 +397,130 @@ impl TestContext {
             });
 
         Some(super::integration_context::format_simple_query_results(&messages))
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    async fn create_pre_agg_tables(
+        &self,
+        client: &tokio_postgres::Client,
+        pre_aggregations: &[Rc<PreAggregation>],
+    ) {
+        for pre_agg in pre_aggregations {
+            let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
+            let yaml = Self::build_pre_agg_query_yaml(pre_agg);
+
+            let pa_ctx = Self::new_with_options(
+                self.schema.clone(),
+                Tz::UTC,
+                None,
+                None,
+                false,
+            )
+            .expect("Failed to create pre-agg context");
+
+            let (raw_sql, _) = pa_ctx
+                .build_sql_with_used_pre_aggregations(&yaml)
+                .unwrap_or_else(|e| {
+                    panic!("Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}", yaml, e)
+                });
+
+            let templates = pa_ctx
+                .query_tools
+                .plan_sql_templates(false)
+                .expect("Failed to get SQL templates");
+            let (sql, params) = pa_ctx
+                .query_tools
+                .build_sql_and_params(&raw_sql, true, &templates)
+                .expect("Failed to build pre-agg SQL and params");
+            let inlined_sql = Self::inline_params(&sql, &params);
+
+            for table in &tables {
+                let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                let table_name = PlanSqlTemplates::alias_name(&format!(
+                    "{}.{}",
+                    table.cube_name, name
+                ));
+
+                client
+                    .batch_execute(&format!(
+                        "DROP TABLE IF EXISTS \"{table_name}\";\n\
+                         CREATE TABLE \"{table_name}\" AS ({inlined_sql})"
+                    ))
+                    .await
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "Failed to create pre-agg table {}: {}\nSQL: {}",
+                            table_name, e, inlined_sql
+                        )
+                    });
+            }
+        }
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    fn collect_pre_agg_source_tables(source: &PreAggregationSource) -> Vec<PreAggregationTable> {
+        match source {
+            PreAggregationSource::Single(table) => vec![table.clone()],
+            PreAggregationSource::Join(join) => {
+                let mut tables = Self::collect_pre_agg_source_tables(&join.root);
+                for item in &join.items {
+                    tables.extend(Self::collect_pre_agg_source_tables(&item.to));
+                }
+                tables
+            }
+            PreAggregationSource::Union(union) => {
+                union.items.iter().map(|t| t.as_ref().clone()).collect()
+            }
+        }
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    fn build_pre_agg_query_yaml(pre_agg: &PreAggregation) -> String {
+        let mut yaml = String::new();
+
+        let measures: Vec<String> = pre_agg.measures().iter().map(|m| m.full_name()).collect();
+        if !measures.is_empty() {
+            yaml.push_str("measures:\n");
+            for m in &measures {
+                yaml.push_str(&format!("  - {}\n", m));
+            }
+        }
+
+        let dims: Vec<String> = pre_agg.dimensions().iter().map(|d| d.full_name()).collect();
+        if !dims.is_empty() {
+            yaml.push_str("dimensions:\n");
+            for d in &dims {
+                yaml.push_str(&format!("  - {}\n", d));
+            }
+        }
+
+        let segments: Vec<String> = pre_agg.segments().iter().map(|s| s.full_name()).collect();
+        if !segments.is_empty() {
+            yaml.push_str("segments:\n");
+            for s in &segments {
+                yaml.push_str(&format!("  - {}\n", s));
+            }
+        }
+
+        if !pre_agg.time_dimensions().is_empty() {
+            yaml.push_str("time_dimensions:\n");
+            for td in pre_agg.time_dimensions() {
+                if let Ok(td_sym) = td.as_time_dimension() {
+                    yaml.push_str(&format!(
+                        "  - dimension: {}\n",
+                        td_sym.base_symbol().full_name()
+                    ));
+                    if let Some(gran) = td_sym.granularity() {
+                        yaml.push_str(&format!("    granularity: {}\n", gran));
+                    }
+                } else {
+                    yaml.push_str(&format!("  - dimension: {}\n", td.full_name()));
+                }
+            }
+        }
+
+        yaml.push_str("pre_aggregation_query: true\n");
+        yaml
     }
 
     #[cfg(not(feature = "integration-postgres"))]
