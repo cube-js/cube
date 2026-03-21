@@ -157,6 +157,48 @@ async fn test_number_measure() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_dimension_case_when() {
+    let ctx = create_context();
+
+    // CASE WHEN amount_tier: high(>=200)=3, medium(>=75)=3, low(<75)=3
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.amount_tier
+        order:
+          - id: orders.amount_tier
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_dimension_concat() {
+    let ctx = create_context();
+
+    // CONCAT(name, ' from ', city) — NULL for Charlie Brown (city=NULL)
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - customers.full_location
+        order:
+          - id: customers.full_location
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_number_measure_with_dimension() {
     let ctx = create_context();
 

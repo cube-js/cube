@@ -12,6 +12,9 @@ cubes:
           - name: city
             type: string
             sql: city
+          - name: full_location
+            type: string
+            sql: "CONCAT({CUBE}.name, ' from ', {CUBE}.city)"
       measures:
           - name: count
             type: count
@@ -42,6 +45,9 @@ cubes:
           - name: updated_at
             type: time
             sql: updated_at
+          - name: amount_tier
+            type: string
+            sql: "CASE WHEN {CUBE}.amount >= 200 THEN 'high' WHEN {CUBE}.amount >= 75 THEN 'medium' ELSE 'low' END"
           - name: customer_id
             type: number
             sql: customer_id
