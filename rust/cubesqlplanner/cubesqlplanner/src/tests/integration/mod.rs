@@ -1,4 +1,5 @@
 mod combinations;
+mod custom_granularities;
 mod filters_segments;
 mod joins;
 mod modifiers;
