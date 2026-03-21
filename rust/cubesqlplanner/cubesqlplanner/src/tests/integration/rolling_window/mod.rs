@@ -2,6 +2,7 @@ mod aggregation_types;
 mod basic_types;
 mod calculated_measures;
 mod custom_granularities;
+mod db_time_series;
 mod different_granularities;
 mod edge_cases;
 mod filtered_rolling_measures;

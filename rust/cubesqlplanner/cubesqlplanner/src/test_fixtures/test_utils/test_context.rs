@@ -60,6 +60,15 @@ impl TestContext {
     }
 
     #[allow(dead_code)]
+    pub fn new_with_generated_time_series(schema: MockSchema) -> Result<Self, CubeError> {
+        use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSqlTemplatesRender};
+        let sql_templates = MockSqlTemplatesRender::default_templates_with_generated_time_series();
+        let driver_tools = MockDriverTools::with_sql_templates(sql_templates);
+        let base_tools = schema.create_base_tools_with_driver(driver_tools)?;
+        Self::new_with_base_tools(schema, base_tools)
+    }
+
+    #[allow(dead_code)]
     pub fn new_with_timezone(schema: MockSchema, timezone: Tz) -> Result<Self, CubeError> {
         Self::new_with_options(schema, timezone, None, None, false)
     }
