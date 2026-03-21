@@ -255,8 +255,6 @@ async fn test_multiple_filters_and_logic() {
     }
 }
 
-// --- Step 1: Missing filter operators ---
-
 #[tokio::test(flavor = "multi_thread")]
 async fn test_filter_lt() {
     let ctx = create_context();

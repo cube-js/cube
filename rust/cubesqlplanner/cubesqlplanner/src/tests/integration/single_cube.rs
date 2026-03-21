@@ -104,8 +104,6 @@ async fn test_count_distinct() {
     }
 }
 
-// --- Step 3: Additional measure types ---
-
 #[tokio::test(flavor = "multi_thread")]
 async fn test_count_distinct_approx() {
     let ctx = create_context();
