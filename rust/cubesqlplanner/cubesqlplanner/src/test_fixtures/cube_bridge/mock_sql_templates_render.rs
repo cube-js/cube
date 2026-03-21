@@ -538,7 +538,8 @@ impl MockSqlTemplatesRender {
                 "  '{{ end }}'::timestamp,\n",
                 "  interval '{{ granularity }}'\n",
                 ") AS gs"
-            ).to_string(),
+            )
+            .to_string(),
         );
         render.templates.insert(
             "statements/generated_time_series_with_cte_range_source".to_string(),

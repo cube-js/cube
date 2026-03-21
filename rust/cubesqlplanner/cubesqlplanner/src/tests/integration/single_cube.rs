@@ -22,7 +22,10 @@ async fn test_measures_no_dimensions() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -43,7 +46,10 @@ async fn test_single_dimension_with_measures() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -65,7 +71,10 @@ async fn test_multiple_dimensions_with_measure() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -83,7 +92,10 @@ async fn test_dimensions_only() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -99,7 +111,10 @@ async fn test_count_distinct() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -116,7 +131,10 @@ async fn test_count_distinct_approx() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -134,7 +152,10 @@ async fn test_multiple_count_distinct() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -151,7 +172,10 @@ async fn test_number_measure() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -172,7 +196,10 @@ async fn test_dimension_case_when() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -193,7 +220,10 @@ async fn test_dimension_concat() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -215,7 +245,10 @@ async fn test_number_measure_with_dimension() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }

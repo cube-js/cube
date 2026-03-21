@@ -57,10 +57,7 @@ async fn test_expr_dim_lower() {
 
     ctx.build_sql_from_options(options.clone()).unwrap();
 
-    if let Some(result) = ctx
-        .try_execute_pg_from_options(options, SEED)
-        .await
-    {
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -84,10 +81,7 @@ async fn test_expr_dim_upper_city() {
 
     ctx.build_sql_from_options(options.clone()).unwrap();
 
-    if let Some(result) = ctx
-        .try_execute_pg_from_options(options, SEED)
-        .await
-    {
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -121,10 +115,7 @@ async fn test_expr_with_filter() {
 
     ctx.build_sql_from_options(options.clone()).unwrap();
 
-    if let Some(result) = ctx
-        .try_execute_pg_from_options(options, SEED)
-        .await
-    {
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -147,10 +138,7 @@ async fn test_expr_measure_sum() {
 
     ctx.build_sql_from_options(options.clone()).unwrap();
 
-    if let Some(result) = ctx
-        .try_execute_pg_from_options(options, SEED)
-        .await
-    {
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
         insta::assert_snapshot!(result);
     }
 }

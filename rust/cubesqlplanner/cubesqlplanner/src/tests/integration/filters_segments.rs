@@ -24,7 +24,10 @@ async fn test_filter_equals_string() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -46,7 +49,10 @@ async fn test_filter_not_equals_string() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -67,7 +73,10 @@ async fn test_filter_gt_boundary() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -88,7 +97,10 @@ async fn test_filter_gte_boundary() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -110,7 +122,10 @@ async fn test_filter_on_joined_dimension() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -129,7 +144,10 @@ async fn test_filter_not_set_null() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -154,7 +172,10 @@ async fn test_filter_contains_string() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -173,7 +194,10 @@ async fn test_segment_completed_orders() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -197,7 +221,10 @@ async fn test_segment_plus_filter() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -224,7 +251,10 @@ async fn test_or_filter_group() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -250,7 +280,10 @@ async fn test_multiple_filters_and_logic() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -272,7 +305,10 @@ async fn test_filter_lt() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -294,7 +330,10 @@ async fn test_filter_lte() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -314,7 +353,10 @@ async fn test_filter_set() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -336,7 +378,10 @@ async fn test_filter_starts_with() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -358,7 +403,10 @@ async fn test_filter_ends_with() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -381,7 +429,10 @@ async fn test_filter_not_contains() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -406,7 +457,10 @@ async fn test_filter_in_date_range() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -431,7 +485,10 @@ async fn test_filter_not_in_date_range() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -454,7 +511,10 @@ async fn test_filter_before_date() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -477,7 +537,10 @@ async fn test_filter_after_date() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -501,7 +564,10 @@ async fn test_filter_equals_multiple_values() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -529,7 +595,10 @@ async fn test_measure_filter_having() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -551,7 +620,10 @@ async fn test_segment_with_dimension_grouping() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -573,7 +645,10 @@ async fn test_multiple_segments_combined() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -594,7 +669,10 @@ async fn test_segment_from_joined_cube() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
@@ -623,7 +701,10 @@ async fn test_segment_with_time_dimension() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
