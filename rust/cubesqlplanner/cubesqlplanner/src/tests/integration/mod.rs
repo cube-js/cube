@@ -1,5 +1,6 @@
 mod filters_segments;
 mod joins;
+mod modifiers;
 mod multi_fact;
 mod single_cube;
 mod subquery_dimensions;
