@@ -43,6 +43,9 @@ cubes:
           - name: status
             type: string
             sql: status
+          - name: created_at
+            type: time
+            sql: created_at
       measures:
           - name: count
             type: count
@@ -92,6 +95,7 @@ views:
           - join_path: orders
             includes:
                 - status
+                - created_at
                 - count
                 - total_amount
                 - completed_orders

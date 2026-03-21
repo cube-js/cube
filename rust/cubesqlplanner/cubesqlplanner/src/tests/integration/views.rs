@@ -127,3 +127,77 @@ async fn test_view_multi_fact() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_with_time_dimension() {
+    let ctx = create_context();
+
+    // orders_with_customers by day, dateRange Mar1-Mar4
+    // Mar1=1, Mar2=1, Mar3=1, Mar4=1
+    let query = indoc! {"
+        measures:
+          - orders_with_customers.count
+        time_dimensions:
+          - dimension: orders_with_customers.created_at
+            granularity: day
+            dateRange:
+              - \"2025-03-01\"
+              - \"2025-03-04\"
+        order:
+          - id: orders_with_customers.created_at
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_with_order_and_limit() {
+    let ctx = create_context();
+
+    // orders_with_customers by name, order total desc, limit 2
+    // Bob=550, Alice=425, Diana=400 → top 2: Bob, Alice
+    let query = indoc! {"
+        measures:
+          - orders_with_customers.count
+          - orders_with_customers.total_amount
+        dimensions:
+          - orders_with_customers.name
+        order:
+          - id: orders_with_customers.total_amount
+            desc: true
+        row_limit: \"2\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_ungrouped() {
+    let ctx = create_context();
+
+    // orders_view ungrouped — all 8 orders as individual rows
+    let query = indoc! {"
+        measures:
+          - orders_view.count
+        dimensions:
+          - orders_view.id
+          - orders_view.status
+        ungrouped: true
+        order:
+          - id: orders_view.id
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
