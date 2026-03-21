@@ -1,0 +1,124 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM rw_customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+
+    - name: orders
+      sql: "SELECT * FROM rw_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: category
+            type: string
+            sql: category
+          - name: amount
+            type: number
+            sql: amount
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: avg_amount
+            type: avg
+            sql: amount
+          # Cat 1 — basic rolling types
+          - name: rolling_sum_trailing
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: unbounded
+          - name: rolling_sum_leading
+            type: sum
+            sql: amount
+            rolling_window:
+                leading: unbounded
+          - name: rolling_sum_both
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: unbounded
+                leading: unbounded
+          - name: rolling_sum_bounded
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 3 day
+                leading: 1 day
+          - name: rolling_sum_trailing_7d
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+          - name: rolling_sum_to_date
+            type: sum
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: month
+          # Cat 2 — different aggregation types (all trailing 7 day)
+          - name: rolling_count_7d
+            type: count
+            rolling_window:
+                trailing: 7 day
+          - name: rolling_avg_7d
+            type: avg
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+          - name: rolling_min_7d
+            type: min
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+          - name: rolling_max_7d
+            type: max
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+          - name: rolling_count_unbounded
+            type: count
+            rolling_window:
+                trailing: unbounded
+          # Cat 5 — different windows for multi-rolling tests
+          - name: rolling_sum_14d
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 14 day
+          - name: rolling_count_3d
+            type: count
+            rolling_window:
+                trailing: 3 day
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"
