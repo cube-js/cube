@@ -1,3 +1,4 @@
+mod combinations;
 mod filters_segments;
 mod joins;
 mod modifiers;
