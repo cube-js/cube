@@ -39,6 +39,9 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
+          - name: updated_at
+            type: time
+            sql: updated_at
           - name: customer_id
             type: number
             sql: customer_id

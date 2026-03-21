@@ -331,3 +331,32 @@ async fn test_time_dimension_date_range_with_filter() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiple_time_dimensions() {
+    let ctx = create_context();
+
+    // Two time dimensions: created_at by month + updated_at by month
+    // (Jan,Jan)=2, (Jan,Feb)=1, (Feb,Feb)=1, (Feb,Mar)=1, (Mar,Mar)=3, (Apr,Apr)=1
+    let query = indoc! {"
+        measures:
+          - orders.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+          - dimension: orders.updated_at
+            granularity: month
+        order:
+          - id: orders.created_at
+          - id: orders.updated_at
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
