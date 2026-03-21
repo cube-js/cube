@@ -118,7 +118,7 @@ export class ClickHouseQuery extends BaseQuery {
 
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
     // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    // However parseDateTimeBestEffort works with ISO8601
+    // However parseDateTime64BestEffort works with ISO8601 and preserves millisecond precision
     return `parseDateTime64BestEffort(${value}, 3)`;
   }
 
@@ -205,8 +205,8 @@ export class ClickHouseQuery extends BaseQuery {
    ClickHouse uses :
 
      select
-      parseDateTimeBestEffort(arrayJoin(['2017-01-01T00:00:00.000','2017-01-02T00:00:00.000'])) as date_from,
-      parseDateTimeBestEffort(arrayJoin(['2017-01-01T23:59:59.999','2017-01-02T23:59:59.999'])) as date_to
+      parseDateTime64BestEffort(arrayJoin(['2017-01-01T00:00:00.000','2017-01-02T00:00:00.000']), 3) as date_from,
+      parseDateTime64BestEffort(arrayJoin(['2017-01-01T23:59:59.999','2017-01-02T23:59:59.999']), 3) as date_to
       ...
    )
    */
@@ -264,7 +264,7 @@ export class ClickHouseQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
-    // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
+    // TODO: Introduce additional filter in jinja? or parseDateTime64BestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
     templates.expressions.timestamp_literal = 'parseDateTime64BestEffort(\'{{ value }}\', 3)';
     delete templates.functions.PERCENTILECONT;
