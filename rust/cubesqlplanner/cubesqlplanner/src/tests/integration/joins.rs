@@ -149,3 +149,78 @@ async fn test_join_filter_on_chain() {
         insta::assert_snapshot!(result);
     }
 }
+
+fn create_extended_context() -> TestContext {
+    let schema = MockSchema::from_yaml_file("common/integration_joins_extended.yaml");
+    TestContext::new(schema).unwrap()
+}
+
+const EXTENDED_SEED: &str = "integration_joins_extended_tables.sql";
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_join_one_to_one() {
+    let ctx = create_extended_context();
+
+    // one_to_one: employees → employee_profiles
+    // Engineering: 150k+120k+110k=380000, Sales: 130k+100k=230000
+    let query = indoc! {"
+        measures:
+          - employee_profiles.total_salary
+        dimensions:
+          - employees.department
+        order:
+          - id: employees.department
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, EXTENDED_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_join_self_reference() {
+    let ctx = create_extended_context();
+
+    // Self-join: employees.manager_id → managers.id
+    // Alice: 2(Bob,Charlie), Bob: 1(Eve), Charlie: 1(Diana)
+    let query = indoc! {"
+        measures:
+          - employees.count
+        dimensions:
+          - managers.name
+        order:
+          - id: managers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, EXTENDED_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_join_compound_key() {
+    let ctx = create_extended_context();
+
+    // Compound key: sales.(region,category) → targets.(region,category)
+    // (East,Electronics)=250, (East,Clothing)=50, (West,Electronics)=200, (West,Clothing)=75
+    let query = indoc! {"
+        measures:
+          - sales.total_amount
+        dimensions:
+          - targets.region
+          - targets.category
+        order:
+          - id: targets.region
+          - id: targets.category
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, EXTENDED_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
