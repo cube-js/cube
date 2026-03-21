@@ -236,6 +236,103 @@ async fn test_everything_combined() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_with_segment_filter_dimension() {
+    let ctx = create_multi_fact_context();
+
+    // Multi-fact + segment + filter + dimension
+    // orders(completed+NY): Alice(1,2)=2, Diana(6)=1
+    // returns(NY): Alice(1)=1, Diana=0
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        segments:
+          - orders.completed_orders
+        filters:
+          - dimension: customers.city
+            operator: equals
+            values:
+              - New York
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_multi_fact_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_with_filter_and_join() {
+    let ctx = create_basic_context();
+
+    // Ungrouped + filter on joined dim (city=New York)
+    // NY customers: Alice Johnson(1), Alice Cooper(4)
+    // Orders: 1,2,6,7
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.id
+          - orders.status
+          - customers.name
+        filters:
+          - dimension: customers.city
+            operator: equals
+            values:
+              - New York
+        ungrouped: true
+        order:
+          - id: orders.id
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_limit_with_multi_fact() {
+    let ctx = create_multi_fact_context();
+
+    // Multi-fact + ORDER + LIMIT
+    // Alice(4,1), Bob(3,2), Charlie(0,2), Diana(1,0)
+    // Order by orders.count desc, limit 2: Alice(4,1), Bob(3,2)
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        order:
+          - id: orders.count
+            desc: true
+        row_limit: \"2\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_multi_fact_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // 10.7: Filters that eliminate all rows → empty result
 #[tokio::test(flavor = "multi_thread")]
 async fn test_empty_result_from_filters() {
