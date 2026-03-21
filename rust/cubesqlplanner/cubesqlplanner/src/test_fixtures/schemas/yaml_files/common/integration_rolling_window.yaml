@@ -109,6 +109,34 @@ cubes:
             type: count
             rolling_window:
                 trailing: unbounded
+          # Cat 7 — filtered rolling measure
+          - name: rolling_sum_7d_completed
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+            filters:
+                - sql: "{CUBE}.status = 'completed'"
+          # Cat 8 — to_date with quarter and year
+          - name: rolling_sum_to_date_quarter
+            type: sum
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: quarter
+          - name: rolling_sum_to_date_year
+            type: sum
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: year
+          # Cat 11 — calculated measures over rolling
+          - name: rolling_sum_ratio
+            type: number
+            sql: "{orders.rolling_sum_trailing_7d} / NULLIF({orders.total_amount}, 0)"
+          - name: rolling_sum_plus_count
+            type: number
+            sql: "{orders.rolling_sum_trailing_7d} + {orders.rolling_count_unbounded}"
           # Cat 5 — different windows for multi-rolling tests
           - name: rolling_sum_14d
             type: sum
