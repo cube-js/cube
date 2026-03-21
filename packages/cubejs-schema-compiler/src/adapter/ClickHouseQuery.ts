@@ -119,7 +119,7 @@ export class ClickHouseQuery extends BaseQuery {
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
     // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
     // However parseDateTimeBestEffort works with ISO8601
-    return `parseDateTimeBestEffort(${value})`;
+    return `parseDateTime64BestEffort(${value}, 3)`;
   }
 
   public dimensionsJoinCondition(leftAlias, rightAlias) {
@@ -219,7 +219,7 @@ export class ClickHouseQuery extends BaseQuery {
       datesTo.push(to);
     });
 
-    return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join('\',\'')}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
+    return `SELECT parseDateTime64BestEffort(arrayJoin(['${datesFrom.join('\',\'')}']), 3) as date_from, parseDateTime64BestEffort(arrayJoin(['${datesTo.join('\',\'')}']), 3) as date_to`;
   }
 
   public concatStringsSql(strings) {
@@ -266,7 +266,7 @@ export class ClickHouseQuery extends BaseQuery {
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
-    templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
+    templates.expressions.timestamp_literal = 'parseDateTime64BestEffort(\'{{ value }}\', 3)';
     delete templates.functions.PERCENTILECONT;
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
@@ -279,7 +279,7 @@ export class ClickHouseQuery extends BaseQuery {
     delete templates.types.binary;
     templates.expressions.is_not_distinct_from = 'isNotDistinctFrom({{ left }}, {{ right }})';
 
-    templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
+    templates.statements.time_series_select = 'SELECT parseDateTime64BestEffort(dates.f, 3) date_from, parseDateTime64BestEffort(dates.t, 3) date_to \n' +
     'FROM (\n' +
     '{% for time_item in seria  %}' +
     '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
