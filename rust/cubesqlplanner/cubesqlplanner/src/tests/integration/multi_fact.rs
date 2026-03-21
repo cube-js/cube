@@ -284,6 +284,35 @@ async fn test_multiplied_with_measure_filter() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_measure_filter_on_second_fact() {
+    let ctx = create_context();
+
+    // HAVING returns.count > 1 in multi-fact context
+    // returns by customer: Alice=1, Bob=2, Charlie=2, Diana=0
+    // After filter: Bob(orders=3, returns=2), Charlie(orders=0/NULL, returns=2)
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        filters:
+          - member: returns.count
+            operator: gt
+            values:
+              - \"1\"
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multiplied_with_time_granularity() {
     let ctx = create_context();
 

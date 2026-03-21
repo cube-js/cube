@@ -255,6 +255,287 @@ async fn test_multiple_filters_and_logic() {
     }
 }
 
+// --- Step 1: Missing filter operators ---
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_lt() {
+    let ctx = create_context();
+
+    // amount < 100 → orders: 3(50), 5(25), 7(75), 9(40) → count=4
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.amount
+            operator: lt
+            values:
+              - \"100\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_lte() {
+    let ctx = create_context();
+
+    // amount <= 100 → orders: 1(100), 3(50), 5(25), 7(75), 9(40) → count=5
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.amount
+            operator: lte
+            values:
+              - \"100\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_set() {
+    let ctx = create_context();
+
+    // city IS NOT NULL → customers: 1,2,4,5 → orders: 1,2,3,4,6,7,8 → count=7
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: customers.city
+            operator: set
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_starts_with() {
+    let ctx = create_context();
+
+    // name startsWith 'Ali' → Alice Johnson(1), Alice Cooper(4) → orders: 1,2,6,7 → count=4
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: customers.name
+            operator: startsWith
+            values:
+              - Ali
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_ends_with() {
+    let ctx = create_context();
+
+    // name endsWith 'Smith' → Bob Smith(2) → orders: 3,4 → count=2
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: customers.name
+            operator: endsWith
+            values:
+              - Smith
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_not_contains() {
+    let ctx = create_context();
+
+    // name notContains 'Alice' → Bob Smith(2), Charlie Brown(3), Diana Prince(5)
+    // → orders: 3,4 + 5,9 + 8 → count=5
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: customers.name
+            operator: notContains
+            values:
+              - Alice
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_in_date_range() {
+    let ctx = create_context();
+
+    // inDateRange ['2024-02-01', '2024-02-29']
+    // → >= 2024-02-01T00:00:00 AND <= 2024-02-29T23:59:59.999
+    // → orders: 3(Feb 10), 4(Feb 15) → count=2
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.created_at
+            operator: inDateRange
+            values:
+              - \"2024-02-01\"
+              - \"2024-02-29\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_not_in_date_range() {
+    let ctx = create_context();
+
+    // notInDateRange ['2024-02-01', '2024-02-29']
+    // → < 2024-02-01T00:00:00 OR > 2024-02-29T23:59:59.999
+    // → orders: 1,2,9(Jan) + 5,6,7(Mar) + 8(Apr) → count=7
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.created_at
+            operator: notInDateRange
+            values:
+              - \"2024-02-01\"
+              - \"2024-02-29\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_before_date() {
+    let ctx = create_context();
+
+    // beforeDate '2024-02-01' → < 2024-02-01T00:00:00.000
+    // → orders: 1(Jan15), 2(Jan20), 9(Jan15) → count=3
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.created_at
+            operator: beforeDate
+            values:
+              - \"2024-02-01\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_after_date() {
+    let ctx = create_context();
+
+    // afterDate '2024-03-31' → > 2024-03-31T23:59:59.999
+    // → orders: 8(Apr 1 10:00) → count=1
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.created_at
+            operator: afterDate
+            values:
+              - \"2024-03-31\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_equals_multiple_values() {
+    let ctx = create_context();
+
+    // status IN ('completed', 'pending')
+    // → orders: 1,2,4,6,8(completed) + 3,7,9(pending) → count=8
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+              - pending
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_filter_having() {
+    let ctx = create_context();
+
+    // GROUP BY status, HAVING count > 2
+    // completed: 5 rows → ✓, pending: 3 rows → ✓, cancelled: 1 row → ✗
+    // → 2 groups: completed(5), pending(3)
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        filters:
+          - member: orders.count
+            operator: gt
+            values:
+              - \"2\"
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_segment_with_dimension_grouping() {
     let ctx = create_context();
