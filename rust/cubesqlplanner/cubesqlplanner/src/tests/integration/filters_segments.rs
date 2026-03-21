@@ -555,3 +555,75 @@ async fn test_segment_with_dimension_grouping() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiple_segments_combined() {
+    let ctx = create_context();
+
+    // completed_orders AND sf_customers → only order 4 (completed, Bob=SF)
+    // count=1, total_amount=300
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+        segments:
+          - orders.completed_orders
+          - customers.sf_customers
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_from_joined_cube() {
+    let ctx = create_context();
+
+    // sf_customers segment on joined cube → Bob's orders: 3(50), 4(300)
+    // count=2, total_amount=350
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+        segments:
+          - customers.sf_customers
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_with_time_dimension() {
+    let ctx = create_context();
+
+    // completed_orders + month granularity + dateRange [Jan-Mar]
+    // Jan: 2(300), Feb: 1(300), Mar: 1(150)
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+        segments:
+          - orders.completed_orders
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - \"2024-01-01\"
+              - \"2024-03-31\"
+        order:
+          - id: orders.created_at
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
