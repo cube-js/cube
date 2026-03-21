@@ -1,0 +1,55 @@
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: amount
+        type: number
+        sql: amount
+      - name: created_at
+        type: time
+        sql: created_at
+        granularities:
+          - name: half_year
+            interval: "6 months"
+            origin: "2024-01-01"
+          - name: bi_weekly
+            interval: "2 weeks"
+          - name: fiscal_year
+            interval: "1 year"
+            offset: "3 months"
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        type: sum
+        sql: amount
+      - name: rolling_sum_7d
+        type: sum
+        sql: amount
+        rolling_window:
+            trailing: 7 day
+      - name: rolling_sum_to_date_month
+        type: sum
+        sql: amount
+        rolling_window:
+            type: to_date
+            granularity: month
+      - name: rolling_sum_to_date_half_year
+        type: sum
+        sql: amount
+        rolling_window:
+            type: to_date
+            granularity: half_year
+      - name: rolling_sum_to_date_fiscal_year
+        type: sum
+        sql: amount
+        rolling_window:
+            type: to_date
+            granularity: fiscal_year
