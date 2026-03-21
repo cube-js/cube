@@ -23,6 +23,11 @@ cubes:
             type: number
             sql: "{CustomerOrders.orderTotal}"
             sub_query: true
+          - name: totalSpendPropagated
+            type: number
+            sql: "{CustomerOrders.orderTotal}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
       measures:
           - name: count
             type: count

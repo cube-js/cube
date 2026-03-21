@@ -1,10 +1,17 @@
+mod advanced_features;
+mod advanced_filters;
 mod combinations;
 mod custom_granularities;
+mod filtered_measures;
 mod filters_segments;
 mod joins;
+mod member_expressions;
 mod modifiers;
 mod multi_fact;
+mod null_filters;
+mod propagate_subquery;
 mod single_cube;
 mod subquery_dimensions;
 mod time_dimensions;
+mod transitive_joins;
 mod views;

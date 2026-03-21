@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/transitive_joins.rs
+expression: result
+---
+cube_a__count
+-------------
+2

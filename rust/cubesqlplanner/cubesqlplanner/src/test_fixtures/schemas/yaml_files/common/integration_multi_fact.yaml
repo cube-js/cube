@@ -51,6 +51,9 @@ cubes:
           - name: unique_customers
             type: count_distinct
             sql: customer_id
+          - name: avg_amount_per_return
+            type: number
+            sql: "{orders.total_amount} / NULLIF({returns.count}, 0)"
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"

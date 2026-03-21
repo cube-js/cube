@@ -78,6 +78,12 @@ cubes:
           - name: avg_order_value
             type: number
             sql: "{orders.total_amount} / {orders.count}"
+          - name: min_created_at
+            type: min
+            sql: created_at
+          - name: status_summary
+            type: string
+            sql: "CASE WHEN {orders.count} > 3 THEN 'high' ELSE 'low' END"
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
