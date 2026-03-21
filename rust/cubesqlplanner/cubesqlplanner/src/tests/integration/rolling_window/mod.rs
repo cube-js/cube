@@ -2,11 +2,16 @@ mod aggregation_types;
 mod basic_types;
 mod calculated_measures;
 mod different_granularities;
+mod edge_cases;
 mod filtered_rolling_measures;
 mod mixed_measures;
-mod multi_fact; // Cat 10: separate schema + seed (integration_rolling_window_multi_fact)
+mod multi_fact;
 mod multiple_rolling;
+mod offset_variations;
+mod running_total;
 mod time_dimension_variations;
+mod to_date_variations;
+mod views;
 mod with_dimensions;
 mod with_filters;
 mod with_joins;

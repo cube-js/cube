@@ -137,6 +137,46 @@ cubes:
           - name: rolling_sum_plus_count
             type: number
             sql: "{orders.rolling_sum_trailing_7d} + {orders.rolling_count_unbounded}"
+          # Cat 13 — offset variations
+          - name: rolling_sum_7d_offset_start
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+                offset: start
+          - name: rolling_sum_7d_offset_end
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+                offset: end
+          - name: rolling_sum_bounded_offset_start
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 3 day
+                leading: 1 day
+                offset: start
+          - name: rolling_sum_bounded_offset_end
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 3 day
+                leading: 1 day
+                offset: end
+          # Cat 15 — running total
+          - name: running_total
+            type: runningTotal
+            sql: amount
+          # Cat 16 — count distinct
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+          - name: rolling_unique_customers_7d
+            type: count_distinct
+            sql: customer_id
+            rolling_window:
+                trailing: 7 day
           # Cat 5 — different windows for multi-rolling tests
           - name: rolling_sum_14d
             type: sum
@@ -150,3 +190,17 @@ cubes:
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
+
+views:
+    - name: orders_rolling_view
+      cubes:
+          - join_path: orders
+            includes:
+                - created_at
+                - category
+                - rolling_sum_trailing_7d
+                - rolling_sum_to_date
+                - count
+          - join_path: orders.customers
+            includes:
+                - name
