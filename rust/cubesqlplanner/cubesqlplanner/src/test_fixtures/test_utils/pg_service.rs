@@ -1,12 +1,15 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use testcontainers::core::{CmdWaitFor, ExecCommand};
 use testcontainers::runners::AsyncRunner;
-use testcontainers::ContainerAsync;
+use testcontainers::ImageExt;
 use testcontainers_modules::postgres::Postgres;
 use tokio::sync::OnceCell;
 use tokio_postgres::{Client, NoTls};
 
+type PgContainer = testcontainers::ContainerAsync<Postgres>;
+
 struct PgInstance {
-    _container: ContainerAsync<Postgres>,
+    _container: PgContainer,
     host: String,
     port: u16,
 }
@@ -16,9 +19,23 @@ static DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 async fn init_pg() -> PgInstance {
     let container = Postgres::default()
+        .with_tag("16-bookworm")
         .start()
         .await
         .expect("Failed to start Postgres container");
+
+    // Install HLL extension for countDistinctApprox support
+    container
+        .exec(
+            ExecCommand::new(vec![
+                "sh",
+                "-c",
+                "apt-get update -qq && apt-get install -y -qq postgresql-16-hll > /dev/null 2>&1",
+            ])
+            .with_cmd_ready_condition(CmdWaitFor::exit_code(0)),
+        )
+        .await
+        .expect("Failed to install postgresql-16-hll");
 
     let host = container
         .get_host()

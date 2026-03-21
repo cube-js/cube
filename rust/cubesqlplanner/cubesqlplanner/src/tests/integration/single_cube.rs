@@ -110,13 +110,17 @@ async fn test_count_distinct() {
 async fn test_count_distinct_approx() {
     let ctx = create_context();
 
-    // countDistinctApprox — SQL generation only (HLL not available in plain PG)
+    // countDistinctApprox via HLL — unique customers = 5
     let query = indoc! {"
         measures:
           - orders.approx_unique_customers
     "};
 
     ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
