@@ -154,3 +154,128 @@ async fn test_ungrouped_multiplied() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_limit_only_no_offset() {
+    let ctx = create_basic_context();
+
+    // Limit 2 without offset: cancelled(1), completed(5)
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+        row_limit: \"2\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, BASIC_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_measure_only() {
+    let ctx = create_basic_context();
+
+    // Order by count desc only (no dimension in ORDER)
+    // completed=5, pending=3, cancelled=1
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.count
+            desc: true
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, BASIC_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_time_dimension() {
+    let ctx = create_basic_context();
+
+    // Order by time dimension desc: Apr(1), Mar(3), Feb(2), Jan(3)
+    let query = indoc! {"
+        measures:
+          - orders.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        order:
+          - id: orders.created_at
+            desc: true
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, BASIC_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_with_filter() {
+    let ctx = create_basic_context();
+
+    // Ungrouped + filter status=completed → orders 1,2,4,6,8
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.id
+          - orders.status
+          - orders.amount
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        ungrouped: true
+        order:
+          - id: orders.id
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, BASIC_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_with_time_dimension() {
+    let ctx = create_basic_context();
+
+    // Ungrouped + time dimension dateRange Jan → orders 1,2,9
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.id
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            dateRange:
+              - \"2024-01-01\"
+              - \"2024-01-31\"
+        ungrouped: true
+        order:
+          - id: orders.id
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, BASIC_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
