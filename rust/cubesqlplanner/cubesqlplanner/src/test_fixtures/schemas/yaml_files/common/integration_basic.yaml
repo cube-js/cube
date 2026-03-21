@@ -63,6 +63,15 @@ cubes:
           - name: unique_customers
             type: count_distinct
             sql: customer_id
+          - name: unique_statuses
+            type: count_distinct
+            sql: status
+          - name: approx_unique_customers
+            type: countDistinctApprox
+            sql: customer_id
+          - name: avg_order_value
+            type: number
+            sql: "{orders.total_amount} / {orders.count}"
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"

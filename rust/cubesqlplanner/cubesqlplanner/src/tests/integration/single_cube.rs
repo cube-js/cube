@@ -103,3 +103,75 @@ async fn test_count_distinct() {
         insta::assert_snapshot!(result);
     }
 }
+
+// --- Step 3: Additional measure types ---
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_count_distinct_approx() {
+    let ctx = create_context();
+
+    // countDistinctApprox — SQL generation only (HLL not available in plain PG)
+    let query = indoc! {"
+        measures:
+          - orders.approx_unique_customers
+    "};
+
+    ctx.build_sql(query).unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiple_count_distinct() {
+    let ctx = create_context();
+
+    // Two countDistinct measures: unique_customers=5, unique_statuses=3
+    let query = indoc! {"
+        measures:
+          - orders.unique_customers
+          - orders.unique_statuses
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_number_measure() {
+    let ctx = create_context();
+
+    // Calculated measure: total_amount / count = 1440 / 9 = 160
+    let query = indoc! {"
+        measures:
+          - orders.avg_order_value
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_number_measure_with_dimension() {
+    let ctx = create_context();
+
+    // Calculated measure by status:
+    // completed: 1250/5=250, pending: 165/3=55, cancelled: 25/1=25
+    let query = indoc! {"
+        measures:
+          - orders.avg_order_value
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_basic_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
