@@ -1,5 +1,10 @@
 mod add_group_by;
+mod calculated;
+mod case_switch;
+mod dimensions;
+mod filters;
 mod group_by;
+mod rank;
 mod reduce_by;
 mod time_shift_basic;
 mod time_shift_mixed;

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/rank.rs
+expression: result
+---
+orders__status | orders__total_amount | orders__amount_rank
+---------------+----------------------+--------------------
+cancelled      | 200.00               | 1                  
+completed      | 1400.00              | 1                  
+pending        | 650.00               | 1
