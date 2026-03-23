@@ -42,7 +42,7 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
-          # --- Cat 8: multi-stage dimensions ---
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -57,7 +57,7 @@ cubes:
                 - customers.id
 
       measures:
-          # --- Base measures ---
+
           - name: count
             type: count
 
@@ -69,7 +69,7 @@ cubes:
             type: avg
             sql: amount
 
-          # --- Cat 1: add_group_by ---
+
           - name: amount_by_id
             type: number
             sql: "{CUBE.total_amount}"
@@ -92,7 +92,7 @@ cubes:
                 - orders.status
                 - orders.category
 
-          # --- Cat 2: reduce_by ---
+
           - name: amount_reduce_category
             type: sum
             sql: "{CUBE.total_amount}"
@@ -115,7 +115,7 @@ cubes:
                 - orders.status
                 - orders.category
 
-          # --- Cat 3: group_by ---
+
           - name: amount_group_by_status
             type: sum
             sql: "{CUBE.total_amount}"
@@ -146,7 +146,7 @@ cubes:
                 - orders.status
                 - orders.created_at.month
 
-          # --- Cat 4-5: time_shift ---
+
           - name: amount_prev_month
             type: number
             sql: "{CUBE.total_amount}"
@@ -179,7 +179,7 @@ cubes:
             sql: "{CUBE.total_amount} - {CUBE.amount_prev_month}"
             multi_stage: true
 
-          # --- Cat 6: calculated measures over multi-stage ---
+
           - name: mom_growth
             type: number
             sql: "({CUBE.total_amount} - {CUBE.amount_prev_month}) / NULLIF({CUBE.amount_prev_month}, 0)"
@@ -190,7 +190,7 @@ cubes:
             sql: "{CUBE.total_amount} / NULLIF({CUBE.amount_reduce_category}, 0)"
             multi_stage: true
 
-          # --- Cat 7: rank measures ---
+
           - name: amount_rank
             type: rank
             multi_stage: true
@@ -207,7 +207,7 @@ cubes:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
 
-          # --- Cat 9: case/switch ---
+
           - name: status_weighted_amount
             type: number
             multi_stage: true

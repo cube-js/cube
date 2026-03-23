@@ -1,0 +1,5 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/edge_cases.rs
+expression: result
+---
+(empty result)

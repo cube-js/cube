@@ -17,9 +17,7 @@ pub struct YamlBaseQueryOptions {
     pub order: Option<Vec<YamlOrderByItem>>,
     #[serde(default)]
     pub filters: Option<Vec<YamlFilterItem>>,
-    #[serde(default)]
-    pub limit: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "limit")]
     pub row_limit: Option<String>,
     #[serde(default)]
     pub offset: Option<String>,
