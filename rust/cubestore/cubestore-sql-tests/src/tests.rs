@@ -11193,7 +11193,7 @@ async fn queue_full_workflow_v2_with_external_id(
         &vec![Row::new(vec![TableValue::Boolean(true)])]
     );
 
-    // QUEUE RESULT EXTERNAL_ID "ext-v2" "path" — found by external_id, marks deleted
+    // QUEUE RESULT EXTERNAL_ID "ext-v2" "path" — found by external_id (read-many)
     let result = service
         .exec_query(r#"QUEUE RESULT EXTERNAL_ID "ext-v2" "STANDALONE#queue:ext_v2""#)
         .await?;
@@ -11203,7 +11203,7 @@ async fn queue_full_workflow_v2_with_external_id(
         &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
     );
 
-    // Second call still returns result (mark-then-read semantics of external_id lookup)
+    // Second call still returns result (read-many semantics for external_id lookup)
     let result = service
         .exec_query(r#"QUEUE RESULT EXTERNAL_ID "ext-v2" "STANDALONE#queue:ext_v2""#)
         .await?;
@@ -11212,7 +11212,16 @@ async fn queue_full_workflow_v2_with_external_id(
         &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
     );
 
-    // QUEUE RESULT by path returns empty (marked deleted by external_id read)
+    // QUEUE RESULT by path still works (marks deleted on first read)
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_eq!(
+        result.get_rows(),
+        &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
+    );
+
+    // QUEUE RESULT by path returns empty after mark-delete
     let result = service
         .exec_query(r#"QUEUE RESULT "STANDALONE#queue:ext_v2""#)
         .await?;
@@ -11225,6 +11234,16 @@ async fn queue_full_workflow_v2_with_external_id(
         &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
     );
 
+    // QUEUE RESULT by external_id still works after path mark-delete (read-many)
+    let result = service
+        .exec_query(r#"QUEUE RESULT EXTERNAL_ID "ext-v2" "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_eq!(
+        result.get_rows(),
+        &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
+    );
+
+    // Unknown external_id returns empty
     let result = service
         .exec_query(r#"QUEUE RESULT EXTERNAL_ID "unknown-ext" "STANDALONE#queue:ext_v2""#)
         .await?;
