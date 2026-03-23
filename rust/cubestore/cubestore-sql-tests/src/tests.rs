@@ -358,6 +358,7 @@ lazy_static::lazy_static! {
         "queue_result_by_external_id",
         "queue_full_workflow_v1",
         "queue_full_workflow_v2",
+        "queue_full_workflow_v2_with_external_id",
         "queue_heartbeat_by_id",
         "queue_heartbeat_by_path",
         "queue_latest_result_v1",
@@ -10587,9 +10588,10 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), Cube
 }
 
 async fn queue_ack_then_result_v1(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
         .await?;
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
     let ack_result = service
         .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
@@ -10628,7 +10630,7 @@ async fn queue_ack_then_result_v1(service: Box<dyn SqlClient>) -> Result<(), Cub
     assert_queue_result_columns(&result);
     assert_eq!(
         result.get_rows(),
-        &vec![queue_result_row("result:5555", "1", None)]
+        &vec![queue_result_row("result:5555", &id, None)]
     );
 
     // second call should not return anything, because first call should remove result
@@ -11129,12 +11131,12 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) -> Result<(), CubeEr
 }
 
 async fn queue_result_by_external_id(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    service
+    let add_response = service
         .exec_query(
             r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-123' "STANDALONE#queue:123456789" "payload123456789";"#,
         )
-        .await
-        ?;
+        .await?;
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
     let ack_result = service
         .exec_query(r#"QUEUE ACK "STANDALONE#queue:123456789" "result:123456789""#)
@@ -11156,7 +11158,7 @@ async fn queue_result_by_external_id(service: Box<dyn SqlClient>) -> Result<(), 
 
     assert_eq!(
         result.get_rows(),
-        &vec![queue_result_row("result:123456789", "1", Some("ext-123"))]
+        &vec![queue_result_row("result:123456789", &id, Some("ext-123"))]
     );
 
     // Second call should return empty (result deleted after first retrieval)
@@ -11165,7 +11167,7 @@ async fn queue_result_by_external_id(service: Box<dyn SqlClient>) -> Result<(), 
         .await?;
     assert_eq!(
         result.get_rows(),
-        &vec![queue_result_row("result:123456789", "1", Some("ext-123"))]
+        &vec![queue_result_row("result:123456789", &id, Some("ext-123"))]
     );
     Ok(())
 }
