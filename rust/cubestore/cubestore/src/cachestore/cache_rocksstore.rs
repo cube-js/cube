@@ -588,63 +588,55 @@ impl RocksCacheStore {
         self.write_operation_queue("lookup_queue_result_by_key", move |db_ref, batch_pipe| {
             let result_schema = QueueResultRocksTable::new(db_ref.clone());
 
-            if let QueueKey::ById(_) = &key {
-                let queue_result = result_schema.get_row_by_key(key)?;
-                return if let Some(queue_result) = queue_result {
-                    let id = queue_result.get_id();
-                    let external_id = queue_result.get_row().get_external_id().clone();
-                    Ok(Some(QueueResultResponse::Success {
-                        value: Some(queue_result.into_row().value),
-                        id,
-                        external_id,
-                    }))
-                } else {
-                    Ok(None)
+            // Try id first
+            if key.is_id() {
+                let Some(queue_result) = result_schema.get_row_by_key(key)? else {
+                    return Ok(None);
                 };
-            }
 
-            // ByPath — try external_id first (if provided), then fall back to path lookup
+                let id = queue_result.get_id();
+                let external_id = queue_result.get_row().get_external_id().clone();
+
+                return Ok(Some(QueueResultResponse::Success {
+                    value: Some(queue_result.into_row().value),
+                    id,
+                    external_id,
+                }));
+            };
+
+            // try external_id first (if provided), then fall back to path lookup
             if let Some(ref external_id) = external_id {
-                let queue_result = result_schema.get_row_by_external_id(external_id.clone())?;
-                if let Some(queue_result) = queue_result {
-                    if queue_result.get_row().is_deleted() {
-                        let id = queue_result.get_id();
-                        let external_id = queue_result.get_row().get_external_id().clone();
-                        return Ok(Some(QueueResultResponse::Success {
-                            value: Some(queue_result.into_row().value),
-                            id,
-                            external_id,
-                        }));
-                    } else {
-                        return Self::queue_result_ready_to_delete_impl(
-                            &result_schema,
-                            batch_pipe,
-                            queue_result,
-                        );
-                    }
+                let Some(queue_result) =
+                    result_schema.get_row_by_external_id(external_id.clone())?
+                else {
+                    return Ok(None);
+                };
+
+                let id = queue_result.get_id();
+                let external_id = queue_result.get_row().get_external_id().clone();
+
+                return Ok(Some(QueueResultResponse::Success {
+                    value: Some(queue_result.into_row().value),
+                    id,
+                    external_id,
+                }));
+            };
+
+            let Some(queue_result) = result_schema.get_row_by_key(key)? else {
+                return Ok(None);
+            };
+
+            // When external_id filter is active, only return if it matches
+            if let Some(ref external_id) = external_id {
+                if queue_result.get_row().get_external_id().as_ref() != Some(external_id) {
+                    return Ok(None);
                 }
             }
 
-            let queue_result = result_schema.get_row_by_key(key)?;
-            if let Some(queue_result) = queue_result {
-                // When external_id filter is active, only return if it matches
-                if let Some(ref external_id) = external_id {
-                    if queue_result.get_row().get_external_id().as_ref() != Some(external_id) {
-                        return Ok(None);
-                    }
-                }
-
-                if queue_result.get_row().is_deleted() {
-                    Ok(None)
-                } else {
-                    Self::queue_result_ready_to_delete_impl(
-                        &result_schema,
-                        batch_pipe,
-                        queue_result,
-                    )
-                }
-            } else {
+            if queue_result.get_row().is_deleted() {
                 Ok(None)
+            } else {
+                Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, queue_result)
             }
         })
         .await
@@ -705,7 +697,14 @@ impl QueueKey {
     pub(crate) fn is_path(&self) -> bool {
         match self {
             QueueKey::ByPath(_) => true,
-            QueueKey::ById(_) => false,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_id(&self) -> bool {
+        match self {
+            QueueKey::ById(_) => true,
+            _ => false,
         }
     }
 }
