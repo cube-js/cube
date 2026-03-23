@@ -154,6 +154,7 @@ pub enum QueueCommand {
     },
     Result {
         key: QueueKey,
+        external_id: Option<String>,
     },
     ResultByExternalId {
         key: Ident,
@@ -628,9 +629,18 @@ impl<'a> CubeStoreParser<'a> {
                     concurrency,
                 }
             }
-            "result" => QueueCommand::Result {
-                key: self.parse_queue_key()?,
-            },
+            "result" => {
+                let external_id = if self.parse_custom_token("external_id") {
+                    Some(self.parser.parse_literal_string()?)
+                } else {
+                    None
+                };
+
+                QueueCommand::Result {
+                    key: self.parse_queue_key()?,
+                    external_id,
+                }
+            }
             "result_by_external_id" => QueueCommand::ResultByExternalId {
                 key: self.parser.parse_identifier()?,
             },
