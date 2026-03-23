@@ -1,6 +1,10 @@
 cubes:
     - name: customers
       sql: "SELECT * FROM ms_customers"
+      joins:
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
       dimensions:
           - name: id
             type: number
@@ -57,7 +61,6 @@ cubes:
                 - customers.id
 
       measures:
-
           - name: count
             type: count
 
@@ -68,7 +71,6 @@ cubes:
           - name: avg_amount
             type: avg
             sql: amount
-
 
           - name: amount_by_id
             type: number
@@ -92,7 +94,6 @@ cubes:
                 - orders.status
                 - orders.category
 
-
           - name: amount_reduce_category
             type: sum
             sql: "{CUBE.total_amount}"
@@ -114,7 +115,6 @@ cubes:
             reduce_by:
                 - orders.status
                 - orders.category
-
 
           - name: amount_group_by_status
             type: sum
@@ -145,7 +145,6 @@ cubes:
             group_by:
                 - orders.status
                 - orders.created_at.month
-
 
           - name: amount_prev_month
             type: number
@@ -179,7 +178,6 @@ cubes:
             sql: "{CUBE.total_amount} - {CUBE.amount_prev_month}"
             multi_stage: true
 
-
           - name: mom_growth
             type: number
             sql: "({CUBE.total_amount} - {CUBE.amount_prev_month}) / NULLIF({CUBE.amount_prev_month}, 0)"
@@ -189,7 +187,6 @@ cubes:
             type: number
             sql: "{CUBE.total_amount} / NULLIF({CUBE.amount_reduce_category}, 0)"
             multi_stage: true
-
 
           - name: amount_rank
             type: rank
@@ -207,7 +204,6 @@ cubes:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
 
-
           - name: status_weighted_amount
             type: number
             multi_stage: true
@@ -221,6 +217,44 @@ cubes:
                 else:
                     sql: "{CUBE.total_amount} * 0"
 
+          - name: rolling_sum_7d
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+                offset: start
+
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
+
+    - name: returns
+      sql: "SELECT * FROM ms_returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
+
+views:
+    - name: orders_ms_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - created_at
+                - total_amount
+                - amount_prev_month
+                - mom_growth

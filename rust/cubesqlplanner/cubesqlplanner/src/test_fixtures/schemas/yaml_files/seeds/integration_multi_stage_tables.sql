@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS ms_returns CASCADE;
 DROP TABLE IF EXISTS ms_orders CASCADE;
 DROP TABLE IF EXISTS ms_customers CASCADE;
 
@@ -44,3 +45,22 @@ INSERT INTO ms_orders (id, customer_id, status, category, amount, created_at) VA
     (13, 3, 'pending',    'clothing',    250.00, '2024-03-12 09:00:00'),
     (14, 3, 'cancelled',  'books',       100.00, '2024-03-18 11:00:00'),
     (15, 3, 'pending',    'electronics',  50.00, '2024-03-24 16:00:00');
+
+CREATE TABLE ms_returns (
+    id INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES ms_customers(id),
+    refund_amount NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+
+-- Returns totals: Jan=130, Feb=180, Mar=250, Grand=560
+INSERT INTO ms_returns (id, customer_id, refund_amount, created_at) VALUES
+    -- January 2024 — customer 1 (Alice)
+    (1, 1, 50.00,  '2024-01-08 10:00:00'),
+    (2, 1, 80.00,  '2024-01-22 14:00:00'),
+    -- February 2024 — customer 2 (Bob)
+    (3, 2, 100.00, '2024-02-10 11:00:00'),
+    (4, 2, 80.00,  '2024-02-20 16:00:00'),
+    -- March 2024 — customer 3 (Charlie)
+    (5, 3, 150.00, '2024-03-05 09:00:00'),
+    (6, 3, 100.00, '2024-03-15 13:00:00');
