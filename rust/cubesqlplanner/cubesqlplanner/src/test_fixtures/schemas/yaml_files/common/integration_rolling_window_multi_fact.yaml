@@ -2,12 +2,12 @@ cubes:
     - name: customers
       sql: "SELECT * FROM mf_customers"
       joins:
-          - name: orders
+          - name: payments
             relationship: one_to_many
-            sql: "{customers}.id = {orders.customer_id}"
-          - name: returns
+            sql: "{customers}.id = {payments.customer_id}"
+          - name: messages
             relationship: one_to_many
-            sql: "{customers}.id = {returns.customer_id}"
+            sql: "{customers}.id = {messages.customer_id}"
       dimensions:
           - name: id
             type: number
@@ -19,12 +19,15 @@ cubes:
           - name: city
             type: string
             sql: city
+          - name: registered_at
+            type: time
+            sql: registered_at
       measures:
           - name: count
             type: count
 
-    - name: orders
-      sql: "SELECT * FROM mf_orders"
+    - name: payments
+      sql: "SELECT * FROM mf_payments"
       dimensions:
           - name: id
             type: number
@@ -45,14 +48,14 @@ cubes:
           - name: total_amount
             type: sum
             sql: amount
-          - name: rolling_sum_trailing_7d
+          - name: rolling_sum_7d
             type: sum
             sql: amount
             rolling_window:
                 trailing: 7 day
 
-    - name: returns
-      sql: "SELECT * FROM mf_returns"
+    - name: messages
+      sql: "SELECT * FROM mf_messages"
       dimensions:
           - name: id
             type: number
@@ -61,26 +64,12 @@ cubes:
           - name: customer_id
             type: number
             sql: customer_id
-          - name: reason
-            type: string
-            sql: reason
-          - name: refund
-            type: number
-            sql: refund
           - name: created_at
             type: time
             sql: created_at
       measures:
           - name: count
             type: count
-          - name: total_refund
-            type: sum
-            sql: refund
-          - name: rolling_refund_7d
-            type: sum
-            sql: refund
-            rolling_window:
-                trailing: 7 day
           - name: rolling_count_7d
             type: count
             rolling_window:
