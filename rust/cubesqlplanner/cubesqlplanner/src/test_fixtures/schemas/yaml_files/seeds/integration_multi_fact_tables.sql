@@ -6,7 +6,8 @@ DROP TABLE IF EXISTS customers CASCADE;
 CREATE TABLE customers (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    city TEXT NOT NULL
+    city TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE orders (
@@ -32,11 +33,11 @@ CREATE TABLE reviews (
     created_at TIMESTAMP NOT NULL
 );
 
-INSERT INTO customers (id, name, city) VALUES
-    (1, 'Alice', 'New York'),
-    (2, 'Bob', 'Boston'),
-    (3, 'Charlie', 'Chicago'),
-    (4, 'Diana', 'New York');
+INSERT INTO customers (id, name, city, created_at) VALUES
+    (1, 'Alice', 'New York', '2025-01-15 10:00:00'),
+    (2, 'Bob', 'Boston', '2025-02-01 12:00:00'),
+    (3, 'Charlie', 'Chicago', '2025-02-15 09:00:00'),
+    (4, 'Diana', 'New York', '2025-03-01 08:00:00');
 
 INSERT INTO orders (id, customer_id, status, amount, created_at) VALUES
     (1, 1, 'completed', 100.00, '2025-03-01 10:00:00'),

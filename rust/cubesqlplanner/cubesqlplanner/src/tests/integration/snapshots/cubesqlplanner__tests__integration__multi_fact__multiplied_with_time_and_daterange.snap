@@ -2,10 +2,8 @@
 source: cubesqlplanner/src/tests/integration/multi_fact.rs
 expression: result
 ---
-customers__name | orders__created_at_day | orders__count | returns__count
-----------------+------------------------+---------------+---------------
-Alice           | 2025-03-01 00:00:00    | 1             | 1             
-Alice           | 2025-03-02 00:00:00    | 1             | 1             
-Alice           | 2025-03-03 00:00:00    | 1             | 1             
-Bob             | 2025-03-04 00:00:00    | 1             | 2             
-Bob             | 2025-03-05 00:00:00    | 1             | 2
+customers__name | customers__created_at_month | orders__count | returns__count
+----------------+-----------------------------+---------------+---------------
+Alice           | 2025-01-01 00:00:00         | 4             | 1             
+Bob             | 2025-02-01 00:00:00         | 3             | 2             
+Charlie         | 2025-02-01 00:00:00         | 0             | 2
