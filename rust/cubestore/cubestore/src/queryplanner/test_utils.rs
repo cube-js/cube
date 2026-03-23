@@ -858,7 +858,11 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_result(&self, _key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError> {
+    async fn queue_result(
+        &self,
+        _key: QueueKey,
+        _external_id: Option<String>,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 

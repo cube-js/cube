@@ -526,8 +526,9 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Result { key } => {
-                let ack_result = self.cachestore.queue_result(key).await?;
+            QueueCommand::Result { key, external_id } => {
+                let ack_result = self.cachestore.queue_result(key, external_id).await?;
+
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
                 } else {
@@ -539,6 +540,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -563,6 +566,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -584,6 +589,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),

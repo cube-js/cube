@@ -9765,10 +9765,11 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
             .await?;
         assert_eq!(
             blocking_res.get_rows(),
-            &vec![Row::new(vec![
-                TableValue::String(format!("result:{}", interval_id)),
-                TableValue::String("success".to_string())
-            ]),]
+            &vec![queue_result_row(
+                &format!("result:{}", interval_id),
+                &interval_id.to_string(),
+                None
+            )]
         );
     }
     Ok(())
@@ -10154,10 +10155,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         let (blocking_res, _ack_res) = join!(blocking, ack);
         assert_eq!(
             blocking_res.get_rows(),
-            &vec![Row::new(vec![
-                TableValue::String("result:3".to_string()),
-                TableValue::String("success".to_string())
-            ]),]
+            &vec![queue_result_row("result:3", "3", None)]
         );
     }
 
@@ -10414,10 +10412,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) -> Result<(), CubeE
         let (blocking_res, _ack_res) = join!(blocking, ack);
         assert_eq!(
             blocking_res.get_rows(),
-            &vec![Row::new(vec![
-                TableValue::String("result:3".to_string()),
-                TableValue::String("success".to_string())
-            ]),]
+            &vec![queue_result_row("result:3", "3", None)]
         );
     }
 
@@ -10495,14 +10490,29 @@ fn assert_queue_retrieve_columns(response: &Arc<DataFrame>) {
     );
 }
 
-fn assert_queue_result_blocking_columns(response: &Arc<DataFrame>) {
+fn assert_queue_result_columns(response: &Arc<DataFrame>) {
     assert_eq!(
         response.get_columns(),
         &vec![
             Column::new("payload".to_string(), ColumnType::String, 0),
             Column::new("type".to_string(), ColumnType::String, 1),
+            Column::new("id".to_string(), ColumnType::String, 2),
+            Column::new("external_id".to_string(), ColumnType::String, 3),
         ]
     );
+}
+
+fn queue_result_row(payload: &str, id: &str, external_id: Option<&str>) -> Row {
+    Row::new(vec![
+        TableValue::String(payload.to_string()),
+        TableValue::String("success".to_string()),
+        TableValue::String(id.to_string()),
+        if let Some(ext_id) = external_id {
+            TableValue::String(ext_id.to_string())
+        } else {
+            TableValue::Null
+        },
+    ])
 }
 
 async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
@@ -10611,19 +10621,10 @@ async fn queue_ack_then_result_v1(service: Box<dyn SqlClient>) -> Result<(), Cub
         .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
         .await?;
 
-    assert_eq!(
-        result.get_columns(),
-        &vec![
-            Column::new("payload".to_string(), ColumnType::String, 0),
-            Column::new("type".to_string(), ColumnType::String, 1),
-        ]
-    );
+    assert_queue_result_columns(&result);
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:5555".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:5555", "1", None)]
     );
 
     // second call should not return anything, because first call should remove result
@@ -10673,19 +10674,10 @@ async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) -> Result<(), Cub
         .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
         .await?;
 
-    assert_eq!(
-        result.get_columns(),
-        &vec![
-            Column::new("payload".to_string(), ColumnType::String, 0),
-            Column::new("type".to_string(), ColumnType::String, 1),
-        ]
-    );
+    assert_queue_result_columns(&result);
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:5555".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:5555", &id, None)]
     );
 
     // second call should not return anything, because first call should mark result as ready to delete
@@ -10700,7 +10692,7 @@ async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) -> Result<(), Cub
     let result = service
         .exec_query(&format!("QUEUE RESULT_BLOCKING 1000 {}", id))
         .await?;
-    assert_queue_result_blocking_columns(&result);
+    assert_queue_result_columns(&result);
     assert_eq!(result.get_rows().len(), 1);
     Ok(())
 }
@@ -10721,19 +10713,10 @@ async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(
 
     // QUEUE RESULT by id (v2 read-many semantics) — returns result
     let result = service.exec_query(&format!("QUEUE RESULT {}", id)).await?;
-    assert_eq!(
-        result.get_columns(),
-        &vec![
-            Column::new("payload".to_string(), ColumnType::String, 0),
-            Column::new("type".to_string(), ColumnType::String, 1),
-        ]
-    );
+    assert_queue_result_columns(&result);
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:12345".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:12345", &id, None)]
     );
 
     // second call by id should still return result (read-many, not consume-once)
@@ -10801,29 +10784,17 @@ async fn queue_ack_then_result_v2_with_external_id(
     let result = service
         .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
         .await?;
-    assert_eq!(
-        result.get_columns(),
-        &vec![
-            Column::new("payload".to_string(), ColumnType::String, 0),
-            Column::new("type".to_string(), ColumnType::String, 1),
-        ]
-    );
+    assert_queue_result_columns(&result);
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:5555".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:5555", &id, Some("ext-5555"))]
     );
     let result = service
         .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
         .await?;
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:5555".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:5555", &id, Some("ext-5555"))]
     );
 
     // RESULT by path should also return empty (already marked as deleted)
@@ -10838,7 +10809,7 @@ async fn queue_ack_then_result_v2_with_external_id(
     let result = service
         .exec_query(&format!("QUEUE RESULT_BLOCKING 1000 {}", id))
         .await?;
-    assert_queue_result_blocking_columns(&result);
+    assert_queue_result_columns(&result);
     assert_eq!(result.get_rows().len(), 1);
     Ok(())
 }
@@ -11102,34 +11073,16 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) -> Result<(
         };
 
         let (blocking1_res, blocking2_res, _ack_res) = join!(blocking1, blocking2, ack);
-        assert_eq!(
-            blocking1_res.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("type".to_string(), ColumnType::String, 1),
-            ]
-        );
+        assert_queue_result_columns(&blocking1_res);
         assert_eq!(
             blocking1_res.get_rows(),
-            &vec![Row::new(vec![
-                TableValue::String("result:12345".to_string()),
-                TableValue::String("success".to_string())
-            ]),]
+            &vec![queue_result_row("result:12345", "1", None)]
         );
 
-        assert_eq!(
-            blocking2_res.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("type".to_string(), ColumnType::String, 1),
-            ]
-        );
+        assert_queue_result_columns(&blocking2_res);
         assert_eq!(
             blocking2_res.get_rows(),
-            &vec![Row::new(vec![
-                TableValue::String("result:12345".to_string()),
-                TableValue::String("success".to_string())
-            ]),]
+            &vec![queue_result_row("result:12345", "1", None)]
         );
     }
     Ok(())
@@ -11193,20 +11146,11 @@ async fn queue_result_by_external_id(service: Box<dyn SqlClient>) -> Result<(), 
     let result = service
         .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
         .await?;
-    assert_eq!(
-        result.get_columns(),
-        &vec![
-            Column::new("payload".to_string(), ColumnType::String, 0),
-            Column::new("type".to_string(), ColumnType::String, 1),
-        ]
-    );
+    assert_queue_result_columns(&result);
 
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:123456789".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:123456789", "1", Some("ext-123"))]
     );
 
     // Second call should return empty (result deleted after first retrieval)
@@ -11215,11 +11159,71 @@ async fn queue_result_by_external_id(service: Box<dyn SqlClient>) -> Result<(), 
         .await?;
     assert_eq!(
         result.get_rows(),
-        &vec![Row::new(vec![
-            TableValue::String("result:123456789".to_string()),
-            TableValue::String("success".to_string())
-        ]),]
+        &vec![queue_result_row("result:123456789", "1", Some("ext-123"))]
     );
+    Ok(())
+}
+
+async fn queue_full_workflow_v2_with_external_id(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    let add_response = service
+        .exec_query(
+            r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-v2' "STANDALONE#queue:ext_v2" "payload_ext_v2";"#,
+        )
+        .await?;
+    let id = assert_queue_add_and_get_id(&add_response)?;
+
+    let retrieve_response = service
+        .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_eq!(retrieve_response.get_rows().len(), 1);
+
+    let ack_result = service
+        .exec_query(&format!(r#"QUEUE ACK {} "result:ext_v2""#, id))
+        .await?;
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // QUEUE RESULT EXTERNAL_ID "ext-v2" "path" — found by external_id, marks deleted
+    let result = service
+        .exec_query(r#"QUEUE RESULT EXTERNAL_ID "ext-v2" "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_queue_result_columns(&result);
+    assert_eq!(
+        result.get_rows(),
+        &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
+    );
+
+    // Second call still returns result (mark-then-read semantics of external_id lookup)
+    let result = service
+        .exec_query(r#"QUEUE RESULT EXTERNAL_ID "ext-v2" "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_eq!(
+        result.get_rows(),
+        &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
+    );
+
+    // QUEUE RESULT by path returns empty (marked deleted by external_id read)
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_eq!(result.get_rows().len(), 0);
+
+    // QUEUE RESULT by id still works (read-many)
+    let result = service.exec_query(&format!("QUEUE RESULT {}", id)).await?;
+    assert_eq!(
+        result.get_rows(),
+        &vec![queue_result_row("result:ext_v2", &id, Some("ext-v2"))]
+    );
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT EXTERNAL_ID "unknown-ext" "STANDALONE#queue:ext_v2""#)
+        .await?;
+    assert_eq!(result.get_rows().len(), 0);
+
     Ok(())
 }
 

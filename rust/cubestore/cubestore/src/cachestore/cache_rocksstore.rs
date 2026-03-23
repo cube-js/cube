@@ -554,8 +554,12 @@ impl RocksCacheStore {
         queue_result: IdRow<QueueResult>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         if queue_result.get_row().is_deleted() {
+            let id = queue_result.get_id();
+            let external_id = queue_result.get_row().get_external_id().clone();
             return Ok(Some(QueueResultResponse::Success {
                 value: Some(queue_result.into_row().value),
+                id,
+                external_id,
             }));
         }
 
@@ -567,21 +571,56 @@ impl RocksCacheStore {
         // TODO: Partial update? Index?
         let queue_result = result_schema.update(row_id, new_row, &row, batch_pipe)?;
 
+        let id = queue_result.get_id();
+        let external_id = queue_result.get_row().get_external_id().clone();
         Ok(Some(QueueResultResponse::Success {
             value: Some(queue_result.into_row().value),
+            id,
+            external_id,
         }))
     }
 
     async fn lookup_queue_result_by_key(
         &self,
         key: QueueKey,
+        external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         self.write_operation_queue("lookup_queue_result_by_key", move |db_ref, batch_pipe| {
             let result_schema = QueueResultRocksTable::new(db_ref.clone());
+
+            // If external_id is provided, try lookup by external_id first
+            if let Some(ref external_id) = external_id {
+                let queue_result = result_schema.get_row_by_external_id(external_id.clone())?;
+                if let Some(queue_result) = queue_result {
+                    if queue_result.get_row().is_deleted() {
+                        let id = queue_result.get_id();
+                        let external_id = queue_result.get_row().get_external_id().clone();
+                        return Ok(Some(QueueResultResponse::Success {
+                            value: Some(queue_result.into_row().value),
+                            id,
+                            external_id,
+                        }));
+                    } else {
+                        return Self::queue_result_ready_to_delete_impl(
+                            &result_schema,
+                            batch_pipe,
+                            queue_result,
+                        );
+                    }
+                }
+            }
+
             let query_key_is_path = key.is_path();
             let queue_result = result_schema.get_row_by_key(key.clone())?;
 
             if let Some(queue_result) = queue_result {
+                // When external_id filter is active, only return if it matches
+                if let Some(ref external_id) = external_id {
+                    if queue_result.get_row().get_external_id().as_ref() != Some(external_id) {
+                        return Ok(None);
+                    }
+                }
+
                 if query_key_is_path {
                     if queue_result.get_row().is_deleted() {
                         Ok(None)
@@ -593,8 +632,12 @@ impl RocksCacheStore {
                         )
                     }
                 } else {
+                    let id = queue_result.get_id();
+                    let external_id = queue_result.get_row().get_external_id().clone();
                     Ok(Some(QueueResultResponse::Success {
                         value: Some(queue_result.into_row().value),
+                        id,
+                        external_id,
                     }))
                 }
             } else {
@@ -710,19 +753,35 @@ impl QueueCancelResponse {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueResultResponse {
-    Success { value: Option<String> },
+    Success {
+        value: Option<String>,
+        #[serde(default)]
+        id: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        external_id: Option<String>,
+    },
 }
 
 impl QueueResultResponse {
     pub fn into_queue_result_row(self) -> Row {
         match self {
-            QueueResultResponse::Success { value } => Row::new(vec![
+            QueueResultResponse::Success {
+                value,
+                id,
+                external_id,
+            } => Row::new(vec![
                 if let Some(v) = value {
                     TableValue::String(v)
                 } else {
                     TableValue::Null
                 },
                 TableValue::String("success".to_string()),
+                TableValue::String(id.to_string()),
+                if let Some(ext_id) = external_id {
+                    TableValue::String(ext_id)
+                } else {
+                    TableValue::Null
+                },
             ]),
         }
     }
@@ -839,7 +898,11 @@ pub trait CacheStore: DIService + Send + Sync {
         caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError>;
     async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError>;
-    async fn queue_result(&self, key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError>;
+    async fn queue_result(
+        &self,
+        key: QueueKey,
+        external_id: Option<String>,
+    ) -> Result<Option<QueueResultResponse>, CubeError>;
     async fn queue_result_by_external_id(
         &self,
         external_id: String,
@@ -1476,8 +1539,12 @@ impl CacheStore for RocksCacheStore {
         .await
     }
 
-    async fn queue_result(&self, key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.lookup_queue_result_by_key(key).await
+    async fn queue_result(
+        &self,
+        key: QueueKey,
+        external_id: Option<String>,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        self.lookup_queue_result_by_key(key, external_id).await
     }
 
     async fn queue_result_by_external_id(
@@ -1490,8 +1557,12 @@ impl CacheStore for RocksCacheStore {
 
             if let Some(queue_result) = queue_result {
                 if queue_result.get_row().is_deleted() {
+                    let id = queue_result.get_id();
+                    let external_id = queue_result.get_row().get_external_id().clone();
                     Ok(Some(QueueResultResponse::Success {
                         value: Some(queue_result.into_row().value),
+                        id,
+                        external_id,
                     }))
                 } else {
                     Self::queue_result_ready_to_delete_impl(
@@ -1516,7 +1587,7 @@ impl CacheStore for RocksCacheStore {
         // it will fix the position (subscribe) of a broadcast channel
         let listener = self.get_listener().await;
 
-        let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
+        let store_in_result = self.lookup_queue_result_by_key(key.clone(), None).await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
@@ -1530,9 +1601,11 @@ impl CacheStore for RocksCacheStore {
         if let Ok(res) = fut.await {
             match res {
                 Ok(Some(ack_event)) => match ack_event.result {
-                    QueueResultAckEventResult::Empty => {
-                        Ok(Some(QueueResultResponse::Success { value: None }))
-                    }
+                    QueueResultAckEventResult::Empty => Ok(Some(QueueResultResponse::Success {
+                        value: None,
+                        id: ack_event.id,
+                        external_id: None,
+                    })),
                     QueueResultAckEventResult::WithResult { result } => {
                         if query_key_is_path {
                             // Queue v1 behavior
@@ -1544,6 +1617,8 @@ impl CacheStore for RocksCacheStore {
 
                         Ok(Some(QueueResultResponse::Success {
                             value: Some(result.to_string()),
+                            id: ack_event.id,
+                            external_id: None,
                         }))
                     }
                 },
@@ -1744,7 +1819,11 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
     }
 
-    async fn queue_result(&self, _key: QueueKey) -> Result<Option<QueueResultResponse>, CubeError> {
+    async fn queue_result(
+        &self,
+        _key: QueueKey,
+        _external_id: Option<String>,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_result was used.")
     }
 
