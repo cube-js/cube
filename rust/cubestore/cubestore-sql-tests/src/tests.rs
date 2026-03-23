@@ -11039,13 +11039,15 @@ async fn queue_merge_extra_by_id(service: Box<dyn SqlClient>) -> Result<(), Cube
 }
 
 async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:12345" "payload1";"#)
         .await?;
+    let id = assert_queue_add_and_get_id(&add_response)?;
 
     let service = Arc::new(service);
 
     {
+        let id_clone = id.clone();
         let service_to_move = service.clone();
         let blocking1 = async move {
             service_to_move
@@ -11080,13 +11082,13 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) -> Result<(
         assert_queue_result_columns(&blocking1_res);
         assert_eq!(
             blocking1_res.get_rows(),
-            &vec![queue_result_row("result:12345", "1", None)]
+            &vec![queue_result_row("result:12345", &id_clone, None)]
         );
 
         assert_queue_result_columns(&blocking2_res);
         assert_eq!(
             blocking2_res.get_rows(),
-            &vec![queue_result_row("result:12345", "1", None)]
+            &vec![queue_result_row("result:12345", &id_clone, None)]
         );
     }
     Ok(())
