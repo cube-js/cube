@@ -267,6 +267,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("queue_list_v1", queue_list_v1),
         t("queue_full_workflow_v1", queue_full_workflow_v1),
         t("queue_full_workflow_v2", queue_full_workflow_v2),
+        t(
+            "queue_full_workflow_v2_with_external_id",
+            queue_full_workflow_v2_with_external_id,
+        ),
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
         t("queue_ack_then_result_v1", queue_ack_then_result_v1),
