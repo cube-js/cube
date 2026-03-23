@@ -206,21 +206,16 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async getResult(queryKey: QueryKey, externalId?: string): Promise<unknown> {
-    if (externalId && await this.driver.hasCapability('queueExternalId')) {
-      const rows = await this.driver.query('QUEUE RESULT EXTERNAL_ID ? ?', [
-        externalId,
-        this.prefixKey(this.redisHash(queryKey)),
-      ]);
-      if (rows && rows.length) {
-        return this.decodeQueryDefFromRow(rows[0], 'getResult');
-      }
+    const params: string[] = [];
 
-      return null;
+    const passExternalId = externalId && await this.driver.hasCapability('queueExternalId');
+    if (passExternalId) {
+      params.push(externalId);
     }
 
-    const rows = await this.driver.query('QUEUE RESULT ?', [
-      this.prefixKey(this.redisHash(queryKey)),
-    ]);
+    params.push(this.prefixKey(this.redisHash(queryKey)));
+
+    const rows = await this.driver.query(`QUEUE RESULT ${passExternalId ? 'EXTERNAL_ID ? ' : ''}?`, params);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResult');
     }
