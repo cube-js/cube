@@ -21,10 +21,11 @@ import fetch from 'node-fetch';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
 
-type CubeStoreCapability = 'queueExclusive';
+type CubeStoreCapability = 'queueExclusive' | 'queueExternalId';
 
 const CubeStoreCapabilityMinVersion: Record<CubeStoreCapability, string> = {
   queueExclusive: '1.6.22',
+  queueExternalId: '1.6.26',
 };
 
 const GenericTypeToCubeStore: Record<string, string> = {

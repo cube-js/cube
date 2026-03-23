@@ -4,6 +4,7 @@ import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
 import { QueryQueue, QueryQueueOptions } from '../../src';
+import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
 import { processUidRE } from '../../src/orchestrator/utils';
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
@@ -463,6 +464,46 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       await queue.queueDriver.release(redisClient);
       await queue.queueDriver.release(redisClient2);
+    });
+
+    test('no-cache queries should not loop with concurrent clients', async () => {
+      const query: QueryKey = ['select * from no_cache_test', []];
+
+      // Two clients execute the same query concurrently with different requestIds.
+      // delay=1500ms > continueWaitTimeout=1s, so both will get ContinueWaitError.
+      const clientA = queue
+        .executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
+          stageQueryKey: query, requestId: 'req-uuid-A-span-1', spanId: 'span-A'
+        })
+        .catch(e => e);
+      const clientB = queue
+        .executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
+          stageQueryKey: query, requestId: 'req-uuid-B-span-1', spanId: 'span-B'
+        })
+        .catch(e => e);
+
+      const [errA, errB] = await Promise.all([clientA, clientB]);
+      expect(errA).toBeInstanceOf(ContinueWaitError);
+      expect(errB).toBeInstanceOf(ContinueWaitError);
+
+      await awaitProcessing();
+
+      // Both clients retry (with new span suffix, same UUID prefix).
+      // Both should find the existing result without triggering re-execution.
+      const [resultA, resultB] = await Promise.all([
+        queue.executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
+          stageQueryKey: query, requestId: 'req-uuid-A-span-2', spanId: 'span-A2'
+        }),
+        queue.executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
+          stageQueryKey: query, requestId: 'req-uuid-B-span-2', spanId: 'span-B2'
+        }),
+      ]);
+
+      expect(resultA).toBeDefined();
+      expect(resultB).toBeDefined();
+
+      // The query handler should have been called exactly once, not re-queued on retry
+      expect(delayCount).toBe(1);
     });
   });
 };
