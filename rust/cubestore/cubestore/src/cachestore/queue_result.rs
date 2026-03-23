@@ -92,7 +92,10 @@ impl<'a> QueueResultRocksTable<'a> {
         external_id: String,
     ) -> Result<Option<IdRow<QueueResult>>, CubeError> {
         let index_key = QueueResultIndexKey::ByExternalId(Some(external_id));
-        self.get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByExternalId)
+        let row =
+            self.get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByExternalId)?;
+
+        Ok(row.filter(|r| r.get_row().get_expire() >= &Utc::now()))
     }
 }
 
