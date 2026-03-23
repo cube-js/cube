@@ -329,6 +329,7 @@ impl TestContext {
                 .order(order)
                 .filters(filters)
                 .join_hints(join_hints)
+                .limit(yaml_options.row_limit.clone())
                 .row_limit(yaml_options.row_limit)
                 .offset(yaml_options.offset)
                 .ungrouped(yaml_options.ungrouped)
