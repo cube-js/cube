@@ -14,13 +14,13 @@ pub struct YamlMeasureDefinition {
     measure_type: String,
     #[serde(default)]
     multi_stage: Option<bool>,
-    #[serde(default)]
+    #[serde(default, alias = "reduce_by")]
     reduce_by_references: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, alias = "add_group_by")]
     add_group_by_references: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, alias = "group_by")]
     group_by_references: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, alias = "time_shift")]
     time_shift_references: Option<Vec<TimeShiftReference>>,
     #[serde(default)]
     rolling_window: Option<RollingWindow>,

@@ -8,6 +8,7 @@ mod joins;
 mod member_expressions;
 mod modifiers;
 mod multi_fact;
+mod multi_stage;
 mod null_filters;
 mod propagate_subquery;
 mod rolling_window;

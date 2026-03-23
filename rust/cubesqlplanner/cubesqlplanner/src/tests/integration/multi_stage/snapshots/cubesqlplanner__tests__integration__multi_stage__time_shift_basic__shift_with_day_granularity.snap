@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/time_shift_basic.rs
+expression: result
+---
+orders__created_at_day | orders__amount_prev_month
+-----------------------+--------------------------
+2024-02-05 00:00:00    | 100.00                   
+2024-02-10 00:00:00    | 200.00                   
+2024-02-15 00:00:00    | 120.00                   
+2024-02-20 00:00:00    | 50.00                    
+2024-02-25 00:00:00    | 30.00
