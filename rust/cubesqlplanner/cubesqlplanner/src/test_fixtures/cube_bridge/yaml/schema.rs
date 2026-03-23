@@ -20,7 +20,12 @@ pub struct YamlSchema {
 #[derive(Debug, Deserialize)]
 struct YamlCube {
     name: String,
-    sql: String,
+    #[serde(default)]
+    sql: Option<String>,
+    #[serde(default)]
+    sql_table: Option<String>,
+    #[serde(default)]
+    calendar: Option<bool>,
     #[serde(default)]
     joins: Vec<YamlJoin>,
     #[serde(default)]
@@ -106,7 +111,9 @@ impl YamlSchema {
 
             let cube_def = MockCubeDefinition::builder()
                 .name(cube.name.clone())
-                .sql(cube.sql.clone())
+                .sql_opt(cube.sql.clone())
+                .sql_table_opt(cube.sql_table.clone())
+                .is_calendar(cube.calendar)
                 .joins(joins)
                 .build();
 

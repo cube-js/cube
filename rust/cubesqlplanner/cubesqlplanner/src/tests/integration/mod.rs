@@ -1,5 +1,6 @@
 mod advanced_features;
 mod advanced_filters;
+mod calendar;
 mod combinations;
 mod custom_granularities;
 mod filtered_measures;

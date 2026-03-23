@@ -2,18 +2,24 @@ use crate::cube_bridge::case_variant::CaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
-use crate::test_fixtures::cube_bridge::{MockDimensionDefinition, MockGranularityDefinition};
+use crate::cube_bridge::member_sql::MemberSql;
+use crate::test_fixtures::cube_bridge::{
+    MockDimensionDefinition, MockGranularityDefinition, MockMemberSql,
+};
 use serde::Deserialize;
 use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]
 pub struct YamlGranularityEntry {
     pub name: String,
-    pub interval: String,
+    #[serde(default)]
+    pub interval: Option<String>,
     #[serde(default)]
     pub origin: Option<String>,
     #[serde(default)]
     pub offset: Option<String>,
+    #[serde(default)]
+    pub sql: Option<String>,
 }
 
 pub struct YamlDimensionBuildResult {
@@ -68,15 +74,39 @@ impl YamlDimensionDefinition {
             }
         });
 
+        const PREDEFINED: &[&str] = &[
+            "second", "minute", "hour", "day", "week", "month", "quarter", "year",
+        ];
+
         let granularities: Vec<(String, MockGranularityDefinition)> = self
             .granularities
             .into_iter()
             .map(|entry| {
-                let def = MockGranularityDefinition::builder()
-                    .interval(entry.interval)
-                    .origin_opt(entry.origin)
-                    .offset_opt(entry.offset)
-                    .build();
+                let interval = entry.interval.unwrap_or_else(|| {
+                    if PREDEFINED.contains(&entry.name.as_str()) {
+                        format!("1 {}", entry.name)
+                    } else {
+                        panic!("Granularity '{}' requires explicit interval", entry.name)
+                    }
+                });
+
+                let def = if let Some(sql_str) = entry.sql {
+                    let sql: Rc<dyn MemberSql> =
+                        Rc::new(MockMemberSql::new(&sql_str).unwrap());
+                    MockGranularityDefinition::builder()
+                        .interval(interval)
+                        .origin_opt(entry.origin)
+                        .offset_opt(entry.offset)
+                        .sql(sql)
+                        .build()
+                } else {
+                    MockGranularityDefinition::builder()
+                        .interval(interval)
+                        .origin_opt(entry.origin)
+                        .offset_opt(entry.offset)
+                        .build()
+                };
+
                 (entry.name, def)
             })
             .collect();

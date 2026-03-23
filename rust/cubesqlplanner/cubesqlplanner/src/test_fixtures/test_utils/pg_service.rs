@@ -1,3 +1,4 @@
+use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicU64, Ordering};
 use testcontainers::core::{CmdWaitFor, ExecCommand};
 use testcontainers::runners::AsyncRunner;
@@ -9,9 +10,19 @@ use tokio_postgres::{Client, NoTls};
 type PgContainer = testcontainers::ContainerAsync<Postgres>;
 
 struct PgInstance {
-    _container: PgContainer,
+    // ManuallyDrop prevents async Drop which panics when tokio runtime is gone at process exit
+    _container: ManuallyDrop<PgContainer>,
+    container_id: String,
     host: String,
     port: u16,
+}
+
+impl Drop for PgInstance {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new("docker")
+            .args(["rm", "-f", &self.container_id])
+            .output();
+    }
 }
 
 static PG_INSTANCE: OnceCell<PgInstance> = OnceCell::const_new();
@@ -47,8 +58,11 @@ async fn init_pg() -> PgInstance {
         .await
         .expect("Failed to get container port");
 
+    let container_id = container.id().to_string();
+
     PgInstance {
-        _container: container,
+        _container: ManuallyDrop::new(container),
+        container_id,
         host,
         port,
     }
