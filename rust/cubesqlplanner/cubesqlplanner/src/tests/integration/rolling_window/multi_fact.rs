@@ -64,6 +64,29 @@ async fn test_rolling_and_regular_from_different_facts() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_two_rolling_aggregated_by_day() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - payments.rolling_sum_7d
+          - messages.rolling_count_7d
+        time_dimensions:
+          - dimension: customers.registered_at
+            granularity: day
+            dateRange:
+              - "2024-01-10"
+              - "2024-01-25"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_two_rolling_with_shared_dimension_and_filter() {
     let ctx = create_context();
 
