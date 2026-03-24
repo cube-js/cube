@@ -18,6 +18,8 @@ struct PgInstance {
     port: u16,
 }
 
+// TODO: Remove manual atexit cleanup once testcontainers-rs supports Ryuk.
+// See: https://github.com/testcontainers/testcontainers-rs/issues/577
 static CLEANUP_CONTAINER_ID: OnceLock<String> = OnceLock::new();
 
 extern "C" fn cleanup_container() {
