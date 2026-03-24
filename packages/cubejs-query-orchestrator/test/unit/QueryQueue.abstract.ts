@@ -505,5 +505,54 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // The query handler should have been called exactly once, not re-queued on retry
       expect(delayCount).toBe(1);
     });
+
+    test('single client long polling loop should not re-execute query', async () => {
+      jest.setTimeout(30 * 1000);
+
+      const query: QueryKey = ['select * from long_poll_loop_test', []];
+      const requestUuid = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      let spanCounter = 1;
+
+      // Emulate query orchestrator long polling loop:
+      // client keeps calling executeInQueue with the same requestId UUID prefix
+      // and incrementing span suffix, just like the real orchestrator does on
+      // ContinueWaitError retries. No manual awaitProcessing — query executes
+      // naturally in the background while the client retries.
+      let result: any = null;
+      const deadline = Date.now() + 10000;
+
+      while (Date.now() < deadline) {
+        try {
+          result = await queue.executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
+            stageQueryKey: query,
+            requestId: `${requestUuid}-span-${spanCounter++}`,
+            spanId: `span-${spanCounter}`,
+          });
+          break;
+        } catch (e) {
+          if (e instanceof ContinueWaitError) {
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+          throw e;
+        }
+      }
+
+      expect(result).toBeDefined();
+      // The query handler should have been called exactly once, not re-queued on retry
+      expect(delayCount).toBe(1);
+
+      // CubeStore supports read-many via external_id, so the result should
+      // still be available. Local driver consumes the result on first read.
+      if (options.cacheAndQueueDriver === 'cubestore') {
+        const secondResult = await queue.executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
+          stageQueryKey: query,
+          requestId: `${requestUuid}-span-${spanCounter++}`,
+          spanId: `span-${spanCounter}`,
+        });
+        expect(secondResult).toBeDefined();
+        expect(delayCount).toBe(1);
+      }
+    }, 30000);
   });
 };
