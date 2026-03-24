@@ -595,43 +595,44 @@ impl RocksCacheStore {
                 };
 
                 let id = queue_result.get_id();
-                let external_id = queue_result.get_row().get_external_id().clone();
+                let row_external_id = queue_result.get_row().get_external_id().clone();
+
+                if let Some(ref external_id) = external_id {
+                    if row_external_id.as_ref() != Some(external_id) {
+                        return Err(CubeError::user(format!(
+                            "Queue result (id = {}) external_id mismatch: expected {}, got {:?}",
+                            id, external_id, row_external_id
+                        )));
+                    }
+                }
 
                 return Ok(Some(QueueResultResponse::Success {
                     value: Some(queue_result.into_row().value),
                     id,
-                    external_id,
+                    external_id: row_external_id,
                 }));
             };
 
             // try external_id first (if provided), then fall back to path lookup
+            // external_id can be different for path, because path is re-used across different requests across time
             if let Some(ref external_id) = external_id {
-                let Some(queue_result) =
+                if let Some(queue_result) =
                     result_schema.get_row_by_external_id(external_id.clone())?
-                else {
-                    return Ok(None);
-                };
+                {
+                    let id = queue_result.get_id();
+                    let external_id = queue_result.get_row().get_external_id().clone();
 
-                let id = queue_result.get_id();
-                let external_id = queue_result.get_row().get_external_id().clone();
-
-                return Ok(Some(QueueResultResponse::Success {
-                    value: Some(queue_result.into_row().value),
-                    id,
-                    external_id,
-                }));
-            };
+                    return Ok(Some(QueueResultResponse::Success {
+                        value: Some(queue_result.into_row().value),
+                        id,
+                        external_id,
+                    }));
+                }
+            }
 
             let Some(queue_result) = result_schema.get_row_by_key(key)? else {
                 return Ok(None);
             };
-
-            // When external_id filter is active, only return if it matches
-            if let Some(ref external_id) = external_id {
-                if queue_result.get_row().get_external_id().as_ref() != Some(external_id) {
-                    return Ok(None);
-                }
-            }
 
             if queue_result.get_row().is_deleted() {
                 Ok(None)
