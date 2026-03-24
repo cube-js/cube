@@ -1,8 +1,8 @@
 use crate::cube_bridge::case_variant::CaseVariant;
+use crate::cube_bridge::member_sql::MemberSql;
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
-use crate::cube_bridge::member_sql::MemberSql;
 use crate::test_fixtures::cube_bridge::{
     MockDimensionDefinition, MockGranularityDefinition, MockMemberSql,
 };
@@ -91,8 +91,7 @@ impl YamlDimensionDefinition {
                 });
 
                 let def = if let Some(sql_str) = entry.sql {
-                    let sql: Rc<dyn MemberSql> =
-                        Rc::new(MockMemberSql::new(&sql_str).unwrap());
+                    let sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(&sql_str).unwrap());
                     MockGranularityDefinition::builder()
                         .interval(interval)
                         .origin_opt(entry.origin)
