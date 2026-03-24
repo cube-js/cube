@@ -606,10 +606,12 @@ impl RocksCacheStore {
                     }
                 }
 
-                // When external_id filter is active, only return if it matches
                 if let Some(ref external_id) = external_id {
-                    if queue_result.get_row().get_external_id().as_ref() != Some(external_id) {
-                        return Ok(None);
+                    if row_external_id.as_ref() != Some(external_id) {
+                        return Err(CubeError::user(format!(
+                            "Queue result (id = {}) external_id mismatch: expected {}, got {:?}",
+                            id, external_id, row_external_id
+                        )));
                     }
                 }
 
