@@ -11341,20 +11341,17 @@ async fn sys_cachestore_healthcheck(service: Box<dyn SqlClient>) -> Result<(), C
     Ok(())
 }
 
-async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
+async fn join_multi_partition_small(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.orders (order_id int, customer_id int, amount int)")
-        .await
-        .unwrap();
+        .await?;
     service
         .exec_query("CREATE INDEX orders_by_cid ON s.orders (customer_id)")
-        .await
-        .unwrap();
+        .await?;
     service
         .exec_query("CREATE TABLE s.customers (customer_id int, customer_name text)")
-        .await
-        .unwrap();
+        .await?;
 
     // Insert 60 orders in batches of 10 to trigger compaction/split cycles.
     // customer_id = id % 5 (5 distinct customers), amount = id * 7.
@@ -11372,8 +11369,7 @@ async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
                 "INSERT INTO s.orders (order_id, customer_id, amount) VALUES {}",
                 values.join(", ")
             ))
-            .await
-            .unwrap();
+            .await?;
     }
 
     // Insert 10 customers in 1 batch.
@@ -11385,8 +11381,7 @@ async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
             "INSERT INTO s.customers (customer_id, customer_name) VALUES {}",
             values.join(", ")
         ))
-        .await
-        .unwrap();
+        .await?;
 
     // Wait for compaction/split to complete.
     tokio::time::sleep(Duration::from_secs(4)).await;
@@ -11403,8 +11398,7 @@ async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
              LEFT JOIN s.customers c ON o.customer_id = c.customer_id \
              GROUP BY 1 ORDER BY 2 DESC",
         )
-        .await
-        .unwrap();
+        .await?;
 
     assert_eq!(
         to_rows(&result),
@@ -11441,28 +11435,25 @@ async fn join_multi_partition_small(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&total_result), vec![vec![TableValue::Int(12390)]]);
+    Ok(())
 }
 
-async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
+async fn join_multi_partition_large(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query(
             "CREATE TABLE s.orders (order_id int, customer_id int, product_id int, amount int)",
         )
-        .await
-        .unwrap();
+        .await?;
     service
         .exec_query("CREATE INDEX orders_by_cid ON s.orders (customer_id)")
-        .await
-        .unwrap();
+        .await?;
     service
         .exec_query("CREATE TABLE s.customers (customer_id int, customer_name text)")
-        .await
-        .unwrap();
+        .await?;
     service
         .exec_query("CREATE TABLE s.products (product_id int, product_name text)")
-        .await
-        .unwrap();
+        .await?;
 
     // Insert 150 orders in batches of 10.
     // customer_id = id % 3 (3 customers), product_id = id % 2 (2 products),
@@ -11482,8 +11473,7 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
                 "INSERT INTO s.orders (order_id, customer_id, product_id, amount) VALUES {}",
                 values.join(", ")
             ))
-            .await
-            .unwrap();
+            .await?;
     }
 
     // Insert 30 customers in batches of 10 (more than needed, extras won't match).
@@ -11499,8 +11489,7 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
                 "INSERT INTO s.customers (customer_id, customer_name) VALUES {}",
                 values.join(", ")
             ))
-            .await
-            .unwrap();
+            .await?;
     }
 
     // Insert 20 products in 2 batches (more than needed, extras won't match).
@@ -11516,8 +11505,7 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
                 "INSERT INTO s.products (product_id, product_name) VALUES {}",
                 values.join(", ")
             ))
-            .await
-            .unwrap();
+            .await?;
     }
 
     // Wait for compaction/split to complete.
@@ -11535,8 +11523,7 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
              LEFT JOIN s.products p ON o.product_id = p.product_id \
              GROUP BY 1, 2 ORDER BY 1, 2",
         )
-        .await
-        .unwrap();
+        .await?;
 
     assert_eq!(
         to_rows(&result),
@@ -11587,9 +11574,9 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) {
              LEFT JOIN s.customers c ON o.customer_id = c.customer_id \
              LEFT JOIN s.products p ON o.product_id = p.product_id",
         )
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(to_rows(&count_result), vec![vec![TableValue::Int(150)]]);
+    Ok(())
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
