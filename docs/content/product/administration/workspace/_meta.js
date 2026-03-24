@@ -21,5 +21,9 @@ export default {
     title: "Semantic Catalog",
     display: "hidden"
   },
+  "maintenance-window": {
+    title: "Maintenance window",
+    display: "hidden"
+  },
   "recipes": "Recipes",
 }
