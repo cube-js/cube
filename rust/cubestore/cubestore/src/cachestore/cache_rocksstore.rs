@@ -606,15 +606,6 @@ impl RocksCacheStore {
                     }
                 }
 
-                if let Some(ref external_id) = external_id {
-                    if row_external_id.as_ref() != Some(external_id) {
-                        return Err(CubeError::user(format!(
-                            "Queue result (id = {}) external_id mismatch: expected {}, got {:?}",
-                            id, external_id, row_external_id
-                        )));
-                    }
-                }
-
                 return Ok(Some(QueueResultResponse::Success {
                     value: Some(queue_result.into_row().value),
                     id,
