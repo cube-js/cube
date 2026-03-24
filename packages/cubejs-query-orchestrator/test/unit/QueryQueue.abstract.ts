@@ -180,7 +180,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     test('stage reporting', async () => {
       const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, {
         stageQueryKey: '1',
-        requestId: 'request-id',
+        requestId: '9f056234-aa57-4702-ab30-145221da6a46-span-1',
         spanId: 'span-id'
       });
       await delayFn(null, 50);
@@ -192,13 +192,13 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     test('priority stage reporting', async () => {
       const resultPromise1 = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, {
         stageQueryKey: '12',
-        requestId: 'request-id',
+        requestId: '4274691a-5f4c-480e-89c4-d2b9d989891c-span-1',
         spanId: 'span-id'
       });
       await delayFn(null, 50);
       const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, {
         stageQueryKey: '12',
-        requestId: 'request-id',
+        requestId: '000bce99-b987-4649-ae5e-1178532929f5-span-1',
         spanId: 'span-id'
       });
       await delayFn(null, 50);
@@ -473,12 +473,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // delay=1500ms > continueWaitTimeout=1s, so both will get ContinueWaitError.
       const clientA = queue
         .executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
-          stageQueryKey: query, requestId: 'req-uuid-A-span-1', spanId: 'span-A'
+          stageQueryKey: query, requestId: '70b0b0a6-60ff-43ee-95ca-b5a3d864879f-span-1', spanId: 'span-A'
         })
         .catch(e => e);
       const clientB = queue
         .executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
-          stageQueryKey: query, requestId: 'req-uuid-B-span-1', spanId: 'span-B'
+          stageQueryKey: query, requestId: '8030e1f2-5e14-4241-9481-46e34d478131-span-1', spanId: 'span-B'
         })
         .catch(e => e);
 
@@ -492,10 +492,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // Both should find the existing result without triggering re-execution.
       const [resultA, resultB] = await Promise.all([
         queue.executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
-          stageQueryKey: query, requestId: 'req-uuid-A-span-2', spanId: 'span-A2'
+          stageQueryKey: query, requestId: '70b0b0a6-60ff-43ee-95ca-b5a3d864879f-span-2', spanId: 'span-A2'
         }),
         queue.executeInQueue('delay', query, { delay: 1500, result: '1' }, 0, {
-          stageQueryKey: query, requestId: 'req-uuid-B-span-2', spanId: 'span-B2'
+          stageQueryKey: query, requestId: '8030e1f2-5e14-4241-9481-46e34d478131-span-2', spanId: 'span-B2'
         }),
       ]);
 
