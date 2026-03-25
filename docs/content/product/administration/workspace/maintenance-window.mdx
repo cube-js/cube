@@ -53,7 +53,7 @@ snapshot during the window.
 Navigate to <Btn>Admin → Settings → Maintenance Window</Btn> in the Cube Cloud
 console.
 
-<Screenshot src="https://lgo0ecceic.ucarecd.net/7dc5443b-29d2-48ca-b46e-20ddf26691a5/" />
+<Screenshot src="https://lgo0ecceic.ucarecd.net/ed674316-b6fe-41c9-94e2-ddf15a462485/" />
 
 1. Toggle **Enable Scheduled Maintenance Window** to on.
 2. Select the **Day of week** (e.g., Sunday).
@@ -75,6 +75,30 @@ defaults to **Sunday** and the time defaults to **02:00 UTC**.
 Your deployment is immediately assigned the latest eligible snapshot
 so that it starts from a known, stable version.
 
+## Version rollback
+
+If a new version introduces issues, you can roll back to the
+immediately previous snapshot directly from the settings page.
+
+When the maintenance window is enabled and your deployment has been
+updated at least once, a **Version Rollback** section appears below the
+schedule settings. It shows:
+
+- **Current snapshot** — the snapshot ID and activation date in use.
+- **Previous snapshot** — the snapshot that was active before the
+  current one.
+
+Click **Rollback to snapshot #N** to revert to the previous version.
+The rollback takes effect on the next reconciliation cycle.
+
+<WarningBox>
+
+Rollback is limited to the immediately previous snapshot. You cannot
+roll back further than one version. If you need to revert to an older
+version, contact support.
+
+</WarningBox>
+
 ## FAQ
 
 ### What happens if I disable the maintenance window?
@@ -94,5 +118,12 @@ At most, your services will be behind by the interval between your
 maintenance windows (typically one week) plus the 24-hour eligibility
 buffer. For example, with a Sunday 02:00 UTC window, your services
 could be up to ~8 days behind the latest release in the worst case.
+
+### Can I roll back to a previous version?
+
+Yes. When the maintenance window is enabled, the settings page shows a
+**Version Rollback** section that lets you revert to the immediately
+previous snapshot. See [Version rollback](#version-rollback) above for
+details.
 
 [ref-dedicated]: /product/deployment/cloud/deployment-types#production-cluster
