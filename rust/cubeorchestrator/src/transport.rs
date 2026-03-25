@@ -97,6 +97,8 @@ pub struct ExtendedDimensionFormat {
     pub label: Option<String>,
     #[serde(rename = "type")]
     pub format_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -319,3 +321,39 @@ pub struct TransformDataRequest {
 }
 
 pub type JsRawData = Vec<IndexMap<String, DBResponsePrimitive>>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_dimension_format_custom_numeric() {
+        let json = json!({"type": "custom-numeric", "value": ".2f"});
+        let format: DimensionFormat = serde_json::from_value(json).unwrap();
+
+        // Round-trip
+        let serialized = serde_json::to_value(&format).unwrap();
+        assert_eq!(serialized, json!({"type": "custom-numeric", "value": ".2f"}));
+    }
+
+    #[test]
+    fn test_dimension_format_custom_time() {
+        let json = json!({"type": "custom-time", "value": "%Y-%m-%d %H:%M:%S"});
+        let format: DimensionFormat = serde_json::from_value(json).unwrap();
+
+        // Round-trip
+        let serialized = serde_json::to_value(&format).unwrap();
+        assert_eq!(serialized, json!({"type": "custom-time", "value": "%Y-%m-%d %H:%M:%S"}));
+    }
+
+    #[test]
+    fn test_dimension_format_link() {
+        let json = json!({"type": "link", "label": "Click"});
+        let format: DimensionFormat = serde_json::from_value(json).unwrap();
+
+        // Round-trip
+        let serialized = serde_json::to_value(&format).unwrap();
+        assert_eq!(serialized, json!({"type": "link", "label": "Click"}));
+    }
+}
