@@ -2549,7 +2549,10 @@ mod tests {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
                 let indexes = QueueItemRocksTable::indexes();
 
-                queue_schema.migrate()?;
+                // Force rebuild index manually, instead of relying on the automatic rebuild (it will ignore).
+                for index in indexes.iter() {
+                    queue_schema.rebuild_index(index)?;
+                }
 
                 Ok(())
             })
