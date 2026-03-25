@@ -307,9 +307,9 @@
     algoliasearch "^4.17.0"
     classnames "^2.3.2"
 
-"@cube-dev/purple-banner@https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz":
-  version "2.0.21"
-  resolved "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz#57217ed1c3952b5ba8f235d9863f07dc9921d3c4"
+"@cube-dev/purple-banner@https://github.com/cubedevinc/purple-banner/releases/download/v2.0.22/cube-dev-purple-banner-2.0.22.tgz":
+  version "2.0.22"
+  resolved "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.22/cube-dev-purple-banner-2.0.22.tgz#551241f8290e72fd4612f84e0040e4e3d67c9d23"
   dependencies:
     classnames "^2.3.1"
     dayjs "^1.11.7"

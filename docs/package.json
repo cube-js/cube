@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@cube-dev/marketing-ui": "^0.0.1-beta.22",
-    "@cube-dev/purple-banner": "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz",
+    "@cube-dev/purple-banner": "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.22/cube-dev-purple-banner-2.0.22.tgz",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-navigation-menu": "^1.2.14",
     "algoliasearch": "^5.49.0",
