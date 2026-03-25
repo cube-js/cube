@@ -123,7 +123,7 @@ cube(`Orders`, {
     createdAt: {
       sql: `created_at`,
       type: `time`,
-      format: { type: 'custom-time', value: '%Y-%m-%d' },
+      format: '%Y-%m-%d',
     },
 
     updatedAt: {
