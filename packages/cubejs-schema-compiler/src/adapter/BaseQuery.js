@@ -1780,7 +1780,25 @@ export class BaseQuery {
     // TODO not working yet
     const membersToSelect = measures?.concat(multiStageDimensions).concat(multiStageTimeDimensions);
     const select = fromSubQuery && fromSubQuery.outerMeasuresJoinFullKeyQueryAggregate(membersToSelect, membersToSelect, withQuery.memberFrom.map(f => f.alias));
-    const fromSql = select && this.wrapInParenthesis(select);
+    // Leaf multi_stage measure: sql references a raw column with no measure dependencies,
+    // so fromMeasures is null, fromSubQuery was never built, and select is null.
+    // Fall back to querying the cube's own table directly instead of producing an empty FROM.
+    // See: https://github.com/cube-js/cube/issues/9241
+    let fromSql = select && this.wrapInParenthesis(select);
+    if (!fromSql && !fromSubQuery && withQuery.measures?.length) {
+      const leafFromQuery = this.newSubQuery({
+        measures: withQuery.measures,
+        dimensions: withQuery.dimensions,
+        timeDimensions: withQuery.timeDimensions,
+        multiStageDimensions: withQuery.multiStageDimensions,
+        multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
+        filters: withQuery.filters,
+        segments: withQuery.segments,
+        multiStageQuery: true,
+        disableExternalPreAggregations: true,
+      });
+      fromSql = this.wrapInParenthesis(leafFromQuery.buildParamAnnotatedSql());
+    }
 
     const subQueryOptions = {
       measures: withQuery.measures,

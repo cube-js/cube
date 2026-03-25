@@ -2683,4 +2683,110 @@ describe('Class unit tests', () => {
     const re = new RegExp('(b__aid).*(b__bval_sum).*(b__count).*');
     expect(re.test(sql[0])).toBeTruthy();
   });
+
+  describe('multi_stage leaf measure (raw column sql, no measure dependencies)', () => {
+    // Regression tests for https://github.com/cube-js/cube/issues/9241
+    //
+    // The bug: a multi_stage measure whose sql references a raw column (no {} measure dependency)
+    // has no children in the member dependency graph. When a higher-level multi_stage measure
+    // references it via {leaf_measure}, renderWithQuery is called for the leaf withQuery with
+    // memberFrom=null. This left fromSubQuery=null and fromSql=null, causing the error check
+    // at the end of renderWithQuery to throw "lacks FROM clause".
+    //
+    // The two-level schema is required to trigger the path: the outer measure forces
+    // renderWithQuery to be called for the leaf, which is where the fix applies.
+    const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+    measures:
+      - name: raw_sum
+        sql: amount
+        type: sum
+        multi_stage: true
+
+      - name: raw_avg
+        sql: amount
+        type: avg
+        multi_stage: true
+
+      - name: computed_from_raw_sum
+        sql: "{raw_sum}"
+        type: number
+        multi_stage: true
+
+      - name: computed_from_raw_avg
+        sql: "{raw_avg}"
+        type: number
+        multi_stage: true
+`);
+
+    it('does not throw "lacks FROM clause" (sum leaf)', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['orders.computed_from_raw_sum'],
+        dimensions: ['orders.status'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      expect(() => query.buildSqlAndParams()).not.toThrow();
+    });
+
+    it('generates a CTE query (multi_stage path is taken)', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['orders.computed_from_raw_sum'],
+        dimensions: ['orders.status'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/WITH\s+cte_\d+\s+AS/i);
+      expect(sql).toContain('orders');
+    });
+
+    it('propagates filters through the leaf fallback subquery', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['orders.computed_from_raw_sum'],
+        dimensions: ['orders.status'],
+        timeDimensions: [],
+        filters: [{ member: 'orders.status', operator: 'equals', values: ['completed'] }],
+      });
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/WHERE/i);
+    });
+
+    it('works for avg type as well as sum', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['orders.computed_from_raw_avg'],
+        dimensions: ['orders.status'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      expect(() => query.buildSqlAndParams()).not.toThrow();
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/WITH\s+cte_\d+\s+AS/i);
+    });
+  });
 });
