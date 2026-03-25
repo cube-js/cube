@@ -22,7 +22,7 @@ pub struct QueueResult {
 
 impl RocksEntity for QueueResult {
     fn version() -> u32 {
-        3
+        4
     }
 }
 
