@@ -150,7 +150,7 @@ cubes:
       - name: count_non_production
         description: |
           Counts all non-production environments.
-          See for details: https://cube.dev/docs/product/workspace/environments
+          See for details: https://cube.dev/docs/product/administration/deployment/environments
         type: count
         filters:
           - sql: "{environment_name} IS NOT NULL"
@@ -199,6 +199,6 @@ Example query in Playground:
 <Screenshot src="https://ucarecdn.com/327373f0-217b-4a91-8ac7-fd2d97c79513/" />
 
 
-[ref-query-history-export]: /product/workspace/monitoring#query-history-export
-[ref-query-history]: /product/workspace/query-history
-[ref-vector-configuration]: /product/workspace/monitoring#configuration
+[ref-query-history-export]: /product/administration/deployment/monitoring#query-history-export
+[ref-query-history]: /product/administration/monitoring/query-history
+[ref-vector-configuration]: /product/administration/deployment/monitoring#configuration

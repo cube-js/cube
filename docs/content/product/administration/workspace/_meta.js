@@ -1,18 +1,12 @@
 export default {
-  "visual-model": "Visual Model",
-  "dev-mode": "Development mode",
-  "environments": "Environments",
-  "integrations": "Integrations",
-  "sql-runner": "SQL Runner",
-  "query-history": "Query History",
-  "pre-aggregations": "Pre-aggregations",
-  "performance": "Performance Insights",
-  "monitoring": "Monitoring Integrations",
-  "audit-log": "Audit Log",
-  "chats-history": "Chats History",
-  "encryption-keys": "Encryption keys",
-  "budgets": "Budgets",
-  "preferences": "Preferences",
+  "integrations": {
+    title: "Integrations",
+    display: "hidden"
+  },
+  "preferences": {
+    title: "Preferences",
+    display: "hidden"
+  },
   "cli": {
     title: "CLI",
     display: "hidden"
@@ -25,5 +19,4 @@ export default {
     title: "Maintenance window",
     display: "hidden"
   },
-  "recipes": "Recipes",
 }
