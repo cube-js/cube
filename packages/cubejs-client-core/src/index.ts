@@ -7,8 +7,10 @@ import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './Ht
 import RequestError from './RequestError';
 import {
   CacheMode,
+  DimensionFormat,
   ExtractTimeMembers,
   LoadResponse,
+  MeasureFormat,
   MetaResponse,
   PivotQuery,
   ProgressResponse,
@@ -123,6 +125,7 @@ export type CubeSqlSchemaColumn = {
   name: string;
   // eslint-disable-next-line camelcase
   column_type: string;
+  format?: DimensionFormat | MeasureFormat;
 };
 
 export type CubeSqlResult = {

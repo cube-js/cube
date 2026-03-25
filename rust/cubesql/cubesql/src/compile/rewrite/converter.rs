@@ -2090,18 +2090,23 @@ impl LanguageToLogicalPlanConverter {
 
                 let node = Arc::new(CubeScanNode::new(
                     Arc::new(DFSchema::new_with_metadata(
-                        fields.into_iter().map(|(f, m)| {
-                            if let MemberField::Member(member) = &m {
-                                let mut metadata = f.field().metadata().cloned().unwrap_or_default();
-                                metadata.insert("member_name".to_string(), member.member.clone());
-                                DFField::from_qualified(
-                                    f.qualifier().unwrap_or(&"".to_string()),
-                                    f.field().clone().with_metadata(Some(metadata)),
-                                )
-                            } else {
-                                f
-                            }
-                        }).collect(),
+                        fields
+                            .into_iter()
+                            .map(|(f, m)| {
+                                if let MemberField::Member(member) = &m {
+                                    let mut metadata =
+                                        f.field().metadata().cloned().unwrap_or_default();
+                                    metadata
+                                        .insert("member_name".to_string(), member.member.clone());
+                                    DFField::from_qualified(
+                                        f.qualifier().unwrap_or(&"".to_string()),
+                                        f.field().clone().with_metadata(Some(metadata)),
+                                    )
+                                } else {
+                                    f
+                                }
+                            })
+                            .collect(),
                         HashMap::new(),
                     )?),
                     member_fields,
