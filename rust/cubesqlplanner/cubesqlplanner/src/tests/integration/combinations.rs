@@ -96,6 +96,45 @@ async fn test_multiplied_with_join_filter_segment_time() {
     }
 }
 
+// 10.2b: Same as 10.2 but with SUM hub measure → AggregateMultipliedSubquery
+//         instead of count (which just becomes count distinct)
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_aggregate_with_join_filter_segment_time() {
+    let ctx = create_multi_fact_context();
+
+    let query = indoc! {"
+        measures:
+          - customers.total_lifetime_value
+          - orders.count
+        dimensions:
+          - customers.name
+        segments:
+          - orders.completed_orders
+        filters:
+          - dimension: customers.city
+            operator: equals
+            values:
+              - New York
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - \"2025-03-01\"
+              - \"2025-03-31\"
+        order:
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_multi_fact_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // 10.3: Subquery dimension filter + time dateRange
 #[tokio::test(flavor = "multi_thread")]
 async fn test_subquery_dim_filter_with_time_range() {

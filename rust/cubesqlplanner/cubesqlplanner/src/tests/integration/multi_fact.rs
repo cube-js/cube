@@ -464,6 +464,54 @@ async fn test_multiplied_with_order_and_limit() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_aggregate_hub_sum_measure() {
+    let ctx = create_context();
+
+    // customers.total_lifetime_value (SUM) by orders.status
+    // customers is multiplied in customers→orders join (one_to_many)
+    // SUM is not additive in multiplied context → AggregateMultipliedSubquery
+    // Measure references only customers → source = Cube (no MeasureSubquery)
+    let query = indoc! {"
+        measures:
+          - customers.total_lifetime_value
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_aggregate_with_measure_subquery() {
+    let ctx = create_context();
+
+    // customers.total_lifetime_value_for_east (SUM with filter {regions.name} = 'East')
+    // customers is multiplied in customers→orders join → AggregateMultipliedSubquery
+    // Measure filter references regions cube → MeasureSubquery (customers→regions join,
+    // where customers is NOT multiplied since many_to_one)
+    let query = indoc! {"
+        measures:
+          - customers.total_lifetime_value_for_east
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_non_multiplied_multi_join() {
     let ctx = create_context();
 
