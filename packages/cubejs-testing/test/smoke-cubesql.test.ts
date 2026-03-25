@@ -148,52 +148,6 @@ describe('SQL API', () => {
       expect(rows).toBe(ROWS_LIMIT);
     });
 
-    it('includes format in schema columns', async () => {
-      const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token,
-        },
-        body: JSON.stringify({
-          query: 'SELECT totalAmount, createdAt, status FROM Orders LIMIT 1',
-        }),
-      });
-
-      const reader = response.body;
-      let schema: any[] = [];
-
-      const execute = () => new Promise<void>((resolve, reject) => {
-        let isFirstChunk = true;
-        reader.on('data', (chunk: Buffer) => {
-          if (isFirstChunk) {
-            isFirstChunk = false;
-            schema = JSON.parse(chunk.toString()).schema;
-          }
-        });
-        reader.on('error', () => reject(new Error('Stream error')));
-        reader.on('end', () => resolve());
-      });
-
-      await execute();
-
-      expect(schema).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'totalAmount',
-            format: 'currency',
-          }),
-          expect.objectContaining({
-            name: 'createdAt',
-            format: { type: 'custom-time', value: '%Y-%m-%d' },
-          }),
-          expect.objectContaining({
-            name: 'status',
-          }),
-        ])
-      );
-    });
-
     it('streams schema and empty data with LIMIT 0', async () => {
       const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',
@@ -262,6 +216,29 @@ describe('SQL API', () => {
           .reduce((a, b) => a + b, 0);
         expect(rows).toBe(0);
       }
+    });
+
+    it('includes format in schema columns', async () => {
+      const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+        body: JSON.stringify({
+          query: 'SELECT DATE_TRUNC(\'year\', createdAt) AS createdAt, totalAmount, numberTotal, status FROM Orders LIMIT 1',
+        }),
+      });
+
+      const text = await response.text();
+      const { schema } = JSON.parse(text.split('\n')[0]);
+
+      expect(schema).toEqual([
+        { name: 'createdAt', column_type: 'Timestamp', format: { type: 'custom-time', value: '%Y-%m-%d' } },
+        { name: 'totalAmount', column_type: 'Double', format: 'currency' },
+        { name: 'numberTotal', column_type: 'Double', format: { type: 'custom-numeric', value: '$,.2f' } },
+        { name: 'status', column_type: 'String' },
+      ]);
     });
 
     describe('sql4sql', () => {

@@ -54,7 +54,8 @@ cube(`Orders`, {
     },
     numberTotal: {
       sql: `${totalAmount}`,
-      type: `number`
+      type: `number`,
+      format: '$,.2f',
     },
     amountRank: {
       multi_stage: true,
