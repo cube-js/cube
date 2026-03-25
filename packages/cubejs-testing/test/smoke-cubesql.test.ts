@@ -148,6 +148,56 @@ describe('SQL API', () => {
       expect(rows).toBe(ROWS_LIMIT);
     });
 
+    it('includes format in schema columns', async () => {
+      const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+        body: JSON.stringify({
+          query: 'SELECT totalAmount, createdAt, status FROM Orders LIMIT 1',
+        }),
+      });
+
+      const reader = response.body;
+      let schema: any[] = [];
+
+      const execute = () => new Promise<void>((resolve, reject) => {
+        let isFirstChunk = true;
+        reader.on('data', (chunk: Buffer) => {
+          if (isFirstChunk) {
+            isFirstChunk = false;
+            schema = JSON.parse(chunk.toString()).schema;
+          }
+        });
+        reader.on('error', () => reject(new Error('Stream error')));
+        reader.on('end', () => resolve());
+      });
+
+      await execute();
+
+      expect(schema).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'totalAmount',
+            format: 'currency',
+          }),
+          expect.objectContaining({
+            name: 'createdAt',
+            format: { type: 'custom-time', value: '%Y-%m-%d' },
+          }),
+          expect.objectContaining({
+            name: 'status',
+          }),
+        ])
+      );
+
+      // status should not have format
+      const statusCol = schema.find((c: any) => c.name === 'status');
+      expect(statusCol).not.toHaveProperty('format');
+    });
+
     it('streams schema and empty data with LIMIT 0', async () => {
       const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',

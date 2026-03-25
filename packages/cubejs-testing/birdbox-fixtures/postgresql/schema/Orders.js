@@ -47,6 +47,7 @@ cube(`Orders`, {
     totalAmount: {
       sql: `amount`,
       type: `sum`,
+      format: `currency`,
     },
     toRemove: {
       type: `count`,
@@ -121,7 +122,8 @@ cube(`Orders`, {
 
     createdAt: {
       sql: `created_at`,
-      type: `time`
+      type: `time`,
+      format: { type: 'custom-time', value: '%Y-%m-%d' },
     },
 
     updatedAt: {
