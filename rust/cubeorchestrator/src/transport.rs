@@ -334,7 +334,10 @@ mod tests {
 
         // Round-trip
         let serialized = serde_json::to_value(&format).unwrap();
-        assert_eq!(serialized, json!({"type": "custom-numeric", "value": ".2f"}));
+        assert_eq!(
+            serialized,
+            json!({"type": "custom-numeric", "value": ".2f"})
+        );
     }
 
     #[test]
@@ -344,7 +347,10 @@ mod tests {
 
         // Round-trip
         let serialized = serde_json::to_value(&format).unwrap();
-        assert_eq!(serialized, json!({"type": "custom-time", "value": "%Y-%m-%d %H:%M:%S"}));
+        assert_eq!(
+            serialized,
+            json!({"type": "custom-time", "value": "%Y-%m-%d %H:%M:%S"})
+        );
     }
 
     #[test]
