@@ -1,8 +1,8 @@
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
-use cubesql::sql::dataframe::{arrow_to_column_type, Column};
-use cubesql::sql::ColumnFlags;
+use cubesql::sql::dataframe::arrow_to_column_type;
+use cubesql::sql::ColumnType;
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -33,6 +33,8 @@ use cubesql::{telemetry::ReportingLogger, CubeError};
 #[cfg(feature = "async-log")]
 use log_nonblock::NonBlockingLoggerBuilder;
 use neon::prelude::*;
+use serde::Serialize;
+
 use neon::result::Throw;
 #[cfg(not(feature = "async-log"))]
 use simple_logger::SimpleLogger;
@@ -42,6 +44,14 @@ pub(crate) struct SQLInterface {
 }
 
 impl Finalize for SQLInterface {}
+
+#[derive(Serialize)]
+pub(crate) struct SchemaColumn {
+    name: String,
+    column_type: ColumnType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    format: Option<serde_json::Value>,
+}
 
 impl SQLInterface {
     pub fn new(services: Arc<NodeCubeServices>) -> Self {
@@ -298,20 +308,16 @@ async fn handle_sql_query(
                     CubeError::internal(format!("Failed to get meta context: {}", err))
                 })?;
 
-            let meta_context_ref = meta_context.clone();
-
             let stmt =
                 parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
             let query_plan = convert_statement_to_cube_query(
                 stmt,
-                meta_context,
+                meta_context.clone(),
                 session,
                 &mut None,
                 span_id_clone,
             )
             .await?;
-
-            let meta = meta_context_ref;
 
             let mut stream = get_df_batches(&query_plan).await?;
 
@@ -325,44 +331,37 @@ async fn handle_sql_query(
 
             drain_handler.handle(stream_methods.on.clone()).await?;
 
-            // Get schema from stream and convert to DataFrame columns format
-            let stream_schema = stream.schema();
-            let mut columns = Vec::with_capacity(stream_schema.fields().len());
-            for field in stream_schema.fields().iter() {
-                columns.push(Column::new(
-                    field.name().clone(),
-                    arrow_to_column_type(field.data_type().clone())?,
-                    ColumnFlags::empty(),
-                ));
-            }
+            // Get schema from stream and convert to schema columns with format
+            let mut columns = Vec::with_capacity(stream.schema().fields().len());
 
-            // Send schema first
-            let mut columns_json = serde_json::to_value(&columns)?;
-
-            // Merge format info into each column using member_name from field metadata
-            if let Some(arr) = columns_json.as_array_mut() {
-                for (col_json, field) in arr.iter_mut().zip(stream_schema.fields().iter()) {
-                    if let Some(member_name) = field.metadata().and_then(|m| m.get("member_name")) {
-                        let format = meta
+            for field in stream.schema().fields().iter() {
+                let format = field
+                    .metadata()
+                    .and_then(|m| m.get("member_name"))
+                    .and_then(|member_name| {
+                        meta_context
                             .find_measure_with_name(member_name)
                             .and_then(|m| m.format.as_ref())
                             .or_else(|| {
-                                meta.find_dimension_with_name(member_name)
+                                meta_context
+                                    .find_dimension_with_name(member_name)
                                     .and_then(|d| d.format.as_ref())
-                            });
-                        if let Some(fmt) = format {
-                            if let Ok(v) = serde_json::to_value(fmt.as_ref()) {
-                                col_json.as_object_mut().unwrap().insert("format".into(), v);
-                            }
-                        }
-                    }
-                }
+                            })
+                    })
+                    .and_then(|fmt| serde_json::to_value(fmt.as_ref()).ok());
+
+                columns.push(SchemaColumn {
+                    name: field.name().clone(),
+                    column_type: arrow_to_column_type(field.data_type().clone())?,
+                    format,
+                });
             }
 
+            // Send schema first
             let mut schema_response = Map::new();
-            schema_response.insert("schema".into(), columns_json);
+            schema_response.insert("schema".into(), serde_json::to_value(&columns)?);
 
-            if let Some(last_refresh_time) = stream_schema.metadata().get("lastRefreshTime") {
+            if let Some(last_refresh_time) = stream.schema().metadata().get("lastRefreshTime") {
                 schema_response.insert(
                     "lastRefreshTime".into(),
                     serde_json::Value::String(last_refresh_time.clone()),
