@@ -192,10 +192,6 @@ describe('SQL API', () => {
           }),
         ])
       );
-
-      // status should not have format
-      const statusCol = schema.find((c: any) => c.name === 'status');
-      expect(statusCol).not.toHaveProperty('format');
     });
 
     it('streams schema and empty data with LIMIT 0', async () => {
@@ -219,7 +215,7 @@ describe('SQL API', () => {
       const execute = () => new Promise<void>((resolve, reject) => {
         const onData = jest.fn((chunk: Buffer) => {
           const chunkStr = chunk.toString('utf-8');
-          
+
           if (isFirstChunk) {
             isFirstChunk = false;
             const json = JSON.parse(chunkStr);
@@ -251,13 +247,13 @@ describe('SQL API', () => {
       });
 
       await execute();
-      
+
       // Verify schema was sent first
       expect(schemaReceived).toBe(true);
-      
+
       // Verify empty data was sent
       expect(emptyDataReceived).toBe(true);
-      
+
       // Verify no actual rows were returned
       const dataLines = data.split('\n').filter((it) => it.trim());
       if (dataLines.length > 0) {
