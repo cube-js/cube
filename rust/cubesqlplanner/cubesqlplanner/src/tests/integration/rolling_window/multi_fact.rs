@@ -87,6 +87,37 @@ async fn test_two_rolling_aggregated_by_day() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_with_multiplied_aggregate_hub_measure() {
+    let ctx = create_context();
+
+    // Combines multi-stage (rolling_sum_7d) with AggregateMultipliedSubquery
+    // (customers.total_lifetime_value SUM on hub, multiplied by payments).
+    // payments.payment_type dimension forces customers→payments join,
+    // making customers multiplied → AggregateMultipliedSubquery for the SUM measure.
+    let query = indoc! {r#"
+        measures:
+          - payments.rolling_sum_7d
+          - customers.total_lifetime_value
+        dimensions:
+          - payments.payment_type
+        time_dimensions:
+          - dimension: customers.registered_at
+            granularity: day
+            dateRange:
+              - "2024-01-10"
+              - "2024-01-25"
+        order:
+          - id: payments.payment_type
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_two_rolling_with_shared_dimension_and_filter() {
     let ctx = create_context();
 

@@ -25,6 +25,9 @@ cubes:
       measures:
           - name: count
             type: count
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
 
     - name: payments
       sql: "SELECT * FROM mf_payments"
@@ -39,6 +42,9 @@ cubes:
           - name: amount
             type: number
             sql: amount
+          - name: payment_type
+            type: string
+            sql: payment_type
           - name: created_at
             type: time
             sql: created_at
