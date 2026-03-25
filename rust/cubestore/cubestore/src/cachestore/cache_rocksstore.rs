@@ -2495,4 +2495,107 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_queue_add_none_external_id_after_rebuild() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_none_ext_rebuild",
+            Config::test("test_queue_add_none_ext_rebuild"),
+        );
+
+        // Add two queue items without external_id
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path1".to_string(),
+                value: "v1".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path2".to_string(),
+                value: "v2".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        // Add one item with a real external_id
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path_ext".to_string(),
+                value: "v_ext".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-real".to_string()),
+            })
+            .await?;
+
+        // Simulate migration: rebuild the ByExternalId index.
+        cachestore
+            .read_operation_queue("test_rebuild_index", move |db_ref| {
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let indexes = QueueItemRocksTable::indexes();
+
+                queue_schema.migrate()?;
+
+                Ok(())
+            })
+            .await?;
+
+        // After rebuild, adding another item without external_id should still succeed
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path3".to_string(),
+                value: "v3".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await;
+        assert!(
+            res.is_ok(),
+            "Insert with None external_id after index rebuild should succeed, got: {:?}",
+            res.err()
+        );
+
+        // Uniqueness for real external_id values should still be enforced after rebuild
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path_ext_dup".to_string(),
+                value: "v_ext_dup".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-real".to_string()),
+            })
+            .await;
+        assert!(
+            res.is_err(),
+            "Duplicate external_id should still fail after rebuild"
+        );
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Unique constraint violation"));
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_none_ext_rebuild");
+
+        Ok(())
+    }
 }

@@ -509,7 +509,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let serialized_row = ser.take_buffer();
 
         for index in Self::indexes().iter() {
-            if index.is_unique() {
+            if index.is_unique() && index.should_index_row(&row) {
                 let hash = index.key_hash(&row);
                 let index_val = index.index_key_by(&row);
                 let existing_keys =
@@ -733,9 +733,12 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 log_shown = true;
             }
             let row = row?;
-            let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
-            batch.put(index_row.key, index_row.val);
+            if index.should_index_row(row.get_row()) {
+                let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
+                batch.put(index_row.key, index_row.val);
+            }
         }
+
         batch.put(
             &RowKey::SecondaryIndexInfo {
                 index_id: Self::index_id(index.get_id()),
@@ -748,6 +751,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             .as_slice(),
         );
         self.db().write(batch)?;
+
         if log_shown {
             log::info!(
                 "Rebuilding metastore index {:?} for table {:?} complete ({:?})",
@@ -756,6 +760,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 time.elapsed()?
             );
         }
+
         Ok(())
     }
 

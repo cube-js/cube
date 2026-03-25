@@ -298,6 +298,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "queue_result_by_id_external_id_mismatch",
             queue_result_by_id_external_id_mismatch,
         ),
+        t(
+            "queue_result_ack_multiple_with_external_id",
+            queue_result_ack_multiple_with_external_id,
+        ),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
@@ -363,6 +367,7 @@ lazy_static::lazy_static! {
         "queue_custom_orphaned",
         "queue_result_by_external_id",
         "queue_result_by_id_external_id_mismatch",
+        "queue_result_ack_multiple_with_external_id",
         "queue_full_workflow_v1",
         "queue_full_workflow_v2",
         "queue_full_workflow_v2_with_external_id",
@@ -11309,6 +11314,109 @@ async fn queue_result_by_id_external_id_mismatch(
         err_msg.contains("external_id mismatch"),
         "Error should mention external_id mismatch, got: {}",
         err_msg
+    );
+
+    Ok(())
+}
+
+async fn queue_result_ack_multiple_with_external_id(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    // 2 items with external_id
+    let add1 = service
+        .exec_query(
+            r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-multi-1' "STANDALONE#queue:multi1" "payload1";"#,
+        )
+        .await?;
+    let id1 = assert_queue_add_and_get_id(&add1)?;
+
+    let add2 = service
+        .exec_query(
+            r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-multi-2' "STANDALONE#queue:multi2" "payload2";"#,
+        )
+        .await?;
+    let id2 = assert_queue_add_and_get_id(&add2)?;
+
+    // 2 items without external_id
+    let add3 = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:multi3" "payload3";"#)
+        .await?;
+    let id3 = assert_queue_add_and_get_id(&add3)?;
+
+    let add4 = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:multi4" "payload4";"#)
+        .await?;
+    let id4 = assert_queue_add_and_get_id(&add4)?;
+
+    // ACK all 4 items
+    let ack1 = service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:multi1" "result:multi1""#)
+        .await?;
+    assert_eq!(
+        ack1.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    let ack2 = service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:multi2" "result:multi2""#)
+        .await?;
+    assert_eq!(
+        ack2.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    let ack3 = service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:multi3" "result:multi3""#)
+        .await?;
+    assert_eq!(
+        ack3.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    let ack4 = service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:multi4" "result:multi4""#)
+        .await?;
+    assert_eq!(
+        ack4.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // Verify results for items with external_id
+    let result1 = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:multi1""#)
+        .await?;
+    assert_queue_result_columns(&result1);
+    assert_eq!(
+        result1.get_rows(),
+        &vec![queue_result_row("result:multi1", &id1, Some("ext-multi-1"))]
+    );
+
+    let result2 = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:multi2""#)
+        .await?;
+    assert_queue_result_columns(&result2);
+    assert_eq!(
+        result2.get_rows(),
+        &vec![queue_result_row("result:multi2", &id2, Some("ext-multi-2"))]
+    );
+
+    // Verify results for items without external_id
+    let result3 = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:multi3""#)
+        .await?;
+    assert_queue_result_columns(&result3);
+    assert_eq!(
+        result3.get_rows(),
+        &vec![queue_result_row("result:multi3", &id3, None)]
+    );
+
+    let result4 = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:multi4""#)
+        .await?;
+    assert_queue_result_columns(&result4);
+    assert_eq!(
+        result4.get_rows(),
+        &vec![queue_result_row("result:multi4", &id4, None)]
     );
 
     Ok(())
