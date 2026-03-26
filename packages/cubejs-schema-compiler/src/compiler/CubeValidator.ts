@@ -428,10 +428,21 @@ const ToDate = {
   granularity: GranularitySchema,
 };
 
+const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().messages({
+  'any.unknown': `"currency" property can only be used with numeric measures, actual type: ${value}`,
+});
+
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
   format: measureFormatSchema,
-  currency: currencySchema,
+  currency: Joi.when('type', {
+    switch: [
+      { is: 'string', then: forbiddenCurrencyNonNumericMeasure('string') },
+      { is: 'boolean', then: forbiddenCurrencyNonNumericMeasure('boolean') },
+      { is: 'time', then: forbiddenCurrencyNonNumericMeasure('time') },
+    ],
+    otherwise: currencySchema,
+  }),
   public: Joi.boolean().strict(),
   // TODO: Deprecate and remove, please use public
   visible: Joi.boolean().strict(),

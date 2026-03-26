@@ -1804,6 +1804,28 @@ describe('Cube Validation', () => {
         );
       });
 
+      it('non-numeric measure with currency - error', async () => {
+        const cubeValidator = new CubeValidator(new CubeSymbols());
+        const cube = {
+          name: 'name',
+          sql: () => 'SELECT * FROM public.Orders',
+          measures: {
+            label: {
+              sql: () => 'label',
+              type: 'string',
+              currency: 'usd'
+            },
+          },
+          fileName: 'fileName',
+        };
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeTruthy();
+        expect(validationResult.error!.message).toContain(
+          '"currency" property can only be used with numeric measures'
+        );
+      });
+
       it('measure with both format and currency - correct', async () => {
         const cubeValidator = new CubeValidator(new CubeSymbols());
         const cube = {
