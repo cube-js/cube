@@ -1634,8 +1634,10 @@ describe('Cube Validation', () => {
           discount: { sql: () => 'discount', type: 'number', format: 'percent_0' },
           total: { sql: () => 'total', type: 'number', format: 'currency_1' },
           pop: { sql: () => 'pop', type: 'number', format: 'abbr_3' },
+          ab: { sql: () => 'ab', type: 'number', format: 'abbr' },
           bal: { sql: () => 'bal', type: 'number', format: 'accounting' },
           dec: { sql: () => 'dec', type: 'number', format: 'decimal_4' },
+          dec2: { sql: () => 'dec2', type: 'number', format: 'decimal' },
         },
         fileName: 'fileName',
       };
