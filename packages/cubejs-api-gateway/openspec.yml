@@ -147,7 +147,7 @@ components:
           $ref: "#/components/schemas/V1CubeMetaFormat"
         currency:
           type: "string"
-          description: "ISO 4217 currency code (3 characters, e.g. usd, eur)"
+          description: "ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)"
         order:
           $ref: "#/components/schemas/V1CubeMetaDimensionOrder"
         key:
@@ -182,7 +182,7 @@ components:
           $ref: "#/components/schemas/V1CubeMetaFormat"
         currency:
           type: "string"
-          description: "ISO 4217 currency code (3 characters, e.g. usd, eur)"
+          description: "ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)"
         aliasMember:
           description: "When measure is defined in View, it keeps the original path: Cube.measure"
           type: "string"
