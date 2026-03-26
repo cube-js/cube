@@ -769,12 +769,13 @@ The Snowflake account identifier to use when connecting to the database.
 
 ## `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`
 
-The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with
-username/password, or `SNOWFLAKE_JWT` with key pairs.
+The type of authenticator to use with Snowflake. Use `EXTERNALBROWSER`
+with SSO, `SNOWFLAKE` with username/password,
+or `SNOWFLAKE_JWT` with key pairs.
 
-| Possible Values              | Default in Development | Default in Production |
-| ---------------------------- | ---------------------- | --------------------- |
-| `SNOWFLAKE`, `SNOWFLAKE_JWT` | `SNOWFLAKE`            | `SNOWFLAKE`           |
+| Possible Values                                 | Default in Development | Default in Production |
+| ----------------------------------------------- | ---------------------- | --------------------- |
+| `EXTERNALBROWSER`, `SNOWFLAKE`, `SNOWFLAKE_JWT` | `SNOWFLAKE`            | `SNOWFLAKE`           |
 
 ## `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN`
 

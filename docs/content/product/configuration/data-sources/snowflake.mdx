@@ -20,7 +20,7 @@ GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
 </InfoBox>
 
 - [Account/Server URL][snowflake-docs-account-id] for Snowflake.
-- User name and password or an RSA private key for the Snowflake account.
+- User name and password or an RSA private key for the Snowflake account. Also, single sign-on (SSO) through a web browser is available.
 - Optionally, the warehouse name, the user role, and the database name.
 
 ## Setup
@@ -79,8 +79,8 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | <EnvVar>CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE</EnvVar>      | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |
 | <EnvVar>CUBEJS_DB_NAME</EnvVar>                                     | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |
 | <EnvVar>CUBEJS_DB_USER</EnvVar>                                     | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |
-| <EnvVar>CUBEJS_DB_PASS</EnvVar>                                     | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |
-| <EnvVar>CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR</EnvVar>                  | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`, `OAUTH`                                  |    ❌    |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>                                     | The password used to connect to the database                                                                                                        | A valid database password                                              |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR</EnvVar>                  | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `EXTERNALBROWSER`, `SNOWFLAKE`, `SNOWFLAKE_JWT`, `OAUTH`               |    ❌    |
 | <EnvVar>CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY</EnvVar>                    | The content of the private RSA key                                                                                                                  | Content of the private RSA key (encrypted or not)                      |    ❌    |
 | <EnvVar>CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH</EnvVar>               | The path to the private RSA key                                                                                                                     | A valid path to the private RSA key                                    |    ❌    |
 | <EnvVar>CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS</EnvVar>               | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
