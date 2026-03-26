@@ -53,7 +53,7 @@ snapshot during the window.
 Navigate to <Btn>Admin → Settings → Maintenance Window</Btn> in the Cube Cloud
 console.
 
-<Screenshot src="https://lgo0ecceic.ucarecd.net/ed674316-b6fe-41c9-94e2-ddf15a462485/" />
+<Screenshot src="https://lgo0ecceic.ucarecd.net/2ce65ee8-4041-435f-8d74-a84b1b9d6d53/" />
 
 1. Toggle **Enable Scheduled Maintenance Window** to on.
 2. Select the **Day of week** (e.g., Sunday).
@@ -75,27 +75,23 @@ defaults to **Sunday** and the time defaults to **02:00 UTC**.
 Your deployment is immediately assigned the latest eligible snapshot
 so that it starts from a known, stable version.
 
-## Version rollback
-
-If a new version introduces issues, you can roll back to the
-immediately previous snapshot directly from the settings page.
+## Active version
 
 When the maintenance window is enabled and your deployment has been
-updated at least once, a **Version Rollback** section appears below the
-schedule settings. It shows:
+updated at least once, an **Active Version** section appears below the
+schedule settings.
 
-- **Current snapshot** — the snapshot ID and activation date in use.
-- **Previous snapshot** — the snapshot that was active before the
-  current one.
+The **Active Version** dropdown shows all snapshots that were active
+for your deployment within the last 7 days. The currently active
+snapshot is pre-selected and marked with `(current)`.
 
-Click **Rollback to snapshot #N** to revert to the previous version.
-The rollback takes effect on the next reconciliation cycle.
+To switch to a different version, select it from the dropdown. The
+change takes effect on the next reconciliation cycle.
 
 <WarningBox>
 
-Rollback is limited to the immediately previous snapshot. You cannot
-roll back further than one version. If you need to revert to an older
-version, contact support.
+Only snapshots from the last 7 days are available. If you need to
+revert to an older version, contact support.
 
 </WarningBox>
 
@@ -121,9 +117,9 @@ could be up to ~8 days behind the latest release in the worst case.
 
 ### Can I roll back to a previous version?
 
-Yes. When the maintenance window is enabled, the settings page shows a
-**Version Rollback** section that lets you revert to the immediately
-previous snapshot. See [Version rollback](#version-rollback) above for
-details.
+Yes. When the maintenance window is enabled, the settings page shows an
+**Active Version** dropdown listing all snapshots from the last 7 days.
+Select any of them to switch back. See [Active version](#active-version)
+above for details.
 
 [ref-dedicated]: /product/deployment/cloud/deployment-types#production-cluster
