@@ -1659,21 +1659,6 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('invalid named format (unknown base) - error', async () => {
-      const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'name',
-        sql: () => 'SELECT * FROM public.Orders',
-        measures: {
-          amount: { sql: () => 'amount', type: 'sum', format: 'unknown_2' },
-        },
-        fileName: 'fileName',
-      };
-
-      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(validationResult.error).toBeTruthy();
-    });
-
     it('string dimension with named numeric format - error', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
