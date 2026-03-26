@@ -150,7 +150,7 @@ interface SnowflakeDriverOptions {
   host?: string,
   account: string,
   username: string,
-  password: string,
+  password?: string,
   region?: string,
   warehouse?: string,
   role?: string,
@@ -475,6 +475,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       config.privateKey = this.config.privateKey;
       config.privateKeyPath = this.config.privateKeyPath;
       config.privateKeyPass = this.config.privateKeyPass;
+    } else if (this.config.authenticator?.toUpperCase() === 'EXTERNALBROWSER') {
+      config.username = this.config.username;
     } else {
       config.username = this.config.username;
       config.password = this.config.password;
