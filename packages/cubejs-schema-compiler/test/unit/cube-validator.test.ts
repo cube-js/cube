@@ -1644,21 +1644,6 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeFalsy();
     });
 
-    it('invalid named format (bare decimal without suffix) - error', async () => {
-      const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'name',
-        sql: () => 'SELECT * FROM public.Orders',
-        measures: {
-          amount: { sql: () => 'amount', type: 'sum', format: 'decimal' },
-        },
-        fileName: 'fileName',
-      };
-
-      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(validationResult.error).toBeTruthy();
-    });
-
     it('string dimension with named numeric format - error', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {

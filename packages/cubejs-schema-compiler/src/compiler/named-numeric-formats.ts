@@ -13,15 +13,6 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   number_5: ',.5f',
   number_6: ',.6f',
 
-  // decimal (Looker compat, same as number): ,.Xf — no bare "decimal"
-  decimal_0: ',.0f',
-  decimal_1: ',.1f',
-  decimal_2: ',.2f',
-  decimal_3: ',.3f',
-  decimal_4: ',.4f',
-  decimal_5: ',.5f',
-  decimal_6: ',.6f',
-
   // percent: .X%
   percent_0: '.0%',
   percent_1: '.1%',
@@ -40,7 +31,19 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   currency_5: '$,.5f',
   currency_6: '$,.6f',
 
+  // decimal (Looker compat, same as number): ,.Xf
+  // Alias to decimal_2
+  decimal: ',.2f',
+  decimal_0: ',.0f',
+  decimal_1: ',.1f',
+  decimal_2: ',.2f',
+  decimal_3: ',.3f',
+  decimal_4: ',.4f',
+  decimal_5: ',.5f',
+  decimal_6: ',.6f',
+
   // abbr (SI prefix): .Xs
+  // Alias to abbr_2
   abbr: '.2s',
   abbr_0: '.0s',
   abbr_1: '.1s',
@@ -51,6 +54,7 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   abbr_6: '.6s',
 
   // accounting (negative in parens): (,.Xf
+  // Alias to accounting_2
   accounting: '(,.2f',
   accounting_0: '(,.0f',
   accounting_1: '(,.1f',
