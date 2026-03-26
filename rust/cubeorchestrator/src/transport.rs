@@ -184,6 +184,9 @@ pub struct ConfigItem {
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<DimensionFormat>,
+    /// ISO 4217 currency code in uppercase (e.g. USD, EUR)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -218,6 +221,9 @@ pub struct AnnotatedConfigItem {
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<DimensionFormat>,
+    /// ISO 4217 currency code in uppercase (e.g. USD, EUR)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -361,5 +367,52 @@ mod tests {
         // Round-trip
         let serialized = serde_json::to_value(&format).unwrap();
         assert_eq!(serialized, json!({"type": "link", "label": "Click"}));
+    }
+
+    #[test]
+    fn test_config_item_with_currency() {
+        let json = json!({
+            "title": "Total Amount",
+            "shortTitle": "Amount",
+            "type": "number",
+            "format": "currency",
+            "currency": "USD",
+            "drillMembers": [],
+            "drillMembersGrouped": { "measures": [], "dimensions": [] }
+        });
+        let item: ConfigItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.currency, Some("USD".to_string()));
+
+        let serialized = serde_json::to_value(&item).unwrap();
+        assert_eq!(serialized["currency"], "USD");
+    }
+
+    #[test]
+    fn test_config_item_without_currency() {
+        let json = json!({
+            "title": "Count",
+            "shortTitle": "Count",
+            "type": "number"
+        });
+        let item: ConfigItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.currency, None);
+
+        let serialized = serde_json::to_value(&item).unwrap();
+        assert!(serialized.get("currency").is_none());
+    }
+
+    #[test]
+    fn test_annotated_config_item_with_currency() {
+        let json = json!({
+            "title": "Price",
+            "shortTitle": "Price",
+            "type": "number",
+            "currency": "EUR"
+        });
+        let item: AnnotatedConfigItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.currency, Some("EUR".to_string()));
+
+        let serialized = serde_json::to_value(&item).unwrap();
+        assert_eq!(serialized["currency"], "EUR");
     }
 }
