@@ -1,0 +1,132 @@
+---
+title: Concepts
+description: Core concepts of Cube data modeling — cubes, views, measures, dimensions, and joins.
+---
+
+ Data Modeling Concepts
+
+## Cubes
+
+A cube represents a dataset in your data model. Each cube is typically mapped to a single table or view in your database:
+
+```yaml
+cubes:
+  - name: users
+    sql_table: public.users
+```
+
+You can also use a SQL query as the data source:
+
+```yaml
+cubes:
+  - name: active_users
+    sql: >
+      SELECT * FROM public.users
+      WHERE is_active = true
+```
+
+## Measures
+
+Measures are quantitative data points — the "what" you're measuring:
+
+```yaml
+measures:
+  - name: count
+    type: count
+
+  - name: total_revenue
+    type: sum
+    sql: revenue
+
+  - name: average_order_value
+    type: avg
+    sql: amount
+```
+
+### Measure types
+
+| Type | Description |
+|------|-------------|
+| `count` | Count of rows |
+| `count_distinct` | Count of distinct values |
+| `sum` | Sum of values |
+| `avg` | Average of values |
+| `min` | Minimum value |
+| `max` | Maximum value |
+| `number` | Custom SQL expression |
+
+## Dimensions
+
+Dimensions are qualitative attributes — the "by what" you're slicing data:
+
+```yaml
+dimensions:
+  - name: status
+    sql: status
+    type: string
+
+  - name: created_at
+    sql: created_at
+    type: time
+```
+
+### Dimension types
+
+| Type | Description |
+|------|-------------|
+| `string` | Text values |
+| `number` | Numeric values |
+| `boolean` | True/false values |
+| `time` | Timestamps and dates |
+| `geo` | Geographic coordinates |
+
+## Joins
+
+Joins define relationships between cubes:
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{CUBE}.customer_id = {customers.id}"
+```
+
+### Relationship types
+
+<AccordionGroup>
+  <Accordion title="one_to_one">
+    Each record in the first cube matches exactly one record in the joined cube.
+  </Accordion>
+  <Accordion title="many_to_one">
+    Multiple records in the first cube match one record in the joined cube. This is the most common type (e.g., orders → customers).
+  </Accordion>
+  <Accordion title="one_to_many">
+    One record in the first cube matches multiple records in the joined cube.
+  </Accordion>
+</AccordionGroup>
+
+## Views
+
+Views provide curated interfaces to your data model. They select specific measures and dimensions from one or more cubes:
+
+```yaml
+views:
+  - name: order_analytics
+    cubes:
+      - join_path: orders
+        includes:
+          - count
+          - total_amount
+          - status
+      - join_path: orders.customers
+        includes:
+          - name: company
+```
+
+<Info>
+Views are the recommended way to expose data to end users and AI agents. They provide a clean, focused interface without exposing the full complexity of your data graph.
+</Info>

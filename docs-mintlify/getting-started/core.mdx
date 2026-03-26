@@ -1,0 +1,67 @@
+---
+title: Cube Core
+description: Get started with self-hosted Cube Core.
+---
+
+ Cube Core
+
+Cube Core is the open-source version of Cube that you can self-host.
+
+## Quick start with Docker
+
+The fastest way to get started with Cube Core is using Docker:
+
+```bash
+docker pull cubejs/cube:latest
+```
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: "2.2"
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 15432:15432
+    environment:
+      - CUBEJS_DEV_MODE=true
+    volumes:
+      - .:/cube/conf
+```
+
+Start the services:
+
+```bash
+docker compose up -d
+```
+
+<Info>
+Cube will start in development mode, which enables the Playground at [http://localhost:4000](http://localhost:4000).
+</Info>
+
+## Configuration
+
+Cube Core is configured using environment variables. The most common ones are:
+
+| Variable | Description |
+|----------|-------------|
+| `CUBEJS_DB_TYPE` | The type of database to connect to |
+| `CUBEJS_DB_HOST` | Database host |
+| `CUBEJS_DB_PORT` | Database port |
+| `CUBEJS_DB_NAME` | Database name |
+| `CUBEJS_DB_USER` | Database user |
+| `CUBEJS_DB_PASS` | Database password |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Data Modeling" icon="cube" href="/data-modeling/overview">
+    Learn how to define your data model
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Explore all configuration options
+  </Card>
+</CardGroup>

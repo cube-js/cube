@@ -1,0 +1,53 @@
+---
+title: Integrating with services on AWS
+description: Cube Cloud works with numerious services available on Amazon Web Services (AWS). This page provides a non-exhaustive lists of...
+---
+
+# Integrating with services on AWS
+
+Cube Cloud works with numerious services available on
+[Amazon Web Services](https://aws.amazon.com) (AWS).
+This page provides a non-exhaustive lists of these services.
+
+<Info>
+
+[Contact us](https://cube.dev/contact) if you have questions about Cube Cloud integration with a particular service.
+
+</Info>
+
+## Data sources
+
+Cube Cloud integrates with the following [data sources](/docs/configuration/data-sources):
+
+- [Amazon Redshift](/docs/configuration/data-sources/aws-redshift)
+- [Amazon Athena](/docs/configuration/data-sources/aws-athena)
+- [Postgres](/docs/configuration/data-sources/postgres), [Microsoft SQL Server](/docs/configuration/data-sources/ms-sql), [MySQL](/docs/configuration/data-sources/mysql), and [Oracle](/docs/configuration/data-sources/oracle) on [Amazon RDS](https://aws.amazon.com/rds/)
+- [Hive / SparkSQL](/docs/configuration/data-sources/hive), [Presto](/docs/configuration/data-sources/presto), and [Trino](/docs/configuration/data-sources/trino) on [Amazon EMR](https://aws.amazon.com/emr/)
+- [Elasticsearch](/docs/configuration/data-sources/elasticsearch) on [Amazon OpenSearch Service](https://aws.amazon.com/opensearch-service/)
+- [Parquet, CSV, and JSON files](/docs/configuration/data-sources/duckdb) on [Amazon S3](https://aws.amazon.com/s3/)
+
+## Data visualization tools
+
+Cube Cloud integrates with the following [data visualization tools](/docs/configuration/visualization-tools):
+
+- [Amazon QuickSight](https://aws.amazon.com/quicksight/) via [SQL API](/api-reference/sql-api)
+
+## Storage
+
+[Amazon S3](https://aws.amazon.com/s3/) can be used as storage for [export buckets](/docs/caching/using-pre-aggregations#export-bucket) and [pre-aggregations](/docs/caching/using-pre-aggregations).
+
+## Compute
+
+[Amazon EC2](https://aws.amazon.com/ec2/) can be used as compute for [deployments](/docs/deployment/cloud/deployments).
+
+## Authentication
+
+[Amazon Cognito](https://aws.amazon.com/pm/cognito/) can be used for [authentication of API requests](/access-security/access-control/recipes/aws-cognito).
+
+## Monitoring
+
+[Amazon CloudWatch](https://aws.amazon.com/cloudwatch/) and [Amazon S3](https://aws.amazon.com/s3/) can be used as destinations for [monitoring integrations](/admin/deployment/monitoring).
+
+## Networking
+
+[Amazon VPC](https://aws.amazon.com/vpc/) can be used for [secure networking](/docs/deployment/cloud/vpc/aws).

@@ -1,0 +1,136 @@
+---
+title: Maintenance window
+description: Cube Cloud can apply platform updates to your infrastructure during a scheduled weekly time slot instead of immediately as they are released. This gives you...
+---
+
+# Maintenance window
+
+Cube Cloud can apply platform updates to your infrastructure during a
+scheduled weekly time slot instead of immediately as they are released.
+This gives you control over **when** updates happen, reducing the risk
+of unexpected changes during peak hours.
+
+<Info>
+
+Maintenance window is available for deployments with
+[dedicated infrastructure][ref-dedicated] on
+[Enterprise and above plans](https://cube.dev/pricing).
+
+</Info>
+
+## How it works
+
+Cube Cloud automatically takes daily snapshots of all current service
+versions. Each snapshot captures a consistent, known-good combination
+of service versions at that point in time.
+
+A snapshot must be at least **24 hours old** before it becomes eligible
+for deployment. This ensures that only versions confirmed stable in
+production are promoted to tenants with a maintenance window enabled.
+
+During the configured maintenance window, the system automatically
+advances your deployment to the latest eligible snapshot. Outside of the
+window, no updates are applied.
+
+<Info>
+
+You do not choose specific versions. The system manages version
+progression automatically — the maintenance window only controls
+**when** the update happens.
+
+</Info>
+
+## What gets updated
+
+The maintenance window applies to all Cube Cloud services for your
+deployment, including:
+
+- **Control-plane services** — the infrastructure serving the Cube Cloud
+  UI, API, and orchestration.
+- **Data-plane services** — the infrastructure responsible for query
+  execution, builds, and worker lifecycle in dedicated regions.
+
+Both control-plane and data-plane services are updated to the same
+snapshot during the window.
+
+## Configuration
+
+Navigate to **Admin → Settings → Maintenance Window** in the Cube Cloud
+console.
+
+<Frame>
+  <img src="https://lgo0ecceic.ucarecd.net/ed674316-b6fe-41c9-94e2-ddf15a462485/" />
+</Frame>
+
+1. Toggle **Enable Scheduled Maintenance Window** to on.
+2. Select the **Day of week** (e.g., Sunday).
+3. Select the **Time (UTC)** — the hour when the update window opens
+   (e.g., 02:00 UTC).
+
+Settings are saved automatically.
+
+<Warning>
+
+The maintenance window spans **one hour** starting from the selected
+time. For example, selecting 02:00 means updates may be applied between
+02:00 and 02:59 UTC on the selected day.
+
+</Warning>
+
+When you enable the maintenance window for the first time, the day
+defaults to **Sunday** and the time defaults to **02:00 UTC**.
+Your deployment is immediately assigned the latest eligible snapshot
+so that it starts from a known, stable version.
+
+## Version rollback
+
+If a new version introduces issues, you can roll back to the
+immediately previous snapshot directly from the settings page.
+
+When the maintenance window is enabled and your deployment has been
+updated at least once, a **Version Rollback** section appears below the
+schedule settings. It shows:
+
+- **Current snapshot** — the snapshot ID and activation date in use.
+- **Previous snapshot** — the snapshot that was active before the
+  current one.
+
+Click **Rollback to snapshot #N** to revert to the previous version.
+The rollback takes effect on the next reconciliation cycle.
+
+<Warning>
+
+Rollback is limited to the immediately previous snapshot. You cannot
+roll back further than one version. If you need to revert to an older
+version, contact support.
+
+</Warning>
+
+## FAQ
+
+### What happens if I disable the maintenance window?
+
+Your deployment returns to the default behavior — receiving updates
+immediately as they are released.
+
+### What if no new snapshot is available during my maintenance window?
+
+Nothing happens. The system only advances your deployment if a newer
+eligible snapshot exists. If you are already on the latest eligible
+snapshot, the maintenance window is a no-op.
+
+### How far behind the latest release will my services be?
+
+At most, your services will be behind by the interval between your
+maintenance windows (typically one week) plus the 24-hour eligibility
+buffer. For example, with a Sunday 02:00 UTC window, your services
+could be up to ~8 days behind the latest release in the worst case.
+
+### Can I roll back to a previous version?
+
+Yes. When the maintenance window is enabled, the settings page shows a
+**Version Rollback** section that lets you revert to the immediately
+previous snapshot. See [Version rollback](#version-rollback) above for
+details.
+
+[ref-dedicated]: /docs/deployment/cloud/deployment-types#production-cluster

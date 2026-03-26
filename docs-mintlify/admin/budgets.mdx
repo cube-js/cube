@@ -1,0 +1,83 @@
+---
+title: Budgets
+description: As an account administrator, you can define rules which trigger notifications when your account's usage exceeds a certain threshold. These rules are called...
+---
+
+# Budgets
+
+As an account administrator, you can define rules which trigger notifications
+when your account's usage exceeds a certain threshold. These rules are called
+"budgets".
+
+<Info>
+
+Available on [Premium and above plans](https://cube.dev/pricing).
+
+</Info>
+
+<video width="100%" controls>
+  <source
+    src="https://ucarecdn.com/038cb7bf-babc-4592-9692-9c3a1ee05449/video.mp4"
+    type="video/mp4"
+  />
+</video>
+
+## How budgets work
+
+Budgets are configured on a per-account basis. When a budget is triggered, any configured users
+will receive an email notification. Budget notifications are sent immediately after being triggered.
+
+## List all budgets
+
+To see a list of all configured budgets in your account, first go to the Billing settings page by
+clicking on your avatar in the top right corner, then clicking on **Billing**.
+
+On the Billing settings page, click the **Budgets** tab to see all configured budgets in your
+account:
+
+<Frame>
+  <img src="https://ucarecdn.com/fc1e2d41-9778-4f79-b93c-04fb375c69e2/" />
+</Frame>
+
+## Create a budget
+
+To create a new budget, click the **Add Budget** button. Enter a name for the budget,
+then select a time period (either 'Daily' or 'Monthly') and a corresponding target amount, which
+is the amount of usage that will trigger a notification.
+
+<Frame>
+  <img src="https://ucarecdn.com/89725881-cefd-48c0-8132-0afa32af30c2/" />
+</Frame>
+
+### Threshold Rules
+
+You can also configure threshold rules, which allow you to trigger notifications when usage
+exceeds a certain percentage of the target amount. For example, if you set a target amount of
+\$1,000 and a threshold of 80%, you will also receive a notification when your usage exceeds \$800.
+
+<Frame>
+  <img src="https://ucarecdn.com/6f1c03cf-1eaf-41c6-b31e-a4b2d0e586ac/" />
+</Frame>
+
+<Info>
+
+A good rule-of-thumb for accounts that pay annually is to set a monthly budget of 1/12 (~8.3%) for your first budget.
+
+</Info>
+
+If you have multiple thresholds defined, some thresholds __may not be triggered__ if a higher threshold
+is triggered first. For example, if you have a target amount of \$1,000 and thresholds of 80% and 90%,
+and your usage hits 95%, you will only receive a notification when your usage exceeds \$900.
+
+### Managing Notifications
+
+When creating a new budget, by default, all users will receive email notifications.
+
+<Frame>
+  <img src="https://ucarecdn.com/6f1c03cf-1eaf-41c6-b31e-a4b2d0e586ac/" />
+</Frame>
+
+You can also specify particular users who should receive alerts by
+toggling the **Specific users** option and selecting them. Optionally,
+you can also add additional email addresses that should receive
+email notifications by entering the email address in the **Custom email** field.

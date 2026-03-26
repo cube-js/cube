@@ -1,0 +1,110 @@
+---
+title: Audit Log
+description: Audit Log collects, stores, and displays security-related events within a Cube Cloud account, across all deployments. You can use it to maintain and review...
+---
+
+# Audit Log
+
+Audit Log collects, stores, and displays security-related events within a Cube Cloud
+account, across all deployments. You can use it to maintain and review a historical
+record of activity for compliance purposes.
+
+<Info>
+
+Available on the [Enterprise Premier plan](https://cube.dev/pricing).
+You can also choose an [Audit Log tier](/admin/pricing#audit-log-tiers).
+
+</Info>
+
+Read below about [collected events](#event-types). Also, see how you can [enable](#configuration)
+Audit Log, [view events](#viewing-events), and [download](#downloading-events) them.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/W7hQzLS3wPc"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+## Configuration
+
+To enable Audit Log, navigate to the **Team & Security** page, open the
+**Audit Log** tab, and turn the **Enable Audit Log** switch on.
+
+<Info>
+
+If you choose to disable Audit Log, your account will be billed for using it until the
+end of the month.
+
+</Info>
+
+## Viewing events
+
+### Table view
+
+Audit Log displays events in a table with the following information for each event:
+- Event timestamp in your local time zone.
+- User email, if applicable to a particular event.
+- Event name (see [event types](#event-types) for the full list).
+- Deployment name, if applicable to a particular event.
+
+<Frame>
+  <img src="https://ucarecdn.com/93cec1af-4307-402e-826e-930f39626071/" />
+</Frame>
+
+### Extended view
+
+You can click on any event to view extended information:
+- IP address from which an event was initiated.
+- Event-specific attributes.
+
+<Frame>
+  <img src="https://ucarecdn.com/43f0d225-0cde-40dd-867b-8705f3ee0ff2/" />
+</Frame>
+
+#### Sanitization
+
+Audit Log uses heuristics to detect sensitive values (e.g., passwords and tokens)
+and sanitize them, i.e., replace them with `[HIDDEN]` in event-specific
+attributes. You can see that a password was sanitized on the screenshot above.
+
+If you'd like your custom environment variable to be sanitized, include one of
+the following substrings in its name: `PASS`, `SECRET`, `TOKEN`, `KEY`.
+
+### Filters
+
+You can also customize the table view with filters on the top and in the right sidebar:
+- Text input for full-text search.
+- Date range filter.
+- Filters to narrow the view down to a specific user, event, or deployment.
+
+<Frame>
+  <img src="https://ucarecdn.com/794dcf79-4268-46ad-8077-f2675dede9d0/" />
+</Frame>
+
+## Downloading events
+
+You can use the **↓ CSV** button to download a CSV file with all events in the
+current view:
+
+<Frame>
+  <img src="https://ucarecdn.com/794dcf79-4268-46ad-8077-f2675dede9d0/" />
+</Frame>
+
+## Event types
+
+Audit Log collects the following types of events:
+
+| Category | Event type |
+| --- | --- |
+| Users | `Created user`<br/>`Deleted user`<br/>`Invited user`<br/>`Updated user profile`<br/>`Requested password reset`<br/>`Changed password` |
+| [Custom roles](/access-security/users-and-permissions/custom-roles) | `Created role`<br/>`Deleted role`<br/>`Updated role`<br/>`Assigned role to user`<br/>`Assigned roles to user`<br/>`Removed role from user` |
+| Authentication | `Logged in`<br/>`Logged out`<br/>`Redirected to SAML provider for login`<br/>`Logged in via SAML` |
+| Account and [single sign-on](/docs/workspace/sso) | `Updated account settings`<br/>`Updated account authentication configuration`<br/>`Updated account SAML configuration`<br/>`Uploaded identity provider metadata file` |
+| [Deployments](/docs/deployment/cloud/deployments) | `Created deployment`<br/>`Deleted deployment`<br/>`Updated deployment configuration`<br/>`Enabled SQL API for deployment`<br/>`Generated data model` |
+| Branches and [dev mode](/docs/data-modeling/dev-mode) | `Created Git branch`<br/>`Deleted Git branch`<br/>`Entered dev mode`<br/>`Exited dev mode`<br/>`Pulled changes to data model`<br/>`Committed and merged changes to data model`<br/>`Merged changes to data model`<br/>`Reverted changes to data model in branch` |
+| [Continuous deployment](/docs/deployment/cloud/continuous-deployment) | `Requested connection of GitHub account`<br/>`Connected deployment to GitHub repository`<br/>`Generated SSH key for deployment`<br/>`Connected deployment to Git upstream`<br/>`Generated Git credentials for Cube Cloud repository`<br/>`Generated webhook token for Git repository`<br/>`Received a Git hook`<br/>`Started uploading files`<br/>`Finished uploading files`<br/>`Triggered new build` |
+| [Budgets](/admin/budgets) | `Created budget`<br/>`Deleted budget`<br/>`Updated budget` |

@@ -1,0 +1,45 @@
+---
+title: "APIs & Integrations Overview"
+description: Connect to Cube using REST, GraphQL, or SQL APIs.
+---
+
+ APIs & Integrations
+
+Cube exposes your semantic layer through multiple API protocols, enabling integration with any tool in your data stack.
+
+## Available APIs
+
+<CardGroup cols={3}>
+  <Card title="REST API" icon="code" href="/apis-integrations/rest-api">
+    JSON-based API for custom applications
+  </Card>
+  <Card title="SQL API" icon="database" href="/apis-integrations/sql-api">
+    Postgres-compatible SQL interface
+  </Card>
+  <Card title="GraphQL API" icon="circle-nodes">
+    Flexible query API for frontend apps
+  </Card>
+</CardGroup>
+
+## Choosing an API
+
+| Use case | Recommended API |
+|----------|-----------------|
+| Custom web applications | REST API |
+| BI tools (Tableau, Power BI, Metabase) | SQL API |
+| Frontend applications | GraphQL or REST API |
+| AI agents | SQL API or REST API |
+| Data notebooks | SQL API |
+
+## Authentication
+
+All APIs support JWT-based authentication. Include a valid JWT token in your requests:
+
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  https://your-cube-instance.com/cubejs-api/v1/load?query=...
+```
+
+<Info>
+The JWT token carries the security context used by Cube to enforce access control policies.
+</Info>

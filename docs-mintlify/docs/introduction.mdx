@@ -1,0 +1,109 @@
+---
+description: Introduction
+hideTableOfContents: true
+---
+
+ Introduction
+
+Cube is the business intelligence platform powered by the open-source semantic layer.
+
+Cube uses AI agents to build data models and enable data consumers to perform analysis. Use AI to quickly build semantic layer and fully control the analytics context.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/gvDy37p7AZ0"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+Cube is a new generation of a business intelligence and embedded analytics platform built to be used by both humans and AI agents. It empowers different personas across your organization:
+
+- **Data Engineers** can quickly curate data models with AI assistance, accelerating the development and maintenance of semantic layers
+- **Data Analysts** can perform deep analysis with AI assistance, diving into complex data relationships and patterns
+- **Business Users** benefit from workbooks and dashboards that Cube can automatically build and maintain
+
+## How is Cube different?
+
+At the foundation of Cube's agentic analytics platform is an [open-source semantic layer](https://github.com/cube-js/cube)—the critical infrastructure that enables both AI agents and humans to work with trusted, consistent data.
+
+The semantic layer provides the governed data foundation that makes agentic analytics possible. It organizes data from your cloud data warehouses into centralized, consistent definitions that AI agents can reliably query, explore, and reason about. Without a semantic layer, AI agents would struggle with inconsistent metrics, scattered business logic, and ungoverned data access—making their outputs unreliable and potentially dangerous.
+
+### Semantic SQL
+
+Unlike other tools, Cube AI agents don't query the data warehouse directly. Instead, they query the semantic layer using Semantic SQL, creating a trusted proxy architecture. The semantic layer runtime acts as guardrails between AI agents and your warehouse—all queries must pass through this deterministic runtime, which validates every request and prevents incorrect queries from reaching your data.
+
+Semantic SQL extends Postgres-compatible SQL with the MEASURE function. This architecture lets AI leverage the full power of SQL to build ad-hoc derived calculations on top of existing semantic model calculations, combining flexibility with governance.
+
+Security policies are enforced deterministically at the semantic layer runtime, ensuring consistent access control across all queries.
+
+<Frame>
+  <img src="https://lgo0ecceic.ucarecd.net/97dd04e5-f534-424e-8d6b-e6e0c19fd95f/" />
+</Frame>
+
+### Semantic layer architecture
+
+#### Code-first
+
+A code-first approach is essential for both traditional data engineering and agentic analytics. Managing data models, configurations, and policies as code enables the same proven practices that power modern software development: version control for collaboration and code reviews, automated testing and documentation, and established patterns for reusability and maintainability.
+
+For agentic analytics specifically, a code-first semantic layer creates new possibilities. AI agents can help curate and maintain data models themselves, accelerating development while maintaining quality through git workflows. The structured, version-controlled nature of code makes it easier for agents to understand changes, suggest improvements, and even implement modifications autonomously.
+
+Everything within Cube—from configurations to data models to access control policies—is managed through code. This foundation enables both human data engineers and AI agents to collaborate on building and maintaining the semantic layer that powers agentic analytics.
+
+The semantic layer that powers Cube's agentic analytics platform is built on four essential pillars: data modeling, access control, caching, and APIs. Each pillar plays a critical role in enabling AI agents and users to work with data reliably, securely, and efficiently.
+
+#### Data Modeling
+
+**The data model provides the knowledge graph that AI agents use to understand your business.** It centralizes metric definitions, entity relationships, and business logic upstream from all consumption tools—whether those are AI agents, BI tools, or custom applications. This centralization is critical for agentic analytics: AI agents need a structured understanding of what metrics mean, how entities relate, and what calculations are valid.
+
+When an AI agent analyzes sales performance or answers questions about customer behavior, it relies on the semantic layer's data model to understand that "revenue" is calculated consistently, that customers have orders, and that orders contain line items. This structured knowledge enables agents to generate reliable insights and navigate complex data relationships autonomously.
+
+**Cube's data model is code-first.** Data teams define data models with YAML or JavaScript code, managed through version control systems. This enables AI-assisted development where agents can help curate and maintain the semantic layer itself, accelerating model development while maintaining quality through git workflows and multiple isolated environments.
+
+**Cube's data model is dataset-centric**, inspired by and expanding upon dimensional modeling. You work with two types of objects:
+
+**Cubes** represent business entities such as customers, line items, and orders. They define all calculations within measures and dimensions, as well as relationships between entities. These relationships form the knowledge graph that AI agents traverse when exploring data and generating insights.
+
+**Views** sit on top of the data graph of cubes, creating facades that data consumers interact with. Think of views as the final data products for AI agents, BI users, and applications. Views select measures and dimensions from connected cubes and present them as unified datasets, providing AI agents with the right context and scope for specific analytical tasks.
+
+#### Access Control
+
+**Access control ensures that AI agents respect the same data security policies as human users.** This is critical for agentic analytics: when AI agents autonomously query and analyze data, they must enforce the same governance rules that apply to human users—whether that's row-level security, column-level restrictions, or data masking.
+
+By centralizing access control in the semantic layer, you ensure that all data consumption—whether by AI agents, BI tools, or custom applications—goes through a single governed checkpoint. This provides comprehensive oversight and prevents agents from inadvertently exposing sensitive data or violating security policies.
+
+Cube's code-first approach enables data teams to **define access control policies with Python or JavaScript**, ranging from simple row-level access rules to completely custom data models per tenant backed by different data sources. These policies apply uniformly to all consumers of the semantic layer, ensuring AI agents operate within the same security boundaries as human users.
+
+#### Caching
+
+**Caching enables AI agents to deliver fast, interactive experiences without overwhelming your data infrastructure.** For agentic analytics to be effective, AI agents must respond quickly to user questions, iteratively explore data, and generate insights in real-time. Without caching, every agent query would hit your data warehouse directly, creating latency issues and potentially significant costs.
+
+The semantic layer acts as a performance buffer between AI agents and your data sources. Through intelligent caching, it ensures agents can work interactively while protecting your cloud data warehouse from unnecessary and redundant load.
+
+Cube implements caching through an **aggregate awareness framework called pre-aggregations.** Data teams define pre-aggregates in the data model as rollup tables, including measures and dimensions. Cube builds and refreshes these pre-aggregates in the background by querying your cloud data warehouse and storing results in Cube Store, Cube's purpose-built caching engine backed by distributed file storage such as S3. Pre-aggregations can be refreshed on schedule or as part of workflow orchestration.
+
+When an AI agent sends a query to Cube, the aggregate awareness engine determines if an existing and fresh pre-aggregate can serve that query. This significantly accelerates agent responses and reduces both latency and data warehouse costs—essential for enabling the iterative, exploratory workflows that characterize agentic analytics.
+
+#### APIs
+
+**APIs enable AI agents, applications, and tools to interact with the semantic layer through standard protocols.** For agentic analytics to work across diverse use cases—from AI-powered workbooks to embedded analytics to traditional BI—the semantic layer must provide universal interoperability. AI agents need to query data, introspect the data model, and integrate with other systems without requiring custom integrations for every tool or framework.
+
+Rather than inventing proprietary protocols, Cube implements widely adopted standards: **REST, GraphQL, and SQL.**
+
+**REST and GraphQL** provide modern API interfaces for building custom applications and enabling programmatic access. These APIs power agentic workflows, allowing AI agents to query data, retrieve results, and build interactive experiences.
+
+**SQL** is universally adopted across the data stack. Every BI tool, visualization platform, and data application can query a SQL data source. Cube implements Postgres-compatible SQL and extends it to support semantic layer concepts like measures—special types that know how to evaluate themselves based on data model definitions. Any tool that can connect to Postgres or Redshift can connect to Cube, making the semantic layer accessible to both AI agents and traditional analytics tools.
+
+**Data model introspection through the meta API** is essential for agentic analytics. It enables AI agents to discover available metrics, understand entity relationships, and determine valid queries—providing the context agents need to navigate the semantic layer autonomously. This same introspection capability allows BI tools to automatically map to data model objects and helps applications build dynamic interfaces.
+
+
+[ref-workbooks]: /docs/workspace/workbooks
+[ref-embedding]: /api-reference/embedding
+[ref-chat-api]: /api-reference/chat-api
+[ref-mcp-server]: /api-reference/mcp-server
+[ref-spaces-agents-models]: /docs/agentic-analytics/spaces-agents-models
+[ref-agent-rules]: /docs/agentic-analytics/agent-rules
+[ref-agent-memories]: /docs/agentic-analytics/memory-isolation

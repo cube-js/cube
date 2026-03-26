@@ -1,0 +1,142 @@
+---
+title: Cube Cloud for Excel
+description: "Cube Cloud for Excel is the native [Microsoft Excel][ref-excel] add-in for Cube Cloud."
+---
+
+# Cube Cloud for Excel
+
+Cube Cloud for Excel is the native [Microsoft Excel][ref-excel] add-in for Cube Cloud.
+
+it works with Excel on all operating systems,
+including macOS, and all platforms, including web and mobile. It doesn't integrate
+with the native [PivotTable][link-pivottable] in Excel but provides a custom
+[pivot table](#create-reports-via-pivot-table) UI.
+
+<Info>
+
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</Info>
+
+After [configuring](#configuration), [installing](#installation), and
+[authenticating](#authentication) this add-in, you will be able to [create
+reports via pivot table](#create-reports-via-pivot-table) and work with
+[saved reports](#work-with-saved-reports).
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/vG7iEdYTvIQ"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+## Configuration
+
+Cube Cloud for Excel uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
+
+## Installation
+
+You have to install Cube Cloud for Excel into your Microsoft 365 organization.
+To do so, navigate to its [page in the Microsoft AppSource][link-ms-appsource]
+and click **Get it now**:
+
+<Frame>
+  <img src="https://ucarecdn.com/8d451775-6b44-47b5-a682-87cb30f3f8e6/" />
+</Frame>
+
+You can also add this add-in to your Excel application via the **Add-ins**
+button. Where this button is located depends on the [Excel version][link-excel-addins].
+For example, in Excel for the web, it's located on the rightmost side of the
+**Home** ribbon.
+
+Search for `Cube Cloud for Excel (add-in)` and click **Add**:
+
+<Frame>
+  <img src="https://ucarecdn.com/83ab1e1f-e7d0-4c9c-bea1-f12c193d5e94/" />
+</Frame>
+
+## Authentication
+
+You need to authenticate Cube Cloud for Excel to retrieve data from Cube Cloud.
+To do so, open the sidebar by clicking on the **Cube Cloud** button in
+the **Home** ribbon. Then, click **Sign in**.
+
+<Frame>
+  <img src="https://ucarecdn.com/bdf82477-02d3-4686-9c8f-8d6384c3e7f3/" />
+</Frame>
+
+A modal window with an authentication prompt will appear. Choose the deployments
+that you want to work with in Microsoft Excel and click **Authorize**.
+Once you see the `Access Granted` message, close the modal window.
+
+If you want to revoke the authentication, open the add-in menu and click
+**Sign out**.
+
+## Create reports via pivot table
+
+To create a report, go to the add-in menu and click **Create report via pivot
+table**. Then, select a Cube Cloud deployment from the drop-down. Finally,
+you can start building a query by selecting a view and its members in the UI that
+looks and feels like [Playground][ref-playground].
+
+<Info>
+
+Cube Cloud for Excel works only with [views][ref-views], not cubes.
+
+</Info>
+
+Click on members to add them to **Rows** and **Measures**.
+If needed, drag dimensions from **Rows** to **Columns**. Click on
+the funnel buttons to add members to **Filters**. Click on **×** to
+remove members from a query.
+
+<Frame>
+  <img src="https://ucarecdn.com/670fda9d-358a-4345-9242-7888d8aaedd8/" />
+</Frame>
+
+Use **Order** and **Filters** panes below to sort and filter the
+data in the report.
+
+If you'd like to move the report to a new location, click on the desired top-left
+cell and then confirm with the target button under **Result location**.
+
+<Frame>
+  <img src="https://ucarecdn.com/4c3af7b9-4ef6-4f7f-8d0f-6d579609482e/" />
+</Frame>
+
+With every change to your query, Cube Cloud for Excel will update the report on
+the sheet after a slight delay. If you'd like to minimize it, consider
+implementing [pre-aggregations][ref-pre-aggs].
+
+When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
+by clicking **Save**.
+
+## Work with saved reports
+
+Go to the add-in menu and click **View saved reports** to see a list of
+reports.
+
+Click **Refresh** to manually refresh the data in the report's location.
+Click **Edit** to chnage the query or the location.
+
+<Frame>
+  <img src="https://ucarecdn.com/167abe25-635c-4fa6-b4a2-c090aa533f3c/" />
+</Frame>
+
+You can also manage saved reports in the **[Saved Reports][ref-saved-reports]** page
+in Cube Cloud.
+
+
+[ref-excel]: /docs/configuration/visualization-tools/excel
+[link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
+[ref-playground]: /docs/workspace/playground
+[ref-views]: /docs/data-modeling/concepts#views
+[ref-pre-aggs]: /docs/caching/using-pre-aggregations
+[ref-sql-api-enabled]: /api-reference/sql-api#cube-cloud
+[link-excel-addins]: https://support.microsoft.com/en-us/office/add-or-remove-add-ins-in-excel-0af570c4-5cf3-4fa9-9b88-403625a0b460
+[link-ms-appsource]: https://appsource.microsoft.com/en-us/product/office/WA200008486
+[ref-saved-reports]: /docs/workspace/saved-reports

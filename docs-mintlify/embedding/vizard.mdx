@@ -1,0 +1,81 @@
+---
+title: Chart Prototyping
+description: "Chart Prototyping generates code of a front-end application that works with the [REST API][ref-rest-api] and visualizes data on charts. It's convenient for..."
+---
+
+# Chart Prototyping
+
+Chart Prototyping generates code of a front-end application that works with
+the [REST API][ref-rest-api] and visualizes data on charts. It's convenient
+for boostrapping a new embedded analytics application or copying and pasting
+code to an existing one.
+
+<Info>
+
+Chart Prototyping is part of [Playground][ref-playground].
+
+</Info>
+
+To access Chart Prototyping from Playground, compose and run a query, expand
+the **Chart** pane, and click **Code** on the right:
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/OFiJ8AVNHQw"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+## Preview the chart
+
+Chart Prototyping shows you a preview of the chart on the **Preview**
+tab:
+
+<Frame>
+  <img src="https://ucarecdn.com/c9511662-9673-43ef-a496-33d7cf30d5ab/" />
+</Frame>
+
+You can also customize the chart by choosing a visualization type,
+a framework, a charting library, or one of other options in the sidebar.
+
+<Info>
+
+If you'd like to request the support for a specific charting library or
+framework, please [contact us](http://cube.dev/contact).
+
+</Info>
+
+## Browse the code
+
+You can also browse the generated code of this application on the
+**Code** tab:
+
+<Frame>
+  <img src="https://ucarecdn.com/b86c7ef5-afc2-4ccb-b529-4b98dea98772/" />
+</Frame>
+
+## Download the application
+
+Finally, you can download a ZIP archive with the code and the file with your
+Cube Cloud credentials using the buttons on the bottom of the **Code**
+tab:
+
+<Frame>
+  <img src="https://ucarecdn.com/b86c7ef5-afc2-4ccb-b529-4b98dea98772/" />
+</Frame>
+
+First, unarchive the code. Then, rename the credentials file to `.env.local`
+(so that it starts with a dot) and place it into the folder with unarchived code.
+You can now run the application with the following commands:
+
+```bash
+npm install
+npm run dev
+```
+
+
+[ref-rest-api]: /api-reference/rest-api
+[ref-playground]: /docs/workspace/playground

@@ -1,0 +1,70 @@
+---
+title: Data Sources
+description: Connect Cube to your preferred data warehouse or database.
+---
+
+ Data Sources
+
+Cube supports a wide range of data sources. Below is a list of supported databases and warehouses.
+
+## Cloud data warehouses
+
+<CardGroup cols={3}>
+  <Card title="Snowflake" icon="snowflake">
+    Enterprise data warehouse with automatic scaling
+  </Card>
+  <Card title="BigQuery" icon="google">
+    Google's serverless data warehouse
+  </Card>
+  <Card title="Databricks" icon="layer-group">
+    Unified analytics platform on the lakehouse
+  </Card>
+  <Card title="AWS Redshift" icon="aws">
+    Amazon's cloud data warehouse
+  </Card>
+</CardGroup>
+
+## Relational databases
+
+<CardGroup cols={3}>
+  <Card title="PostgreSQL" icon="database">
+    Popular open-source relational database
+  </Card>
+  <Card title="MySQL" icon="database">
+    World's most popular open-source database
+  </Card>
+  <Card title="MS SQL" icon="microsoft">
+    Microsoft SQL Server
+  </Card>
+  <Card title="Oracle" icon="building">
+    Enterprise relational database
+  </Card>
+</CardGroup>
+
+## OLAP & analytics
+
+<CardGroup cols={3}>
+  <Card title="ClickHouse" icon="bolt">
+    Column-oriented OLAP database
+  </Card>
+  <Card title="DuckDB" icon="duck">
+    In-process analytical database
+  </Card>
+  <Card title="Apache Druid" icon="chart-simple">
+    Real-time analytics database
+  </Card>
+</CardGroup>
+
+## Connecting a data source
+
+To connect a data source, set the `CUBEJS_DB_TYPE` environment variable:
+
+```bash
+CUBEJS_DB_TYPE=postgres
+```
+
+Each data source has its own set of required environment variables. Refer to the individual data source pages for details.
+
+<Tip>
+In Cube Cloud, you can configure data sources through the UI without managing environment variables directly.
+</Tip>

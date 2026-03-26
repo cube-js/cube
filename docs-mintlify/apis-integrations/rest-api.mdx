@@ -1,0 +1,102 @@
+---
+title: REST API
+description: Query Cube using the REST API for custom applications.
+---
+
+ REST API
+
+The Cube REST API provides a JSON-based interface for querying your semantic layer.
+
+## Base URL
+
+```
+https://your-cube-instance.com/cubejs-api/v1
+```
+
+## Load endpoint
+
+The primary endpoint for querying data:
+
+```bash
+curl \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -G "https://your-cube-instance.com/cubejs-api/v1/load" \
+  --data-urlencode 'query={
+    "measures": ["orders.count"],
+    "dimensions": ["orders.status"],
+    "timeDimensions": [{
+      "dimension": "orders.created_at",
+      "granularity": "month"
+    }]
+  }'
+```
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "orders.status": "completed",
+      "orders.count": 1250,
+      "orders.created_at.month": "2024-01-01T00:00:00.000"
+    },
+    {
+      "orders.status": "pending",
+      "orders.count": 340,
+      "orders.created_at.month": "2024-01-01T00:00:00.000"
+    }
+  ]
+}
+```
+
+## Meta endpoint
+
+Retrieve the data model schema:
+
+```bash
+curl \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  "https://your-cube-instance.com/cubejs-api/v1/meta"
+```
+
+## Query format
+
+### Measures and dimensions
+
+```json
+{
+  "measures": ["orders.count", "orders.total_amount"],
+  "dimensions": ["orders.status", "customers.city"]
+}
+```
+
+### Filters
+
+```json
+{
+  "measures": ["orders.count"],
+  "filters": [
+    {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": ["completed"]
+    }
+  ]
+}
+```
+
+### Time dimensions
+
+```json
+{
+  "measures": ["orders.count"],
+  "timeDimensions": [
+    {
+      "dimension": "orders.created_at",
+      "dateRange": ["2024-01-01", "2024-12-31"],
+      "granularity": "month"
+    }
+  ]
+}
+```
