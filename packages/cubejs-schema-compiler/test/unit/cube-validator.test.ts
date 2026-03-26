@@ -1821,8 +1821,8 @@ describe('Cube Validation', () => {
 
         const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
         expect(validationResult.error).toBeTruthy();
-        expect(validationResult.error!.message).toContain(
-          '"currency" property can only be used with numeric measures'
+        expect(validationResult.error!.message).toEqual(
+          '"currency" property can only be used with numeric measures, actual type: string'
         );
       });
 
