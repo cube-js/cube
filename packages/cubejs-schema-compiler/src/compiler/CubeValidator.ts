@@ -113,13 +113,14 @@ const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day
 // Do not allow negative intervals for granularities, while offsets could be negative
 const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
 
-const formatSchema = Joi.alternatives([
+const formatAlternatives = [
   Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
   Joi.object().keys({
     type: Joi.string().valid('link'),
     label: Joi.string().required()
   })
-]);
+];
+const formatSchema = Joi.alternatives(formatAlternatives);
 
 // POSIX strftime specification (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions
 // See: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
@@ -267,7 +268,7 @@ const measureFormatSchema = Joi.alternatives([
 ]);
 
 const dimensionNumericFormatSchema = Joi.alternatives([
-  formatSchema,
+  ...formatAlternatives,
   namedNumericFormatSchema,
   customNumericFormatSchema
 ]);
