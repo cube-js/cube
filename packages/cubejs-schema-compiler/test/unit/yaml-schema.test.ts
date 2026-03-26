@@ -945,4 +945,81 @@ cubes:
 
     await compiler.compile();
   });
+
+  describe('Currency property', () => {
+    it('measure with currency in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: currency
+          currency: usd
+      `);
+
+      await compiler.compile();
+
+      const { measures } = metaTransformer.cubes[0].config;
+      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
+      expect(totalAmount).toBeDefined();
+      expect(totalAmount!.currency).toBe('USD');
+      expect(totalAmount!.format).toBe('currency');
+    });
+
+    it('number dimension with currency in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          currency: eur
+      `);
+
+      await compiler.compile();
+
+      const { dimensions } = metaTransformer.cubes[0].config;
+      const price = dimensions.find((d) => d.name === 'Orders.price');
+      expect(price).toBeDefined();
+      expect(price!.currency).toBe('EUR');
+    });
+
+    it('non-number dimension with currency in YAML - error', async () => {
+      const { compiler } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: status
+          sql: status
+          type: string
+          currency: usd
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('"currency" property can only be used with dimensions of type "number"');
+      }
+    });
+  });
 });

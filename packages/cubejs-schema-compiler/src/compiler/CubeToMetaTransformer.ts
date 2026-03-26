@@ -266,7 +266,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 ? true
                 : extendedDimDef.suggestFilterValues,
             format: this.transformDimensionFormat(extendedDimDef),
-            currency: extendedDimDef.currency,
+            currency: extendedDimDef.currency?.toUpperCase(),
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -385,7 +385,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
       description: extendedMetricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
       format: this.transformMeasureFormat(extendedMetricDef.format),
-      currency: extendedMetricDef.currency,
+      currency: extendedMetricDef.currency?.toUpperCase(),
       cumulativeTotal: isCumulative,
       cumulative: isCumulative,
       type,
