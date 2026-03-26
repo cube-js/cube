@@ -1022,4 +1022,96 @@ cubes:
       }
     });
   });
+
+  describe('Named numeric formats', () => {
+    it('measure with named format in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: accounting_2
+        - name: bytes
+          sql: bytes
+          type: sum
+          format: abbr_3
+      `);
+
+      await compiler.compile();
+
+      const { measures } = metaTransformer.cubes[0].config;
+      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
+      expect(totalAmount).toBeDefined();
+      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2f' });
+
+      const bytes = measures.find((m) => m.name === 'Orders.bytes');
+      expect(bytes).toBeDefined();
+      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3s' });
+    });
+
+    it('number dimension with named format in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          format: currency_1
+        - name: population
+          sql: population
+          type: number
+          format: abbr
+      `);
+
+      await compiler.compile();
+
+      const { dimensions } = metaTransformer.cubes[0].config;
+      const price = dimensions.find((d) => d.name === 'Orders.price');
+      expect(price).toBeDefined();
+      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1f' });
+
+      const population = dimensions.find((d) => d.name === 'Orders.population');
+      expect(population).toBeDefined();
+      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2s' });
+    });
+
+    it('invalid named format in YAML - error', async () => {
+      const { compiler } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: unknown_format
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('format');
+      }
+    });
+  });
 });

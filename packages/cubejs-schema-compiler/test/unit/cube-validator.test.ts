@@ -1601,6 +1601,95 @@ describe('Cube Validation', () => {
     });
   });
 
+  describe('Named numeric formats', () => {
+    it('measures with valid named formats - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        measures: {
+          num3: { sql: () => 'amount', type: 'sum', format: 'number_3' },
+          pct1: { sql: () => 'ratio', type: 'avg', format: 'percent_1' },
+          cur4: { sql: () => 'revenue', type: 'sum', format: 'currency_4' },
+          dec5: { sql: () => 'amount', type: 'sum', format: 'decimal_5' },
+          ab: { sql: () => 'bytes', type: 'sum', format: 'abbr' },
+          ab2: { sql: () => 'bytes', type: 'sum', format: 'abbr_2' },
+          acc: { sql: () => 'amount', type: 'sum', format: 'accounting' },
+          acc0: { sql: () => 'amount', type: 'sum', format: 'accounting_0' },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('number dimensions with valid named formats - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          price: { sql: () => 'price', type: 'number', format: 'number_2' },
+          discount: { sql: () => 'discount', type: 'number', format: 'percent_0' },
+          total: { sql: () => 'total', type: 'number', format: 'currency_1' },
+          pop: { sql: () => 'pop', type: 'number', format: 'abbr_3' },
+          bal: { sql: () => 'bal', type: 'number', format: 'accounting' },
+          dec: { sql: () => 'dec', type: 'number', format: 'decimal_4' },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('invalid named format (bare decimal without suffix) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        measures: {
+          amount: { sql: () => 'amount', type: 'sum', format: 'decimal' },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('invalid named format (unknown base) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        measures: {
+          amount: { sql: () => 'amount', type: 'sum', format: 'unknown_2' },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('string dimension with named numeric format - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: { sql: () => 'status', type: 'string', format: 'abbr_2' },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
+
   describe('Custom numeric format for number dimensions (d3-format)', () => {
     it('number dimensions with valid d3-format and standard formats - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());

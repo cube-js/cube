@@ -4,6 +4,7 @@ import cronParser from 'cron-parser';
 import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
+import { NAMED_NUMERIC_FORMATS } from './named-numeric-formats';
 
 /* *****************************
  * ATTENTION:
@@ -249,13 +250,25 @@ const customNumericFormatSchema = Joi.string().custom((value, helper) => {
   return value;
 });
 
+const namedNumericFormatSchema = Joi.string().custom((value, helper) => {
+  if (value in NAMED_NUMERIC_FORMATS) {
+    return value;
+  }
+
+  return helper.message({
+    custom: `"${value}" is not a valid named numeric format. Valid named formats: number, percent, currency, id, abbr, accounting (with optional _N decimal suffix, e.g. percent_3)`
+  });
+});
+
 const measureFormatSchema = Joi.alternatives([
   Joi.string().valid('percent', 'currency', 'number'),
+  namedNumericFormatSchema,
   customNumericFormatSchema
 ]);
 
 const dimensionNumericFormatSchema = Joi.alternatives([
   formatSchema,
+  namedNumericFormatSchema,
   customNumericFormatSchema
 ]);
 

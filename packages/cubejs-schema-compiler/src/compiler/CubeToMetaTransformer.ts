@@ -18,6 +18,7 @@ import type { ContextEvaluator } from './ContextEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
+import { resolveNamedNumericFormat } from './named-numeric-formats';
 
 export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
@@ -413,6 +414,13 @@ export class CubeToMetaTransformer implements CompilerInterface {
       return format;
     }
 
+    // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
+    const resolved = resolveNamedNumericFormat(format);
+    if (resolved) {
+      return { type: 'custom-numeric', value: resolved };
+    }
+
+    // Existing standard formats stay as-is (breaking change to convert these)
     const standardFormats = ['imageUrl', 'currency', 'percent', 'number', 'id'];
     if (standardFormats.includes(format)) {
       return format;
@@ -423,7 +431,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
       return { type: 'custom-time', value: format };
     }
 
-    // Custom numeric format for number dimensions
+    // Custom numeric format for number dimensions (raw d3-format specifier)
     if (type === 'number') {
       return { type: 'custom-numeric', value: format };
     }
@@ -436,12 +444,19 @@ export class CubeToMetaTransformer implements CompilerInterface {
       return undefined;
     }
 
+    // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
+    const resolved = resolveNamedNumericFormat(format);
+    if (resolved) {
+      return { type: 'custom-numeric', value: resolved };
+    }
+
+    // Existing standard formats stay as-is (breaking change to convert these)
     const standardFormats = ['percent', 'currency', 'number'];
     if (standardFormats.includes(format)) {
       return format;
     }
 
-    // Custom numeric format
+    // Custom numeric format (raw d3-format specifier)
     return { type: 'custom-numeric', value: format };
   }
 }
