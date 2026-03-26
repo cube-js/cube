@@ -99,6 +99,9 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             MultiStageCalculationWindowFunction::Rank => {
                 context_factory.set_multi_stage_rank(partition_by)
             }
+            MultiStageCalculationWindowFunction::Median => {
+                context_factory.set_multi_stage_median()
+            }
             MultiStageCalculationWindowFunction::Window => {
                 context_factory.set_multi_stage_window(partition_by)
             }

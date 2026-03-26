@@ -793,7 +793,7 @@ const measureTypeWithCount = Joi.string().valid(
 
 const multiStageMeasureType = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox', 'numberAgg',
-  'rank'
+  'rank', 'median'
 );
 
 const timeShiftItemRequired = Joi.object({

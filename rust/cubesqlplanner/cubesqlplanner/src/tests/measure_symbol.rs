@@ -191,6 +191,19 @@ fn measure_rank_properties() {
 }
 
 #[test]
+fn measure_median_properties() {
+    let ctx = ctx();
+    let m = ctx.create_measure("test_measures.median_measure").unwrap();
+    let measure = m.as_measure().unwrap();
+
+    assert!(matches!(measure.kind(), MeasureKind::Median(_)));
+    assert!(!measure.is_calculated());
+    assert!(!measure.is_running_total());
+    assert!(!measure.is_cumulative());
+    assert!(!measure.is_addictive());
+}
+
+#[test]
 fn measure_rolling_window_properties() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.rolling_sum").unwrap();

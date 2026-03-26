@@ -4,6 +4,69 @@ import {
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
+describe('Multi-Stage median type', () => {
+  jest.setTimeout(200000);
+
+  // Test data:
+  //   client A, date 2024-01-01: policy_ids 1,2,3 → count_distinct = 3
+  //   client B, date 2024-01-01: policy_id 1      → count_distinct = 1
+  //   median of [3,1] = PERCENTILE_CONT(0.5) = 2
+  //   filtered to client A only: median of [3] = 3
+  const { compiler: medianCompiler, joinGraph: medianJoinGraph, cubeEvaluator: medianCubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: policies
+    sql: >
+      SELECT 'A' as client_id, '2024-01-01' as collection_date, 1 as policy_id
+      UNION ALL SELECT 'A', '2024-01-01', 2
+      UNION ALL SELECT 'A', '2024-01-01', 3
+      UNION ALL SELECT 'B', '2024-01-01', 1
+
+    dimensions:
+      - name: client_id
+        sql: client_id
+        type: string
+        primary_key: true
+
+      - name: collection_date
+        sql: collection_date
+        type: string
+
+    measures:
+      - name: _inner_count_distinct_policy_id
+        sql: policy_id
+        type: count_distinct
+        public: false
+
+      - name: median_policies
+        sql: "{_inner_count_distinct_policy_id}"
+        type: median
+        multi_stage: true
+        group_by:
+          - client_id
+          - collection_date
+  `);
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('median multi_stage returns correct unfiltered result', async () => dbRunner.runQueryTest({
+      measures: ['policies.median_policies'],
+    }, [
+      { policies__median_policies: '2' },
+    ],
+    { joinGraph: medianJoinGraph, cubeEvaluator: medianCubeEvaluator, compiler: medianCompiler }));
+
+    it('median multi_stage is filter-aware', async () => dbRunner.runQueryTest({
+      measures: ['policies.median_policies'],
+      filters: [{ member: 'policies.client_id', operator: 'equals', values: ['A'] }],
+    }, [
+      { policies__median_policies: '3' },
+    ],
+    { joinGraph: medianJoinGraph, cubeEvaluator: medianCubeEvaluator, compiler: medianCompiler }));
+  } else {
+    test.skip('median multi_stage returns correct unfiltered result', () => { expect(1).toBe(1); });
+    test.skip('median multi_stage is filter-aware', () => { expect(1).toBe(1); });
+  }
+});
+
 describe('Multi-Stage', () => {
   jest.setTimeout(200000);
 

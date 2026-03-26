@@ -7,6 +7,7 @@ mod filters;
 mod granularities;
 mod group_by;
 mod joins;
+mod median;
 mod multi_fact;
 mod multiple_measures;
 mod order_limit;

@@ -26,6 +26,7 @@ impl ToString for MultiStageCalculationType {
 #[derive(PartialEq, Clone)]
 pub enum MultiStageCalculationWindowFunction {
     Rank,
+    Median,
     Window,
     None,
 }
@@ -34,6 +35,7 @@ impl ToString for MultiStageCalculationWindowFunction {
     fn to_string(&self) -> String {
         match self {
             MultiStageCalculationWindowFunction::Rank => "Rank".to_string(),
+            MultiStageCalculationWindowFunction::Median => "Median".to_string(),
             MultiStageCalculationWindowFunction::Window => "Window".to_string(),
             MultiStageCalculationWindowFunction::None => "None".to_string(),
         }
