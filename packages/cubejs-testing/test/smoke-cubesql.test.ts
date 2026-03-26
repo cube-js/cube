@@ -235,7 +235,7 @@ describe('SQL API', () => {
 
       expect(schema).toEqual([
         { name: 'createdAt', column_type: 'Timestamp', format: { type: 'custom-time', value: '%Y-%m-%d' } },
-        { name: 'totalAmount', column_type: 'Double', format: 'currency' },
+        { name: 'totalAmount', column_type: 'Double', format: 'currency', currency: 'USD' },
         { name: 'numberTotal', column_type: 'Double', format: { type: 'custom-numeric', value: '$,.2f' } },
         { name: 'status', column_type: 'String' },
       ]);

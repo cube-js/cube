@@ -35,6 +35,7 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  currency?: string;
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;

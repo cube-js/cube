@@ -48,6 +48,7 @@ cube(`Orders`, {
       sql: `amount`,
       type: `sum`,
       format: `currency`,
+      currency: `usd`,
     },
     toRemove: {
       type: `count`,

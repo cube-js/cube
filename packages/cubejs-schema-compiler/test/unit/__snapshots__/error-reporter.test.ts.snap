@@ -6,8 +6,8 @@ Object {
     Object {
       "fileName": "test.js",
       "message": "Syntax Error: Duplicate error
-[0m[31m[1m>[22m[39m[90m 1 |[39m test content
- [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m [31m[1mDuplicate error[22m[39m[0m",
+> 1 | test content
+    | ^^^ Duplicate error",
       "plainMessage": "Syntax Error: Duplicate error",
     },
   ],
@@ -39,13 +39,13 @@ Validation error
 
 schema/users.js Errors:
 Syntax Error: Invalid measure definition
-[0m [90m 2 |[39m   sql[33m:[39m [32m\`SELECT * FROM users\`[39m[33m,[39m
- [90m 3 |[39m   measures[33m:[39m {
-[31m[1m>[22m[39m[90m 4 |[39m     count[33m:[39m {
- [90m   |[39m    [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m [31m[1mInvalid measure definition[22m[39m
- [90m 5 |[39m       type[33m:[39m [32m'count'[39m
- [90m 6 |[39m     }
- [90m 7 |[39m   }[0m
+  2 |   sql: \`SELECT * FROM users\`,
+  3 |   measures: {
+> 4 |     count: {
+    |    ^^^^^ Invalid measure definition
+  5 |       type: 'count'
+  6 |     }
+  7 |   }
 "
 `;
 
@@ -59,12 +59,12 @@ exports[`ErrorReporter should group and format errors and warnings from differen
 Array [
   "schema/users.js:
 Warning: Deprecated syntax
-[0m [90m 1 |[39m cube([32m'Users'[39m[33m,[39m {
-[31m[1m>[22m[39m[90m 2 |[39m   sql[33m:[39m [32m\`SELECT * FROM users\`[39m[33m,[39m
- [90m   |[39m  [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m [31m[1mDeprecated syntax[22m[39m
- [90m 3 |[39m   measures[33m:[39m {
- [90m 4 |[39m     count[33m:[39m {
- [90m 5 |[39m       type[33m:[39m [32m'count'[39m[0m",
+  1 | cube('Users', {
+> 2 |   sql: \`SELECT * FROM users\`,
+    |  ^^^ Deprecated syntax
+  3 |   measures: {
+  4 |     count: {
+  5 |       type: 'count'",
   "schema/orders.js:
 Consider adding indexes",
   "schema/analytics.js:

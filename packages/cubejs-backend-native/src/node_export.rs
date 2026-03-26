@@ -51,6 +51,8 @@ pub(crate) struct SchemaColumn {
     column_type: ColumnType,
     #[serde(skip_serializing_if = "Option::is_none")]
     format: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,
 }
 
 impl SQLInterface {
@@ -335,9 +337,11 @@ async fn handle_sql_query(
             let mut columns = Vec::with_capacity(stream.schema().fields().len());
 
             for field in stream.schema().fields().iter() {
-                let format = field
+                let member_name = field
                     .metadata()
-                    .and_then(|m| m.get("member_name"))
+                    .and_then(|m| m.get("member_name"));
+
+                let format = member_name
                     .and_then(|member_name| {
                         meta_context
                             .find_measure_with_name(member_name)
@@ -350,10 +354,24 @@ async fn handle_sql_query(
                     })
                     .and_then(|fmt| serde_json::to_value(fmt.as_ref()).ok());
 
+                let currency = member_name
+                    .and_then(|member_name| {
+                        meta_context
+                            .find_measure_with_name(member_name)
+                            .and_then(|m| m.currency.as_ref())
+                            .or_else(|| {
+                                meta_context
+                                    .find_dimension_with_name(member_name)
+                                    .and_then(|d| d.currency.as_ref())
+                            })
+                    })
+                    .cloned();
+
                 columns.push(SchemaColumn {
                     name: field.name().clone(),
                     column_type: arrow_to_column_type(field.data_type().clone())?,
                     format,
+                    currency,
                 });
             }
 

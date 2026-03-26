@@ -40,6 +40,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   cumulative?: boolean;
   aggType?: string;
   keyReference?: string;
+  currency?: string;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -69,6 +70,7 @@ export type MeasureConfig = {
   description?: string;
   shortTitle: string;
   format?: MeasureFormat;
+  currency?: string;
   cumulativeTotal: boolean;
   cumulative: boolean;
   type: string;
@@ -92,6 +94,7 @@ export type DimensionConfig = {
   shortTitle: string;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  currency?: string;
   meta?: any;
   isVisible: boolean;
   public: boolean;
@@ -263,6 +266,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 ? true
                 : extendedDimDef.suggestFilterValues,
             format: this.transformDimensionFormat(extendedDimDef),
+            currency: extendedDimDef.currency,
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -381,6 +385,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
       description: extendedMetricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
       format: this.transformMeasureFormat(extendedMetricDef.format),
+      currency: extendedMetricDef.currency,
       cumulativeTotal: isCumulative,
       cumulative: isCumulative,
       type,
