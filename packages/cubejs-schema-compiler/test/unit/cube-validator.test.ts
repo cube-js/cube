@@ -1781,7 +1781,7 @@ describe('Cube Validation', () => {
         expect(validationResult.error).toBeFalsy();
       });
 
-      it('string dimension with currency - error', async () => {
+      it('non-number dimension with currency - error', async () => {
         const cubeValidator = new CubeValidator(new CubeSymbols());
         const cube = {
           name: 'name',
@@ -1798,6 +1798,10 @@ describe('Cube Validation', () => {
 
         const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
         expect(validationResult.error).toBeTruthy();
+        const nestedMessages = validationResult.error!.details[0]?.context?.details?.map((d: any) => d.message);
+        expect(nestedMessages).toContain(
+          '"currency" property can only be used with dimensions of type "number"'
+        );
       });
 
       it('measure with both format and currency - correct', async () => {

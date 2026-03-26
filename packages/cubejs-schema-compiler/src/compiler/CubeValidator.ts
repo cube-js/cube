@@ -320,7 +320,9 @@ const BaseDimensionWithoutSubQuery = {
   currency: Joi.when('type', {
     is: 'number',
     then: currencySchema,
-    otherwise: Joi.forbidden()
+    otherwise: Joi.any().custom((_value, helper) => helper.message({
+      custom: '"currency" property can only be used with dimensions of type "number"'
+    }))
   }),
   meta: Joi.any(),
   order: Joi.string().valid('asc', 'desc'),
