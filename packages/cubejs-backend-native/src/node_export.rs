@@ -337,35 +337,26 @@ async fn handle_sql_query(
             let mut columns = Vec::with_capacity(stream.schema().fields().len());
 
             for field in stream.schema().fields().iter() {
-                let member_name = field
+                let (format, currency) = field
                     .metadata()
-                    .and_then(|m| m.get("member_name"));
-
-                let format = member_name
+                    .and_then(|m| m.get("member_name"))
                     .and_then(|member_name| {
                         meta_context
                             .find_measure_with_name(member_name)
-                            .and_then(|m| m.format.as_ref())
+                            .map(|m| (m.format.as_ref(), m.currency.as_ref()))
                             .or_else(|| {
                                 meta_context
                                     .find_dimension_with_name(member_name)
-                                    .and_then(|d| d.format.as_ref())
+                                    .map(|d| (d.format.as_ref(), d.currency.as_ref()))
                             })
                     })
-                    .and_then(|fmt| serde_json::to_value(fmt.as_ref()).ok());
-
-                let currency = member_name
-                    .and_then(|member_name| {
-                        meta_context
-                            .find_measure_with_name(member_name)
-                            .and_then(|m| m.currency.as_ref())
-                            .or_else(|| {
-                                meta_context
-                                    .find_dimension_with_name(member_name)
-                                    .and_then(|d| d.currency.as_ref())
-                            })
+                    .map(|(fmt, cur)| {
+                        (
+                            fmt.and_then(|f| serde_json::to_value(f.as_ref()).ok()),
+                            cur.cloned(),
+                        )
                     })
-                    .cloned();
+                    .unwrap_or((None, None));
 
                 columns.push(SchemaColumn {
                     name: field.name().clone(),
