@@ -27,6 +27,8 @@ export type Annotation = {
   type: string;
   meta?: any;
   format?: DimensionFormat | MeasureFormat;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -384,6 +386,8 @@ export type TCubeMeasure = BaseCubeMember & {
     dimensions: string[];
   };
   format?: 'currency' | 'percent';
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
 };
 
 export type CubeTimeDimensionGranularity = {
@@ -395,6 +399,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   key?: string;
 };
 
