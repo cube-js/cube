@@ -15,7 +15,13 @@ export type GranularityAnnotation = {
 };
 
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type CustomNumericFormat = {
+  type: 'custom-numeric';
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s') */
+  value: string;
+  /** Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used. */
+  alias?: string;
+};
 export type DimensionLinkFormat = { type: 'link'; label: string };
 export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
   | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
