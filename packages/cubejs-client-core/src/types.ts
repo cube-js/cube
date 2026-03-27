@@ -14,10 +14,14 @@ export type GranularityAnnotation = {
   origin?: string;
 };
 
-export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
+export type DimensionCustomTimeFormat = {
+  type: 'custom-time';
+  /** POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S'). See https://d3js.org/d3-time-format */
+  value: string;
+};
 export type CustomNumericFormat = {
   type: 'custom-numeric';
-  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s') */
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format */
   value: string;
   /** Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used. */
   alias?: string;
