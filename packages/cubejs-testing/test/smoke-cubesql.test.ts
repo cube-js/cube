@@ -980,6 +980,38 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('measure-with-ad-hoc-filters-and-original-measure');
     });
 
+    test('measure in view with ad-hoc filter', async () => {
+      const query = `
+      SELECT
+        SUM(CASE
+          WHEN status = 'processed' THEN totalAmount
+        END) AS new_amount,
+        AVG(CASE
+          WHEN status = 'processed' THEN avgAmount
+        END) AS new_avg_amount,
+        MIN(CASE
+          WHEN status = 'processed' THEN minAmount
+        END) AS new_min_amount,
+        MAX(CASE
+          WHEN status = 'processed' THEN maxAmount
+        END) AS new_max_amount,
+        COUNT(DISTINCT CASE
+          WHEN status = 'shipped' THEN orderCount
+        END) AS new_count_distinct
+        
+        /* Works but testing Postgres does not include "hll_hash_any" function
+        APPROX_DISTINCT(CASE
+          WHEN status = 'shipped' THEN approxOrderCount
+        END) AS new_approx_distinct
+        */
+      FROM
+        OrdersView
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('measure-in-view-with-ad-hoc-filters');
+    });
+
     /// Query references `updatedAt` in three places: in outer projection, in grouping key and in window
     /// Incoming query is consistent: all three references same column
     /// This tests that generated SQL for pushdown remains consistent:

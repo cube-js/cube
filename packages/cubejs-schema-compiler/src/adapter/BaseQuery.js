@@ -3319,13 +3319,28 @@ export class BaseQuery {
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
         const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
         let sql;
+        let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
-          sql = symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+          const evaluateSql = () => symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
             primaryKeys.length && (
               primaryKeys.length > 1 ?
                 this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
                 : this.primaryKeySql(primaryKeys[0], cubeName)
             ) || '*';
+          // For patched view measures (aggType is set), the view's sql resolves to
+          // already-aggregated SQL (e.g. SUM(col)). Filters must be applied inside
+          // that aggregation, not outside. We pre-evaluate the filter SQL at the
+          // view level, push it down via context, and skip filters at this level.
+          const isPatchedViewMeasure = symbol.aggType && symbol.patchedFrom && symbol.filters?.length;
+          if (isPatchedViewMeasure) {
+            const pushDownFilterSql = this.evaluateFiltersArray(symbol.filters, cubeName);
+            sql = this.evaluateSymbolSqlWithContext(evaluateSql, {
+              patchMeasurePushDownFilterSql: pushDownFilterSql,
+            });
+            patchedSymbol = { ...symbol, filters: [] };
+          } else {
+            sql = evaluateSql();
+          }
         }
         const result = this.renderSqlMeasure(
           name,
@@ -3335,7 +3350,7 @@ export class BaseQuery {
               sql,
               isMemberExpr,
             ),
-            symbol,
+            patchedSymbol,
             cubeName
           ),
           symbol,
@@ -3836,11 +3851,21 @@ export class BaseQuery {
   }
 
   applyMeasureFilters(evaluateSql, symbol, cubeName) {
-    if (!symbol.filters || !symbol.filters.length) {
+    const pushDownFilterSql = this.safeEvaluateSymbolContext().patchMeasurePushDownFilterSql;
+    const hasOwnFilters = symbol.filters && symbol.filters.length;
+
+    if (!hasOwnFilters && !pushDownFilterSql) {
       return evaluateSql;
     }
 
-    const where = this.evaluateMeasureFilters(symbol, cubeName);
+    const parts = [];
+    if (hasOwnFilters) {
+      parts.push(this.evaluateMeasureFilters(symbol, cubeName));
+    }
+    if (pushDownFilterSql) {
+      parts.push(pushDownFilterSql);
+    }
+    const where = parts.join(' AND ');
 
     return `CASE WHEN ${where} THEN ${evaluateSql === '*' ? '1' : evaluateSql} END`;
   }
