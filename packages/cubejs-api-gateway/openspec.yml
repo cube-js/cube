@@ -332,6 +332,9 @@ components:
         value:
           type: "string"
           description: "d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format"
+        alias:
+          type: "string"
+          description: "Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used."
       required:
         - type
         - value

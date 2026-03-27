@@ -99,6 +99,8 @@ pub struct ExtendedDimensionFormat {
     pub format_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,6 +345,19 @@ mod tests {
         assert_eq!(
             serialized,
             json!({"type": "custom-numeric", "value": ".2f"})
+        );
+    }
+
+    #[test]
+    fn test_dimension_format_custom_numeric_with_alias() {
+        let json = json!({"type": "custom-numeric", "value": ".2%", "alias": "percent_2"});
+        let format: DimensionFormat = serde_json::from_value(json).unwrap();
+
+        // Round-trip
+        let serialized = serde_json::to_value(&format).unwrap();
+        assert_eq!(
+            serialized,
+            json!({"type": "custom-numeric", "value": ".2%", "alias": "percent_2"})
         );
     }
 

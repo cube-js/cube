@@ -20,7 +20,7 @@ import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 import { resolveNamedNumericFormat } from './named-numeric-formats';
 
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type CustomNumericFormat = { type: 'custom-numeric'; value: string; alias?: string };
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
 export type DimensionLinkFormat = { type: 'link'; label?: string };
 export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
@@ -409,54 +409,54 @@ export class CubeToMetaTransformer implements CompilerInterface {
     return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
   }
 
-  private transformDimensionFormat({ format, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
-    if (!format || typeof format === 'object') {
-      return format;
+  private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
+    if (!formatOrName || typeof formatOrName === 'object') {
+      return formatOrName;
     }
 
     // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
-    const resolved = resolveNamedNumericFormat(format);
+    const resolved = resolveNamedNumericFormat(formatOrName);
     if (resolved) {
-      return { type: 'custom-numeric', value: resolved };
+      return { type: 'custom-numeric', value: resolved, alias: formatOrName };
     }
 
     // Existing standard formats stay as-is (breaking change to convert these)
     const standardFormats = ['imageUrl', 'currency', 'percent', 'number', 'id'];
-    if (standardFormats.includes(format)) {
-      return format;
+    if (standardFormats.includes(formatOrName)) {
+      return formatOrName;
     }
 
     // Custom time format for time dimensions
     if (type === 'time') {
-      return { type: 'custom-time', value: format };
+      return { type: 'custom-time', value: formatOrName };
     }
 
     // Custom numeric format for number dimensions (raw d3-format specifier)
     if (type === 'number') {
-      return { type: 'custom-numeric', value: format };
+      return { type: 'custom-numeric', value: formatOrName };
     }
 
-    return format;
+    return formatOrName;
   }
 
-  private transformMeasureFormat(format: string | undefined): MeasureFormat | undefined {
-    if (!format) {
+  private transformMeasureFormat(formatOrName: string | undefined): MeasureFormat | undefined {
+    if (!formatOrName) {
       return undefined;
     }
 
     // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
-    const resolved = resolveNamedNumericFormat(format);
+    const resolved = resolveNamedNumericFormat(formatOrName);
     if (resolved) {
-      return { type: 'custom-numeric', value: resolved };
+      return { type: 'custom-numeric', value: resolved, alias: formatOrName };
     }
 
     // Existing standard formats stay as-is (breaking change to convert these)
     const standardFormats = ['percent', 'currency', 'number'];
-    if (standardFormats.includes(format)) {
-      return format;
+    if (standardFormats.includes(formatOrName)) {
+      return formatOrName;
     }
 
     // Custom numeric format (raw d3-format specifier)
-    return { type: 'custom-numeric', value: format };
+    return { type: 'custom-numeric', value: formatOrName };
   }
 }
