@@ -290,14 +290,25 @@ class ApiGateway {
         );
 
         const compilerApi = await this.getCompilerApi(req.context);
-        let schema = compilerApi.getGraphQLSchema();
+
+        // In devMode/playground, all fields are shown regardless of RBAC
+        const showAll = getEnv('devMode') || req.context.signedWithPlaygroundAuthSecret;
+
+        // Get metaConfig with visibilityMaskHash for RBAC-based schema caching
+        const metaConfigResult = await compilerApi.metaConfig(req.context, {
+          requestId: req.context.requestId,
+          includeVisibilityMaskHash: true,
+        });
+        const { visibilityMaskHash, cubes: metaConfigCubes } = metaConfigResult;
+
+        // Cache key: 'all' for devMode (RBAC doesn't matter), or visibilityMaskHash for RBAC-filtered schemas
+        const cacheKey = showAll ? 'all' : (visibilityMaskHash || 'default');
+
+        let schema = compilerApi.getGraphQLSchema(cacheKey);
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig(req.context, {
-            requestId: req.context.requestId,
-          });
-          metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
-          schema = makeSchema(metaConfig);
-          compilerApi.setGraphQLSchema(schema);
+          const filteredMeta = this.filterVisibleItemsInMeta(req.context, metaConfigCubes);
+          schema = makeSchema(filteredMeta);
+          compilerApi.setGraphQLSchema(schema, cacheKey);
         }
         return graphqlHTTP({
           schema,

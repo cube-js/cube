@@ -125,7 +125,7 @@ export class CompilerApi {
 
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
-  protected graphqlSchema?: GraphQLSchema;
+  protected graphqlSchemas: Map<string, GraphQLSchema> = new Map();
 
   protected compilers?: Promise<Compiler>;
 
@@ -193,15 +193,15 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
-    this.graphqlSchema = undefined;
+    this.graphqlSchemas.clear();
   }
 
-  public setGraphQLSchema(schema: GraphQLSchema): void {
-    this.graphqlSchema = schema;
+  public setGraphQLSchema(schema: GraphQLSchema, cacheKey: string = 'default'): void {
+    this.graphqlSchemas.set(cacheKey, schema);
   }
 
-  public getGraphQLSchema(): GraphQLSchema {
-    return this.graphqlSchema;
+  public getGraphQLSchema(cacheKey: string = 'default'): GraphQLSchema | undefined {
+    return this.graphqlSchemas.get(cacheKey);
   }
 
   public createNativeInstance(): NativeInstance {
@@ -959,9 +959,9 @@ export class CompilerApi {
 
   public async metaConfig(
     requestContext: Context,
-    options: { includeCompilerId?: boolean; requestId?: string } = {}
+    options: { includeCompilerId?: boolean; includeVisibilityMaskHash?: boolean; requestId?: string } = {}
   ): Promise<any> {
-    const { includeCompilerId, ...restOptions } = options;
+    const { includeCompilerId, includeVisibilityMaskHash, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     const { cubes } = compilers.metaTransformer;
     const { visibilityMaskHash, cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
@@ -969,15 +969,19 @@ export class CompilerApi {
       requestContext,
       cubes
     );
-    if (includeCompilerId) {
-      return {
-        cubes: patchedCubes,
+    if (includeCompilerId || includeVisibilityMaskHash) {
+      const result: any = { cubes: patchedCubes };
+      if (includeCompilerId) {
         // This compilerId is primarily used by the cubejs-backend-native or caching purposes.
         // By default, it doesn't account for member visibility changes introduced above by DAP.
         // Here we're modifying the original compilerId in a way that it's distinct for
         // distinct schema versions while still being a valid UUID.
-        compilerId: visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId,
-      };
+        result.compilerId = visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId;
+      }
+      if (includeVisibilityMaskHash) {
+        result.visibilityMaskHash = visibilityMaskHash;
+      }
+      return result;
     }
     return patchedCubes;
   }
