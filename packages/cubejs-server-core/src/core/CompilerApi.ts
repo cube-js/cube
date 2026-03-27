@@ -124,7 +124,6 @@ export class CompilerApi {
 
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
-
   protected compilers?: Promise<Compiler>;
 
   protected compilerVersion?: string;
