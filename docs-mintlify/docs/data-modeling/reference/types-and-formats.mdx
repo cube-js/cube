@@ -22,6 +22,17 @@ value to a string:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: high_or_low
+        sql: "CASE WHEN {CUBE.number} > 100 THEN 'high' ELSE 'low' END"
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -33,17 +44,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: high_or_low
-        sql: "CASE WHEN {CUBE.number} > 100 THEN 'high' ELSE 'low' END"
-        type: string
 ```
 
 </CodeGroup>
@@ -58,6 +58,22 @@ with an aggregate function that returns a value of the timestamp type.
 In the example below, we create a `time` measure from an existing dimension:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: last_order
+        sql: "MAX(created_at)"
+        type: time
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -79,22 +95,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: last_order
-        sql: "MAX(created_at)"
-        type: time
-
-    dimensions:
-      - name: created_at
-        sql: created_at
-        type: time
-```
-
 </CodeGroup>
 
 ### `boolean`
@@ -110,6 +110,17 @@ The example below adds an `is_completed` measure which only returns `true` if
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: is_completed
+        sql: "BOOL_AND(status = 'completed')"
+        type: boolean
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -123,17 +134,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: is_completed
-        sql: "BOOL_AND(status = 'completed')"
-        type: boolean
-```
-
 </CodeGroup>
 
 ### `number`
@@ -145,6 +145,18 @@ The `sql` parameter is required and must include any valid SQL expression
 with an aggregate function that returns a value of the numeric type.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: purchases_ratio
+        sql: "1.0 * {purchases} / {count}"
+        type: number
+        format: percent
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -160,24 +172,23 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: purchases_ratio
-        sql: "1.0 * {purchases} / {count}"
-        type: number
-        format: percent
-```
-
 </CodeGroup>
 
 You can put any sql into `number` measure as long as it's an aggregate
 expression:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: ratio
+        sql: "SUM({CUBE}.amount) / count(*)"
+        type: number
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -190,17 +201,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: ratio
-        sql: "SUM({CUBE}.amount) / count(*)"
-        type: number
 ```
 
 </CodeGroup>
@@ -228,6 +228,17 @@ value.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: median_price
+        sql: "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)"
+        type: number_agg
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -239,17 +250,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: median_price
-        sql: "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)"
-        type: number_agg
 ```
 
 </CodeGroup>
@@ -268,20 +268,6 @@ count. [Learn more about Drill Downs][ref-drilldowns].
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  // ...
-
-  measures: {
-    number_of_users: {
-      type: `count`,
-      // optional
-      drill_members: [id, name, email, company]
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
@@ -297,6 +283,20 @@ cubes:
           - company
 ```
 
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    number_of_users: {
+      type: `count`,
+      // optional
+      drill_members: [id, name, email, company]
+    }
+  }
+})
+```
+
 </CodeGroup>
 
 ### `count_distinct`
@@ -309,6 +309,17 @@ of any type (without an aggregate function).
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: unique_user_count
+        sql: user_id
+        type: count_distinct
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -320,17 +331,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: unique_user_count
-        sql: user_id
-        type: count_distinct
 ```
 
 </CodeGroup>
@@ -351,6 +351,17 @@ of any type (without an aggregate function).
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: unique_user_count
+        sql: user_id
+        type: count_distinct_approx
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -362,17 +373,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: unique_user_count
-        sql: user_id
-        type: count_distinct_approx
 ```
 
 </CodeGroup>
@@ -387,6 +387,25 @@ The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+
+      - name: revenue_2
+        sql: "{charges_amount}"
+        type: sum
+
+      - name: revenue_3
+        sql: fee * 0.1
+        type: sum
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -411,25 +430,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: revenue
-        sql: amount
-        type: sum
-
-      - name: revenue_2
-        sql: "{charges_amount}"
-        type: sum
-
-      - name: revenue_3
-        sql: fee * 0.1
-        type: sum
-```
-
 </CodeGroup>
 
 ### `avg`
@@ -442,6 +442,17 @@ The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: avg_transaction
+        sql: "{transaction_amount}"
+        type: avg
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -456,17 +467,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: avg_transaction
-        sql: "{transaction_amount}"
-        type: avg
-```
-
 </CodeGroup>
 
 ### `min`
@@ -477,6 +477,17 @@ The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: date_first_purchase
+        sql: date_purchase
+        type: min
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -491,17 +502,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: date_first_purchase
-        sql: date_purchase
-        type: min
-```
-
 </CodeGroup>
 
 ### `max`
@@ -512,6 +512,17 @@ The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: date_last_purchase
+        sql: date_purchase
+        type: max
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -524,17 +535,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: date_last_purchase
-        sql: date_purchase
-        type: max
 ```
 
 </CodeGroup>
@@ -550,6 +550,18 @@ see as output.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: purchase_conversion
+        sql: "1.0 * {purchase} / {checkout}"
+        type: number
+        format: percent
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -562,18 +574,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: purchase_conversion
-        sql: "1.0 * {purchase} / {checkout}"
-        type: number
-        format: percent
 ```
 
 </CodeGroup>
@@ -601,6 +601,18 @@ depending on your data source and column types.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+        format: currency
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -613,18 +625,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: total_amount
-        sql: amount
-        type: sum
-        format: currency
 ```
 
 </CodeGroup>
@@ -643,6 +643,18 @@ Check [APIs & Integrations][ref-apis-support] for details.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+        format: "$,.2f"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -655,18 +667,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: total_amount
-        sql: amount
-        type: sum
-        format: "$,.2f"
 ```
 
 </CodeGroup>
@@ -736,6 +736,17 @@ several time dimensions in a single cube.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: completed_at
+        sql: completed_at
+        type: time
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -747,17 +758,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: completed_at
-        sql: completed_at
-        type: time
 ```
 
 </CodeGroup>
@@ -786,6 +786,17 @@ The following model creates a field `full_name` by combining 2 fields:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: full_name
+        sql: "CONCAT({first_name}, ' ', {last_name})"
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -799,17 +810,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: full_name
-        sql: "CONCAT({first_name}, ' ', {last_name})"
-        type: string
-```
-
 </CodeGroup>
 
 ### `number`
@@ -817,6 +817,17 @@ cubes:
 `number` is typically used with fields that contain number or integer.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: amount
+        sql: amount
+        type: number
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -831,17 +842,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: amount
-        sql: amount
-        type: number
-```
-
 </CodeGroup>
 
 ### `boolean`
@@ -850,6 +850,17 @@ cubes:
 boolean. For example:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: is_enabled
+        sql: is_enabled
+        type: boolean
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -862,17 +873,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: is_enabled
-        sql: is_enabled
-        type: boolean
 ```
 
 </CodeGroup>
@@ -895,6 +895,20 @@ You do not need to include the `sql` parameter for the dimension of this type.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -912,20 +926,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: currency
-        type: switch
-        values:
-          - USD
-          - EUR
-          - GBP
-```
-
 </CodeGroup>
 
 <Info>
@@ -941,6 +941,20 @@ endpoint][ref-meta-api], they are represented as dimensions of type `string`.
 it requires to set two fields: latitude and longitude.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: location
+        type: geo
+        latitude:
+          sql: "{CUBE}.latitude"
+        longitude:
+          sql: "{CUBE}.longitude"
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -960,20 +974,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: location
-        type: geo
-        latitude:
-          sql: "{CUBE}.latitude"
-        longitude:
-          sql: "{CUBE}.longitude"
-```
-
 </CodeGroup>
 
 ## Dimension Formats
@@ -984,6 +984,18 @@ cubes:
 `sql` parameter should contain full path to the image.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: image
+        sql: "CONCAT('https://img.example.com/id/', {id})"
+        type: string
+        format: imageUrl
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -999,18 +1011,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: image
-        sql: "CONCAT('https://img.example.com/id/', {id})"
-        type: string
-        format: imageUrl
-```
-
 </CodeGroup>
 
 ### `id`
@@ -1020,6 +1020,18 @@ numbers which is default for type `number`. The `sql` parameter is required and
 can take any valid SQL expression.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: image
+        sql: id
+        type: number
+        format: id
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -1035,18 +1047,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: image
-        sql: id
-        type: number
-        format: id
-```
-
 </CodeGroup>
 
 ### `link`
@@ -1058,6 +1058,25 @@ examples below for details.
 The `sql` parameter is required and can take any valid SQL expression.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: order_link
+        sql: "'http://myswebsite.com/orders/' || id"
+        type: string
+        format: link
+
+      - name: crm_link
+        sql: "'https://na1.salesforce.com/' || id"
+        type: string
+        format:
+          label: View in Salesforce
+          type: link
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -1082,25 +1101,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: order_link
-        sql: "'http://myswebsite.com/orders/' || id"
-        type: string
-        format: link
-
-      - name: crm_link
-        sql: "'https://na1.salesforce.com/' || id"
-        type: string
-        format:
-          label: View in Salesforce
-          type: link
-```
-
 </CodeGroup>
 
 ### `currency`
@@ -1108,6 +1108,18 @@ cubes:
 `currency` is used for monetary values.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: amount
+        sql: amount
+        type: number
+        format: currency
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -1123,18 +1135,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: amount
-        sql: amount
-        type: number
-        format: currency
-```
-
 </CodeGroup>
 
 ### `percent`
@@ -1142,6 +1142,19 @@ cubes:
 `percent` is used for formatting numbers with a percent symbol.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: open_rate
+        sql:
+          "COALESCE(1.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
+        type: number
+        format: percent
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -1155,19 +1168,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: open_rate
-        sql:
-          "COALESCE(1.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
-        type: number
-        format: percent
 ```
 
 </CodeGroup>
@@ -1186,6 +1186,18 @@ Check [APIs & Integrations][ref-apis-support] for details.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: amount
+        sql: amount
+        type: number
+        format: "$,.2f"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -1198,18 +1210,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: amount
-        sql: amount
-        type: number
-        format: "$,.2f"
 ```
 
 </CodeGroup>
@@ -1232,6 +1232,18 @@ Check [APIs & Integrations][ref-apis-support] for details.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        format: "%Y-%m-%d %H:%M:%S"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -1244,18 +1256,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: created_at
-        sql: created_at
-        type: time
-        format: "%Y-%m-%d %H:%M:%S"
 ```
 
 </CodeGroup>

@@ -1,0 +1,112 @@
+---
+title: Microsoft Fabric
+description: "[Microsoft Fabric][link-fabric] is an all-in-one analytics solution for enterprises. It offers a comprehensive suite of services, including a data warehouse."
+---
+
+# Microsoft Fabric
+
+[Microsoft Fabric][link-fabric] is an all-in-one analytics solution for
+enterprises. It offers a comprehensive suite of services, including a
+data warehouse.
+
+<Info>
+
+Available on the [Enterprise Premier plan](https://cube.dev/pricing).
+[Contact us](https://cube.dev/contact) for details.
+
+</Info>
+
+## Setup
+
+When creating a new deployment in Cube Cloud, at the **Set up a database
+connection** step, choose **Microsoft Fabric**.
+
+<Frame>
+  <img src="https://ucarecdn.com/ecfef0be-8122-43c1-acca-7e9a5806b6fb/" />
+</Frame>
+
+Then, provide the **JDBC URL** connection string in the following
+format. See below for tips on filling in `<SERVER_NAME>`, `<DATABASE_NAME>`,
+`<AUTH_TYPE>`, `<USER_NAME>`, and `<PASSWORD>`.
+
+```
+jdbc:sqlserver://;serverName=<SERVER_NAME>.datawarehouse.pbidedicated.windows.net;database=<DATABASE_NAME>;encrypt=true;Authentication=<AUTH_TYPE>;UserName=<USER_NAME>;Password=<PASSWORD>
+```
+
+Optionally, fill in **Database** if you'd like to override the database
+name from the JDBC URL.
+
+### Server and database name
+
+To obtain your data warehouse server name and database name, navigate to your
+data warehouse in Microsoft Fabric and click on the cog icon to open
+**Settings**:
+
+<Frame>
+  <img src="https://ucarecdn.com/ed1b2916-ac3e-4493-8eee-e2fd5dd89dbc/" />
+</Frame>
+
+On the **About** page, you can find the database name (`<DATABASE_NAME>`)
+under **Name** and the server name (`<SERVER_NAME>`) under
+**SQL connection string**:
+
+<Frame>
+  <img src="https://ucarecdn.com/7818f783-4bd6-431c-87dd-c5169232c91b/" />
+</Frame>
+
+### Authentication
+
+Microsoft Fabric supports two [authentication types][link-fabric-auth]:
+
+* Use `ActiveDirectoryPassword` as `<AUTH_TYPE>` to connect using a
+Microsoft Entra principal name and password. Provide principal name as
+`<USER_NAME>` and password as `<PASSWORD>`. 
+* Use `ActiveDirectoryServicePrincipal` as `<AUTH_TYPE>` to connect
+using the client ID and secret of a service principal identity. Provide
+client ID as `<USER_NAME>` and secet as `<PASSWORD>`.
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using Microsoft Fabric as a source
+database.
+
+## Pre-Aggregation Build Strategies
+
+<Info>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</Info>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Simple        |             ✅             |     ✅      |
+| Batching      |             -              |      -      |
+| Export Bucket |             -              |      -      |
+
+By default, Microsoft Fabric uses a [simple][self-preaggs-simple] strategy
+to build pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for Microsoft Fabric.
+
+### Batching
+
+Microsoft Fabric does not support batching.
+
+### Export Bucket
+
+Microsoft Fabric does not support export buckets.
+
+[link-fabric]: https://www.microsoft.com/en-us/microsoft-fabric/
+[link-fabric-auth]: https://learn.microsoft.com/en-us/sql/connect/jdbc/setting-the-connection-properties?view=sql-server-ver16#properties
+[ref-caching-using-preaggs-build-strats]: /docs/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[self-preaggs-simple]: #simple

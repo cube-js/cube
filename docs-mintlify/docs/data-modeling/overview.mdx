@@ -48,16 +48,16 @@ our `users` table.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`users`, {
-  sql_table: `users`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: users
     sql_table: users
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  sql_table: `users`
+})
 ```
 
 </CodeGroup>
@@ -82,6 +82,26 @@ Let's go ahead and create our first measure and two dimensions:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+    dimensions:
+      - name: city
+        sql: city
+        type: string
+
+      - name: company_name
+        sql: company_name
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   sql_table: `users`,
@@ -105,26 +125,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-
-    dimensions:
-      - name: city
-        sql: city
-        type: string
-
-      - name: company_name
-        sql: company_name
-        type: string
 ```
 
 </CodeGroup>
@@ -159,6 +159,24 @@ accomplish this, we will introduce **measure filters**:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+      - name: paying_count
+        sql: id
+        type: count
+        filters:
+          - sql: "{CUBE}.paying = 'true'"
+
+    # ...
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   measures: {
@@ -176,24 +194,6 @@ cube(`users`, {
 
   // ...
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-
-      - name: paying_count
-        sql: id
-        type: count
-        filters:
-          - sql: "{CUBE}.paying = 'true'"
-
-    # ...
 ```
 
 </CodeGroup>
@@ -231,6 +231,29 @@ called `paying_percentage`:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+      - name: paying_count
+        sql: id
+        type: count
+        filters:
+          - sql: "{CUBE}.paying = 'true'"
+
+      - name: paying_percentage
+        sql: "1.0 * {paying_count} / {count}"
+        type: number
+        format: percent
+
+    # ...
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   measures: {
@@ -254,29 +277,6 @@ cube(`users`, {
 
   // ...
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-
-      - name: paying_count
-        sql: id
-        type: count
-        filters:
-          - sql: "{CUBE}.paying = 'true'"
-
-      - name: paying_percentage
-        sql: "1.0 * {paying_count} / {count}"
-        type: number
-        format: percent
-
-    # ...
 ```
 
 </CodeGroup>
@@ -307,6 +307,16 @@ Let's create a view that exposes our users data:
 
 <CodeGroup>
 
+```yaml title="YAML"
+views:
+  - name: users_view
+
+    cubes:
+      - join_path: users
+        includes:
+          - "*"
+```
+
 ```javascript title="JavaScript"
 view(`users_view`, {
   cubes: [
@@ -316,16 +326,6 @@ view(`users_view`, {
     }
   ]
 })
-```
-
-```yaml title="YAML"
-views:
-  - name: users_view
-
-    cubes:
-      - join_path: users
-        includes:
-          - "*"
 ```
 
 </CodeGroup>

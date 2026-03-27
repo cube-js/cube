@@ -1,0 +1,56 @@
+---
+title: Oracle
+description: The driver for Oracle is community-supported and is not maintained by Cube or the database vendor.
+---
+
+# Oracle
+
+<Warning>
+
+The driver for Oracle is community-supported and is not maintained by Cube or the database vendor.
+
+</Warning>
+
+## Prerequisites
+
+- The hostname for the [Oracle][oracle] database server
+- The username/password for the [Oracle][oracle] database server
+- The name of the database to use within the [Oracle][oracle] database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=oracle
+CUBEJS_DB_HOST=my.oracle.host
+CUBEJS_DB_NAME=my_oracle_database
+CUBEJS_DB_USER=oracle_user
+CUBEJS_DB_PASS=**********
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                                         | Possible Values           | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| [`CUBEJS_DB_HOST`](/docs/configuration/reference/environment-variables#cubejs_db_host)     | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| [`CUBEJS_DB_PORT`](/docs/configuration/reference/environment-variables#cubejs_db_port)     | The port for the database connection                                                | A valid port number       |    ❌    |
+| [`CUBEJS_DB_NAME`](/docs/configuration/reference/environment-variables#cubejs_db_name)     | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| [`CUBEJS_DB_USER`](/docs/configuration/reference/environment-variables#cubejs_db_user)     | The username used to connect to the database                                        | A valid database username |    ✅    |
+| [`CUBEJS_DB_PASS`](/docs/configuration/reference/environment-variables#cubejs_db_pass)     | The password used to connect to the database                                        | A valid database password |    ✅    |
+| [`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl)      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
+| [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool) | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+## SSL
+
+To enable SSL-encrypted connections between Cube and Oracle, set the
+[`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+[oracle]: https://www.oracle.com/uk/index.html
+[ref-recipe-enable-ssl]: /docs/configuration/recipes/using-ssl-connections-to-data-source

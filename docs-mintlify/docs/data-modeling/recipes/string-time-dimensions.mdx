@@ -15,6 +15,17 @@ example cube for BigQuery:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: events
+    sql_table: schema.events
+
+    dimensions:
+      - name: date
+        sql: PARSE_TIMESTAMP('%Y-%m-%d', date)
+        type: time
+```
+
 ```javascript title="JavaScript"
 cube(`events`, {
   sql_table: `schema.events`,
@@ -26,17 +37,6 @@ cube(`events`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: events
-    sql_table: schema.events
-
-    dimensions:
-      - name: date
-        sql: PARSE_TIMESTAMP('%Y-%m-%d', date)
-        type: time
 ```
 
 </CodeGroup>

@@ -40,16 +40,6 @@ JavaScript files within a single data model.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql: `
-    SELECT *
-    FROM orders, line_items
-    WHERE orders.id = line_items.order_id
-  `
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
@@ -58,6 +48,16 @@ cubes:
       FROM orders, line_items
       WHERE orders.id = line_items.order_id
 
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql: `
+    SELECT *
+    FROM orders, line_items
+    WHERE orders.id = line_items.order_id
+  `
+})
 ```
 
 </CodeGroup>
@@ -644,6 +644,40 @@ references.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: contacts
+        sql: "{CUBE}.contact_id = {contacts.id}"
+        relationship: one_to_one
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "COALESCE({CUBE.name}, {contacts.name})"
+        type: string
+
+  - name: contacts
+    sql_table: contacts
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   sql_table: `users`,
@@ -687,40 +721,6 @@ cube(`contacts`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    joins:
-      - name: contacts
-        sql: "{CUBE}.contact_id = {contacts.id}"
-        relationship: one_to_one
-
-    dimensions:
-      - name: id
-        sql: "{CUBE}.id"
-        type: number
-        primary_key: true
-
-      - name: name
-        sql: "COALESCE({CUBE.name}, {contacts.name})"
-        type: string
-
-  - name: contacts
-    sql_table: contacts
-
-    dimensions:
-      - name: id
-        sql: "{CUBE}.id"
-        type: number
-        primary_key: true
-
-      - name: name
-        sql: "{CUBE}.name"
-        type: string
-```
-
 </CodeGroup>
 
 Check the `{users.name}` dimension. Referencing another cube in the
@@ -752,6 +752,28 @@ Consider the following data model:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: organisms
+    sql_table: organisms
+
+  - name: animals
+    sql: |
+      SELECT *
+      FROM {organisms.sql()}
+      WHERE kingdom = 'animals'
+
+  - name: dogs
+    sql: |
+      SELECT *
+      FROM {animals.sql()}
+      WHERE species = 'dogs'
+
+    measures:
+      - name: count
+        type: count
+```
+
 ```javascript title="JavaScript"
 cube(`organisms`, {
   sql_table: `organisms`
@@ -778,28 +800,6 @@ cube(`dogs`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: organisms
-    sql_table: organisms
-
-  - name: animals
-    sql: |
-      SELECT *
-      FROM {organisms.sql()}
-      WHERE kingdom = 'animals'
-
-  - name: dogs
-    sql: |
-      SELECT *
-      FROM {animals.sql()}
-      WHERE species = 'dogs'
-
-    measures:
-      - name: count
-        type: count
 ```
 
 </CodeGroup>

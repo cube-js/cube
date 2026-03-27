@@ -6,6 +6,9 @@
     "light": "/logo/light.svg"
   },
   "favicon": "/favicon.svg",
+  "codeBlock": {
+    "mode": "dark"
+  },
   "colors": {
     "primary": "#7A77FF",
     "light": "#A5A3FF",
@@ -21,8 +24,8 @@
   },
   "tabs": [
     {
-      "name": "Analytics",
-      "url": "analytics"
+      "name": "Cube Core",
+      "url": "cube-core"
     },
     {
       "name": "Embedding",
@@ -104,65 +107,6 @@
             "docs/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
             "docs/getting-started/migrate-from-core/import-git-repository-via-ssh",
             "docs/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh"
-          ]
-        }
-      ]
-    },
-    {
-      "group": "Configuration",
-      "pages": [
-        "docs/configuration",
-        {
-          "group": "Data Sources",
-          "pages": [
-            "docs/configuration/data-sources",
-            "docs/configuration/data-sources/aws-athena",
-            "docs/configuration/data-sources/aws-redshift",
-            "docs/configuration/data-sources/clickhouse",
-            "docs/configuration/data-sources/databricks-jdbc",
-            "docs/configuration/data-sources/druid",
-            "docs/configuration/data-sources/duckdb",
-            "docs/configuration/data-sources/elasticsearch",
-            "docs/configuration/data-sources/firebolt",
-            "docs/configuration/data-sources/google-bigquery",
-            "docs/configuration/data-sources/hive",
-            "docs/configuration/data-sources/ksqldb",
-            "docs/configuration/data-sources/materialize",
-            "docs/configuration/data-sources/mongodb",
-            "docs/configuration/data-sources/ms-fabric",
-            "docs/configuration/data-sources/ms-sql",
-            "docs/configuration/data-sources/mysql",
-            "docs/configuration/data-sources/oracle",
-            "docs/configuration/data-sources/pinot",
-            "docs/configuration/data-sources/postgres",
-            "docs/configuration/data-sources/presto",
-            "docs/configuration/data-sources/questdb",
-            "docs/configuration/data-sources/risingwave",
-            "docs/configuration/data-sources/singlestore",
-            "docs/configuration/data-sources/snowflake",
-            "docs/configuration/data-sources/sqlite",
-            "docs/configuration/data-sources/trino",
-            "docs/configuration/data-sources/vertica"
-          ]
-        },
-        "docs/configuration/multiple-data-sources",
-        "docs/configuration/concurrency",
-        "docs/configuration/multitenancy",
-        {
-          "group": "Reference",
-          "pages": [
-            "docs/configuration/reference/environment-variables",
-            "docs/configuration/reference/config"
-          ]
-        },
-        {
-          "group": "Recipes",
-          "pages": [
-            "docs/configuration/recipes/environment-variables",
-            "docs/configuration/recipes/using-ssl-connections-to-data-source",
-            "docs/configuration/recipes/data-store-cost-saving-guide",
-            "docs/configuration/recipes/multiple-sources-same-schema",
-            "docs/configuration/recipes/custom-data-model-per-tenant"
           ]
         }
       ]
@@ -326,6 +270,64 @@
     },
 
     {
+      "group": "Getting Started",
+      "pages": [
+        "cube-core",
+        "docs/getting-started/core",
+        "docs/getting-started/core/create-a-project",
+        "docs/getting-started/core/query-data",
+        "docs/getting-started/core/add-a-pre-aggregation",
+        "docs/getting-started/core/learn-more"
+      ]
+    },
+    {
+      "group": "Deployment",
+      "pages": [
+        "admin/deployment/core",
+        "docs/caching/running-in-production"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "admin/configuration/reference/environment-variables",
+        "admin/configuration/reference/config",
+        "admin/configuration/multitenancy",
+        "admin/configuration/concurrency",
+        "admin/configuration/multiple-data-sources",
+        {
+          "group": "Recipes",
+          "pages": [
+            "admin/configuration/recipes/environment-variables",
+            "admin/configuration/recipes/using-ssl-connections-to-data-source",
+            "admin/configuration/recipes/multiple-sources-same-schema",
+            "admin/configuration/recipes/custom-data-model-per-tenant"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Authentication",
+      "pages": [
+        "access-security/access-control/context",
+        "access-security/authentication/jwt",
+        "access-security/authentication/auth0",
+        "access-security/authentication/aws-cognito"
+      ]
+    },
+    {
+      "group": "Migrate to Cube Cloud",
+      "pages": [
+        "docs/getting-started/migrate-from-core",
+        "docs/getting-started/migrate-from-core/upload-with-cli",
+        "docs/getting-started/migrate-from-core/import-github-repository",
+        "docs/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
+        "docs/getting-started/migrate-from-core/import-git-repository-via-ssh",
+        "docs/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh"
+      ]
+    },
+
+    {
       "group": "Core Data APIs",
       "pages": [
         "api-reference",
@@ -477,6 +479,65 @@
       ]
     },
 
+    {
+      "group": "Configuration",
+      "pages": [
+        "admin/configuration",
+        {
+          "group": "Data Sources",
+          "pages": [
+            "admin/configuration/data-sources",
+            "admin/configuration/data-sources/aws-athena",
+            "admin/configuration/data-sources/aws-redshift",
+            "admin/configuration/data-sources/clickhouse",
+            "admin/configuration/data-sources/databricks-jdbc",
+            "admin/configuration/data-sources/druid",
+            "admin/configuration/data-sources/duckdb",
+            "admin/configuration/data-sources/elasticsearch",
+            "admin/configuration/data-sources/firebolt",
+            "admin/configuration/data-sources/google-bigquery",
+            "admin/configuration/data-sources/hive",
+            "admin/configuration/data-sources/ksqldb",
+            "admin/configuration/data-sources/materialize",
+            "admin/configuration/data-sources/mongodb",
+            "admin/configuration/data-sources/ms-fabric",
+            "admin/configuration/data-sources/ms-sql",
+            "admin/configuration/data-sources/mysql",
+            "admin/configuration/data-sources/oracle",
+            "admin/configuration/data-sources/pinot",
+            "admin/configuration/data-sources/postgres",
+            "admin/configuration/data-sources/presto",
+            "admin/configuration/data-sources/questdb",
+            "admin/configuration/data-sources/risingwave",
+            "admin/configuration/data-sources/singlestore",
+            "admin/configuration/data-sources/snowflake",
+            "admin/configuration/data-sources/sqlite",
+            "admin/configuration/data-sources/trino",
+            "admin/configuration/data-sources/vertica"
+          ]
+        },
+        "admin/configuration/multiple-data-sources",
+        "admin/configuration/concurrency",
+        "admin/configuration/multitenancy",
+        {
+          "group": "Reference",
+          "pages": [
+            "admin/configuration/reference/environment-variables",
+            "admin/configuration/reference/config"
+          ]
+        },
+        {
+          "group": "Recipes",
+          "pages": [
+            "admin/configuration/recipes/environment-variables",
+            "admin/configuration/recipes/using-ssl-connections-to-data-source",
+            "admin/configuration/recipes/data-store-cost-saving-guide",
+            "admin/configuration/recipes/multiple-sources-same-schema",
+            "admin/configuration/recipes/custom-data-model-per-tenant"
+          ]
+        }
+      ]
+    },
     {
       "group": "Deployment",
       "pages": [

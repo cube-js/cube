@@ -10,6 +10,17 @@ Joins allow to access and compare members from two or more cubes at the same tim
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: my_cube
+    # ...
+
+    joins:
+      - name: target_cube
+        relationship: one_to_one || one_to_many || many_to_one
+        sql: SQL ON clause
+```
+
 ```javascript title="JavaScript"
 cube(`my_cube`, {
   // ...
@@ -21,17 +32,6 @@ cube(`my_cube`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: my_cube
-    # ...
-
-    joins:
-      - name: target_cube
-        relationship: one_to_one || one_to_many || many_to_one
-        sql: SQL ON clause
 ```
 
 </CodeGroup>
@@ -65,6 +65,17 @@ would define the join as follows:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: products
+        relationship: many_to_one
+        sql: "{CUBE.id} = {products.order_id}"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -76,17 +87,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    joins:
-      - name: products
-        relationship: many_to_one
-        sql: "{CUBE.id} = {products.order_id}"
 ```
 
 </CodeGroup>
@@ -140,6 +140,17 @@ For example, in a data model containing `users` and their `profiles`, the
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    joins:
+      - name: profiles
+        relationship: one_to_one
+        sql: "{users}.id = {profiles.user_id}"
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   // ...
@@ -151,17 +162,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    joins:
-      - name: profiles
-        relationship: one_to_one
-        sql: "{users}.id = {profiles.user_id}"
 ```
 
 </CodeGroup>
@@ -177,6 +177,17 @@ written, the `authors` cube would declare the following join:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: authors
+    # ...
+
+    joins:
+      - name: books
+        relationship: one_to_many
+        sql: "{authors}.id = {books.author_id}"
+```
+
 ```javascript title="JavaScript"
 cube(`authors`, {
   // ...
@@ -188,17 +199,6 @@ cube(`authors`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: authors
-    # ...
-
-    joins:
-      - name: books
-        relationship: one_to_many
-        sql: "{authors}.id = {books.author_id}"
 ```
 
 </CodeGroup>
@@ -216,6 +216,17 @@ the `orders` cube would have the following join:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -229,6 +240,16 @@ cube(`orders`, {
 })
 ```
 
+</CodeGroup>
+
+### sql
+
+`sql` is necessary to indicate a related column between cubes. It is important
+to properly specify a matching column when creating joins. Take a look at the
+example below:
+
+<CodeGroup>
+
 ```yaml title="YAML"
 cubes:
   - name: orders
@@ -239,16 +260,6 @@ cubes:
         relationship: many_to_one
         sql: "{orders}.customer_id = {customers.id}"
 ```
-
-</CodeGroup>
-
-### sql
-
-`sql` is necessary to indicate a related column between cubes. It is important
-to properly specify a matching column when creating joins. Take a look at the
-example below:
-
-<CodeGroup>
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -263,17 +274,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    joins:
-      - name: customers
-        relationship: many_to_one
-        sql: "{orders}.customer_id = {customers.id}"
 ```
 
 </CodeGroup>
@@ -293,6 +293,18 @@ keys with `Order` to get the correct `Order Amount` sum result. Please note that
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: customer_id
+        sql: id
+        type: number
+        primary_key: true
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -307,18 +319,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: customer_id
-        sql: id
-        type: number
-        primary_key: true
-```
-
 </CodeGroup>
 
 <Info>
@@ -329,6 +329,19 @@ parameter to `false`. If you still want `public` to be `true` — set it manuall
 </Info>
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: customer_id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -345,19 +358,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: customer_id
-        sql: id
-        type: number
-        primary_key: true
-        public: true
-```
-
 </CodeGroup>
 
 If you don't have a single column in a cube's table that can act as a primary
@@ -372,20 +372,6 @@ depending on your database.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`users`, {
-  // ...
-
-  dimensions: {
-    id: {
-      sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
-      type: `string`,
-      primary_key: true
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: users
@@ -398,6 +384,20 @@ cubes:
           {CUBE}.activity_week"
         type: string
         primary_key: true
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
+      type: `string`,
+      primary_key: true
+    }
+  }
+})
 ```
 
 </CodeGroup>
@@ -414,6 +414,41 @@ Such pre-aggregations and queries are always considered non-additive for the pur
 Let's consider an example data model:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+
+- name: customers
+    sql_table: customers
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: average_age
+        sql: age
+        type: avg
+
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -458,41 +493,6 @@ cube(`customers`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    sql_table: orders
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-      - name: city
-        sql: city
-        type: string
-
-    joins:
-      - name: customers
-        relationship: many_to_one
-        sql: "{orders}.customer_id = {customers.id}"
-
-- name: customers
-    sql_table: customers
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-
-    measures:
-      - name: average_age
-        sql: age
-        type: avg
-
-```
-
 </CodeGroup>
 
 If we try to query `customers.average_age` by `orders.city`, the Cube detects that the `average_age` measure in the `customers` cube would be multiplied by `orders` to `customers` and would generate SQL similar to:
@@ -525,6 +525,17 @@ basic cube. Take a look at the following example:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    dimensions:
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   // ...
@@ -536,17 +547,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    dimensions:
-      - name: name
-        sql: "{CUBE}.name"
-        type: string
 ```
 
 </CodeGroup>
@@ -564,6 +564,37 @@ Cube automatically takes care of transitive joins. For example, consider the
 following data model:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: a
+    # ...
+
+    joins:
+      - name: b
+        sql: "{a}.b_id = {b.id}"
+        relationship: many_to_one
+
+    measures:
+      - name: count
+        type: count
+
+  - name: b
+    # ...
+
+    joins:
+      - name: c
+        sql: "{b}.c_id = {c.id}"
+        relationship: many_to_one
+
+  - name: c
+    # ...
+
+    dimensions:
+      - name: category
+        sql: category
+        type: string
+```
 
 ```javascript title="JavaScript"
 cube(`a`, {
@@ -604,37 +635,6 @@ cube(`c`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: a
-    # ...
-
-    joins:
-      - name: b
-        sql: "{a}.b_id = {b.id}"
-        relationship: many_to_one
-
-    measures:
-      - name: count
-        type: count
-
-  - name: b
-    # ...
-
-    joins:
-      - name: c
-        sql: "{b}.c_id = {c.id}"
-        relationship: many_to_one
-
-  - name: c
-    # ...
-
-    dimensions:
-      - name: category
-        sql: category
-        type: string
 ```
 
 </CodeGroup>

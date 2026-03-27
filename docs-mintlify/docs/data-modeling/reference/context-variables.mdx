@@ -23,49 +23,6 @@ model code DRY and easy to maintain.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`users`, {
-  sql_table: `users`,
-
-  joins: {
-    contacts: {
-      sql: `${CUBE}.contact_id = ${contacts.id}`,
-      relationship: `one_to_one`
-    }
-  },
-
-  dimensions: {
-    id: {
-      sql: `${CUBE}.id`,
-      type: `number`,
-      primary_key: true
-    },
-
-    name: {
-      sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
-      type: `string`
-    }
-  }
-})
-
-cube(`contacts`, {
-  sql_table: `contacts`,
-
-  dimensions: {
-    id: {
-      sql: `${CUBE}.id`,
-      type: `number`,
-      primary_key: true
-    },
-
-    name: {
-      sql: `${CUBE}.name`,
-      type: `string`
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: users
@@ -107,6 +64,49 @@ cubes:
 
 
 
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  sql_table: `users`,
+
+  joins: {
+    contacts: {
+      sql: `${CUBE}.contact_id = ${contacts.id}`,
+      relationship: `one_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    name: {
+      sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
+      type: `string`
+    }
+  }
+})
+
+cube(`contacts`, {
+  sql_table: `contacts`,
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    name: {
+      sql: `${CUBE}.name`,
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeGroup>
@@ -181,29 +181,6 @@ See the example below for the case when a string is passed to `filter()`:
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`order_facts`, {
-  sql: `
-    SELECT *
-    FROM orders
-    WHERE ${FILTER_PARAMS.order_facts.date.filter('date')}
-  `,
-
-  measures: {
-    count: {
-      type: `count`
-    }
-  },
-
-  dimensions: {
-    date: {
-      sql: `date`,
-      type: `time`
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: order_facts
@@ -225,6 +202,29 @@ cubes:
 
 
 
+```
+
+```javascript title="JavaScript"
+cube(`order_facts`, {
+  sql: `
+    SELECT *
+    FROM orders
+    WHERE ${FILTER_PARAMS.order_facts.date.filter('date')}
+  `,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeGroup>
@@ -660,26 +660,6 @@ respective use:
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`visitors`, {
-  // ...
-
-  dimensions: {
-    // Do not use in timeDimensions query property
-    created_at_converted: {
-      sql: SQL_UTILS.convertTz(`created_at`),
-      type: `time`
-    },
-
-    // Use in timeDimensions query property
-    created_at: {
-      sql: `created_at`,
-      type: "time"
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: visitors
@@ -698,6 +678,26 @@ cubes:
 
 
 
+```
+
+```javascript title="JavaScript"
+cube(`visitors`, {
+  // ...
+
+  dimensions: {
+    // Do not use in timeDimensions query property
+    created_at_converted: {
+      sql: SQL_UTILS.convertTz(`created_at`),
+      type: `time`
+    },
+
+    // Use in timeDimensions query property
+    created_at: {
+      sql: `created_at`,
+      type: "time"
+    }
+  }
+})
 ```
 
 </CodeGroup>

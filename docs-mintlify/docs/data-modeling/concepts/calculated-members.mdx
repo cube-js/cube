@@ -109,6 +109,52 @@ In the following example, the `orders.purchases_to_users_ratio` measure referenc
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 11 AS user_id, 'processing' AS status UNION ALL
+      SELECT 2 AS id, 11 AS user_id, 'completed'  AS status UNION ALL
+      SELECT 3 AS id, 11 AS user_id, 'completed'  AS status
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: purchases
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+  - name: users
+    sql: >
+      SELECT 11 AS id, 'Alice' AS name UNION ALL
+      SELECT 12 AS id, 'Bob'   AS name UNION ALL
+      SELECT 13 AS id, 'Eve'   AS name
+
+    joins:
+      - name: orders
+        sql: "{CUBE}.id = {orders}.user_id"
+        relationship: one_to_many
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+
+      - name: purchases_to_users_ratio
+        sql: "1.0 * {orders.purchases} / {CUBE.count}"
+        type: number
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   sql: `
@@ -169,52 +215,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    sql: >
-      SELECT 1 AS id, 11 AS user_id, 'processing' AS status UNION ALL
-      SELECT 2 AS id, 11 AS user_id, 'completed'  AS status UNION ALL
-      SELECT 3 AS id, 11 AS user_id, 'completed'  AS status
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-
-    measures:
-      - name: purchases
-        type: count
-        filters:
-          - sql: "{CUBE}.status = 'completed'"
-
-  - name: users
-    sql: >
-      SELECT 11 AS id, 'Alice' AS name UNION ALL
-      SELECT 12 AS id, 'Bob'   AS name UNION ALL
-      SELECT 13 AS id, 'Eve'   AS name
-
-    joins:
-      - name: orders
-        sql: "{CUBE}.id = {orders}.user_id"
-        relationship: one_to_many
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-
-    measures:
-      - name: count
-        type: count
-
-      - name: purchases_to_users_ratio
-        sql: "1.0 * {orders.purchases} / {CUBE.count}"
-        type: number
 ```
 
 </CodeGroup>

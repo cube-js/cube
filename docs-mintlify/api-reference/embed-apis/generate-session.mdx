@@ -72,6 +72,30 @@ Use the `sessionId` directly in your embed URL to authenticate and load content 
 
 <CodeGroup>
 
+```python title="Python" Python
+import requests
+
+API_KEY = 'YOUR_API_KEY'
+ACCOUNT_NAME = 'your-account'
+
+# Generate a session on your server
+response = requests.post(
+    f'https://{ACCOUNT_NAME}.cubecloud.dev/api/v1/embed/generate-session',
+    headers={
+        'Content-Type': 'application/json',
+        'Authorization': f'Api-Key {API_KEY}'
+    },
+    json={
+        'externalId': 'user@example.com',
+        'userAttributes': [
+            {'name': 'department', 'value': 'Sales'}
+        ]
+    }
+)
+
+session_id = response.json()['sessionId']
+```
+
 ```javascript title="JavaScript" JavaScript
 const API_KEY = 'YOUR_API_KEY';
 const ACCOUNT_NAME = 'your-account';
@@ -95,30 +119,6 @@ const response = await fetch(
 );
 
 const { sessionId } = await response.json();
-```
-
-```python title="Python" Python
-import requests
-
-API_KEY = 'YOUR_API_KEY'
-ACCOUNT_NAME = 'your-account'
-
-# Generate a session on your server
-response = requests.post(
-    f'https://{ACCOUNT_NAME}.cubecloud.dev/api/v1/embed/generate-session',
-    headers={
-        'Content-Type': 'application/json',
-        'Authorization': f'Api-Key {API_KEY}'
-    },
-    json={
-        'externalId': 'user@example.com',
-        'userAttributes': [
-            {'name': 'department', 'value': 'Sales'}
-        ]
-    }
-)
-
-session_id = response.json()['sessionId']
 ```
 
 ```bash title="Bash" cURL

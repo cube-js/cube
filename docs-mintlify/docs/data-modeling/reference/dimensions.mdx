@@ -23,22 +23,6 @@ among all dimensions, measures, and segments within a cube and follow the
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`products`, {
-  dimensions: {
-    price: {
-      sql: `price`,
-      type: `number`
-    },
-
-    brand_name: {
-      sql: `brand_name`,
-      type: `string`
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: products
@@ -53,6 +37,22 @@ cubes:
         type: string
 
 
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  dimensions: {
+    price: {
+      sql: `price`,
+      type: `number`
+    },
+
+    brand_name: {
+      sql: `brand_name`,
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeGroup>
@@ -70,28 +70,6 @@ The following example will create a `size` dimension with values
 `xl`, `xxl`, and `Unknown`:
 
 <CodeGroup>
-
-```javascript title="JavaScript"
-cube(`products`, {
-  // ...
-
-  dimensions: {
-    size: {
-      type: `string`,
-      case: {
-        when: [
-          { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
-          { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
-          { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
-          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` }
-        ],
-        else: { label: `Unknown` }
-      }
-    }
-  }
-})
-
-```
 
 ```yaml title="YAML"
 cubes:
@@ -113,6 +91,28 @@ cubes:
               label: xxl
           else:
             label: Unknown
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` }
+        ],
+        else: { label: `Unknown` }
+      }
+    }
+  }
+})
+
 ```
 
 </CodeGroup>
@@ -161,6 +161,18 @@ order to override default behavior, please use the `title` property:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: meta_value
+        title: Size
+        sql: meta_value
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`products`, {
   // ...
@@ -175,18 +187,6 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: meta_value
-        title: Size
-        sql: meta_value
-        type: string
-```
-
 </CodeGroup>
 
 ### `description`
@@ -196,6 +196,18 @@ When applicable, it will be displayed in [Playground][ref-playground] and expose
 to data consumers via [APIs and integrations][ref-apis].
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        description: Comments for orders
+        sql: comments
+        type: string
+```
 
 ```javascript title="JavaScript"
 cube(`products`, {
@@ -211,18 +223,6 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: comment
-        description: Comments for orders
-        sql: comments
-        type: string
-```
-
 </CodeGroup>
 
 ### `public`
@@ -232,6 +232,18 @@ values for `public` are `true` and `false`. When set to `false`, this dimension
 **cannot** be queried through the API. Defaults to `true`.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        sql: comment
+        type: string
+        public: false
+```
 
 ```javascript title="JavaScript"
 cube(`products`, {
@@ -247,18 +259,6 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: comment
-        sql: comment
-        type: string
-        public: false
-```
-
 </CodeGroup>
 
 ### `format`
@@ -269,6 +269,18 @@ in different ways, for example, a link for `external_url`. Please refer to the
 formats.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: total
+        sql: amount
+        type: number
+        format: currency
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -284,18 +296,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: total
-        sql: amount
-        type: number
-        format: currency
-```
-
 </CodeGroup>
 
 ### `meta`
@@ -303,6 +303,19 @@ cubes:
 Custom metadata. Can be used to pass any information to the frontend.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        meta:
+          any: value
+```
 
 ```javascript title="JavaScript"
 cube(`products`, {
@@ -320,19 +333,6 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: users_count
-        sql: "{users.count}"
-        type: number
-        meta:
-          any: value
-```
-
 </CodeGroup>
 
 ### `order`
@@ -347,6 +347,23 @@ when displaying dimension values, ensuring a uniform user experience across
 different tools connected to the semantic layer.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+        order: asc
+
+      - name: created_at
+        sql: created_at
+        type: time
+        order: desc
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -368,23 +385,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: status
-        sql: status
-        type: string
-        order: asc
-
-      - name: created_at
-        sql: created_at
-        type: time
-        order: desc
-```
-
 </CodeGroup>
 
 ### `primary_key`
@@ -404,6 +404,18 @@ explicitly.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+```
+
 ```javascript title="JavaScript"
 cube(`products`, {
   // ...
@@ -418,24 +430,37 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-```
-
 </CodeGroup>
 
 It is possible to have more than one primary key dimension in a cube if you'd
 like them all to be parts of a composite key:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    sql: |
+      SELECT 1 AS column_a, 1 AS column_b UNION ALL
+      SELECT 2 AS column_a, 1 AS column_b UNION ALL
+      SELECT 1 AS column_a, 2 AS column_b UNION ALL
+      SELECT 2 AS column_a, 2 AS column_b
+
+    dimensions:
+      - name: composite_key_a
+        sql: column_a
+        type: number
+        primary_key: true
+
+      - name: composite_key_b
+        sql: column_b
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+```
 
 ```javascript title="JavaScript"
 cube(`products`, {
@@ -468,31 +493,6 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    sql: |
-      SELECT 1 AS column_a, 1 AS column_b UNION ALL
-      SELECT 2 AS column_a, 1 AS column_b UNION ALL
-      SELECT 1 AS column_a, 2 AS column_b UNION ALL
-      SELECT 2 AS column_a, 2 AS column_b
-
-    dimensions:
-      - name: composite_key_a
-        sql: column_a
-        type: number
-        primary_key: true
-
-      - name: composite_key_b
-        sql: column_b
-        type: number
-        primary_key: true
-
-    measures:
-      - name: count
-        type: count
-```
-
 </CodeGroup>
 
 Querying the `count` measure of the cube shown above will generate the following
@@ -518,6 +518,19 @@ passed to the [subquery][self-subquery].
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+        propagate_filters_to_sub_query: true
+```
+
 ```javascript title="JavaScript"
 cube(`products`, {
   // ...
@@ -531,19 +544,6 @@ cube(`products`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: users_count
-        sql: "{users.count}"
-        type: number
-        sub_query: true
-        propagate_filters_to_sub_query: true
 ```
 
 </CodeGroup>
@@ -644,6 +644,18 @@ an advanced concept and you can learn more about it [here][ref-subquery].
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+```
+
 ```javascript title="JavaScript"
 cube(`products`, {
   // ...
@@ -658,18 +670,6 @@ cube(`products`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: users_count
-        sql: "{users.count}"
-        type: number
-        sub_query: true
-```
-
 </CodeGroup>
 
 ### `type`
@@ -679,6 +679,17 @@ a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
 for the full list of dimension types.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: rating
+        sql: rating
+        type: number
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -691,17 +702,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: rating
-        sql: rating
-        type: number
 ```
 
 </CodeGroup>

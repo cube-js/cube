@@ -20,6 +20,21 @@ among all measures, dimensions, and segments within a cube and follow the
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -38,21 +53,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-
-      - name: total_amount
-        sql: amount
-        type: sum
-```
-
 </CodeGroup>
 
 ### `title`
@@ -62,6 +62,18 @@ default, Cube will humanize your measure key to create a display name. In order
 to override default behavior, please use the `title` parameter.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        title: Number of Orders Placed
+        sql: id
+        type: count
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -77,18 +89,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        title: Number of Orders Placed
-        sql: id
-        type: count
-```
-
 </CodeGroup>
 
 ### `description`
@@ -98,6 +98,18 @@ When applicable, it will be displayed in [Playground][ref-playground] and expose
 to data consumers via [APIs and integrations][ref-apis].
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        description: Count of all orders
+        sql: id
+        type: count
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -113,18 +125,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        description: Count of all orders
-        sql: id
-        type: count
-```
-
 </CodeGroup>
 
 ### `public`
@@ -134,6 +134,18 @@ values for `public` are `true` and `false`. When set to `false`, this measure
 **cannot** be queried through the API. Defaults to `true`.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        sql: id
+        type: count
+        public: false
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -149,18 +161,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        sql: id
-        type: count
-        public: false
-```
-
 </CodeGroup>
 
 ### `meta`
@@ -168,6 +168,19 @@ cubes:
 Custom metadata. Can be used to pass any information to the frontend.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue
+        type: sum
+        sql: price
+        meta:
+          any: value
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -185,19 +198,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: revenue
-        type: sum
-        sql: price
-        meta:
-          any: value
-```
-
 </CodeGroup>
 
 ### `sql`
@@ -208,6 +208,17 @@ Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
 the corresponding `sql` parameter.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: users_count
+        sql: "COUNT(*)"
+        type: number
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -220,17 +231,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: users_count
-        sql: "COUNT(*)"
-        type: number
 ```
 
 </CodeGroup>
@@ -324,6 +324,19 @@ the `filters` parameter. The syntax looks like the following:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_completed_count
+        sql: id
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -338,19 +351,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_completed_count
-        sql: id
-        type: count
-        filters:
-          - sql: "{CUBE}.status = 'completed'"
-```
-
 </CodeGroup>
 
 ### `type`
@@ -361,6 +361,17 @@ Types][ref-schema-ref-types-formats-measures-types] for the full list of measure
 types.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        sql: id
+        type: count
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -373,17 +384,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        sql: id
-        type: count
 ```
 
 </CodeGroup>
@@ -432,6 +432,19 @@ By default, the `leading` and `trailing` parameters are set to zero.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: rolling_count_month
+        sql: id
+        type: count
+        rolling_window:
+          trailing: 1 month
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -448,24 +461,23 @@ cube(`orders`, {
 })
 ```
 
+</CodeGroup>
+
+Here's an example of an `unbounded` window that's used for cumulative counts:
+
+<CodeGroup>
+
 ```yaml title="YAML"
 cubes:
   - name: orders
     # ...
 
     measures:
-      - name: rolling_count_month
-        sql: id
+      - name: cumulative_count
         type: count
         rolling_window:
-          trailing: 1 month
+          trailing: unbounded
 ```
-
-</CodeGroup>
-
-Here's an example of an `unbounded` window that's used for cumulative counts:
-
-<CodeGroup>
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -480,18 +492,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: cumulative_count
-        type: count
-        rolling_window:
-          trailing: unbounded
 ```
 
 </CodeGroup>
@@ -1072,6 +1072,46 @@ measures.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+    
+    measures:
+      - name: amount_usd
+        sql: amount_usd
+        type: sum
+
+      - name: amount_eur
+        sql: amount_eur
+        type: sum
+
+      - name: amount_gbp
+        sql: amount_gbp
+        type: sum
+
+      - name: amount_in_currency
+        multi_stage: true
+        case:
+          switch: "{CUBE.currency}"
+          when:
+            - value: EUR
+              sql: "{CUBE.amount_eur}"
+            - value: GBP
+              sql: "{CUBE.amount_gbp}"
+          else:
+            sql: "{CUBE.amount_usd}"
+        type: number
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -1127,46 +1167,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: currency
-        type: switch
-        values:
-          - USD
-          - EUR
-          - GBP
-    
-    measures:
-      - name: amount_usd
-        sql: amount_usd
-        type: sum
-
-      - name: amount_eur
-        sql: amount_eur
-        type: sum
-
-      - name: amount_gbp
-        sql: amount_gbp
-        type: sum
-
-      - name: amount_in_currency
-        multi_stage: true
-        case:
-          switch: "{CUBE.currency}"
-          when:
-            - value: EUR
-              sql: "{CUBE.amount_eur}"
-            - value: GBP
-              sql: "{CUBE.amount_gbp}"
-          else:
-            sql: "{CUBE.amount_usd}"
-        type: number
-```
-
 </CodeGroup>
 
 ### `format`
@@ -1177,6 +1177,18 @@ in different ways, for example, as currency for `revenue`. Please refer to the
 list of supported formats.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+        format: currency
+```
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -1192,18 +1204,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: total
-        sql: amount
-        type: sum
-        format: currency
-```
-
 </CodeGroup>
 
 ### `drill_members`
@@ -1216,20 +1216,6 @@ variables in the `drill_members` array. [Learn more about how to define and use
 drill downs][ref-drilldowns].
 
 <CodeGroup>
-
-```javascript title="JavaScript"
-cube(`orders`, {
-  // ...
-
-  measures: {
-    revenue: {
-      type: `sum`,
-      sql: `price`,
-      drill_members: [id, price, status, products.name, products.id]
-    }
-  }
-})
-```
 
 ```yaml title="YAML"
 cubes:
@@ -1246,6 +1232,20 @@ cubes:
           - status
           - products.name
           - products.id
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue: {
+      type: `sum`,
+      sql: `price`,
+      drill_members: [id, price, status, products.name, products.id]
+    }
+  }
+})
 ```
 
 </CodeGroup>

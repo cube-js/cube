@@ -119,9 +119,35 @@ def transform_codetabs(content: str) -> str:
 
         return match.group(0)
 
+    # Priority order for code blocks: YAML first, then Python, then rest
+    LANG_PRIORITY = {"yaml": 0, "yml": 0, "python": 1, "py": 1}
+
+    def reorder_code_blocks(group_content):
+        """Reorder code blocks so YAML comes first, then Python, then others."""
+        # Split into individual code blocks
+        block_pattern = re.compile(r"(```+\w*.*?```+)", re.DOTALL)
+        blocks = block_pattern.findall(group_content)
+        if len(blocks) <= 1:
+            return group_content
+
+        def block_sort_key(block):
+            lang_match = re.match(r"```+(\w+)", block)
+            lang = lang_match.group(1).lower() if lang_match else ""
+            return LANG_PRIORITY.get(lang, 99)
+
+        sorted_blocks = sorted(blocks, key=block_sort_key)
+        if sorted_blocks == blocks:
+            return group_content
+
+        # Rebuild with sorted blocks
+        result = "\n\n".join(sorted_blocks)
+        return "\n\n" + result + "\n\n"
+
     # Only add titles to code blocks that are inside <CodeGroup> sections
     def process_codegroup(match):
         group_content = match.group(1)
+        # Reorder so YAML is first
+        group_content = reorder_code_blocks(group_content)
         # Add title to code fences inside the group
         group_content = re.sub(
             r"(```+)(\w+)?(.*?)$",

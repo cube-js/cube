@@ -835,6 +835,31 @@ Uses the same API key authentication as the Chat API.
 
 <CodeGroup>
 
+```python title="Python" Python
+import requests
+
+CHAT_API_URL = "YOUR_CHAT_API_URL"
+ABORT_URL = CHAT_API_URL.replace("/stream-chat-state", "/abort")
+API_KEY = "YOUR_API_KEY"
+
+response = requests.post(
+    ABORT_URL,
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Api-Key {API_KEY}"
+    },
+    json={
+        "chatId": "CHAT_ID_TO_ABORT",
+        "sessionSettings": {
+            "externalId": "user@example.com"
+        }
+    }
+)
+
+if response.status_code == 204:
+    print("Chat streaming aborted successfully")
+```
+
 ```bash title="Bash" cURL
 # Derive the abort URL from your Chat API URL by replacing /stream-chat-state with /abort
 ABORT_URL="${CHAT_API_URL/stream-chat-state/abort}"
@@ -874,36 +899,46 @@ if (response.status === 204) {
 }
 ```
 
-```python title="Python" Python
-import requests
-
-CHAT_API_URL = "YOUR_CHAT_API_URL"
-ABORT_URL = CHAT_API_URL.replace("/stream-chat-state", "/abort")
-API_KEY = "YOUR_API_KEY"
-
-response = requests.post(
-    ABORT_URL,
-    headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Api-Key {API_KEY}"
-    },
-    json={
-        "chatId": "CHAT_ID_TO_ABORT",
-        "sessionSettings": {
-            "externalId": "user@example.com"
-        }
-    }
-)
-
-if response.status_code == 204:
-    print("Chat streaming aborted successfully")
-```
-
 </CodeGroup>
 
 ## Code Examples
 
 <CodeGroup>
+
+```python title="Python" Python
+import requests
+import json
+
+# Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+CHAT_API_URL = "YOUR_CHAT_API_URL"
+API_KEY = "YOUR_API_KEY"
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Api-Key {API_KEY}"
+}
+
+data = {
+    "input": "What are our top performing products?",
+    "sessionSettings": {
+        "externalId": "user@example.com",
+        "email": "user@example.com",  # optional
+        "userAttributes": [  # optional
+            {
+                "name": "city",
+                "value": "San Francisco"
+            }
+        ]
+    }
+}
+
+response = requests.post(CHAT_API_URL, headers=headers, json=data, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line.decode('utf-8'))
+        print("Received:", message)
+```
 
 ```bash title="Bash" cURL
 # Copy YOUR_CHAT_API_URL from your agent settings (Admin → Agents → Chat API URL field)
@@ -970,41 +1005,6 @@ while (true) {
     }
   });
 }
-```
-
-```python title="Python" Python
-import requests
-import json
-
-# Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
-CHAT_API_URL = "YOUR_CHAT_API_URL"
-API_KEY = "YOUR_API_KEY"
-
-headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Api-Key {API_KEY}"
-}
-
-data = {
-    "input": "What are our top performing products?",
-    "sessionSettings": {
-        "externalId": "user@example.com",
-        "email": "user@example.com",  # optional
-        "userAttributes": [  # optional
-            {
-                "name": "city",
-                "value": "San Francisco"
-            }
-        ]
-    }
-}
-
-response = requests.post(CHAT_API_URL, headers=headers, json=data, stream=True)
-
-for line in response.iter_lines():
-    if line:
-        message = json.loads(line.decode('utf-8'))
-        print("Received:", message)
 ```
 
 </CodeGroup>

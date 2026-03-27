@@ -362,6 +362,33 @@ The pre-aggregation definition looks as follows:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - order_total
+        dimensions:
+          - product_name
+          - product_category
+          - zip_code
+        time_dimension: timestamp
+        granularity: hour
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
+        refresh_key:
+          every: 1 hour
+          incremental: true
+          update_window: 1 day
+        build_range_start:
+          sql: SELECT DATE_SUB(NOW(), 365)
+        build_range_end:
+          sql: SELECT NOW()
+```
+
 ```javascript title="JavaScript"
 cube("orders", {
   // ...
@@ -388,33 +415,6 @@ cube("orders", {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    pre_aggregations:
-      - name: main
-        measures:
-          - order_total
-        dimensions:
-          - product_name
-          - product_category
-          - zip_code
-        time_dimension: timestamp
-        granularity: hour
-        partition_granularity: day
-        allow_non_strict_date_range_match: true
-        refresh_key:
-          every: 1 hour
-          incremental: true
-          update_window: 1 day
-        build_range_start:
-          sql: SELECT DATE_SUB(NOW(), 365)
-        build_range_end:
-          sql: SELECT NOW()
 ```
 
 </CodeGroup>
@@ -471,6 +471,23 @@ index as follows:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        # ...
+
+        indexes:
+          - name: category_productname_zipcode_index
+            columns:
+              - product_category
+              - zip_code
+              - product_name
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -491,23 +508,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    pre_aggregations:
-      - name: main
-        # ...
-
-        indexes:
-          - name: category_productname_zipcode_index
-            columns:
-              - product_category
-              - zip_code
-              - product_name
 ```
 
 </CodeGroup>
@@ -561,6 +561,24 @@ in the index definition:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        # ...
+
+        indexes:
+          # ...
+
+          - name: zip_code_index
+            columns:
+              - zip_code
+            type: aggregate
+```
+
 ```javascript title="JavaScript"
 cube("orders", {
   // ...
@@ -580,24 +598,6 @@ cube("orders", {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    pre_aggregations:
-      - name: main
-        # ...
-
-        indexes:
-          # ...
-
-          - name: zip_code_index
-            columns:
-              - zip_code
-            type: aggregate
 ```
 
 </CodeGroup>

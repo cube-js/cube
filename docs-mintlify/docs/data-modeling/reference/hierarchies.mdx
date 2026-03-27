@@ -38,6 +38,21 @@ among all members within a cube and follow the [naming conventions][ref-naming].
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    # ...
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   sql_table: `users`,
@@ -54,21 +69,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    # ...
-
-    hierarchies:
-      - name: location
-        title: User Location
-        levels:
-          - state
-          - city
 ```
 
 </CodeGroup>
@@ -79,6 +79,21 @@ You can use the `title` parameter to set the human-readable name of a hierarchy:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    # ...
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   sql_table: `users`,
@@ -95,21 +110,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    # ...
-
-    hierarchies:
-      - name: location
-        title: User Location
-        levels:
-          - state
-          - city
 ```
 
 </CodeGroup>
@@ -121,6 +121,28 @@ by listing the dimensions included in the hierarchy, from less granular to more
 granular ones:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: state
+        sql: state
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+```
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -150,10 +172,22 @@ cube(`users`, {
 })
 ```
 
+</CodeGroup>
+
+You can include the same dimension in multiple hierarchies. It is also possible to
+include a dimension from a joined cube into a hierarchy: 
+
+<CodeGroup>
+
 ```yaml title="YAML"
 cubes:
   - name: users
     sql_table: users
+
+    joins:
+      - name: orders
+        sql: "{CUBE.id} = {orders.user_id}"
+        relationship: one_to_many
 
     dimensions:
       - name: state
@@ -164,20 +198,24 @@ cubes:
         sql: city
         type: string
 
+      - name: status
+        sql: status
+        type: string
+
     hierarchies:
-      - name: location
-        title: User Location
+      - name: details
+        title: User Details
         levels:
+          - status
           - state
           - city
+
+      - name: statuses
+        title: User & Order Statuses
+        levels:
+          - status
+          - orders.status
 ```
-
-</CodeGroup>
-
-You can include the same dimension in multiple hierarchies. It is also possible to
-include a dimension from a joined cube into a hierarchy: 
-
-<CodeGroup>
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -227,44 +265,6 @@ cube(`users`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    joins:
-      - name: orders
-        sql: "{CUBE.id} = {orders.user_id}"
-        relationship: one_to_many
-
-    dimensions:
-      - name: state
-        sql: state
-        type: string
-
-      - name: city
-        sql: city
-        type: string
-
-      - name: status
-        sql: status
-        type: string
-
-    hierarchies:
-      - name: details
-        title: User Details
-        levels:
-          - status
-          - state
-          - city
-
-      - name: statuses
-        title: User & Order Statuses
-        levels:
-          - status
-          - orders.status
-```
-
 </CodeGroup>
 
 ### `public`
@@ -274,6 +274,22 @@ values for `public` are `true` and `false`. When set to `false`, this hierarchy
 **cannot** be queried through the API. Defaults to `true`.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    # ...
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+        public: false
+```
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -292,22 +308,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    # ...
-
-    hierarchies:
-      - name: location
-        title: User Location
-        levels:
-          - state
-          - city
-        public: false
 ```
 
 </CodeGroup>

@@ -15,6 +15,36 @@ Within each cube are definitions of [measures][ref-ref-measures],
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: organizations
+        relationship: many_to_one
+        sql: "{CUBE.organization_id} = {organizations.id}"
+
+    measures:
+      - name: count
+        type: count
+        sql: id
+
+    dimensions:
+      - name: organization_id
+        sql: organization_id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: country
+        sql: country
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   sql_table: `users`,
@@ -53,36 +83,6 @@ cube(`users`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    sql_table: users
-
-    joins:
-      - name: organizations
-        relationship: many_to_one
-        sql: "{CUBE.organization_id} = {organizations.id}"
-
-    measures:
-      - name: count
-        type: count
-        sql: id
-
-    dimensions:
-      - name: organization_id
-        sql: organization_id
-        type: number
-        primary_key: true
-
-      - name: created_at
-        sql: created_at
-        type: time
-
-      - name: country
-        sql: country
-        type: string
-```
-
 </CodeGroup>
 
 ## Parameters
@@ -95,16 +95,16 @@ conventions][ref-naming].
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: orders
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: orders
+})
 ```
 
 </CodeGroup>
@@ -116,18 +116,18 @@ by databases such as Postgres:
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`order_facts_about_literally_everything_in_the_world`, {
-  sql_table: `orders`,
-  sql_alias: `order_facts`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: order_facts_about_literally_everything_in_the_world
     sql_table: orders
     sql_alias: order_facts
+```
+
+```javascript title="JavaScript"
+cube(`order_facts_about_literally_everything_in_the_world`, {
+  sql_table: `orders`,
+  sql_alias: `order_facts`
+})
 ```
 
 </CodeGroup>
@@ -144,6 +144,25 @@ In the example below, `extended_order_facts` will reuse the `sql` and `count` me
 from `order_facts`:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: order_facts
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+        sql: id
+
+  - name: extended_order_facts
+    extends: order_facts
+
+    measures:
+      - name: double_count
+        type: number
+        sql: "{count} * 2"
+```
 
 ```javascript title="JavaScript"
 cube(`order_facts`, {
@@ -167,25 +186,6 @@ cube(`extended_order_facts`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: order_facts
-    sql_table: orders
-
-    measures:
-      - name: count
-        type: count
-        sql: id
-
-  - name: extended_order_facts
-    extends: order_facts
-
-    measures:
-      - name: double_count
-        type: number
-        sql: "{count} * 2"
 ```
 
 </CodeGroup>
@@ -230,18 +230,18 @@ function as part of the `context` parameter. By default, each cube has a
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`order_facts`, {
-  data_source: `prod_db`,
-  sql_table: `orders`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: order_facts
     data_source: prod_db
     sql_table: orders
+```
+
+```javascript title="JavaScript"
+cube(`order_facts`, {
+  data_source: `prod_db`,
+  sql_table: `orders`
+})
 ```
 
 </CodeGroup>
@@ -256,16 +256,16 @@ plain table, without aggregations.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql: `SELECT * FROM orders`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql: SELECT * FROM orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql: `SELECT * FROM orders`
+})
 ```
 
 </CodeGroup>
@@ -274,6 +274,16 @@ You can also reference other cubes' SQL statements for code reuse using the
 [`{cube.sql()}`][ref-syntax-cube-sql] function:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: companies
+    sql:
+      SELECT
+        users.company_name,
+        users.company_id
+      FROM {users.sql()} AS users
+```
 
 ```javascript title="JavaScript"
 cube(`companies`, {
@@ -284,16 +294,6 @@ cube(`companies`, {
     FROM ${users.sql()} AS users
   `
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: companies
-    sql:
-      SELECT
-        users.company_name,
-        users.company_id
-      FROM {users.sql()} AS users
 ```
 
 </CodeGroup>
@@ -311,16 +311,16 @@ cube will query.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `public.orders`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: public.orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `public.orders`
+})
 ```
 
 </CodeGroup>
@@ -338,18 +338,18 @@ organization.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `orders`,
-  title: `Product Orders`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: orders
     title: Product Orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`
+})
 ```
 
 </CodeGroup>
@@ -365,20 +365,20 @@ interpret the data correctly.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `orders`,
-  title: `Product Orders`,
-  description: `All orders-related information`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: orders
     title: Product Orders
     description: All orders-related information
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+  description: `All orders-related information`
+})
 ```
 
 </CodeGroup>
@@ -391,18 +391,18 @@ be queried through the API. Defaults to `true`.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `public.orders`,
-  public: false
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: public.orders
     public: false
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `public.orders`,
+  public: false
+})
 ```
 
 </CodeGroup>
@@ -432,6 +432,14 @@ it last ran. timestamp in that case.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: order_facts
+    sql_table: orders
+    refresh_key:
+      sql: SELECT MAX(updated_at_timestamp) FROM orders
+```
+
 ```javascript title="JavaScript"
 cube(`order_facts`, {
   sql_table: `orders`,
@@ -445,19 +453,19 @@ cube(`order_facts`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: order_facts
-    sql_table: orders
-    refresh_key:
-      sql: SELECT MAX(updated_at_timestamp) FROM orders
-```
-
 </CodeGroup>
 
 You can use interval-based `refresh_key`. For example:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: order_facts
+    sql_table: orders
+    refresh_key:
+      every: 1 hour
+```
 
 ```javascript title="JavaScript"
 cube(`order_facts`, {
@@ -467,14 +475,6 @@ cube(`order_facts`, {
     every: `1 hour`
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: order_facts
-    sql_table: orders
-    refresh_key:
-      every: 1 hour
 ```
 
 </CodeGroup>
@@ -503,6 +503,16 @@ For example:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: order_facts
+    sql_table: orders
+
+    refresh_key:
+      every: 30 5 * * 5
+      timezone: America/Los_Angeles
+```
+
 ```javascript title="JavaScript"
 cube(`order_facts`, {
   sql_table: `orders`,
@@ -512,16 +522,6 @@ cube(`order_facts`, {
     timezone: "America/Los_Angeles"
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: order_facts
-    sql_table: orders
-
-    refresh_key:
-      every: 30 5 * * 5
-      timezone: America/Los_Angeles
 ```
 
 </CodeGroup>
@@ -591,16 +591,6 @@ Custom metadata. Can be used to pass any information to the frontend.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `orders`,
-  title: `Product Orders`,
-  meta: {
-    any: `value`
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
@@ -609,6 +599,16 @@ cubes:
     meta:
       any: value
 
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+  meta: {
+    any: `value`
+  }
+})
 ```
 
 </CodeGroup>

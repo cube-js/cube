@@ -22,14 +22,14 @@ conventions][ref-naming].
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-view(`active_users`, {})
-
-```
-
 ```yaml title="YAML"
 views:
   - name: active_users
+```
+
+```javascript title="JavaScript"
+view(`active_users`, {})
+
 ```
 
 </CodeGroup>
@@ -42,6 +42,20 @@ all declared members of a view.
 In the example below, `extended_orders` will extend `orders` with an additional join path:
 
 <CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+  - name: extended_orders
+    extends: orders
+    cubes:
+      - join_path: base_orders.users
+        includes: "*"
+```
 
 ```javascript title="JavaScript"
 view(`orders`, {
@@ -64,20 +78,6 @@ view(`extended_orders`, {
 })
 ```
 
-```yaml title="YAML"
-views:
-  - name: orders
-    cubes:
-      - join_path: base_orders
-        includes: "*"
-
-  - name: extended_orders
-    extends: orders
-    cubes:
-      - join_path: base_orders.users
-        includes: "*"
-```
-
 </CodeGroup>
 
 ### `title`
@@ -86,18 +86,18 @@ Use the `title` parameter to change the display name of the view.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `orders`,
-  title: `Product Orders`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: orders
     title: Product Orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`
+})
 ```
 
 </CodeGroup>
@@ -113,16 +113,16 @@ interpret the data correctly.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-view(`active_users`, {
-  description: `14 days rolling count of active users`
-})
-```
-
 ```yaml title="YAML"
 views:
   - name: active_users
     description: 14 days rolling count of active users
+```
+
+```javascript title="JavaScript"
+view(`active_users`, {
+  description: `14 days rolling count of active users`
+})
 ```
 
 </CodeGroup>
@@ -156,6 +156,23 @@ recipe.
 
 <CodeGroup>
 
+```yaml title="YAML"
+views:
+  - name: arr
+    description: Annual Recurring Revenue
+    public: COMPILE_CONTEXT.security_context.is_finance
+
+    cubes:
+      - join_path: revenue
+        includes:
+          - arr
+          - date
+
+      - join_path: revenue.customers
+        includes:
+          - plan
+```
+
 ```javascript title="JavaScript"
 view(`arr`, {
   description: `Annual Recurring Revenue`,
@@ -177,23 +194,6 @@ view(`arr`, {
 })
 ```
 
-```yaml title="YAML"
-views:
-  - name: arr
-    description: Annual Recurring Revenue
-    public: COMPILE_CONTEXT.security_context.is_finance
-
-    cubes:
-      - join_path: revenue
-        includes:
-          - arr
-          - date
-
-      - join_path: revenue.customers
-        includes:
-          - plan
-```
-
 </CodeGroup>
 
 To learn more about using `public` to control visibility based on security
@@ -206,20 +206,20 @@ Custom metadata. Can be used to pass any information to the frontend.
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-view(`active_users`, {
-  meta: {
-    any: `value`
-  }
-})
-```
-
 ```yaml title="YAML"
 views:
   - name: active_users
     meta:
       any: value
 
+```
+
+```javascript title="JavaScript"
+view(`active_users`, {
+  meta: {
+    any: `value`
+  }
+})
 ```
 
 </CodeGroup>
@@ -231,6 +231,38 @@ your view by combining multiple joined cubes together and specifying the path by
 which they should be joined for that particular view.
 
 <CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+
+      - join_path: base_orders.line_items.products
+        includes:
+          - name: name
+            alias: product
+            title: My custom product
+            description: My custom product description
+            format: number
+            meta:
+              some: custom
+              meta: data
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: "*"
+        excludes:
+          - company
+```
 
 ```javascript title="JavaScript"
 view(`orders`, {
@@ -272,38 +304,6 @@ view(`orders`, {
     }
   ]
 })
-```
-
-```yaml title="YAML"
-views:
-  - name: orders
-
-    cubes:
-      - join_path: base_orders
-        includes:
-          - status
-          - created_date
-          - total_amount
-          - total_amount_shipped
-          - count
-          - average_order_value
-
-      - join_path: base_orders.line_items.products
-        includes:
-          - name: name
-            alias: product
-            title: My custom product
-            description: My custom product description
-            format: number
-            meta:
-              some: custom
-              meta: data
-
-      - join_path: base_orders.users
-        prefix: true
-        includes: "*"
-        excludes:
-          - company
 ```
 
 </CodeGroup>
@@ -375,6 +375,35 @@ included members via the `includes` parameter:
 
 <CodeGroup>
 
+```yaml title="YAML"
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Basic Details
+        includes:
+          - created_at
+          - location
+          - orders_status
+          - orders_count
+
+      - name: Sensitive Details
+        includes:
+          - name
+          - gender
+```
+
 ```javascript title="JavaScript"
 view(`customers`, {
   cubes: [
@@ -415,35 +444,6 @@ view(`customers`, {
 })
 ```
 
-```yaml title="YAML"
-views:
-  - name: customers
-
-    cubes:
-      - join_path: users
-        includes: "*"
-
-      - join_path: users.orders
-        prefix: true
-        includes:
-          - status
-          - price
-          - count
-
-    folders:
-      - name: Basic Details
-        includes:
-          - created_at
-          - location
-          - orders_status
-          - orders_count
-
-      - name: Sensitive Details
-        includes:
-          - name
-          - gender
-```
-
 </CodeGroup>
 
 You can also use the `join_path` parameter within `includes` to add all members from a
@@ -451,6 +451,35 @@ specific [join path](#join_path) without listing them individually. You can mix
 `join_path` with individual member names in the same folder:
 
 <CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+      - join_path: base_orders.line_items
+        includes: "*"
+
+      - join_path: base_orders.users
+        includes:
+          - count
+          - name: count_distinct
+            alias: users_distinct_count
+
+    folders:
+      - name: Order Details
+        includes:
+          - join_path: base_orders
+
+      - name: Line Items & Users
+        includes:
+          - join_path: base_orders.line_items
+          - count
+          - users_distinct_count
+```
 
 ```javascript title="JavaScript"
 view(`orders`, {
@@ -494,35 +523,6 @@ view(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-views:
-  - name: orders
-
-    cubes:
-      - join_path: base_orders
-        includes: "*"
-
-      - join_path: base_orders.line_items
-        includes: "*"
-
-      - join_path: base_orders.users
-        includes:
-          - count
-          - name: count_distinct
-            alias: users_distinct_count
-
-    folders:
-      - name: Order Details
-        includes:
-          - join_path: base_orders
-
-      - name: Line Items & Users
-        includes:
-          - join_path: base_orders.line_items
-          - count
-          - users_distinct_count
-```
-
 </CodeGroup>
 
 #### Nesting
@@ -531,6 +531,46 @@ Nested folders are also supported. The `includes` parameter can contain not only
 references to view members but also other folders:
 
 <CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Customer Information
+        includes:
+          - name: Personal Details
+            includes:
+              - name
+              - gender
+
+          - name: Location
+            includes:
+              - address
+              - postal_code
+              - city
+
+      - name: Order Analytics
+        includes:
+          - orders_status
+          - orders_price
+          
+          - name: Metrics
+            includes:
+              - orders_count
+              - orders_average_value
+```
 
 ```javascript title="JavaScript"
 view(`customers`, {
@@ -587,46 +627,6 @@ view(`customers`, {
     }
   ]
 })
-```
-
-```yaml title="YAML"
-views:
-  - name: customers
-
-    cubes:
-      - join_path: users
-        includes: "*"
-
-      - join_path: users.orders
-        prefix: true
-        includes:
-          - status
-          - price
-          - count
-
-    folders:
-      - name: Customer Information
-        includes:
-          - name: Personal Details
-            includes:
-              - name
-              - gender
-
-          - name: Location
-            includes:
-              - address
-              - postal_code
-              - city
-
-      - name: Order Analytics
-        includes:
-          - orders_status
-          - orders_price
-          
-          - name: Metrics
-            includes:
-              - orders_count
-              - orders_average_value
 ```
 
 </CodeGroup>

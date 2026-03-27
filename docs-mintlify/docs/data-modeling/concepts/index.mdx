@@ -50,16 +50,16 @@ your [data source][ref-data-sources] using the [`sql_table` property][ref-schema
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `orders`
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
     sql_table: orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`
+})
 ```
 
 </CodeGroup>
@@ -76,16 +76,6 @@ complex SQL queries:
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql: `
-    SELECT *
-    FROM orders, line_items
-    WHERE orders.id = line_items.order_id
-  `
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
@@ -94,6 +84,16 @@ cubes:
       FROM orders, line_items
       WHERE orders.id = line_items.order_id
 
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql: `
+    SELECT *
+    FROM orders, line_items
+    WHERE orders.id = line_items.order_id
+  `
+})
 ```
 
 </CodeGroup>
@@ -147,6 +147,32 @@ from `base_orders`, `products`, and `users` cubes:
 
 <CodeGroup>
 
+```yaml title="YAML"
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+
+      - join_path: base_orders.line_items.products
+        includes:
+          - name: name
+            alias: product
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: "*"
+        excludes:
+          - company
+```
+
 ```javascript title="JavaScript"
 view(`orders`, {
   cubes: [
@@ -178,32 +204,6 @@ view(`orders`, {
     }
   ]
 })
-```
-
-```yaml title="YAML"
-views:
-  - name: orders
-
-    cubes:
-      - join_path: base_orders
-        includes:
-          - status
-          - created_date
-          - total_amount
-          - total_amount_shipped
-          - count
-          - average_order_value
-
-      - join_path: base_orders.line_items.products
-        includes:
-          - name: name
-            alias: product
-
-      - join_path: base_orders.users
-        prefix: true
-        includes: "*"
-        excludes:
-          - company
 ```
 
 </CodeGroup>
@@ -238,6 +238,24 @@ _Dimensions_ represent the properties of a **single** data point in the cube.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        # Here we explicitly let Cube know this field is the primary key
+        # This is required for de-duplicating results when using joins
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -259,24 +277,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        # Here we explicitly let Cube know this field is the primary key
-        # This is required for de-duplicating results when using joins
-        primary_key: true
-
-      - name: status
-        sql: status
-        type: string
-```
-
 </CodeGroup>
 
 Note that the `id` dimension is defined as a [primary key][ref-ref-primary-key].
@@ -287,6 +287,24 @@ you'd like them all to be parts of a composite key.
 represented as follows:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: line_items
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        # Again, we explicitly let Cube know this field is the primary key
+        # This is required for de-duplicating results when using joins
+        primary_key: true
+
+      - name: order_id
+        sql: order_id
+        type: number
+```
 
 ```javascript title="JavaScript"
 cube(`line_items`, {
@@ -307,24 +325,6 @@ cube(`line_items`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: line_items
-    # ...
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        # Again, we explicitly let Cube know this field is the primary key
-        # This is required for de-duplicating results when using joins
-        primary_key: true
-
-      - name: order_id
-        sql: order_id
-        type: number
 ```
 
 </CodeGroup>
@@ -383,6 +383,29 @@ Here's how we can add time dimensions to the data model:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        # You can use this time dimension with all default granularities:
+        # year, quarter, month, week, day, hour, minute, second
+
+      - name: completed_at
+        sql: completed_at
+        type: time
+        # You can use this time dimension with all default granularities
+        # and an additional custom granularity defined below
+        granularities:
+          - name: fiscal_year_starting_on_february_01
+            interval: 1 year
+            offset: 1 month
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -411,29 +434,6 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    dimensions:
-      - name: created_at
-        sql: created_at
-        type: time
-        # You can use this time dimension with all default granularities:
-        # year, quarter, month, week, day, hour, minute, second
-
-      - name: completed_at
-        sql: completed_at
-        type: time
-        # You can use this time dimension with all default granularities
-        # and an additional custom granularity defined below
-        granularities:
-          - name: fiscal_year_starting_on_february_01
-            interval: 1 year
-            offset: 1 month
-```
-
 </CodeGroup>
 
 Time dimensions are essential to enabling performance boosts such as
@@ -448,6 +448,16 @@ following:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -460,22 +470,23 @@ cube(`orders`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: count
-        type: count
-```
-
 </CodeGroup>
 
 In our `LineItems` cube, we can also create a measure to sum up the total value
 of line items sold:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: line_items
+    # ...
+
+    measures:
+      - name: total
+        sql: price
+        type: sum
+```
 
 ```javascript title="JavaScript"
 cube(`line_items`, {
@@ -488,17 +499,6 @@ cube(`line_items`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: line_items
-    # ...
-
-    measures:
-      - name: total
-        sql: price
-        type: sum
 ```
 
 </CodeGroup>
@@ -678,6 +678,19 @@ In the following example, we are left-joining the `line_items` cube onto our
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: line_items
+        # Here we use the `CUBE` global to refer to the current cube,
+        # so the following is equivalent to `orders.id = line_items.order_id`
+        sql: "{CUBE}.id = {line_items.order_id}"
+        relationship: many_to_one
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -691,19 +704,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    joins:
-      - name: line_items
-        # Here we use the `CUBE` global to refer to the current cube,
-        # so the following is equivalent to `orders.id = line_items.order_id`
-        sql: "{CUBE}.id = {line_items.order_id}"
-        relationship: many_to_one
 ```
 
 </CodeGroup>
@@ -729,6 +729,16 @@ following:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    segments:
+      - name: only_completed
+        sql: "{CUBE}.status = 'completed'"
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   // ...
@@ -739,16 +749,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    segments:
-      - name: only_completed
-        sql: "{CUBE}.status = 'completed'"
 ```
 
 </CodeGroup>
@@ -767,21 +767,6 @@ and keep the cache up-to-date. Within a data model, they are defined using the
 
 <CodeGroup>
 
-```javascript title="JavaScript"
-cube(`orders`, {
-  // ...
-
-  pre_aggregations: {
-    main: {
-      measures: [CUBE.count],
-      dimensions: [CUBE.status],
-      timeDimension: CUBE.created_at,
-      granularity: `day`
-    }
-  }
-})
-```
-
 ```yaml title="YAML"
 cubes:
   - name: orders
@@ -795,6 +780,21 @@ cubes:
           - status
         time_dimension: created_at
         granularity: day
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.status],
+      timeDimension: CUBE.created_at,
+      granularity: `day`
+    }
+  }
+})
 ```
 
 </CodeGroup>

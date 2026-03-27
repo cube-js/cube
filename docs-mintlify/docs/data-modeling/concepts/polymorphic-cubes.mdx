@@ -90,6 +90,23 @@ Then you can derive the `teachers` and `students` cubes from `users`:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: teachers
+    extends: users
+    sql: |
+      SELECT *
+      FROM {users.sql()}
+      WHERE type = 'teacher'
+
+  - name: students
+    extends: users
+    sql: |
+      SELECT *
+      FROM {users.sql()}
+      WHERE type = 'student'
+```
+
 ```javascript title="JavaScript"
 cube(`teachers`, {
   extends: users,
@@ -108,23 +125,6 @@ cube(`students`, {
     WHERE type = 'student'
   `
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: teachers
-    extends: users
-    sql: |
-      SELECT *
-      FROM {users.sql()}
-      WHERE type = 'teacher'
-
-  - name: students
-    extends: users
-    sql: |
-      SELECT *
-      FROM {users.sql()}
-      WHERE type = 'student'
 ```
 
 </CodeGroup>

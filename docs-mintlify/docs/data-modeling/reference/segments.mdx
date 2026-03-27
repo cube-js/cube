@@ -12,6 +12,16 @@ For example, users for one particular city can be treated as a segment:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   // ...
@@ -23,6 +33,12 @@ cube(`users`, {
 })
 ```
 
+</CodeGroup>
+
+Or use segments to implement cross-column `OR` logic:
+
+<CodeGroup>
+
 ```yaml title="YAML"
 cubes:
   - name: users
@@ -30,14 +46,9 @@ cubes:
 
     segments:
       - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco'"
+        sql: |
+          {CUBE}.location = 'San Francisco' OR {CUBE}.state = 'CA'
 ```
-
-</CodeGroup>
-
-Or use segments to implement cross-column `OR` logic:
-
-<CodeGroup>
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -52,17 +63,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    segments:
-      - name: sf_users
-        sql: |
-          {CUBE}.location = 'San Francisco' OR {CUBE}.state = 'CA'
 ```
 
 </CodeGroup>
@@ -110,6 +110,16 @@ among all segments, dimensions, and measures within a cube and follow the
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   // ...
@@ -122,16 +132,6 @@ cube(`users`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    segments:
-      - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco'"
-```
-
 </CodeGroup>
 
 ### `description`
@@ -141,6 +141,17 @@ When applicable, it will be displayed in [Playground][ref-playground] and expose
 to data consumers via [APIs and integrations][ref-apis].
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+        description: Users from San Francisco
+```
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -155,17 +166,6 @@ cube(`users`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    segments:
-      - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco'"
-        description: Users from San Francisco
-```
-
 </CodeGroup>
 
 ### `public`
@@ -175,6 +175,15 @@ values for `public` are `true` and `false`. When set to `false`, this segment
 **cannot** be queried through the API. Defaults to `true`.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+        public: false
+```
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -187,15 +196,6 @@ cube(`users`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    segments:
-      - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco'"
-        public: false
-```
-
 </CodeGroup>
 
 ### `sql`
@@ -204,6 +204,16 @@ The `sql` parameter defines how a segment would filter out a subset of data. It
 takes any SQL expression that would be valid within a `WHERE` statement.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -217,16 +227,6 @@ cube(`users`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    segments:
-      - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco'"
-```
-
 </CodeGroup>
 
 ## Segments vs Dimension Filters
@@ -237,6 +237,21 @@ to use segments instead of filters on dimensions.
 Let's consider an example:
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    dimensions:
+      - name: location
+        sql: location
+        type: string
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
 
 ```javascript title="JavaScript"
 cube(`users`, {
@@ -255,21 +270,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    dimensions:
-      - name: location
-        sql: location
-        type: string
-
-    segments:
-      - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco'"
 ```
 
 </CodeGroup>
@@ -307,6 +307,17 @@ expression which can be reused for a lot of user queries. For example:
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_ny_users
+        sql: |
+          {CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New York%'
+```
+
 ```javascript title="JavaScript"
 cube(`users`, {
   // ...
@@ -320,17 +331,6 @@ cube(`users`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: users
-    # ...
-
-    segments:
-      - name: sf_ny_users
-        sql: |
-          {CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New York%'
 ```
 
 </CodeGroup>

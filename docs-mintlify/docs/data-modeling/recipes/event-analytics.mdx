@@ -57,6 +57,31 @@ as primary key.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: events
+    sql: |
+      SELECT
+        t.id || '-e' as event_id
+        , t.anonymous_id as anonymous_id
+        , t.timestamp
+        , t.event
+        , t.context_page_path as page_path
+        , NULL as referrer
+      from javascript.tracks as t
+
+      UNION ALL
+
+      SELECT
+        p.id as event_id
+        , p.anonymous_id
+        , p.timestamp
+        , 'pageview' as event
+        , p.context_page_path as page_path
+        , p.referrer as referrer
+      FROM javascript.pages as p
+```
+
 ```javascript title="JavaScript"
 cube(`events`, {
   sql: `
@@ -83,31 +108,6 @@ cube(`events`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: events
-    sql: |
-      SELECT
-        t.id || '-e' as event_id
-        , t.anonymous_id as anonymous_id
-        , t.timestamp
-        , t.event
-        , t.context_page_path as page_path
-        , NULL as referrer
-      from javascript.tracks as t
-
-      UNION ALL
-
-      SELECT
-        p.id as event_id
-        , p.anonymous_id
-        , p.timestamp
-        , 'pageview' as event
-        , p.context_page_path as page_path
-        , p.referrer as referrer
-      FROM javascript.pages as p
-```
-
 </CodeGroup>
 
 The above SQL creates base table for our events cube. Now we can add some
@@ -115,6 +115,22 @@ measures to calculate the number of events and number of page views only, using
 a filter on `event` column.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: events
+    # ...
+
+    measures:
+      - name: count
+        sql: event_id
+        type: count
+
+      - name: page_views_count
+        sql: event_id
+        type: count
+        filters: [{ sql: "{CUBE}.event = 'pageview'" }]
+```
 
 ```javascript title="JavaScript"
 cube("events", {
@@ -135,22 +151,6 @@ cube("events", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: events
-    # ...
-
-    measures:
-      - name: count
-        sql: event_id
-        type: count
-
-      - name: page_views_count
-        sql: event_id
-        type: count
-        filters: [{ sql: "{CUBE}.event = 'pageview'" }]
-```
-
 </CodeGroup>
 
 Having this in place, we will already be able to calculate the total number of
@@ -158,6 +158,31 @@ events and pageviews. Next, we’re going to add dimensions to be able to filter
 events in a specific time range and for specific types.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: events
+    # ...
+
+    dimensions:
+      - name: anonymous_id
+        sql: anonymous_id
+        type: number
+        primary_key: true
+
+      - name: event_id
+        sql: event_id
+        type: number
+        primary_key: true
+
+      - name: timestamp
+        sql: timestamp
+        type: time
+
+      - name: event
+        sql: event
+        type: string
+```
 
 ```javascript title="JavaScript"
 cube("events", {
@@ -187,31 +212,6 @@ cube("events", {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: events
-    # ...
-
-    dimensions:
-      - name: anonymous_id
-        sql: anonymous_id
-        type: number
-        primary_key: true
-
-      - name: event_id
-        sql: event_id
-        type: number
-        primary_key: true
-
-      - name: timestamp
-        sql: timestamp
-        type: time
-
-      - name: event
-        sql: event
-        type: string
 ```
 
 </CodeGroup>
@@ -244,6 +244,27 @@ cube.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    sql: |
+      SELECT
+        ROW_NUMBER() OVER(PARTITION BY event.anonymous_id ORDER BY event.timestamp) || ' - '|| event.anonymous_id AS session_id
+        , event.anonymous_id
+        , event.timestamp AS session_start_at
+        , ROW_NUMBER() OVER(PARTITION BY event.anonymous_id ORDER BY event.timestamp) AS session_sequence
+        , LEAD(timestamp) OVER(PARTITION BY event.anonymous_id ORDER BY event.timestamp) AS next_session_start_at
+      FROM (
+        SELECT e.anonymous_id
+          , e.timestamp
+          , DATEDIFF(minutes
+          , LAG(e.timestamp) OVER(PARTITION BY e.anonymous_id ORDER BY e.timestamp)
+          , e.timestamp) AS inactivity_time
+        FROM {events.sql()} AS e
+      ) AS event
+      WHERE (event.inactivity_time > 30 OR event.inactivity_time IS NULL)
+```
+
 ```javascript title="JavaScript"
 // Create new cube for sessions with the following content
 cube(`sessions`, {
@@ -266,27 +287,6 @@ cube(`sessions`, {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    sql: |
-      SELECT
-        ROW_NUMBER() OVER(PARTITION BY event.anonymous_id ORDER BY event.timestamp) || ' - '|| event.anonymous_id AS session_id
-        , event.anonymous_id
-        , event.timestamp AS session_start_at
-        , ROW_NUMBER() OVER(PARTITION BY event.anonymous_id ORDER BY event.timestamp) AS session_sequence
-        , LEAD(timestamp) OVER(PARTITION BY event.anonymous_id ORDER BY event.timestamp) AS next_session_start_at
-      FROM (
-        SELECT e.anonymous_id
-          , e.timestamp
-          , DATEDIFF(minutes
-          , LAG(e.timestamp) OVER(PARTITION BY e.anonymous_id ORDER BY e.timestamp)
-          , e.timestamp) AS inactivity_time
-        FROM {events.sql()} AS e
-      ) AS event
-      WHERE (event.inactivity_time > 30 OR event.inactivity_time IS NULL)
-```
-
 </CodeGroup>
 
 As a primary key, we’re going to use `session_id`, which is the combination of
@@ -295,6 +295,36 @@ for each session. Having this in place, we can already count sessions and plot a
 time series chart of sessions.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    measures:
+      - name: count
+        sql: session_id
+        type: count
+
+    dimensions:
+      - name: anonymous_id
+        sql: anonymous_id
+        type: number
+        primary_key: true
+
+      - name: session_id
+        sql: session_id
+        type: number
+        primary_key: true
+
+      - name: start_at
+        sql: session_start_at
+        type: time
+
+      - name: next_start_at
+        sql: next_session_start_at
+        type: time
+```
 
 ```javascript title="JavaScript"
 cube("sessions", {
@@ -333,36 +363,6 @@ cube("sessions", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    measures:
-      - name: count
-        sql: session_id
-        type: count
-
-    dimensions:
-      - name: anonymous_id
-        sql: anonymous_id
-        type: number
-        primary_key: true
-
-      - name: session_id
-        sql: session_id
-        type: number
-        primary_key: true
-
-      - name: start_at
-        sql: session_start_at
-        type: time
-
-      - name: next_start_at
-        sql: next_session_start_at
-        type: time
-```
-
 </CodeGroup>
 
 ## Connecting Events to Sessions
@@ -377,6 +377,20 @@ condition, such as all users' events from session start (inclusive) till the
 start of the next session (exclusive) belong to that session.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: events
+    # ...
+
+    joins:
+      - name: sessions
+        relationship: many_to_one
+        sql: |
+          {events.anonymous_id} = {sessions.anonymous_id}
+          AND {events.timestamp} >= {sessions.start_at}
+          AND ({events.timestamp} < {sessions.next_start_at} or {sessions.next_start_at} is null)
+```
 
 ```javascript title="JavaScript"
 cube("events", {
@@ -395,26 +409,50 @@ cube("events", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: events
-    # ...
-
-    joins:
-      - name: sessions
-        relationship: many_to_one
-        sql: |
-          {events.anonymous_id} = {sessions.anonymous_id}
-          AND {events.timestamp} >= {sessions.start_at}
-          AND ({events.timestamp} < {sessions.next_start_at} or {sessions.next_start_at} is null)
-```
-
 </CodeGroup>
 
 To determine the end of the session, we’re going to use a [subquery
 dimension](/docs/data-modeling/concepts/calculated-members#subquery-dimensions).
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: events
+    # ...
+
+    measures:
+      - name: last_event_timestamp
+        sql: timestamp
+        type: max
+        public: false
+
+  - name: sessions
+    # ...
+
+    dimensions:
+      - name: end_raw
+        sql: "{events.last_event_timestamp}"
+        type: time
+        sub_query: true
+        public: false
+
+      - name: end_at
+        sql: |
+          CASE WHEN {end_raw} + INTERVAL '1 minutes' > {CUBE}.next_session_start_at
+            THEN {CUBE}.next_session_start_at
+            ELSE {end_raw} + INTERVAL '30 minutes'
+          END
+
+      - name: duration_minutes
+        sql: "datediff(minutes, {CUBE}.session_start_at, {end_at})"
+        type: number
+        
+    measures:
+      - name: average_duration_minutes
+        sql: "{duration_minutes}"
+        type: avg
+```
 
 ```javascript title="JavaScript"
 cube("events", {
@@ -463,44 +501,6 @@ cube("sessions", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: events
-    # ...
-
-    measures:
-      - name: last_event_timestamp
-        sql: timestamp
-        type: max
-        public: false
-
-  - name: sessions
-    # ...
-
-    dimensions:
-      - name: end_raw
-        sql: "{events.last_event_timestamp}"
-        type: time
-        sub_query: true
-        public: false
-
-      - name: end_at
-        sql: |
-          CASE WHEN {end_raw} + INTERVAL '1 minutes' > {CUBE}.next_session_start_at
-            THEN {CUBE}.next_session_start_at
-            ELSE {end_raw} + INTERVAL '30 minutes'
-          END
-
-      - name: duration_minutes
-        sql: "datediff(minutes, {CUBE}.session_start_at, {end_at})"
-        type: number
-        
-    measures:
-      - name: average_duration_minutes
-        sql: "{duration_minutes}"
-        type: avg
-```
-
 </CodeGroup>
 
 ## Mapping Sessions to Users
@@ -518,6 +518,28 @@ used later on to join `sessions` to your `users` cube, which could be a cube
 built based on your internal database data for users.
 
 <CodeGroup>
+
+```yaml title="YAML"
+# Create a new file for the `identifies` cube with following content
+cubes:
+  - name: identifies
+    sql: "SELECT distinct user_id, anonymous_id FROM javascript.identifies"
+
+    dimensions:
+      - name: id
+        sql: "user_id || '-' || anonymous_id"
+        type: string
+        primary_key: true
+
+      - name: anonymous_id
+        sql: anonymous_id
+        type: number
+
+      - name: user_id
+        sql: user_id
+        type: number
+        format: id
+```
 
 ```javascript title="JavaScript"
 // Create a new file for the `identifies` cube with following content
@@ -545,34 +567,23 @@ cube(`identifies`, {
 })
 ```
 
-```yaml title="YAML"
-# Create a new file for the `identifies` cube with following content
-cubes:
-  - name: identifies
-    sql: "SELECT distinct user_id, anonymous_id FROM javascript.identifies"
-
-    dimensions:
-      - name: id
-        sql: "user_id || '-' || anonymous_id"
-        type: string
-        primary_key: true
-
-      - name: anonymous_id
-        sql: anonymous_id
-        type: number
-
-      - name: user_id
-        sql: user_id
-        type: number
-        format: id
-```
-
 </CodeGroup>
 
 We need to declare a relationship between `identifies` and `sessions`, where
 session has a `many_to_one` relationship with identity.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    joins:
+      - name: identifies
+        relationship: many_to_one
+        sql: "{identifies.anonymous_id} = {sessions.anonymous_id}"
+```
 
 ```javascript title="JavaScript"
 cube("sessions", {
@@ -585,17 +596,6 @@ cube("sessions", {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    joins:
-      - name: identifies
-        relationship: many_to_one
-        sql: "{identifies.anonymous_id} = {sessions.anonymous_id}"
 ```
 
 </CodeGroup>
@@ -636,6 +636,21 @@ users and the average sessions per user.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ... 
+
+    measures:
+      - name: users_count
+        sql: "{user_id}"
+        type: count_distinct
+
+      - name: average_sessions_per_user
+        sql: "{count}::NUMERIC / NULLIF({users_count}, 0)"
+        type: number
+```
+
 ```javascript title="JavaScript"
 cube("sessions", {
   // ...,
@@ -654,21 +669,6 @@ cube("sessions", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ... 
-
-    measures:
-      - name: users_count
-        sql: "{user_id}"
-        type: count_distinct
-
-      - name: average_sessions_per_user
-        sql: "{count}::NUMERIC / NULLIF({users_count}, 0)"
-        type: number
-```
-
 </CodeGroup>
 
 That was our final step in building a foundation for a sessions data model.
@@ -685,6 +685,18 @@ dimension in the `sessions` cube.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    dimensions:
+      - name: number_events
+        sql: "{events.count}"
+        type: number
+        sub_query: true
+```
+
 ```javascript title="JavaScript"
 cube("sessions", {
   // ...,
@@ -699,18 +711,6 @@ cube("sessions", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    dimensions:
-      - name: number_events
-        sql: "{events.count}"
-        type: number
-        sub_query: true
-```
-
 </CodeGroup>
 
 ### Bounce Rate
@@ -720,6 +720,31 @@ this dimension, we can add two measures to the Sessions cube as well - a count
 of bounced sessions and a bounce rate.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    dimensions:
+      - name: is_bounced
+        type: string
+        case:
+          when: [{ sql: "{number_events} = 1", label: "True" }]
+          else: { label: "False" }
+
+    measures:
+      - name: bounced_count
+        sql: session_id
+        type: count
+        filters:
+          - - sql: "{is_bounced} = 'True'
+
+      - name: bounce_rate
+        sql: "100.00 * {bounced_count} / NULLIF({count}, 0)"
+        type: number
+        format: percent
+```
 
 ```javascript title="JavaScript"
 cube("sessions", {
@@ -755,31 +780,6 @@ cube("sessions", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    dimensions:
-      - name: is_bounced
-        type: string
-        case:
-          when: [{ sql: "{number_events} = 1", label: "True" }]
-          else: { label: "False" }
-
-    measures:
-      - name: bounced_count
-        sql: session_id
-        type: count
-        filters:
-          - - sql: "{is_bounced} = 'True'
-
-      - name: bounce_rate
-        sql: "100.00 * {bounced_count} / NULLIF({count}, 0)"
-        type: number
-        format: percent
-```
-
 </CodeGroup>
 
 ### First Referrer
@@ -788,6 +788,17 @@ We already have this column in place in our base table. We’re just going to
 define a dimension on top of this.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    measures:
+      - name: first_referrer
+        type: string
+        sql: first_referrer
+```
 
 ```javascript title="JavaScript"
 cube("sessions", {
@@ -800,17 +811,6 @@ cube("sessions", {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    measures:
-      - name: first_referrer
-        type: string
-        sql: first_referrer
 ```
 
 </CodeGroup>
@@ -893,6 +893,19 @@ Define a measure on the Events cube to count only `form_submitted` events.
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: events
+    # ...
+
+    # Add this measure to the `events` cube
+    measures:
+      - name: form_submitted_count
+        sql: event_id
+        type: count
+        filters: [{ sql: "{CUBE}.event = 'form_submitted'" }]
+```
+
 ```javascript title="JavaScript"
 cube("events", {
   // ...,
@@ -908,24 +921,24 @@ cube("events", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: events
-    # ...
-
-    # Add this measure to the `events` cube
-    measures:
-      - name: form_submitted_count
-        sql: event_id
-        type: count
-        filters: [{ sql: "{CUBE}.event = 'form_submitted'" }]
-```
-
 </CodeGroup>
 
 Define a dimension `form_submitted_count` on the Sessions using `sub_query`.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    # Add this dimension to the `sessions` cube
+    dimensions:
+      - name: form_submitted_count
+        sql: "{events.form_submitted_count}"
+        type: number
+        sub_query: true
+```
 
 ```javascript title="JavaScript"
 cube("sessions", {
@@ -942,25 +955,25 @@ cube("sessions", {
 })
 ```
 
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    # Add this dimension to the `sessions` cube
-    dimensions:
-      - name: form_submitted_count
-        sql: "{events.form_submitted_count}"
-        type: number
-        sub_query: true
-```
-
 </CodeGroup>
 
 Create a measure to count only sessions where `form_submitted_count` is greater
 than 0.
 
 <CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sessions
+    # ...
+
+    # Add this measure to the `sessions` cube
+    measures:
+      - name: with_form_submitted_count
+        sql: session_id
+        type: count
+        filters: [{ sql: "{form_submitted_count} > 0" }]
+```
 
 ```javascript title="JavaScript"
 cube("sessions", {
@@ -975,19 +988,6 @@ cube("sessions", {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: sessions
-    # ...
-
-    # Add this measure to the `sessions` cube
-    measures:
-      - name: with_form_submitted_count
-        sql: session_id
-        type: count
-        filters: [{ sql: "{form_submitted_count} > 0" }]
 ```
 
 </CodeGroup>

@@ -21,6 +21,43 @@ the `orders` cube, which describes orders in our store. It’s connected to
 
 <CodeGroup>
 
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: users
+        relationship: many_to_one
+        sql: "{CUBE}.user_id = {users.id}"
+
+      - name: products
+        relationship: many_to_one
+        sql: "{CUBE}.product_id = {products.id}"
+
+    measures:
+      - name: count
+        type: count
+        # Here we define all possible properties we might want
+        # to "drill down" on from our front-end
+        drill_members:
+          - id
+          - status
+          - products.name
+          - users.city
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+
+      - name: status
+        sql: status
+        type: string
+```
+
 ```javascript title="JavaScript"
 cube(`orders`, {
   sql_table: `orders`,
@@ -60,43 +97,6 @@ cube(`orders`, {
     }
   }
 })
-```
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    sql_table: orders
-
-    joins:
-      - name: users
-        relationship: many_to_one
-        sql: "{CUBE}.user_id = {users.id}"
-
-      - name: products
-        relationship: many_to_one
-        sql: "{CUBE}.product_id = {products.id}"
-
-    measures:
-      - name: count
-        type: count
-        # Here we define all possible properties we might want
-        # to "drill down" on from our front-end
-        drill_members:
-          - id
-          - status
-          - products.name
-          - users.city
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-        public: true
-
-      - name: status
-        sql: status
-        type: string
 ```
 
 </CodeGroup>
