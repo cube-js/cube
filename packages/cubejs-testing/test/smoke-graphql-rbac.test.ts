@@ -1,11 +1,10 @@
 /**
- * Integration test for GraphQL schema caching per security context.
+ * Integration test for GraphQL schema caching and RBAC enforcement.
  *
- * This test verifies that when different users (with different RBAC roles)
- * make GraphQL requests, they each get a schema appropriate to their
- * access level - not a cached schema from another user.
- *
- * The fix uses `visibilityMaskHash` as the cache key for GraphQL schemas.
+ * This test verifies that:
+ * 1. GraphQL schema is cached (unfiltered) - all users see all fields in schema
+ * 2. RBAC is enforced at query execution time - accessing restricted fields returns empty results
+ *    (same behavior as REST API, per the TODO in smoke-rbac.test.ts)
  */
 
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -20,7 +19,7 @@ import {
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
 } from './smoke-tests';
 
-describe('GraphQL Schema Caching per Security Context', () => {
+describe('GraphQL Schema Caching and RBAC', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
 
@@ -44,12 +43,11 @@ describe('GraphQL Schema Caching per Security Context', () => {
     await birdbox.stop();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-  async function graphqlIntrospection(role: string): Promise<any> {
+  async function graphqlRequest(role: string, query: string): Promise<any> {
     const token = sign({
       auth: { roles: [role] },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
 
-    // apiUrl includes /cubejs-api/v1, but GraphQL is at /cubejs-api/graphql
     const baseUrl = birdbox.configuration.apiUrl.replace('/cubejs-api/v1', '');
     const res = await fetch(`${baseUrl}/cubejs-api/graphql`, {
       method: 'POST',
@@ -57,60 +55,97 @@ describe('GraphQL Schema Caching per Security Context', () => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        query: '{ __type(name: "OrdersMembers") { fields { name } } }',
-      }),
+      body: JSON.stringify({ query }),
     });
     return res.json();
   }
 
-  test('tenant-a sees internalCode but not tier', async () => {
-    const result = await graphqlIntrospection('tenant-a');
-    const fields = result.data?.__type?.fields?.map((f: any) => f.name) || [];
+  test('all roles see the same unfiltered schema', async () => {
+    const introspectionQuery = '{ __type(name: "OrdersMembers") { fields { name } } }';
 
-    expect(fields).toContain('internalCode');
-    expect(fields).not.toContain('tier');
+    const resultA = await graphqlRequest('tenant-a', introspectionQuery);
+    const resultB = await graphqlRequest('tenant-b', introspectionQuery);
+    const resultDefault = await graphqlRequest('default', introspectionQuery);
+
+    const fieldsA = resultA.data?.__type?.fields?.map((f: any) => f.name) || [];
+    const fieldsB = resultB.data?.__type?.fields?.map((f: any) => f.name) || [];
+    const fieldsDefault = resultDefault.data?.__type?.fields?.map((f: any) => f.name) || [];
+
+    // All roles see the same schema with all fields
+    expect(fieldsA).toEqual(fieldsB);
+    expect(fieldsA).toEqual(fieldsDefault);
+    expect(fieldsA).toContain('internalCode');
+    expect(fieldsA).toContain('tier');
   });
 
-  test('tenant-b sees tier but not internalCode', async () => {
-    const result = await graphqlIntrospection('tenant-b');
-    const fields = result.data?.__type?.fields?.map((f: any) => f.name) || [];
+  test('tenant-a can query internalCode but not tier', async () => {
+    // Query allowed field - should return data
+    const allowedResult = await graphqlRequest('tenant-a', `{
+      cube(where: { orders: {} }) {
+        orders { internalCode }
+      }
+    }`);
+    expect(allowedResult.errors).toBeUndefined();
+    expect(allowedResult.data.cube).toHaveLength(1);
+    expect(allowedResult.data.cube[0].orders.internalCode).toBe('secret123');
 
-    expect(fields).toContain('tier');
-    expect(fields).not.toContain('internalCode');
+    // Query restricted field - should return empty results (RBAC denies access)
+    const restrictedResult = await graphqlRequest('tenant-a', `{
+      cube(where: { orders: {} }) {
+        orders { tier }
+      }
+    }`);
+    expect(restrictedResult.errors).toBeUndefined();
+    expect(restrictedResult.data.cube).toEqual([]);
   });
 
-  test('alternating requests maintain correct schemas', async () => {
-    // Request A -> B -> A -> B to verify caching works correctly
-    const resultA1 = await graphqlIntrospection('tenant-a');
-    const resultB1 = await graphqlIntrospection('tenant-b');
-    const resultA2 = await graphqlIntrospection('tenant-a');
-    const resultB2 = await graphqlIntrospection('tenant-b');
+  test('tenant-b can query tier but not internalCode', async () => {
+    // Query allowed field - should return data
+    const allowedResult = await graphqlRequest('tenant-b', `{
+      cube(where: { orders: {} }) {
+        orders { tier }
+      }
+    }`);
+    expect(allowedResult.errors).toBeUndefined();
+    expect(allowedResult.data.cube).toHaveLength(1);
+    expect(allowedResult.data.cube[0].orders.tier).toBe('premium');
 
-    const fieldsA1 = resultA1.data?.__type?.fields?.map((f: any) => f.name) || [];
-    const fieldsB1 = resultB1.data?.__type?.fields?.map((f: any) => f.name) || [];
-    const fieldsA2 = resultA2.data?.__type?.fields?.map((f: any) => f.name) || [];
-    const fieldsB2 = resultB2.data?.__type?.fields?.map((f: any) => f.name) || [];
-
-    // A should always see internalCode, never tier
-    expect(fieldsA1).toContain('internalCode');
-    expect(fieldsA1).not.toContain('tier');
-    expect(fieldsA2).toEqual(fieldsA1);
-
-    // B should always see tier, never internalCode
-    expect(fieldsB1).toContain('tier');
-    expect(fieldsB1).not.toContain('internalCode');
-    expect(fieldsB2).toEqual(fieldsB1);
+    // Query restricted field - should return empty results (RBAC denies access)
+    const restrictedResult = await graphqlRequest('tenant-b', `{
+      cube(where: { orders: {} }) {
+        orders { internalCode }
+      }
+    }`);
+    expect(restrictedResult.errors).toBeUndefined();
+    expect(restrictedResult.data.cube).toEqual([]);
   });
 
-  test('default role sees neither internalCode nor tier', async () => {
-    const result = await graphqlIntrospection('default');
-    const fields = result.data?.__type?.fields?.map((f: any) => f.name) || [];
+  test('default role cannot query internalCode or tier', async () => {
+    // Both restricted fields should return empty results
+    const result1 = await graphqlRequest('default', `{
+      cube(where: { orders: {} }) {
+        orders { internalCode }
+      }
+    }`);
+    expect(result1.errors).toBeUndefined();
+    expect(result1.data.cube).toEqual([]);
 
-    expect(fields).not.toContain('internalCode');
-    expect(fields).not.toContain('tier');
-    // Should still see basic fields
-    expect(fields).toContain('count');
-    expect(fields).toContain('amount');
+    const result2 = await graphqlRequest('default', `{
+      cube(where: { orders: {} }) {
+        orders { tier }
+      }
+    }`);
+    expect(result2.errors).toBeUndefined();
+    expect(result2.data.cube).toEqual([]);
+
+    // But basic fields should work and return data
+    const basicResult = await graphqlRequest('default', `{
+      cube(where: { orders: {} }) {
+        orders { count }
+      }
+    }`);
+    expect(basicResult.errors).toBeUndefined();
+    expect(basicResult.data.cube).toHaveLength(1);
+    expect(basicResult.data.cube[0].orders.count).toBeDefined();
   });
 });

@@ -19,6 +19,7 @@ import {
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
+import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
@@ -124,6 +125,8 @@ export class CompilerApi {
 
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
+  protected graphqlSchema?: GraphQLSchema;
+
   protected compilers?: Promise<Compiler>;
 
   protected compilerVersion?: string;
@@ -190,6 +193,15 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
+    this.graphqlSchema = undefined;
+  }
+
+  public setGraphQLSchema(schema: GraphQLSchema): void {
+    this.graphqlSchema = schema;
+  }
+
+  public getGraphQLSchema(): GraphQLSchema | undefined {
+    return this.graphqlSchema;
   }
 
   public createNativeInstance(): NativeInstance {
@@ -947,11 +959,20 @@ export class CompilerApi {
 
   public async metaConfig(
     requestContext: Context,
-    options: { includeCompilerId?: boolean; requestId?: string } = {}
+    options: { includeCompilerId?: boolean; skipVisibilityPatch?: boolean; requestId?: string } = {}
   ): Promise<any> {
-    const { includeCompilerId, ...restOptions } = options;
+    const { includeCompilerId, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     const { cubes } = compilers.metaTransformer;
+
+    // When skipVisibilityPatch is true, return raw cubes without RBAC filtering
+    if (skipVisibilityPatch) {
+      if (includeCompilerId) {
+        return { cubes, compilerId: compilers.compilerId };
+      }
+      return cubes;
+    }
+
     const { visibilityMaskHash, cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,

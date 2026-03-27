@@ -291,12 +291,16 @@ class ApiGateway {
 
         const compilerApi = await this.getCompilerApi(req.context);
 
-        // Regenerate schema on every request to respect RBAC visibility
-        let metaConfig = await compilerApi.metaConfig(req.context, {
-          requestId: req.context.requestId,
-        });
-        metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
-        const schema = makeSchema(metaConfig);
+        // Cache unfiltered schema - RBAC enforcement happens at query execution time
+        let schema = compilerApi.getGraphQLSchema();
+        if (!schema) {
+          const metaConfig = await compilerApi.metaConfig(req.context, {
+            requestId: req.context.requestId,
+            skipVisibilityPatch: true,
+          });
+          schema = makeSchema(metaConfig);
+          compilerApi.setGraphQLSchema(schema);
+        }
         return graphqlHTTP({
           schema,
           context: {
