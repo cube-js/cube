@@ -200,7 +200,7 @@ export class CompilerApi {
     this.graphqlSchema = schema;
   }
 
-  public getGraphQLSchema(): GraphQLSchema | undefined {
+  public getGraphQLSchema(): GraphQLSchema {
     return this.graphqlSchema;
   }
 
