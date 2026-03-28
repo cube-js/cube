@@ -719,6 +719,11 @@ export default class ResultSet<T extends Record<string, any> = any> {
    * ```
    */
   public chartPivot(pivotConfig?: PivotConfig): ChartPivotRow[] {
+	
+    if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
+      throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
+    }
+
     const validate = (value: string) => {
       if (this.parseDateMeasures && LocalDateRegex.test(value)) {
         return new Date(value);
@@ -779,6 +784,10 @@ export default class ResultSet<T extends Record<string, any> = any> {
    * @returns An array of pivoted rows
    */
   public tablePivot(pivotConfig?: PivotConfig): Array<{ [key: string]: string | number | boolean }> {
+    if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
+      throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
+    }
+
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
 
