@@ -34,6 +34,12 @@ def transform_alert_boxes(content: str) -> str:
     for nextra, mintlify in replacements.items():
         content = content.replace(f"<{nextra}>", f"<{mintlify}>")
         content = content.replace(f"</{nextra}>", f"</{mintlify}>")
+        # Also handle tags with attributes: <InfoBox heading="..."> -> <Info>
+        content = re.sub(
+            rf"<{nextra}\s+[^>]*>",
+            f"<{mintlify}>",
+            content,
+        )
     return content
 
 

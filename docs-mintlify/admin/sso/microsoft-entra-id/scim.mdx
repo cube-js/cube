@@ -1,0 +1,124 @@
+---
+title: SCIM provisioning with Microsoft Entra ID
+description: With SCIM (System for Cross-domain Identity Management) enabled, you can automate user provisioning in Cube and keep user groups synchronized with Microsoft...
+---
+
+# SCIM provisioning with Microsoft Entra ID
+
+With SCIM (System for Cross-domain Identity Management) enabled, you can
+automate user provisioning in Cube and keep user groups synchronized
+with Microsoft Entra ID (formerly Azure Active Directory).
+
+<Info>
+
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</Info>
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- Microsoft Entra SAML authentication already configured. If not, complete
+  the [SAML setup][ref-saml] first.
+- Admin permissions in Cube.
+- Sufficient permissions in Microsoft Entra to manage Enterprise Applications.
+
+## Enable SCIM provisioning in Cube
+
+Before configuring SCIM in Microsoft Entra, you need to enable SCIM
+provisioning in Cube:
+
+1. In Cube, navigate to **Admin → Settings**.
+2. In the **SAML** section, enable **SCIM Provisioning**.
+
+## Generate an API key in Cube
+
+To allow Entra ID to communicate with Cube via SCIM, you'll need to
+create a dedicated API key:
+
+1. In Cube, navigate to **Settings → API Keys**.
+2. Create a new API key. Give it a descriptive name such as **Entra SCIM**.
+3. Copy the generated key and store it securely — you'll need it in the
+   next step.
+
+## Set up provisioning in Microsoft Entra
+
+This section assumes you already have a Cube Enterprise Application
+in Microsoft Entra. If you haven't created one yet, follow the
+[SAML setup guide][ref-saml] first.
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com).
+2. Go to **Applications → Enterprise Applications** and open your
+   Cube application.
+3. Navigate to **Manage → Provisioning**.
+4. Set the **Provisioning Mode** to **Automatic**.
+5. Under **Admin Credentials**, fill in the following:
+   - **Tenant URL** — Your Cube deployment URL with `/api/scim/v2`
+     appended. For example: `https://your-deployment.cubecloud.dev/api/scim/v2`
+   - **Secret Token** — The API key you generated in the previous step.
+6. Click **Test Connection** to verify that Entra ID can reach
+   Cube. Proceed once the test is successful.
+
+## Configure attribute mappings
+
+Next, configure which user and group attributes are synchronized with
+Cube:
+
+1. In the **Mappings** section, select the object type you want to
+   configure — either users or groups.
+2. Remove all default attribute mappings **except** the following:
+   - **For users**: keep `userName`, `displayName` and `active`.
+   - **For groups**: keep `displayName` and `members`.
+3. Click **Save**.
+
+<Info>
+
+Users provisioned via SCIM will receive the Explorer role.
+To grant admin permissions, update the user's role manually in
+Cube under **Team & Security**.
+
+</Info>
+
+## Syncing user attributes
+
+You can sync [user attributes][ref-user-attributes] from Microsoft Entra to
+Cube via SCIM, allowing you to centralize user management in Entra.
+
+### Create a user attribute in Cube
+
+In Cube, navigate to **Admin → Settings → User Attributes** and
+create a new attribute. Take note of the attribute **reference** name — you will
+need it when configuring Entra.
+
+### Create an Entra user attribute
+
+1. In the [Microsoft Entra admin center](https://entra.microsoft.com), navigate
+   to **Applications → Enterprise Applications** and open your Cube
+   application.
+2. Go to **Manage → Provisioning → Mappings**.
+3. Select the user mapping you want to add the attribute to.
+4. At the bottom of the page, select **Show advanced options**.
+5. Select **Edit attribute list for customappsso**.
+6. Add a new attribute with the following settings:
+   - **Name** — The reference of the attribute you created in Cube,
+     prefixed with `urn:cube:params:1.0:UserAttribute:`.
+     For example, for an attribute with the reference `country`, enter
+     `urn:cube:params:1.0:UserAttribute:country`.
+   - **Type** — Select the matching type (`string` or `integer`).
+7. Save the changes.
+
+### Create attribute mapping
+
+1. After saving, click **Yes** when prompted.
+2. In the **Attribute Mapping** page, click **Add New Mapping**.
+3. In the **Target attribute** dropdown, select the attribute you created
+   in the previous step.
+4. Configure the source mapping to the appropriate Entra field.
+5. Click **OK**, then **Save**.
+
+The next time the Entra application syncs, the attribute values will be
+provisioned as [user attributes][ref-user-attributes] in Cube.
+
+[ref-saml]: /access-security/sso/microsoft-entra-id/saml
+[ref-user-attributes]: /access-security/users-and-permissions/user-attributes

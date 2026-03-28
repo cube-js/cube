@@ -1,0 +1,118 @@
+---
+title: SAML authentication with Microsoft Entra ID
+description: With SAML (Security Assertion Markup Language) enabled, you can authenticate users in Cube through Microsoft Entra ID (formerly Azure Active Directory),...
+---
+
+# SAML authentication with Microsoft Entra ID
+
+With SAML (Security Assertion Markup Language) enabled, you can authenticate
+users in Cube through Microsoft Entra ID (formerly Azure Active Directory),
+allowing your team to access Cube using single sign-on.
+
+<Info>
+
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</Info>
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- Admin permissions in Cube.
+- Sufficient permissions in Microsoft Entra to create and configure
+  Enterprise Applications.
+
+## Enable SAML in Cube
+
+First, enable SAML authentication in Cube:
+
+1. In Cube, navigate to **Admin → Settings**.
+2. On the **Authentication & SSO** tab, enable the **SAML**
+   toggle.
+3. Take note of the **Single Sign-On URL** and **Audience**
+   values — you'll need them when configuring the Enterprise Application
+   in Entra.
+
+## Create an Enterprise Application in Entra
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com).
+2. Go to [Enterprise Applications](https://portal.azure.com/#view/Microsoft_AAD_IAM/StartboardApplicationsMenuBlade/~/AppAppsPreview)
+   and click **New application**.
+3. Select **Create your own application**.
+4. Give it a name and choose a **non-gallery application**, then click
+   **Create**.
+
+## Configure SAML in Entra
+
+1. In your new Enterprise Application, go to the **Single sign-on**
+   section and select **SAML**.
+2. In the **Basic SAML Configuration** section, enter the following:
+   - **Entity ID** — Use the **Single Sign-On URL** value from Cube.
+   - **Reply URL** — Use the **Single Sign-On URL** value from Cube.
+3. Go to **Attributes & Claims → Edit → Advanced settings** and
+   set the audience claim override to the **Audience** value from Cube.
+4. Go to **SAML Certificates → Edit** and select **Sign SAML
+   response and assertion** for the **Signing Option**.
+5. Download the **Federation Metadata XML** file — you'll need it
+   in the next step.
+
+## Complete configuration in Cube
+
+Return to the SAML configuration page in Cube and provide the identity
+provider details. You can do this in one of two ways:
+
+**Option A: Upload metadata file**
+
+1. In the **Import IdP Metadata** section, click **Upload
+   Metadata File**.
+2. Select the **Federation Metadata XML** file you downloaded from Entra.
+   This will automatically populate the **Entity ID / Issuer**,
+   **SSO (Sign on) URL**, and **Certificate** fields.
+
+**Option B: Enter details manually**
+
+If you prefer to configure the fields manually, enter the following
+values from the Entra **Single sign-on** page:
+
+- **Entity ID / Issuer** — Use the **Microsoft Entra Identifier**
+  value.
+- **SSO (Sign on) URL** — Use the **Login URL** value.
+- **Certificate** — Paste the Base64-encoded certificate from the
+  **SAML Certificates** section.
+
+## Configure attribute mappings
+
+To map user attributes from Entra to Cube, configure the claim URIs
+in the SAML settings:
+
+- Enter the claim URI that corresponds to the user's email address in
+  the **Email** attribute field. Common values:
+  - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`
+  - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name`
+- To map a role attribute from Entra to an identically-named role
+  defined in Cube, add the corresponding claim URI to the
+  **Role** field.
+- You can also map the user's display name in the same manner.
+
+<Info>
+
+Admin status cannot be set via SSO. To grant admin permissions, update
+the user's role manually in Cube under **Team & Security**.
+
+</Info>
+
+## Assign users
+
+Make sure the new Enterprise Application is assigned to the relevant
+users or groups in Entra before testing.
+
+## Test the integration
+
+1. In the Entra **Single sign-on** section, click **Test**
+   to verify the SAML integration works for your Cube account.
+2. Alternatively, copy the **Single Sign-On URL** from Cube,
+   open it in a new browser tab, and verify you are redirected to
+   Entra for authentication and then back to Cube.
+
+[ext-ms-entra-id]: https://www.microsoft.com/en-us/security/business/identity-access/microsoft-entra-id
