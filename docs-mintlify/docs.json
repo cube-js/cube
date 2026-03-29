@@ -33,28 +33,6 @@
                 ]
               },
               {
-                "group": "Cube Cloud & Snowflake",
-                "pages": [
-                  "docs/getting-started/cloud",
-                  "docs/getting-started/cloud/load-data",
-                  "docs/getting-started/cloud/connect-to-snowflake",
-                  "docs/getting-started/cloud/create-data-model",
-                  "docs/getting-started/cloud/query-from-bi",
-                  "docs/getting-started/cloud/query-from-react-app"
-                ]
-              },
-              {
-                "group": "Cube Cloud & Databricks",
-                "pages": [
-                  "docs/getting-started/databricks",
-                  "docs/getting-started/databricks/load-data",
-                  "docs/getting-started/databricks/connect-to-databricks",
-                  "docs/getting-started/databricks/create-data-model",
-                  "docs/getting-started/databricks/query-from-bi",
-                  "docs/getting-started/databricks/query-from-react-app"
-                ]
-              },
-              {
                 "group": "Migrate from Cube Core",
                 "pages": [
                   "docs/getting-started/migrate-from-core",
@@ -68,10 +46,43 @@
             ]
           },
           {
+            "group": "Explore & Analyze",
+            "pages": [
+              {
+                "group": "Workbooks",
+                "pages": [
+                  "analytics/workbooks",
+                  "analytics/workbooks/querying-data",
+                  "analytics/workbooks/source-sql-tabs",
+                  "analytics/workbooks/charts"
+                ]
+              },
+              "analytics/explore",
+              "analytics/analytics-chat"
+            ]
+          },
+          {
+            "group": "Present & Share",
+            "pages": [
+              "analytics/dashboards",
+              "analytics/scheduled-refreshes",
+              "analytics/notifications"
+            ]
+          },
+          {
             "group": "Data Modeling",
             "pages": [
               "docs/data-modeling/overview",
-              "docs/data-modeling/data-access-policies",
+              {
+                "group": "Access Control",
+                "pages": [
+                  "access-security/access-control/index",
+                  "docs/data-modeling/data-access-policies",
+                  "access-security/access-control/row-level-security",
+                  "access-security/access-control/member-level-security",
+                  "access-security/access-control/context"
+                ]
+              },
               {
                 "group": "Concepts",
                 "pages": [
@@ -154,7 +165,6 @@
               "docs/caching/matching-pre-aggregations",
               "docs/caching/refreshing-pre-aggregations",
               "docs/caching/lambda-pre-aggregations",
-              "docs/caching/running-in-production",
               {
                 "group": "Recipes",
                 "pages": [
@@ -172,7 +182,14 @@
             "group": "Integrations",
             "pages": [
               "docs/integrations/tableau",
-              "docs/integrations/power-bi",
+              {
+                "group": "Power BI",
+                "pages": [
+                  "docs/integrations/power-bi",
+                  "access-security/authentication/kerberos",
+                  "access-security/authentication/ntlm"
+                ]
+              },
               "docs/integrations/microsoft-excel",
               "docs/integrations/google-sheets",
               "docs/integrations/snowflake-semantic-views",
@@ -185,59 +202,17 @@
                   "docs/integrations/semantic-layer-sync/preset",
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
-              }
-            ]
-          },
-          {
-            "group": "Explore & Analyze",
-            "pages": [
-              {
-                "group": "Workbooks",
-                "pages": [
-                  "analytics/workbooks",
-                  "analytics/workbooks/querying-data",
-                  "analytics/workbooks/source-sql-tabs",
-                  "analytics/workbooks/charts"
-                ]
               },
-              "analytics/explore",
-              "analytics/analytics-chat"
+              "api-reference/mcp-server"
             ]
-          },
-          {
-            "group": "Present & Share",
-            "pages": [
-              "analytics/dashboards",
-              "analytics/scheduled-refreshes",
-              "analytics/notifications"
-            ]
-          },
+          }
         ]
       },
       {
         "tab": "Admin",
         "groups": [
           {
-            "group": "Configuration",
-            "pages": [
-              "admin/configuration/reference/environment-variables",
-              "admin/configuration/reference/config",
-              "admin/configuration/multitenancy",
-              "admin/configuration/concurrency",
-              "admin/configuration/multiple-data-sources",
-              {
-                "group": "Recipes",
-                "pages": [
-                  "admin/configuration/recipes/environment-variables",
-                  "admin/configuration/recipes/using-ssl-connections-to-data-source",
-                  "admin/configuration/recipes/multiple-sources-same-schema",
-                  "admin/configuration/recipes/custom-data-model-per-tenant"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "Configuration",
+            "group": "Data Sources",
             "pages": [
               "admin/configuration",
               {
@@ -275,14 +250,6 @@
               },
               "admin/configuration/multiple-data-sources",
               "admin/configuration/concurrency",
-              "admin/configuration/multitenancy",
-              {
-                "group": "Reference",
-                "pages": [
-                  "admin/configuration/reference/environment-variables",
-                  "admin/configuration/reference/config"
-                ]
-              },
               {
                 "group": "Recipes",
                 "pages": [
@@ -291,6 +258,37 @@
                   "admin/configuration/recipes/data-store-cost-saving-guide",
                   "admin/configuration/recipes/multiple-sources-same-schema",
                   "admin/configuration/recipes/custom-data-model-per-tenant"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Users & Permissions",
+            "pages": [
+              "admin/users-and-permissions",
+              "admin/users-and-permissions/roles-and-permissions",
+              "admin/users-and-permissions/user-attributes",
+              "admin/users-and-permissions/user-groups",
+              "admin/users-and-permissions/custom-roles"
+            ]
+          },
+          {
+            "group": "SSO & Identity Providers",
+            "pages": [
+              "admin/sso/index",
+              "admin/sso/google-workspace",
+              {
+                "group": "Microsoft Entra ID",
+                "pages": [
+                  "admin/sso/microsoft-entra-id/saml",
+                  "admin/sso/microsoft-entra-id/scim"
+                ]
+              },
+              {
+                "group": "Okta",
+                "pages": [
+                  "admin/sso/okta/saml",
+                  "admin/sso/okta/scim"
                 ]
               }
             ]
@@ -393,39 +391,7 @@
               "admin/ai/memory-isolation"
             ]
           },
-          {
-            "group": "SSO & Identity Providers",
-            "pages": [
-              "admin/sso",
-              "admin/sso/google-workspace",
-              {
-                "group": "Microsoft Entra ID",
-                "pages": [
-                  "admin/sso/microsoft-entra-id",
-                  "admin/sso/microsoft-entra-id/saml",
-                  "admin/sso/microsoft-entra-id/scim"
-                ]
-              },
-              {
-                "group": "Okta",
-                "pages": [
-                  "admin/sso/okta",
-                  "admin/sso/okta/saml",
-                  "admin/sso/okta/scim"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "Users & Permissions",
-            "pages": [
-              "admin/users-and-permissions",
-              "admin/users-and-permissions/roles-and-permissions",
-              "admin/users-and-permissions/user-attributes",
-              "admin/users-and-permissions/user-groups",
-              "admin/users-and-permissions/custom-roles"
-            ]
-          },
+         
           {
             "group": "Account & Workspace",
             "pages": [
@@ -467,12 +433,33 @@
               "embedding/react-embed-sdk",
               "embedding/vizard"
             ]
+          },
+          {
+            "group": "Using Core Data APIs",
+            "pages": [
+              {
+                "group": "Authentication",
+                "pages": [
+                  "access-security/authentication/jwt",
+                  "access-security/authentication/auth0",
+                  "access-security/authentication/aws-cognito"
+                ]
+              },
+              "cube-core/configuration/multitenancy"
+            ]
           }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Reference",
         "groups": [
+          {
+            "group": "Configuration Reference",
+            "pages": [
+              "admin/configuration/reference/environment-variables",
+              "admin/configuration/reference/config"
+            ]
+          },
           {
             "group": "Core Data APIs",
             "pages": [
@@ -533,8 +520,7 @@
                   "api-reference/orchestration-api/dagster",
                   "api-reference/orchestration-api/prefect"
                 ]
-              },
-              "api-reference/mcp-server"
+              }
             ]
           },
           {
@@ -554,17 +540,6 @@
                   "api-reference/javascript-sdk/reference/cubejs-client-ws-transport"
                 ]
               }
-            ]
-          },
-          {
-            "group": "API Recipes",
-            "pages": [
-              "api-reference/recipes/getting-unique-values-for-a-field",
-              "api-reference/recipes/cast-numerics",
-              "api-reference/recipes/sorting",
-              "api-reference/recipes/pagination",
-              "api-reference/recipes/drilldowns",
-              "api-reference/recipes/real-time-data-fetch"
             ]
           }
         ]
@@ -586,73 +561,19 @@
           {
             "group": "Deployment",
             "pages": [
-              "cube-core/deployment"
+              "cube-core/deployment",
+              "cube-core/running-in-production"
             ]
           },
           {
-            "group": "Configuration",
+            "group": "API Recipes",
             "pages": [
-              "cube-core/configuration/environment-variables",
-              "cube-core/configuration/config",
-              "cube-core/configuration/multitenancy",
-              "cube-core/configuration/concurrency",
-              "cube-core/configuration/multiple-data-sources"
-            ]
-          },
-          {
-            "group": "Authentication",
-            "pages": [
-              "cube-core/authentication/context",
-              "cube-core/authentication/jwt",
-              "cube-core/authentication/auth0",
-              "cube-core/authentication/aws-cognito"
-            ]
-          },
-          {
-            "group": "Migrate to Cube Cloud",
-            "pages": [
-              "cube-core/migrate-from-core",
-              "cube-core/migrate-from-core/upload-with-cli",
-              "cube-core/migrate-from-core/import-github-repository",
-              "cube-core/migrate-from-core/import-gitlab-repository-via-ssh",
-              "cube-core/migrate-from-core/import-git-repository-via-ssh",
-              "cube-core/migrate-from-core/import-bitbucket-repository-via-ssh"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Access & Security",
-        "groups": [
-          {
-            "group": "Authentication",
-            "pages": [
-              "access-security/access-control/context",
-              "access-security/authentication/jwt",
-              "access-security/authentication/auth0",
-              "access-security/authentication/aws-cognito"
-            ]
-          },
-          {
-            "group": "Access Control",
-            "pages": [
-              "access-security/access-control",
-              "access-security/access-control/row-level-security",
-              "access-security/access-control/member-level-security",
-              "access-security/access-control/context"
-            ]
-          },
-          {
-            "group": "Authentication",
-            "pages": [
-              "access-security/authentication",
-              "access-security/authentication/name-password",
-              "access-security/authentication/kerberos",
-              "access-security/authentication/ntlm",
-              "access-security/authentication/identity-provider",
-              "access-security/authentication/jwt",
-              "access-security/authentication/auth0",
-              "access-security/authentication/aws-cognito"
+              "api-reference/recipes/getting-unique-values-for-a-field",
+              "api-reference/recipes/cast-numerics",
+              "api-reference/recipes/sorting",
+              "api-reference/recipes/pagination",
+              "api-reference/recipes/drilldowns",
+              "api-reference/recipes/real-time-data-fetch"
             ]
           }
         ]
