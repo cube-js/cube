@@ -2683,4 +2683,57 @@ describe('Class unit tests', () => {
     const re = new RegExp('(b__aid).*(b__bval_sum).*(b__count).*');
     expect(re.test(sql[0])).toBeTruthy();
   });
+
+  describe('SECURITY_CONTEXT unsafeValue with nested properties', () => {
+    // language=JavaScript
+    const securityContextCompilers = prepareJsCompiler(`
+      cube(\`orders\`, {
+        sql: \`SELECT * FROM \${SECURITY_CONTEXT.cubeCloud.groups.unsafeValue() === 'admin' ? 'admin_orders' : 'public_orders'}\`,
+
+        measures: {
+          count: {
+            type: 'count',
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: 'id',
+            type: 'number',
+            primaryKey: true,
+          },
+        },
+      });
+    `);
+
+    it('should resolve nested unsafeValue to leaf value, not parent object', async () => {
+      await securityContextCompilers.compiler.compile();
+
+      const query = new PostgresQuery(securityContextCompilers, {
+        measures: ['orders.count'],
+        timeDimensions: [],
+        contextSymbols: {
+          securityContext: { cubeCloud: { groups: 'admin' } }
+        }
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('admin_orders');
+      expect(sql).not.toContain('public_orders');
+    });
+
+    it('should resolve nested unsafeValue to non-matching leaf value', async () => {
+      await securityContextCompilers.compiler.compile();
+
+      const query = new PostgresQuery(securityContextCompilers, {
+        measures: ['orders.count'],
+        timeDimensions: [],
+        contextSymbols: {
+          securityContext: { cubeCloud: { groups: 'viewer' } }
+        }
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('public_orders');
+      expect(sql).not.toContain('admin_orders');
+    });
+  });
 });

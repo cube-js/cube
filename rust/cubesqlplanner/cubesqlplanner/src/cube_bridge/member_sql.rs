@@ -519,7 +519,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             )?;
             result.set_field(
                 "unsafeValue",
-                Self::security_context_unsafe_value_fn(inner_context, target.clone())?,
+                Self::security_context_unsafe_value_fn(inner_context, property_value.clone())?,
             )?;
             let result = NativeObjectHandle::new(result.into_object());
             Ok(Some(result))
