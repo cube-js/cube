@@ -880,9 +880,9 @@ describe('SQL Generation', () => {
           if (q.measures[0].includes('count')) {
             expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
-            expect(queryString.includes('- interval \'2 day\'')).toBeTruthy();
+            expect(queryString.includes('- interval \'2 days\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
-            expect(queryString.includes('+ interval \'3 day\'')).toBeTruthy();
+            expect(queryString.includes('+ interval \'3 days\'')).toBeTruthy();
           }
         });
       });

@@ -54,7 +54,7 @@ export class PostgresQuery extends BaseQuery {
       delete parsed.quarter;
     }
     const normalized = Object.entries(parsed)
-      .map(([unit, value]) => `${value} ${unit}`)
+      .map(([unit, value]) => `${value} ${unit}${value !== 1 ? 's' : ''}`)
       .join(' ');
     return `'${normalized}'`;
   }
