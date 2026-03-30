@@ -53,10 +53,12 @@ impl SqlNode for TimeDimensionNode {
                         );
                     }
 
-                    let converted_tz = if self
-                        .dimensions_with_ignored_timezone
-                        .contains(&ev.full_name())
-                    {
+                    let skip_convert_tz = query_tools.convert_tz_for_raw_time_dimension()
+                        || self
+                            .dimensions_with_ignored_timezone
+                            .contains(&ev.full_name());
+
+                    let converted_tz = if skip_convert_tz {
                         input_sql
                     } else {
                         templates.convert_tz(input_sql)?
@@ -67,6 +69,15 @@ impl SqlNode for TimeDimensionNode {
                     input_sql
                 };
                 Ok(res)
+            }
+            MemberSymbol::Dimension(ev) => {
+                if query_tools.convert_tz_for_raw_time_dimension()
+                    && ev.dimension_type() == "time"
+                {
+                    Ok(templates.convert_tz(input_sql)?)
+                } else {
+                    Ok(input_sql)
+                }
             }
             _ => Ok(input_sql),
         }

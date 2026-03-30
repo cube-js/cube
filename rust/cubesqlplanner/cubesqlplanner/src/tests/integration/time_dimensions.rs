@@ -376,16 +376,15 @@ async fn test_convert_tz_for_raw_time_dimensions() {
         order:
           - id: orders.created_at
         timezone: \"America/Los_Angeles\"
+        convert_tz_for_raw_time_dimension: true
     "};
 
-    let sql = ctx.build_sql(query).unwrap();
-    println!("{}", sql);
+    ctx.build_sql(query).unwrap();
 
     if let Some(result) = ctx
         .try_execute_pg(query, "integration_basic_tables.sql")
         .await
     {
-        println!("{}", result);
-        //insta::assert_snapshot!(result);
+        insta::assert_snapshot!(result);
     }
 }
