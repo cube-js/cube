@@ -109,6 +109,14 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        revenueRollingQuarter: {
+          type: 'sum',
+          sql: 'amount',
+          rollingWindow: {
+            trailing: '2 quarters',
+            offset: 'start'
+          }
+        },
         revenueRollingThreeDay: {
           type: 'sum',
           sql: 'amount',
@@ -1141,6 +1149,48 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_rolling: '900' },
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling: null },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
+  ]));
+
+  it('rolling quarter', async () => runQueryTest({
+    measures: [
+      'visitors.revenueRolling'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'quarter',
+      dateRange: ['2016-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_quarter: '2016-01-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-04-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-07-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-10-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling: null }
+  ]));
+
+  it('rolling over 2 quarters', async () => runQueryTest({
+    measures: [
+      'visitors.revenueRollingQuarter'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'quarter',
+      dateRange: ['2016-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_quarter: '2016-01-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-04-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-07-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-10-01T00:00:00.000Z', visitors__revenue_rolling_quarter: '500' },
+    { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling_quarter: '500' }
   ]));
 
   if (getEnv('nativeSqlPlanner')) {
