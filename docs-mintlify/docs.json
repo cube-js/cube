@@ -24,7 +24,6 @@
               {
                 "group": "Getting Started",
                 "pages": [
-                  "docs/getting-started",
                   "docs/getting-started/connect-your-data",
                   "docs/getting-started/use-analytics-chat",
                   "docs/getting-started/create-workbooks-and-dashboards",
@@ -157,7 +156,7 @@
             ]
           },
           {
-            "group": "Caching",
+            "group": "Pre-aggregations",
             "pages": [
               "docs/caching",
               "docs/caching/getting-started-pre-aggregations",
@@ -463,8 +462,7 @@
           {
             "group": "Core Data APIs",
             "pages": [
-              "api-reference",
-              "api-reference/core-data-apis",
+              "api-reference/core-data-apis/index",
               "api-reference/core-data-apis/queries",
               {
                 "group": "SQL API",
@@ -503,7 +501,7 @@
           {
             "group": "Embed APIs",
             "pages": [
-              "api-reference/embed-apis",
+              "api-reference/embed-apis/index",
               "api-reference/embed-apis/chat-api",
               "api-reference/embed-apis/generate-session"
             ]
