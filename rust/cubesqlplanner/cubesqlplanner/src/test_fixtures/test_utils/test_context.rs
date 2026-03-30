@@ -28,7 +28,7 @@ pub struct TestContext {
 
 impl TestContext {
     pub fn new(schema: MockSchema) -> Result<Self, CubeError> {
-        Self::new_with_options(schema, Tz::UTC, None, None, false)
+        Self::new_with_options(schema, Tz::UTC, None, None, false, false)
     }
 
     #[allow(dead_code)]
@@ -47,6 +47,7 @@ impl TestContext {
             Rc::new(base_tools),
             join_graph,
             Some(Tz::UTC.to_string()),
+            false,
             false,
             None,
             None,
@@ -70,14 +71,14 @@ impl TestContext {
 
     #[allow(dead_code)]
     pub fn new_with_timezone(schema: MockSchema, timezone: Tz) -> Result<Self, CubeError> {
-        Self::new_with_options(schema, timezone, None, None, false)
+        Self::new_with_options(schema, timezone, None, None, false, false)
     }
 
     pub fn new_with_masked_members(
         schema: MockSchema,
         masked_members: Vec<String>,
     ) -> Result<Self, CubeError> {
-        Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false)
+        Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false, false)
     }
 
     fn for_options(&self, options: &dyn BaseQueryOptions) -> Result<Self, CubeError> {
@@ -94,6 +95,7 @@ impl TestContext {
             static_data.masked_members.clone(),
             static_data.member_to_alias.clone(),
             static_data.export_annotated_sql,
+            static_data.convert_tz_for_raw_time_dimension.unwrap_or(false),
         )
     }
 
@@ -103,6 +105,7 @@ impl TestContext {
         masked_members: Option<Vec<String>>,
         member_to_alias: Option<std::collections::HashMap<String, String>>,
         export_annotated_sql: bool,
+        convert_tz_for_raw_time_dimension: bool,
     ) -> Result<Self, CubeError> {
         let base_tools = schema.create_base_tools_with_timezone(timezone.to_string())?;
         let join_graph = Rc::new(schema.create_join_graph()?);
@@ -117,6 +120,7 @@ impl TestContext {
             join_graph,
             Some(timezone.to_string()),
             export_annotated_sql,
+            convert_tz_for_raw_time_dimension,
             masked_members,
             member_to_alias,
         )?;
@@ -343,6 +347,7 @@ impl TestContext {
                         .unwrap_or(false),
                 )
                 .pre_aggregation_id(yaml_options.pre_aggregation_id)
+                .convert_tz_for_raw_time_dimension(yaml_options.convert_tz_for_raw_time_dimension)
                 .member_to_alias(yaml_options.member_to_alias)
                 .masked_members(yaml_options.masked_members)
                 .timezone(yaml_options.timezone)
@@ -447,7 +452,7 @@ impl TestContext {
             let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
             let yaml = Self::build_pre_agg_query_yaml(pre_agg);
 
-            let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false)
+            let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
                 .expect("Failed to create pre-agg context");
 
             let (raw_sql, _) = pa_ctx

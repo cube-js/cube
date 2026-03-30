@@ -30,6 +30,7 @@ pub struct QueryTools {
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     evaluator_compiler: Rc<RefCell<Compiler>>,
     timezone: Tz,
+    convert_tz_for_raw_time_dimension: bool,
     masked_members: HashSet<String>,
 }
 
@@ -41,6 +42,7 @@ impl QueryTools {
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
         export_annotated_sql: bool,
+        convert_tz_for_raw_time_dimension: bool,
         masked_members: Option<Vec<String>>,
         member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<Rc<Self>, CubeError> {
@@ -67,6 +69,7 @@ impl QueryTools {
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
             evaluator_compiler,
             timezone,
+            convert_tz_for_raw_time_dimension,
             masked_members: masked_members.unwrap_or_default().into_iter().collect(),
         }))
     }
@@ -94,6 +97,10 @@ impl QueryTools {
 
     pub fn timezone(&self) -> Tz {
         self.timezone
+    }
+
+    pub fn convert_tz_for_raw_time_dimension(&self) -> bool {
+        self.convert_tz_for_raw_time_dimension
     }
 
     pub fn join_for_hints(

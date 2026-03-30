@@ -5017,6 +5017,47 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }]
   ));
 
+  it('raw time dimension with timezone', async () => runQueryTest(
+    {
+      measures: [
+        'visitors.visitor_revenue',
+      ],
+      dimensions: ['visitors.created_at'],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      convertTzForRawTimeDimension: true,
+      order: [{
+        id: 'visitors.created_at'
+      }]
+    },
+    [
+      {
+        visitors__created_at: '2017-01-02T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100'
+      },
+      {
+        visitors__created_at: '2017-01-04T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitor_revenue: '200'
+      },
+      {
+        visitors__created_at: '2017-01-05T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__visitor_revenue: null
+      },
+      {
+        visitors__created_at: '2017-01-06T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__visitor_revenue: null
+      }
+    ]
+  ));
+
   it('simple join with segment', async () => runQueryTest(
     {
       measures: [
