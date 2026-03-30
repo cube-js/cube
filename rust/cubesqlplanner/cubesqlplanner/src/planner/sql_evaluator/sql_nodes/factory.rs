@@ -257,11 +257,12 @@ impl SqlNodesFactory {
             let input: Rc<dyn SqlNode> = CaseSqlNode::new(input);
             input
         };
-        let input: Rc<dyn SqlNode> =
-            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
 
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
 
         let input = if !self.calendar_time_shifts.is_empty() {
             CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
