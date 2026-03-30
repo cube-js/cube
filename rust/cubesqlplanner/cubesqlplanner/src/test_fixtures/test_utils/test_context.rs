@@ -95,7 +95,9 @@ impl TestContext {
             static_data.masked_members.clone(),
             static_data.member_to_alias.clone(),
             static_data.export_annotated_sql,
-            static_data.convert_tz_for_raw_time_dimension.unwrap_or(false),
+            static_data
+                .convert_tz_for_raw_time_dimension
+                .unwrap_or(false),
         )
     }
 
@@ -452,8 +454,9 @@ impl TestContext {
             let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
             let yaml = Self::build_pre_agg_query_yaml(pre_agg);
 
-            let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
-                .expect("Failed to create pre-agg context");
+            let pa_ctx =
+                Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
+                    .expect("Failed to create pre-agg context");
 
             let (raw_sql, _) = pa_ctx
                 .build_sql_with_used_pre_aggregations(&yaml)

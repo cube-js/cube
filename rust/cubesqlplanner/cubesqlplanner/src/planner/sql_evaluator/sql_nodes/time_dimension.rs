@@ -71,8 +71,7 @@ impl SqlNode for TimeDimensionNode {
                 Ok(res)
             }
             MemberSymbol::Dimension(ev) => {
-                if query_tools.convert_tz_for_raw_time_dimension()
-                    && ev.dimension_type() == "time"
+                if query_tools.convert_tz_for_raw_time_dimension() && ev.dimension_type() == "time"
                 {
                     Ok(templates.convert_tz(input_sql)?)
                 } else {
