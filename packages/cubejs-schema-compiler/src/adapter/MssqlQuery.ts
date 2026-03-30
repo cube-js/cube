@@ -1,11 +1,12 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
 
-import { QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
+import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseSegment } from './BaseSegment';
 import { ParamAllocator } from './ParamAllocator';
+import { resolveWindowsTimezone } from './windows-iana';
 
 const abbrs = {
   EST: 'Eastern Standard Time',
@@ -73,6 +74,14 @@ class MssqlSegment extends BaseSegment {
 }
 
 export class MssqlQuery extends BaseQuery {
+  private readonly useNamedTimezones: boolean;
+
+  public constructor(compilers: any, options: any) {
+    super(compilers, options);
+
+    this.useNamedTimezones = getEnv('mssqlUseNamedTimezones', { dataSource: this.dataSource });
+  }
+
   public newFilter(filter) {
     return new MssqlFilter(this, filter);
   }
@@ -90,6 +99,11 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public convertTz(field) {
+    if (this.useNamedTimezones) {
+      const windowsTz = resolveWindowsTimezone(this.timezone);
+      return `CAST(${field} AT TIME ZONE 'UTC' AT TIME ZONE '${windowsTz}' AS DATETIME2)`;
+    }
+
     const offset = moment().tz(this.timezone).format('Z');
 
     // 1. Treating the field as UTC (add '+00:00' offset)

@@ -1055,33 +1055,29 @@ const variables: Record<string, (...args: any) => any> = {
    * @see https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_convert-tz
    * @see https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
    */
-  mysqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => {
-    const val = process.env[
-      keyByDataSource(
-        'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
-        dataSource,
-      )
-    ];
+  mysqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => (
+    get(keyByDataSource('CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES', dataSource))
+      // It's true in schema-compiler integration tests
+      .default('false')
+      .asBool()
+  ),
 
-    if (val) {
-      if (val.toLocaleLowerCase() === 'true') {
-        return true;
-      } else if (val.toLowerCase() === 'false') {
-        return false;
-      } else {
-        throw new TypeError(
-          `The ${
-            keyByDataSource(
-              'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
-              dataSource,
-            )
-          } must be either 'true' or 'false'.`
-        );
-      }
-    } else {
-      return false;
-    }
-  },
+  /** ****************************************************************
+   * MSSQL Driver                                                    *
+   ***************************************************************** */
+
+  /**
+   * Use named timezones for date/time conversions via AT TIME ZONE.
+   * Defaults to FALSE, meaning that numeric offsets for timezone will be used.
+   *
+   * @see https://learn.microsoft.com/en-us/sql/t-sql/queries/at-time-zone-transact-sql
+   */
+  mssqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => (
+    get(keyByDataSource('CUBEJS_DB_MSSQL_USE_NAMED_TIMEZONES', dataSource))
+      // It's true in schema-compiler integration tests
+      .default('false')
+      .asBool()
+  ),
 
   /** ****************************************************************
    * Databricks Driver                                               *
