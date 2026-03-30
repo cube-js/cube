@@ -1,19 +1,65 @@
 ---
-description: Manage user attributes, roles, permissions, and groups to control access to Cube features and data.
+title: Users and permissions
+description: Manage users, roles, permissions, and groups to control access to Cube features and data.
 ---
 
- Users and permissions
+# Users and permissions
 
 Manage users and control access to features and data in Cube.
 
-## Users and permissions
+## Managing users
+
+Admins can invite users to join Cube Cloud and manage their access
+from the **Admin → Users** page.
+
+### Inviting users
+
+To invite a new user:
+
+1. Navigate to **Admin → Users**.
+2. Click **Invite User**.
+3. Enter the user's email address and select a [role][ref-roles].
+4. Click **Send Invite**.
+
+The invited user will receive an email with instructions to join your
+Cube Cloud account.
+
+### Deactivating users
+
+You can deactivate a user to revoke their access to Cube Cloud without
+permanently deleting their account. Deactivated users cannot sign in
+or access any resources.
+
+To deactivate a user:
+
+1. Navigate to **Admin → Users**.
+2. Find the user you want to deactivate.
+3. Click the user's menu and select **Deactivate**.
+
+{/* TODO: Verify exact UI flow for deactivation - menu label and confirmation dialog */}
+
+<Info>
+
+Deactivation is reversible. You can reactivate a user at any time
+from the same menu by selecting **Activate**.
+
+</Info>
+
+If you use [SCIM provisioning][ref-okta-scim], users can also be
+deactivated automatically when they are unassigned or deactivated in
+your identity provider.
+
+## Access control
 
 Configure access control to:
 
 - Define [user attributes][ref-attributes] for personalized data access
 - Set up [roles and permissions][ref-roles] to control feature access
 - Create [custom roles][ref-custom-roles] with specific permissions for your team
+- Organize users into [groups][ref-groups] for collective access management
 
 [ref-attributes]: /access-security/users-and-permissions/user-attributes
 [ref-roles]: /access-security/users-and-permissions/roles-and-permissions
 [ref-custom-roles]: /access-security/users-and-permissions/custom-roles
+[ref-groups]: /access-security/users-and-permissions/user-groups
+[ref-okta-scim]: /access-security/sso/okta/scim
