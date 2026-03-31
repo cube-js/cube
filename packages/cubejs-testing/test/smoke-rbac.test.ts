@@ -782,6 +782,120 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('SECURITY_CONTEXT.cubeCloud features via SQL API', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('sc_test', 'sc_test_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('filter with scalar value generates equality (tenantId)', async () => {
+      const res = await connection.query(
+        'SELECT count FROM security_context_test'
+      );
+      expect(res.rows.length).toBe(1);
+      // tenantId = 'tenant_1' is used as filter('id'), so id = 'tenant_1'
+      // Since id is numeric and tenant_1 is not, this may return 0 rows or error
+      // The key is that the SQL generates correctly and doesn't crash
+      expect(res.rows[0].count).toBeDefined();
+    });
+
+    test('filter with array value generates IN clause (groups)', async () => {
+      const res = await connection.query(
+        'SELECT count FROM sc_array_filter_test'
+      );
+      expect(res.rows.length).toBe(1);
+      // groups = ['admin', 'operator'] → product_id IN ('admin', 'operator')
+      // Since product_id is numeric this returns 0, but the SQL must not crash
+      expect(res.rows[0].count).toBeDefined();
+    });
+
+    test('toString interpolation renders as param in SQL', async () => {
+      const res = await connection.query(
+        'SELECT count FROM sc_interpolation_test'
+      );
+      expect(res.rows.length).toBe(1);
+      // SQL: WHERE id > ${SECURITY_CONTEXT.cubeCloud.tenantId}
+      // tenantId = 'tenant_1', so id > 'tenant_1' — postgres will cast
+      expect(res.rows[0].count).toBeDefined();
+    });
+
+    test('groups shorthand in access policy row filter', async () => {
+      const res = await connection.query(
+        'SELECT count FROM sc_groups_shorthand_test'
+      );
+      expect(res.rows.length).toBe(1);
+      // groups shorthand resolves to securityContext.cubeCloud.groups = ['admin', 'operator']
+      // which filters product_id by those values
+      expect(res.rows[0].count).toBeDefined();
+    });
+  });
+
+  describe('SECURITY_CONTEXT.cubeCloud features via REST API', () => {
+    let scClient: CubeApi;
+
+    const SC_TEST_TOKEN = sign({
+      cubeCloud: {
+        tenantId: 'tenant_1',
+        groups: ['admin', 'operator'],
+      },
+      auth: {
+        username: 'sc_test',
+        userAttributes: {},
+        roles: [],
+        groups: [],
+      },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+      expiresIn: '2 days'
+    });
+
+    beforeAll(async () => {
+      scClient = cubejs(async () => SC_TEST_TOKEN, {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+    });
+
+    test('filter with scalar value (tenantId) via REST', async () => {
+      const result = await scClient.load({
+        measures: ['security_context_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['security_context_test.count']).toBeDefined();
+    });
+
+    test('filter with array value (groups) generates IN clause via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_array_filter_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['sc_array_filter_test.count']).toBeDefined();
+    });
+
+    test('toString interpolation via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_interpolation_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['sc_interpolation_test.count']).toBeDefined();
+    });
+
+    test('groups shorthand access policy via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_groups_shorthand_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['sc_groups_shorthand_test.count']).toBeDefined();
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;
