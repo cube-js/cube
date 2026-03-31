@@ -1,17 +1,16 @@
 /* eslint-disable no-restricted-syntax */
-import { get } from 'env-var';
+import { from } from 'env-var';
 import { displayCLIWarning } from './cli';
 import { isNativeSupported } from './platform';
 
 export class InvalidConfiguration extends Error {
-  public constructor(key: string, value: any, description: string) {
-    super(`Value "${value}" is not valid for ${key}. ${description}`);
+  public constructor(value: any, description: string) {
+    super(`Value "${value}" is not valid. ${description}`);
   }
 }
 
 export function convertTimeStrToSeconds(
   input: string,
-  envName: string,
   description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
 ) {
   if (/^\d+$/.test(input)) {
@@ -30,12 +29,11 @@ export function convertTimeStrToSeconds(
     }
   }
 
-  throw new InvalidConfiguration(envName, input, description);
+  throw new InvalidConfiguration(input, description);
 }
 
 export function convertSizeToBytes(
   input: string,
-  envName: string,
   description: string = 'Must be a number in bytes or size string (1kb, 1mb, 1gb).',
 ): number {
   if (/^\d+$/.test(input)) {
@@ -51,21 +49,21 @@ export function convertSizeToBytes(
       case 'gb':
         return parseInt(input.slice(0, -2), 10) * 1024 * 1024 * 1024;
       default: {
-        throw new InvalidConfiguration(envName, input, description);
+        throw new InvalidConfiguration(input, description);
       }
     }
   }
 
-  throw new InvalidConfiguration(envName, input, description);
+  throw new InvalidConfiguration(input, description);
 }
 
-export function asPortNumber(input: number, envName: string) {
+export function asPortNumber(input: number) {
   if (input < 0) {
-    throw new InvalidConfiguration(envName, input, 'Should be a positive integer.');
+    throw new InvalidConfiguration(input, 'Should be a positive integer.');
   }
 
   if (input > 65535) {
-    throw new InvalidConfiguration(envName, input, 'Should be lower or equal than 65535.');
+    throw new InvalidConfiguration(input, 'Should be lower or equal than 65535.');
   }
 
   return input;
@@ -126,106 +124,105 @@ export function keyByDataSource(origin: string, dataSource?: string): string {
   }
 }
 
-function asPortOrSocket(input: string, envName: string): number | string {
-  if (/^-?\d+$/.test(input)) {
-    return asPortNumber(parseInt(input, 10), envName);
-  }
+const env = from(process.env, {
+  asTimeInSeconds: (value: string) => convertTimeStrToSeconds(value),
+  asSizeInBytes: (value: string) => convertSizeToBytes(value),
+  asPortOrSocket: (value: string): number | string => {
+    if (/^-?\d+$/.test(value)) {
+      return asPortNumber(parseInt(value, 10));
+    }
 
-  // @todo Can we check that path for socket is valid?
-  return input;
-}
+    return value;
+  },
+  asFalseOrPort: (value: string): number | false => {
+    if (value.toLowerCase() === 'false' || value === '0' || value === undefined) {
+      return false;
+    }
 
-function asFalseOrPort(input: string, envName: string): number | false {
-  if (input.toLowerCase() === 'false' || input === '0' || input === undefined) {
-    return false;
-  }
+    return asPortNumber(parseInt(value, 10));
+  },
+  asBoolOrTime: (value: string): number | boolean => {
+    if (value.toLowerCase() === 'true') {
+      return true;
+    }
 
-  return asPortNumber(parseInt(input, 10), envName);
-}
+    if (value.toLowerCase() === 'false' || value === '0') {
+      return false;
+    }
 
-function asBoolOrTime(input: string, envName: string): number | boolean {
-  if (input.toLowerCase() === 'true') {
-    return true;
-  }
-
-  if (input.toLowerCase() === 'false' || input === '0') {
-    return false;
-  }
-
-  return convertTimeStrToSeconds(
-    input,
-    envName,
-    'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
-  );
-}
+    return convertTimeStrToSeconds(
+      value,
+      'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
+    );
+  },
+});
 
 const variables: Record<string, (...args: any) => any> = {
-  devMode: () => get('CUBEJS_DEV_MODE')
+  devMode: () => env.get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
-  logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
-  port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
-  tls: () => get('CUBEJS_ENABLE_TLS')
+  logLevel: () => env.get('CUBEJS_LOG_LEVEL').asString(),
+  port: () => env.get('PORT').default('4000').asPortOrSocket(),
+  tls: () => env.get('CUBEJS_ENABLE_TLS')
     .default('false')
     .asBoolStrict(),
-  webSockets: () => get('CUBEJS_WEB_SOCKETS')
+  webSockets: () => env.get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
-  serverHeadersTimeout: () => get('CUBEJS_SERVER_HEADERS_TIMEOUT')
+  serverHeadersTimeout: () => env.get('CUBEJS_SERVER_HEADERS_TIMEOUT')
     .asInt(),
-  serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
+  serverKeepAliveTimeout: () => env.get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
     .asInt(),
   maxRequestSize: () => {
-    const value = process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb';
-    const bytes = convertSizeToBytes(value, 'CUBEJS_MAX_REQUEST_SIZE');
+    const bytes = env.get('CUBEJS_MAX_REQUEST_SIZE').default('50mb').asSizeInBytes();
 
     const minBytes = 100 * 1024; // 100kb
     const maxBytes = 64 * 1024 * 1024; // 64mb
 
     if (bytes < minBytes || bytes > maxBytes) {
       throw new InvalidConfiguration(
-        'CUBEJS_MAX_REQUEST_SIZE',
-        value,
+        process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb',
         'Must be between 100kb and 64mb.'
       );
     }
 
     return bytes;
   },
-  rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
+  rollupOnlyMode: () => env.get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
-  schemaPath: () => get('CUBEJS_SCHEMA_PATH')
+  schemaPath: () => env.get('CUBEJS_SCHEMA_PATH')
     .default('model')
     .asString(),
   refreshWorkerMode: () => {
-    const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
+    const refreshWorkerMode = env.get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
       return refreshWorkerMode;
     }
 
     // @deprecated Please use CUBEJS_REFRESH_WORKER
-    const scheduledRefresh = get('CUBEJS_SCHEDULED_REFRESH').asBool();
+    const scheduledRefresh = env.get('CUBEJS_SCHEDULED_REFRESH').asBool();
     if (scheduledRefresh !== undefined) {
       return scheduledRefresh;
     }
 
     // @deprecated Please use CUBEJS_REFRESH_WORKER
-    if (process.env.CUBEJS_SCHEDULED_REFRESH_TIMER) {
-      return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
+    const timer = env.get('CUBEJS_SCHEDULED_REFRESH_TIMER').asBoolOrTime();
+    if (timer !== undefined) {
+      return timer;
     }
 
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
   scheduledRefreshQueriesPerAppId: () => {
-    const refreshQueries = get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive();
+    const refreshQueries = env.get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive();
 
     if (refreshQueries) {
       return refreshQueries;
     }
 
-    const refreshConcurrency = get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
+    const refreshConcurrency = env.get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
 
     if (refreshConcurrency) {
       console.warn(
@@ -235,45 +232,45 @@ const variables: Record<string, (...args: any) => any> = {
 
     return refreshConcurrency;
   },
-  refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
+  refreshWorkerConcurrency: () => env.get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
   // eslint-disable-next-line consistent-return
   scheduledRefreshTimezones: () => {
-    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
+    const timezones = env.get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
 
     if (timezones) {
       return timezones.split(',').map(t => t.trim());
     }
   },
-  preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
-  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
+  preAggregationsBuilder: () => env.get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
+  gracefulShutdown: () => env.get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
-  dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
+  dockerImageVersion: () => env.get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
   concurrency: ({
     dataSource,
   }: {
     dataSource: string,
-  }) => get(keyByDataSource('CUBEJS_CONCURRENCY', dataSource)).asInt(),
+  }) => env.get(keyByDataSource('CUBEJS_CONCURRENCY', dataSource)).asInt(),
   // It's only excepted for CI, nothing else.
-  internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
+  internalExceptions: () => env.get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
     .asEnum(['exit', 'log', 'false']),
-  preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
+  preAggregationsSchema: () => env.get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
     .asString(),
-  maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
+  maxPartitionsPerCube: () => env.get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
     .default('10000')
     .asInt(),
-  scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
+  scheduledRefreshBatchSize: () => env.get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
-  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
-  nativeSqlPlannerPreAggregations: () => get('CUBEJS_TESSERACT_PRE_AGGREGATIONS').default('false').asBool(),
-  nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
+  nativeSqlPlanner: () => env.get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
+  nativeSqlPlannerPreAggregations: () => env.get('CUBEJS_TESSERACT_PRE_AGGREGATIONS').default('false').asBool(),
+  nativeOrchestrator: () => env.get('CUBEJS_TESSERACT_ORCHESTRATOR')
     .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => {
-    const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
+    const enabled = env.get('CUBEJS_TRANSPILATION_WORKER_THREADS')
       .default('true')
       .asBoolStrict();
 
@@ -285,23 +282,23 @@ const variables: Record<string, (...args: any) => any> = {
 
     return true;
   },
-  allowNonStrictDateRangeMatching: () => get('CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH')
+  allowNonStrictDateRangeMatching: () => env.get('CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH')
     .default('true')
     .asBoolStrict(),
-  transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
+  transpilationWorkerThreadsCount: () => env.get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
     .default('0')
     .asInt(),
   // This one takes precedence over CUBEJS_TRANSPILATION_WORKER_THREADS
-  transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
+  transpilationNative: () => env.get('CUBEJS_TRANSPILATION_NATIVE')
     .default('false')
     .asBoolStrict(),
-  nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
+  nestedFoldersDelimiter: () => env.get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
-  defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
+  defaultTimezone: () => env.get('CUBEJS_DEFAULT_TIMEZONE')
     .default('UTC')
     .asString(),
-  preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
+  preciseDecimalInCubestore: () => env.get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
     .default('false')
     .asBoolStrict(),
 
@@ -465,7 +462,7 @@ const variables: Record<string, (...args: any) => any> = {
   dbKafkaUseSsl: ({ dataSource }: {
     dataSource: string,
   }) => (
-    get(keyByDataSource('CUBEJS_DB_KAFKA_USE_SSL', dataSource))
+    env.get(keyByDataSource('CUBEJS_DB_KAFKA_USE_SSL', dataSource))
       .default('false')
       .asBool()
   ),
@@ -672,11 +669,9 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
   }: {
     dataSource: string,
-  }) => {
-    const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
-    const value = process.env[key] || '5s';
-    return convertTimeStrToSeconds(value, key);
-  },
+  }) => env.get(keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource))
+    .default('5s')
+    .asTimeInSeconds(),
 
   /**
    * Polling timeout. Currently used in BigQuery, Dremio and Athena.
@@ -686,15 +681,8 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
   }: {
     dataSource: string,
-  }) => {
-    const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource);
-    const value = process.env[key];
-    if (value) {
-      return convertTimeStrToSeconds(value, key);
-    } else {
-      return null;
-    }
-  },
+  }) => env.get(keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource))
+    .asTimeInSeconds() ?? null,
 
   /**
    * Query timeout. Currently used in BigQuery, ClickHouse, Dremio, Postgres, Snowflake
@@ -708,16 +696,14 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
   }: {
     dataSource?: string,
-  } = {}) => {
-    const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
-    const value = process.env[key] || '10m';
-    return convertTimeStrToSeconds(value, key);
-  },
+  } = {}) => env.get(keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource))
+    .default('10m')
+    .asTimeInSeconds()!,
 
   /**
    * Max limit which can be specified in the incoming query.
    */
-  dbQueryLimit: (): number => get('CUBEJS_DB_QUERY_LIMIT')
+  dbQueryLimit: (): number => env.get('CUBEJS_DB_QUERY_LIMIT')
     .default(50000)
     .asInt(),
 
@@ -725,28 +711,28 @@ const variables: Record<string, (...args: any) => any> = {
    * Query limit wich will be used in the query to the data source if
    * limit property was not specified in the query.
    */
-  dbQueryDefaultLimit: (): number => get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
+  dbQueryDefaultLimit: (): number => env.get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
     .default(10000)
     .asInt(),
 
   /**
    * Query stream `highWaterMark` value.
    */
-  dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
+  dbQueryStreamHighWaterMark: (): number => env.get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
     .default(8192)
     .asInt(),
 
   /**
    * Max number of elements
    */
-  usedPreAggregationCacheMaxCount: (): number => get('CUBEJS_USED_PRE_AGG_CACHE_MAX_COUNT')
+  usedPreAggregationCacheMaxCount: (): number => env.get('CUBEJS_USED_PRE_AGG_CACHE_MAX_COUNT')
     .default(8192)
     .asInt(),
 
   /**
    * Max number of elements
    */
-  touchPreAggregationCacheMaxCount: (): number => get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_COUNT')
+  touchPreAggregationCacheMaxCount: (): number => env.get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_COUNT')
     .default(8192)
     .asInt(),
 
@@ -757,13 +743,12 @@ const variables: Record<string, (...args: any) => any> = {
     // eslint-disable-next-line no-use-before-define
     const touchPreAggregationTimeout = getEnv('touchPreAggregationTimeout');
 
-    const maxAge = get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE')
+    const maxAge = env.get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE')
       .default(Math.round(touchPreAggregationTimeout / 2))
       .asIntPositive();
 
     if (maxAge > touchPreAggregationTimeout) {
       throw new InvalidConfiguration(
-        'CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE',
         maxAge,
         `Must be less or equal then CUBEJS_TOUCH_PRE_AGG_TIMEOUT (${touchPreAggregationTimeout}).`
       );
@@ -775,21 +760,21 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Expire time for touch records
    */
-  touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
+  touchPreAggregationTimeout: (): number => env.get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
     .default(60 * 60 * 24)
     .asIntPositive(),
 
   /**
    * Maximum time for exponential backoff for pre-aggs (in seconds)
    */
-  preAggBackoffMaxTime: (): number => get('CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME')
+  preAggBackoffMaxTime: (): number => env.get('CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME')
     .default(10 * 60)
     .asIntPositive(),
 
   /**
    * Expire time for touch records
    */
-  dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
+  dropPreAggregationsWithoutTouch: (): boolean => env.get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
     .default('true')
     .asBoolStrict(),
 
@@ -799,7 +784,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Currently defaults to 'false' as changing this in a live deployment could break existing pre-aggregations.
    * This will eventually default to true.
    */
-  fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
+  fetchColumnsByOrdinalPosition: (): boolean => env.get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
     .default('true')
     .asBoolStrict(),
 
@@ -1056,7 +1041,7 @@ const variables: Record<string, (...args: any) => any> = {
    * @see https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
    */
   mysqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => (
-    get(keyByDataSource('CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES', dataSource))
+    env.get(keyByDataSource('CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES', dataSource))
       // It's true in schema-compiler integration tests
       .default('false')
       .asBool()
@@ -1073,7 +1058,7 @@ const variables: Record<string, (...args: any) => any> = {
    * @see https://learn.microsoft.com/en-us/sql/t-sql/queries/at-time-zone-transact-sql
    */
   mssqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => (
-    get(keyByDataSource('CUBEJS_DB_MSSQL_USE_NAMED_TIMEZONES', dataSource))
+    env.get(keyByDataSource('CUBEJS_DB_MSSQL_USE_NAMED_TIMEZONES', dataSource))
       // It's true in schema-compiler integration tests
       .default('false')
       .asBool()
@@ -1343,7 +1328,7 @@ const variables: Record<string, (...args: any) => any> = {
   }: {
     dataSource: string,
   }) => (
-    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource))
+    env.get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource))
       .default('false')
       .asBool()
   ),
@@ -1356,7 +1341,7 @@ const variables: Record<string, (...args: any) => any> = {
   }: {
     dataSource: string,
   }) => (
-    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_COMPRESSION', dataSource))
+    env.get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_COMPRESSION', dataSource))
       .default('false')
       .asBool()
   ),
@@ -2161,96 +2146,88 @@ const variables: Record<string, (...args: any) => any> = {
    * Cube Store Driver                                               *
    ***************************************************************** */
 
-  cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
+  cubeStoreHost: () => env.get('CUBEJS_CUBESTORE_HOST')
     .asString(),
-  cubeStorePort: () => get('CUBEJS_CUBESTORE_PORT')
+  cubeStorePort: () => env.get('CUBEJS_CUBESTORE_PORT')
     .asPortNumber(),
-  cubeStoreUser: () => get('CUBEJS_CUBESTORE_USER')
+  cubeStoreUser: () => env.get('CUBEJS_CUBESTORE_USER')
     .asString(),
-  cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
+  cubeStorePass: () => env.get('CUBEJS_CUBESTORE_PASS')
     .asString(),
-  cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
+  cubeStoreMaxConnectRetries: () => env.get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
     .default('20')
     .asInt(),
-  cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
+  cubeStoreNoHeartBeatTimeout: () => env.get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')
     .asInt(),
-  cubeStoreRollingWindowJoin: () => get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
+  cubeStoreRollingWindowJoin: () => env.get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
     .default('true')
     .asBoolStrict(),
-  allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
+  allowUngroupedWithoutPrimaryKey: () => env.get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
+    .default(env.get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
-  nodeEnv: () => get('NODE_ENV')
+  nodeEnv: () => env.get('NODE_ENV')
     .asString(),
-  cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
+  cacheAndQueueDriver: () => env.get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  defaultApiScope: () => get('CUBEJS_DEFAULT_API_SCOPES')
+  defaultApiScope: () => env.get('CUBEJS_DEFAULT_API_SCOPES')
     .asArray(','),
-  jwkUrl: () => get('CUBEJS_JWK_URL')
+  jwkUrl: () => env.get('CUBEJS_JWK_URL')
     .asString(),
-  jwtKey: () => get('CUBEJS_JWT_KEY')
+  jwtKey: () => env.get('CUBEJS_JWT_KEY')
     .asString(),
-  jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
+  jwtAlgorithms: () => env.get('CUBEJS_JWT_ALGS')
     .asArray(','),
-  jwtAudience: () => get('CUBEJS_JWT_AUDIENCE')
+  jwtAudience: () => env.get('CUBEJS_JWT_AUDIENCE')
     .asString(),
-  jwtIssuer: () => get('CUBEJS_JWT_ISSUER')
+  jwtIssuer: () => env.get('CUBEJS_JWT_ISSUER')
     .asArray(','),
-  jwtSubject: () => get('CUBEJS_JWT_SUBJECT')
+  jwtSubject: () => env.get('CUBEJS_JWT_SUBJECT')
     .asString(),
-  jwtClaimsNamespace: () => get('CUBEJS_JWT_CLAIMS_NAMESPACE')
+  jwtClaimsNamespace: () => env.get('CUBEJS_JWT_CLAIMS_NAMESPACE')
     .asString(),
-  playgroundAuthSecret: () => get('CUBEJS_PLAYGROUND_AUTH_SECRET')
+  playgroundAuthSecret: () => env.get('CUBEJS_PLAYGROUND_AUTH_SECRET')
     .asString(),
-  agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
+  agentFrameSize: () => env.get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
-  agentEndpointUrl: () => get('CUBEJS_AGENT_ENDPOINT_URL')
+  agentEndpointUrl: () => env.get('CUBEJS_AGENT_ENDPOINT_URL')
     .asString(),
-  agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
+  agentFlushInterval: () => env.get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
     .asInt(),
-  agentMaxSockets: () => get('CUBEJS_AGENT_MAX_SOCKETS')
+  agentMaxSockets: () => env.get('CUBEJS_AGENT_MAX_SOCKETS')
     .default(100)
     .asInt(),
-  instanceId: () => get('CUBEJS_INSTANCE_ID')
+  instanceId: () => env.get('CUBEJS_INSTANCE_ID')
     .asString(),
-  telemetry: () => get('CUBEJS_TELEMETRY')
+  telemetry: () => env.get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),
   // SQL Interface
   sqlPort: () => {
-    const port = asFalseOrPort(process.env.CUBEJS_SQL_PORT || 'false', 'CUBEJS_SQL_PORT');
-    if (port) {
-      return port;
-    }
-
-    return undefined;
+    const port = env.get('CUBEJS_SQL_PORT').default('false').asFalseOrPort();
+    return port || undefined;
   },
   nativeApiGatewayPort: () => {
     if (process.env.CUBEJS_NATIVE_API_GATEWAY_PORT === 'false') {
       return undefined;
     }
 
-    const port = asFalseOrPort(process.env.CUBEJS_NATIVE_API_GATEWAY_PORT || 'false', 'CUBEJS_NATIVE_API_GATEWAY_PORT');
-    if (port) {
-      return port;
-    }
-
-    return undefined;
+    const port = env.get('CUBEJS_NATIVE_API_GATEWAY_PORT').default('false').asFalseOrPort();
+    return port || undefined;
   },
   pgSqlPort: () => {
     if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
       return undefined;
     }
 
-    const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
+    const port = env.get('CUBEJS_PG_SQL_PORT').default('false').asFalseOrPort();
     if (port) {
       return port;
     }
 
-    const isDevMode = get('CUBEJS_DEV_MODE')
+    const isDevMode = env.get('CUBEJS_DEV_MODE')
       .default('false')
       .asBoolStrict();
 
@@ -2268,49 +2245,49 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  sqlUser: () => get('CUBEJS_SQL_USER').asString(),
-  sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
-  sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
+  sqlUser: () => env.get('CUBEJS_SQL_USER').asString(),
+  sqlPassword: () => env.get('CUBEJS_SQL_PASSWORD').asString(),
+  sqlSuperUser: () => env.get('CUBEJS_SQL_SUPER_USER').asString(),
   // Internal testing, please don't enable it. It's not ready for public preview
-  nativeApiGateway: () => get('CUBE_JS_NATIVE_API_GATEWAY_INTERNAL')
+  nativeApiGateway: () => env.get('CUBE_JS_NATIVE_API_GATEWAY_INTERNAL')
     .asBool(),
   // Experiments & Preview flags
-  livePreview: () => get('CUBEJS_LIVE_PREVIEW')
+  livePreview: () => env.get('CUBEJS_LIVE_PREVIEW')
     .default('true')
     .asBoolStrict(),
-  externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
+  externalDefault: () => env.get('CUBEJS_EXTERNAL_DEFAULT')
     .default('true')
     .asBoolStrict(),
-  scheduledRefreshDefault: () => get(
+  scheduledRefreshDefault: () => env.get(
     'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
   ).default('true').asBoolStrict(),
-  previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
+  previewFeatures: () => env.get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
-  batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
+  batchingRowSplitCount: () => env.get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
     .default(256 * 1024)
     .asInt(),
-  maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
+  maxSourceRowLimit: () => env.get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
     .asInt(),
-  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  convertTzForRawTimeDimension: () => env.get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36
   // This code is used to detect Redis and throw an error
   // TODO(ovr): Remove in after 1.0 + LTS
-  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+  redisUseIORedis: () => env.get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
   // TODO(ovr): Remove in after 1.0 + LTS
   redisUrl: () => {
-    const redisUrl = get('CUBEJS_REDIS_URL')
+    const redisUrl = env.get('CUBEJS_REDIS_URL')
       .asString();
     if (redisUrl) {
       return redisUrl;
     }
 
-    const legacyRedisUrl = get('REDIS_URL')
+    const legacyRedisUrl = env.get('REDIS_URL')
       .asString();
     if (legacyRedisUrl) {
       return legacyRedisUrl;
@@ -2318,16 +2295,16 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  fastReload: () => get('CUBEJS_FAST_RELOAD_ENABLED')
+  fastReload: () => env.get('CUBEJS_FAST_RELOAD_ENABLED')
     .default('false')
     .asBoolStrict(),
-  accessPolicyMaskString: () => get('CUBEJS_ACCESS_POLICY_MASK_STRING')
+  accessPolicyMaskString: () => env.get('CUBEJS_ACCESS_POLICY_MASK_STRING')
     .asString(),
-  accessPolicyMaskTime: () => get('CUBEJS_ACCESS_POLICY_MASK_TIME')
+  accessPolicyMaskTime: () => env.get('CUBEJS_ACCESS_POLICY_MASK_TIME')
     .asString(),
-  accessPolicyMaskBoolean: () => get('CUBEJS_ACCESS_POLICY_MASK_BOOLEAN')
+  accessPolicyMaskBoolean: () => env.get('CUBEJS_ACCESS_POLICY_MASK_BOOLEAN')
     .asString(),
-  accessPolicyMaskNumber: () => get('CUBEJS_ACCESS_POLICY_MASK_NUMBER')
+  accessPolicyMaskNumber: () => env.get('CUBEJS_ACCESS_POLICY_MASK_NUMBER')
     .asString(),
 };
 
