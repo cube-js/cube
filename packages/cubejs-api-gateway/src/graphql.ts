@@ -657,7 +657,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             ...(query.timeDimensions || []).map((td: any) => td.dimension),
           ];
 
-          if (requestedMembers.length > 0) {
+          if (requestedMembers.length > 0 && req.context) {
             // Get RBAC-filtered metadata for this security context
             const compilerApi = await apiGateway.getCompilerApi(req.context);
             const filteredMetaConfig = await compilerApi.metaConfig(req.context, {
