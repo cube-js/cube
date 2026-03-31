@@ -649,6 +649,47 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
         resolve: async (_, args, { req, res, apiGateway }, info) => {
           const query = getJsonQuery(metaConfig, args, info);
 
+          // Validate that all requested members are accessible by this security context
+          const requestedMembers = [
+            ...(query.measures || []),
+            ...(query.dimensions || []),
+            ...(query.segments || []),
+            ...(query.timeDimensions || []).map((td: any) => td.dimension),
+          ];
+
+          if (requestedMembers.length > 0) {
+            // Get RBAC-filtered metadata for this security context
+            const compilerApi = await apiGateway.getCompilerApi(req.context);
+            const filteredMetaConfig = await compilerApi.metaConfig(req.context, {
+              requestId: req.context.requestId,
+            });
+
+            // Build set of allowed (visible) members
+            const allowedMembers = new Set<string>();
+            filteredMetaConfig.forEach((cube: any) => {
+              cube.config.measures?.forEach((m: any) => {
+                if (m.isVisible) allowedMembers.add(m.name);
+              });
+              cube.config.dimensions?.forEach((d: any) => {
+                if (d.isVisible) allowedMembers.add(d.name);
+              });
+              cube.config.segments?.forEach((s: any) => {
+                if (s.isVisible) allowedMembers.add(s.name);
+              });
+            });
+
+            // Check if any requested member is hidden
+            const hiddenMembers = requestedMembers.filter(m => !allowedMembers.has(m));
+            if (hiddenMembers.length > 0) {
+              throw new Error(
+                `You requested hidden member: '${hiddenMembers[0]}'. ` +
+                'Please make it visible using `public: true`. ' +
+                'Please note primaryKey fields are `public: false` by default: ' +
+                'https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.'
+              );
+            }
+          }
+
           const results = await new Promise<any>((resolve, reject) => {
             apiGateway.load({
               query,

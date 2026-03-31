@@ -3,8 +3,8 @@
  *
  * This test verifies that:
  * 1. GraphQL schema is cached (unfiltered) - all users see all fields in schema
- * 2. RBAC is enforced at query execution time - accessing restricted fields returns empty results
- *    (same behavior as REST API, per the TODO in smoke-rbac.test.ts)
+ * 2. RBAC is enforced at query execution time
+ * 3. Both complete denial (includes: []) and partial denial (excludes: [...]) return errors
  */
 
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -33,8 +33,8 @@ describe('GraphQL Schema Caching and RBAC', () => {
         CUBEJS_DB_TYPE: 'duckdb',
       },
       {
-        schemaDir: 'graphql-rbac/model',
-        cubejsConfig: 'graphql-rbac/cube.js',
+        schemaDir: 'rbac-graphql/model',
+        cubejsConfig: 'rbac-graphql/cube.js',
       }
     );
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
@@ -89,14 +89,14 @@ describe('GraphQL Schema Caching and RBAC', () => {
     expect(allowedResult.data.cube).toHaveLength(1);
     expect(allowedResult.data.cube[0].orders.internalCode).toBe('secret123');
 
-    // Query restricted field - should return empty results (RBAC denies access)
+    // Query restricted field - should return error (RBAC denies access)
     const restrictedResult = await graphqlRequest('tenant-a', `{
       cube(where: { orders: {} }) {
         orders { tier }
       }
     }`);
-    expect(restrictedResult.errors).toBeUndefined();
-    expect(restrictedResult.data.cube).toEqual([]);
+    expect(restrictedResult.errors).toBeDefined();
+    expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
   });
 
   test('tenant-b can query tier but not internalCode', async () => {
@@ -110,42 +110,44 @@ describe('GraphQL Schema Caching and RBAC', () => {
     expect(allowedResult.data.cube).toHaveLength(1);
     expect(allowedResult.data.cube[0].orders.tier).toBe('premium');
 
-    // Query restricted field - should return empty results (RBAC denies access)
+    // Query restricted field - should return error (RBAC denies access)
     const restrictedResult = await graphqlRequest('tenant-b', `{
       cube(where: { orders: {} }) {
         orders { internalCode }
       }
     }`);
-    expect(restrictedResult.errors).toBeUndefined();
-    expect(restrictedResult.data.cube).toEqual([]);
+    expect(restrictedResult.errors).toBeDefined();
+    expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
   });
 
-  test('default role cannot query internalCode or tier', async () => {
-    // Both restricted fields should return empty results
+  test('default role cannot query any fields - complete denial returns errors', async () => {
+    // With includes: [] (complete denial), GraphQL returns errors for hidden members
+
+    // Query internalCode - should return error (complete denial)
     const result1 = await graphqlRequest('default', `{
       cube(where: { orders: {} }) {
         orders { internalCode }
       }
     }`);
-    expect(result1.errors).toBeUndefined();
-    expect(result1.data.cube).toEqual([]);
+    expect(result1.errors).toBeDefined();
+    expect(result1.errors[0].message).toContain('You requested hidden member');
 
+    // Query tier - should also return error (complete denial)
     const result2 = await graphqlRequest('default', `{
       cube(where: { orders: {} }) {
         orders { tier }
       }
     }`);
-    expect(result2.errors).toBeUndefined();
-    expect(result2.data.cube).toEqual([]);
+    expect(result2.errors).toBeDefined();
+    expect(result2.errors[0].message).toContain('You requested hidden member');
 
-    // But basic fields should work and return data
-    const basicResult = await graphqlRequest('default', `{
+    // Query count - should also return error (complete denial with includes: [])
+    const result3 = await graphqlRequest('default', `{
       cube(where: { orders: {} }) {
         orders { count }
       }
     }`);
-    expect(basicResult.errors).toBeUndefined();
-    expect(basicResult.data.cube).toHaveLength(1);
-    expect(basicResult.data.cube[0].orders.count).toBeDefined();
+    expect(result3.errors).toBeDefined();
+    expect(result3.errors[0].message).toContain('You requested hidden member');
   });
 });

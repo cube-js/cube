@@ -811,21 +811,22 @@ describe('Cube RBAC Engine', () => {
     });
 
     test('line_items hidden price_dim', async () => {
-      // When querying hidden members, row-level security denies access
-      // by filtering out all rows (returns empty result)
-      // TODO we should evaluate member access before the query runs and bounce early with an error
-      let query: Query = {
-        measures: ['line_items.count'],
-        dimensions: ['line_items.price_dim'],
-        order: {
-          'line_items.price_dim': 'asc',
-        },
-      };
-      const hiddenMemberResult = await client.load(query, {});
-      // Row-level security denies access by returning empty results
-      expect(hiddenMemberResult.rawData()).toEqual([]);
+      // When querying hidden members, access is denied with an error
+      let error = '';
+      try {
+        await client.load({
+          measures: ['line_items.count'],
+          dimensions: ['line_items.price_dim'],
+          order: {
+            'line_items.price_dim': 'asc',
+          },
+        });
+      } catch (e: any) {
+        error = e.toString();
+      }
+      expect(error).toContain('You requested hidden member');
 
-      query = {
+      const query: Query = {
         measures: ['line_items_view_no_policy.count'],
         dimensions: ['line_items_view_no_policy.price_dim'],
         order: {
@@ -848,17 +849,23 @@ describe('Cube RBAC Engine', () => {
       }
       expect(error).toContain('You requested hidden member');
 
-      let result = await defaultClient.load({
-        measures: ['orders_view.count'],
-        dimensions: ['orders_view.created_at'],
-        order: {
-          'orders_view.created_at': 'asc',
-        },
-      });
-      // It should only return one value allowed by the default policy
-      expect(result.rawData()).toMatchSnapshot('orders_view_rest');
+      // orders_view - only admin role has access, default user denied
+      error = '';
+      try {
+        await defaultClient.load({
+          measures: ['orders_view.count'],
+          dimensions: ['orders_view.created_at'],
+          order: {
+            'orders_view.created_at': 'asc',
+          },
+        });
+      } catch (e: any) {
+        error = e.toString();
+      }
+      expect(error).toContain('You requested hidden member');
 
-      result = await defaultClient.load({
+      // orders_open should return all values since it has no access policy
+      const result = await defaultClient.load({
         measures: ['orders_open.count'],
         dimensions: ['orders_open.created_at'],
         order: {
@@ -866,7 +873,6 @@ describe('Cube RBAC Engine', () => {
         },
         limit: 10
       });
-      // order_open should return all values since it has no access policy
       expect(result.rawData()).toMatchSnapshot('orders_open_rest');
     });
   });
@@ -925,12 +931,16 @@ describe('Cube RBAC Engine [dev mode]', () => {
   });
 
   test('products with no matching policy', async () => {
-    const result = await client.load({
-      measures: ['products.count'],
-    });
-
-    // Querying a cube with no matching access policy should return no data
-    expect(result.rawData()).toMatchSnapshot('products_no_policy');
+    // Querying a cube with no matching access policy should throw an error
+    let error = '';
+    try {
+      await client.load({
+        measures: ['products.count'],
+      });
+    } catch (e: any) {
+      error = e.toString();
+    }
+    expect(error).toContain('You requested hidden member');
   });
 });
 
@@ -1038,11 +1048,15 @@ describe('Cube RBAC Engine [Python config][dev mode]', () => {
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('products with no matching policy', async () => {
-    const result = await client.load({
-      measures: ['products.count'],
-    });
-
-    // Querying a cube with no matching access policy should return no data
-    expect(result.rawData()).toMatchSnapshot('products_no_policy_python');
+    // Querying a cube with no matching access policy should throw an error
+    let error = '';
+    try {
+      await client.load({
+        measures: ['products.count'],
+      });
+    } catch (e: any) {
+      error = e.toString();
+    }
+    expect(error).toContain('You requested hidden member');
   });
 });

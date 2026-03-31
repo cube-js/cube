@@ -36,17 +36,17 @@ cube('Orders', {
     },
   },
 
-  // RBAC access policies - these apply visibility masks at runtime
+  // RBAC access policies - complete denial for default role
   accessPolicy: [
     {
-      // Default policy for all roles - hide special fields
+      // Default: complete denial - no members accessible (triggers "You requested hidden member" error)
       role: '*',
       memberLevel: {
-        excludes: ['internalCode', 'tier'],
+        includes: [],
       },
     },
     {
-      // tenant-a can see internalCode (include all, exclude only tier)
+      // tenant-a: can access all EXCEPT tier
       role: 'tenant-a',
       memberLevel: {
         includes: '*',
@@ -54,7 +54,7 @@ cube('Orders', {
       },
     },
     {
-      // tenant-b can see tier (include all, exclude only internalCode)
+      // tenant-b: can access all EXCEPT internalCode
       role: 'tenant-b',
       memberLevel: {
         includes: '*',
