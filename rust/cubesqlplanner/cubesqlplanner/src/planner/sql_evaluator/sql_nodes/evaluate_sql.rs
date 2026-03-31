@@ -35,6 +35,7 @@ impl SqlNode for EvaluateSqlNode {
                 Ok(res)
             }
             MemberSymbol::TimeDimension(ev) => {
+                let visitor = visitor.with_ignore_tz_convert();
                 let res = visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
                 Ok(res)
             }

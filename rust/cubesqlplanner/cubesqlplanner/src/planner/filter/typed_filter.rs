@@ -2,7 +2,8 @@ use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
+use crate::planner::visitor_context::evaluate_filter_with_context;
+use crate::planner::{FiltersContext, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -109,7 +110,7 @@ impl TypedFilter {
         }
 
         let resolved = resolve_base_symbol(&self.member_evaluator);
-        let member_sql = evaluate_with_context(&resolved, context.clone(), plan_templates)?;
+        let member_sql = evaluate_filter_with_context(&resolved, context.clone(), plan_templates)?;
 
         let filters_context = context.filters_context();
         let ctx = FilterSqlContext {
