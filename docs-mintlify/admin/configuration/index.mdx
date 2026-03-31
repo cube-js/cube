@@ -16,7 +16,7 @@ statically and is not supposed to change while a Cube deployment is running.
 
 <Info>
 
-For example, [`CUBEJS_DATASOURCES`](/docs/configuration/reference/environment-variables#cubejs_datasources) defines a list of data sources to connect
+For example, [`CUBEJS_DATASOURCES`](/reference/configuration/environment-variables#cubejs_datasources) defines a list of data sources to connect
 to; changing that list would require the deployment to restart.
 
 </Info>
@@ -55,7 +55,7 @@ programmatically and applied dynamically while a Cube deployment is running.
 
 <Info>
 
-For example, [`query_rewrite`](/docs/configuration/reference/config#query_rewrite)
+For example, [`query_rewrite`](/reference/configuration/config#query_rewrite)
 provides a way to inspect, modify, or restrict every query that is being
 processed by Cube.
 
@@ -184,7 +184,7 @@ Cube Cloud automatically installs dependencies from `requirements.txt` and
 ## Development mode
 
 Cube can be run in an insecure, development mode by setting the
-[`CUBEJS_DEV_MODE`](/docs/configuration/reference/environment-variables#cubejs_dev_mode) environment variable to `true`. Putting Cube in development
+[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) environment variable to `true`. Putting Cube in development
 mode does the following:
 
 - Disables authentication checks.
@@ -199,10 +199,10 @@ mode does the following:
   instead of throwing errors.
 
 [ref-folder-structure]: /docs/data-modeling/syntax#folder-structure
-[link-config]: /docs/configuration/reference/config
+[link-config]: /reference/configuration/config
 [link-dev-playground]: /docs/workspace/playground
-[link-env-vars]: /docs/configuration/reference/environment-variables
-[link-scheduled-refresh]: /docs/data-modeling/reference/pre-aggregations#scheduled_refresh
+[link-env-vars]: /reference/configuration/environment-variables
+[link-scheduled-refresh]: /reference/data-modeling/pre-aggregations#scheduled_refresh
 [ref-dynamic-data-models]: /docs/data-modeling/dynamic
 [ref-custom-docker-image]: /docs/deployment/core#extend-the-docker-image
 [link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/
@@ -213,5 +213,5 @@ mode does the following:
 [ref-visual-model]: /docs/data-modeling/visual-modeler
 [ref-python]: /docs/data-modeling/dynamic/jinja#python
 [ref-javascript]: /docs/data-modeling/dynamic/javascript
-[ref-cube-package-config]: /docs/data-modeling/reference/cube-package#config-object
-[ref-env-var-recipe]: /docs/configuration/recipes/environment-variables
+[ref-cube-package-config]: /reference/data-modeling/cube-package#config-object
+[ref-env-var-recipe]: /admin/configuration/recipes/environment-variables

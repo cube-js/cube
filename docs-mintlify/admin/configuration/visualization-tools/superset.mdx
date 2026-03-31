@@ -35,7 +35,7 @@ page, click **Connect to Cube**, and choose **Apache Superset** or
 You can connect a Cube deployment to Superset or Preset using the [SQL API][ref-sql-api].
 
 In Cube Core, the SQL API is disabled by default. Enable it and [configure
-the credentials](/api-reference/sql-api#configuration) to
+the credentials](/reference/sql-api#configuration) to
 connect to Metabase.
 
 ## Connecting from Superset or Preset
@@ -123,12 +123,12 @@ We can select the `COUNT(*)` as a metric and `created_at` as the time column
 with a time grain of `month`.
 
 The `COUNT(*)` aggregate function is being mapped to a measure of type
-[count](/docs/data-modeling/reference/types-and-formats#count) in Cube's
+[count](/reference/data-modeling/measures#type) in Cube's
 **Orders** data model file.
 
 
 [superset]: https://superset.apache.org/
 [preset]: https://preset.io
 [ref-sls]: /docs/integrations/semantic-layer-sync
-[ref-sql-api]: /api-reference/sql-api
+[ref-sql-api]: /reference/sql-api
 [ref-data-model]: /docs/data-modeling/overview

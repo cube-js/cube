@@ -38,7 +38,7 @@ CUBEJS_DB_BQ_KEY_FILE=/path/to/my/keyfile.json
 ```
 
 You could also encode the key file using Base64 and set the result to
-[`CUBEJS_DB_BQ_CREDENTIALS`](/docs/configuration/reference/environment-variables#cubejs_db_bq_credentials):
+[`CUBEJS_DB_BQ_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_bq_credentials):
 
 ```dotenv
 CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
@@ -71,16 +71,16 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 
 | Environment Variable           | Description                                                                                                                                                                                     | Possible Values                                                         | Required |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | :------: |
-| [`CUBEJS_DB_BQ_PROJECT_ID`](/docs/configuration/reference/environment-variables#cubejs_db_bq_project_id)      | The Google BigQuery project ID to connect to                                                                                                                                                    | A valid Google BigQuery Project ID                                      |    ✅    |
-| [`CUBEJS_DB_BQ_KEY_FILE`](/docs/configuration/reference/environment-variables#cubejs_db_bq_key_file)        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅    |
-| [`CUBEJS_DB_BQ_CREDENTIALS`](/docs/configuration/reference/environment-variables#cubejs_db_bq_credentials)     | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
-| [`CUBEJS_DB_BQ_LOCATION`](/docs/configuration/reference/environment-variables#cubejs_db_bq_location)        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |
-| [`CUBEJS_DB_EXPORT_BUCKET`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket)      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |
-| [`CUBEJS_DB_EXPORT_BUCKET_TYPE`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket_type) | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
-| [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool)           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_BQ_PROJECT_ID`](/reference/configuration/environment-variables#cubejs_db_bq_project_id)      | The Google BigQuery project ID to connect to                                                                                                                                                    | A valid Google BigQuery Project ID                                      |    ✅    |
+| [`CUBEJS_DB_BQ_KEY_FILE`](/reference/configuration/environment-variables#cubejs_db_bq_key_file)        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅    |
+| [`CUBEJS_DB_BQ_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_bq_credentials)     | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
+| [`CUBEJS_DB_BQ_LOCATION`](/reference/configuration/environment-variables#cubejs_db_bq_location)        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |
+| [`CUBEJS_DB_EXPORT_BUCKET`](/reference/configuration/environment-variables#cubejs_db_export_bucket)      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |
+| [`CUBEJS_DB_EXPORT_BUCKET_TYPE`](/reference/configuration/environment-variables#cubejs_db_export_bucket_type) | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
+| [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -156,5 +156,5 @@ BigQuery connections are made over HTTPS.
   https://support.google.com/a/answer/7378726?hl=en
 [ref-caching-large-preaggs]: /docs/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]: /docs/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-batching]: #batching

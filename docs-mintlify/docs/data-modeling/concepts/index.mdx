@@ -1,4 +1,5 @@
 ---
+title: Concepts
 description: Learn foundational OLAP concepts like cubes, dimensions, measures, and joins used in Cube data modeling.
 ---
 
@@ -347,10 +348,10 @@ data types in SQL are mapped to dimension types in the following way:
 
 | Data type in SQL | Dimension type in Cube |
 | --- | --- |
-| `timestamp`, `date`, `time` | [`time`](/docs/data-modeling/reference/types-and-formats#time) |
-| `text`, `varchar` | [`string`](/docs/data-modeling/reference/types-and-formats#string) |
-| `integer`, `bigint`, `decimal` | [`number`](/docs/data-modeling/reference/types-and-formats#number) |
-| `boolean` | [`boolean`](/docs/data-modeling/reference/types-and-formats#boolean) |
+| `timestamp`, `date`, `time` | [`time`](/reference/data-modeling/dimensions#type) |
+| `text`, `varchar` | [`string`](/reference/data-modeling/dimensions#type) |
+| `integer`, `bigint`, `decimal` | [`number`](/reference/data-modeling/dimensions#type) |
+| `boolean` | [`boolean`](/reference/data-modeling/dimensions#type) |
 
 <Note>
 
@@ -520,17 +521,17 @@ aggregate functions in SQL are mapped to measure types in the following way:
 
 | Aggregate function in SQL | Measure type in Cube |
 | --- | --- |
-| `AVG` | [`avg`](/docs/data-modeling/reference/types-and-formats#avg) |
-| `BOOL_AND`, `BOOL_OR` | [`boolean`](/docs/data-modeling/reference/types-and-formats#boolean) |
-| `COUNT` | [`count`](/docs/data-modeling/reference/types-and-formats#count) |
-| `COUNT(DISTINCT …)` | [`count_distinct`](/docs/data-modeling/reference/types-and-formats#count_distinct) |
-| `APPROX_COUNT_DISTINCT` | [`count_distinct_approx`](/docs/data-modeling/reference/types-and-formats#count_distinct_approx) |
-| `MAX` | [`max`](/docs/data-modeling/reference/types-and-formats#max) |
-| `MIN` | [`min`](/docs/data-modeling/reference/types-and-formats#min) |
-| `PERCENTILE_CONT`, `MEDIAN` | [`number`](/docs/data-modeling/reference/types-and-formats#number) |
-| `STRING_AGG`, `LISTAGG` | [`string`](/docs/data-modeling/reference/types-and-formats#string) |
-| `SUM` | [`sum`](/docs/data-modeling/reference/types-and-formats#sum) |
-| Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/docs/data-modeling/reference/types-and-formats#time) |
+| `AVG` | [`avg`](/reference/data-modeling/measures#type) |
+| `BOOL_AND`, `BOOL_OR` | [`boolean`](/reference/data-modeling/measures#type) |
+| `COUNT` | [`count`](/reference/data-modeling/measures#type) |
+| `COUNT(DISTINCT …)` | [`count_distinct`](/reference/data-modeling/measures#type) |
+| `APPROX_COUNT_DISTINCT` | [`count_distinct_approx`](/reference/data-modeling/measures#type) |
+| `MAX` | [`max`](/reference/data-modeling/measures#type) |
+| `MIN` | [`min`](/reference/data-modeling/measures#type) |
+| `PERCENTILE_CONT`, `MEDIAN` | [`number`](/reference/data-modeling/measures#type) |
+| `STRING_AGG`, `LISTAGG` | [`string`](/reference/data-modeling/measures#type) |
+| `SUM` | [`sum`](/reference/data-modeling/measures#type) |
+| Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/reference/data-modeling/measures#type) |
 
 <Note>
 
@@ -557,11 +558,11 @@ matching][ref-matching-preaggs].
 
 Additivity of a measure depends on its [type](#measure-types). Only measures
 with the following types are considered *additive*:
-[`count`](/docs/data-modeling/reference/types-and-formats#count),
-[`count_distinct_approx`](/docs/data-modeling/reference/types-and-formats#count_distinct_approx),
-[`min`](/docs/data-modeling/reference/types-and-formats#min),
-[`max`](/docs/data-modeling/reference/types-and-formats#max),
-[`sum`](/docs/data-modeling/reference/types-and-formats#sum).
+[`count`](/reference/data-modeling/measures#type),
+[`count_distinct_approx`](/reference/data-modeling/measures#type),
+[`min`](/reference/data-modeling/measures#type),
+[`max`](/reference/data-modeling/measures#type),
+[`sum`](/reference/data-modeling/measures#type).
 Measures with all other types are considered *non-additive*.
 
 #### Example
@@ -810,21 +811,21 @@ See the reference documentaton for the full list of pre-aggregation
 </Note>
 
 
-[ref-backend-query-filters]: /api-reference/rest-api/query-format#filters-format
+[ref-backend-query-filters]: /reference/rest-api/query-format#filters-format
 [ref-caching-preaggs-intro]: /docs/caching/getting-started-pre-aggregations
 [ref-caching-use-preaggs-partition-time]: /docs/caching/using-pre-aggregations#partitioning
-[ref-ref-dimension-types]: /docs/data-modeling/reference/types-and-formats#dimension-types
-[ref-ref-measure-types]: /docs/data-modeling/reference/types-and-formats#measure-types
-[ref-schema-ref-sql]: /docs/data-modeling/reference/cube#sql
-[ref-schema-ref-sql-table]: /docs/data-modeling/reference/cube#sql_table
-[ref-tutorial-incremental-preagg]: /docs/data-modeling/reference/pre-aggregations#incremental
-[ref-cubes]: /docs/data-modeling/reference/cube
-[ref-views]: /docs/data-modeling/reference/view
-[ref-dimensions]: /docs/data-modeling/reference/dimensions
-[ref-measures]: /docs/data-modeling/reference/measures
-[ref-joins]: /docs/data-modeling/reference/joins
-[ref-segments]: /docs/data-modeling/reference/segments
-[ref-preaggs]: /docs/data-modeling/reference/pre-aggregations
+[ref-ref-dimension-types]: /reference/data-modeling/dimensions#type
+[ref-ref-measure-types]: /reference/data-modeling/measures#type
+[ref-schema-ref-sql]: /reference/data-modeling/cube#sql
+[ref-schema-ref-sql-table]: /reference/data-modeling/cube#sql_table
+[ref-tutorial-incremental-preagg]: /reference/data-modeling/pre-aggregations#incremental
+[ref-cubes]: /reference/data-modeling/cube
+[ref-views]: /reference/data-modeling/view
+[ref-dimensions]: /reference/data-modeling/dimensions
+[ref-measures]: /reference/data-modeling/measures
+[ref-joins]: /reference/data-modeling/joins
+[ref-segments]: /reference/data-modeling/segments
+[ref-preaggs]: /reference/data-modeling/pre-aggregations
 [ref-extending-cubes]: /docs/data-modeling/concepts/code-reusability-extending-cubes
 [ref-polymorphic-cubes]: /docs/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /docs/data-modeling/concepts/data-blending
@@ -839,23 +840,23 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-syntax-references]: /docs/data-modeling/syntax#references
 [ref-syntax-references-column]: /docs/data-modeling/syntax#column
 [ref-calculated-measures]: /docs/data-modeling/overview#4-using-calculated-measures
-[ref-multitenancy]: /docs/configuration/multitenancy
+[ref-multitenancy]: /admin/configuration/multitenancy
 [ref-pmc]: /docs/deployment/cloud/deployment-types#production-multi-cluster
-[ref-ref-time-dimensions]: /docs/data-modeling/reference/types-and-formats#time
-[ref-ref-dimension-granularities]: /docs/data-modeling/reference/dimensions#granularities
-[ref-ref-primary-key]: /docs/data-modeling/reference/dimensions#primary_key
+[ref-ref-time-dimensions]: /reference/data-modeling/dimensions#type
+[ref-ref-dimension-granularities]: /reference/data-modeling/dimensions#granularities
+[ref-ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-custom-granularity-recipe]: /docs/data-modeling/recipes/custom-granularity
 [ref-proxy-granularity]: /docs/data-modeling/concepts/calculated-members#time-dimension-granularity
 [ref-mls]: /access-security/access-control/member-level-security
-[ref-ref-hierarchies]: /docs/data-modeling/reference/hierarchies
-[ref-ref-folders]: /docs/data-modeling/reference/view#folders
+[ref-ref-hierarchies]: /reference/data-modeling/hierarchies
+[ref-ref-folders]: /reference/data-modeling/view#folders
 [ref-multi-stage-calculations]: /docs/data-modeling/concepts/multi-stage-calculations
 [ref-entities-vs-metrics-recipe]: /docs/data-modeling/recipes/designing-metrics
 [ref-avg-and-percentile-recipe]: /docs/data-modeling/recipes/percentiles
 [ref-period-over-period-recipe]: /docs/data-modeling/recipes/period-over-period
 [ref-custom-calendar-recipe]: /docs/data-modeling/recipes/custom-calendar
 [ref-cube-with-dbt]: /docs/data-modeling/recipes/dbt
-[ref-apis-support]: /api-reference#data-modeling
-[ref-viz-tools]: /docs/configuration/visualization-tools
-[ref-data-sources]: /docs/configuration/data-sources
+[ref-apis-support]: /reference#data-modeling
+[ref-viz-tools]: /admin/configuration/visualization-tools
+[ref-data-sources]: /admin/configuration/data-sources
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes

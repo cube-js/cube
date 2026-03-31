@@ -73,6 +73,19 @@
             "pages": [
               "docs/data-modeling/overview",
               {
+                "group": "Concepts",
+                "root": "docs/data-modeling/concepts/index",
+                "pages": [
+                  "docs/data-modeling/concepts/syntax",
+                  "docs/data-modeling/concepts/calculated-members",
+                  "docs/data-modeling/concepts/multi-stage-calculations",
+                  "docs/data-modeling/concepts/working-with-joins",
+                  "docs/data-modeling/concepts/code-reusability-extending-cubes",
+                  "docs/data-modeling/concepts/polymorphic-cubes",
+                  "docs/data-modeling/concepts/data-blending"
+                ]
+              },
+              {
                 "group": "Access Control",
                 "pages": [
                   "access-security/access-control/index",
@@ -82,19 +95,7 @@
                   "access-security/access-control/context"
                 ]
               },
-              {
-                "group": "Concepts",
-                "pages": [
-                  "docs/data-modeling/concepts",
-                  "docs/data-modeling/concepts/calculated-members",
-                  "docs/data-modeling/concepts/multi-stage-calculations",
-                  "docs/data-modeling/concepts/working-with-joins",
-                  "docs/data-modeling/concepts/code-reusability-extending-cubes",
-                  "docs/data-modeling/concepts/polymorphic-cubes",
-                  "docs/data-modeling/concepts/data-blending"
-                ]
-              },
-              "docs/data-modeling/syntax",
+              
               {
                 "group": "Dynamic Data Models",
                 "pages": [
@@ -105,27 +106,13 @@
                   "docs/data-modeling/dynamic/schema-execution-environment"
                 ]
               },
-              "docs/data-modeling/visual-modeler",
-              "docs/data-modeling/data-model-ide",
-              "docs/data-modeling/dev-mode",
-              "docs/data-modeling/sql-runner",
               {
-                "group": "Reference",
+                "group": "Developing Model",
                 "pages": [
-                  "docs/data-modeling/reference/cube",
-                  "docs/data-modeling/reference/view",
-                  "docs/data-modeling/reference/measures",
-                  "docs/data-modeling/reference/dimensions",
-                  "docs/data-modeling/reference/hierarchies",
-                  "docs/data-modeling/reference/segments",
-                  "docs/data-modeling/reference/joins",
-                  "docs/data-modeling/reference/pre-aggregations",
-                  "docs/data-modeling/reference/data-access-policies",
-                  "docs/data-modeling/reference/types-and-formats",
-                  "docs/data-modeling/reference/context-variables",
-                  "docs/data-modeling/reference/cube-package",
-                  "docs/data-modeling/reference/cube_dbt",
-                  "docs/data-modeling/reference/lkml2cube"
+                  "docs/data-modeling/visual-modeler",
+                  "docs/data-modeling/data-model-ide",
+                  "docs/data-modeling/dev-mode",
+                  "docs/data-modeling/sql-runner"
                 ]
               },
               {
@@ -202,7 +189,7 @@
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
               },
-              "api-reference/mcp-server"
+              "reference/mcp-server"
             ]
           }
         ]
@@ -453,47 +440,70 @@
         "tab": "Reference",
         "groups": [
           {
-            "group": "Configuration Reference",
+            "group": "Data Modeling",
             "pages": [
-              "admin/configuration/reference/environment-variables",
-              "admin/configuration/reference/config"
+              "reference/data-modeling/cube",
+              "reference/data-modeling/view",
+              "reference/data-modeling/measures",
+              "reference/data-modeling/dimensions",
+              "reference/data-modeling/hierarchies",
+              "reference/data-modeling/segments",
+              "reference/data-modeling/joins",
+              "reference/data-modeling/pre-aggregations",
+              "reference/data-modeling/data-access-policies",
+              "reference/data-modeling/context-variables",
+              {
+                "group": "Packages",
+                "pages": [
+                  "reference/data-modeling/cube-package",
+                  "reference/data-modeling/cube_dbt",
+                  "reference/data-modeling/lkml2cube"
+                ] 
+              }
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "reference/configuration/environment-variables",
+              "reference/configuration/config"
             ]
           },
           {
             "group": "Core Data APIs",
             "pages": [
-              "api-reference/core-data-apis/index",
-              "api-reference/core-data-apis/queries",
+              "reference/core-data-apis/index",
+              "reference/core-data-apis/queries",
               {
                 "group": "SQL API",
                 "pages": [
-                  "api-reference/core-data-apis/sql-api",
-                  "api-reference/core-data-apis/sql-api/query-format",
-                  "api-reference/core-data-apis/sql-api/joins",
-                  "api-reference/core-data-apis/sql-api/security",
-                  "api-reference/core-data-apis/sql-api/reference"
+                  "reference/core-data-apis/sql-api",
+                  "reference/core-data-apis/sql-api/query-format",
+                  "reference/core-data-apis/sql-api/joins",
+                  "reference/core-data-apis/sql-api/security",
+                  "reference/core-data-apis/sql-api/reference"
                 ]
               },
               {
                 "group": "REST API",
                 "pages": [
-                  "api-reference/core-data-apis/rest-api",
-                  "api-reference/core-data-apis/rest-api/query-format",
-                  "api-reference/core-data-apis/rest-api/reference"
+                  "reference/core-data-apis/rest-api",
+                  "reference/core-data-apis/rest-api/query-format",
+                  "reference/core-data-apis/rest-api/reference"
                 ]
               },
               {
                 "group": "GraphQL API",
                 "pages": [
-                  "api-reference/core-data-apis/graphql-api",
-                  "api-reference/core-data-apis/graphql-api/reference"
+                  "reference/core-data-apis/graphql-api",
+                  "reference/core-data-apis/graphql-api/reference"
                 ]
               },
               {
                 "group": "DAX API",
                 "pages": [
-                  "api-reference/core-data-apis/dax-api",
-                  "api-reference/core-data-apis/dax-api/reference"
+                  "reference/core-data-apis/dax-api",
+                  "reference/core-data-apis/dax-api/reference"
                 ]
               }
             ]
@@ -501,22 +511,22 @@
           {
             "group": "Embed APIs",
             "pages": [
-              "api-reference/embed-apis/index",
-              "api-reference/embed-apis/chat-api",
-              "api-reference/embed-apis/generate-session"
+              "reference/embed-apis/index",
+              "reference/embed-apis/chat-api",
+              "reference/embed-apis/generate-session"
             ]
           },
           {
             "group": "Other APIs",
             "pages": [
-              "api-reference/control-plane-api",
+              "reference/control-plane-api",
               {
                 "group": "Orchestration API",
                 "pages": [
-                  "api-reference/orchestration-api",
-                  "api-reference/orchestration-api/airflow",
-                  "api-reference/orchestration-api/dagster",
-                  "api-reference/orchestration-api/prefect"
+                  "reference/orchestration-api",
+                  "reference/orchestration-api/airflow",
+                  "reference/orchestration-api/dagster",
+                  "reference/orchestration-api/prefect"
                 ]
               }
             ]
@@ -524,18 +534,18 @@
           {
             "group": "JavaScript SDK",
             "pages": [
-              "api-reference/javascript-sdk",
-              "api-reference/javascript-sdk/react",
-              "api-reference/javascript-sdk/vue",
-              "api-reference/javascript-sdk/angular",
+              "reference/javascript-sdk",
+              "reference/javascript-sdk/react",
+              "reference/javascript-sdk/vue",
+              "reference/javascript-sdk/angular",
               {
                 "group": "SDK Reference",
                 "pages": [
-                  "api-reference/javascript-sdk/reference/cubejs-client-core",
-                  "api-reference/javascript-sdk/reference/cubejs-client-react",
-                  "api-reference/javascript-sdk/reference/cubejs-client-vue",
-                  "api-reference/javascript-sdk/reference/cubejs-client-ngx",
-                  "api-reference/javascript-sdk/reference/cubejs-client-ws-transport"
+                  "reference/javascript-sdk/reference/cubejs-client-core",
+                  "reference/javascript-sdk/reference/cubejs-client-react",
+                  "reference/javascript-sdk/reference/cubejs-client-vue",
+                  "reference/javascript-sdk/reference/cubejs-client-ngx",
+                  "reference/javascript-sdk/reference/cubejs-client-ws-transport"
                 ]
               }
             ]
@@ -566,12 +576,12 @@
           {
             "group": "API Recipes",
             "pages": [
-              "api-reference/recipes/getting-unique-values-for-a-field",
-              "api-reference/recipes/cast-numerics",
-              "api-reference/recipes/sorting",
-              "api-reference/recipes/pagination",
-              "api-reference/recipes/drilldowns",
-              "api-reference/recipes/real-time-data-fetch"
+              "reference/recipes/getting-unique-values-for-a-field",
+              "reference/recipes/cast-numerics",
+              "reference/recipes/sorting",
+              "reference/recipes/pagination",
+              "reference/recipes/drilldowns",
+              "reference/recipes/real-time-data-fetch"
             ]
           }
         ]
@@ -604,5 +614,23 @@
       "github": "https://github.com/cube-js/cube",
       "linkedin": "https://www.linkedin.com/company/cube-dev"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/docs/data-modeling/reference/types-and-formats",
+      "destination": "/reference/data-modeling/measures#type"
+    },
+    {
+      "source": "/docs/data-modeling/reference/:slug*",
+      "destination": "/reference/data-modeling/:slug*"
+    },
+    {
+      "source": "/api-reference/:slug*",
+      "destination": "/reference/:slug*"
+    },
+    {
+      "source": "/docs/configuration/:slug*",
+      "destination": "/admin/configuration/:slug*"
+    }
+  ]
 }

@@ -33,17 +33,17 @@ CUBEJS_DB_PASS=**********
 
 | Environment Variable               | Description                                                                         | Possible Values           | Required |
 | ---------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| [`CUBEJS_DB_HOST`](/docs/configuration/reference/environment-variables#cubejs_db_host)                   | The host URL for a database                                                         | A valid database host URL |    ✅    |
-| [`CUBEJS_DB_PORT`](/docs/configuration/reference/environment-variables#cubejs_db_port)                   | The port for the database connection                                                | A valid port number       |    ❌    |
-| [`CUBEJS_DB_NAME`](/docs/configuration/reference/environment-variables#cubejs_db_name)                   | The name of the database to connect to                                              | A valid database name     |    ✅    |
-| [`CUBEJS_DB_USER`](/docs/configuration/reference/environment-variables#cubejs_db_user)                   | The username used to connect to the database                                        | A valid database username |    ✅    |
-| [`CUBEJS_DB_PASS`](/docs/configuration/reference/environment-variables#cubejs_db_pass)                   | The password used to connect to the database                                        | A valid database password |    ✅    |
-| [`CUBEJS_DB_CLICKHOUSE_READONLY`](/docs/configuration/reference/environment-variables#cubejs_db_clickhouse_readonly)    | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
-| [`CUBEJS_DB_CLICKHOUSE_COMPRESSION`](/docs/configuration/reference/environment-variables#cubejs_db_clickhouse_compression) | Whether the ClickHouse client has compression enabled or not                        | `true`, `false`           |    ❌    |
-| [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool)               | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency)               | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
+| [`CUBEJS_DB_HOST`](/reference/configuration/environment-variables#cubejs_db_host)                   | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| [`CUBEJS_DB_PORT`](/reference/configuration/environment-variables#cubejs_db_port)                   | The port for the database connection                                                | A valid port number       |    ❌    |
+| [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)                   | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)                   | The username used to connect to the database                                        | A valid database username |    ✅    |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)                   | The password used to connect to the database                                        | A valid database password |    ✅    |
+| [`CUBEJS_DB_CLICKHOUSE_READONLY`](/reference/configuration/environment-variables#cubejs_db_clickhouse_readonly)    | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
+| [`CUBEJS_DB_CLICKHOUSE_COMPRESSION`](/reference/configuration/environment-variables#cubejs_db_clickhouse_compression) | Whether the ClickHouse client has compression enabled or not                        | `true`, `false`           |    ❌    |
+| [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)               | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)               | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
 
 When using [pre-aggregations][ref-preaggs] with ClickHouse, you have to define
@@ -120,7 +120,7 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ## SSL
 
 To enable SSL-encrypted connections between Cube and ClickHouse, set the
-[`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
+[`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
@@ -128,20 +128,20 @@ Database][ref-recipe-enable-ssl].
 
 You can connect to a ClickHouse database when your user's permissions are
 [restricted][clickhouse-readonly] to read-only, by setting
-[`CUBEJS_DB_CLICKHOUSE_READONLY`](/docs/configuration/reference/environment-variables#cubejs_db_clickhouse_readonly) to `true`.
+[`CUBEJS_DB_CLICKHOUSE_READONLY`](/reference/configuration/environment-variables#cubejs_db_clickhouse_readonly) to `true`.
 
 You can connect to a ClickHouse database with compression enabled, by setting
-[`CUBEJS_DB_CLICKHOUSE_COMPRESSION`](/docs/configuration/reference/environment-variables#cubejs_db_clickhouse_compression) to `true`.
+[`CUBEJS_DB_CLICKHOUSE_COMPRESSION`](/reference/configuration/environment-variables#cubejs_db_clickhouse_compression) to `true`.
 
 [clickhouse]: https://clickhouse.tech/
 [clickhouse-docs-users]:
   https://clickhouse.tech/docs/en/operations/settings/settings-users/
 [clickhouse-readonly]: https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly
 [ref-caching-using-preaggs-build-strats]: /docs/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-recipe-enable-ssl]: /docs/configuration/recipes/using-ssl-connections-to-data-source
+[ref-recipe-enable-ssl]: /admin/configuration/recipes/using-ssl-connections-to-data-source
 [ref-caching-large-preaggs]: /docs/caching/using-pre-aggregations#export-bucket
-[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-batching]: #batching
 [ref-preaggs]: /docs/caching/using-pre-aggregations
-[ref-preaggs-indexes]: /docs/data-modeling/reference/pre-aggregations#indexes
-[ref-preaggs-rollup-join]: /docs/data-modeling/reference/pre-aggregations#rollup_join
+[ref-preaggs-indexes]: /reference/data-modeling/pre-aggregations#indexes
+[ref-preaggs-rollup-join]: /reference/data-modeling/pre-aggregations#rollup_join

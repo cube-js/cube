@@ -1,0 +1,1216 @@
+---
+title: Dimensions
+description: Reference for every dimension option on a cube—identifiers, SQL, types, formatting, and hierarchy membership.
+---
+
+# Dimensions
+
+You can use the `dimensions` parameter within [cubes][ref-ref-cubes] to define dimensions.
+You can think about a dimension as an attribute related to a measure, e.g. the measure `user_count`
+can have dimensions like `country`, `age`, `occupation`, etc.
+
+Any dimension should have the following parameters: [`name`](#name), [`sql`](#sql), and [`type`](#type).
+
+Dimensions can be also organized into [hierarchies][ref-ref-hierarchies].
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a dimension. It must be unique
+among all dimensions, measures, and segments within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+
+    dimensions:
+      - name: price
+        sql: price
+        type: number
+
+      - name: brand_name
+        sql: brand_name
+        type: string
+
+
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  dimensions: {
+    price: {
+      sql: `price`,
+      type: `number`
+    },
+
+    brand_name: {
+      sql: `brand_name`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `case`
+
+The `case` statement is used to define dimensions based on SQL conditions.
+
+The `when` parameters declares a series of `sql` conditions and `labels`
+that are returned if the condition is truthy. The `else` parameter declares
+the default `label` that would be returned if there's no truthy `sql`
+condition.
+
+The following example will create a `size` dimension with values
+`xl`, `xxl`, and `Unknown`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: size
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.size_value = 'xl-en'"
+              label: xl
+            - sql: "{CUBE}.size_value = 'xl'"
+              label: xl
+            - sql: "{CUBE}.size_value = 'xxl-en'"
+              label: xxl
+            - sql: "{CUBE}.size_value = 'xxl'"
+              label: xxl
+          else:
+            label: Unknown
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` }
+        ],
+        else: { label: `Unknown` }
+      }
+    }
+  }
+})
+
+```
+
+</CodeGroup>
+
+The `label` property can be defined dynamically as an object with a `sql`
+property in JavaScript models:
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          {
+            sql: `${CUBE}.meta_value = 'xl-en'`,
+            label: { sql: `${CUBE}.english_size` }
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xl'`,
+            label: { sql: `${CUBE}.euro_size` }
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xxl-en'`,
+            label: { sql: `${CUBE}.english_size` }
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xxl'`,
+            label: { sql: `${CUBE}.euro_size` }
+          }
+        ],
+        else: { label: `Unknown` }
+      }
+    }
+  }
+})
+```
+
+### `title`
+
+You can use the `title` parameter to change a dimension's displayed name. By
+default, Cube will humanize your dimension key to create a display name. In
+order to override default behavior, please use the `title` property:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: meta_value
+        title: Size
+        sql: meta_value
+        type: string
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    meta_value: {
+      title: `Size`,
+      sql: `meta_value`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `description`
+
+This parameter provides a human-readable description of a dimension.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        description: Comments for orders
+        sql: comments
+        type: string
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      description: `Comments for orders`,
+      sql: `comments`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a dimension. Valid
+values for `public` are `true` and `false`. When set to `false`, this dimension
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        sql: comment
+        type: string
+        public: false
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      sql: `comment`,
+      type: `string`,
+      public: false
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `format`
+
+`format` is an optional parameter. It controls how dimension values are
+displayed to data consumers. The available formats depend on the dimension type.
+
+For `string` dimensions:
+
+| Format | Description |
+|--------|-------------|
+| `imageUrl` | Display the value as an image |
+| `link` | Display the value as a hyperlink |
+
+For `number` dimensions, you can use the same named formats and custom
+[d3-format][link-d3-format] specifiers as [measures](/reference/data-modeling/measures#format):
+
+| Format | Description | Example | Output |
+|--------|-------------|---------|--------|
+| `number` / `number_N` | Grouped fixed-point | `number` | 1,234.57 |
+| `percent` / `percent_N` | Percentage | `percent_1` | 12.5% |
+| `currency` / `currency_N` | Currency with grouping | `currency_0` | $1,235 |
+| `abbr` / `abbr_N` | SI prefix (K, M, G, …) | `abbr` | 1.2K |
+| `accounting` / `accounting_N` | Negatives in parentheses | `accounting_2` | (1,234.57) |
+| `id` | Raw integer, no grouping | `id` | 12345 |
+
+For `time` dimensions, you can use [POSIX strftime][link-strftime] format strings
+with [d3-time-format][link-d3-time-format] extensions (e.g., `%Y-%m-%d %H:%M:%S`).
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: total
+        sql: amount
+        type: number
+        format: currency
+
+      - name: image
+        sql: "CONCAT('https://img.example.com/id/', {id})"
+        type: string
+        format: imageUrl
+
+      - name: order_link
+        sql: "'http://mywebsite.com/orders/' || id"
+        type: string
+        format: link
+
+      - name: crm_link
+        sql: "'https://na1.salesforce.com/' || id"
+        type: string
+        format:
+          label: View in Salesforce
+          type: link
+
+      - name: created_at
+        sql: created_at
+        type: time
+        format: "%Y-%m-%d %H:%M:%S"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    total: {
+      sql: `amount`,
+      type: `number`,
+      format: `currency`
+    },
+
+    image: {
+      sql: `CONCAT('https://img.example.com/id/', ${id})`,
+      type: `string`,
+      format: `imageUrl`
+    },
+
+    order_link: {
+      sql: `'http://mywebsite.com/orders/' || id`,
+      type: `string`,
+      format: `link`
+    },
+
+    crm_link: {
+      sql: `'https://na1.salesforce.com/' || id`,
+      type: `string`,
+      format: {
+        label: `View in Salesforce`,
+        type: `link`
+      }
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      format: `%Y-%m-%d %H:%M:%S`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Common time format examples:
+
+| Format string | Example output |
+|---------------|----------------|
+| `%m/%d/%Y %H:%M` | 12/04/2025 14:30 |
+| `%Y-%m-%d %H:%M:%S` | 2025-12-04 14:30:00 |
+| `%B %d, %Y` | December 04, 2025 |
+| `%b %d, %Y` | Dec 04, 2025 |
+| `%I:%M %p` | 02:30 PM |
+| `%A, %B %d` | Thursday, December 04 |
+| `Q%q %Y` | Q4 2025 |
+| `Week %V, %Y` | Week 49, 2025 |
+
+### `currency`
+
+The optional `currency` parameter specifies the [ISO 4217][link-iso-4217]
+currency code for a `number`-type dimension. Use it alongside
+`format: currency` to indicate which currency the values represent.
+
+The value is a 3-letter currency code (e.g., `USD`, `EUR`, `GBP`) and is
+case-insensitive.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: price
+        sql: price
+        type: number
+        format: currency
+        currency: EUR
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    price: {
+      sql: `price`,
+      type: `number`,
+      format: `currency`,
+      currency: `EUR`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+<Info>
+
+The `currency` parameter can only be used with dimensions of type `number`.
+Using it with other dimension types will result in a validation error.
+
+</Info>
+
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        meta:
+          any: value
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      meta: {
+        any: "value"
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `order`
+
+The `order` parameter specifies the default sort order for a dimension. Valid
+values are `asc` (ascending) and `desc` (descending). This parameter is optional.
+
+When set, the dimension's default sort order is exposed via
+[APIs and integrations][ref-apis]. Consuming applications, such as BI tools
+and custom frontends, can use this metadata to apply consistent default sorting
+when displaying dimension values, ensuring a uniform user experience across
+different tools connected to the semantic layer.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+        order: asc
+
+      - name: created_at
+        sql: created_at
+        type: time
+        order: desc
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+      order: `asc`
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      order: `desc`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `primary_key`
+
+Specify if a dimension is a primary key for a cube. The default value is
+`false`.
+
+A primary key is used to make [joins][ref-schema-ref-joins] work properly.
+
+<Info>
+
+Setting `primary_key` to `true` will change the default value of the [`public`
+parameter](#public) to `false`. If you still want `public` to be `true`, set it
+explicitly.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+It is possible to have more than one primary key dimension in a cube if you'd
+like them all to be parts of a composite key:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    sql: |
+      SELECT 1 AS column_a, 1 AS column_b UNION ALL
+      SELECT 2 AS column_a, 1 AS column_b UNION ALL
+      SELECT 1 AS column_a, 2 AS column_b UNION ALL
+      SELECT 2 AS column_a, 2 AS column_b
+
+    dimensions:
+      - name: composite_key_a
+        sql: column_a
+        type: number
+        primary_key: true
+
+      - name: composite_key_b
+        sql: column_b
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  sql: `
+    SELECT 1 AS column_a, 1 AS column_b UNION ALL
+    SELECT 2 AS column_a, 1 AS column_b UNION ALL
+    SELECT 1 AS column_a, 2 AS column_b UNION ALL
+    SELECT 2 AS column_a, 2 AS column_b
+  `,
+
+  dimensions: {
+    composite_key_a: {
+      sql: `column_a`,
+      type: `number`,
+      primary_key: true
+    },
+
+    composite_key_b: {
+      sql: `column_b`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Querying the `count` measure of the cube shown above will generate the following
+SQL to the upstream data source:
+
+```sql
+SELECT
+  count(
+    CAST("product".column_a as TEXT) || CAST("product".column_b as TEXT)
+  ) "product__count"
+FROM (
+  SELECT 1 AS column_a, 1 AS column_b UNION ALL
+  SELECT 2 AS column_a, 1 AS column_b UNION ALL
+  SELECT 1 AS column_a, 2 AS column_b UNION ALL
+  SELECT 2 AS column_a, 2 AS column_b
+) AS "product"
+```
+
+### `propagate_filters_to_sub_query`
+
+When this statement is set to `true`, the filters applied to the query will be
+passed to the [subquery][self-subquery].
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+        propagate_filters_to_sub_query: true
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+      propagate_filters_to_sub_query: true
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `sql`
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the dimension. Please refer to the [Dimension
+Types][ref-schema-ref-dims-types] to understand what the `sql` parameter should
+be for a given dimension type.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `mask`
+
+The optional `mask` parameter defines the replacement value used when the
+dimension is masked by a [data masking][ref-data-masking] access policy.
+
+The mask can be a static value (number, boolean, or string) or a SQL expression:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: secret_code
+        sql: secret_code
+        type: string
+        mask:
+          sql: "CONCAT('***', RIGHT({CUBE}.secret_code, 3))"
+
+      - name: revenue
+        sql: revenue
+        type: number
+        mask: -1
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    secret_code: {
+      sql: `secret_code`,
+      type: `string`,
+      mask: {
+        sql: `CONCAT('***', RIGHT(${CUBE}.secret_code, 3))`
+      }
+    },
+
+    revenue: {
+      sql: `revenue`,
+      type: `number`,
+      mask: -1
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+If no `mask` is defined, the default mask value is `NULL`. See
+[data masking][ref-data-masking] for more details.
+
+### `sub_query`
+
+The `sub_query` statement allows you to reference a measure in a dimension. It's
+an advanced concept and you can learn more about it [here][ref-subquery].
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+```
+
+```javascript title="JavaScript"
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `type`
+
+`type` is a required parameter. There are various types that can be assigned to
+a dimension. A dimension can only have one type.
+
+| Type | Description |
+|------|-------------|
+| `time` | Timestamp column for time series data. The target column should be `TIMESTAMP`; cast other temporal types in `sql`. See [this recipe][ref-string-time-dims] for string-based datetimes. |
+| `string` | Text fields containing letters or special characters. |
+| `number` | Numeric or integer fields. |
+| `boolean` | Boolean fields or data coercible to boolean. |
+| `switch` | Predefined set of allowed values (enum-like). Useful for [`case` measures][ref-case-measures]. Tesseract only. |
+| `geo` | Geographic coordinates. Requires `latitude` and `longitude` sub-parameters instead of `sql`. |
+
+<Warning>
+
+`switch` dimensions are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: completed_at
+        sql: completed_at
+        type: time
+
+      - name: full_name
+        sql: "CONCAT({first_name}, ' ', {last_name})"
+        type: string
+
+      - name: amount
+        sql: amount
+        type: number
+
+      - name: is_enabled
+        sql: is_enabled
+        type: boolean
+
+      - name: location
+        type: geo
+        latitude:
+          sql: "{CUBE}.latitude"
+        longitude:
+          sql: "{CUBE}.longitude"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    completed_at: {
+      sql: `completed_at`,
+      type: `time`
+    },
+
+    full_name: {
+      sql: `CONCAT(${first_name}, ' ', ${last_name})`,
+      type: `string`
+    },
+
+    amount: {
+      sql: `amount`,
+      type: `number`
+    },
+
+    is_enabled: {
+      sql: `is_enabled`,
+      type: `boolean`
+    },
+
+    location: {
+      type: `geo`,
+      latitude: {
+        sql: `${CUBE}.latitude`
+      },
+      longitude: {
+        sql: `${CUBE}.longitude`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `granularities`
+
+By default, the following granularities are available for time dimensions:
+`year`, `quarter`, `month`, `week` (starting on Monday), `day`, `hour`, `minute`,
+`second`.
+
+You can use the `granularities` parameter with any dimension of the [type
+`time`][ref-time-dimensions] to define one or more custom granularities, such as
+a *week starting on Sunday* or a *fiscal year*.
+
+<Note>
+
+See [this recipe][ref-custom-granularity-recipe] for more custom granularity
+examples.
+
+</Note>
+
+<Warning>
+
+Custom granularities are supported for the following [data sources][ref-data-sources]:
+Amazon Athena, Amazon Redshift, DuckDB, Databricks, Google BigQuery, ClickHouse, Microsoft SQL Server, MySQL, Postgres, and Snowflake.
+Please [file an issue](https://github.com/cube-js/cube/issues) if you need support for another data source.
+
+</Warning>
+
+For each custom granularity, the `interval` parameter is required. It specifies
+the duration of the time interval and has the following format:
+`quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
+
+Optionally, a custom granularity might use the `offset` parameter to specify how
+the time interval is shifted forward or backward in time. It has the same
+format as `interval`, however, you can also provide negative quantities, e.g.,
+`-1 day` or `1 month -10 days`.
+
+Alternatively, instead of `offset`, you can provide the `origin` parameter.
+When `origin` is provided, time intervals will be shifted in a way that one of
+them will match the provided origin. It accepts an ISO 8601-compliant [date time
+string][link-date-time-string], e.g., `2024-01-02` or `2024-01-02T12:00:00.000Z`.
+
+Optionally, a custom granularity might have the `title` parameter with a
+human-friendly description.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql: |
+      SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+        granularities:
+          - name: quarter_hour
+            interval: 15 minutes
+
+          - name: week_starting_on_sunday
+            interval: 1 week
+            offset: -1 day
+
+          - name: fiscal_year_starting_on_april_01
+            title: Corporate and government fiscal year in the United Kingdom
+            interval: 1 year
+            origin: "2025-04-01"
+            # You have to use quotes here to make `origin` a valid YAML string 
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql: `
+    SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+  `,
+
+  dimensions: {
+    time: {
+      sql: `time`,
+      type: `time`,
+      granularities: {
+        quarter_hour: {
+          interval: `15 minutes`
+        },
+        week_starting_on_sunday: {
+          interval: `1 week`,
+          offset: `-1 day`
+        },
+        fiscal_year_starting_on_april_01: {
+          title: `Corporate and government fiscal year in the United Kingdom`,
+          interval: `1 year`,
+          origin: `2025-04-01`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+#### Calendar cubes
+
+When the `granularities` parameter is used in time dimensions within [calendar
+cubes][ref-calendar-cubes], you can still use it to define custom granularities.
+
+Additionally, you can override the _default granularities_. This can be useful for
+modeling custom calendars, such as fiscal calendars.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    sql: >
+      SELECT
+        date_key,
+        calendar_date,
+        start_of_month,
+        start_of_quarter,
+        start_of_year
+      FROM calendar_table
+
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: calendar_date
+        type: time
+        granularities:
+          - name: month
+            sql: "{CUBE}.start_of_month"
+
+          - name: quarter
+            sql: "{CUBE}.start_of_quarter"
+
+          - name: year
+            sql: "{CUBE}.start_of_year"
+
+```
+
+```javascript title="JavaScript"
+cube(`fiscal_calendar`, {
+  calendar: true,
+  sql: `
+    SELECT
+      date_key,
+      calendar_date,
+      start_of_month,
+      start_of_quarter,
+      start_of_year
+    FROM calendar_table
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `date_key`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `calendar_date`,
+      type: `time`,
+      granularities: {
+        month: {
+          sql: `${CUBE}.start_of_month`
+        },
+        quarter: {
+          sql: `${CUBE}.start_of_quarter`
+        },
+        year: {
+          sql: `${CUBE}.start_of_year`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `time_shift`
+
+The `time_shift` parameter allows overriding the time shift behavior for time dimensions
+within [calendar cubes][ref-calendar-cubes]. Such time shifts can be referenced in
+[time-shift measures][ref-time-shift] of other cubes, enabling the use of custom calendars.
+
+The `time_shift` parameter can only be set on _time dimensions_ within _calendar cubes_,
+i.e., cubes where the [`calendar` parameter][ref-cube-calendar] is set to `true`. 
+
+The `time_shift` parameter accepts an array of time shift definitions. Each definition
+can include `time_dimension`, `type`, `interval`, and `name` parameters, similarly to the
+[`time_shift` parameter][ref-measure-time-shift] of time-shift measures. Additionally,
+you can use the `sql` parameter to define a custom time mapping using a SQL expression.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    sql: >
+      SELECT
+        date_key,
+        calendar_date,
+        fiscal_date_prior_year,
+        fiscal_date_next_quarter
+      FROM calendar_table
+
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: calendar_date
+        type: time
+        time_shift:
+          - name: prior_calendar_year
+            type: prior
+            interval: 1 year
+
+          - name: next_calendar_quarter
+            type: next
+            interval: 1 quarter
+
+          - name: prior_fiscal_year
+            sql: "{CUBE}.fiscal_date_prior_year"
+
+          - name: next_fiscal_quarter
+            sql: "{CUBE}.fiscal_date_next_quarter"
+```
+
+```javascript title="JavaScript"
+cube(`fiscal_calendar`, {
+  calendar: true,
+  sql: `
+    SELECT
+      date_key,
+      calendar_date,
+      fiscal_date_prior_year,
+      fiscal_date_next_quarter
+    FROM calendar_table
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `date_key`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `calendar_date`,
+      type: `time`,
+      time_shift: [
+        {
+          name: `prior_calendar_year`,
+          type: `prior`,
+          interval: `1 year`
+        },
+        {
+          name: `next_calendar_quarter`,
+          type: `next`,
+          interval: `1 quarter`
+        },
+        {
+          name: `prior_fiscal_year`,
+          sql: `${CUBE}.fiscal_date_prior_year`
+        },
+        {
+          name: `next_fiscal_quarter`,
+          sql: `${CUBE}.fiscal_date_next_quarter`
+        }
+      ]
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+
+[ref-ref-cubes]: /reference/data-modeling/cube
+[ref-schema-ref-joins]: /reference/data-modeling/joins
+[ref-subquery]: /docs/data-modeling/concepts/calculated-members#subquery-dimensions
+[self-subquery]: #sub-query
+[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-playground]: /docs/workspace/playground
+[ref-apis]: /reference
+[ref-time-dimensions]: #type
+[link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
+[ref-custom-granularity-recipe]: /docs/data-modeling/recipes/custom-granularity
+[ref-ref-hierarchies]: /reference/data-modeling/hierarchies
+[ref-data-sources]: /admin/configuration/data-sources
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
+[ref-time-shift]: /docs/data-modeling/concepts/multi-stage-calculations#time-shift
+[ref-cube-calendar]: /reference/data-modeling/cube#calendar
+[ref-measure-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-data-masking]: /access-security/access-control/data-access-policies#data-masking
+[link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
+[link-d3-format]: https://d3js.org/d3-format
+[link-strftime]: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+[link-d3-time-format]: https://d3js.org/d3-time-format
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-case-measures]: /reference/data-modeling/measures#case
+[ref-meta-api]: /reference/rest-api/reference#base_pathv1meta
+[ref-string-time-dims]: /docs/data-modeling/recipes/string-time-dimensions

@@ -9,7 +9,7 @@ description: Set up Cube with DuckDB for cloud object storage, local database fi
 support for querying data in CSV, JSON and Parquet formats from an AWS
 S3-compatible blob storage. This means you can [query data stored in AWS S3,
 Google Cloud Storage, or Cloudflare R2][duckdb-docs-s3-import].
-You can also use the [`CUBEJS_DB_DUCKDB_DATABASE_PATH`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_database_path) environment variable to
+You can also use the [`CUBEJS_DB_DUCKDB_DATABASE_PATH`](/reference/configuration/environment-variables#cubejs_db_duckdb_database_path) environment variable to
 connect to a local DuckDB database.
 
 <Frame>
@@ -69,10 +69,10 @@ deployment][ref-demo-deployment] in Cube Cloud.
 
 | Environment Variable                       | Description                                                                                                           | Possible Values                                               | Required |
 |--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|:--------:|
-| [`CUBEJS_DB_DUCKDB_MEMORY_LIMIT`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_memory_limit)            | The maximum memory limit for DuckDB. Equivalent to `SET memory_limit=<MEMORY_LIMIT>`. Default is 75% of available RAM | A valid memory limit                                          |    ❌     |
-| [`CUBEJS_DB_DUCKDB_SCHEMA`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_schema)                  | The [default search schema][link-duckdb-configuration-ref]                                                            | A valid schema name                                           |    ❌     |
-| [`CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_motherduck_token)        | The service token to use for connections to MotherDuck                                                                | A valid [MotherDuck service token][motherduck-docs-svc-token] |    ❌     |
-| [`CUBEJS_DB_DUCKDB_DATABASE_PATH`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_database_path)           | The database filepath to use for connection to a local database.                                                      | A valid duckdb database file path                             |    ❌     |
+| [`CUBEJS_DB_DUCKDB_MEMORY_LIMIT`](/reference/configuration/environment-variables#cubejs_db_duckdb_memory_limit)            | The maximum memory limit for DuckDB. Equivalent to `SET memory_limit=<MEMORY_LIMIT>`. Default is 75% of available RAM | A valid memory limit                                          |    ❌     |
+| [`CUBEJS_DB_DUCKDB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_duckdb_schema)                  | The [default search schema][link-duckdb-configuration-ref]                                                            | A valid schema name                                           |    ❌     |
+| [`CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN`](/reference/configuration/environment-variables#cubejs_db_duckdb_motherduck_token)        | The service token to use for connections to MotherDuck                                                                | A valid [MotherDuck service token][motherduck-docs-svc-token] |    ❌     |
+| [`CUBEJS_DB_DUCKDB_DATABASE_PATH`](/reference/configuration/environment-variables#cubejs_db_duckdb_database_path)           | The database filepath to use for connection to a local database.                                                      | A valid duckdb database file path                             |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`        | The Access Key ID to use for database connections                                                                     | A valid Access Key ID                                         |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY`    | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_ENDPOINT`             | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ❌     |
@@ -80,12 +80,12 @@ deployment][ref-demo-deployment] in Cube Cloud.
 | `CUBEJS_DB_DUCKDB_S3_USE_SSL`              | Use SSL for connection                                                                                                | A boolean                                                     |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_URL_STYLE`            | To choose the S3 URL style(vhost or path)                                                                             | `vhost` or `path`                                             |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`        | The token for the S3 session                                                                                          | A valid Session Token                                         |    ❌     |
-| [`CUBEJS_DB_DUCKDB_EXTENSIONS`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_extensions)              | A comma-separated list of DuckDB extensions to install and load                                                       | A comma-separated list of DuckDB extensions                   |    ❌     |
-| [`CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS`](/docs/configuration/reference/environment-variables#cubejs_db_duckdb_community_extensions)    | A comma-separated list of DuckDB community extensions to install and load                                             | A comma-separated list of DuckDB community extensions         |    ❌     |
+| [`CUBEJS_DB_DUCKDB_EXTENSIONS`](/reference/configuration/environment-variables#cubejs_db_duckdb_extensions)              | A comma-separated list of DuckDB extensions to install and load                                                       | A comma-separated list of DuckDB extensions                   |    ❌     |
+| [`CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS`](/reference/configuration/environment-variables#cubejs_db_duckdb_community_extensions)    | A comma-separated list of DuckDB community extensions to install and load                                             | A comma-separated list of DuckDB community extensions         |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN` | A flag to use credentials chain for secrets for S3 connections                                                        | `true`, `false`. Defaults to `false`                          |    ❌     |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency)                       | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                    | A valid number                                                |    ❌     |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)                       | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                    | A valid number                                                |    ❌     |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -137,6 +137,6 @@ connections are made over HTTPS.
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
 [ref-caching-using-preaggs-build-strats]: /docs/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-batching]: #batching
 [ref-demo-deployment]: /docs/deployment/cloud/deployments#demo-deployments

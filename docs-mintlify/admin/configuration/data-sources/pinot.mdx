@@ -44,16 +44,16 @@ CUBEJS_DB_PASS=**********
 
 | Environment Variable            | Description                                           | Possible Values     | Required |
 |---------------------------------|-------------------------------------------------------|---------------------|:--------:|
-| [`CUBEJS_DB_HOST`](/docs/configuration/reference/environment-variables#cubejs_db_host)                | The host URL for your Pinot broker                    | A valid host URL    |    ✅    |
-| [`CUBEJS_DB_PORT`](/docs/configuration/reference/environment-variables#cubejs_db_port)                | The port for the database connection                  | A valid port number |    ✅    |
-| [`CUBEJS_DB_USER`](/docs/configuration/reference/environment-variables#cubejs_db_user)                | The username used to connect to the broker            | A valid username    |    ❌    |
-| [`CUBEJS_DB_PASS`](/docs/configuration/reference/environment-variables#cubejs_db_pass)                | The password used to connect to the broker            | A valid password    |    ❌    |
-| [`CUBEJS_DB_NAME`](/docs/configuration/reference/environment-variables#cubejs_db_name)                | The database name for StarTree                        | A valid name        |    ❌    |
-| [`CUBEJS_DB_PINOT_NULL_HANDLING`](/docs/configuration/reference/environment-variables#cubejs_db_pinot_null_handling) | If `true`, enables null handling. Default is `false`  | `true`, `false`     |    ❌    |
-| [`CUBEJS_DB_PINOT_AUTH_TOKEN`](/docs/configuration/reference/environment-variables#cubejs_db_pinot_auth_token)    | The authentication token for StarTree                 | A valid token       |    ❌    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_HOST`](/reference/configuration/environment-variables#cubejs_db_host)                | The host URL for your Pinot broker                    | A valid host URL    |    ✅    |
+| [`CUBEJS_DB_PORT`](/reference/configuration/environment-variables#cubejs_db_port)                | The port for the database connection                  | A valid port number |    ✅    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)                | The username used to connect to the broker            | A valid username    |    ❌    |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)                | The password used to connect to the broker            | A valid password    |    ❌    |
+| [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)                | The database name for StarTree                        | A valid name        |    ❌    |
+| [`CUBEJS_DB_PINOT_NULL_HANDLING`](/reference/configuration/environment-variables#cubejs_db_pinot_null_handling) | If `true`, enables null handling. Default is `false`  | `true`, `false`     |    ❌    |
+| [`CUBEJS_DB_PINOT_AUTH_TOKEN`](/reference/configuration/environment-variables#cubejs_db_pinot_auth_token)    | The authentication token for StarTree                 | A valid token       |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -104,5 +104,5 @@ Cube does not require any additional configuration to enable SSL as Pinot connec
 [link-pinot-nvs]: https://docs.pinot.apache.org/developers/advanced/null-value-support#advanced-null-handling-support
 [pinot-docs-approx-agg-fns]:
   https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting
-[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [link-startree]: https://startree.ai

@@ -59,7 +59,7 @@ By default, Cube uses the following concurrency settings for data sources:
 | [Snowflake][ref-snowflake] | 8 |
 | All other data sources | 5 or [less, if specified in the driver][link-github-data-source-concurrency] |
 
-You can use the [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) environment variable to adjust the maximum
+You can use the [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) environment variable to adjust the maximum
 number of concurrent queries to a data source. It's recommended to use the default
 configuration unless you're sure that your data source can handle more concurrent
 queries.
@@ -67,7 +67,7 @@ queries.
 ### Connection pooling
 
 For data sources that support connection pooling, the maximum number of concurrent
-connections to the database can also be set by using the [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool)
+connections to the database can also be set by using the [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)
 environment variable. If changing this from the default, you must ensure that the
 new value is greater than the number of concurrent connections used by Cube's query
 queues and the refresh worker.
@@ -79,17 +79,17 @@ However, you can override this behvaior in the refresh worker
 [configuration][ref-preagg-refresh].
 
 
-[ref-data-apis]: /api-reference
-[ref-data-sources]: /docs/configuration/data-sources
-[ref-context-to-orchestrator-id]: /docs/configuration/reference/config#context_to_orchestrator_id
-[ref-driver-factory]: /docs/configuration/reference/config#driver_factory
+[ref-data-apis]: /reference
+[ref-data-sources]: /admin/configuration/data-sources
+[ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
+[ref-driver-factory]: /reference/configuration/config#driver_factory
 [ref-preagg-refresh]: /docs/caching/refreshing-pre-aggregations#configuration
-[ref-athena]: /docs/configuration/data-sources/aws-athena
-[ref-clickhouse]: /docs/configuration/data-sources/clickhouse
-[ref-databricks]: /docs/configuration/data-sources/databricks-jdbc
-[ref-firebolt]: /docs/configuration/data-sources/firebolt
-[ref-pinot]: /docs/configuration/data-sources/pinot
-[ref-redshift]: /docs/configuration/data-sources/aws-redshift
-[ref-snowflake]: /docs/configuration/data-sources/snowflake
-[ref-bigquery]: /docs/configuration/data-sources/google-bigquery
+[ref-athena]: /admin/configuration/data-sources/aws-athena
+[ref-clickhouse]: /admin/configuration/data-sources/clickhouse
+[ref-databricks]: /admin/configuration/data-sources/databricks-jdbc
+[ref-firebolt]: /admin/configuration/data-sources/firebolt
+[ref-pinot]: /admin/configuration/data-sources/pinot
+[ref-redshift]: /admin/configuration/data-sources/aws-redshift
+[ref-snowflake]: /admin/configuration/data-sources/snowflake
+[ref-bigquery]: /admin/configuration/data-sources/google-bigquery
 [link-github-data-source-concurrency]: https://github.com/search?q=repo%3Acube-js%2Fcube+getDefaultConcurrency+path%3Apackages%2Fcubejs-&type=code

@@ -25,7 +25,7 @@ CUBEJS_DB_TYPE=databricks-jdbc
 CUBEJS_DB_NAME=default
 # You can find this inside the cluster's configuration
 CUBEJS_DB_DATABRICKS_URL=jdbc:databricks://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token
-# You can specify the personal access token separately from [`CUBEJS_DB_DATABRICKS_URL`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_url) by doing this:
+# You can specify the personal access token separately from [`CUBEJS_DB_DATABRICKS_URL`](/reference/configuration/environment-variables#cubejs_db_databricks_url) by doing this:
 CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
 # This accepts the Databricks usage policy and must be set to `true` to use the Databricks JDBC driver
 CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
@@ -54,18 +54,18 @@ docker run -it -p 4000:4000 --env-file=.env cube-jdk
 
 | Environment Variable                 | Description                                                                                     | Possible Values       | Required |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------- | :------: |
-| [`CUBEJS_DB_NAME`](/docs/configuration/reference/environment-variables#cubejs_db_name)                     | The name of the database to connect to                                                          | A valid database name |    ✅    |
-| [`CUBEJS_DB_DATABRICKS_URL`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_url)           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |
-| [`CUBEJS_DB_DATABRICKS_ACCEPT_POLICY`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_accept_policy) | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |
-| [`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_oauth_client_id) | The OAuth client ID for [service principal][ref-databricks-m2m-oauth] authentication | A valid client ID | ❌ |
-| [`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_oauth_client_secret) | The OAuth client secret for [service principal][ref-databricks-m2m-oauth] authentication | A valid client secret | ❌ |
-| [`CUBEJS_DB_DATABRICKS_TOKEN`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_token)         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ❌    |
-| [`CUBEJS_DB_DATABRICKS_CATALOG`](/docs/configuration/reference/environment-variables#cubejs_db_databricks_catalog)       | The name of the [Databricks catalog][databricks-catalog] to connect to                                                | A valid catalog name  |    ❌    |
-| [`CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket_mount_dir)  | The path for the [Databricks DBFS mount][databricks-docs-dbfs] (Not needed if using Unity Catalog connection)         | A valid mount path    |    ❌    |
-| [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool)                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)                     | The name of the database to connect to                                                          | A valid database name |    ✅    |
+| [`CUBEJS_DB_DATABRICKS_URL`](/reference/configuration/environment-variables#cubejs_db_databricks_url)           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |
+| [`CUBEJS_DB_DATABRICKS_ACCEPT_POLICY`](/reference/configuration/environment-variables#cubejs_db_databricks_accept_policy) | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |
+| [`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID`](/reference/configuration/environment-variables#cubejs_db_databricks_oauth_client_id) | The OAuth client ID for [service principal][ref-databricks-m2m-oauth] authentication | A valid client ID | ❌ |
+| [`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET`](/reference/configuration/environment-variables#cubejs_db_databricks_oauth_client_secret) | The OAuth client secret for [service principal][ref-databricks-m2m-oauth] authentication | A valid client secret | ❌ |
+| [`CUBEJS_DB_DATABRICKS_TOKEN`](/reference/configuration/environment-variables#cubejs_db_databricks_token)         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ❌    |
+| [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)       | The name of the [Databricks catalog][databricks-catalog] to connect to                                                | A valid catalog name  |    ❌    |
+| [`CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`](/reference/configuration/environment-variables#cubejs_db_export_bucket_mount_dir)  | The path for the [Databricks DBFS mount][databricks-docs-dbfs] (Not needed if using Unity Catalog connection)         | A valid mount path    |    ❌    |
+| [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -128,7 +128,7 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 <Info>
 
 When using an export bucket, remember to assign the **Storage Object Admin**
-role to your Google Cloud credentials ([`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`](/docs/configuration/reference/environment-variables#cubejs_db_export_gcs_credentials)).
+role to your Google Cloud credentials ([`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_export_gcs_credentials)).
 
 </Info>
 
@@ -202,7 +202,7 @@ bucket][self-preaggs-export-bucket] **must be** configured.
 [gh-cubejs-jdbc-install]:
   https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [ref-caching-using-preaggs-build-strats]: /docs/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [databricks-docs-approx-agg-fns]: https://docs.databricks.com/en/sql/language-manual/functions/approx_count_distinct.html
 [self-preaggs-simple]: #simple
 [self-preaggs-export-bucket]: #export-bucket

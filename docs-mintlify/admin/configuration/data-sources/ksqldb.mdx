@@ -73,17 +73,17 @@ CUBEJS_DB_PASS=password
 
 | Environment Variable | Description                                                                   | Possible Values           | Required |
 | -------------------- | ----------------------------------------------------------------------------- | ------------------------- | :------: |
-| [`CUBEJS_DB_URL`](/docs/configuration/reference/environment-variables#cubejs_db_url)      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
-| [`CUBEJS_DB_USER`](/docs/configuration/reference/environment-variables#cubejs_db_user)     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
-| [`CUBEJS_DB_PASS`](/docs/configuration/reference/environment-variables#cubejs_db_pass)     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_URL`](/reference/configuration/environment-variables#cubejs_db_url)      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregations Support
 
 ksqlDB supports only
 [streaming pre-aggregations](/docs/caching/using-pre-aggregations#streaming-pre-aggregations).
 
 
-[ref-powerbi]: /docs/configuration/visualization-tools/powerbi
-[ref-dax-api]: /api-reference/dax-api
+[ref-powerbi]: /admin/configuration/visualization-tools/powerbi
+[ref-dax-api]: /reference/dax-api

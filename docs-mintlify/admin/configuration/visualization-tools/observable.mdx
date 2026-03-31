@@ -30,7 +30,7 @@ You can connect a Cube deployment to Observable using the [SQL API][ref-sql-api]
 or the [REST API][ref-rest-api].
 
 In Cube Core, the SQL API is disabled by default. Enable it and [configure
-the credentials](/api-reference/sql-api#configuration) to
+the credentials](/reference/sql-api#configuration) to
 connect to Observable.
 
 ## Connecting from Observable
@@ -84,7 +84,7 @@ You can also create a visualization of the executed SQL query.
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
-[REST API page](/api-reference/rest-api) for details.
+[REST API page](/reference/rest-api) for details.
 
 You will also need to generate a JSON Web Token that would be used to
 authenticate requests to Cube.
@@ -125,7 +125,7 @@ Also make sure to add the token next to the Bearer part of the Authorization
 header.
 
 Get your Cube query in the JSON
-[query format](/api-reference/rest-api/query-format) ready. You can
+[query format](/reference/rest-api/query-format) ready. You can
 copy it from Cube's Playground or compose manually.
 
 Paste the JSON query in another JavaScript cell as an object literal and give it
@@ -186,5 +186,5 @@ You can also create a visualization of the executed REST API request.
   />
 </div>
 
-[ref-sql-api]: /api-reference/sql-api
-[ref-rest-api]: /api-reference/rest-api
+[ref-sql-api]: /reference/sql-api
+[ref-rest-api]: /reference/rest-api

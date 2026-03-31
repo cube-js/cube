@@ -88,19 +88,19 @@ the gateway needs minimal permissions but must exist in that same directory.
 
 ### Verifying the credentials
 
-By default, [`CUBEJS_SQL_USER`](/docs/configuration/reference/environment-variables#cubejs_sql_user) and [`CUBEJS_SQL_PASSWORD`](/docs/configuration/reference/environment-variables#cubejs_sql_password) environment variables are used
+By default, [`CUBEJS_SQL_USER`](/reference/configuration/environment-variables#cubejs_sql_user) and [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password) environment variables are used
 to verify the passed credentials. You can also customize the authentication by using the
 [`check_sql_auth` configuration option][ref-config-check-sql-auth].
 
-Also, the [`CUBEJS_SQL_SUPER_USER`](/docs/configuration/reference/environment-variables#cubejs_sql_super_user) environment variable or the [`can_switch_sql_user`
+Also, the [`CUBEJS_SQL_SUPER_USER`](/reference/configuration/environment-variables#cubejs_sql_super_user) environment variable or the [`can_switch_sql_user`
 configuration option][ref-config-can-switch-sql-user] can be used to ensure that the
 user name can be changed to the UPN of the interacting user only if proper credentials
 of the master user account were passed.
 
 
 [link-ntlm]: https://en.wikipedia.org/wiki/NTLM
-[ref-dax-api]: /api-reference/dax-api
+[ref-dax-api]: /reference/dax-api
 [link-power-bi-opdg]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
 [ref-kerberos]: /access-security/authentication/kerberos
-[ref-config-check-sql-auth]: /docs/configuration/reference/config#check_sql_auth
-[ref-config-can-switch-sql-user]: /docs/configuration/reference/config#can_switch_sql_user
+[ref-config-check-sql-auth]: /reference/configuration/config#check_sql_auth
+[ref-config-can-switch-sql-user]: /reference/configuration/config#can_switch_sql_user

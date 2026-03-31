@@ -33,13 +33,13 @@ CUBEJS_DB_PASS=**********
 
 | Environment Variable | Description                                                                         | Possible Values                | Required |
 | -------------------- | ----------------------------------------------------------------------------------- | ------------------------------ | :------: |
-| [`CUBEJS_DB_URL`](/docs/configuration/reference/environment-variables#cubejs_db_url)      | The URL for a database                                                              | A valid database URL for Druid |    ✅    |
-| [`CUBEJS_DB_USER`](/docs/configuration/reference/environment-variables#cubejs_db_user)     | The username used to connect to the database                                        | A valid database username      |    ✅    |
-| [`CUBEJS_DB_PASS`](/docs/configuration/reference/environment-variables#cubejs_db_pass)     | The password used to connect to the database                                        | A valid database password      |    ✅    |
-| [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool) | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                 |    ❌    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_URL`](/reference/configuration/environment-variables#cubejs_db_url)      | The URL for a database                                                              | A valid database URL for Druid |    ✅    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)     | The username used to connect to the database                                        | A valid database username      |    ✅    |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)     | The password used to connect to the database                                        | A valid database password      |    ✅    |
+| [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool) | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                 |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## SSL
 
 Cube does not require any additional configuration to enable SSL as Druid

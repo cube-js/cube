@@ -149,11 +149,11 @@ in BigQuery.
 </Info>
 
 Please note that it makes sense to make the `status_snapshots` cube
-[extend](/docs/data-modeling/reference/cube#extends) the original `statuses`
+[extend](/reference/data-modeling/cube#extends) the original `statuses`
 cube in order to reuse the dimension definitions. We only need to add a new
 dimension that indicates the `date` of a snapshot. We're also referencing the
 definition of the `statuses` cube with the
-[`sql()` property](/docs/data-modeling/reference/cube#sql).
+[`sql()` property](/reference/data-modeling/cube#sql).
 
 ## Query
 

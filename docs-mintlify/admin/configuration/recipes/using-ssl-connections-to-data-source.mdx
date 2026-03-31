@@ -13,11 +13,11 @@ instructions.
 
 ## Configuration
 
-Generally, you can enable SSL via the [`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl) environment variable.
+Generally, you can enable SSL via the [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) environment variable.
 
 ### Cube Core
 
-To enable SSL, set the [`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl) environment variable to `true`. Cube can
+To enable SSL, set the [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) environment variable to `true`. Cube can
 also be configured to use custom connection settings. For example, to use a
 custom certificate authority and certificates, you could do the following:
 
@@ -72,11 +72,11 @@ Add the following environment variables:
 
 | Environment Variable | Description                                                                                                                                                                                                 | Example                                  |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| [`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl)      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
-| [`CUBEJS_DB_SSL_CA`](/docs/configuration/reference/environment-variables#cubejs_db_ssl_ca)   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]          | A valid CA bundle or a path to one       |
-| [`CUBEJS_DB_SSL_CERT`](/docs/configuration/reference/environment-variables#cubejs_db_ssl_cert) | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options] | A valid SSL certificate or a path to one |
-| [`CUBEJS_DB_SSL_KEY`](/docs/configuration/reference/environment-variables#cubejs_db_ssl_key)  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]       | A valid SSL private key or a path to one |
+| [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
+| [`CUBEJS_DB_SSL_CA`](/reference/configuration/environment-variables#cubejs_db_ssl_ca)   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]          | A valid CA bundle or a path to one       |
+| [`CUBEJS_DB_SSL_CERT`](/reference/configuration/environment-variables#cubejs_db_ssl_cert) | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options] | A valid SSL certificate or a path to one |
+| [`CUBEJS_DB_SSL_KEY`](/reference/configuration/environment-variables#cubejs_db_ssl_key)  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]       | A valid SSL private key or a path to one |
 
 [nodejs-docs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
-[ref-config-db]: /docs/configuration/data-sources
+[ref-config-db]: /admin/configuration/data-sources

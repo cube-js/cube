@@ -23,8 +23,8 @@ The diagram below shows how it works during the request processing in Cube:
 
 Relevant configuration options: [`check_auth`][ref-config-check-auth] and [`jwt`][ref-config-jwt].
 
-Relevant environment variables: [`CUBEJS_API_SECRET`](/docs/configuration/reference/environment-variables#cubejs_api_secret), [`CUBEJS_JWT_KEY`](/docs/configuration/reference/environment-variables#cubejs_jwt_key), [`CUBEJS_JWK_URL`](/docs/configuration/reference/environment-variables#cubejs_jwk_url),
-[`CUBEJS_JWT_AUDIENCE`](/docs/configuration/reference/environment-variables#cubejs_jwt_audience), [`CUBEJS_JWT_ISSUER`](/docs/configuration/reference/environment-variables#cubejs_jwt_issuer), [`CUBEJS_JWT_SUBJECT`](/docs/configuration/reference/environment-variables#cubejs_jwt_subject), [`CUBEJS_JWT_CLAIMS_NAMESPACE`](/docs/configuration/reference/environment-variables#cubejs_jwt_claims_namespace).
+Relevant environment variables: [`CUBEJS_API_SECRET`](/reference/configuration/environment-variables#cubejs_api_secret), [`CUBEJS_JWT_KEY`](/reference/configuration/environment-variables#cubejs_jwt_key), [`CUBEJS_JWK_URL`](/reference/configuration/environment-variables#cubejs_jwk_url),
+[`CUBEJS_JWT_AUDIENCE`](/reference/configuration/environment-variables#cubejs_jwt_audience), [`CUBEJS_JWT_ISSUER`](/reference/configuration/environment-variables#cubejs_jwt_issuer), [`CUBEJS_JWT_SUBJECT`](/reference/configuration/environment-variables#cubejs_jwt_subject), [`CUBEJS_JWT_CLAIMS_NAMESPACE`](/reference/configuration/environment-variables#cubejs_jwt_claims_namespace).
 
 ## Custom authentication
 
@@ -54,7 +54,7 @@ can still use it to [pass a security context][ref-sec-ctx].
 
 Authentication tokens are generated based on your API secret. Cube CLI generates
 an API Secret when a project is scaffolded and saves this value in the `.env`
-file as [`CUBEJS_API_SECRET`](/docs/configuration/reference/environment-variables#cubejs_api_secret).
+file as [`CUBEJS_API_SECRET`](/reference/configuration/environment-variables#cubejs_api_secret).
 
 You can generate two types of tokens:
 
@@ -231,8 +231,8 @@ module.exports = {
 [link-jwt-docs]: https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
-[ref-config-check-auth]: /docs/configuration/reference/config#check_auth
-[ref-config-jwt]: /docs/configuration/reference/config#jwt
+[ref-config-check-auth]: /reference/configuration/config#check_auth
+[ref-config-jwt]: /reference/configuration/config#jwt
 [ref-recipe-auth0]: /access-security/access-control/recipes/auth0-guide
 [ref-recipe-cognito]: /access-security/access-control/recipes/aws-cognito
 [ref-sec-ctx]: /access-security/access-control/context

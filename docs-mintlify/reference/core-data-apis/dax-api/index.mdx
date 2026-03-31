@@ -1,0 +1,85 @@
+---
+description: "Connect Microsoft Power BI to Cube natively using the DAX API for superior feature support over the SQL API."
+---
+
+ DAX API
+
+The DAX API enables Cube to connect to [Microsoft Power BI][ref-powerbi].
+It derives its name from [data analysis expressions][link-dax], a query language
+for Power BI and SQL Server Analysis Services.
+
+Unlike the [SQL API][ref-sql-api], it provides a native experience and superior
+support for Power BI features.
+
+<Info>
+
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+Also requires the M [deployment tier](/admin/pricing#deployment-tiers).
+
+</Info>
+
+Read below about the DAX API [configuration](#configuration),
+[authentication](#authentication), and [using it](#using-dax-api-with-power-bi) with Power BI.
+
+See the [DAX API reference][ref-ref-dax-api] for the list of supported DAX functions.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/vgrFPOMuJJs"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+## Configuration
+
+<Warning>
+
+Please contact the customer success team in Cube Cloud so we can guide you
+through the configuration.
+
+</Warning>
+
+To enable or disable the DAX API on a specific deployment, go to **Settings**
+in the Cube Cloud sidebar, then **Configuration**, and then toggle the
+**Enable DAX API** option.
+
+### Date hierarchies
+
+By default, the DAX API exposes all [time dimensions][ref-time-dimensions] as _date
+hierarchies_ in [Power BI][ref-power-bi]. You can set the [`CUBEJS_DAX_CREATE_DATE_HIERARCHIES`](/reference/configuration/environment-variables#cubejs_dax_create_date_hierarchies)
+environment variable to `false` to disable this behavior.
+
+Note that each date hierarchy will include additional columns, suffixed by `_year`,
+`_quarter`, `_month`, `_day`. If the data model has other members with names that follow
+this pattern (e.g., a time dimension named `date` and another dimension named `date_year`
+in the same cube or view), that would cause a conflict.
+
+## Authentication
+
+The DAX API supports [Kerberos][ref-kerberos] and [NTLM][ref-ntlm] authentication
+methods.
+
+While NTLM can be used for testing purposes, we strongly recommend configuring
+Kerberos for production environments.
+
+## Data modeling
+
+<Info>
+
+The DAX API only exposes [views][ref-views], not cubes.
+
+</Info>
+
+
+[ref-powerbi]: /admin/configuration/visualization-tools/powerbi
+[link-dax]: https://learn.microsoft.com/en-us/dax/
+[ref-sql-api]: /reference/sql-api
+[ref-ref-dax-api]: /reference/dax-api/reference
+[ref-views]: /docs/data-modeling/concepts#views
+[ref-time-dimensions]: /docs/data-modeling/concepts#time-dimensions
+[ref-kerberos]: /access-security/authentication/kerberos
+[ref-ntlm]: /access-security/authentication/ntlm
+[ref-power-bi]: /admin/configuration/visualization-tools/powerbi

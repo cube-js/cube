@@ -17,7 +17,7 @@ aggregated data. Each stage results in one or more [common table expressions][li
 
 Multi-stage calculations are powered by Tesseract, the [next-generation data modeling
 engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`](/docs/configuration/reference/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
+[`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
 
 </Warning>
 
@@ -705,12 +705,12 @@ Query and result:
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-measures]: /docs/data-modeling/concepts#measures
 [ref-dimensions]: /docs/data-modeling/concepts#dimensions
-[ref-rolling-window]: /docs/data-modeling/reference/measures#rolling_window
+[ref-rolling-window]: /reference/data-modeling/measures#rolling_window
 [link-cte]: https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
-[ref-ref-time-shift]: /docs/data-modeling/reference/measures#time_shift
+[ref-ref-time-shift]: /reference/data-modeling/measures#time_shift
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
-[ref-case-measures]: /docs/data-modeling/reference/measures#case
-[ref-switch-dimensions]: /docs/data-modeling/reference/types-and-formats#switch
-[ref-group-by]: /docs/data-modeling/reference/measures#group_by
-[ref-reduce-by]: /docs/data-modeling/reference/measures#reduce_by
-[ref-add-group-by]: /docs/data-modeling/reference/measures#add_group_by
+[ref-case-measures]: /reference/data-modeling/measures#case
+[ref-switch-dimensions]: /reference/data-modeling/dimensions#type
+[ref-group-by]: /reference/data-modeling/measures#group_by
+[ref-reduce-by]: /reference/data-modeling/measures#reduce_by
+[ref-add-group-by]: /reference/data-modeling/measures#add_group_by

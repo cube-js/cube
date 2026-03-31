@@ -30,24 +30,24 @@ CUBEJS_DB_SCHEMA=my_presto_schema
 
 | Environment Variable       | Description                                                                         | Possible Values                               | Required |
 | -------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- | :------: |
-| [`CUBEJS_DB_HOST`](/docs/configuration/reference/environment-variables#cubejs_db_host)           | The host URL for a database                                                         | A valid database host URL                     |    ✅    |
-| [`CUBEJS_DB_PORT`](/docs/configuration/reference/environment-variables#cubejs_db_port)           | The port for the database connection                                                | A valid port number                           |    ❌    |
-| [`CUBEJS_DB_USER`](/docs/configuration/reference/environment-variables#cubejs_db_user)           | The username used to connect to the database                                        | A valid database username                     |    ✅    |
-| [`CUBEJS_DB_PASS`](/docs/configuration/reference/environment-variables#cubejs_db_pass)           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
-| [`CUBEJS_DB_PRESTO_CATALOG`](/docs/configuration/reference/environment-variables#cubejs_db_presto_catalog) | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
-| [`CUBEJS_DB_PRESTO_AUTH_TOKEN`](/docs/configuration/reference/environment-variables#cubejs_db_presto_auth_token) | The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header. | A valid authentication token |    ❌    |
-| [`CUBEJS_DB_SCHEMA`](/docs/configuration/reference/environment-variables#cubejs_db_schema)         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
-| [`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl)            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
-| [`CUBEJS_DB_MAX_POOL`](/docs/configuration/reference/environment-variables#cubejs_db_max_pool)       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
-| [`CUBEJS_CONCURRENCY`](/docs/configuration/reference/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
-| [`CUBEJS_DB_EXPORT_BUCKET_TYPE`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket_type) | The export bucket type for pre-aggregations | `s3`, `gcs` | ❌ |
-| [`CUBEJS_DB_EXPORT_BUCKET`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket) | The export bucket to connect to | A valid bucket URL | ❌ |
-| [`CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket_aws_key) | The AWS Access Key ID to use for export bucket writes | A valid AWS Access Key ID | ❌ |
-| [`CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket_aws_secret) | The AWS Secret Access Key to use for export bucket writes | A valid AWS Secret Access Key | ❌ |
-| [`CUBEJS_DB_EXPORT_BUCKET_AWS_REGION`](/docs/configuration/reference/environment-variables#cubejs_db_export_bucket_aws_region) | The AWS region to use for export bucket writes | A valid AWS region | ❌ |
-| [`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`](/docs/configuration/reference/environment-variables#cubejs_db_export_gcs_credentials) | A Base64 encoded JSON key file for connecting to Google Cloud Storage | A valid Google Cloud JSON key file, encoded as a Base64 string | ❌ |
+| [`CUBEJS_DB_HOST`](/reference/configuration/environment-variables#cubejs_db_host)           | The host URL for a database                                                         | A valid database host URL                     |    ✅    |
+| [`CUBEJS_DB_PORT`](/reference/configuration/environment-variables#cubejs_db_port)           | The port for the database connection                                                | A valid port number                           |    ❌    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)           | The username used to connect to the database                                        | A valid database username                     |    ✅    |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
+| [`CUBEJS_DB_PRESTO_CATALOG`](/reference/configuration/environment-variables#cubejs_db_presto_catalog) | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
+| [`CUBEJS_DB_PRESTO_AUTH_TOKEN`](/reference/configuration/environment-variables#cubejs_db_presto_auth_token) | The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header. | A valid authentication token |    ❌    |
+| [`CUBEJS_DB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_schema)         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
+| [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
+| [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_EXPORT_BUCKET_TYPE`](/reference/configuration/environment-variables#cubejs_db_export_bucket_type) | The export bucket type for pre-aggregations | `s3`, `gcs` | ❌ |
+| [`CUBEJS_DB_EXPORT_BUCKET`](/reference/configuration/environment-variables#cubejs_db_export_bucket) | The export bucket to connect to | A valid bucket URL | ❌ |
+| [`CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`](/reference/configuration/environment-variables#cubejs_db_export_bucket_aws_key) | The AWS Access Key ID to use for export bucket writes | A valid AWS Access Key ID | ❌ |
+| [`CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET`](/reference/configuration/environment-variables#cubejs_db_export_bucket_aws_secret) | The AWS Secret Access Key to use for export bucket writes | A valid AWS Secret Access Key | ❌ |
+| [`CUBEJS_DB_EXPORT_BUCKET_AWS_REGION`](/reference/configuration/environment-variables#cubejs_db_export_bucket_aws_region) | The AWS region to use for export bucket writes | A valid AWS region | ❌ |
+| [`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_export_gcs_credentials) | A Base64 encoded JSON key file for connecting to Google Cloud Storage | A valid Google Cloud JSON key file, encoded as a Base64 string | ❌ |
 
-[ref-data-source-concurrency]: /docs/configuration/concurrency#data-source-concurrency
+[ref-data-source-concurrency]: /admin/configuration/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -106,7 +106,7 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 <Info>
 
 When using an export bucket, remember to assign the **Storage Object Admin**
-role to your Google Cloud credentials ([`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`](/docs/configuration/reference/environment-variables#cubejs_db_export_gcs_credentials)).
+role to your Google Cloud credentials ([`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_export_gcs_credentials)).
 
 </Info>
 
@@ -119,7 +119,7 @@ CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Presto, set the
-[`CUBEJS_DB_SSL`](/docs/configuration/reference/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
+[`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
@@ -129,6 +129,6 @@ Database][ref-recipe-enable-ssl].
 [presto-docs-approx-agg-fns]:
   https://prestodb.io/docs/current/functions/aggregate.html
 [ref-caching-using-preaggs-build-strats]: /docs/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-recipe-enable-ssl]: /docs/configuration/recipes/using-ssl-connections-to-data-source
-[ref-schema-ref-types-formats-countdistinctapprox]: /docs/data-modeling/reference/types-and-formats#count_distinct_approx
+[ref-recipe-enable-ssl]: /admin/configuration/recipes/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-simple]: #simple

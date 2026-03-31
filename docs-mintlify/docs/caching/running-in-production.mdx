@@ -45,7 +45,7 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
-In the command above, we're specifying [`CUBEJS_CUBESTORE_HOST`](/docs/configuration/reference/environment-variables#cubejs_cubestore_host) to let Cube know
+In the command above, we're specifying [`CUBEJS_CUBESTORE_HOST`](/reference/configuration/environment-variables#cubejs_cubestore_host) to let Cube know
 where Cube Store is running.
 
 You can also use Docker Compose to achieve the same:
@@ -389,7 +389,7 @@ Error: Query execution timeout after 10 min of waiting
 It means that your pre-aggregation is too heavy and takes too long to build.
 
 As a temporary solution, you can increase the timeout for all queies that Cube
-runs against your data source via the [`CUBEJS_DB_QUERY_TIMEOUT`](/docs/configuration/reference/environment-variables#cubejs_db_query_timeout) environment variable.
+runs against your data source via the [`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout) environment variable.
 
 However, it is recommended that you optimize your pre-aggregations instead:
 
@@ -428,14 +428,14 @@ It's not supported by Cube or the vendor.
 
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /docs/caching/using-pre-aggregations#partitioning
-[ref-config-env]: /docs/configuration/reference/environment-variables
+[ref-config-env]: /reference/configuration/environment-variables
 [link-parquet-encryption]: https://parquet.apache.org/docs/file-format/data-pages/encryption/
 [link-aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 [ref-cmk]: /admin/deployment/encryption-keys
-[ref-data-sources]: /docs/configuration/data-sources
+[ref-data-sources]: /admin/configuration/data-sources
 [ref-pre-agg-partitions]: /docs/caching/using-pre-aggregations#partitioning
-[ref-pre-agg-incremental]: /docs/data-modeling/reference/pre-aggregations#incremental
-[ref-pre-agg-build-range]: /docs/data-modeling/reference/pre-aggregations#build_range_start-and-build_range_end
-[ref-cube-sql]: /docs/data-modeling/reference/cube#sql
-[ref-pre-agg-original-sql]: /docs/data-modeling/reference/pre-aggregations#original_sql
-[ref-pre-agg-use-original-sql]: /docs/data-modeling/reference/pre-aggregations#use_original_sql_pre_aggregations
+[ref-pre-agg-incremental]: /reference/data-modeling/pre-aggregations#incremental
+[ref-pre-agg-build-range]: /reference/data-modeling/pre-aggregations#build_range_start-and-build_range_end
+[ref-cube-sql]: /reference/data-modeling/cube#sql
+[ref-pre-agg-original-sql]: /reference/data-modeling/pre-aggregations#original_sql
+[ref-pre-agg-use-original-sql]: /reference/data-modeling/pre-aggregations#use_original_sql_pre_aggregations
