@@ -296,6 +296,8 @@ jobs:
             use_tesseract_sql_planner: true
           - database: clickhouse
             use_tesseract_sql_planner: true
+          - database: mssql
+            use_tesseract_sql_planner: true
       fail-fast: false
 
     steps:
