@@ -268,11 +268,15 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    // MSSQL ROUND requires 2 arguments: ROUND(number, length)
+    templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
     // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
     delete templates.functions.STRING_AGG;
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     delete templates.expressions.ilike;
+    // MSSQL uses + for string concatenation instead of ||
+    templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.types.string = 'VARCHAR';
@@ -298,11 +302,37 @@ export class MssqlQuery extends BaseQuery {
       '{% if not loop.last %}, {% endif %}' +
       '{% endfor %}' +
       ') AS dates (date_from, date_to)';
+    // MSSQL uses recursive CTE for time series generation.
+    // The template body becomes content of `time_series AS (...)` CTE,
+    // so it self-references `time_series` for recursion.
+    templates.statements.generated_time_series_select =
+      'SELECT CAST({{ start }} AS DATETIME2) AS date_from,\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, CAST({{ start }} AS DATETIME2))) AS date_to\n' +
+      'UNION ALL\n' +
+      'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from)))\n' +
+      'FROM time_series\n' +
+      'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= CAST({{ end }} AS DATETIME2)';
+
+    templates.statements.generated_time_series_with_cte_range_source =
+      'SELECT {{ range_source }}.{{ min_name }} AS date_from,\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, {{ range_source }}.{{ min_name }})) AS date_to,\n' +
+      '       {{ range_source }}.{{ max_name }} AS max_date\n' +
+      'FROM {{ range_source }}\n' +
+      'UNION ALL\n' +
+      'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from))),\n' +
+      '       max_date\n' +
+      'FROM time_series\n' +
+      'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= max_date';
+
     // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.statements.select = '{% if ctes %} WITH \n' +
       '{{ ctes | join(\',\n\') }}\n' +
       '{% endif %}' +
-      'SELECT {% if distinct %}DISTINCT {% endif %}' +
+      'SELECT {% if limit is not none and not order_by %}TOP {{ limit }} {% endif %}{% if distinct %}DISTINCT {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
       '{{ from | indent(2, true) }}\n' +
@@ -312,8 +342,9 @@ export class MssqlQuery extends BaseQuery {
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
-      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS{% endif %}' +
-      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
+      '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
+      '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
     return templates;
   }
 }
