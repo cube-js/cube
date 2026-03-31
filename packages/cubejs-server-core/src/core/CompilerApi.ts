@@ -959,11 +959,19 @@ export class CompilerApi {
 
   public async metaConfig(
     requestContext: Context,
-    options: { includeCompilerId?: boolean; requestId?: string } = {}
+    options: { includeCompilerId?: boolean; skipVisibilityPatch?: boolean; requestId?: string } = {}
   ): Promise<any> {
-    const { includeCompilerId, ...restOptions } = options;
+    const { includeCompilerId, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     const { cubes } = compilers.metaTransformer;
+
+    if (skipVisibilityPatch) {
+      if (includeCompilerId) {
+        return { cubes, compilerId: compilers.compilerId };
+      }
+      return cubes;
+    }
+
     const { visibilityMaskHash, cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,
