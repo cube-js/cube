@@ -17,6 +17,7 @@ import {
   getEnv,
   assertDataSource,
   getRealType,
+  hasPreAggregationsEnvVars,
   internalExceptions,
   track,
   FileRepository,
@@ -599,20 +600,33 @@ export class CubejsServerCore {
       /**
        * Driver factory function `DriverFactoryByDataSource`.
        */
-      async (dataSource = 'default') => {
-        if (driverPromise[dataSource]) {
-          return driverPromise[dataSource];
+      async (dataSource = 'default', preAggregations = false) => {
+        // Only create a separate pre-agg driver when credentials are actually
+        // configured (custom driverFactory or PRE_AGGREGATIONS env vars).
+        const usePreAgg = preAggregations && (
+          !!this.options.driverFactory || hasPreAggregationsEnvVars(dataSource)
+        );
+        const factoryKey = usePreAgg ? `${dataSource}__pre_agg` : dataSource;
+
+        if (driverPromise[factoryKey]) {
+          return driverPromise[factoryKey];
         }
 
         // eslint-disable-next-line no-return-assign
-        return driverPromise[dataSource] = (async () => {
+        return driverPromise[factoryKey] = (async () => {
           let driver: BaseDriver | null = null;
 
           try {
+            this.logger('Initializing data source connection', {
+              dataSource,
+              preAggregations: usePreAgg || false,
+            });
+
             driver = await this.resolveDriver(
               {
                 ...context,
                 dataSource,
+                preAggregations: usePreAgg || false,
               },
               orchestratorOptions,
             );
@@ -624,6 +638,11 @@ export class CubejsServerCore {
 
               await driver.testConnection();
 
+              this.logger('Data source connection initialized', {
+                dataSource,
+                preAggregations: usePreAgg || undefined,
+              });
+
               return driver;
             }
 
@@ -631,7 +650,7 @@ export class CubejsServerCore {
               `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
             );
           } catch (e) {
-            driverPromise[dataSource] = null;
+            driverPromise[factoryKey] = null;
 
             if (driver) {
               await driver.release();
@@ -868,6 +887,7 @@ export class CubejsServerCore {
           testConnectionTimeout: options?.testConnectionTimeout,
         };
       opts.dataSource = assertDataSource(context.dataSource);
+      opts.preAggregations = context.preAggregations || false;
       return CubejsServerCore.createDriver(type, opts);
     }
   }

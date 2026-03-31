@@ -203,6 +203,7 @@ export class OptsHandler {
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
     const type = <DatabaseType>getEnv('dbType', {
       dataSource: assertDataSource(ctx.dataSource),
+      preAggregations: ctx.preAggregations,
     });
     return { type };
   }

@@ -50,6 +50,11 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -68,16 +73,17 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { dataSource: configDataSource, maxPoolSize, testConnectionTimeout, ...mongoBIDriverConfiguration } = config;
     const dataSource = configDataSource || assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
       // mysql2 uses own typings for ssl property, which is not correct
       // Types of property 'pfx' are incompatible. Skipping validation with any cast
-      ssl: this.getSslOptions(dataSource) as any,
+      ssl: this.getSslOptions(dataSource, preAggregations) as any,
       typeCast: (field: Field, next) => {
         if (field.type === 'DATETIME') {
           // Example value 1998-08-02 00:00:00
@@ -125,7 +131,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       min: 0,
       max:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,

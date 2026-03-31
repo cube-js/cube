@@ -100,6 +100,11 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -118,28 +123,29 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const accessKeyId =
       config.accessKeyId ||
-      getEnv('athenaAwsKey', { dataSource });
+      getEnv('athenaAwsKey', { dataSource, preAggregations });
 
     const secretAccessKey =
       config.secretAccessKey ||
-      getEnv('athenaAwsSecret', { dataSource });
+      getEnv('athenaAwsSecret', { dataSource, preAggregations });
 
     const assumeRoleArn =
       config.athenaAwsAssumeRoleArn ||
-      getEnv('athenaAwsAssumeRoleArn', { dataSource });
+      getEnv('athenaAwsAssumeRoleArn', { dataSource, preAggregations });
 
     const assumeRoleExternalId =
       config.athenaAwsAssumeRoleExternalId ||
-      getEnv('athenaAwsAssumeRoleExternalId', { dataSource });
+      getEnv('athenaAwsAssumeRoleExternalId', { dataSource, preAggregations });
 
     const { schema, ...restConfig } = config;
 
     this.schema = schema ||
-      getEnv('dbName', { dataSource }) ||
-      getEnv('dbSchema', { dataSource });
+      getEnv('dbName', { dataSource, preAggregations }) ||
+      getEnv('dbSchema', { dataSource, preAggregations });
 
     // Configure credentials based on authentication method
     let credentials;
@@ -166,34 +172,34 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ...restConfig,
       region:
         config.region ||
-        getEnv('athenaAwsRegion', { dataSource }),
+        getEnv('athenaAwsRegion', { dataSource, preAggregations }),
       S3OutputLocation:
         config.S3OutputLocation ||
-        getEnv('athenaAwsS3OutputLocation', { dataSource }),
+        getEnv('athenaAwsS3OutputLocation', { dataSource, preAggregations }),
       workGroup:
         config.workGroup ||
-        getEnv('athenaAwsWorkgroup', { dataSource }) ||
+        getEnv('athenaAwsWorkgroup', { dataSource, preAggregations }) ||
         'primary',
       catalog:
         config.catalog ||
-        getEnv('athenaAwsCatalog', { dataSource }),
+        getEnv('athenaAwsCatalog', { dataSource, preAggregations }),
       database:
         config.database ||
-        getEnv('dbName', { dataSource }),
+        getEnv('dbName', { dataSource, preAggregations }),
       exportBucket:
         config.exportBucket ||
-        getEnv('dbExportBucket', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }),
       pollTimeout: (
         config.pollTimeout ||
-        getEnv('dbPollTimeout', { dataSource }) ||
-        getEnv('dbQueryTimeout', { dataSource })
+        getEnv('dbPollTimeout', { dataSource, preAggregations }) ||
+        getEnv('dbQueryTimeout', { dataSource, preAggregations })
       ) * 1000,
       pollMaxInterval: (
         config.pollMaxInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
       exportBucketCsvEscapeSymbol:
-        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
     };
     if (this.config.exportBucket) {
       this.config.exportBucket =
