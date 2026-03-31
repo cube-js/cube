@@ -294,7 +294,7 @@ class ApiGateway {
         // Cache unfiltered schema - RBAC enforcement happens at query execution time
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig(req.context, {
+          const metaConfig = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
             skipVisibilityPatch: true,
           });
