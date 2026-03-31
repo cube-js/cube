@@ -1929,39 +1929,6 @@ class ApiGateway {
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
-      // Validate that all requested members are accessible by this security context
-      const allowedMembers = new Set<string>();
-      metaConfigResult.forEach((cube: any) => {
-        cube.config.measures?.forEach((m: any) => {
-          if (m.isVisible) allowedMembers.add(m.name);
-        });
-        cube.config.dimensions?.forEach((d: any) => {
-          if (d.isVisible) allowedMembers.add(d.name);
-        });
-        cube.config.segments?.forEach((s: any) => {
-          if (s.isVisible) allowedMembers.add(s.name);
-        });
-      });
-
-      for (const normalizedQuery of normalizedQueries) {
-        const requestedMembers = [
-          ...(normalizedQuery.measures || []),
-          ...(normalizedQuery.dimensions || []),
-          ...(normalizedQuery.segments || []),
-          ...(normalizedQuery.timeDimensions || []).map((td: any) => td.dimension),
-        ];
-
-        const hiddenMembers = requestedMembers.filter(m => !allowedMembers.has(m));
-        if (hiddenMembers.length > 0) {
-          throw new UserError(
-            `You requested hidden member: '${hiddenMembers[0]}'. ` +
-            'Please make it visible using `public: true`. ' +
-            'Please note primaryKey fields are `public: false` by default: ' +
-            'https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.'
-          );
-        }
-      }
-
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;

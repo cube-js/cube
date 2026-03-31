@@ -11,22 +11,6 @@ import request from 'supertest';
 
 import { makeSchema } from '../src/graphql';
 
-// Helper to create mock apiGateway with getCompilerApi for RBAC validation
-const createMockApiGateway = (metaCfg: any) => ({
-  async load({ query, res: response }: any) {
-    expect(query).toMatchSnapshot();
-
-    response({
-      query,
-      annotation: {},
-      data: [],
-    });
-  },
-  getCompilerApi: () => ({
-    metaConfig: async () => metaCfg,
-  }),
-});
-
 const metaConfig = [
   {
     config: {
@@ -176,7 +160,17 @@ describe('GraphQL Schema', () => {
         context: {
           req,
           res,
-          apiGateway: createMockApiGateway(metaConfig),
+          apiGateway: {
+            async load({ query, res: response }) {
+              expect(query).toMatchSnapshot(req.body.query);
+
+              response({
+                query,
+                annotation: {},
+                data: [],
+              });
+            },
+          },
         },
       })(req, res);
     });
@@ -191,7 +185,17 @@ describe('GraphQL Schema', () => {
         context: {
           req,
           res,
-          apiGateway: createMockApiGateway(metaConfig),
+          apiGateway: {
+            async load({ query, res: response }) {
+              expect(query).toMatchSnapshot(req.body.query);
+
+              response({
+                query,
+                annotation: {},
+                data: [],
+              });
+            },
+          },
         },
       })(req, res);
     });
@@ -234,7 +238,17 @@ describe('GraphQL Schema', () => {
         context: {
           req,
           res,
-          apiGateway: createMockApiGateway(metaConfig),
+          apiGateway: {
+            async load({ query, res: response }) {
+              expect(query).toMatchSnapshot(req.body.query);
+
+              response({
+                query,
+                annotation: {},
+                data: [],
+              });
+            },
+          },
         },
       })(req, res);
     });
@@ -304,9 +318,6 @@ describe('GraphQL Schema', () => {
                 ],
               });
             },
-            getCompilerApi: () => ({
-              metaConfig: async () => metaConfig,
-            }),
           },
         },
         extensions: () => res.extensions || {},
