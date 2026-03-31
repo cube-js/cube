@@ -153,6 +153,7 @@ export function hasPreAggregationsEnvVars(dataSource?: string): boolean {
       return true;
     }
   }
+
   return false;
 }
 
