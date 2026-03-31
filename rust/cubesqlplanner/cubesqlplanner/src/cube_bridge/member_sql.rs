@@ -548,7 +548,10 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             )?;
             result.set_field(
                 "unsafeValue",
-                Self::security_context_unsafe_value_fn(inner_context.clone(), property_value.clone())?,
+                Self::security_context_unsafe_value_fn(
+                    inner_context.clone(),
+                    property_value.clone(),
+                )?,
             )?;
             result.set_field(
                 "toString",
