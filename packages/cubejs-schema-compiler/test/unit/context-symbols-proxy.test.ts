@@ -52,4 +52,62 @@ describe('CubeSymbols.contextSymbolsProxyFrom', () => {
 
     expect(proxy.cubeCloud.tenantId.filter('col')).toBe('1 = 1');
   });
+
+  it('filter with nested array passes allocated params to function for IN clause', () => {
+    const symbols = { cubeCloud: { groups: ['admin', 'user'] } };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = proxy.cubeCloud.groups.filter(
+      (groups) => `col IN (${groups.join(', ')})`
+    );
+    expect(result).toBe('col IN (__param("admin"), __param("user"))');
+  });
+
+  it('filter with nested array and string column produces IN clause', () => {
+    const symbols = { cubeCloud: { groups: ['admin', 'user'] } };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = proxy.cubeCloud.groups.filter('col');
+    expect(result).toBe('col IN (__param("admin"), __param("user"))');
+  });
+
+  it('filter with nested primitive and string column produces equality', () => {
+    const symbols = { cubeCloud: { tenantId: 'abc' } };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = proxy.cubeCloud.tenantId.filter('col');
+    expect(result).toBe('col = __param("abc")');
+  });
+
+  it('toString on nested primitive allocates param for interpolation', () => {
+    const symbols = { cubeCloud: { tenantId: 'abc' } };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = `${proxy.cubeCloud.tenantId}`;
+    expect(result).toBe('__param("abc")');
+  });
+
+  it('toString on nested array allocates each element as param', () => {
+    const symbols = { cubeCloud: { groups: ['admin', 'user'] } };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = `${proxy.cubeCloud.groups}`;
+    expect(result).toBe('__param("admin"),__param("user")');
+  });
+
+  it('toString on proxy wrapping array allocates params via toPrimitive', () => {
+    const symbols = { cubeCloud: { groups: ['admin', 'user'] } };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = String(proxy.cubeCloud.groups);
+    expect(result).toBe('__param("admin"),__param("user")');
+  });
+
+  it('toString on missing property returns empty string', () => {
+    const symbols = { cubeCloud: {} };
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    const result = `${proxy.cubeCloud.tenantId}`;
+    expect(result).toBe('');
+  });
 });

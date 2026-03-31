@@ -221,10 +221,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
     path.traverse({
       Identifier: (p) => {
+        CubePropContextTranspiler.transformAccessPolicyShorthandIdentifier(p, identifiers);
         CubePropContextTranspiler.matchAndTransformIdentifier(p, resolveSymbol, identifiers);
       },
       MemberExpression: (p) => {
-        CubePropContextTranspiler.transformUserAttributesMemberExpression(p);
+        CubePropContextTranspiler.transformAccessPolicyShorthandMemberExpression(p);
       }
     });
 
@@ -238,9 +239,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       ) &&
       resolveSymbol(path.node.name)
     ) {
-      // Special handling for userAttributes - replace in parameter list with securityContext
       const fullPath = this.fullPath(path);
-      if ((path.node.name === 'userAttributes' || path.node.name === 'user_attributes') && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
+      if (
+        this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name) &&
+        (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
+      ) {
         identifiers.push('securityContext');
       } else {
         identifiers.push(path.node.name);
@@ -248,29 +251,55 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     }
   }
 
-  protected static transformUserAttributesMemberExpression(path: NodePath<t.MemberExpression>) {
-    // Check if this is userAttributes.someProperty (object should be identifier named 'userAttributes')
+  private static readonly CUBE_CLOUD_SHORTHAND_IDENTIFIERS = ['userAttributes', 'user_attributes', 'groups'];
+
+  private static isAccessPolicyPath(path: NodePath): boolean {
     const fullPath = this.fullPath(path);
+    return fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy');
+  }
+
+  protected static transformAccessPolicyShorthandIdentifier(path: NodePath<t.Identifier>, identifiers: string[]) {
     if (
-      (t.isIdentifier(path.node.object, { name: 'userAttributes' }) || t.isIdentifier(path.node.object, { name: 'user_attributes' })) &&
-      (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
+      !path.parent ||
+      path.parent.type !== 'MemberExpression' ||
+      path.key !== 'property'
     ) {
-      // Replace userAttributes with securityContext.cubeCloud.userAttributes
+      if (
+        this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name) &&
+        path.parent?.type !== 'MemberExpression' &&
+        this.isAccessPolicyPath(path)
+      ) {
+        const securityContext = t.identifier('securityContext');
+        const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
+        const prop = path.node.name === 'user_attributes' ? 'userAttributes' : path.node.name;
+        const newExpr = t.memberExpression(cubeCloud, t.identifier(prop));
+        path.replaceWith(newExpr);
+        identifiers.push('securityContext');
+      }
+    }
+  }
+
+  protected static transformAccessPolicyShorthandMemberExpression(path: NodePath<t.MemberExpression>) {
+    const fullPath = this.fullPath(path);
+    const isAccessPolicy = fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy');
+
+    if (
+      t.isIdentifier(path.node.object) &&
+      this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.object.name) &&
+      isAccessPolicy
+    ) {
       const securityContext = t.identifier('securityContext');
       const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
-      const userAttributes = t.memberExpression(cubeCloud, t.identifier('userAttributes'));
-      const newMemberExpression = t.memberExpression(userAttributes, path.node.property, path.node.computed);
-
+      const prop = path.node.object.name === 'user_attributes' ? 'userAttributes' : path.node.object.name;
+      const shorthand = t.memberExpression(cubeCloud, t.identifier(prop));
+      const newMemberExpression = t.memberExpression(shorthand, path.node.property, path.node.computed);
       path.replaceWith(newMemberExpression);
     } else if (
       t.isMemberExpression(path.node.object) &&
       t.isIdentifier(path.node.object.property, { name: 'user_attributes' }) &&
       !path.node.object.computed &&
-      (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
+      isAccessPolicy
     ) {
-      // Also handle case where user_attributes appears within a MemberExpression chain like
-      // securityContext.cubeCloud.user_attributes
-      // We need to convert user_attributes to userAttributes in such chains
       const newObject = t.memberExpression(
         path.node.object.object,
         t.identifier('userAttributes'),

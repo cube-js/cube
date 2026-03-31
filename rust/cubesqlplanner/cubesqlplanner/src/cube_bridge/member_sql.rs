@@ -418,15 +418,17 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                             .map(|v| Self::process_secutity_context_value(&proxy_state, &v))
                             .collect::<Result<Vec<_>, _>>()?;
 
-                        let values = values.to_native(context)?;
-
                         if let Ok(column) = column.to_function() {
-                            let result = column.call(vec![values])?;
+                            let native_values = values.to_native(context)?;
+                            let result = column.call(vec![native_values])?;
                             if let Ok(result) = result.to_string() {
                                 result.value()?
                             } else {
                                 "".to_string()
                             }
+                        } else if let Ok(column) = column.to_string() {
+                            let column_value = column.value()?;
+                            format!("{} IN ({})", column_value, values.join(", "))
                         } else {
                             "".to_string()
                         }
@@ -460,6 +462,26 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         Ok(NativeObjectHandle::new(result.into_object()))
     }
 
+    fn security_context_to_string_fn<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        property_value: NativeObjectHandle<CIT>,
+        proxy_state: ProxyStateWeak,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        let allocated = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
+            prop_vec
+                .iter()
+                .map(|v| Self::process_secutity_context_value(&proxy_state, v))
+                .collect::<Result<Vec<_>, _>>()?
+                .join(",")
+        } else if let Ok(prop) = String::from_native(property_value.clone()) {
+            Self::process_secutity_context_value(&proxy_state, &prop)?
+        } else {
+            String::new()
+        };
+        let result = context_holder.to_string_fn(allocated)?;
+        Ok(NativeObjectHandle::new(result.into_object()))
+    }
+
     fn security_context_proxy<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         proxy_state: ProxyStateWeak,
@@ -486,6 +508,13 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                 return Ok(Some(Self::security_context_unsafe_value_fn(
                     inner_context,
                     target.clone(),
+                )?));
+            }
+            if &prop == "toString" || &prop == "valueOf" {
+                return Ok(Some(Self::security_context_to_string_fn(
+                    inner_context,
+                    target.clone(),
+                    proxy_state.clone(),
                 )?));
             }
             let target_obj = target.to_struct()?;
@@ -519,7 +548,15 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             )?;
             result.set_field(
                 "unsafeValue",
-                Self::security_context_unsafe_value_fn(inner_context, property_value.clone())?,
+                Self::security_context_unsafe_value_fn(inner_context.clone(), property_value.clone())?,
+            )?;
+            result.set_field(
+                "toString",
+                Self::security_context_to_string_fn(
+                    inner_context,
+                    property_value.clone(),
+                    proxy_state.clone(),
+                )?,
             )?;
             let result = NativeObjectHandle::new(result.into_object());
             Ok(Some(result))

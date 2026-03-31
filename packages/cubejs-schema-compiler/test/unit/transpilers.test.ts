@@ -183,6 +183,105 @@ describe('Transpilers', () => {
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
+  it('CubePropContextTranspiler with shorthand groups in values should transpile to securityContext.cubeCloud.groups', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ groups ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
+  });
+
+  it('CubePropContextTranspiler with shorthand groups member access should transpile to securityContext.cubeCloud.groups', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ groups.someProperty ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups.someProperty');
+  });
+
+  it('CubePropContextTranspiler with full path to groups should work normally', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ securityContext.cubeCloud.groups ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
+  });
+
   it('ImportExportTranspiler', async () => {
     const ieTranspiler = new ImportExportTranspiler();
     const errorsReport = new ErrorReporter();

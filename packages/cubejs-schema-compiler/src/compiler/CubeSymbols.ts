@@ -1486,13 +1486,20 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const methods = (paramValue) => ({
           filter: (column) => {
             if (paramValue) {
-              const value = Array.isArray(paramValue) ?
-                paramValue.map(allocateParam) :
-                allocateParam(paramValue);
-              if (typeof column === 'function') {
-                return column(value);
+              if (Array.isArray(paramValue)) {
+                const values = paramValue.map(allocateParam);
+                if (typeof column === 'function') {
+                  return column(values);
+                } else {
+                  return `${column} IN (${values.join(', ')})`;
+                }
               } else {
-                return `${column} = ${value}`;
+                const value = allocateParam(paramValue);
+                if (typeof column === 'function') {
+                  return column(value);
+                } else {
+                  return `${column} = ${value}`;
+                }
               }
             } else {
               return '1 = 1';
@@ -1504,7 +1511,23 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             }
             return methods(paramValue).filter(column);
           },
-          unsafeValue: () => paramValue
+          unsafeValue: () => paramValue,
+          toString: () => {
+            if (paramValue !== undefined && paramValue !== null) {
+              return Array.isArray(paramValue)
+                ? paramValue.map(allocateParam).join(',')
+                : String(allocateParam(paramValue));
+            }
+            return '';
+          },
+          [Symbol.toPrimitive]: () => {
+            if (paramValue !== undefined && paramValue !== null) {
+              return Array.isArray(paramValue)
+                ? paramValue.map(allocateParam).join(',')
+                : String(allocateParam(paramValue));
+            }
+            return '';
+          }
         });
         return methods(target)[name] ||
           typeof propValue === 'object' && propValue !== null && CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam) ||
