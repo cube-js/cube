@@ -558,7 +558,7 @@ const variables = {
     dataSource,
   }: {
     dataSource: string,
-  }): { user: string; password: string | undefined } | undefined => {
+  }): { user: string; password?: string } | undefined => {
     const user = getEnvFn('dbUser')({
       dataSource,
     });
@@ -571,8 +571,12 @@ const variables = {
       );
     }
 
-    if (user) {
+    if (user && password) {
       return { user, password };
+    }
+
+    if (user) {
+      return { user };
     }
 
     return undefined;
