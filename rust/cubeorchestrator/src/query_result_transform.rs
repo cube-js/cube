@@ -164,6 +164,52 @@ pub fn get_blending_response_key(
     ))
 }
 
+fn member_name(m: &MemberOrMemberExpression) -> Option<&str> {
+    match m {
+        MemberOrMemberExpression::Member(s) => Some(s.as_str()),
+        MemberOrMemberExpression::ParsedMemberExpression(e) => Some(e.name.as_str()),
+        MemberOrMemberExpression::MemberExpression(e) => Some(e.name.as_str()),
+    }
+}
+
+/// When the query result is empty (no columns/rows), we still need to verify
+/// that all requested members are present in the annotation.
+/// This catches RBAC-denied members that would otherwise silently return empty data.
+fn validate_query_members_in_annotation(
+    query: &NormalizedQuery,
+    annotation: &HashMap<String, ConfigItem>,
+) -> Result<()> {
+    let requested: Vec<&str> = query
+        .measures
+        .iter()
+        .flat_map(|v| v.iter())
+        .chain(query.dimensions.iter().flat_map(|v| v.iter()))
+        .chain(query.segments.iter().flat_map(|v| v.iter()))
+        .filter_map(member_name)
+        .collect();
+
+    let td_members: Vec<&str> = query
+        .time_dimensions
+        .iter()
+        .flat_map(|v| v.iter())
+        .map(|td| td.dimension.as_str())
+        .collect();
+
+    for m in requested.iter().chain(td_members.iter()) {
+        if !annotation.contains_key(*m) {
+            bail!(
+                concat!(
+                    "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
+                    "Please note primaryKey fields are `public: false` by default: ",
+                    "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
+                ),
+                m
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Parse member names from request/response.
 pub fn get_members(
     query_type: &QueryType,
@@ -185,6 +231,7 @@ pub fn get_members(
     let mut members_arr: Vec<String> = vec![];
 
     if db_data.columns.is_empty() {
+        validate_query_members_in_annotation(query, annotation)?;
         return Ok((members_map, members_arr));
     }
 
@@ -2194,6 +2241,54 @@ mod tests {
         assert_eq!(members_to_alias_map.len(), 0);
         assert_eq!(members.len(), 0);
         Ok(())
+    }
+
+    #[test]
+    fn test_get_members_empty_dataset_with_hidden_member() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"regular_profit_by_postal_code".to_string())
+            .unwrap()
+            .clone();
+
+        // Remove a measure from annotation to simulate RBAC-hidden member
+        let hidden_member = test_data
+            .request
+            .query
+            .measures
+            .as_ref()
+            .and_then(|m| m.first())
+            .and_then(|m| match m {
+                MemberOrMemberExpression::Member(s) => Some(s.clone()),
+                _ => None,
+            })
+            .expect("Test data should have at least one measure");
+        test_data.request.annotation.remove(&hidden_member);
+
+        let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
+        let annotation = &test_data.request.annotation;
+        let query = &test_data.request.query;
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
+
+        match get_members(
+            query_type,
+            query,
+            &QueryResult {
+                columns: vec![],
+                rows: vec![],
+                columns_pos: IndexMap::new(),
+            },
+            alias_to_member_name_map,
+            annotation,
+        ) {
+            Ok(_) => Err(TestError(
+                "get_members() should fail for hidden member with empty dataset".to_string(),
+            )
+            .into()),
+            Err(err) => {
+                assert!(err.to_string().contains("You requested hidden member"));
+                Ok(())
+            }
+        }
     }
 
     #[test]
