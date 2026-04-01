@@ -430,6 +430,9 @@ Using it with other dimension types will result in a validation error.
 
 Custom metadata. Can be used to pass any information to the frontend.
 
+You can also use the `ai_context` key to provide context to the
+[AI agent][ref-ai-context] without exposing it in the user interface.
+
 <CodeGroup>
 
 ```yaml title="YAML"
@@ -443,6 +446,9 @@ cubes:
         type: number
         meta:
           any: value
+          ai_context: >
+            This is a subquery dimension. Use it to get the
+            number of users associated with each product.
 ```
 
 ```javascript title="JavaScript"
@@ -454,7 +460,9 @@ cube(`products`, {
       sql: `${users.count}`,
       type: `number`,
       meta: {
-        any: "value"
+        any: "value",
+        ai_context: `This is a subquery dimension. Use it to get the
+          number of users associated with each product.`
       }
     }
   }
@@ -1187,6 +1195,7 @@ cube(`fiscal_calendar`, {
 </CodeGroup>
 
 
+[ref-ai-context]: /docs/data-modeling/ai-context
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-schema-ref-joins]: /reference/data-modeling/joins
 [ref-subquery]: /docs/data-modeling/concepts/calculated-members#subquery-dimensions

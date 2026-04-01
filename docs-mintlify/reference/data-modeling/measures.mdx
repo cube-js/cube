@@ -165,6 +165,9 @@ cube(`orders`, {
 
 Custom metadata. Can be used to pass any information to the frontend.
 
+You can also use the `ai_context` key to provide context to the
+[AI agent][ref-ai-context] without exposing it in the user interface.
+
 <CodeGroup>
 
 ```yaml title="YAML"
@@ -178,6 +181,8 @@ cubes:
         sql: price
         meta:
           any: value
+          ai_context: >
+            Use this measure for all revenue-related questions.
 ```
 
 ```javascript title="JavaScript"
@@ -189,7 +194,8 @@ cube(`orders`, {
       type: `sum`,
       sql: `price`,
       meta: {
-        any: "value"
+        any: "value",
+        ai_context: `Use this measure for all revenue-related questions.`
       }
     }
   }
@@ -1416,6 +1422,7 @@ cube(`orders`, {
 </CodeGroup>
 
 
+[ref-ai-context]: /docs/data-modeling/ai-context
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-schema-ref-types-formats-measures-formats]: /reference/data-modeling/measures#format
 [ref-drilldowns]: /reference/recipes/drilldowns

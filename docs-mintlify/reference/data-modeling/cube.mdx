@@ -585,6 +585,9 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 Custom metadata. Can be used to pass any information to the frontend.
 
+You can also use the `ai_context` key to provide context to the
+[AI agent][ref-ai-context] without exposing it in the user interface.
+
 <CodeGroup>
 
 ```yaml title="YAML"
@@ -594,6 +597,9 @@ cubes:
     title: Product Orders
     meta:
       any: value
+      ai_context: >
+        This cube contains all e-commerce orders. When users ask
+        about revenue, prefer the total_revenue measure.
 
 ```
 
@@ -602,7 +608,9 @@ cube(`orders`, {
   sql_table: `orders`,
   title: `Product Orders`,
   meta: {
-    any: `value`
+    any: `value`,
+    ai_context: `This cube contains all e-commerce orders. When users ask
+      about revenue, prefer the total_revenue measure.`
   }
 })
 ```
@@ -648,6 +656,7 @@ The `measures` parameter is used to configure [measures][ref-ref-measures].
 The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
 
 
+[ref-ai-context]: /docs/data-modeling/ai-context
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
 [ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control/recipes/controlling-access-to-cubes-and-views
 [ref-naming]: /docs/data-modeling/syntax#naming
