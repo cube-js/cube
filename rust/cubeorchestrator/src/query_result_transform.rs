@@ -208,7 +208,15 @@ fn validate_query_members_in_annotation(
         ensure_member_in_annotation(m, annotation)?;
     }
 
-    for td in query.time_dimensions.iter().flat_map(|v| v.iter()) {
+    // Only validate time dimensions that have a granularity set.
+    // Time dimensions without granularity are used purely for date-range filtering
+    // and don't produce result columns, so they are not present in the annotation map.
+    for td in query
+        .time_dimensions
+        .iter()
+        .flat_map(|v| v.iter())
+        .filter(|td| td.granularity.is_some())
+    {
         ensure_member_in_annotation(td.dimension.as_str(), annotation)?;
     }
 
@@ -2274,6 +2282,54 @@ mod tests {
                 Ok(())
             }
         }
+    }
+
+    #[test]
+    fn test_get_members_empty_dataset_with_filter_only_time_dimension() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"regular_profit_by_postal_code".to_string())
+            .unwrap()
+            .clone();
+
+        // Add a filter-only time dimension (no granularity) to the query.
+        // This simulates a dateRange filter like:
+        //   timeDimensions: [{ dimension: "Orders.created_at", dateRange: [...] }]
+        // These dimensions are NOT in the annotation because they don't produce
+        // result columns — they're only used for filtering.
+        test_data.request.query.time_dimensions = Some(vec![QueryTimeDimension {
+            dimension: "ECommerceRecordsUs2021.order_date".to_string(),
+            date_range: Some(vec![
+                "2025-01-01".to_string(),
+                "2025-12-31".to_string(),
+            ]),
+            compare_date_range: None,
+            granularity: None,
+        }]);
+
+        let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
+        let annotation = &test_data.request.annotation;
+        let query = &test_data.request.query;
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
+
+        // Should succeed — filter-only time dimensions must not be checked
+        // against the annotation map.
+        let result = get_members(
+            query_type,
+            query,
+            &QueryResult {
+                columns: vec![],
+                rows: vec![],
+                columns_pos: IndexMap::new(),
+            },
+            alias_to_member_name_map,
+            annotation,
+        );
+        assert!(
+            result.is_ok(),
+            "Filter-only time dimension (no granularity) should not trigger hidden member error, got: {:?}",
+            result.err()
+        );
+        Ok(())
     }
 
     #[test]
