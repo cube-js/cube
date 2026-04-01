@@ -1,0 +1,135 @@
+---
+title: Bring your own LLM
+description: Configure custom OpenAI and Anthropic models for your AI agents in Cube Cloud.
+---
+
+Cube Cloud includes a set of [predefined LLM models](/admin/ai/spaces-agents-models#3-models-llm-models)
+for powering your AI agents. If you need to use a specific model version, a
+fine-tuned model, or route requests through a particular inference provider, you
+can bring your own LLM (BYOLLM) by registering a custom model in Cube Cloud.
+
+BYOLLM supports **OpenAI** and **Anthropic** model families. You can use models
+hosted directly by these providers or through compatible inference endpoints.
+
+## Supported providers
+
+Cube Cloud supports the following LLM providers for custom models:
+
+| Provider | Description |
+| --- | --- |
+| OpenAI | Models accessed via the OpenAI API, including GPT-4o, GPT-4.1, and custom fine-tuned models |
+| Anthropic | Models accessed via the Anthropic API, including Claude 3.5, Claude 3.7, Claude 4, and newer releases |
+
+Different inference providers that expose OpenAI-compatible or
+Anthropic-compatible APIs are also supported. This lets you route requests
+through providers such as Azure OpenAI Service, Amazon Bedrock, or any endpoint
+that implements the same API contract.
+
+## Register a custom model
+
+To register a custom model, navigate to **AI &rarr; Models** in the Cube Cloud
+settings and add a new model entry. You will need to provide:
+
+- **Model name** — a display name used to identify the model across your
+  deployment
+- **Provider** — select either `OpenAI` or `Anthropic`
+- **Model identifier** — the model ID as recognized by the provider API (e.g.,
+  `gpt-4o-2024-11-20`, `claude-sonnet-4-20250514`)
+- **API key** — the secret key for authenticating with the provider
+- **API base URL** *(optional)* — a custom endpoint URL if you are using a
+  third-party inference provider or a private deployment instead of the default
+  provider endpoint
+
+<Warning>
+
+API keys are stored securely in Cube Cloud and are never exposed in logs or API
+responses. Rotate your keys regularly and use keys scoped to the minimum
+required permissions.
+
+</Warning>
+
+## Assign a custom model to an agent
+
+After registering a custom model, you can assign it to any agent.
+
+### Using the UI
+
+In the Cube Cloud console, navigate to the agent configuration page and select
+your custom model from the **LLM** dropdown. Custom models appear alongside
+predefined models.
+
+### Using YAML configuration
+
+Reference a custom model in your [YAML agent configuration](/admin/ai/yaml-config)
+using the `byom` key:
+
+```yaml
+agents:
+  - name: my-agent
+    space: my-space
+    llm:
+      byom:
+        name: my-custom-model
+```
+
+You can also reference a custom model by its numeric ID:
+
+```yaml
+agents:
+  - name: my-agent
+    space: my-space
+    llm:
+      byom:
+        id: 123
+```
+
+Custom embedding models are also supported using the same syntax on the
+`embedding_llm` field:
+
+```yaml
+agents:
+  - name: my-agent
+    space: my-space
+    embedding_llm:
+      byom:
+        name: my-custom-embedding-model
+```
+
+## Predefined models
+
+Cube Cloud provides the following predefined models that you can use without
+any additional configuration:
+
+**Anthropic models:**
+
+| Model ID | Description |
+| --- | --- |
+| `claude_3_5_sonnetv2` | Claude 3.5 Sonnet v2 |
+| `claude_3_7_sonnet` | Claude 3.7 Sonnet |
+| `claude_3_7_sonnet_thinking` | Claude 3.7 Sonnet with extended thinking |
+| `claude_4_sonnet` | Claude 4 Sonnet |
+| `claude_4_5_sonnet` | Claude 4.5 Sonnet |
+| `claude_4_5_haiku` | Claude 4.5 Haiku |
+| `claude_4_5_opus` | Claude 4.5 Opus |
+
+**OpenAI models:**
+
+| Model ID | Description |
+| --- | --- |
+| `gpt_4o` | GPT-4o |
+| `gpt_4_1` | GPT-4.1 |
+| `gpt_4_1_mini` | GPT-4.1 Mini |
+| `gpt_5` | GPT-5 |
+| `gpt_5_mini` | GPT-5 Mini |
+| `o3` | o3 |
+| `o4_mini` | o4-mini |
+
+**Embedding models:**
+
+| Model ID | Description |
+| --- | --- |
+| `text-embedding-3-large` | OpenAI text-embedding-3-large |
+| `text-embedding-3-small` | OpenAI text-embedding-3-small |
+
+If none of the predefined models meet your requirements, use the BYOLLM feature
+to register a custom model.
