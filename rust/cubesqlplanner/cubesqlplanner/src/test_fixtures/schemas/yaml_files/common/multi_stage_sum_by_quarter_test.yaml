@@ -27,9 +27,9 @@ cubes:
         sql: "{CUBE.count_distinct}"
         type: sum
         add_group_by:
-          - coach.time___month
+          - time___month
         group_by:
-          - coach.time___quarter
+          - time___quarter
         public: false
 
       - name: count_distinct__sum_by_quarter
@@ -37,7 +37,7 @@ cubes:
         sql: "{CUBE.count_distinct__sum_by_quarter_aux}"
         type: sum
         add_group_by:
-          - coach.time___quarter
+          - time___quarter
 
     pre_aggregations:
       - name: main

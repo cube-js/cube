@@ -368,6 +368,10 @@ pub struct MockCubeBuilder {
 }
 
 impl MockCubeBuilder {
+    pub fn cube_name(&self) -> String {
+        self.cube_name.clone()
+    }
+
     pub fn cube_def(mut self, definition: MockCubeDefinition) -> Self {
         self.cube_definition = Some(definition);
         self
