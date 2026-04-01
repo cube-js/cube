@@ -134,28 +134,30 @@ impl PreAggregationsCompiler {
         };
         let time_dimensions =
             if let Some(td_refs) = description.time_dimension_references()? {
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-                let mut result = Vec::new();
+                let mut resolved = Vec::new();
                 for td_ref in td_refs.iter() {
-                    let td_static = td_ref.static_data();
                     let dims = Self::symbols_from_ref(
                         self.query_tools.clone(),
                         &name.cube_name,
                         td_ref.dimension()?,
                         Self::check_is_time_dimension,
                     )?;
-                    let base_symbol = dims[0].clone();
+                    resolved.push((dims[0].clone(), td_ref.static_data().granularity.clone()));
+                }
+                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+                let mut result = Vec::new();
+                for (base_symbol, granularity) in resolved {
                     let granularity_obj = GranularityHelper::make_granularity_obj(
                         self.query_tools.cube_evaluator().clone(),
                         &mut evaluator_compiler,
                         &base_symbol.cube_name(),
                         &base_symbol.name(),
-                        Some(td_static.granularity.clone()),
+                        Some(granularity.clone()),
                     )?;
                     let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
                         base_symbol,
-                        Some(td_static.granularity.clone()),
+                        Some(granularity),
                         granularity_obj,
                         None,
                     ));
