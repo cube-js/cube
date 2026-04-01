@@ -147,7 +147,10 @@ impl PreAggregationsCompiler {
                         name
                     ))
                 })?;
-                resolved.push((base_symbol.clone(), td_ref.static_data().granularity.clone()));
+                resolved.push((
+                    base_symbol.clone(),
+                    td_ref.static_data().granularity.clone(),
+                ));
             }
             let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
             let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
