@@ -7,6 +7,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeA.id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
@@ -27,6 +28,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.other_id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -53,6 +55,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeA.count_a",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -76,6 +79,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeB.count_b",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -114,6 +118,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeB.other_id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -140,6 +145,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeA.count_a",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -163,6 +169,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeB.count_b",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -201,6 +208,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeA.id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
@@ -221,6 +229,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeB.id",
       "format": "imageUrl",
@@ -241,6 +250,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.other_id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -267,6 +277,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeA.count_a",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -290,6 +301,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeB.count_b",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -328,6 +340,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeB.other_id",
+      "cubeDescription": undefined,
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -354,6 +367,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeA.count_a",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
@@ -377,6 +391,7 @@ Object {
     Object {
       "aggType": "number",
       "aliasMember": "CubeB.count_b",
+      "cubeDescription": undefined,
       "cumulative": false,
       "cumulativeTotal": false,
       "currency": undefined,
