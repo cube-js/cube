@@ -34,7 +34,7 @@ pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
     pre_aggregation_dimensions: HashMap<String, bool>,
-    pre_aggregation_time_dimensions: HashMap<String, (Option<Rc<TimeDimensionSymbol>>, bool)>,
+    pre_aggregation_time_dimensions: HashMap<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
     pre_aggregation_segments: HashMap<String, bool>,
     result: MatchState,
 }
@@ -46,17 +46,17 @@ impl<'a> DimensionMatcher<'a> {
             .iter()
             .map(|d| (d.full_name(), false))
             .collect();
-        let pre_aggregation_time_dimensions = pre_aggregation
-            .time_dimensions
-            .iter()
-            .map(|dim| {
-                if let Ok(td) = dim.as_time_dimension() {
-                    (td.base_symbol().full_name(), (Some(td), false))
-                } else {
-                    (dim.full_name(), (None, false))
-                }
-            })
-            .collect::<HashMap<_, _>>();
+        let mut pre_aggregation_time_dimensions =
+            HashMap::<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
+        for dim in pre_aggregation.time_dimensions.iter() {
+            if let Ok(td) = dim.as_time_dimension() {
+                let key = td.base_symbol().full_name();
+                pre_aggregation_time_dimensions
+                    .entry(key)
+                    .or_default()
+                    .push((td, false));
+            }
+        }
         let pre_aggregation_segments = pre_aggregation
             .segments
             .iter()
@@ -128,12 +128,15 @@ impl<'a> DimensionMatcher<'a> {
             MatchState::Partial
         };
         self.result = self.result.combine(&dimension_coverage_result);
-        let time_dimension_coverage_result =
-            if self.pre_aggregation_time_dimensions.values().all(|v| v.1) {
-                MatchState::Full
-            } else {
-                MatchState::Partial
-            };
+        let time_dimension_coverage_result = if self
+            .pre_aggregation_time_dimensions
+            .values()
+            .all(|entries| entries.iter().all(|(_, matched)| *matched))
+        {
+            MatchState::Full
+        } else {
+            MatchState::Partial
+        };
         self.result = self.result.combine(&time_dimension_coverage_result);
         let segment_coverage_result = if self.pre_aggregation_segments.values().all(|v| *v) {
             MatchState::Full
@@ -233,39 +236,41 @@ impl<'a> DimensionMatcher<'a> {
         };
         let base_symbol_name = time_dimension.base_symbol().full_name();
 
-        if let Some(found) = self
+        if let Some(entries) = self
             .pre_aggregation_time_dimensions
             .get_mut(&base_symbol_name)
         {
-            if add_to_matched_dimension {
-                found.1 = true;
+            // First, look for exact granularity match
+            let exact_match = entries
+                .iter_mut()
+                .find(|(td, _)| granularity.is_none() || td.granularity() == &granularity);
+            if let Some((_, matched)) = exact_match {
+                if add_to_matched_dimension {
+                    *matched = true;
+                }
+                return Ok(MatchState::Full);
             }
 
-            let pre_agg_td = &found.0;
-            let pre_aggr_granularity = if let Some(pre_agg_td) = pre_agg_td {
-                pre_agg_td.granularity().clone()
-            } else {
-                None
-            };
-
-            if granularity.is_none() || pre_aggr_granularity == granularity {
-                Ok(MatchState::Full)
-            } else if pre_aggr_granularity.is_none() {
-                Ok(MatchState::NotMatched)
-            } else if let Some(pre_agg_td) = pre_agg_td {
+            // No exact match — find the finest pre-agg granularity that covers the query
+            let mut best_match = MatchState::NotMatched;
+            for (pre_agg_td, matched) in entries.iter_mut() {
+                let pre_aggr_granularity = pre_agg_td.granularity();
+                if pre_aggr_granularity.is_none() {
+                    continue;
+                }
                 let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
                     (&granularity, time_dimension),
-                    (&pre_aggr_granularity, &pre_agg_td),
+                    (pre_aggr_granularity, pre_agg_td),
                 )?;
-
-                if min_granularity == pre_aggr_granularity {
-                    Ok(MatchState::Partial)
-                } else {
-                    Ok(MatchState::NotMatched)
+                if min_granularity == *pre_aggr_granularity {
+                    if add_to_matched_dimension {
+                        *matched = true;
+                    }
+                    best_match = MatchState::Partial;
+                    break;
                 }
-            } else {
-                Ok(MatchState::NotMatched)
             }
+            Ok(best_match)
         } else {
             if time_dimension.owned_by_cube() {
                 Ok(MatchState::NotMatched)
