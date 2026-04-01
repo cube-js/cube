@@ -175,6 +175,8 @@ fn member_name(m: &MemberOrMemberExpression) -> Option<&str> {
 /// When the query result is empty (no columns/rows), we still need to verify
 /// that all requested members are present in the annotation.
 /// This catches RBAC-denied members that would otherwise silently return empty data.
+/// Note: segments are excluded because the annotation map only contains
+/// measures, dimensions, and time dimensions.
 fn validate_query_members_in_annotation(
     query: &NormalizedQuery,
     annotation: &HashMap<String, ConfigItem>,
@@ -184,7 +186,6 @@ fn validate_query_members_in_annotation(
         .iter()
         .flat_map(|v| v.iter())
         .chain(query.dimensions.iter().flat_map(|v| v.iter()))
-        .chain(query.segments.iter().flat_map(|v| v.iter()))
         .filter_map(member_name)
         .collect();
 
