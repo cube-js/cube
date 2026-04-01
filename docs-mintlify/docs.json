@@ -9,7 +9,7 @@
   },
   "favicon": "/favicon.svg",
   "banner": {
-    "content": "This is a preview of the new Cube documentation. For the current live docs, visit [cube.dev/docs](https://cube.dev/docs)",
+    "content": "This is an upcoming version of the Cube documentation. For the current version, visit [cube.dev/docs](https://cube.dev/docs)",
     "dismissible": false
   },
   "navigation": {
@@ -325,7 +325,7 @@
           {
             "group": "AI",
             "pages": [
-              "admin/ai",
+              "admin/ai/index",
               "admin/ai/spaces-agents-models",
               "admin/ai/agent-rules",
               "admin/ai/memory-isolation"
@@ -366,7 +366,7 @@
           {
             "group": "Embedding",
             "pages": [
-              "embedding",
+              "embedding/index",
               "embedding/private-embedding",
               "embedding/signed-embedding",
               "embedding/creator-mode",

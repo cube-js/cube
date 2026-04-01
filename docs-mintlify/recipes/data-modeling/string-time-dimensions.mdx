@@ -3,11 +3,6 @@ title: Working around string time dimensions
 description: "Cube always expects a timestamp with timezone (or compatible type) as an input to the [time dimension][ref-time-dimension]."
 ---
 
-# Working around string time dimensions
-
-Cube always expects a timestamp with timezone (or compatible type) as an
-input to the [time dimension][ref-time-dimension].
-
 However, there are a lot of cases when the underlying table's datetime
 information is stored as a string. Most SQL databases support datetime
 parsing which allows converting strings to timestamps. Let's consider an
