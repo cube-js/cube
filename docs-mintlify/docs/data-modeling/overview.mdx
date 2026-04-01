@@ -277,7 +277,7 @@ measure via an API, the following SQL will be generated:
 
 ```sql
 SELECT
-  100.0 * COUNT(
+  1.0 * COUNT(
     CASE WHEN (users.paying = 'true') THEN users.id END
   ) / COUNT(users.id) AS paying_percentage
 FROM users

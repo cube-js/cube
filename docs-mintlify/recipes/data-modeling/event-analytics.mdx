@@ -739,7 +739,7 @@ cubes:
           - - sql: "{is_bounced} = 'True'
 
       - name: bounce_rate
-        sql: "100.00 * {bounced_count} / NULLIF({count}, 0)"
+        sql: "1.0 * {bounced_count} / NULLIF({count}, 0)"
         type: number
         format: percent
 ```
@@ -770,7 +770,7 @@ cube("sessions", {
     },
 
     bounce_rate: {
-      sql: `100.00 * ${bounced_count} / NULLIF(${count}, 0)`,
+      sql: `1.0 * ${bounced_count} / NULLIF(${count}, 0)`,
       type: `number`,
       format: `percent`
     }
@@ -846,7 +846,7 @@ cube("sessions", {
 
     repeat_percent: {
       description: `Percent of Repeat Sessions`,
-      sql: `100.00 * ${repeat_count} / NULLIF(${count}, 0)`,
+      sql: `1.0 * ${repeat_count} / NULLIF(${count}, 0)`,
       type: `number`,
       format: `percent`
     }
@@ -875,7 +875,7 @@ cubes:
 
       - name: repeat_percent
         description: Percent of Repeat Sessions
-        sql: "100.00 * {repeat_count} / NULLIF({count}, 0)"
+        sql: "1.0 * {repeat_count} / NULLIF({count}, 0)"
         type: number
         format: percent
 
