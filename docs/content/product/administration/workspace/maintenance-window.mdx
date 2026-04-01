@@ -53,7 +53,7 @@ snapshot during the window.
 Navigate to <Btn>Admin → Settings → Maintenance Window</Btn> in the Cube Cloud
 console.
 
-<Screenshot src="https://lgo0ecceic.ucarecd.net/2ce65ee8-4041-435f-8d74-a84b1b9d6d53/" />
+<Screenshot src="https://lgo0ecceic.ucarecd.net/e6db33a7-0d5e-4e28-8494-554393eaf2cb/" />
 
 1. Toggle **Enable Scheduled Maintenance Window** to on.
 2. Select the **Day of week** (e.g., Sunday).
@@ -95,6 +95,27 @@ revert to an older version, contact support.
 
 </WarningBox>
 
+## Upgrade now
+
+If a critical fix has been released and you don't want to wait for the
+next scheduled maintenance window, you can apply the latest eligible
+snapshot immediately.
+
+When the maintenance window is enabled, an **Upgrade Now** section
+appears at the bottom of the settings page. Click **Upgrade Now** to
+advance to the latest eligible snapshot right away.
+
+The button is disabled while the upgrade is in progress. Once complete,
+the new version will appear in the **Active Version** dropdown.
+
+<InfoBox>
+
+The same eligibility rules apply — only snapshots that are at least
+24 hours old are considered. If you are already on the latest eligible
+snapshot, the button will return an error.
+
+</InfoBox>
+
 ## FAQ
 
 ### What happens if I disable the maintenance window?
@@ -120,6 +141,12 @@ could be up to ~8 days behind the latest release in the worst case.
 Yes. When the maintenance window is enabled, the settings page shows an
 **Active Version** dropdown listing all snapshots from the last 7 days.
 Select any of them to switch back. See [Active version](#active-version)
+above for details.
+
+### Can I trigger an immediate upgrade without waiting for the window?
+
+Yes. Use the **Upgrade Now** button on the settings page to apply the
+latest eligible snapshot immediately. See [Upgrade now](#upgrade-now)
 above for details.
 
 [ref-dedicated]: /product/deployment/cloud/deployment-types#production-cluster
