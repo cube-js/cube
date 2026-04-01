@@ -141,7 +141,13 @@ impl PreAggregationsCompiler {
                     td_ref.dimension()?,
                     Self::check_is_time_dimension,
                 )?;
-                resolved.push((dims[0].clone(), td_ref.static_data().granularity.clone()));
+                let base_symbol = dims.first().ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "No time dimension symbols resolved for pre-aggregation '{:?}'",
+                        name
+                    ))
+                })?;
+                resolved.push((base_symbol.clone(), td_ref.static_data().granularity.clone()));
             }
             let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
             let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
