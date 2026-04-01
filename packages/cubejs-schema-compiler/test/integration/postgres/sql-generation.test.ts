@@ -5708,4 +5708,51 @@ cubes:
       },
     ]);
   });
+
+  if (getEnv('nativeSqlPlanner')) {
+    describe('FILTER_PARAMS with segments under Tesseract', () => {
+      const fpCompilers = prepareJsCompiler(`
+        cube('orders_fp', {
+          sql: \`
+            SELECT * FROM orders
+            WHERE \${FILTER_PARAMS.orders_fp.created_at.filter('created_at')}
+              AND \${FILTER_PARAMS.orders_fp.status.filter('status')}
+          \`,
+          measures: {
+            count: { type: 'count' },
+          },
+          dimensions: {
+            id: { sql: 'id', type: 'number', primaryKey: true },
+            status: { sql: 'status', type: 'string' },
+            created_at: { sql: 'created_at', type: 'time' },
+          },
+          segments: {
+            completed: { sql: \`\${CUBE}.status = 'completed'\` },
+          },
+        });
+      `);
+
+      it('FILTER_PARAMS pushdown is preserved when a segment is present', async () => {
+        await fpCompilers.compiler.compile();
+        const query = new PostgresQuery(fpCompilers, {
+          measures: ['orders_fp.count'],
+          segments: ['orders_fp.completed'],
+          filters: [
+            { member: 'orders_fp.status', operator: 'equals', values: ['completed'] },
+          ],
+          timeDimensions: [{
+            dimension: 'orders_fp.created_at',
+            dateRange: ['2024-01-01', '2024-01-31'],
+          }],
+          timezone: 'UTC',
+        });
+
+        const [sql] = query.buildSqlAndParams();
+
+        expect(sql).not.toMatch(/WHERE\s+1\s*=\s*1\s+AND\s+1\s*=\s*1/);
+        expect(sql).toMatch(/created_at/);
+        expect(sql).toMatch(/status/);
+      });
+    });
+  }
 });
