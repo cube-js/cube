@@ -33,3 +33,23 @@ You can query source SQL in two ways:
 - **Write SQL manually** – Write standard SQL queries directly against your data source for maximum flexibility
 - **Ask AI** – Use the AI agent to help you research your data source, build SQL queries, and refine results in real-time
 
+## Workbook versions
+
+When you [publish a dashboard][ref-dashboards] from a workbook, Cube
+automatically creates a version snapshot. Each time you publish, a new
+version is recorded so you can track changes to your dashboard over time.
+
+### Restoring a version
+
+You can restore the state of your workbook from any previously published
+dashboard version. Restoring a version rebuilds the workbook with the
+charts and configuration from that published snapshot.
+
+<Warning>
+Restoring a version replaces **all existing tabs** in the workbook with
+the tabs from the selected version. Any current work in the workbook that
+has not been published will be lost.
+</Warning>
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+
