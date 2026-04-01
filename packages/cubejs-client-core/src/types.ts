@@ -377,6 +377,7 @@ export type BaseCubeMember = {
   title: string;
   shortTitle: string;
   description?: string;
+  cubeDescription?: string;
   /**
    * @deprecated use `public` instead
    */

@@ -27,6 +27,7 @@ type ConfigItem = {
   title: string;
   shortTitle: string;
   description: string;
+  cubeDescription?: string;
   type: string;
   format: string;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
@@ -61,6 +62,7 @@ const annotation = (
     title: config.title,
     shortTitle: config.shortTitle,
     description: config.description,
+    cubeDescription: config.cubeDescription,
     type: config.type,
     format: config.format,
     currency: config.currency,

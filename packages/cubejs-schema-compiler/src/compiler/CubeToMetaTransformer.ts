@@ -69,6 +69,7 @@ export type MeasureConfig = {
   name: string;
   title: string;
   description?: string;
+  cubeDescription?: string;
   shortTitle: string;
   format?: MeasureFormat;
   currency?: string;
@@ -92,6 +93,7 @@ export type DimensionConfig = {
   title: string;
   type: string;
   description?: string;
+  cubeDescription?: string;
   shortTitle: string;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
@@ -111,6 +113,7 @@ export type SegmentConfig = {
   title: string;
   shortTitle: string;
   description?: string;
+  cubeDescription?: string;
   meta?: any;
   isVisible: boolean;
   public: boolean;
@@ -244,6 +247,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
           const measureVisibility = isCubeVisible ? this.isVisible(metricDef, true) : false;
           return {
             ...this.measureConfig(cubeName, cubeTitle, nameToMetric),
+            cubeDescription: extendedCube.description,
             isVisible: measureVisibility,
             public: measureVisibility,
           };
@@ -261,6 +265,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
             title: this.title(cubeTitle, nameToDimension, false),
             type: this.dimensionDataType(extendedDimDef.type || 'string'),
             description: extendedDimDef.description,
+            cubeDescription: extendedCube.description,
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               extendedDimDef.suggestFilterValues == null
@@ -296,6 +301,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
             title: this.title(cubeTitle, nameToSegment, false),
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: extendedSegmentDef.description,
+            cubeDescription: extendedCube.description,
             meta: extendedSegmentDef.meta,
             isVisible: segmentVisibility,
             public: segmentVisibility,

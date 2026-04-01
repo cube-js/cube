@@ -96,6 +96,9 @@ components:
           type: "string"
         description:
           type: "string"
+        cubeDescription:
+          type: "string"
+          description: "Description of the parent cube/view this segment belongs to"
         shortTitle:
           type: "string"
         meta:
@@ -132,6 +135,9 @@ components:
           type: "string"
         description:
           type: "string"
+        cubeDescription:
+          type: "string"
+          description: "Description of the parent cube/view this dimension belongs to"
         type:
           type: "string"
         aliasMember:
@@ -172,6 +178,9 @@ components:
           type: "string"
         description:
           type: "string"
+        cubeDescription:
+          type: "string"
+          description: "Description of the parent cube/view this measure belongs to"
         type:
           type: "string"
         aggType:

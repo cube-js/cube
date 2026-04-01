@@ -90,6 +90,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.bar',
               description: 'measure from compilerApi mock',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
           ],
@@ -97,14 +98,17 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.id',
               description: 'id dimension from compilerApi mock',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
             {
               name: 'Foo.time',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
             {
               name: 'Foo.timeGranularities',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
               granularities: [
                 {
@@ -120,6 +124,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.quux',
               description: 'segment from compilerApi mock',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
           ],
@@ -138,6 +143,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.bar',
               description: 'measure from compilerApi mock',
+              cubeDescription: 'cube from compilerApi mock',
               sql: 'bar',
               isVisible: true,
             },
@@ -146,10 +152,12 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.id',
               description: 'id dimension from compilerApi mock',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
             {
               name: 'Foo.time',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
           ],
@@ -157,6 +165,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.quux',
               description: 'segment from compilerApi mock',
+              cubeDescription: 'cube from compilerApi mock',
               isVisible: true,
             },
           ],

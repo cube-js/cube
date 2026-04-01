@@ -21,6 +21,8 @@ pub struct V1CubeMetaMeasure {
     pub short_title: Option<String>,
     #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(rename = "cubeDescription", skip_serializing_if = "Option::is_none")]
+    pub cube_description: Option<String>,
     #[serde(rename = "type")]
     pub r#type: String,
     #[serde(rename = "aggType", skip_serializing_if = "Option::is_none")]
@@ -43,6 +45,7 @@ impl V1CubeMetaMeasure {
             title: None,
             short_title: None,
             description: None,
+            cube_description: None,
             r#type,
             agg_type: None,
             meta: None,
