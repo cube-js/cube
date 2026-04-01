@@ -19,7 +19,7 @@ import { Mutex } from 'async-mutex';
 import { KsqlQuery } from './KsqlQuery';
 
 type KsqlDriverOptions = {
-  url: string,
+  url?: string,
   username?: string,
   password?: string,
   kafkaHost?: string,
@@ -117,13 +117,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
-    const url = getEnv('dbUrl', { dataSource });
-    if (!url) {
-      throw new Error('CUBEJS_DB_URL is required for ksqlDB');
-    }
-
     this.config = {
-      url,
+      url: getEnv('dbUrl', { dataSource }),
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       kafkaHost: getEnv('dbKafkaHost', { dataSource }),
@@ -178,6 +173,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
+
     const { data } = await this.apiQuery('/ksql', {
       ksql: `${formatSql(query, values)};`,
       ...(options.streamOffset ? {
