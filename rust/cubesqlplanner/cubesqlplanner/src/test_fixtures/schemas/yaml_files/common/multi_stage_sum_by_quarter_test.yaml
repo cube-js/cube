@@ -8,14 +8,6 @@ cubes:
         type: time
         public: false
 
-      - name: time___month
-        sql: "{time.month}"
-        type: time
-
-      - name: time___quarter
-        sql: "{time.quarter}"
-        type: time
-
     measures:
       - name: count_distinct
         sql: id
