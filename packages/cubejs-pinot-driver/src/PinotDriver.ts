@@ -28,7 +28,7 @@ export type PinotDriverConfiguration = {
   port?: string | number;
   user?: string;
   database?: string;
-  basicAuth?: { user?: string, password?: string };
+  basicAuth?: { user: string, password: string };
   authToken?: string;
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
@@ -101,12 +101,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       port: getEnv('dbPort', { dataSource }),
       user: getEnv('dbUser', { dataSource }),
       database: getEnv('dbName', { dataSource }),
-      basicAuth: getEnv('dbPass', { dataSource })
-        ? {
-          user: getEnv('dbUser', { dataSource }),
-          password: getEnv('dbPass', { dataSource }),
-        }
-        : undefined,
+      basicAuth: getEnv('dbBasicAuth', { dataSource }),
       authToken: getEnv('pinotAuthToken', { dataSource }),
       ssl: this.getSslOptions(dataSource),
       nullHandling: getEnv('pinotNullHandling', { dataSource }),

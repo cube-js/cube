@@ -86,11 +86,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
-    const dbUser = getEnv('dbUser', { dataSource });
-    const dbPassword = getEnv('dbPass', { dataSource });
+    const basicAuth = getEnv('dbBasicAuth', { dataSource });
     const authToken = getEnv('prestoAuthToken', { dataSource });
 
-    if (authToken && dbPassword) {
+    if (authToken && basicAuth) {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
@@ -105,9 +104,9 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       schema:
         getEnv('dbName', { dataSource }) ||
         getEnv('dbSchema', { dataSource }),
-      user: dbUser,
+      user: getEnv('dbUser', { dataSource }),
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
-      ...(dbUser && dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
+      ...(basicAuth ? { basic_auth: basicAuth } : {}),
       ssl: this.getSslOptions(dataSource),
       bucketType: getEnvFn('dbExportBucketType')({ supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),

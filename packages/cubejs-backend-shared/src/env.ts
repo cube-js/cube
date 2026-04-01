@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-restricted-syntax,no-use-before-define */
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
 import { isNativeSupported } from './platform';
@@ -550,6 +550,33 @@ const variables = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PASS', dataSource)]
   ),
+
+  /**
+   * Small helper to simplify getting basicAuth across drivers
+   */
+  dbBasicAuth: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }): { user: string; password: string } | undefined => {
+    const user = getEnvFn('dbUser')({
+      dataSource,
+    });
+    const password = getEnvFn('dbPass')({
+      dataSource,
+    });
+    if (user && password) {
+      return { user, password };
+    }
+
+    if (user || password) {
+      throw new Error(
+        `Both ${keyByDataSource('CUBEJS_DB_USER', dataSource)} and ${keyByDataSource('CUBEJS_DB_PASS', dataSource)} must be set for basic auth`
+      );
+    }
+
+    return undefined;
+  },
 
   /**
    * Database name.
