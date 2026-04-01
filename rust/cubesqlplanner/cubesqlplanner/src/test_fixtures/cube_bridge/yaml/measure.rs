@@ -49,10 +49,7 @@ struct YamlOrderBy {
     dir: String,
 }
 
-fn qualify_references(
-    refs: Option<Vec<String>>,
-    cube_name: Option<&str>,
-) -> Option<Vec<String>> {
+fn qualify_references(refs: Option<Vec<String>>, cube_name: Option<&str>) -> Option<Vec<String>> {
     match cube_name {
         Some(cn) => refs.map(|v| {
             v.into_iter()

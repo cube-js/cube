@@ -208,14 +208,6 @@ describe('PreAggregationsMultiStage', () => {
         type: 'time',
         public: false,
       },
-      time___month: {
-        sql: \`\${time.month}\`,
-        type: 'time',
-      },
-      time___quarter: {
-        sql: \`\${time.quarter}\`,
-        type: 'time',
-      },
     },
 
     measures: {
@@ -228,23 +220,32 @@ describe('PreAggregationsMultiStage', () => {
         multi_stage: true,
         sql: \`\${count_distinct}\`,
         type: 'sum',
-        add_group_by: [time___month],
-        group_by: [time___quarter],
+        add_group_by: [time.month],
+        group_by: [time.quarter],
         public: false,
       },
       count_distinct__sum_by_quarter: {
         multi_stage: true,
         sql: \`\${count_distinct__sum_by_quarter_aux}\`,
         type: 'sum',
-        add_group_by: [time___quarter],
+        add_group_by: [time.quarter],
       },
     },
 
     preAggregations: {
       main: {
         type: 'rollup',
-        measureReferences: [count_distinct],
-        dimensionReferences: [time___month, time___quarter],
+        measures: [count_distinct],
+        timeDimensions: [
+          {
+            dimension: time,
+            granularity: 'month'
+          },
+          {
+            dimension: time,
+            granularity: 'quarter'
+          }
+        ]
       },
     },
   })

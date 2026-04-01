@@ -132,72 +132,71 @@ impl PreAggregationsCompiler {
         } else {
             Vec::new()
         };
-        let time_dimensions =
-            if let Some(td_refs) = description.time_dimension_references()? {
-                let mut resolved = Vec::new();
-                for td_ref in td_refs.iter() {
-                    let dims = Self::symbols_from_ref(
-                        self.query_tools.clone(),
-                        &name.cube_name,
-                        td_ref.dimension()?,
-                        Self::check_is_time_dimension,
-                    )?;
-                    resolved.push((dims[0].clone(), td_ref.static_data().granularity.clone()));
-                }
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-                let mut result = Vec::new();
-                for (base_symbol, granularity) in resolved {
-                    let granularity_obj = GranularityHelper::make_granularity_obj(
-                        self.query_tools.cube_evaluator().clone(),
-                        &mut evaluator_compiler,
-                        &base_symbol.cube_name(),
-                        &base_symbol.name(),
-                        Some(granularity.clone()),
-                    )?;
-                    let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                        base_symbol,
-                        Some(granularity),
-                        granularity_obj,
-                        None,
-                    ));
-                    result.push(symbol);
-                }
-                result
-            } else if let Some(refs) = description.time_dimension_reference()? {
+        let time_dimensions = if let Some(td_refs) = description.time_dimension_references()? {
+            let mut resolved = Vec::new();
+            for td_ref in td_refs.iter() {
                 let dims = Self::symbols_from_ref(
                     self.query_tools.clone(),
                     &name.cube_name,
-                    refs,
+                    td_ref.dimension()?,
                     Self::check_is_time_dimension,
                 )?;
+                resolved.push((dims[0].clone(), td_ref.static_data().granularity.clone()));
+            }
+            let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+            let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+            let mut result = Vec::new();
+            for (base_symbol, granularity) in resolved {
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &base_symbol.cube_name(),
+                    &base_symbol.name(),
+                    Some(granularity.clone()),
+                )?;
+                let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    base_symbol,
+                    Some(granularity),
+                    granularity_obj,
+                    None,
+                ));
+                result.push(symbol);
+            }
+            result
+        } else if let Some(refs) = description.time_dimension_reference()? {
+            let dims = Self::symbols_from_ref(
+                self.query_tools.clone(),
+                &name.cube_name,
+                refs,
+                Self::check_is_time_dimension,
+            )?;
 
-                if static_data.granularity.is_some() {
-                    let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-                    let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-                    let base_symbol = dims[0].clone();
+            if static_data.granularity.is_some() {
+                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+                let base_symbol = dims[0].clone();
 
-                    let granularity_obj = GranularityHelper::make_granularity_obj(
-                        self.query_tools.cube_evaluator().clone(),
-                        &mut evaluator_compiler,
-                        &base_symbol.cube_name(),
-                        &base_symbol.name(),
-                        static_data.granularity.clone(),
-                    )?;
-                    let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                        base_symbol,
-                        static_data.granularity.clone(),
-                        granularity_obj,
-                        None,
-                    ));
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &base_symbol.cube_name(),
+                    &base_symbol.name(),
+                    static_data.granularity.clone(),
+                )?;
+                let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    base_symbol,
+                    static_data.granularity.clone(),
+                    granularity_obj,
+                    None,
+                ));
 
-                    vec![symbol]
-                } else {
-                    vec![dims[0].clone()]
-                }
+                vec![symbol]
             } else {
-                Vec::new()
-            };
+                vec![dims[0].clone()]
+            }
+        } else {
+            Vec::new()
+        };
         let segments = if let Some(refs) = description.segment_references()? {
             Self::symbols_from_ref(
                 self.query_tools.clone(),
