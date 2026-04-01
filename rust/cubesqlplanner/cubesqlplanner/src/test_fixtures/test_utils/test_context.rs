@@ -374,7 +374,7 @@ impl TestContext {
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<String, CubeError> {
         let request = QueryProperties::try_new(self.query_tools.clone(), options)?;
-        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), false);
+        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), true);
         let (sql, _) = planner.plan()?;
         Ok(sql)
     }
@@ -386,7 +386,7 @@ impl TestContext {
         let options = self.create_query_options_from_yaml(query);
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryProperties::try_new(ctx.query_tools.clone(), options)?;
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
         planner.plan()
     }
 
@@ -414,7 +414,7 @@ impl TestContext {
             .expect("Failed to create context");
         let request = QueryProperties::try_new(ctx.query_tools.clone(), options)
             .expect("Failed to create query properties");
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), false);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
         if !pre_aggregations.is_empty() {

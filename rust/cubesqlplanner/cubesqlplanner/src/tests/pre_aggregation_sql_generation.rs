@@ -803,6 +803,37 @@ async fn test_segment_with_coarser_granularity() {
     }
 }
 
+// --- Multi-stage count_distinct sum by quarter with pre-aggregation ---
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_count_distinct_sum_by_quarter_with_pre_aggregation() {
+    let schema = MockSchema::from_yaml_file("common/multi_stage_sum_by_quarter_test.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - coach.count_distinct__sum_by_quarter
+        cubestoreSupportMultistage: true
+    "};
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "main");
+
+    if let Some(result) = ctx
+        .try_execute_pg(query_yaml, "multi_stage_sum_by_quarter_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(
+            "multi_stage_count_distinct_sum_by_quarter_with_pre_agg_pg_result",
+            result
+        );
+    }
+}
+
 // --- rollupJoin with calculated measures through view ---
 
 #[test]

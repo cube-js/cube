@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+expression: result
+---
+coach__count_distinct__sum_by_quarter
+-------------------------------------
+28
