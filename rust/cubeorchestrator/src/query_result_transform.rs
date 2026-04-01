@@ -172,6 +172,23 @@ fn member_name(m: &MemberOrMemberExpression) -> Option<&str> {
     }
 }
 
+fn ensure_member_in_annotation(
+    member: &str,
+    annotation: &HashMap<String, ConfigItem>,
+) -> Result<()> {
+    if !annotation.contains_key(member) {
+        bail!(
+            concat!(
+                "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
+                "Please note primaryKey fields are `public: false` by default: ",
+                "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
+            ),
+            member
+        );
+    }
+    Ok(())
+}
+
 /// When the query result is empty (no columns/rows), we still need to verify
 /// that all requested members are present in the annotation.
 /// This catches RBAC-denied members that would otherwise silently return empty data.
@@ -181,33 +198,20 @@ fn validate_query_members_in_annotation(
     query: &NormalizedQuery,
     annotation: &HashMap<String, ConfigItem>,
 ) -> Result<()> {
-    let requested: Vec<&str> = query
+    for m in query
         .measures
         .iter()
         .flat_map(|v| v.iter())
         .chain(query.dimensions.iter().flat_map(|v| v.iter()))
         .filter_map(member_name)
-        .collect();
-
-    let td_members: Vec<&str> = query
-        .time_dimensions
-        .iter()
-        .flat_map(|v| v.iter())
-        .map(|td| td.dimension.as_str())
-        .collect();
-
-    for m in requested.iter().chain(td_members.iter()) {
-        if !annotation.contains_key(*m) {
-            bail!(
-                concat!(
-                    "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
-                    "Please note primaryKey fields are `public: false` by default: ",
-                    "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
-                ),
-                m
-            );
-        }
+    {
+        ensure_member_in_annotation(m, annotation)?;
     }
+
+    for td in query.time_dimensions.iter().flat_map(|v| v.iter()) {
+        ensure_member_in_annotation(td.dimension.as_str(), annotation)?;
+    }
+
     Ok(())
 }
 
@@ -245,16 +249,7 @@ pub fn get_members(
             .get(column)
             .context(format!("Member name not found for alias: '{}'", column))?;
 
-        if !annotation.contains_key(member_name) {
-            bail!(
-                concat!(
-                    "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
-                    "Please note primaryKey fields are `public: false` by default: ",
-                    "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
-                ),
-                column
-            );
-        }
+        ensure_member_in_annotation(member_name, annotation)?;
 
         members_map.insert(member_name.clone(), column.clone());
         members_arr.push(member_name.clone());
@@ -393,19 +388,8 @@ pub fn get_vanilla_row(
                 }
             };
 
-            let annotation_for_member = match annotation.get(member_name) {
-                Some(am) => am,
-                None => {
-                    bail!(
-                    concat!(
-                        "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
-                        "Please note primaryKey fields are `public: false` by default: ",
-                        "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
-                    ),
-                    alias
-                )
-                }
-            };
+            ensure_member_in_annotation(member_name, annotation)?;
+            let annotation_for_member = annotation.get(member_name).unwrap();
 
             let transformed_value = transform_value(
                 value.clone(),
