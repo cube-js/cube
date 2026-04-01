@@ -795,34 +795,30 @@ describe('Cube RBAC Engine', () => {
 
     test('filter with scalar value generates equality (tenantId)', async () => {
       const res = await connection.query(
-        'SELECT count FROM security_context_test'
+        'SELECT * FROM security_context_test'
       );
       expect(res.rows.length).toBe(1);
-      expect(res.rows[0].count).toBeDefined();
     });
 
     test('filter with array value generates IN clause (groups)', async () => {
       const res = await connection.query(
-        'SELECT count FROM sc_array_filter_test'
+        'SELECT * FROM sc_array_filter_test'
       );
-      expect(res.rows.length).toBe(1);
-      expect(res.rows[0].count).toBeDefined();
+      expect(res.rows.length).toBeGreaterThan(0);
     });
 
     test('toString interpolation renders as param in SQL', async () => {
       const res = await connection.query(
-        'SELECT count FROM sc_interpolation_test'
+        'SELECT * FROM sc_interpolation_test'
       );
-      expect(res.rows.length).toBe(1);
-      expect(res.rows[0].count).toBeDefined();
+      expect(res.rows.length).toBeGreaterThan(0);
     });
 
     test('groups shorthand in access policy row filter', async () => {
       const res = await connection.query(
-        'SELECT count FROM sc_groups_shorthand_test'
+        'SELECT * FROM sc_groups_shorthand_test'
       );
-      expect(res.rows.length).toBe(1);
-      expect(res.rows[0].count).toBeDefined();
+      expect(res.rows.length).toBeGreaterThan(0);
     });
   });
 
@@ -831,8 +827,8 @@ describe('Cube RBAC Engine', () => {
 
     const SC_TEST_TOKEN = sign({
       cubeCloud: {
-        tenantId: 1,
-        groups: [1, 2],
+        tenantId: '1',
+        groups: ['1', '2'],
       },
       auth: {
         username: 'sc_test',

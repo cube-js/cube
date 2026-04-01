@@ -216,6 +216,39 @@ describe('Transpilers', () => {
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
   });
 
+  it('CubePropContextTranspiler with bare shorthand groups (no array wrap) should transpile to securityContext.cubeCloud.groups', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: groups
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
+  });
+
   it('CubePropContextTranspiler with shorthand groups member access should transpile to securityContext.cubeCloud.groups', async () => {
     const { cubeEvaluator, compiler } = prepareJsCompiler(`
         cube(\`Test\`, {

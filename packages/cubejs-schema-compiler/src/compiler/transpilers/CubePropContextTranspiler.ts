@@ -181,6 +181,13 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     // @ts-ignore
     let fp = path?.node?.key?.name || path?.node?.key?.value || '';
     let pp: NodePath<t.Node> | null | undefined = path?.parentPath;
+    // When path is a value node (e.g. bare Identifier) inside an ObjectProperty,
+    // include the ObjectProperty's key so the full path is computed correctly.
+    if (!fp && pp?.node?.type === 'ObjectProperty') {
+      // @ts-ignore
+      fp = pp?.node?.key?.name || pp?.node?.key?.value || '';
+      pp = pp?.parentPath;
+    }
     while (pp) {
       if (pp?.parentPath?.node?.type === 'ArrayExpression') {
         fp = `0.${fp}`;
@@ -216,7 +223,10 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     const identifiers: string[] = [];
 
     if (path.node.type === 'Identifier') {
-      CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
+      CubePropContextTranspiler.transformAccessPolicyShorthandIdentifier(path as NodePath<t.Identifier>, identifiers);
+      if (path.node.type === 'Identifier') {
+        CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
+      }
     }
 
     path.traverse({
