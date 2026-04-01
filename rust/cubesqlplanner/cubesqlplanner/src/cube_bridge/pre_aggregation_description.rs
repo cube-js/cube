@@ -1,7 +1,11 @@
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::pre_aggregation_time_dimension::{
+    NativePreAggregationTimeDimension, PreAggregationTimeDimension,
+};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -38,4 +42,9 @@ pub trait PreAggregationDescription {
 
     #[nbridge(field, optional)]
     fn rollup_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+
+    #[nbridge(field, vec, optional)]
+    fn time_dimension_references(
+        &self,
+    ) -> Result<Option<Vec<Rc<dyn PreAggregationTimeDimension>>>, CubeError>;
 }
