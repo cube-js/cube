@@ -49,7 +49,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   // eslint-disable-next-line camelcase
   custom_auth?: string;
   // eslint-disable-next-line camelcase
-  basic_auth?: { user: string, password: string };
+  basic_auth?: { user: string, password?: string };
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;

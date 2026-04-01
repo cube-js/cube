@@ -558,21 +558,21 @@ const variables = {
     dataSource,
   }: {
     dataSource: string,
-  }): { user: string; password: string } | undefined => {
+  }): { user: string; password: string | undefined } | undefined => {
     const user = getEnvFn('dbUser')({
       dataSource,
     });
     const password = getEnvFn('dbPass')({
       dataSource,
     });
-    if (user && password) {
-      return { user, password };
+    if (password && !user) {
+      throw new Error(
+        `${keyByDataSource('CUBEJS_DB_USER', dataSource)} must be set when ${keyByDataSource('CUBEJS_DB_PASS', dataSource)} is provided`
+      );
     }
 
-    if (user || password) {
-      throw new Error(
-        `Both ${keyByDataSource('CUBEJS_DB_USER', dataSource)} and ${keyByDataSource('CUBEJS_DB_PASS', dataSource)} must be set for basic auth`
-      );
+    if (user) {
+      return { user, password };
     }
 
     return undefined;

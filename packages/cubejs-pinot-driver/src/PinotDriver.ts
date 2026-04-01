@@ -28,7 +28,7 @@ export type PinotDriverConfiguration = {
   port?: string | number;
   user?: string;
   database?: string;
-  basicAuth?: { user: string, password: string };
+  basicAuth?: { user: string, password?: string };
   authToken?: string;
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
