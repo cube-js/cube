@@ -8,7 +8,7 @@ import {
   TableStructure,
   TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import * as stream from 'stream';
 import { Connection, Database } from 'duckdb';
@@ -40,15 +40,19 @@ const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
 };
 
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
+  protected readonly config: DuckDBDriverConfiguration & { dataSource: string };
+
   protected initPromise: Promise<InitPromise> | null = null;
 
-  private readonly schema: string;
+  private readonly schema: string | undefined;
 
   public constructor(
-    protected readonly config: DuckDBDriverConfiguration = {},
+    config: DuckDBDriverConfiguration = {},
   ) {
     super();
 
+    const dataSource = config.dataSource || assertDataSource('default');
+    this.config = { ...config, dataSource };
     this.schema = this.config.schema || getEnv('duckdbSchema', this.config);
   }
 

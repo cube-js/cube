@@ -2,6 +2,8 @@
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
 import { isNativeSupported } from './platform';
+import type { LogLevel } from './logger';
+import type { ApiScopes, ExportBucketType } from './shared-types';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -163,7 +165,24 @@ const variables = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
-  logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
+  logLevel: (): LogLevel | undefined => {
+    const value = get('CUBEJS_LOG_LEVEL').asString();
+    if (value) {
+      switch (value.toLowerCase()) {
+        case 'trace':
+        case 'info':
+        case 'warn':
+        case 'error':
+          break;
+        // not used, but let's allow
+        case 'debug':
+          break;
+        default:
+          throw new InvalidConfiguration('CUBEJS_LOG_LEVEL', value, 'Must be one of: trace, debug, info, warn, error');
+      }
+    }
+    return value as LogLevel | undefined;
+  },
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
@@ -847,20 +866,20 @@ const variables = {
   /**
    * Export bucket storage type.
    */
-  dbExportBucketType: ({
+  dbExportBucketType: <T extends ExportBucketType>({
     supported,
     dataSource,
   }: {
-    supported: ('s3' | 'gcp' | 'azure')[],
+    supported: readonly T[],
     dataSource: string,
-  }) => {
+  }): T | undefined => {
     const val = process.env[
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
-    ];
+    ] as T | undefined;
     if (
       val &&
       supported &&
-      supported.indexOf(<'s3' | 'gcp' | 'azure'>val) === -1
+      supported.indexOf(val) === -1
     ) {
       throw new TypeError(
         `The ${
@@ -868,6 +887,7 @@ const variables = {
         } must be one of the [${supported.join(', ')}].`
       );
     }
+
     return val;
   },
 
@@ -2186,7 +2206,7 @@ const variables = {
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
   defaultApiScope: () => get('CUBEJS_DEFAULT_API_SCOPES')
-    .asArray(','),
+    .asArray(',') as ApiScopes[] | undefined,
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
@@ -2333,6 +2353,20 @@ const variables = {
 
 type Vars = typeof variables;
 
+export function getEnvFn<T extends keyof Vars>(key: T): Vars[T] {
+  if (key in variables) {
+    return variables[key] as Vars[T];
+  }
+
+  throw new Error(
+    `Unsupported env variable: "${key}"`,
+  );
+}
+
+/**
+ * @deprecated Use getEnvFn instead. TypeScript cannot infer return types correctly
+ * for generic env functions through this wrapper, as ReturnType<> erases generics.
+ */
 export function getEnv<T extends keyof Vars>(key: T, ...args: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
     return (variables[key] as any)(...args);

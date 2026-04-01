@@ -43,7 +43,7 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
     return options.cacheAndQueueDriver;
   }
 
-  const cacheAndQueueDriver = getEnv('cacheAndQueueDriver');
+  const cacheAndQueueDriver = getEnv('cacheAndQueueDriver') as CacheAndQueryDriverType | undefined;
   if (cacheAndQueueDriver) {
     return cacheAndQueueDriver;
   }

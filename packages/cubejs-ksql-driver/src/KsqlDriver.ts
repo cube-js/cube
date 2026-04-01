@@ -20,8 +20,8 @@ import { KsqlQuery } from './KsqlQuery';
 
 type KsqlDriverOptions = {
   url: string,
-  username: string,
-  password: string,
+  username?: string,
+  password?: string,
   kafkaHost?: string,
   kafkaUser?: string,
   kafkaPassword?: string,
@@ -117,8 +117,13 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
+    const url = getEnv('dbUrl', { dataSource });
+    if (!url) {
+      throw new Error('CUBEJS_DB_URL is required for ksqlDB');
+    }
+
     this.config = {
-      url: getEnv('dbUrl', { dataSource }),
+      url,
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       kafkaHost: getEnv('dbKafkaHost', { dataSource }),
@@ -150,10 +155,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     const url = `${this.config.url}${path}`;
     try {
       return await axios.post(url, body, {
-        auth: {
+        auth: this.config.username && this.config.password ? {
           username: this.config.username,
           password: this.config.password,
-        },
+        } : undefined,
       });
     } catch (e) {
       throw new Error(

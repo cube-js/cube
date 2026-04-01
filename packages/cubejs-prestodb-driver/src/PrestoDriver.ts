@@ -15,7 +15,8 @@ import {
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
-  assertDataSource,
+  getEnvFn,
+  assertDataSource, ExportBucketType,
 } from '@cubejs-backend/shared';
 
 import { Transform, TransformCallback } from 'stream';
@@ -41,7 +42,7 @@ export type PrestoDriverExportBucket = {
 
 export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   host?: string;
-  port?: string;
+  port?: string | number;
   catalog?: string;
   schema?: string;
   user?: string;
@@ -54,7 +55,8 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   queryTimeout?: number;
 };
 
-const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
+const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'] as const;
+
 /**
  * Presto driver class.
  */
@@ -105,9 +107,9 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         getEnv('dbSchema', { dataSource }),
       user: dbUser,
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
-      ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
+      ...(dbUser && dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
       ssl: this.getSslOptions(dataSource),
-      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
+      bucketType: getEnvFn('dbExportBucketType')({ supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
       accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource }),
       secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
@@ -309,7 +311,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       throw new Error('Export bucket is not configured.');
     }
 
-    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
+    if (!this.config.bucketType || !SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
       }`);

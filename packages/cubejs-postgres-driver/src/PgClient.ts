@@ -14,5 +14,7 @@ export class PgClient extends Client {
   }
 }
 
-export type PgClientConfig = ClientConfig;
+export type PgClientConfig = ClientConfig & {
+  password?: string;
+};
 export type PgQueryResult<T extends QueryResultRow = any> = QueryResult<T>;

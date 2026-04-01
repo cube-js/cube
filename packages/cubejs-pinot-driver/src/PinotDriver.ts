@@ -25,10 +25,10 @@ import { PinotQuery } from './PinotQuery';
 
 export type PinotDriverConfiguration = {
   host?: string;
-  port?: string;
+  port?: string | number;
   user?: string;
   database?: string;
-  basicAuth?: { user: string, password: string };
+  basicAuth?: { user?: string, password?: string };
   authToken?: string;
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;

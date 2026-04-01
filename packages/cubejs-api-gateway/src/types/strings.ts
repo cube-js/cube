@@ -100,15 +100,7 @@ type QueryOrderType =
   'asc' |
   'desc';
 
-/**
- * ApiScopes data type.
- */
-type ApiScopes =
-  'graphql' |
-  'meta' |
-  'data' |
-  'sql' |
-  'jobs';
+export type { ApiScopes } from '@cubejs-backend/shared';
 
 export {
   RequestType,
@@ -121,5 +113,4 @@ export {
   FilterOperator,
   QueryTimeDimensionGranularity,
   QueryOrderType,
-  ApiScopes,
 };
