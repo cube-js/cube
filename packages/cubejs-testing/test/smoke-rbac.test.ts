@@ -811,9 +811,6 @@ describe('Cube RBAC Engine', () => {
     });
 
     test('line_items hidden price_dim', async () => {
-      // When querying hidden members, row-level security denies access
-      // by filtering out all rows (returns empty result)
-      // TODO we should evaluate member access before the query runs and bounce early with an error
       let query: Query = {
         measures: ['line_items.count'],
         dimensions: ['line_items.price_dim'],
@@ -821,9 +818,13 @@ describe('Cube RBAC Engine', () => {
           'line_items.price_dim': 'asc',
         },
       };
-      const hiddenMemberResult = await client.load(query, {});
-      // Row-level security denies access by returning empty results
-      expect(hiddenMemberResult.rawData()).toEqual([]);
+      let error = '';
+      try {
+        await client.load(query, {});
+      } catch (e: any) {
+        error = e.toString();
+      }
+      expect(error).toContain('You requested hidden member');
 
       query = {
         measures: ['line_items_view_no_policy.count'],
@@ -848,17 +849,21 @@ describe('Cube RBAC Engine', () => {
       }
       expect(error).toContain('You requested hidden member');
 
-      let result = await defaultClient.load({
-        measures: ['orders_view.count'],
-        dimensions: ['orders_view.created_at'],
-        order: {
-          'orders_view.created_at': 'asc',
-        },
-      });
-      // It should only return one value allowed by the default policy
-      expect(result.rawData()).toMatchSnapshot('orders_view_rest');
+      error = '';
+      try {
+        await defaultClient.load({
+          measures: ['orders_view.count'],
+          dimensions: ['orders_view.created_at'],
+          order: {
+            'orders_view.created_at': 'asc',
+          },
+        });
+      } catch (e: any) {
+        error = e.toString();
+      }
+      expect(error).toContain('You requested hidden member');
 
-      result = await defaultClient.load({
+      const result = await defaultClient.load({
         measures: ['orders_open.count'],
         dimensions: ['orders_open.created_at'],
         order: {
