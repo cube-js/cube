@@ -93,7 +93,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: true,
-      requestTimeout: getEnv('dbQueryTimeout') * 1000,
+      requestTimeout: getEnv('dbQueryTimeout', { dataSource }) * 1000,
       apiEndpoint:
         getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
       ...config,

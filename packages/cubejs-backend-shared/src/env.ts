@@ -159,7 +159,7 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
-const variables: Record<string, (...args: any) => any> = {
+const variables = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
@@ -707,8 +707,8 @@ const variables: Record<string, (...args: any) => any> = {
   dbQueryTimeout: ({
     dataSource,
   }: {
-    dataSource?: string,
-  } = {}) => {
+    dataSource: string,
+  }) => {
     const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
     const value = process.env[key] || '10m';
     return convertTimeStrToSeconds(value, key);
@@ -2329,13 +2329,13 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   accessPolicyMaskNumber: () => get('CUBEJS_ACCESS_POLICY_MASK_NUMBER')
     .asString(),
-};
+} satisfies Record<string, (...args: any[]) => unknown>;
 
 type Vars = typeof variables;
 
-export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
+export function getEnv<T extends keyof Vars>(key: T, ...args: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return variables[key](opts);
+    return (variables[key] as any)(...args);
   }
 
   throw new Error(

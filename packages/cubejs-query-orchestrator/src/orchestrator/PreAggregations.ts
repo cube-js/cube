@@ -287,7 +287,7 @@ export class PreAggregations {
     this.touchTablePersistTime = options.touchTablePersistTime || getEnv('touchPreAggregationTimeout');
     this.preAggBackoffMaxTime = options.preAggBackoffMaxTime || getEnv('preAggBackoffMaxTime');
     this.dropPreAggregationsWithoutTouch = options.dropPreAggregationsWithoutTouch || getEnv('dropPreAggregationsWithoutTouch');
-    this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
+    this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout', { dataSource: 'default' });
     this.externalRefresh = options.externalRefresh;
 
     /**

@@ -702,20 +702,20 @@ describe('Multiple datasources', () => {
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE = 'postgres1';
     process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_TYPE = 'wrong1';
-    expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('dbExportBucketType', { dataSource: 'postgres' })).toEqual('postgres1');
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('dbExportBucketType', { dataSource: 'default', supported: ['default1'] as any })).toEqual('default1');
+    expect(getEnv('dbExportBucketType', { dataSource: 'postgres', supported: ['postgres1'] as any })).toEqual('postgres1');
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
     expect(getEnv('dbExportBucketType', {
       dataSource: 'default',
-      supported: ['default1'],
+      supported: ['default1'] as any,
     })).toEqual('default1');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'postgres',
-      supported: ['postgres1'],
+      supported: ['postgres1'] as any,
     })).toEqual('postgres1');
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
     expect(() => getEnv('dbExportBucketType', {
@@ -726,27 +726,27 @@ describe('Multiple datasources', () => {
       dataSource: 'postgres',
       supported: [],
     })).toThrow('The CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE must be one of the [].');
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default2';
     process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE = 'postgres2';
     process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_TYPE = 'wrong2';
-    expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('dbExportBucketType', { dataSource: 'postgres' })).toEqual('postgres2');
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('dbExportBucketType', { dataSource: 'default', supported: ['default2'] as any })).toEqual('default2');
+    expect(getEnv('dbExportBucketType', { dataSource: 'postgres', supported: ['postgres2'] as any })).toEqual('postgres2');
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
     expect(getEnv('dbExportBucketType', {
       dataSource: 'default',
-      supported: ['default2'],
+      supported: ['default2'] as any,
     })).toEqual('default2');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'postgres',
-      supported: ['postgres2'],
+      supported: ['postgres2'] as any,
     })).toEqual('postgres2');
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
     expect(() => getEnv('dbExportBucketType', {
@@ -757,16 +757,16 @@ describe('Multiple datasources', () => {
       dataSource: 'postgres',
       supported: [],
     })).toThrow('The CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE must be one of the [].');
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     delete process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE;
     delete process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE;
     delete process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_TYPE;
-    expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('dbExportBucketType', { dataSource: 'postgres' })).toBeUndefined();
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('dbExportBucketType', { dataSource: 'default', supported: [] })).toBeUndefined();
+    expect(getEnv('dbExportBucketType', { dataSource: 'postgres', supported: [] })).toBeUndefined();
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
     expect(getEnv('dbExportBucketType', {
@@ -777,7 +777,7 @@ describe('Multiple datasources', () => {
       dataSource: 'postgres',
       supported: [],
     })).toBeUndefined();
-    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
