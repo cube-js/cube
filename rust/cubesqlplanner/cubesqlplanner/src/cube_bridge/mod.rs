@@ -29,6 +29,7 @@ pub mod member_sql;
 pub mod options_member;
 pub mod pre_aggregation_description;
 pub mod pre_aggregation_obj;
+pub mod pre_aggregation_time_dimension;
 pub mod security_context;
 pub mod segment_definition;
 pub mod sql_templates_render;
