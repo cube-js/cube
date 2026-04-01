@@ -187,6 +187,17 @@ export class CubeToMetaTransformer implements CompilerInterface {
     this.queries = this.cubes;
   }
 
+  private static truncateDescription(description: string | undefined): string | undefined {
+    if (!description) {
+      return description;
+    }
+    const maxLen = getEnv('maxEmbeddingDescriptionLength');
+    if (maxLen > 0 && description.length > maxLen) {
+      return description.slice(0, maxLen);
+    }
+    return description;
+  }
+
   protected transform(cube: CubeDefinitionExtended, _errorReporter?: ErrorReporter): TransformedCube {
     const extendedCube = cube as ExtendedCubeDefinition;
     const cubeName = extendedCube.name;
@@ -232,6 +243,9 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const nestedFolders: NestedFolder[] = (extendedCube.folders || []).map((f: Folder) => processFolder(f));
 
+    const truncDesc = CubeToMetaTransformer.truncateDescription;
+    const cubeDesc = truncDesc(extendedCube.description);
+
     return {
       config: {
         name: cubeName,
@@ -239,7 +253,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
         title: cubeTitle,
         isVisible: isCubeVisible,
         public: isCubeVisible,
-        description: extendedCube.description,
+        description: cubeDesc,
         connectedComponent: this.joinGraph.connectedComponents()[cubeName],
         meta: extendedCube.meta,
         measures: Object.entries(extendedCube.measures || {}).map((nameToMetric: [string, any]) => {
@@ -247,7 +261,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
           const measureVisibility = isCubeVisible ? this.isVisible(metricDef, true) : false;
           return {
             ...this.measureConfig(cubeName, cubeTitle, nameToMetric),
-            cubeDescription: extendedCube.description,
+            cubeDescription: cubeDesc,
             isVisible: measureVisibility,
             public: measureVisibility,
           };
@@ -264,8 +278,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
             name: `${cubeName}.${dimensionName}`,
             title: this.title(cubeTitle, nameToDimension, false),
             type: this.dimensionDataType(extendedDimDef.type || 'string'),
-            description: extendedDimDef.description,
-            cubeDescription: extendedCube.description,
+            description: truncDesc(extendedDimDef.description),
+            cubeDescription: cubeDesc,
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               extendedDimDef.suggestFilterValues == null
@@ -300,8 +314,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
             name: `${cubeName}.${segmentName}`,
             title: this.title(cubeTitle, nameToSegment, false),
             shortTitle: this.title(cubeTitle, nameToSegment, true),
-            description: extendedSegmentDef.description,
-            cubeDescription: extendedCube.description,
+            description: truncDesc(extendedSegmentDef.description),
+            cubeDescription: cubeDesc,
             meta: extendedSegmentDef.meta,
             isVisible: segmentVisibility,
             public: segmentVisibility,
@@ -389,7 +403,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     return {
       name,
       title: this.title(cubeTitle, nameToMetric, false),
-      description: extendedMetricDef.description,
+      description: CubeToMetaTransformer.truncateDescription(extendedMetricDef.description),
       shortTitle: this.title(cubeTitle, nameToMetric, true),
       format: this.transformMeasureFormat(extendedMetricDef.format),
       currency: extendedMetricDef.currency?.toUpperCase(),

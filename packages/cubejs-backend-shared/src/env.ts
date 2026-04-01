@@ -298,6 +298,9 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
+  maxEmbeddingDescriptionLength: () => get('CUBEJS_MAX_EMBEDDING_DESCRIPTION_LENGTH')
+    .default('0')
+    .asInt(),
   defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
     .default('UTC')
     .asString(),
