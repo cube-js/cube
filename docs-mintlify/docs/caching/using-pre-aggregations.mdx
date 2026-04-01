@@ -192,8 +192,8 @@ the data between multiple tables, splitting them by a defined attribute.
 Cube can be configured to incrementally refresh only the last set of partitions
 through the `updateWindow` property. This leads to faster refresh times due to
 unnecessary data not being reloaded, and even reduced cost for some databases
-like [BigQuery](/admin/configuration/data-sources/google-bigquery) or
-[AWS Athena](/admin/configuration/data-sources/aws-athena).
+like [BigQuery](/admin/connect-to-data/data-sources/google-bigquery) or
+[AWS Athena](/admin/connect-to-data/data-sources/aws-athena).
 
 <Note>
 
@@ -999,7 +999,7 @@ You don’t need to define `refresh_key` for streaming pre-aggregations. Whether
 pre-aggregation is streaming or not is defined by the data source.
 
 Currently, Cube supports only one streaming data source -
-[ksqlDB](/admin/configuration/data-sources/ksqldb). All pre-aggregations where
+[ksqlDB](/admin/connect-to-data/data-sources/ksqldb). All pre-aggregations where
 data source is ksqlDB are streaming.
 
 We are working on supporting more data sources for streaming pre-aggregations,
@@ -1037,7 +1037,7 @@ of this member. For numeric types, it will most likely be an integer, a float,
 or a decimal type, depending on the nature of your data.
 
 
-[ref-config-db]: /admin/configuration/data-sources
+[ref-config-db]: /admin/connect-to-data/data-sources
 [ref-schema-ref-preaggs]: /reference/data-modeling/pre-aggregations
 [ref-schema-ref-preaggs-refresh-key]: /reference/data-modeling/pre-aggregations#refresh_key
 [ref-schema-ref-preaggs-refresh-key-every]: /reference/data-modeling/pre-aggregations#every
@@ -1058,4 +1058,4 @@ or a decimal type, depending on the nature of your data.
 [ref-cube-store]: /docs/caching/running-in-production#architecture
 [ref-cube-store-storage]: /docs/caching/running-in-production#storage
 [ref-member-sql]: /reference/data-modeling/dimensions#sql
-[ref-incremental-refresh-recipe]: /docs/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range
+[ref-incremental-refresh-recipe]: /recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range

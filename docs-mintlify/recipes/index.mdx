@@ -1,0 +1,162 @@
+---
+title: Recipes Home
+description: Step-by-step tutorials and best practices for getting the most out of Cube.
+mode: wide
+---
+
+Explore **38 recipes** across data modeling, calculations, analytics patterns,
+pre-aggregations, configuration, APIs, and AI.
+
+## Data Modeling
+
+<CardGroup cols={3}>
+  <Card title="Cube style guide" icon="book" href="/recipes/data-modeling/style-guide">
+    Best practices and conventions for structuring your Cube data models.
+  </Card>
+  <Card title="Designing metrics" icon="chart-bar" href="/recipes/data-modeling/designing-metrics">
+    Compare entity-first and metrics-first ways to structure views for BI tools, apps, and agents.
+  </Card>
+  <Card title="Entity-Attribute-Value model" icon="table" href="/recipes/data-modeling/entity-attribute-value">
+    Shape sparse EAV warehouse tables into queryable dimensions and joins.
+  </Card>
+  <Card title="Using Cube with dbt" icon="cubes" href="/recipes/data-modeling/dbt">
+    Layer Cube on dbt-built warehouse models, aligning documentation patterns with your semantic layer.
+  </Card>
+  <Card title="Dynamic data models" icon="wand-magic-sparkles" href="/recipes/data-modeling/using-dynamic-measures">
+    Generate measures programmatically from changing reference data.
+  </Card>
+  <Card title="Dynamic union tables" icon="layer-group" href="/recipes/data-modeling/dynamic-union-tables">
+    Combine multiple database tables that relate to the same entity into a single cube.
+  </Card>
+</CardGroup>
+
+## Calculations & Metrics
+
+<CardGroup cols={3}>
+  <Card title="Averages and percentiles" icon="percent" href="/recipes/data-modeling/percentiles">
+    Model percentile-based metrics alongside averages for accurate representation of skewed distributions.
+  </Card>
+  <Card title="Nested aggregates" icon="clone" href="/recipes/data-modeling/nested-aggregates">
+    Express aggregates-of-aggregates like a median of per-group sums using joined cubes and subquery dimensions.
+  </Card>
+  <Card title="Filtered aggregates" icon="filter" href="/recipes/data-modeling/filtered-aggregates">
+    Model cross-cube filters so measures aggregate facts while respecting dimensions from related cubes.
+  </Card>
+  <Card title="Period-over-period changes" icon="arrow-trend-up" href="/recipes/data-modeling/period-over-period">
+    Calculate week-over-week, month-over-month, and other period-over-period metric changes.
+  </Card>
+  <Card title="Dynamic parameters" icon="sliders" href="/recipes/data-modeling/passing-dynamic-parameters-in-a-query">
+    Let users select filter values and use them in calculations without filtering the entire query.
+  </Card>
+  <Card title="Internal rate of return" icon="calculator" href="/recipes/data-modeling/xirr">
+    Calculate XIRR for a schedule of cash flows that is not necessarily periodic.
+  </Card>
+</CardGroup>
+
+## Time Series & Calendars
+
+<CardGroup cols={3}>
+  <Card title="String time dimensions" icon="font" href="/recipes/data-modeling/string-time-dimensions">
+    Work around non-timestamp time columns by casting strings to proper time dimension types.
+  </Card>
+  <Card title="Custom granularities" icon="clock" href="/recipes/data-modeling/custom-granularity">
+    Implement custom time dimension granularities like fiscal quarters or custom week definitions.
+  </Card>
+  <Card title="Custom calendars" icon="calendar" href="/recipes/data-modeling/custom-calendar">
+    Map fact tables to retail or fiscal calendars using dedicated calendar cubes and proxy dimensions.
+  </Card>
+  <Card title="Data snapshots" icon="camera" href="/recipes/data-modeling/snapshots">
+    Build point-in-time snapshots from change-history data to report status as of any date.
+  </Card>
+</CardGroup>
+
+## User & Event Analytics
+
+<CardGroup cols={3}>
+  <Card title="Active users (DAU, WAU, MAU)" icon="users" href="/recipes/data-modeling/active-users">
+    Measure customer engagement with daily, weekly, and monthly active user metrics.
+  </Card>
+  <Card title="Event analytics" icon="bolt" href="/recipes/data-modeling/event-analytics">
+    Turn raw clickstream events into session definitions and metrics for product analytics.
+  </Card>
+  <Card title="Funnel analysis" icon="arrow-down-wide-short" href="/recipes/data-modeling/funnels">
+    Configure multi-step conversion funnels for product and marketing analytics.
+  </Card>
+  <Card title="Retention analysis & cohorts" icon="rotate" href="/recipes/data-modeling/cohort-retention">
+    Implement cohort-based retention analysis to track user engagement over time.
+  </Card>
+</CardGroup>
+
+## Pre-Aggregations
+
+<CardGroup cols={3}>
+  <Card title="Non-additive measures" icon="square-root-variable" href="/recipes/pre-aggregations/non-additivity">
+    Accelerate averages, distinct counts, and similar non-additive measures with pre-aggregations.
+  </Card>
+  <Card title="Incremental builds" icon="bars-progress" href="/recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range">
+    Rebuild only the time-bounded partitions you need instead of refreshing entire rollups.
+  </Card>
+  <Card title="Disabling pre-aggregations" icon="toggle-off" href="/recipes/pre-aggregations/disabling-pre-aggregations">
+    Conditionally disable pre-aggregations based on environment or deployment context.
+  </Card>
+  <Card title="original_sql and rollups" icon="database" href="/recipes/pre-aggregations/using-originalsql-and-rollups-effectively">
+    Materialize expensive SQL once with original_sql, then reuse across rollup pre-aggregations.
+  </Card>
+  <Card title="Refreshing partitions" icon="arrows-rotate" href="/recipes/pre-aggregations/refreshing-select-partitions">
+    Partition-level refresh patterns for when dimension values change after initial load.
+  </Card>
+  <Card title="Multiple data sources" icon="circle-nodes" href="/recipes/pre-aggregations/joining-multiple-data-sources">
+    Join data from different warehouses with cross-database rollup joins.
+  </Card>
+</CardGroup>
+
+## Configuration
+
+<CardGroup cols={3}>
+  <Card title="Environment variables" icon="key" href="/recipes/configuration/environment-variables">
+    Reference deployment secrets and tunables from environment variables in your config.
+  </Card>
+  <Card title="SSL connections" icon="lock" href="/recipes/configuration/using-ssl-connections-to-data-source">
+    Enable TLS to upstream databases with custom CA bundles and client certificates.
+  </Card>
+  <Card title="Optimizing data source usage" icon="gauge-high" href="/recipes/configuration/data-store-cost-saving-guide">
+    Reduce warehouse spend through pre-aggregation strategy and workload-aware settings.
+  </Card>
+  <Card title="Custom data source per tenant" icon="server" href="/recipes/configuration/multiple-sources-same-schema">
+    Route each tenant to its own database while reusing a single data model.
+  </Card>
+  <Card title="Custom data model per tenant" icon="file-code" href="/recipes/configuration/custom-data-model-per-tenant">
+    Give each tenant a unique data model, from completely different to partially shared schemas.
+  </Card>
+</CardGroup>
+
+## APIs & Frontend
+
+<CardGroup cols={3}>
+  <Card title="Unique values for a field" icon="list" href="/recipes/core-data-api/getting-unique-values-for-a-field">
+    Power filter dropdowns by querying distinct dimension values from Cube's data APIs.
+  </Card>
+  <Card title="Numeric values on the front-end" icon="hashtag" href="/recipes/core-data-api/cast-numerics">
+    Coerce REST numeric strings into JavaScript numbers, with precision pitfalls and caveats.
+  </Card>
+  <Card title="Custom sorting" icon="arrow-down-a-z" href="/recipes/core-data-api/sorting">
+    Sort query result sets by custom criteria beyond default ordering.
+  </Card>
+  <Card title="Pagination" icon="book-open" href="/recipes/core-data-api/pagination">
+    Implement paged tables over Cube queries using limit, offset, and deterministic ordering.
+  </Card>
+  <Card title="Drilldowns" icon="magnifying-glass-plus" href="/recipes/core-data-api/drilldowns">
+    Configure drill members and fetch detail rows behind an aggregate value.
+  </Card>
+  <Card title="Real-time data fetch" icon="wifi" href="/recipes/core-data-api/real-time-data-fetch">
+    Build live-updating dashboards using WebSocket transport and client subscriptions.
+  </Card>
+</CardGroup>
+
+## AI
+
+<CardGroup cols={3}>
+  <Card title="Agent-to-agent with Chat API" icon="robot" href="/recipes/ai/agent-to-agent">
+    Wrap the Cube Chat API as a LangChain tool so an orchestrating agent can query data on demand.
+  </Card>
+</CardGroup>

@@ -1,0 +1,125 @@
+---
+title: Budibase
+description: Budibase is a low-code app-building platform that helps developers create responsive web applications with access methods to databases, APIs, and much more.
+---
+
+# Budibase
+
+Budibase is a low-code app-building platform that helps developers create
+responsive web applications with access methods to databases, APIs, and much
+more.
+
+Here's a short video guide on how to connect Budibase to Cube.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.loom.com/embed/c83e665fa1c947d89f3e304e5b5b81b4"
+  title="Loom video"
+  frameBorder="0"
+  allowFullScreen
+/>
+
+## Connect from Cube Cloud
+
+Navigate to the [Integrations](/docs/workspace/integrations#connect-specific-tools)
+page, click **Connect to Cube**, and choose **Budibase** to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Budibase using the [REST API](/reference/rest-api).
+
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](/reference/rest-api) for details.
+
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
+
+Please check the [Security page](/embedding/authentication/jwt#generating-json-web-tokens)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
+
+## Connecting from Budibase
+
+### Create a new data source
+
+Create a new "REST API" data source in Budibase.
+
+<Frame>
+  <img src="https://ucarecdn.com/381542a0-3d74-4ad6-9f3a-599be5d369f4/" />
+</Frame>
+
+Next, add a "Authorization" header for the REST API. Copy and paste Cube's
+Authorization token.
+
+<Frame>
+  <img src="https://ucarecdn.com/30f74134-1fd4-4d0c-af63-81f6e6aaebb5/" />
+</Frame>
+
+### Add a query
+
+Click "+ Add Query".
+
+Copy and paste the Cube REST API, including the `/load` path, in the API field.
+Make sure to select "POST" as the request.
+
+<Frame>
+  <img src="https://ucarecdn.com/55fbd232-9eb4-4b5b-a15b-611da4381e7f/" />
+</Frame>
+
+Get your Cube query in the JSON
+[query format](/reference/rest-api/query-format) ready. You can
+copy it from Cube's Playground or compose manually.
+
+Paste the JSON query in the **Body** as "raw(JSON)". Make sure to add a `query`
+parameter for your JSON query.
+
+<Frame>
+  <img src="https://ucarecdn.com/5d937df8-6b5f-4b45-ac20-6abcbbb5449a/" />
+</Frame>
+
+Edit the **Transform** to return the data of the request.
+
+```javascript
+return data.data;
+```
+
+<Frame>
+  <img src="https://ucarecdn.com/cda3e40a-ee99-4243-8a67-54e80d749270/" />
+</Frame>
+
+You can also give the query a name. In this sample it's called `OrdersByMonth`.
+
+Lastly, click the "save" button and hit "send" to test the API and get a
+response back.
+
+### Create a data provider
+
+Move to the **Design** section and open the **Components**.
+
+First, add a Data Provider. Select the query from above. In this sample it's
+called `OrdersByMonth`.
+
+<Frame>
+  <img src="https://ucarecdn.com/a882ca72-0b75-4a2a-87a0-8a8c0036dc96/" />
+</Frame>
+
+### Display the data
+
+Add a chart into the data provider. Next, configure the data provider for the
+chart. Make sure it's set to the data provider you just created.
+
+Then, you set the "label column" and "data columns". In this sample you can set
+`Orders.createdAt` as the label column and `Orders.count` as the data columns.
+
+<Frame>
+  <img src="https://ucarecdn.com/2f0ef897-13eb-4dc2-8869-e847618df4d9/" />
+</Frame>
+
+You'll see a nicely rendered chart show up.
+
+<Frame>
+  <img src="https://ucarecdn.com/ee32dd7c-65ad-43cd-982c-1f3e5e50d057/" />
+</Frame>

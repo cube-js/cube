@@ -49,23 +49,23 @@
             "pages": [
               {
                 "group": "Workbooks",
+                "root": "docs/explore-analyze/workbooks/index",
                 "pages": [
-                  "analytics/workbooks",
-                  "analytics/workbooks/querying-data",
-                  "analytics/workbooks/source-sql-tabs",
-                  "analytics/workbooks/charts"
+                  "docs/explore-analyze/workbooks/querying-data",
+                  "docs/explore-analyze/workbooks/source-sql-tabs",
+                  "docs/explore-analyze/workbooks/charts"
                 ]
               },
-              "analytics/explore",
-              "analytics/analytics-chat"
+              "docs/explore-analyze/explore",
+              "docs/explore-analyze/analytics-chat"
             ]
           },
           {
             "group": "Present & Share",
             "pages": [
-              "analytics/dashboards",
-              "analytics/scheduled-refreshes",
-              "analytics/notifications"
+              "docs/explore-analyze/dashboards",
+              "docs/explore-analyze/scheduled-refreshes",
+              "docs/explore-analyze/notifications"
             ]
           },
           {
@@ -88,11 +88,11 @@
               {
                 "group": "Access Control",
                 "pages": [
-                  "access-security/access-control/index",
+                  "docs/data-modeling/access-control/index",
                   "docs/data-modeling/data-access-policies",
-                  "access-security/access-control/row-level-security",
-                  "access-security/access-control/member-level-security",
-                  "access-security/access-control/context"
+                  "docs/data-modeling/access-control/row-level-security",
+                  "docs/data-modeling/access-control/member-level-security",
+                  "docs/data-modeling/access-control/context"
                 ]
               },
               
@@ -114,31 +114,6 @@
                   "docs/data-modeling/dev-mode",
                   "docs/data-modeling/sql-runner"
                 ]
-              },
-              {
-                "group": "Recipes",
-                "pages": [
-                  "docs/data-modeling/recipes/style-guide",
-                  "docs/data-modeling/recipes/designing-metrics",
-                  "docs/data-modeling/recipes/percentiles",
-                  "docs/data-modeling/recipes/nested-aggregates",
-                  "docs/data-modeling/recipes/filtered-aggregates",
-                  "docs/data-modeling/recipes/period-over-period",
-                  "docs/data-modeling/recipes/passing-dynamic-parameters-in-a-query",
-                  "docs/data-modeling/recipes/using-dynamic-measures",
-                  "docs/data-modeling/recipes/dynamic-union-tables",
-                  "docs/data-modeling/recipes/string-time-dimensions",
-                  "docs/data-modeling/recipes/custom-granularity",
-                  "docs/data-modeling/recipes/custom-calendar",
-                  "docs/data-modeling/recipes/entity-attribute-value",
-                  "docs/data-modeling/recipes/snapshots",
-                  "docs/data-modeling/recipes/active-users",
-                  "docs/data-modeling/recipes/event-analytics",
-                  "docs/data-modeling/recipes/funnels",
-                  "docs/data-modeling/recipes/cohort-retention",
-                  "docs/data-modeling/recipes/xirr",
-                  "docs/data-modeling/recipes/dbt"
-                ]
               }
             ]
           },
@@ -150,18 +125,7 @@
               "docs/caching/using-pre-aggregations",
               "docs/caching/matching-pre-aggregations",
               "docs/caching/refreshing-pre-aggregations",
-              "docs/caching/lambda-pre-aggregations",
-              {
-                "group": "Recipes",
-                "pages": [
-                  "docs/caching/recipes/non-additivity",
-                  "docs/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range",
-                  "docs/caching/recipes/disabling-pre-aggregations",
-                  "docs/caching/recipes/using-originalsql-and-rollups-effectively",
-                  "docs/caching/recipes/refreshing-select-partitions",
-                  "docs/caching/recipes/joining-multiple-data-sources"
-                ]
-              }
+              "docs/caching/lambda-pre-aggregations"
             ]
           },
           {
@@ -172,8 +136,8 @@
                 "group": "Power BI",
                 "pages": [
                   "docs/integrations/power-bi",
-                  "access-security/authentication/kerberos",
-                  "access-security/authentication/ntlm"
+                  "docs/integrations/power-bi/kerberos",
+                  "docs/integrations/power-bi/ntlm"
                 ]
               },
               "docs/integrations/microsoft-excel",
@@ -198,54 +162,44 @@
         "tab": "Admin",
         "groups": [
           {
-            "group": "Data Sources",
+            "group": "Connect to data",
             "pages": [
-              "admin/configuration",
+              "admin/connect-to-data/index",
               {
                 "group": "Data Sources",
+                "root": "admin/connect-to-data/data-sources/index",
                 "pages": [
-                  "admin/configuration/data-sources",
-                  "admin/configuration/data-sources/aws-athena",
-                  "admin/configuration/data-sources/aws-redshift",
-                  "admin/configuration/data-sources/clickhouse",
-                  "admin/configuration/data-sources/databricks-jdbc",
-                  "admin/configuration/data-sources/druid",
-                  "admin/configuration/data-sources/duckdb",
-                  "admin/configuration/data-sources/elasticsearch",
-                  "admin/configuration/data-sources/firebolt",
-                  "admin/configuration/data-sources/google-bigquery",
-                  "admin/configuration/data-sources/hive",
-                  "admin/configuration/data-sources/ksqldb",
-                  "admin/configuration/data-sources/materialize",
-                  "admin/configuration/data-sources/mongodb",
-                  "admin/configuration/data-sources/ms-fabric",
-                  "admin/configuration/data-sources/ms-sql",
-                  "admin/configuration/data-sources/mysql",
-                  "admin/configuration/data-sources/oracle",
-                  "admin/configuration/data-sources/pinot",
-                  "admin/configuration/data-sources/postgres",
-                  "admin/configuration/data-sources/presto",
-                  "admin/configuration/data-sources/questdb",
-                  "admin/configuration/data-sources/risingwave",
-                  "admin/configuration/data-sources/singlestore",
-                  "admin/configuration/data-sources/snowflake",
-                  "admin/configuration/data-sources/sqlite",
-                  "admin/configuration/data-sources/trino",
-                  "admin/configuration/data-sources/vertica"
+                  "admin/connect-to-data/data-sources/aws-athena",
+                  "admin/connect-to-data/data-sources/aws-redshift",
+                  "admin/connect-to-data/data-sources/clickhouse",
+                  "admin/connect-to-data/data-sources/databricks-jdbc",
+                  "admin/connect-to-data/data-sources/druid",
+                  "admin/connect-to-data/data-sources/duckdb",
+                  "admin/connect-to-data/data-sources/elasticsearch",
+                  "admin/connect-to-data/data-sources/firebolt",
+                  "admin/connect-to-data/data-sources/google-bigquery",
+                  "admin/connect-to-data/data-sources/hive",
+                  "admin/connect-to-data/data-sources/ksqldb",
+                  "admin/connect-to-data/data-sources/materialize",
+                  "admin/connect-to-data/data-sources/mongodb",
+                  "admin/connect-to-data/data-sources/ms-fabric",
+                  "admin/connect-to-data/data-sources/ms-sql",
+                  "admin/connect-to-data/data-sources/mysql",
+                  "admin/connect-to-data/data-sources/oracle",
+                  "admin/connect-to-data/data-sources/pinot",
+                  "admin/connect-to-data/data-sources/postgres",
+                  "admin/connect-to-data/data-sources/presto",
+                  "admin/connect-to-data/data-sources/questdb",
+                  "admin/connect-to-data/data-sources/risingwave",
+                  "admin/connect-to-data/data-sources/singlestore",
+                  "admin/connect-to-data/data-sources/snowflake",
+                  "admin/connect-to-data/data-sources/sqlite",
+                  "admin/connect-to-data/data-sources/trino",
+                  "admin/connect-to-data/data-sources/vertica"
                 ]
               },
-              "admin/configuration/multiple-data-sources",
-              "admin/configuration/concurrency",
-              {
-                "group": "Recipes",
-                "pages": [
-                  "admin/configuration/recipes/environment-variables",
-                  "admin/configuration/recipes/using-ssl-connections-to-data-source",
-                  "admin/configuration/recipes/data-store-cost-saving-guide",
-                  "admin/configuration/recipes/multiple-sources-same-schema",
-                  "admin/configuration/recipes/custom-data-model-per-tenant"
-                ]
-              }
+              "admin/connect-to-data/multiple-data-sources",
+              "admin/connect-to-data/concurrency"
             ]
           },
           {
@@ -426,9 +380,9 @@
               {
                 "group": "Authentication",
                 "pages": [
-                  "access-security/authentication/jwt",
-                  "access-security/authentication/auth0",
-                  "access-security/authentication/aws-cognito"
+                  "embedding/authentication/jwt",
+                  "embedding/authentication/auth0",
+                  "embedding/authentication/aws-cognito"
                 ]
               },
               "cube-core/configuration/multitenancy"
@@ -572,16 +526,79 @@
               "cube-core/deployment",
               "cube-core/running-in-production"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Recipes",
+        "groups": [
           {
-            "group": "API Recipes",
+            "group": "Topics",
             "pages": [
-              "reference/recipes/getting-unique-values-for-a-field",
-              "reference/recipes/cast-numerics",
-              "reference/recipes/sorting",
-              "reference/recipes/pagination",
-              "reference/recipes/drilldowns",
-              "reference/recipes/real-time-data-fetch"
+              "recipes/index",
+              {
+                "group": "API",
+                "pages": [
+                  "recipes/core-data-api/getting-unique-values-for-a-field",
+                  "recipes/core-data-api/cast-numerics",
+                  "recipes/core-data-api/sorting",
+                  "recipes/core-data-api/pagination",
+                  "recipes/core-data-api/drilldowns",
+                  "recipes/core-data-api/real-time-data-fetch"
+                ]
+              },
+              {
+                "group": "AI",
+                "pages": [
+                  "recipes/ai/agent-to-agent"
+                ]
+              },
+              {
+                "group": "Pre-aggregations",
+                "pages": [
+                  "recipes/pre-aggregations/non-additivity",
+                  "recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range",
+                  "recipes/pre-aggregations/disabling-pre-aggregations",
+                  "recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
+                  "recipes/pre-aggregations/refreshing-select-partitions",
+                  "recipes/pre-aggregations/joining-multiple-data-sources"
+                ]
+              },
+              {
+                "group": "Configuration",
+                "pages": [
+                  "recipes/configuration/environment-variables",
+                  "recipes/configuration/using-ssl-connections-to-data-source",
+                  "recipes/configuration/data-store-cost-saving-guide",
+                  "recipes/configuration/multiple-sources-same-schema",
+                  "recipes/configuration/custom-data-model-per-tenant"
+                ]
+              },
+              {
+                "group": "Data Modeling",
+                "pages": [
+                  "recipes/data-modeling/style-guide",
+                  "recipes/data-modeling/designing-metrics",
+                  "recipes/data-modeling/percentiles",
+                  "recipes/data-modeling/nested-aggregates",
+                  "recipes/data-modeling/filtered-aggregates",
+                  "recipes/data-modeling/period-over-period",
+                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+                  "recipes/data-modeling/using-dynamic-measures",
+                  "recipes/data-modeling/dynamic-union-tables",
+                  "recipes/data-modeling/string-time-dimensions",
+                  "recipes/data-modeling/custom-granularity",
+                  "recipes/data-modeling/custom-calendar",
+                  "recipes/data-modeling/entity-attribute-value",
+                  "recipes/data-modeling/snapshots",
+                  "recipes/data-modeling/active-users",
+                  "recipes/data-modeling/event-analytics",
+                  "recipes/data-modeling/funnels",
+                  "recipes/data-modeling/cohort-retention",
+                  "recipes/data-modeling/xirr",
+                  "recipes/data-modeling/dbt"
+                ]
+              }
             ]
           }
         ]
@@ -616,21 +633,5 @@
     }
   },
   "redirects": [
-    {
-      "source": "/docs/data-modeling/reference/types-and-formats",
-      "destination": "/reference/data-modeling/measures#type"
-    },
-    {
-      "source": "/docs/data-modeling/reference/:slug*",
-      "destination": "/reference/data-modeling/:slug*"
-    },
-    {
-      "source": "/api-reference/:slug*",
-      "destination": "/reference/:slug*"
-    },
-    {
-      "source": "/docs/configuration/:slug*",
-      "destination": "/admin/configuration/:slug*"
-    }
   ]
 }

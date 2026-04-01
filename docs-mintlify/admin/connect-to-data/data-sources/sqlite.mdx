@@ -1,0 +1,39 @@
+---
+title: SQLite
+description: The driver for SQLite is community-supported and is not maintained by Cube or the database vendor.
+---
+
+# SQLite
+
+<Warning>
+
+The driver for SQLite is community-supported and is not maintained by Cube or the database vendor.
+
+</Warning>
+
+## Prerequisites
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=sqlite
+CUBEJS_DB_NAME=my_sqlite_database
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                                         | Possible Values       | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | --------------------- | :------: |
+| [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)     | The name of the database to connect to                                              | A valid database name |    ✅    |
+| [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool) | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number        |    ❌    |
+| [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+## SSL
+
+SQLite does not support SSL connections.
+
