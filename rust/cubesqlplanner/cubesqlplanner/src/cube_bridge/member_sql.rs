@@ -506,13 +506,13 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             }
             if &prop == "unsafeValue" {
                 return Ok(Some(Self::security_context_unsafe_value_fn(
-                    inner_context,
+                    inner_context.clone(),
                     target.clone(),
                 )?));
             }
             if &prop == "toString" || &prop == "valueOf" {
                 return Ok(Some(Self::security_context_to_string_fn(
-                    inner_context,
+                    inner_context.clone(),
                     target.clone(),
                     proxy_state.clone(),
                 )?));
@@ -526,43 +526,67 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                     property_value,
                 )?));
             }
+            Ok(Some(Self::security_context_leaf_proxy(
+                inner_context,
+                proxy_state.clone(),
+                property_value,
+            )?))
+        })
+    }
 
-            let result = inner_context.empty_struct()?;
-            result.set_field(
-                "filter",
-                Self::security_context_filter_fn(
-                    inner_context.clone(),
-                    property_value.clone(),
-                    false,
-                    proxy_state.clone(),
-                )?,
-            )?;
-            result.set_field(
-                "requiredFilter",
-                Self::security_context_filter_fn(
-                    inner_context.clone(),
-                    property_value.clone(),
-                    true,
-                    proxy_state.clone(),
-                )?,
-            )?;
-            result.set_field(
-                "unsafeValue",
-                Self::security_context_unsafe_value_fn(
-                    inner_context.clone(),
-                    property_value.clone(),
-                )?,
-            )?;
-            result.set_field(
-                "toString",
-                Self::security_context_to_string_fn(
-                    inner_context,
-                    property_value.clone(),
-                    proxy_state.clone(),
-                )?,
-            )?;
-            let result = NativeObjectHandle::new(result.into_object());
-            Ok(Some(result))
+    /// Creates a chainable proxy for leaf (non-object) security context values.
+    /// The proxy target is a struct with method properties (filter, unsafeValue,
+    /// etc.). Unknown property access returns another chainable proxy, enabling
+    /// deeply nested paths like `SECURITY_CONTEXT.cubeCloud.tenantId.filter(...)`.
+    fn security_context_leaf_proxy<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        proxy_state: ProxyStateWeak,
+        property_value: NativeObjectHandle<CIT>,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        let result = context_holder.empty_struct()?;
+        result.set_field(
+            "filter",
+            Self::security_context_filter_fn(
+                context_holder.clone(),
+                property_value.clone(),
+                false,
+                proxy_state.clone(),
+            )?,
+        )?;
+        result.set_field(
+            "requiredFilter",
+            Self::security_context_filter_fn(
+                context_holder.clone(),
+                property_value.clone(),
+                true,
+                proxy_state.clone(),
+            )?,
+        )?;
+        result.set_field(
+            "unsafeValue",
+            Self::security_context_unsafe_value_fn(context_holder.clone(), property_value.clone())?,
+        )?;
+        result.set_field(
+            "toString",
+            Self::security_context_to_string_fn(
+                context_holder.clone(),
+                property_value.clone(),
+                proxy_state.clone(),
+            )?,
+        )?;
+        let methods_handle = NativeObjectHandle::new(result.into_object());
+        context_holder.make_proxy(Some(methods_handle), move |inner_context, target, prop| {
+            if let Ok(target_obj) = target.to_struct() {
+                if let Ok(true) = target_obj.has_field(&prop) {
+                    return Ok(Some(target_obj.get_field(&prop)?));
+                }
+            }
+            let empty = inner_context.empty_struct()?;
+            Ok(Some(Self::security_context_leaf_proxy(
+                inner_context,
+                proxy_state.clone(),
+                NativeObjectHandle::new(empty.into_object()),
+            )?))
         })
     }
 

@@ -798,9 +798,6 @@ describe('Cube RBAC Engine', () => {
         'SELECT count FROM security_context_test'
       );
       expect(res.rows.length).toBe(1);
-      // tenantId = 'tenant_1' is used as filter('id'), so id = 'tenant_1'
-      // Since id is numeric and tenant_1 is not, this may return 0 rows or error
-      // The key is that the SQL generates correctly and doesn't crash
       expect(res.rows[0].count).toBeDefined();
     });
 
@@ -809,8 +806,6 @@ describe('Cube RBAC Engine', () => {
         'SELECT count FROM sc_array_filter_test'
       );
       expect(res.rows.length).toBe(1);
-      // groups = ['admin', 'operator'] → product_id IN ('admin', 'operator')
-      // Since product_id is numeric this returns 0, but the SQL must not crash
       expect(res.rows[0].count).toBeDefined();
     });
 
@@ -819,8 +814,6 @@ describe('Cube RBAC Engine', () => {
         'SELECT count FROM sc_interpolation_test'
       );
       expect(res.rows.length).toBe(1);
-      // SQL: WHERE id > ${SECURITY_CONTEXT.cubeCloud.tenantId}
-      // tenantId = 'tenant_1', so id > 'tenant_1' — postgres will cast
       expect(res.rows[0].count).toBeDefined();
     });
 
@@ -829,8 +822,6 @@ describe('Cube RBAC Engine', () => {
         'SELECT count FROM sc_groups_shorthand_test'
       );
       expect(res.rows.length).toBe(1);
-      // groups shorthand resolves to securityContext.cubeCloud.groups = ['admin', 'operator']
-      // which filters product_id by those values
       expect(res.rows[0].count).toBeDefined();
     });
   });
@@ -840,8 +831,8 @@ describe('Cube RBAC Engine', () => {
 
     const SC_TEST_TOKEN = sign({
       cubeCloud: {
-        tenantId: 'tenant_1',
-        groups: ['admin', 'operator'],
+        tenantId: 1,
+        groups: [1, 2],
       },
       auth: {
         username: 'sc_test',

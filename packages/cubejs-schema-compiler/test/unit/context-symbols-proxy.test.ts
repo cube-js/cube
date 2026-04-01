@@ -110,4 +110,14 @@ describe('CubeSymbols.contextSymbolsProxyFrom', () => {
     const result = `${proxy.cubeCloud.tenantId}`;
     expect(result).toBe('');
   });
+
+  it('deeply nested access on empty context chains without error', () => {
+    const symbols = {};
+    const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
+
+    expect(proxy.cubeCloud.tenantId.filter('col')).toBe('1 = 1');
+    expect(proxy.cubeCloud.tenantId.unsafeValue()).toBeUndefined();
+    expect(`${proxy.cubeCloud.tenantId}`).toBe('');
+    expect(proxy.a.b.c.d.e.filter('col')).toBe('1 = 1');
+  });
 });

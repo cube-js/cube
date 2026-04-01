@@ -94,7 +94,7 @@ cube('sc_groups_shorthand_test', {
         filters: [{
           member: 'product_id',
           operator: 'equals',
-          values: [groups],
+          values: groups,
         }],
       },
     },

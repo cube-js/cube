@@ -195,8 +195,8 @@ module.exports = {
         superuser: false,
         securityContext: {
           cubeCloud: {
-            tenantId: 'tenant_1',
-            groups: ['admin', 'operator'],
+            tenantId: 1,
+            groups: [1, 2],
           },
           auth: {
             username: 'sc_test',
