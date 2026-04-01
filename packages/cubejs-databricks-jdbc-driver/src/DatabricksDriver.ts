@@ -5,7 +5,7 @@
  */
 
 import fetch from 'node-fetch';
-import { assertDataSource, getEnv, getEnvFn, LoggerFn, ExportBucketType } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, getEnvFn, LoggerFn } from '@cubejs-backend/shared';
 import {
   DatabaseStructure,
   DriverCapabilities,

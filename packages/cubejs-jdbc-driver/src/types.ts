@@ -1,7 +1,7 @@
 import { PoolOptions } from '@cubejs-backend/shared';
 
 export type JDBCDriverConfiguration = {
-  database: string,
+  database?: string,
   dbType: string,
   url: string,
   drivername: string,
