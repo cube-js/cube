@@ -127,6 +127,7 @@ rocks_table_new!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
 #[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum QueueResultIndexKey {
     ByPath(String),
+    #[nullable]
     ByExternalId(Option<String>),
 }
 

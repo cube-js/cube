@@ -417,6 +417,7 @@ pub enum QueueItemIndexKey {
     ByPath(String),
     ByPrefixAndStatus(String, QueueItemStatus),
     ByPrefix(String),
+    #[nullable]
     ByExternalId(Option<String>),
 }
 
