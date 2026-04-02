@@ -3,7 +3,6 @@ use crate::metastore::IdRow;
 use crate::rocks_table_impl;
 use crate::table::Row;
 use crate::{base_rocks_secondary_index, CubeError};
-use byteorder::{BigEndian, WriteBytesExt};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
@@ -209,7 +208,7 @@ rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
     ]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum PartitionIndexKey {
     ByIndexId(u64),
     ByMultiPartitionId(Option<u64>),
@@ -242,42 +241,7 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
     }
 
     fn key_to_bytes(&self, key: &PartitionIndexKey) -> Vec<u8> {
-        match key {
-            PartitionIndexKey::ByIndexId(index_id) => {
-                let mut buf = Vec::with_capacity(8);
-                buf.write_u64::<BigEndian>(*index_id).unwrap();
-                buf
-            }
-            PartitionIndexKey::ByMultiPartitionId(id) => match id {
-                None => return vec![0],
-                Some(id) => {
-                    let mut buf = Vec::with_capacity(9);
-                    buf.write_u8(1).unwrap();
-                    buf.write_u64::<BigEndian>(*id).unwrap();
-                    buf
-                }
-            },
-            PartitionIndexKey::ByActive(active) => {
-                let mut buf = Vec::with_capacity(1);
-                buf.write_u8(if *active { 1 } else { 0 }).unwrap();
-                buf
-            }
-            PartitionIndexKey::ByJustCreated(just_created) => {
-                let mut buf = Vec::with_capacity(1);
-                buf.write_u8(if *just_created { 1 } else { 0 }).unwrap();
-                buf
-            }
-            PartitionIndexKey::ByParentPartitionId(parent_partition_id) => {
-                let mut buf = Vec::with_capacity(1);
-                if let Some(parent_partition_id) = parent_partition_id {
-                    buf.write_u8(1).unwrap();
-                    buf.write_u64::<BigEndian>(*parent_partition_id).unwrap();
-                } else {
-                    buf.write_u8(0).unwrap();
-                }
-                buf
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

@@ -2,8 +2,6 @@ use super::{IndexId, RocksSecondaryIndex, TableId, WAL};
 use crate::base_rocks_secondary_index;
 
 use crate::rocks_table_impl;
-use byteorder::{BigEndian, WriteBytesExt};
-
 use serde::{Deserialize, Deserializer};
 
 impl WAL {
@@ -49,7 +47,7 @@ rocks_table_impl!(WAL, WALRocksTable, TableId::WALs, {
     vec![Box::new(WALRocksIndex::TableID)]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum WALIndexKey {
     ByTable(u64),
 }
@@ -64,13 +62,7 @@ impl RocksSecondaryIndex<WAL, WALIndexKey> for WALRocksIndex {
     }
 
     fn key_to_bytes(&self, key: &WALIndexKey) -> Vec<u8> {
-        match key {
-            WALIndexKey::ByTable(table_id) => {
-                let mut buf = Vec::new();
-                buf.write_u64::<BigEndian>(*table_id).unwrap();
-                buf
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

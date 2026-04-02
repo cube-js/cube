@@ -7,7 +7,6 @@ use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
-use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema as ArrowSchema;
@@ -20,7 +19,6 @@ use datafusion::logical_expr::AggregateUDF;
 use datafusion::physical_expr::aggregate::AggregateExprBuilder;
 use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::io::Write;
 use std::sync::Arc;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
@@ -461,7 +459,7 @@ pub(crate) enum TableRocksIndex {
     Name = 1,
 }
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum TableIndexKey {
     ByName(u64, String),
 }
@@ -478,14 +476,7 @@ impl RocksSecondaryIndex<Table, TableIndexKey> for TableRocksIndex {
     }
 
     fn key_to_bytes(&self, key: &TableIndexKey) -> Vec<u8> {
-        match key {
-            TableIndexKey::ByName(schema_id, table_name) => {
-                let mut buf = Vec::new();
-                buf.write_u64::<BigEndian>(*schema_id).unwrap();
-                buf.write_all(table_name.as_bytes()).unwrap();
-                buf
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

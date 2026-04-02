@@ -123,7 +123,7 @@ rocks_table_new!(CacheItem, CacheItemRocksTable, TableId::CacheItems, {
     ]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum CacheItemIndexKey {
     // prefix + key
     ByPath(String),
@@ -157,9 +157,7 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
     }
 
     fn key_to_bytes(&self, key: &CacheItemIndexKey) -> Vec<u8> {
-        match key {
-            CacheItemIndexKey::ByPrefix(s) | CacheItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

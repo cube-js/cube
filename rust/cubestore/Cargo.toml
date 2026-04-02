@@ -8,6 +8,7 @@ members = [
     "cubezetasketch",
     "cuberpc",
     "cuberockstore",
+    "cuberockstore-derive",
 ]
 
 [profile.bench]

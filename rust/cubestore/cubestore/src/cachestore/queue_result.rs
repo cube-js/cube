@@ -124,7 +124,7 @@ rocks_table_new!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
     ]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum QueueResultIndexKey {
     ByPath(String),
     ByExternalId(Option<String>),
@@ -143,12 +143,7 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
     }
 
     fn key_to_bytes(&self, key: &QueueResultIndexKey) -> Vec<u8> {
-        match key {
-            QueueResultIndexKey::ByPath(s) => s.as_bytes().to_vec(),
-            QueueResultIndexKey::ByExternalId(s) => {
-                s.as_deref().unwrap_or("__null__").as_bytes().to_vec()
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

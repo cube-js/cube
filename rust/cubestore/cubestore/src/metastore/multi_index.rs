@@ -9,11 +9,7 @@ use crate::data_frame_from;
 use crate::metastore::{Column, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, TableId};
 use crate::rocks_table_impl;
 use crate::table::Row;
-use byteorder::{BigEndian, WriteBytesExt};
-
 use serde::{Deserialize, Deserializer, Serialize};
-use std::io::Cursor;
-use std::io::Write;
 
 data_frame_from! {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
@@ -59,7 +55,7 @@ rocks_table_impl!(MultiIndex, MultiIndexRocksTable, TableId::MultiIndexes, {
     vec![Box::new(MultiIndexRocksIndex::ByName)]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum MultiIndexIndexKey {
     ByName(u64, String),
 }
@@ -74,14 +70,7 @@ impl RocksSecondaryIndex<MultiIndex, MultiIndexIndexKey> for MultiIndexRocksInde
     }
 
     fn key_to_bytes(&self, key: &MultiIndexIndexKey) -> Vec<u8> {
-        match key {
-            MultiIndexIndexKey::ByName(schema, name) => {
-                let mut w = Cursor::new(Vec::with_capacity(8 + name.len()));
-                w.write_u64::<BigEndian>(*schema).unwrap();
-                w.write_all(name.as_bytes()).unwrap();
-                w.into_inner()
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {
@@ -213,7 +202,7 @@ rocks_table_impl!(
     }
 );
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum MultiPartitionIndexKey {
     ByMultiIndexId(u64),
     ByParentId(Option<u64>),
@@ -240,24 +229,7 @@ impl RocksSecondaryIndex<MultiPartition, MultiPartitionIndexKey> for MultiPartit
     }
 
     fn key_to_bytes(&self, key: &MultiPartitionIndexKey) -> Vec<u8> {
-        match key {
-            MultiPartitionIndexKey::ByMultiIndexId(id) => {
-                let mut w = Cursor::new(Vec::with_capacity(8));
-                w.write_u64::<BigEndian>(*id).unwrap();
-                w.into_inner()
-            }
-            MultiPartitionIndexKey::ByParentId(id) => {
-                let mut w = Cursor::new(Vec::with_capacity(9));
-                match id {
-                    None => w.write_u8(0).unwrap(),
-                    Some(id) => {
-                        w.write_u8(1).unwrap();
-                        w.write_u64::<BigEndian>(*id).unwrap();
-                    }
-                }
-                w.into_inner()
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

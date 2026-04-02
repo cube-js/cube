@@ -1,10 +1,8 @@
 use super::{Column, Index, IndexId, IndexType, RocksSecondaryIndex, TableId};
 
 use crate::{rocks_table_impl, CubeError};
-use byteorder::{BigEndian, WriteBytesExt};
 
 use serde::{Deserialize, Deserializer};
-use std::io::{Cursor, Write};
 
 impl Index {
     pub fn try_new(
@@ -88,7 +86,7 @@ rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
     ]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum IndexIndexKey {
     TableId(u64),
     Name(u64, String),
@@ -105,31 +103,7 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
     }
 
     fn key_to_bytes(&self, key: &IndexIndexKey) -> Vec<u8> {
-        match key {
-            IndexIndexKey::TableId(table_id) => {
-                let mut buf = Vec::with_capacity(8);
-                buf.write_u64::<BigEndian>(*table_id).unwrap();
-                buf
-            }
-            IndexIndexKey::Name(table_id, name) => {
-                let bytes = name.as_bytes();
-                let mut buf = Cursor::new(Vec::with_capacity(8 + bytes.len()));
-                buf.write_u64::<BigEndian>(*table_id).unwrap();
-                buf.write_all(bytes).unwrap();
-                buf.into_inner()
-            }
-            IndexIndexKey::MultiIndexId(multi_index_id) => {
-                let mut buf = Cursor::new(Vec::with_capacity(9));
-                match multi_index_id {
-                    None => buf.write_u8(0).unwrap(),
-                    Some(id) => {
-                        buf.write_u8(1).unwrap();
-                        buf.write_u64::<BigEndian>(*id).unwrap();
-                    }
-                }
-                buf.into_inner()
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

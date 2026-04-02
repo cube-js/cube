@@ -412,12 +412,22 @@ rocks_table_new!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
     ]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum QueueItemIndexKey {
     ByPath(String),
     ByPrefixAndStatus(String, QueueItemStatus),
     ByPrefix(String),
     ByExternalId(Option<String>),
+}
+
+impl cuberockstore::IndexKeyToBytes for QueueItemStatus {
+    fn write_index_key_bytes(&self, buf: &mut Vec<u8>) {
+        match self {
+            QueueItemStatus::Pending => buf.push(0_u8),
+            QueueItemStatus::Active => buf.push(1_u8),
+            QueueItemStatus::Finished => buf.push(2_u8),
+        }
+    }
 }
 
 base_rocks_secondary_index!(QueueItem, QueueItemRocksIndex);
@@ -440,25 +450,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     }
 
     fn key_to_bytes(&self, key: &QueueItemIndexKey) -> Vec<u8> {
-        match key {
-            QueueItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
-            QueueItemIndexKey::ByPrefix(s) => s.as_bytes().to_vec(),
-            QueueItemIndexKey::ByExternalId(s) => {
-                s.as_deref().unwrap_or("__null__").as_bytes().to_vec()
-            }
-            QueueItemIndexKey::ByPrefixAndStatus(prefix, s) => {
-                let mut r = Vec::with_capacity(prefix.len() + 1);
-                r.extend_from_slice(&prefix.as_bytes());
-
-                match s {
-                    QueueItemStatus::Pending => r.push(0_u8),
-                    QueueItemStatus::Active => r.push(1_u8),
-                    QueueItemStatus::Finished => r.push(2_u8),
-                }
-
-                r
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

@@ -3,7 +3,6 @@ use crate::metastore::table::Table;
 use crate::metastore::{IdRow, RocksEntity};
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
-use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 
@@ -327,7 +326,7 @@ rocks_table_impl!(
     { vec![Box::new(ReplayHandleRocksIndex::ByTableId),] }
 );
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum ReplayHandleIndexKey {
     ByTableId(u64),
 }
@@ -340,13 +339,7 @@ impl RocksSecondaryIndex<ReplayHandle, ReplayHandleIndexKey> for ReplayHandleRoc
     }
 
     fn key_to_bytes(&self, key: &ReplayHandleIndexKey) -> Vec<u8> {
-        match key {
-            ReplayHandleIndexKey::ByTableId(table_id) => {
-                let mut buf = Vec::with_capacity(8);
-                buf.write_u64::<BigEndian>(*table_id).unwrap();
-                buf
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {

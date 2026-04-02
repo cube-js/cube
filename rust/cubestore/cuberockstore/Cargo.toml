@@ -4,9 +4,11 @@ version = "0.1.0"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
-description = "Cube Rocks Store"
+description = "Cube RocksStore"
 
 [dependencies]
+byteorder = "1.3"
+cuberockstore-derive = { path = "../cuberockstore-derive" }
 
 [target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
 # jemalloc is supported only for gnu linux

@@ -1,0 +1,14 @@
+[package]
+name = "cuberockstore-derive"
+version = "0.1.0"
+authors = ["Cube Dev, Inc."]
+edition = "2021"
+license = "Apache-2.0"
+description = "Derive macros for Cube RocksStore"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"

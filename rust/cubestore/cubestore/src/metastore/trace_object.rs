@@ -2,8 +2,6 @@ use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
 use crate::metastore::RocksEntity;
 use crate::rocks_table_impl;
-use byteorder::{BigEndian, WriteBytesExt};
-
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::Debug;
 
@@ -45,7 +43,7 @@ rocks_table_impl!(TraceObject, TraceObjectRocksTable, TableId::TraceObjects, {
     vec![Box::new(TraceObjectRocksIndex::ByTableId)]
 });
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Hash, Clone, Debug, cuberockstore::SecondaryIndexKey)]
 pub enum TraceObjectIndexKey {
     ByTableId(u64),
 }
@@ -58,13 +56,7 @@ impl RocksSecondaryIndex<TraceObject, TraceObjectIndexKey> for TraceObjectRocksI
     }
 
     fn key_to_bytes(&self, key: &TraceObjectIndexKey) -> Vec<u8> {
-        match key {
-            TraceObjectIndexKey::ByTableId(table_id) => {
-                let mut buf = Vec::with_capacity(8);
-                buf.write_u64::<BigEndian>(*table_id).unwrap();
-                buf
-            }
-        }
+        key.to_bytes()
     }
 
     fn is_unique(&self) -> bool {
