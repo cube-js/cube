@@ -545,7 +545,8 @@
                   "recipes/core-data-api/sorting",
                   "recipes/core-data-api/pagination",
                   "recipes/core-data-api/drilldowns",
-                  "recipes/core-data-api/real-time-data-fetch"
+                  "recipes/core-data-api/real-time-data-fetch",
+                  "recipes/core-data-api/cloud-groups-and-user-attributes"
                 ]
               },
               {
