@@ -315,6 +315,69 @@ describe('Transpilers', () => {
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
   });
 
+  it('CubePropContextTranspiler with groups shorthand in sql template should transpile to SECURITY_CONTEXT.cubeCloud.groups', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: \`SELECT * FROM users WHERE tenant_id = \${groups}\`,
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          }
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledSql = cubeEvaluator.cubeFromPath('Test').sql;
+    expect(transpiledSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.groups');
+  });
+
+  it('CubePropContextTranspiler with userAttributes shorthand in dimension sql should transpile to SECURITY_CONTEXT', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`\${userAttributes.region}\`,
+              type: 'string'
+            }
+          }
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledSql = cubeEvaluator.cubeFromPath('Test').dimensions.userId.sql;
+    expect(transpiledSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.userAttributes');
+  });
+
+  it('CubePropContextTranspiler should not transform groups shorthand when a cube member named groups exists', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            groups: {
+              sql: \`groups_col\`,
+              type: 'string'
+            },
+            filtered: {
+              sql: \`\${groups}\`,
+              type: 'string'
+            }
+          }
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledSql = cubeEvaluator.cubeFromPath('Test').dimensions.filtered.sql;
+    expect(transpiledSql!.toString()).not.toMatch('SECURITY_CONTEXT');
+    expect(transpiledSql!.toString()).not.toMatch('securityContext');
+    expect(transpiledSql!.toString()).toMatch('groups');
+  });
+
   it('ImportExportTranspiler', async () => {
     const ieTranspiler = new ImportExportTranspiler();
     const errorsReport = new ErrorReporter();

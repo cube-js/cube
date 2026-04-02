@@ -221,9 +221,10 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   protected static collectKnownIdentifiersAndTransform(resolveSymbol: SymbolResolver, path: NodePath): string[] {
     const identifiers: string[] = [];
+    const isAccessPolicy = this.isAccessPolicyPath(path);
 
     if (path.node.type === 'Identifier') {
-      CubePropContextTranspiler.transformAccessPolicyShorthandIdentifier(path as NodePath<t.Identifier>, identifiers);
+      CubePropContextTranspiler.transformCubeCloudShorthandIdentifier(path as NodePath<t.Identifier>, identifiers, isAccessPolicy, resolveSymbol);
       if (path.node.type === 'Identifier') {
         CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
       }
@@ -231,11 +232,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
     path.traverse({
       Identifier: (p) => {
-        CubePropContextTranspiler.transformAccessPolicyShorthandIdentifier(p, identifiers);
+        CubePropContextTranspiler.transformCubeCloudShorthandIdentifier(p, identifiers, isAccessPolicy, resolveSymbol);
         CubePropContextTranspiler.matchAndTransformIdentifier(p, resolveSymbol, identifiers);
       },
       MemberExpression: (p) => {
-        CubePropContextTranspiler.transformAccessPolicyShorthandMemberExpression(p);
+        CubePropContextTranspiler.transformCubeCloudShorthandMemberExpression(p, isAccessPolicy, resolveSymbol);
       }
     });
 
@@ -249,15 +250,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       ) &&
       resolveSymbol(path.node.name)
     ) {
-      const fullPath = this.fullPath(path);
-      if (
-        this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name) &&
-        (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
-      ) {
-        identifiers.push('securityContext');
-      } else {
-        identifiers.push(path.node.name);
-      }
+      identifiers.push(path.node.name);
     }
   }
 
@@ -268,47 +261,48 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy');
   }
 
-  protected static transformAccessPolicyShorthandIdentifier(path: NodePath<t.Identifier>, identifiers: string[]) {
-    if (
-      !path.parent ||
-      path.parent.type !== 'MemberExpression' ||
-      path.key !== 'property'
-    ) {
-      if (
-        this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name) &&
-        path.parent?.type !== 'MemberExpression' &&
-        this.isAccessPolicyPath(path)
-      ) {
-        const securityContext = t.identifier('securityContext');
-        const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
-        const prop = path.node.name === 'user_attributes' ? 'userAttributes' : path.node.name;
-        const newExpr = t.memberExpression(cubeCloud, t.identifier(prop));
-        path.replaceWith(newExpr);
-        identifiers.push('securityContext');
-      }
-    }
+  private static securityContextIdentifier(isAccessPolicy: boolean): t.Identifier {
+    return t.identifier(isAccessPolicy ? 'securityContext' : 'SECURITY_CONTEXT');
   }
 
-  protected static transformAccessPolicyShorthandMemberExpression(path: NodePath<t.MemberExpression>) {
-    const fullPath = this.fullPath(path);
-    const isAccessPolicy = fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy');
+  protected static transformCubeCloudShorthandIdentifier(path: NodePath<t.Identifier>, identifiers: string[], isAccessPolicy: boolean, resolveSymbol: SymbolResolver) {
+    if (!this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name)) {
+      return;
+    }
+    if (resolveSymbol(path.node.name)) {
+      return;
+    }
+    if (
+      path.parent &&
+      (path.parent.type === 'MemberExpression' || path.parent.type === 'OptionalMemberExpression') &&
+      path.key === 'property'
+    ) {
+      return;
+    }
+    const contextId = this.securityContextIdentifier(isAccessPolicy);
+    const cubeCloud = t.memberExpression(contextId, t.identifier('cubeCloud'));
+    const prop = path.node.name === 'user_attributes' ? 'userAttributes' : path.node.name;
+    const newExpr = t.memberExpression(cubeCloud, t.identifier(prop));
+    path.replaceWith(newExpr);
+    identifiers.push(contextId.name);
+  }
 
+  protected static transformCubeCloudShorthandMemberExpression(path: NodePath<t.MemberExpression>, isAccessPolicy: boolean, resolveSymbol: SymbolResolver) {
     if (
       t.isIdentifier(path.node.object) &&
       this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.object.name) &&
-      isAccessPolicy
+      !resolveSymbol(path.node.object.name)
     ) {
-      const securityContext = t.identifier('securityContext');
-      const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
+      const contextId = this.securityContextIdentifier(isAccessPolicy);
+      const cubeCloud = t.memberExpression(contextId, t.identifier('cubeCloud'));
       const prop = path.node.object.name === 'user_attributes' ? 'userAttributes' : path.node.object.name;
       const shorthand = t.memberExpression(cubeCloud, t.identifier(prop));
       const newMemberExpression = t.memberExpression(shorthand, path.node.property, path.node.computed);
       path.replaceWith(newMemberExpression);
     } else if (
-      t.isMemberExpression(path.node.object) &&
+      (t.isMemberExpression(path.node.object) || t.isOptionalMemberExpression(path.node.object)) &&
       t.isIdentifier(path.node.object.property, { name: 'user_attributes' }) &&
-      !path.node.object.computed &&
-      isAccessPolicy
+      !path.node.object.computed
     ) {
       const newObject = t.memberExpression(
         path.node.object.object,
