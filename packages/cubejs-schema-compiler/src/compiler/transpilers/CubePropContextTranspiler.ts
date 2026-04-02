@@ -265,6 +265,21 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return t.identifier(isAccessPolicy ? 'securityContext' : 'SECURITY_CONTEXT');
   }
 
+  private static isShadowedByFunctionParam(name: string, path: NodePath): boolean {
+    let current: NodePath | null = path.parentPath;
+    while (current) {
+      const { node } = current;
+      if (
+        (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)) &&
+        node.params.some(p => t.isIdentifier(p) && p.name === name)
+      ) {
+        return true;
+      }
+      current = current.parentPath;
+    }
+    return false;
+  }
+
   protected static transformCubeCloudShorthandIdentifier(path: NodePath<t.Identifier>, identifiers: string[], isAccessPolicy: boolean, resolveSymbol: SymbolResolver) {
     if (!this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name)) {
       return;
@@ -279,6 +294,9 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     ) {
       return;
     }
+    if (this.isShadowedByFunctionParam(path.node.name, path)) {
+      return;
+    }
     const contextId = this.securityContextIdentifier(isAccessPolicy);
     const cubeCloud = t.memberExpression(contextId, t.identifier('cubeCloud'));
     const prop = path.node.name === 'user_attributes' ? 'userAttributes' : path.node.name;
@@ -291,7 +309,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     if (
       t.isIdentifier(path.node.object) &&
       this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.object.name) &&
-      !resolveSymbol(path.node.object.name)
+      !resolveSymbol(path.node.object.name) &&
+      !this.isShadowedByFunctionParam(path.node.object.name, path)
     ) {
       const contextId = this.securityContextIdentifier(isAccessPolicy);
       const cubeCloud = t.memberExpression(contextId, t.identifier('cubeCloud'));
