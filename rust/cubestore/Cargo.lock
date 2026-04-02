@@ -5483,8 +5483,8 @@ dependencies = [
 
 [[package]]
 name = "rust-s3"
-version = "0.32.3"
-source = "git+https://github.com/cube-js/rust-s3.git?rev=c662b9c66c2929da185c46084fc5f455030ad75f#c662b9c66c2929da185c46084fc5f455030ad75f"
+version = "0.37.1"
+source = "git+https://github.com/durch/rust-s3.git?tag=v0.37.1#db637a9264eec8e1c10d09ef2b0adecf994b490a"
 dependencies = [
  "async-trait",
  "aws-creds",
@@ -5508,6 +5508,46 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "url",
+]
+
+[[package]]
+name = "aws-config"
+version = "1.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edc2c34dbe583a282e583a81e5abc717e0eaf19dd1e8d369178994c11eae186c"
+dependencies = [
+ "aws-credential-provider-chain",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-query",
+ "aws-smithy-runtime",
+ "aws-types",
+ "tokio",
+]
+
+[[package]]
+name = "aws-sdk-s3"
+version = "1.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e72e78b0f8c5b3b0d4c5c3c5e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e"
+dependencies = [
+ "aws-credential-provider-chain",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-query",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "futures-util",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
