@@ -135,8 +135,8 @@
               "docs/integrations/tableau",
               {
                 "group": "Power BI",
+                "root": "docs/integrations/power-bi/index",
                 "pages": [
-                  "docs/integrations/power-bi",
                   "docs/integrations/power-bi/kerberos",
                   "docs/integrations/power-bi/ntlm"
                 ]
