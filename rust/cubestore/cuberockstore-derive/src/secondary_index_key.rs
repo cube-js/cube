@@ -97,7 +97,7 @@ pub fn derive_secondary_index_key(input: TokenStream) -> TokenStream {
         });
 
         quote! {
-            pub fn is_nullable(&self) -> bool {
+            fn is_nullable(&self) -> bool {
                 match self {
                     #(#nullable_arms),*
                 }
@@ -105,7 +105,7 @@ pub fn derive_secondary_index_key(input: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            pub fn is_nullable(&self) -> bool {
+            fn is_nullable(&self) -> bool {
                 false
             }
         }
@@ -118,7 +118,15 @@ pub fn derive_secondary_index_key(input: TokenStream) -> TokenStream {
                     #(#to_bytes_arms),*
                 }
             }
+        }
 
+        impl cuberockstore::IndexKeyToBytes for #name {
+            fn write_index_key_bytes(&self, buf: &mut Vec<u8>) {
+                buf.extend_from_slice(&self.to_bytes());
+            }
+        }
+
+        impl cuberockstore::SecondaryIndexKey for #name {
             #is_nullable_method
         }
     };

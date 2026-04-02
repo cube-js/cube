@@ -3,14 +3,15 @@ pub use rocksdb;
 
 mod index_key;
 pub use index_key::IndexKeyToBytes;
+pub use index_key::SecondaryIndexKey;
 
 // re-export derive macro
 pub use cuberockstore_derive::SecondaryIndexKey;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate as cuberockstore;
+    use crate::SecondaryIndexKey;
 
     #[derive(Hash, Clone, Debug, SecondaryIndexKey)]
     enum SimpleKey {

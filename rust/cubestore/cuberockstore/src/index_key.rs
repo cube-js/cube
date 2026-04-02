@@ -43,3 +43,7 @@ impl IndexKeyToBytes for Option<u64> {
         }
     }
 }
+
+pub trait SecondaryIndexKey: IndexKeyToBytes {
+    fn is_nullable(&self) -> bool;
+}
