@@ -379,6 +379,14 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             ParamValue::StringVec(prop_vec)
         } else if let Ok(prop) = String::from_native(property_value.clone()) {
             ParamValue::String(prop)
+        } else if let Ok(prop) = f64::from_native(property_value.clone()) {
+            if prop.fract() == 0.0 && prop.is_finite() {
+                ParamValue::String(format!("{}", prop as i64))
+            } else {
+                ParamValue::String(prop.to_string())
+            }
+        } else if let Ok(prop) = bool::from_native(property_value.clone()) {
+            ParamValue::String(prop.to_string())
         } else if property_value.is_undefined()? || property_value.is_null()? {
             ParamValue::None
         } else {
@@ -467,16 +475,28 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         property_value: NativeObjectHandle<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        let allocated = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
-            prop_vec
+        let str_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
+            Some(prop_vec)
+        } else if let Ok(prop) = String::from_native(property_value.clone()) {
+            Some(vec![prop])
+        } else if let Ok(prop) = f64::from_native(property_value.clone()) {
+            if prop.fract() == 0.0 && prop.is_finite() {
+                Some(vec![format!("{}", prop as i64)])
+            } else {
+                Some(vec![prop.to_string()])
+            }
+        } else if let Ok(prop) = bool::from_native(property_value.clone()) {
+            Some(vec![prop.to_string()])
+        } else {
+            None
+        };
+        let allocated = match str_value {
+            Some(values) => values
                 .iter()
                 .map(|v| Self::process_secutity_context_value(&proxy_state, v))
                 .collect::<Result<Vec<_>, _>>()?
-                .join(",")
-        } else if let Ok(prop) = String::from_native(property_value.clone()) {
-            Self::process_secutity_context_value(&proxy_state, &prop)?
-        } else {
-            String::new()
+                .join(", "),
+            None => String::new(),
         };
         let result = context_holder.to_string_fn(allocated)?;
         Ok(NativeObjectHandle::new(result.into_object()))
