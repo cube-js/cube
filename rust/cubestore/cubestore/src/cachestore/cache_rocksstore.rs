@@ -613,11 +613,15 @@ impl RocksCacheStore {
                 }));
             };
 
-            // try external_id first (if provided), then fall back to path lookup
+            // try (path, external_id) first (if provided), then fall back to path lookup
             // external_id can be different for path, because path is re-used across different requests across time
             if let Some(ref external_id) = external_id {
+                let path = match &key {
+                    QueueKey::ByPath(p) => p.clone(),
+                    QueueKey::ById(_) => unreachable!("already handled ById above"),
+                };
                 if let Some(queue_result) =
-                    result_schema.get_row_by_external_id(external_id.clone())?
+                    result_schema.get_row_by_path_and_external_id(path, external_id.clone())?
                 {
                     let id = queue_result.get_id();
                     let external_id = queue_result.get_row().get_external_id().clone();
@@ -906,10 +910,7 @@ pub trait CacheStore: DIService + Send + Sync {
         key: QueueKey,
         external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError>;
-    async fn queue_result_by_external_id(
-        &self,
-        external_id: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError>;
+
     async fn queue_result_blocking(
         &self,
         key: QueueKey,
@@ -1550,37 +1551,6 @@ impl CacheStore for RocksCacheStore {
         self.lookup_queue_result_by_key(key, external_id).await
     }
 
-    async fn queue_result_by_external_id(
-        &self,
-        external_id: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.write_operation_queue("queue_result_by_external_id", move |db_ref, batch_pipe| {
-            let result_schema = QueueResultRocksTable::new(db_ref.clone());
-            let queue_result = result_schema.get_row_by_external_id(external_id)?;
-
-            if let Some(queue_result) = queue_result {
-                if queue_result.get_row().is_deleted() {
-                    let id = queue_result.get_id();
-                    let external_id = queue_result.get_row().get_external_id().clone();
-                    Ok(Some(QueueResultResponse::Success {
-                        value: Some(queue_result.into_row().value),
-                        id,
-                        external_id,
-                    }))
-                } else {
-                    Self::queue_result_ready_to_delete_impl(
-                        &result_schema,
-                        batch_pipe,
-                        queue_result,
-                    )
-                }
-            } else {
-                Ok(None)
-            }
-        })
-        .await
-    }
-
     async fn queue_result_blocking(
         &self,
         key: QueueKey,
@@ -1828,15 +1798,6 @@ impl CacheStore for ClusterCacheStoreClient {
         _external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_result was used.")
-    }
-
-    async fn queue_result_by_external_id(
-        &self,
-        _external_id: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!(
-            "CacheStore cannot be used on the worker node! queue_result_by_external_id was used."
-        )
     }
 
     async fn queue_result_blocking(
@@ -2393,6 +2354,7 @@ mod tests {
         assert!(res.is_ok(), "First insert with external_id should succeed");
         assert!(res.unwrap().added);
 
+        // Same external_id but different path should succeed (uniqueness is per path now)
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path2".to_string(),
@@ -2404,13 +2366,26 @@ mod tests {
                 external_id: Some("ext-dup".to_string()),
             })
             .await;
-        assert!(res.is_err(), "Duplicate external_id should fail");
-        let err_msg = res.unwrap_err().to_string();
         assert!(
-            err_msg.contains("Unique constraint violation"),
-            "Expected unique constraint error, got: {}",
-            err_msg
+            res.is_ok(),
+            "Same external_id with different path should succeed"
         );
+        assert!(res.unwrap().added);
+
+        // Same path returns added: false (ByPath uniqueness), not an error
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path1".to_string(),
+                value: "v1-dup".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-dup".to_string()),
+            })
+            .await;
+        assert!(res.is_ok(), "Duplicate path should return added: false");
+        assert!(!res.unwrap().added);
 
         // Multiple inserts with None external_id should all succeed
         {
@@ -2543,7 +2518,7 @@ mod tests {
             })
             .await?;
 
-        // Simulate migration: rebuild the ByExternalId index.
+        // Simulate migration: rebuild the ByPathAndExternalId index.
         cachestore
             .read_operation_queue("test_rebuild_index", move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -2576,7 +2551,7 @@ mod tests {
             res.err()
         );
 
-        // Uniqueness for real external_id values should still be enforced after rebuild
+        // Same external_id with different path should succeed after rebuild (uniqueness is per path)
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path_ext_dup".to_string(),
@@ -2589,13 +2564,11 @@ mod tests {
             })
             .await;
         assert!(
-            res.is_err(),
-            "Duplicate external_id should still fail after rebuild"
+            res.is_ok(),
+            "Same external_id with different path should succeed after rebuild, got: {:?}",
+            res.err()
         );
-        assert!(res
-            .unwrap_err()
-            .to_string()
-            .contains("Unique constraint violation"));
+        assert!(res.unwrap().added);
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_add_none_ext_rebuild");
 

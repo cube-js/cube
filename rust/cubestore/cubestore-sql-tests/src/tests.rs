@@ -293,7 +293,6 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             queue_multiple_result_blocking,
         ),
         t("queue_custom_orphaned", queue_custom_orphaned),
-        t("queue_result_by_external_id", queue_result_by_external_id),
         t(
             "queue_result_by_id_external_id_mismatch",
             queue_result_by_id_external_id_mismatch,
@@ -365,7 +364,6 @@ lazy_static::lazy_static! {
         "queue_ack_then_result_v2_by_id",
         "queue_ack_then_result_v2_with_external_id",
         "queue_custom_orphaned",
-        "queue_result_by_external_id",
         "queue_result_by_id_external_id_mismatch",
         "queue_result_ack_multiple_with_external_id",
         "queue_full_workflow_v1",
@@ -11140,48 +11138,6 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) -> Result<(), CubeEr
             TableValue::String("queue_key_1".to_string()),
             TableValue::String("1".to_string()),
         ]),]
-    );
-    Ok(())
-}
-
-async fn queue_result_by_external_id(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    let add_response = service
-        .exec_query(
-            r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-123' "STANDALONE#queue:123456789" "payload123456789";"#,
-        )
-        .await?;
-    let id = assert_queue_add_and_get_id(&add_response)?;
-
-    let ack_result = service
-        .exec_query(r#"QUEUE ACK "STANDALONE#queue:123456789" "result:123456789""#)
-        .await?;
-    assert_eq!(
-        ack_result.get_rows(),
-        &vec![Row::new(vec![TableValue::Boolean(true)])]
-    );
-
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "unknown-ext-id""#)
-        .await?;
-    assert_eq!(result.get_rows().len(), 0);
-
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
-        .await?;
-    assert_queue_result_columns(&result);
-
-    assert_eq!(
-        result.get_rows(),
-        &vec![queue_result_row("result:123456789", &id, Some("ext-123"))]
-    );
-
-    // Second call should return empty (result deleted after first retrieval)
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-123""#)
-        .await?;
-    assert_eq!(
-        result.get_rows(),
-        &vec![queue_result_row("result:123456789", &id, Some("ext-123"))]
     );
     Ok(())
 }
