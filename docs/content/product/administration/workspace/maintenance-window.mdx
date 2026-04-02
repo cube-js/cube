@@ -98,21 +98,24 @@ revert to an older version, contact support.
 ## Upgrade now
 
 If a critical fix has been released and you don't want to wait for the
-next scheduled maintenance window, you can apply the latest eligible
-snapshot immediately.
+next scheduled maintenance window, you can upgrade to the current
+production versions immediately.
 
 When the maintenance window is enabled, an **Upgrade Now** section
 appears at the bottom of the settings page. Click **Upgrade Now** to
-advance to the latest eligible snapshot right away.
+create a snapshot from the service versions currently running in
+production and switch your deployment to it right away.
 
 The button is disabled while the upgrade is in progress. Once complete,
 the new version will appear in the **Active Version** dropdown.
 
 <InfoBox>
 
-The same eligibility rules apply — only snapshots that are at least
-24 hours old are considered. If you are already on the latest eligible
-snapshot, the button will return an error.
+Unlike the scheduled maintenance window, **Upgrade Now** does not
+require a 24-hour eligibility buffer — it always uses the versions
+running in production at the time you click the button. If your
+deployment is already running those versions, the button will return
+an error.
 
 </InfoBox>
 
@@ -145,8 +148,9 @@ above for details.
 
 ### Can I trigger an immediate upgrade without waiting for the window?
 
-Yes. Use the **Upgrade Now** button on the settings page to apply the
-latest eligible snapshot immediately. See [Upgrade now](#upgrade-now)
-above for details.
+Yes. Use the **Upgrade Now** button on the settings page to upgrade to
+the current production versions immediately, without waiting for the
+24-hour eligibility buffer. See [Upgrade now](#upgrade-now) above for
+details.
 
 [ref-dedicated]: /product/deployment/cloud/deployment-types#production-cluster
