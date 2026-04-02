@@ -2298,10 +2298,7 @@ mod tests {
         // result columns — they're only used for filtering.
         test_data.request.query.time_dimensions = Some(vec![QueryTimeDimension {
             dimension: "ECommerceRecordsUs2021.order_date".to_string(),
-            date_range: Some(vec![
-                "2025-01-01".to_string(),
-                "2025-12-31".to_string(),
-            ]),
+            date_range: Some(vec!["2025-01-01".to_string(), "2025-12-31".to_string()]),
             compare_date_range: None,
             granularity: None,
         }]);
