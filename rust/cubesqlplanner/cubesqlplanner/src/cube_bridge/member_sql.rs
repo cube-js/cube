@@ -601,11 +601,11 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                     return Ok(Some(target_obj.get_field(&prop)?));
                 }
             }
-            let empty = inner_context.empty_struct()?;
+            let undef = inner_context.undefined()?;
             Ok(Some(Self::security_context_leaf_proxy(
                 inner_context,
                 proxy_state.clone(),
-                NativeObjectHandle::new(empty.into_object()),
+                undef,
             )?))
         })
     }
