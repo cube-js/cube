@@ -1,27 +1,61 @@
 ---
 title: Calculated fields
-description: Create ad-hoc calculations on top of your semantic model measures and dimensions at query time without modifying the data model.
+description: Create ad-hoc calculations at query time by pointing and clicking in the UI, asking the AI agent, or writing Semantic SQL by hand.
 ---
 
-Calculated fields let you derive new metrics and dimensions at query time using
-[Semantic SQL][ref-semantic-sql]. Instead of modifying the data model, you can
-write expressions that combine, transform, or compute values on top of existing
-measures and dimensions directly in your query.
+Calculated fields let you derive new metrics and dimensions at query time without
+modifying the data model. You can create them by pointing and clicking in the
+workbook UI, asking the AI agent, or writing Semantic SQL manually.
 
-This is useful when you need a one-off calculation for a specific analysis, want
-to experiment with a new metric before adding it to the data model, or need to
-create a derived value that is only relevant to a particular report.
+Unlike other analytics tools where custom fields are computed in the browser,
+Cube compiles calculated fields into SQL and pushes computation down to your
+data warehouse. This means calculated fields have no frontend row limits,
+can operate on the full dataset, and benefit from the same query optimization
+as any other warehouse query.
 
-## How calculated fields work
+## Creating calculated fields
 
-Calculated fields use [query post-processing][ref-post-processing] in Semantic
-SQL. You write a semantic query as an inner query that selects measures and
-dimensions from your data model, then wrap it in an outer query that performs
-additional calculations.
+### Point and click
 
-The inner query runs through the semantic layer with full governance, access
-control, and pre-aggregation support. The outer query then applies your custom
-calculations on top of those results.
+In a [Semantic Query tab][ref-querying-data], you can create calculated fields
+directly from the workbook UI:
+
+1. Open a workbook and select a **Semantic Query** tab.
+2. Click the **+** button next to the measures or dimensions list to add a
+   calculated field.
+3. Define your calculation using the available measures and dimensions. The UI
+   provides an expression editor where you can combine fields with arithmetic
+   operators, functions, and conditional logic.
+4. Give the calculated field a name and run the query.
+
+The calculated field appears alongside your other query results and can be used
+in charts, pivots, and filters within the same workbook.
+
+### AI agent
+
+The AI agent in [Analytics Chat][ref-analytics-chat] and in
+[workbook Semantic Query tabs][ref-querying-data] can create calculated fields
+for you automatically.
+
+Ask a question that requires a derived metric, and the agent writes the
+appropriate Semantic SQL with post-processing to compute the result. For example:
+
+- _"Show me the profit margin for each product category"_
+- _"What percentage of orders are completed vs. total orders?"_
+- _"Add a column that classifies customers as enterprise, mid-market, or small
+  based on their lifetime value"_
+
+The agent generates the query, including any calculated fields, and returns
+the results. You can then explore the results further or save the query to a
+workbook.
+
+### Semantic SQL
+
+For full control, write [Semantic SQL][ref-semantic-sql] directly in the SQL
+editor of a workbook or Explore. Calculated fields use
+[query post-processing][ref-post-processing]: you write an inner query that
+selects measures and dimensions from your data model, then wrap it in an outer
+query that performs additional calculations.
 
 ```sql
 SELECT
@@ -39,37 +73,38 @@ FROM (
 ) AS data
 ```
 
-In this example, `avg_order_value` is a calculated field that divides
-`total_revenue` by `total_orders`. The inner query retrieves the semantic model
-measures, and the outer query computes the derived value.
+In this example, `avg_order_value` is a calculated field. The inner query
+retrieves semantic model measures using the `MEASURE()` function, and the outer
+query computes the derived value.
 
-## Where you can use calculated fields
+## How it works under the hood
 
-### Workbooks
+When you create a calculated field—whether through the UI, the AI agent, or
+by writing SQL—Cube compiles the entire query, including your calculated
+expressions, into a single SQL statement that runs on your data warehouse.
 
-In a [Semantic Query tab][ref-querying-data], switch to the SQL editor and write
-a query with an outer `SELECT` that includes your calculated expressions. This
-gives you full control over the query while still leveraging the semantic layer
-for the underlying data.
+This backend execution model has key advantages over tools that compute custom
+fields in the browser:
 
-### Explore
+- **No row limits.** Frontend-calculated fields are limited to the rows fetched
+  to the browser (typically a few thousand). Cube's calculated fields operate on
+  the full dataset in the warehouse.
+- **Warehouse-native performance.** Your data warehouse optimizes and
+  parallelizes the computation. Complex calculations over millions of rows
+  complete in seconds rather than stalling the browser.
+- **Consistent results.** Because the calculation happens on the full dataset
+  before any row limit is applied, aggregations and percentages reflect the
+  complete data—not a truncated sample.
 
-When exploring data from a dashboard or Analytics Chat result, you can open the
-SQL editor in [Explore][ref-explore] to add calculated fields to your query.
-
-### Analytics Chat
-
-The AI agent in [Analytics Chat][ref-analytics-chat] can create calculated fields
-automatically. When you ask a question that requires a derived metric, the agent
-writes Semantic SQL with post-processing to compute the result. You can ask
-the agent to save frequently used calculations to your data model as permanent
-measures or dimensions.
+The inner query still passes through the semantic layer with full governance,
+access control, and [pre-aggregation][ref-pre-agg] support. The outer
+calculation runs on top of those governed results.
 
 ## Examples
 
 ### Ratios and percentages
 
-Calculate a percentage by dividing one measure by another:
+Calculate a completion rate by dividing one measure by another:
 
 ```sql
 SELECT
@@ -109,9 +144,9 @@ FROM (
 ) AS data
 ```
 
-### Arithmetic operations
+### Arithmetic combinations
 
-Combine multiple measures with arithmetic:
+Combine multiple measures to calculate profit and margin:
 
 ```sql
 SELECT
@@ -134,16 +169,17 @@ FROM (
 
 | | Calculated fields | Data model measures |
 | --- | --- | --- |
-| **Defined in** | Query (Semantic SQL) | Data model (YAML or JavaScript) |
+| **Defined in** | Query (UI, AI agent, or Semantic SQL) | Data model (YAML or JavaScript) |
 | **Scope** | Single query or report | Available across all queries |
+| **Execution** | Compiled to SQL, runs on the warehouse | Compiled to SQL, runs on the warehouse |
 | **Pre-aggregation support** | Outer calculations are not pre-aggregated | Fully supported |
 | **Access control** | Inherits from underlying members | Managed in the data model |
-| **Best for** | Ad-hoc analysis, prototyping | Reusable, governed metrics |
+| **Best for** | Ad-hoc analysis, prototyping metrics | Reusable, governed metrics |
 
 When you find yourself reusing the same calculated field across multiple queries,
-consider adding it to your data model as a [calculated measure or
-dimension][ref-calculated-members] to take advantage of pre-aggregations,
-access control, and discoverability across your team.
+consider promoting it to a [calculated measure or dimension][ref-calculated-members]
+in your data model. This gives you pre-aggregation support, access control, and
+discoverability across your team.
 
 [ref-semantic-sql]: /docs/introduction#semantic-sql
 [ref-post-processing]: /reference/core-data-apis/sql-api/query-format#query-post-processing
@@ -151,3 +187,4 @@ access control, and discoverability across your team.
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-calculated-members]: /docs/data-modeling/concepts/calculated-members
+[ref-pre-agg]: /docs/pre-aggregations/getting-started
