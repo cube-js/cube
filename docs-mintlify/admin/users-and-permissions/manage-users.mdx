@@ -1,0 +1,106 @@
+---
+title: Manage users
+description: Invite team members, assign roles, and manage user accounts in Cube.
+---
+
+As an account administrator, you can invite team members to your Cube account,
+assign them [roles][ref-roles], and manage their access.
+
+To manage users, navigate to **Admin → Users** in your Cube account.
+
+## Invite users
+
+To invite new users to your Cube account:
+
+1. Navigate to **Admin → Users**.
+2. Click **Invite User**.
+3. Enter the user's email address.
+4. Select a [role][ref-roles] for the user (Admin, Developer, Explorer, or Viewer).
+5. Click **Send Invite**.
+
+The invited user will receive an email with a link to join your Cube account.
+If they don't already have a Cube account, they will be prompted to create one.
+
+You can also invite multiple users at once by entering multiple email addresses.
+
+<Info>
+
+If you have [SSO][ref-sso] configured with [SCIM provisioning][ref-scim-okta],
+users can be provisioned automatically from your identity provider
+instead of being invited manually.
+
+</Info>
+
+## View and filter users
+
+The **Admin → Users** page displays a list of all users in your account,
+including their name, email, role, and status.
+
+You can filter users by role or search by name or email to find specific
+users.
+
+## Change a user's role
+
+To change a user's role:
+
+1. Navigate to **Admin → Users**.
+2. Find the user in the list.
+3. Use the role dropdown next to the user to select a new role.
+
+Alternatively, click on a user to open their profile page and change
+the role from there.
+
+See [roles and permissions][ref-roles] for details on what each role
+can access.
+
+If your organization uses [custom roles][ref-custom-roles], you can
+assign one or more custom roles to a user in addition to their
+default role.
+
+## Manage user attributes
+
+You can set [user attributes][ref-attributes] on a per-user basis
+from the user's profile page. User attributes enable row-level
+security by filtering data based on user-specific values.
+
+To set attributes for a user:
+
+1. Navigate to **Admin → Users**.
+2. Click on the user to open their profile page.
+3. In the attributes section, set the desired values.
+
+See [user attributes][ref-attributes] for more details.
+
+## Manage user groups
+
+You can organize users into [groups][ref-groups] for easier access
+management at scale. Groups can be used with [access policies][ref-dap]
+to control row-level security.
+
+## Deactivate a user
+
+To remove a user's access to your Cube account:
+
+1. Navigate to **Admin → Users**.
+2. Find the user in the list.
+3. Click on the user to open their profile page.
+4. Click **Deactivate User**.
+
+Deactivated users can no longer sign in to your Cube account. Their
+queries and workbooks are preserved.
+
+<Info>
+
+If you use [SCIM provisioning][ref-scim-okta], deactivating or
+unassigning a user in your identity provider will automatically
+deactivate them in Cube.
+
+</Info>
+
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-attributes]: /admin/users-and-permissions/user-attributes
+[ref-groups]: /admin/users-and-permissions/user-groups
+[ref-dap]: /docs/data-modeling/access-control/index
+[ref-sso]: /admin/sso/index
+[ref-scim-okta]: /admin/sso/okta/scim
