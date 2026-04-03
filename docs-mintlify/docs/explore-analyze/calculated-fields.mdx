@@ -1,0 +1,123 @@
+---
+title: Calculated fields
+description: Create ad-hoc measures and dimensions at query time without modifying your data model.
+---
+
+Calculated fields let you define new measures and dimensions on the fly while
+exploring data in [Workbooks](/docs/explore-analyze/workbooks) and
+[Explore](/docs/explore-analyze/explore). They are scoped to the current query
+and do not alter your [data model](/docs/data-modeling/overview), so you can
+experiment with new metrics without a deployment cycle.
+
+<Info>
+
+Calculated fields are currently available as **query-level fields** in
+Semantic Query tabs and Explore. Support for additional field types is
+planned for a future release.
+
+</Info>
+
+## When to use calculated fields
+
+Use calculated fields when you need to:
+
+- Compute a ratio, percentage, or difference between existing measures
+- Derive a new dimension from existing dimensions (for example, concatenating
+  first and last name)
+- Test a metric definition before adding it to the data model
+- Create one-off calculations for a specific analysis without involving a data
+  engineer
+
+If you find yourself reusing a calculated field across multiple workbooks,
+consider promoting it to a
+[calculated measure or dimension](/docs/data-modeling/concepts/calculated-members)
+in the data model so it can be governed, reused, and pre-aggregated.
+
+## Creating a calculated field
+
+{/* TODO: Add screenshot of the calculated field UI once available */}
+
+<Steps>
+  <Step title="Open a Semantic Query tab or Explore">
+    In a workbook, open an existing Semantic Query tab or create a new one. You
+    can also start from the **Explore** page.
+  </Step>
+  <Step title="Add a calculated field">
+    In the left pane, click the **+** button next to the measures or dimensions
+    section and select **Calculated field**.
+  </Step>
+  <Step title="Write the expression">
+    Enter a SQL expression that references existing measures or dimensions from
+    the current view. For example, to calculate a completion rate:
+
+    ```sql
+    1.0 * completed_count / count
+    ```
+
+    You can use standard SQL functions and operators supported by your data
+    source.
+  </Step>
+  <Step title="Name the field">
+    Give the calculated field a descriptive name. This name appears in the
+    results table and any visualizations you build.
+  </Step>
+  <Step title="Use the field">
+    The calculated field is now available alongside your other measures or
+    dimensions. You can use it in visualizations, pivot tables, filters, and
+    sorting just like any model-defined field.
+  </Step>
+</Steps>
+
+## Expression syntax
+
+Calculated field expressions use SQL syntax. You can reference any measure or
+dimension available in the current semantic view by name.
+
+### Supported operations
+
+| Operation | Example |
+| --- | --- |
+| Arithmetic | `revenue - cost` |
+| Division with decimals | `1.0 * completed_count / total_count` |
+| String concatenation | `first_name \|\| ' ' \|\| last_name` |
+| Conditional logic | `CASE WHEN status = 'active' THEN 1 ELSE 0 END` |
+| SQL functions | `ROUND(revenue / orders, 2)` |
+
+<Warning>
+
+Available SQL functions depend on your connected data source. For example,
+`CONCAT()` works in most databases, but string concatenation with `||` may
+not be supported in all of them.
+
+</Warning>
+
+## Calculated field scope
+
+Calculated fields are **scoped to the individual query** where they are
+created. They are:
+
+- **Not saved to the data model** — they exist only within the workbook tab
+  or Explore session where you created them
+- **Saved with the workbook** — if you save or publish the workbook, your
+  calculated fields are preserved in that workbook
+- **Not available in other workbooks** — to share a metric across workbooks,
+  add it to the data model as a
+  [calculated measure](/docs/data-modeling/concepts/calculated-members#calculated-measures)
+
+## Limitations
+
+- Calculated fields are available in Semantic Query tabs and Explore only, not
+  in Source SQL tabs
+- Pre-aggregations do not apply to calculated fields since they are not part
+  of the data model
+- Access control policies defined in the data model do not apply to calculated
+  field expressions directly, though the underlying measures and dimensions
+  they reference still respect access control
+
+## Related resources
+
+- [Calculated measures and dimensions](/docs/data-modeling/concepts/calculated-members)
+  for defining reusable calculations in the data model
+- [Querying data](/docs/explore-analyze/workbooks/querying-data) for working
+  with Semantic Query tabs
+- [Explore](/docs/explore-analyze/explore) for ad-hoc data exploration
