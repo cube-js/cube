@@ -121,12 +121,12 @@
           {
             "group": "Pre-aggregations",
             "pages": [
-              "docs/caching",
-              "docs/caching/getting-started-pre-aggregations",
-              "docs/caching/using-pre-aggregations",
-              "docs/caching/matching-pre-aggregations",
-              "docs/caching/refreshing-pre-aggregations",
-              "docs/caching/lambda-pre-aggregations"
+              "docs/pre-aggregations/index",
+              "docs/pre-aggregations/getting-started-pre-aggregations",
+              "docs/pre-aggregations/using-pre-aggregations",
+              "docs/pre-aggregations/matching-pre-aggregations",
+              "docs/pre-aggregations/refreshing-pre-aggregations",
+              "docs/pre-aggregations/lambda-pre-aggregations"
             ]
           },
           {
@@ -135,8 +135,8 @@
               "docs/integrations/tableau",
               {
                 "group": "Power BI",
+                "root": "docs/integrations/power-bi/index",
                 "pages": [
-                  "docs/integrations/power-bi",
                   "docs/integrations/power-bi/kerberos",
                   "docs/integrations/power-bi/ntlm"
                 ]
@@ -146,10 +146,9 @@
               "docs/integrations/snowflake-semantic-views",
               {
                 "group": "Semantic Layer Sync",
+                "root": "docs/integrations/semantic-layer-sync/index",
                 "pages": [
-                  "docs/integrations/semantic-layer-sync",
                   "docs/integrations/semantic-layer-sync/superset",
-                  "docs/integrations/semantic-layer-sync/metabase",
                   "docs/integrations/semantic-layer-sync/preset",
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
@@ -237,16 +236,7 @@
           {
             "group": "Deployment",
             "pages": [
-              "admin/deployment",
-              {
-                "group": "Cloud Providers",
-                "pages": [
-                  "admin/deployment/providers",
-                  "admin/deployment/providers/aws",
-                  "admin/deployment/providers/gcp",
-                  "admin/deployment/providers/azure"
-                ]
-              },
+              "admin/deployment/index",
               "admin/deployment/infrastructure",
               "admin/deployment/environments",
               "admin/deployment/deployments",
@@ -258,24 +248,23 @@
               "admin/deployment/scalability",
               "admin/deployment/encryption-keys",
               "admin/deployment/limits",
-              "admin/deployment/support",
               {
                 "group": "VPC",
+                "root": "admin/deployment/vpc/index",
                 "pages": [
-                  "admin/deployment/vpc",
                   "admin/deployment/vpc/gcp",
                   {
                     "group": "AWS",
+                    "root": "admin/deployment/vpc/aws/index",
                     "pages": [
-                      "admin/deployment/vpc/aws",
                       "admin/deployment/vpc/aws/private-link",
                       "admin/deployment/vpc/aws/vpc-peering"
                     ]
                   },
                   {
                     "group": "Azure",
+                    "root": "admin/deployment/vpc/azure/index",
                     "pages": [
-                      "admin/deployment/vpc/azure",
                       "admin/deployment/vpc/azure/private-link",
                       "admin/deployment/vpc/azure/vpc-peering"
                     ]
@@ -284,29 +273,18 @@
               },
               {
                 "group": "BYOC",
+                "root": "admin/deployment/byoc/index",
                 "pages": [
-                  "admin/deployment/byoc",
                   "admin/deployment/byoc/azure",
                   {
                     "group": "AWS",
+                    "root": "admin/deployment/byoc/aws/index",
                     "pages": [
-                      "admin/deployment/byoc/aws",
                       "admin/deployment/byoc/aws/deployment",
                       "admin/deployment/byoc/aws/privatelink"
                     ]
                   },
                   "admin/deployment/byoc/gcp/deployment"
-                ]
-              },
-              {
-                "group": "Monitoring Integrations",
-                "pages": [
-                  "admin/deployment/monitoring",
-                  "admin/deployment/monitoring/cloudwatch",
-                  "admin/deployment/monitoring/s3",
-                  "admin/deployment/monitoring/datadog",
-                  "admin/deployment/monitoring/grafana-cloud",
-                  "admin/deployment/monitoring/new-relic"
                 ]
               }
             ]
@@ -314,13 +292,23 @@
           {
             "group": "Monitoring",
             "pages": [
-              "admin/monitoring",
               "admin/monitoring/query-history",
               "admin/monitoring/pre-aggregations",
               "admin/monitoring/performance",
               "admin/monitoring/audit-log",
               "admin/monitoring/chats-history",
-              "admin/monitoring/query-history-export"
+              "admin/monitoring/query-history-export",
+              {
+                "group": "Monitoring Integrations",
+                "root": "admin/monitoring/monitoring-integrations/index",
+                "pages": [
+                  "admin/monitoring/monitoring-integrations/cloudwatch",
+                  "admin/monitoring/monitoring-integrations/s3",
+                  "admin/monitoring/monitoring-integrations/datadog",
+                  "admin/monitoring/monitoring-integrations/grafana-cloud",
+                  "admin/monitoring/monitoring-integrations/new-relic"
+                ]
+              }
             ]
           },
           {
@@ -334,29 +322,13 @@
           },
          
           {
-            "group": "Account & Workspace",
+            "group": "Account & Billing",
             "pages": [
-              "admin/api-keys",
-              "admin/budgets",
-              "admin/pricing",
-              "admin/distribution",
-              {
-                "group": "Workspace",
-                "pages": [
-                  "admin/workspace",
-                  "admin/workspace/integrations",
-                  "admin/workspace/preferences",
-                  "admin/workspace/semantic-catalog",
-                  "admin/workspace/maintenance-window",
-                  {
-                    "group": "CLI",
-                    "pages": [
-                      "admin/workspace/cli",
-                      "admin/workspace/cli/reference"
-                    ]
-                  }
-                ]
-              }
+              "admin/account-billing/api-keys",
+              "admin/account-billing/budgets",
+              "admin/account-billing/pricing",
+              "admin/account-billing/distribution",
+              "admin/account-billing/support"
             ]
           }
         ]
@@ -382,11 +354,12 @@
                 "group": "Authentication",
                 "pages": [
                   "embedding/authentication/jwt",
+                  "embedding/authentication/security-context",
                   "embedding/authentication/auth0",
                   "embedding/authentication/aws-cognito"
                 ]
               },
-              "cube-core/configuration/multitenancy"
+              "embedding/multitenancy"
             ]
           }
         ]
@@ -431,8 +404,8 @@
               "reference/core-data-apis/queries",
               {
                 "group": "SQL API",
+                "root": "reference/core-data-apis/sql-api/index",
                 "pages": [
-                  "reference/core-data-apis/sql-api",
                   "reference/core-data-apis/sql-api/query-format",
                   "reference/core-data-apis/sql-api/joins",
                   "reference/core-data-apis/sql-api/security",
@@ -441,23 +414,23 @@
               },
               {
                 "group": "REST API",
+                "root": "reference/core-data-apis/rest-api/index",
                 "pages": [
-                  "reference/core-data-apis/rest-api",
                   "reference/core-data-apis/rest-api/query-format",
                   "reference/core-data-apis/rest-api/reference"
                 ]
               },
               {
                 "group": "GraphQL API",
+                "root": "reference/core-data-apis/graphql-api/index",
                 "pages": [
-                  "reference/core-data-apis/graphql-api",
                   "reference/core-data-apis/graphql-api/reference"
                 ]
               },
               {
                 "group": "DAX API",
+                "root": "reference/core-data-apis/dax-api/index",
                 "pages": [
-                  "reference/core-data-apis/dax-api",
                   "reference/core-data-apis/dax-api/reference"
                 ]
               }
@@ -477,8 +450,8 @@
               "reference/control-plane-api",
               {
                 "group": "Orchestration API",
+                "root": "reference/orchestration-api/index",
                 "pages": [
-                  "reference/orchestration-api",
                   "reference/orchestration-api/airflow",
                   "reference/orchestration-api/dagster",
                   "reference/orchestration-api/prefect"
@@ -513,7 +486,7 @@
           {
             "group": "Getting Started",
             "pages": [
-              "cube-core",
+              "cube-core/index",
               "cube-core/getting-started",
               "cube-core/getting-started/create-a-project",
               "cube-core/getting-started/query-data",

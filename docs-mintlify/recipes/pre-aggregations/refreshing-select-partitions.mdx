@@ -7,7 +7,7 @@ description: Partition-level refresh patterns using refresh_key and FILTER_PARAM
 
 We have a dataset with orders and we want to aggregate data while having decent
 performance. Orders have a creation time, so we can use
-[partitioning](/docs/caching/using-pre-aggregations#partitioning) by time to
+[partitioning](/docs/pre-aggregations/using-pre-aggregations#partitioning) by time to
 optimize pre-aggregations build and refresh time. The problem is that the
 order's status can change after a long period. In this case, we want to rebuild
 only partitions associated with this order.

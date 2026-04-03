@@ -6,15 +6,15 @@ description: Modeling techniques so averages, distinct counts, and similar non-a
 ## Use case
 
 We want to run queries against
-[pre-aggregations](/docs/caching#pre-aggregations) only to ensure our
+[pre-aggregations](/docs/pre-aggregations#pre-aggregations) only to ensure our
 application's superior performance. Usually, accelerating a query is as simple
 as including its measures and dimensions to the pre-aggregation
 [definition](/reference/data-modeling/pre-aggregations#measures).
 
-[Non-additive](/docs/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
+[Non-additive](/docs/pre-aggregations/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
 measures (e.g., average values or distinct counts) are a special case.
 Pre-aggregations with such measures are less likely to be
-[selected](/docs/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation)
+[selected](/docs/pre-aggregations/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation)
 to accelerate a query. However, there are a few ways to work around that.
 
 ## Data modeling
