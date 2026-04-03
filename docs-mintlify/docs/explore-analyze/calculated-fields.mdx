@@ -1,0 +1,130 @@
+---
+title: Calculated fields
+description: Create custom fields at query time in Workbooks and Explore to derive new values from existing measures and dimensions without modifying your data model.
+---
+
+Calculated fields let you create new fields at query time by writing
+expressions that combine existing measures and dimensions. They are useful
+when you need a derived value for a specific analysis without adding it
+to the [data model](/docs/data-modeling/overview).
+
+{/* TODO: Add screenshot of the calculated field UI when available */}
+
+## When to use calculated fields
+
+Use calculated fields when you need to:
+
+- Compute a ratio or percentage from two measures (e.g., conversion rate)
+- Concatenate or transform dimension values for display
+- Apply conditional logic to categorize results
+- Perform arithmetic across measures returned by a query
+
+If you find yourself reusing the same calculated field across multiple
+analyses, consider promoting it to a
+[calculated measure](/docs/data-modeling/concepts/calculated-members#calculated-measures)
+or [proxy dimension](/docs/data-modeling/concepts/calculated-members#proxy-dimensions)
+in your data model so it is governed and available to all users.
+
+## Creating a calculated field
+
+In a Workbook [Semantic Query tab](/docs/explore-analyze/workbooks/querying-data)
+or in [Explore](/docs/explore-analyze/explore), you can create a calculated
+field by writing a Semantic SQL expression that references measures and
+dimensions from the current query.
+
+Under the hood, calculated fields are executed as
+[queries with post-processing](/reference/core-data-apis/queries#query-with-post-processing).
+Cube runs the base semantic query against your data source, then evaluates
+the calculated field expression on the returned result set.
+
+### Calculated measures
+
+A calculated measure derives a new numeric value from other measures.
+Because the expression runs during post-processing, the referenced measures
+must already be part of the query.
+
+For example, to calculate a completion rate from `orders.completed_count` and
+`orders.count`:
+
+```sql
+1.0 * orders.completed_count / orders.count
+```
+
+Other common patterns include:
+
+```sql
+-- Difference between two measures
+orders.revenue - orders.cost
+
+-- Percentage
+100.0 * orders.returned_count / orders.count
+
+-- Conditional measure
+CASE WHEN orders.count > 0 THEN orders.revenue / orders.count ELSE 0 END
+```
+
+### Calculated dimensions
+
+A calculated dimension derives a new value from existing dimensions.
+You can use SQL string functions, conditional expressions, and arithmetic.
+
+```sql
+-- Categorize by value
+CASE
+  WHEN orders.amount > 1000 THEN 'High'
+  WHEN orders.amount > 100 THEN 'Medium'
+  ELSE 'Low'
+END
+
+-- Concatenate dimensions
+users.first_name || ' ' || users.last_name
+
+-- Extract part of a string
+UPPER(SUBSTRING(users.state FROM 4))
+```
+
+## Supported expressions
+
+Calculated fields support the SQL functions and operators available in
+Cube's post-processing engine. Common supported operations include:
+
+| Category | Examples |
+| --- | --- |
+| Arithmetic | `+`, `-`, `*`, `/` |
+| Comparison | `=`, `!=`, `<`, `>`, `<=`, `>=` |
+| Conditional | `CASE WHEN ... THEN ... ELSE ... END` |
+| String | `CONCAT`, `SUBSTRING`, `UPPER`, `LOWER`, `CHAR_LENGTH`, <code>&#124;&#124;</code> |
+| Numeric | `ABS`, `ROUND`, `CEIL`, `FLOOR` |
+| Aggregation (post-processing) | `SUM`, `AVG`, `MIN`, `MAX`, `COUNT` |
+| Null handling | `COALESCE`, `NULLIF`, `IS NULL` |
+
+<Note>
+
+Calculated fields run in Cube's internal SQL engine, not directly in your
+data warehouse. The set of supported functions may differ from your data
+source's SQL dialect. See the [SQL API reference](/reference/core-data-apis/sql-api/reference)
+for the full list of supported functions.
+
+</Note>
+
+## Limitations
+
+- Calculated fields apply only to the current query. They are not persisted
+  in the data model and are not available to other users unless they use the
+  same query.
+- Since calculated fields use [post-processing](/reference/core-data-apis/queries#query-with-post-processing),
+  they support a subset of SQL functions compared to your data warehouse.
+- Calculated fields cannot reference other calculated fields.
+- [Pre-aggregations](/docs/caching) apply to the base semantic query. The
+  calculated field expression itself is evaluated after pre-aggregation results
+  are returned.
+
+## Calculated fields vs. calculated measures in the data model
+
+| | Calculated fields | [Calculated measures](/docs/data-modeling/concepts/calculated-members) |
+| --- | --- | --- |
+| Defined in | Query time (Workbooks, Explore) | Data model (YAML or JavaScript) |
+| Scope | Current query only | Available to all queries and users |
+| Governed | No | Yes — access control and policies apply |
+| Pre-aggregation support | Base query only | Full support with [decomposition](/recipes/pre-aggregations/non-additivity) |
+| Use case | Ad-hoc analysis | Reusable, governed metrics |
