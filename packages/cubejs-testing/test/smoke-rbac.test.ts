@@ -850,7 +850,9 @@ describe('Cube RBAC Engine', () => {
           dateRange: ['2099-01-01', '2099-12-31'],
         }],
       });
-      expect(result.rawData()).toEqual([]);
+      // count returns a row with 0 even when no rows match the filter
+      expect(result.rawData().length).toBe(1);
+      expect(result.rawData()[0]['orders_open.count']).toBe('0');
     });
 
     test('compareDateRange with filter-only time dimension should work', async () => {
@@ -914,7 +916,9 @@ describe('Cube RBAC Engine', () => {
           dateRange: ['2099-01-01', '2099-12-31'],
         }],
       });
-      expect(result.rawData()).toEqual([]);
+      // count returns a row with 0 even when no rows match the filter
+      expect(result.rawData().length).toBe(1);
+      expect(result.rawData()[0]['orders_open.count']).toBe('0');
     });
 
     test('compareDateRange on open cube should not fail for default user', async () => {
