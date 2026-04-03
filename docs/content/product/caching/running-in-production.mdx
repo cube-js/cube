@@ -280,8 +280,36 @@ services:
       - cubestore_router
 ```
 
+A simplified example using Azure Blob Storage might look like:
+
+```yaml
+services:
+  cubestore_router:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_AZURE_CONTAINER=<CONTAINER_NAME>
+      - CUBESTORE_AZURE_ACCOUNT=<STORAGE_ACCOUNT_NAME>
+      - CUBESTORE_AZURE_ACCESS_KEY=<STORAGE_ACCOUNT_KEY>
+
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_AZURE_CONTAINER=<CONTAINER_NAME>
+      - CUBESTORE_AZURE_ACCOUNT=<STORAGE_ACCOUNT_NAME>
+      - CUBESTORE_AZURE_ACCESS_KEY=<STORAGE_ACCOUNT_KEY>
+    depends_on:
+      - cubestore_router
+```
+
 Note that you can’t use the same bucket as an export bucket and persistent
-storage for Cube Store. It's recommended to use two separate buckets. 
+storage for Cube Store. It’s recommended to use two separate buckets.
 
 ### Scratch storage
 
@@ -308,6 +336,17 @@ defined by `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS`, which is set to `180` by
 default.
 
 </WarningBox>
+
+### Azure
+
+Cube Store supports Azure Blob Storage for persistent storage using account
+keys, SAS tokens, or DefaultAzureCredential (workload identity, managed
+identity, Azure CLI).
+
+When `CUBESTORE_AZURE_ACCESS_KEY` and `CUBESTORE_AZURE_SAS_TOKEN` are not set,
+Cube Store automatically uses DefaultAzureCredential, which supports workload
+identity in Kubernetes via the standard `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+and `AZURE_FEDERATED_TOKEN_FILE` environment variables.
 
 ### Garbage collection
 

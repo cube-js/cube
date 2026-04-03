@@ -310,6 +310,17 @@ default.
 
 </Warning>
 
+### Azure
+
+Cube Store supports Azure Blob Storage for persistent storage using account
+keys, SAS tokens, or federated token credentials (workload identity, managed
+identity).
+
+When `CUBESTORE_AZURE_ACCESS_KEY` and `CUBESTORE_AZURE_SAS_TOKEN` are not set,
+Cube Store automatically uses federated token credentials via the standard
+`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_FEDERATED_TOKEN_FILE`
+environment variables.
+
 ### Garbage collection
 
 Cleanup isn’t done in export buckets; however, it's done in the persistent
