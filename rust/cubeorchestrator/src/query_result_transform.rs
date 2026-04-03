@@ -2330,6 +2330,62 @@ mod tests {
     }
 
     #[test]
+    fn test_get_members_compare_date_range_empty_dataset_filter_only_td() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"compare_date_range_count_by_order_date".to_string())
+            .unwrap()
+            .clone();
+
+        // Simulate a compareDateRange sub-query where the time dimension has
+        // no granularity (filter-only). After compareDateRangeTransformer,
+        // each sub-query has dateRange but no granularity.
+        test_data.request.query.time_dimensions = Some(vec![QueryTimeDimension {
+            dimension: "ECommerceRecordsUs2021.orderDate".to_string(),
+            date_range: Some(vec![
+                "2020-01-01T00:00:00.000".to_string(),
+                "2020-01-31T23:59:59.999".to_string(),
+            ]),
+            compare_date_range: None,
+            granularity: None,
+        }]);
+
+        // Remove TD-related entries from annotation since filter-only TDs
+        // don't produce annotation entries (prepareAnnotation skips TDs
+        // without granularity).
+        test_data
+            .request
+            .annotation
+            .remove("ECommerceRecordsUs2021.orderDate.day");
+        test_data
+            .request
+            .annotation
+            .remove("ECommerceRecordsUs2021.orderDate");
+
+        let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
+        let annotation = &test_data.request.annotation;
+        let query = &test_data.request.query;
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
+
+        let result = get_members(
+            query_type,
+            query,
+            &QueryResult {
+                columns: vec![],
+                rows: vec![],
+                columns_pos: IndexMap::new(),
+            },
+            alias_to_member_name_map,
+            annotation,
+        );
+        assert!(
+            result.is_ok(),
+            "compareDateRange with filter-only TD should not trigger hidden member error, got: {:?}",
+            result.err()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_get_members_filled_dataset() -> Result<()> {
         let test_data = TEST_SUITE_DATA
             .get(&"regular_profit_by_postal_code".to_string())

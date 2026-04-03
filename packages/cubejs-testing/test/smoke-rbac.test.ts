@@ -838,6 +838,35 @@ describe('Cube RBAC Engine', () => {
       expect(result.rawData()).toMatchSnapshot('line_items_view_no_policy_rest');
     });
 
+    test('filter-only time dimension should not trigger hidden member error', async () => {
+      // Regression test: compareDateRange queries decompose into sub-queries
+      // where each time dimension has only dateRange (no granularity).
+      // These filter-only TDs don't appear in the annotation map.
+      // The Rust validate_query_members_in_annotation must skip them.
+      const result = await client.load({
+        measures: ['orders_open.count'],
+        timeDimensions: [{
+          dimension: 'orders_open.created_at',
+          dateRange: ['2099-01-01', '2099-12-31'],
+        }],
+      });
+      expect(result.rawData()).toEqual([]);
+    });
+
+    test('compareDateRange with filter-only time dimension should work', async () => {
+      const result = await client.load({
+        measures: ['orders_open.count'],
+        timeDimensions: [{
+          dimension: 'orders_open.created_at',
+          compareDateRange: [
+            ['2020-01-01', '2020-06-30'],
+            ['2020-07-01', '2020-12-31'],
+          ],
+        }],
+      }, { queryType: 'multi' } as any);
+      expect(result).toBeDefined();
+    });
+
     test('orders_view and cube with default policy', async () => {
       let error = '';
       try {
@@ -873,6 +902,33 @@ describe('Cube RBAC Engine', () => {
       });
       // order_open should return all values since it has no access policy
       expect(result.rawData()).toMatchSnapshot('orders_open_rest');
+    });
+
+    test('filter-only time dimension on open cube should not fail for default user', async () => {
+      // Even with no roles, querying an open cube with a filter-only
+      // time dimension (no granularity) should work without hidden member errors.
+      const result = await defaultClient.load({
+        measures: ['orders_open.count'],
+        timeDimensions: [{
+          dimension: 'orders_open.created_at',
+          dateRange: ['2099-01-01', '2099-12-31'],
+        }],
+      });
+      expect(result.rawData()).toEqual([]);
+    });
+
+    test('compareDateRange on open cube should not fail for default user', async () => {
+      const result = await defaultClient.load({
+        measures: ['orders_open.count'],
+        timeDimensions: [{
+          dimension: 'orders_open.created_at',
+          compareDateRange: [
+            ['2020-01-01', '2020-06-30'],
+            ['2020-07-01', '2020-12-31'],
+          ],
+        }],
+      }, { queryType: 'multi' } as any);
+      expect(result).toBeDefined();
     });
   });
 });
