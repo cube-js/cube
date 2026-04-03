@@ -1,0 +1,153 @@
+---
+title: Calculated fields
+description: Create ad-hoc calculations on top of your semantic model measures and dimensions at query time without modifying the data model.
+---
+
+Calculated fields let you derive new metrics and dimensions at query time using
+[Semantic SQL][ref-semantic-sql]. Instead of modifying the data model, you can
+write expressions that combine, transform, or compute values on top of existing
+measures and dimensions directly in your query.
+
+This is useful when you need a one-off calculation for a specific analysis, want
+to experiment with a new metric before adding it to the data model, or need to
+create a derived value that is only relevant to a particular report.
+
+## How calculated fields work
+
+Calculated fields use [query post-processing][ref-post-processing] in Semantic
+SQL. You write a semantic query as an inner query that selects measures and
+dimensions from your data model, then wrap it in an outer query that performs
+additional calculations.
+
+The inner query runs through the semantic layer with full governance, access
+control, and pre-aggregation support. The outer query then applies your custom
+calculations on top of those results.
+
+```sql
+SELECT
+  status,
+  total_revenue,
+  total_orders,
+  total_revenue / total_orders AS avg_order_value
+FROM (
+  SELECT
+    status,
+    MEASURE(total_revenue) AS total_revenue,
+    MEASURE(count) AS total_orders
+  FROM orders
+  GROUP BY 1
+) AS data
+```
+
+In this example, `avg_order_value` is a calculated field that divides
+`total_revenue` by `total_orders`. The inner query retrieves the semantic model
+measures, and the outer query computes the derived value.
+
+## Where you can use calculated fields
+
+### Workbooks
+
+In a [Semantic Query tab][ref-querying-data], switch to the SQL editor and write
+a query with an outer `SELECT` that includes your calculated expressions. This
+gives you full control over the query while still leveraging the semantic layer
+for the underlying data.
+
+### Explore
+
+When exploring data from a dashboard or Analytics Chat result, you can open the
+SQL editor in [Explore][ref-explore] to add calculated fields to your query.
+
+### Analytics Chat
+
+The AI agent in [Analytics Chat][ref-analytics-chat] can create calculated fields
+automatically. When you ask a question that requires a derived metric, the agent
+writes Semantic SQL with post-processing to compute the result. You can ask
+the agent to save frequently used calculations to your data model as permanent
+measures or dimensions.
+
+## Examples
+
+### Ratios and percentages
+
+Calculate a percentage by dividing one measure by another:
+
+```sql
+SELECT
+  category,
+  completed_orders,
+  total_orders,
+  ROUND(100.0 * completed_orders / total_orders, 1) AS completion_rate
+FROM (
+  SELECT
+    category,
+    MEASURE(completed_count) AS completed_orders,
+    MEASURE(count) AS total_orders
+  FROM orders
+  GROUP BY 1
+) AS data
+```
+
+### Conditional logic
+
+Use `CASE` expressions to create categorical fields:
+
+```sql
+SELECT
+  customer_name,
+  lifetime_value,
+  CASE
+    WHEN lifetime_value >= 10000 THEN 'Enterprise'
+    WHEN lifetime_value >= 1000 THEN 'Mid-market'
+    ELSE 'Small'
+  END AS customer_tier
+FROM (
+  SELECT
+    name AS customer_name,
+    MEASURE(lifetime_value) AS lifetime_value
+  FROM customers
+  GROUP BY 1
+) AS data
+```
+
+### Arithmetic operations
+
+Combine multiple measures with arithmetic:
+
+```sql
+SELECT
+  product_name,
+  revenue,
+  cost,
+  revenue - cost AS profit,
+  ROUND(100.0 * (revenue - cost) / revenue, 1) AS margin_pct
+FROM (
+  SELECT
+    name AS product_name,
+    MEASURE(total_revenue) AS revenue,
+    MEASURE(total_cost) AS cost
+  FROM products
+  GROUP BY 1
+) AS data
+```
+
+## Calculated fields vs. data model measures
+
+| | Calculated fields | Data model measures |
+| --- | --- | --- |
+| **Defined in** | Query (Semantic SQL) | Data model (YAML or JavaScript) |
+| **Scope** | Single query or report | Available across all queries |
+| **Pre-aggregation support** | Outer calculations are not pre-aggregated | Fully supported |
+| **Access control** | Inherits from underlying members | Managed in the data model |
+| **Best for** | Ad-hoc analysis, prototyping | Reusable, governed metrics |
+
+When you find yourself reusing the same calculated field across multiple queries,
+consider adding it to your data model as a [calculated measure or
+dimension][ref-calculated-members] to take advantage of pre-aggregations,
+access control, and discoverability across your team.
+
+[ref-semantic-sql]: /docs/introduction#semantic-sql
+[ref-post-processing]: /reference/core-data-apis/sql-api/query-format#query-post-processing
+[ref-querying-data]: /docs/explore-analyze/workbooks/querying-data
+[ref-explore]: /docs/explore-analyze/explore
+[ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-calculated-members]: /docs/data-modeling/concepts/calculated-members
