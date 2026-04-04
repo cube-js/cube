@@ -386,6 +386,10 @@ export type BaseCubeMember = {
   aliasMember?: string;
 };
 
+export type TCubeMeasureFilterMeta = {
+  sql?: string;
+};
+
 export type TCubeMeasure = BaseCubeMember & {
   aggType: 'count' | 'number';
   cumulative: boolean;
@@ -398,11 +402,26 @@ export type TCubeMeasure = BaseCubeMember & {
   format?: 'currency' | 'percent';
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
+  sql?: string;
+  filters?: TCubeMeasureFilterMeta[];
 };
 
 export type CubeTimeDimensionGranularity = {
   name: string;
   title: string;
+};
+
+export type TCubeDimensionCaseWhen = {
+  sql?: string;
+  label?: string | { sql?: string } | unknown;
+};
+
+export type TCubeDimensionCase = {
+  when?: TCubeDimensionCaseWhen[];
+  else?: {
+    label?: string;
+    [key: string]: unknown;
+  };
 };
 
 export type BaseCubeDimension = BaseCubeMember & {
@@ -412,6 +431,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
   key?: string;
+  sql?: string;
+  case?: TCubeDimensionCase;
 };
 
 export type CubeTimeDimension = BaseCubeDimension &
@@ -421,7 +442,9 @@ export type TCubeDimension =
   (BaseCubeDimension & { type: Exclude<BaseCubeDimension['type'], 'time'> }) |
   CubeTimeDimension;
 
-export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
+export type TCubeSegment = Omit<BaseCubeMember, 'type'> & {
+  sql?: string;
+};
 
 export type NotFoundMember = {
   title: string;
@@ -454,6 +477,19 @@ export type TCubeHierarchy = {
   levels: string[];
   public?: boolean;
 };
+
+export type TCubeJoin = {
+  name: string;
+  sql?: string;
+  relationship?: string;
+} & Record<string, unknown>;
+
+export type TCubePreAggregationMeta = {
+  name: string;
+  timeDimensionReference?: string;
+  dimensionReferences?: string;
+  measureReferences?: string;
+} & Record<string, unknown>;
 
 /**
  * @deprecated use DryRunResponse
@@ -492,6 +528,12 @@ export type Cube = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  joins?: TCubeJoin[];
+  sql?: string;
+  extends?: string;
+  fileName?: string;
+  refreshKey?: unknown;
+  preAggregations?: TCubePreAggregationMeta[];
 };
 
 export type CubeMap = {
