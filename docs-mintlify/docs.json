@@ -205,7 +205,7 @@
           {
             "group": "Users & Permissions",
             "pages": [
-              "admin/users-and-permissions",
+              "admin/users-and-permissions/manage-users",
               "admin/users-and-permissions/roles-and-permissions",
               "admin/users-and-permissions/user-attributes",
               "admin/users-and-permissions/user-groups",
