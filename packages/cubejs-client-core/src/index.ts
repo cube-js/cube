@@ -12,6 +12,7 @@ import {
   LoadResponse,
   MeasureFormat,
   MetaResponse,
+  MetaResponseExtended,
   PivotQuery,
   ProgressResponse,
   Query,
@@ -700,21 +701,32 @@ class CubeApi {
     );
   }
 
-  public meta(options?: MetaMethodOptions): Promise<Meta>;
+  public meta(options?: MetaMethodOptions & { extended?: false }): Promise<Meta<MetaResponse>>;
 
-  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+  public meta(options: MetaMethodOptions & { extended: true }): Promise<Meta<MetaResponseExtended>>;
+
+  public meta(options?: MetaMethodOptions & { extended?: false }, callback?: LoadMethodCallback<Meta<MetaResponse>>): UnsubscribeObj;
+
+  public meta(options: MetaMethodOptions & { extended: true }, callback?: LoadMethodCallback<Meta<MetaResponseExtended>>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
    */
-  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
+  public meta(
+    options?: MetaMethodOptions,
+    callback?: LoadMethodCallback<Meta<MetaResponse>> | LoadMethodCallback<Meta<MetaResponseExtended>>
+  ): Promise<Meta<MetaResponse>> | Promise<Meta<MetaResponseExtended>> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
         ...(options?.extended === true ? { extended: true } : {}),
       }),
-      (body: MetaResponse) => new Meta(body),
+      (body: MetaResponse | MetaResponseExtended) => (
+        options?.extended === true
+          ? new Meta<MetaResponseExtended>(body as MetaResponseExtended)
+          : new Meta<MetaResponse>(body as MetaResponse)
+      ),
       options,
       callback
     );
