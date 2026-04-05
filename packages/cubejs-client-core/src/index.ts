@@ -3,11 +3,7 @@ import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
 import ProgressResult from './ProgressResult';
-import HttpTransport, {
-  ErrorResponse,
-  ITransport,
-  TransportOptions,
-} from './HttpTransport';
+import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
 import RequestError from './RequestError';
 import {
   CacheMode,
@@ -21,7 +17,7 @@ import {
   Query,
   QueryOrder,
   QueryType,
-  TransformedQuery,
+  TransformedQuery
 } from './types';
 
 export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
@@ -82,29 +78,24 @@ export type DeeplyReadonly<T> = {
 };
 
 export type ExtractMembers<T extends DeeplyReadonly<Query>> =
-  | (T extends { dimensions: readonly (infer Names)[] } ? Names : never)
-  | (T extends { measures: readonly (infer Names)[] } ? Names : never)
-  | (T extends { timeDimensions: infer U } ? ExtractTimeMembers<U> : never);
+  | (T extends { dimensions: readonly (infer Names)[]; } ? Names : never)
+  | (T extends { measures: readonly (infer Names)[]; } ? Names : never)
+  | (T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never);
 
 // If we can't infer any members at all, then return any.
-export type SingleQueryRecordType<T extends DeeplyReadonly<Query>> =
-  ExtractMembers<T> extends never
-    ? any
-    : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
+export type SingleQueryRecordType<T extends DeeplyReadonly<Query>> = ExtractMembers<T> extends never
+  ? any
+  : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
 
 export type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
   T extends readonly [infer First, ...infer Rest]
-    ?
-        | SingleQueryRecordType<DeeplyReadonly<First>>
-        | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
+    ? SingleQueryRecordType<DeeplyReadonly<First>> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
     : never;
 
 export type QueryRecordType<T extends DeeplyReadonly<Query | Query[]>> =
-  T extends DeeplyReadonly<Query[]>
-    ? QueryArrayRecordType<T>
-    : T extends DeeplyReadonly<Query>
-    ? SingleQueryRecordType<T>
-    : never;
+  T extends DeeplyReadonly<Query[]> ? QueryArrayRecordType<T> :
+    T extends DeeplyReadonly<Query> ? SingleQueryRecordType<T> :
+      never;
 
 export interface UnsubscribeObj {
   /**
@@ -153,20 +144,17 @@ export type CubeSqlResult = {
   lastRefreshTime?: string;
 };
 
-export type CubeSqlStreamChunk =
-  | {
-      type: 'schema';
-      schema: CubeSqlSchemaColumn[];
-      lastRefreshTime?: string;
-    }
-  | {
-      type: 'data';
-      data: (string | number | boolean | null)[];
-    }
-  | {
-      type: 'error';
-      error: string;
-    };
+export type CubeSqlStreamChunk = {
+  type: 'schema';
+  schema: CubeSqlSchemaColumn[];
+  lastRefreshTime?: string;
+} | {
+  type: 'data';
+  data: (string | number | boolean | null)[];
+} | {
+  type: 'error';
+  error: string;
+};
 
 interface BodyResponse {
   error?: string;
@@ -225,11 +213,7 @@ export type CubeApiOptions = {
  * Main class for accessing Cube API
  */
 class CubeApi {
-  private readonly apiToken:
-    | string
-    | (() => Promise<string>)
-    | (CubeApiOptions & any[])
-    | undefined;
+  private readonly apiToken: string | (() => Promise<string>) | (CubeApiOptions & any[]) | undefined;
 
   private readonly apiUrl: string;
 
@@ -251,10 +235,7 @@ class CubeApi {
 
   private updateAuthorizationPromise: Promise<any> | null;
 
-  public constructor(
-    apiToken: string | (() => Promise<string>) | undefined,
-    options: CubeApiOptions
-  );
+  public constructor(apiToken: string | (() => Promise<string>) | undefined, options: CubeApiOptions);
 
   public constructor(options: CubeApiOptions);
 
@@ -298,22 +279,19 @@ class CubeApi {
     this.headers = options.headers || {};
     this.credentials = options.credentials;
 
-    this.transport =
-      options.transport ||
-      new HttpTransport({
-        authorization: typeof apiToken === 'string' ? apiToken : undefined,
-        apiUrl: this.apiUrl,
-        method: this.method,
-        headers: this.headers,
-        credentials: this.credentials,
-        fetchTimeout: options.fetchTimeout,
-        signal: options.signal,
-      });
+    this.transport = options.transport || new HttpTransport({
+      authorization: typeof apiToken === 'string' ? apiToken : undefined,
+      apiUrl: this.apiUrl,
+      method: this.method,
+      headers: this.headers,
+      credentials: this.credentials,
+      fetchTimeout: options.fetchTimeout,
+      signal: options.signal
+    });
 
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
-    this.castNumerics =
-      typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
+    this.castNumerics = typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
     this.networkErrorRetries = options.networkErrorRetries || 0;
 
     this.updateAuthorizationPromise = null;
@@ -326,12 +304,7 @@ class CubeApi {
     });
   }
 
-  private loadMethod(
-    request: CallableFunction,
-    toResult: CallableFunction,
-    options?: LoadMethodOptions,
-    callback?: CallableFunction
-  ) {
+  private loadMethod(request: CallableFunction, toResult: CallableFunction, options?: LoadMethodOptions, callback?: CallableFunction) {
     const mutexValue = ++mutexCounter;
     if (typeof options === 'function' && !callback) {
       callback = options;
@@ -345,7 +318,9 @@ class CubeApi {
       options.mutexObj[mutexKey] = mutexValue;
     }
 
-    const requestPromise = this.updateTransportAuthorization().then(() => request());
+    const requestPromise = this
+      .updateTransportAuthorization()
+      .then(() => request());
 
     let skipAuthorizationUpdate = true;
     let unsubscribed = false;
@@ -353,10 +328,9 @@ class CubeApi {
     const checkMutex = async () => {
       const requestInstance = await requestPromise;
 
-      if (
-        options &&
+      if (options &&
         options.mutexObj &&
-        options.mutexObj[mutexKey] !== mutexValue
+          options.mutexObj[mutexKey] !== mutexValue
       ) {
         unsubscribed = true;
         if (requestInstance.unsubscribe) {
@@ -368,10 +342,7 @@ class CubeApi {
 
     let networkRetries = this.networkErrorRetries;
 
-    const loadImpl = async (
-      response: Response | ErrorResponse,
-      next: CallableFunction
-    ) => {
+    const loadImpl = async (response: Response | ErrorResponse, next: CallableFunction) => {
       const requestInstance = await requestPromise;
 
       const subscribeNext = async () => {
@@ -379,7 +350,7 @@ class CubeApi {
           if (requestInstance.unsubscribe) {
             return next();
           } else {
-            await new Promise<void>((resolve) => setTimeout(() => resolve(), this.pollInterval * 1000));
+            await new Promise<void>(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
             return next();
           }
         }
@@ -389,7 +360,7 @@ class CubeApi {
       const continueWait = async (wait: boolean = false) => {
         if (!unsubscribed) {
           if (wait) {
-            await new Promise<void>((resolve) => setTimeout(() => resolve(), this.pollInterval * 1000));
+            await new Promise<void>(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
           }
           return next();
         }
@@ -402,18 +373,16 @@ class CubeApi {
 
       skipAuthorizationUpdate = false;
 
-      if (
-        ('status' in response && response.status === 502) ||
-        ('error' in response &&
-          response.error?.toLowerCase() === 'network error' &&
-          --networkRetries >= 0)
+      if (('status' in response && response.status === 502) ||
+        ('error' in response && response.error?.toLowerCase() === 'network error') &&
+        --networkRetries >= 0
       ) {
         await checkMutex();
         return continueWait(true);
       }
 
       // From here we're sure that response is only fetch Response
-      response = response as Response;
+      response = (response as Response);
       let body: BodyResponse = {};
       let text = '';
       try {
@@ -426,9 +395,7 @@ class CubeApi {
       if (body.error?.includes('Continue wait')) {
         await checkMutex();
         if (options?.progressCallback) {
-          options.progressCallback(
-            new ProgressResult(body as ProgressResponse)
-          );
+          options.progressCallback(new ProgressResult(body as ProgressResponse));
         }
         return continueWait();
       }
@@ -439,11 +406,7 @@ class CubeApi {
           await requestInstance.unsubscribe();
         }
 
-        const error = new RequestError(
-          body.error || (response as any).error || '',
-          body,
-          response.status
-        );
+        const error = new RequestError(body.error || (response as any).error || '', body, response.status);
         if (callback) {
           callback(error);
         } else {
@@ -466,7 +429,8 @@ class CubeApi {
       return subscribeNext();
     };
 
-    const promise: Promise<any> = requestPromise.then((requestInstance) => mutexPromise(requestInstance.subscribe(loadImpl)));
+    const promise: Promise<any> = requestPromise
+      .then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
 
     if (callback) {
       return {
@@ -478,7 +442,7 @@ class CubeApi {
             return requestInstance.unsubscribe();
           }
           return null;
-        },
+        }
       };
     } else {
       return promise;
@@ -514,11 +478,11 @@ class CubeApi {
   /**
    * Add system properties to a query object.
    */
-  private patchQueryInternal(
-    query: DeeplyReadonly<Query>,
-    responseFormat: ResponseFormat
-  ): DeeplyReadonly<Query> {
-    if (responseFormat === 'compact' && query.responseFormat !== 'compact') {
+  private patchQueryInternal(query: DeeplyReadonly<Query>, responseFormat: ResponseFormat): DeeplyReadonly<Query> {
+    if (
+      responseFormat === 'compact' &&
+      query.responseFormat !== 'compact'
+    ) {
       return {
         ...query,
         responseFormat: 'compact',
@@ -532,11 +496,10 @@ class CubeApi {
    * Process result fetched from the gateway#load method according
    * to the network protocol.
    */
-  protected loadResponseInternal(
-    response: LoadResponse<any>,
-    options: LoadMethodOptions | null = {}
-  ): ResultSet<any> {
-    if (response.results.length) {
+  protected loadResponseInternal(response: LoadResponse<any>, options: LoadMethodOptions | null = {}): ResultSet<any> {
+    if (
+      response.results.length
+    ) {
       if (options?.castNumerics) {
         response.results.forEach((result) => {
           const numericMembers = Object.entries({
@@ -561,16 +524,11 @@ class CubeApi {
         });
       }
 
-      if (
-        response.results[0].query.responseFormat &&
-        response.results[0].query.responseFormat === 'compact'
-      ) {
+      if (response.results[0].query.responseFormat &&
+        response.results[0].query.responseFormat === 'compact') {
         response.results.forEach((result, j) => {
           const data: Record<string, any>[] = [];
-          const { dataset, members } = result.data as unknown as {
-            dataset: any[];
-            members: string[];
-          };
+          const { dataset, members } = result.data as unknown as { dataset: any[]; members: string[] };
           dataset.forEach((r) => {
             const row: Record<string, any> = {};
             members.forEach((m, i) => {
@@ -584,19 +542,19 @@ class CubeApi {
     }
 
     return new ResultSet(response, {
-      parseDateMeasures: this.parseDateMeasures,
+      parseDateMeasures: this.parseDateMeasures
     });
   }
 
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
     query: QueryType,
-    options?: LoadMethodOptions
+    options?: LoadMethodOptions,
   ): Promise<ResultSet<QueryRecordType<QueryType>>>;
 
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
     query: QueryType,
     options?: LoadMethodOptions,
-    callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>
+    callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
   ): UnsubscribeObj;
 
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
@@ -633,12 +591,7 @@ class CubeApi {
    * @param callback
    * @param responseFormat
    */
-  public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
-    query: QueryType,
-    options?: LoadMethodOptions,
-    callback?: CallableFunction,
-    responseFormat: ResponseFormat = 'default'
-  ) {
+  public load<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions, callback?: CallableFunction, responseFormat: ResponseFormat = 'default') {
     [query, options] = this.prepareQueryOptions(query, options, responseFormat);
 
     const params: Record<string, unknown> = {
@@ -660,16 +613,10 @@ class CubeApi {
     );
   }
 
-  private prepareQueryOptions<
-    QueryType extends DeeplyReadonly<Query | Query[]>
-  >(
-    query: QueryType,
-    options?: LoadMethodOptions | null,
-    responseFormat: ResponseFormat = 'default'
-  ): [query: QueryType, options: LoadMethodOptions] {
+  private prepareQueryOptions<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions | null, responseFormat: ResponseFormat = 'default'): [query: QueryType, options: LoadMethodOptions] {
     options = {
       castNumerics: this.castNumerics,
-      ...options,
+      ...options
     };
 
     if (responseFormat === 'compact') {
@@ -677,10 +624,7 @@ class CubeApi {
         const patched = query.map((q) => this.patchQueryInternal(q, 'compact'));
         return [patched as unknown as QueryType, options];
       } else {
-        const patched = this.patchQueryInternal(
-          query as DeeplyReadonly<Query>,
-          'compact'
-        );
+        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, 'compact');
         return [patched as QueryType, options];
       }
     }
@@ -736,34 +680,21 @@ class CubeApi {
     ) as UnsubscribeObj;
   }
 
-  public sql(
-    query: DeeplyReadonly<Query | Query[]>,
-    options?: LoadMethodOptions
-  ): Promise<SqlQuery>;
+  public sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
 
-  public sql(
-    query: DeeplyReadonly<Query | Query[]>,
-    options?: LoadMethodOptions,
-    callback?: LoadMethodCallback<SqlQuery>
-  ): UnsubscribeObj;
+  public sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): UnsubscribeObj;
 
   /**
    * Get generated SQL string for the given `query`.
    */
-  public sql(
-    query: DeeplyReadonly<Query | Query[]>,
-    options?: LoadMethodOptions,
-    callback?: LoadMethodCallback<SqlQuery>
-  ): Promise<SqlQuery> | UnsubscribeObj {
+  public sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): Promise<SqlQuery> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('sql', {
         query,
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
       }),
-      (response: any) => (Array.isArray(response)
-        ? response.map((body) => new SqlQuery(body))
-        : new SqlQuery(response)),
+      (response: any) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
       options,
       callback
     );
@@ -771,18 +702,12 @@ class CubeApi {
 
   public meta(options?: MetaMethodOptions): Promise<Meta>;
 
-  public meta(
-    options?: MetaMethodOptions,
-    callback?: LoadMethodCallback<Meta>
-  ): UnsubscribeObj;
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
    */
-  public meta(
-    options?: MetaMethodOptions,
-    callback?: LoadMethodCallback<Meta>
-  ): Promise<Meta> | UnsubscribeObj {
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
@@ -795,25 +720,14 @@ class CubeApi {
     );
   }
 
-  public dryRun(
-    query: DeeplyReadonly<Query | Query[]>,
-    options?: LoadMethodOptions
-  ): Promise<DryRunResponse>;
+  public dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<DryRunResponse>;
 
-  public dryRun(
-    query: DeeplyReadonly<Query | Query[]>,
-    options: LoadMethodOptions,
-    callback?: LoadMethodCallback<DryRunResponse>
-  ): UnsubscribeObj;
+  public dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): UnsubscribeObj;
 
   /**
    * Get query related meta without query execution
    */
-  public dryRun(
-    query: DeeplyReadonly<Query | Query[]>,
-    options?: LoadMethodOptions,
-    callback?: LoadMethodCallback<DryRunResponse>
-  ): Promise<DryRunResponse> | UnsubscribeObj {
+  public dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): Promise<DryRunResponse> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('dry-run', {
         query,
@@ -826,25 +740,14 @@ class CubeApi {
     );
   }
 
-  public cubeSql(
-    sqlQuery: string,
-    options?: CubeSqlOptions
-  ): Promise<CubeSqlResult>;
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions): Promise<CubeSqlResult>;
 
-  public cubeSql(
-    sqlQuery: string,
-    options?: CubeSqlOptions,
-    callback?: LoadMethodCallback<CubeSqlResult>
-  ): UnsubscribeObj;
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): UnsubscribeObj;
 
   /**
    * Execute a Cube SQL query against Cube SQL interface and return the results.
    */
-  public cubeSql(
-    sqlQuery: string,
-    options?: CubeSqlOptions,
-    callback?: LoadMethodCallback<CubeSqlResult>
-  ): Promise<CubeSqlResult> | UnsubscribeObj {
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): Promise<CubeSqlResult> | UnsubscribeObj {
     return this.loadMethod(
       () => {
         const cubesqlParams: Record<string, unknown> = {
@@ -890,9 +793,7 @@ class CubeApi {
               .filter((d: string) => d.trim().length)
               .map((d: string) => JSON.parse(d).data)
               .reduce((a: any, b: any) => a.concat(b), []),
-            ...(parsedSchema.lastRefreshTime
-              ? { lastRefreshTime: parsedSchema.lastRefreshTime }
-              : {}),
+            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
           };
         } catch (err) {
           throw new Error(response.error);
@@ -907,10 +808,7 @@ class CubeApi {
    * Execute a Cube SQL query against Cube SQL interface and return streaming results as an async generator.
    * The server returns JSONL (JSON Lines) format with schema first, then data rows.
    */
-  public async* cubeSqlStream(
-    sqlQuery: string,
-    options?: CubeSqlOptions
-  ): AsyncGenerator<CubeSqlStreamChunk> {
+  public async* cubeSqlStream(sqlQuery: string, options?: CubeSqlOptions): AsyncGenerator<CubeSqlStreamChunk> {
     if (!this.transport.requestStream) {
       throw new Error('Transport does not support streaming');
     }
@@ -922,8 +820,8 @@ class CubeApi {
       baseRequestId: uuidv4(),
       params: {
         query: sqlQuery,
-        cache: options?.cache,
-      },
+        cache: options?.cache
+      }
     });
 
     const decoder = new TextDecoder();
@@ -947,25 +845,23 @@ class CubeApi {
                 yield {
                   type: 'schema' as const,
                   schema: parsed.schema,
-                  ...(parsed.lastRefreshTime
-                    ? { lastRefreshTime: parsed.lastRefreshTime }
-                    : {}),
+                  ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
                 };
               } else if (parsed.data) {
                 yield {
                   type: 'data' as const,
-                  data: parsed.data,
+                  data: parsed.data
                 };
               } else if (parsed.error) {
                 yield {
                   type: 'error' as const,
-                  error: parsed.error,
+                  error: parsed.error
                 };
               }
             } catch (parseError) {
               yield {
                 type: 'error' as const,
-                error: `Failed to parse JSON line: ${line}`,
+                error: `Failed to parse JSON line: ${line}`
               };
             }
           }
@@ -980,25 +876,23 @@ class CubeApi {
             yield {
               type: 'schema' as const,
               schema: parsed.schema,
-              ...(parsed.lastRefreshTime
-                ? { lastRefreshTime: parsed.lastRefreshTime }
-                : {}),
+              ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
             };
           } else if (parsed.data) {
             yield {
               type: 'data' as const,
-              data: parsed.data,
+              data: parsed.data
             };
           } else if (parsed.error) {
             yield {
               type: 'error' as const,
-              error: parsed.error,
+              error: parsed.error
             };
           }
         } catch (parseError) {
           yield {
             type: 'error' as const,
-            error: `Failed to parse remaining JSON: ${buffer}`,
+            error: `Failed to parse remaining JSON: ${buffer}`
           };
         }
       }
@@ -1015,10 +909,7 @@ class CubeApi {
   }
 }
 
-export default (
-  apiToken: string | (() => Promise<string>),
-  options: CubeApiOptions
-) => new CubeApi(apiToken, options);
+export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
 export { CubeApi };
 export { default as Meta } from './Meta';
