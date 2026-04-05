@@ -827,7 +827,9 @@ describe('Cube RBAC Engine', () => {
 
     const SC_TEST_TOKEN = sign({
       cubeCloud: {
-        tenantId: '1',
+        userAttributes: {
+          tenantId: '1',
+        },
         groups: ['1', '2'],
       },
       auth: {

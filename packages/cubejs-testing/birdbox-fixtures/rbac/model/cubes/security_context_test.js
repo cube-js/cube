@@ -1,7 +1,7 @@
 cube('security_context_test', {
   sql: `
     SELECT * FROM line_items
-    WHERE ${SECURITY_CONTEXT.cubeCloud.tenantId.filter('id')}
+    WHERE ${user_attributes.tenantId.filter('id')}
   `,
 
   dimensions: {
@@ -30,7 +30,7 @@ cube('security_context_test', {
 cube('sc_array_filter_test', {
   sql: `
     SELECT * FROM line_items
-    WHERE ${SECURITY_CONTEXT.cubeCloud.groups.filter('product_id')}
+    WHERE ${groups.filter('product_id')}
   `,
 
   dimensions: {
@@ -49,7 +49,7 @@ cube('sc_array_filter_test', {
 });
 
 cube('sc_interpolation_test', {
-  sql: `SELECT * FROM line_items WHERE id > ${SECURITY_CONTEXT.cubeCloud.tenantId}`,
+  sql: `SELECT * FROM line_items WHERE id > ${user_attributes.tenantId}`,
 
   dimensions: {
     id: {

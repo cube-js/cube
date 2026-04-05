@@ -181,13 +181,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     // @ts-ignore
     let fp = path?.node?.key?.name || path?.node?.key?.value || '';
     let pp: NodePath<t.Node> | null | undefined = path?.parentPath;
-    // When path is a value node (e.g. bare Identifier) inside an ObjectProperty,
-    // include the ObjectProperty's key so the full path is computed correctly.
-    if (!fp && pp?.node?.type === 'ObjectProperty') {
-      // @ts-ignore
-      fp = pp?.node?.key?.name || pp?.node?.key?.value || '';
-      pp = pp?.parentPath;
-    }
     while (pp) {
       if (pp?.parentPath?.node?.type === 'ArrayExpression') {
         fp = `0.${fp}`;
@@ -257,8 +250,12 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   private static readonly CUBE_CLOUD_SHORTHAND_IDENTIFIERS = ['userAttributes', 'user_attributes', 'groups'];
 
   private static isAccessPolicyPath(path: NodePath): boolean {
-    const fullPath = this.fullPath(path);
-    return fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy');
+    // @ts-ignore
+    const target = (!path?.node?.key && path?.parentPath && t.isObjectProperty(path.parentPath.node))
+      ? path.parentPath
+      : path;
+    const fp = this.fullPath(target);
+    return fp.startsWith('accessPolicy') || fp.startsWith('access_policy');
   }
 
   private static securityContextIdentifier(isAccessPolicy: boolean): t.Identifier {

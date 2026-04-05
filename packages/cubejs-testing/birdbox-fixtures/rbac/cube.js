@@ -195,7 +195,9 @@ module.exports = {
         superuser: false,
         securityContext: {
           cubeCloud: {
-            tenantId: '1',
+            userAttributes: {
+              tenantId: '1',
+            },
             groups: ['1', '2'],
           },
           auth: {
