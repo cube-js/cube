@@ -5367,6 +5367,106 @@ mod tests {
 
         //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
     }
+
+    #[test]
+    fn compaction_readiness_threshold() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
+                Config::test("compaction_readiness_threshold")
+                    .update_config(|mut config| {
+                        config.partition_split_threshold = 10;
+                        config.compaction_chunks_count_threshold = 0;
+                        config.compaction_readiness_chunks_threshold = Some(1);
+                        config
+                    })
+                    .start_test(async move |services| {
+                        let service = services.sql_service;
+
+                        let paths = {
+                            let dir = env::temp_dir();
+                            let path_1 = dir.clone().join("compaction-ready-1.csv");
+                            let path_2 = dir.clone().join("compaction-ready-2.csv");
+
+                            let mut file1 = File::create(path_1.clone()).unwrap();
+                            file1.write_all("id,value\n".as_bytes()).unwrap();
+                            for i in 0..10 {
+                                file1
+                                    .write_all(format!("{},{}\n", i, i * 10).as_bytes())
+                                    .unwrap();
+                            }
+
+                            let mut file2 = File::create(path_2.clone()).unwrap();
+                            file2.write_all("id,value\n".as_bytes()).unwrap();
+                            for i in 10..20 {
+                                file2
+                                    .write_all(format!("{},{}\n", i, i * 10).as_bytes())
+                                    .unwrap();
+                            }
+
+                            vec![path_1, path_2]
+                        };
+
+                        service
+                            .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+                            .await
+                            .unwrap();
+                        service
+                            .exec_query(&format!(
+                                "CREATE TABLE test.compaction_ready (`id` int, `value` int) \
+                                 WITH (input_format = 'csv') LOCATION {}",
+                                paths
+                                    .iter()
+                                    .map(|p| format!("'{}'", p.to_string_lossy()))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ))
+                            .await
+                            .unwrap();
+
+                        let result = service
+                            .exec_query("SELECT count(*) FROM test.compaction_ready")
+                            .await
+                            .unwrap();
+                        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
+
+                        let indexes = services
+                            .meta_store
+                            .get_table_indexes(
+                                services
+                                    .meta_store
+                                    .get_table("test".to_string(), "compaction_ready".to_string())
+                                    .await
+                                    .unwrap()
+                                    .get_id(),
+                            )
+                            .await
+                            .unwrap();
+                        let partitions = services
+                            .meta_store
+                            .get_active_partitions_and_chunks_by_index_id_for_select(
+                                indexes.iter().map(|i| i.get_id()).collect(),
+                            )
+                            .await
+                            .unwrap();
+                        for index_partitions in &partitions {
+                            for (_partition, chunks) in index_partitions {
+                                let active = chunks.iter().filter(|c| c.get_row().active()).count();
+                                assert!(
+                                    active <= 1,
+                                    "Expected at most 1 active chunk per partition after \
+                                     compaction readiness, but found {}",
+                                    active,
+                                );
+                            }
+                        }
+                    })
+                    .await;
+            });
+    }
 }
 
 impl SqlServiceImpl {
