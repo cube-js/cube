@@ -1239,6 +1239,8 @@ pub enum MetaStoreEvent {
 
     UpdateQueueItemPayload(IdRow<QueueItemPayload>, IdRow<QueueItemPayload>),
     DeleteQueueItemPayload(IdRow<QueueItemPayload>),
+
+    CompactionResult { table_id: u64 },
 }
 
 fn meta_store_merge(
@@ -2645,18 +2647,22 @@ impl MetaStore for RocksMetaStore {
             if let Some(mp) = p.row.multi_partition_id {
                 let mp = MultiPartitionRocksTable::new(db.clone()).get_row_or_not_found(mp)?;
                 if mp.row.prepared_for_split() {
-                    // When run concurrently with multi-split, the latter takes precedence.
                     return Ok(false);
                 }
             }
             RocksMetaStore::swap_chunks_impl(
                 old_chunk_ids,
                 vec![(new_chunk, Some(new_chunk_file_size))],
-                db,
+                db.clone(),
                 pipe,
                 false,
                 None,
             )?;
+            let index =
+                IndexRocksTable::new(db).get_row_or_not_found(p.get_row().get_index_id())?;
+            pipe.add_event(MetaStoreEvent::CompactionResult {
+                table_id: index.get_row().table_id(),
+            });
             Ok(true)
         })
         .await
@@ -2681,7 +2687,7 @@ impl MetaStore for RocksMetaStore {
         );
         self.write_operation("swap_active_partitions", move |db, pipe| {
             swap_active_partitions_impl(
-                db,
+                db.clone(),
                 pipe,
                 &current_active,
                 &new_active,
@@ -2696,7 +2702,17 @@ impl MetaStore for RocksMetaStore {
                     )))
                 },
                 |_| panic!("error from current partition must propagate before this call"),
-            )
+            )?;
+            if let Some((first_partition, _)) = current_active.first() {
+                if let Ok(index) = IndexRocksTable::new(db)
+                    .get_row_or_not_found(first_partition.get_row().get_index_id())
+                {
+                    pipe.add_event(MetaStoreEvent::CompactionResult {
+                        table_id: index.get_row().table_id(),
+                    });
+                }
+            }
+            Ok(())
         })
         .await
     }

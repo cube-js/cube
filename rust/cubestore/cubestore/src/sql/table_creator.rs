@@ -8,7 +8,8 @@ use crate::import::ImportService;
 use crate::metastore::job::JobType;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::{
-    table::Table, HllFlavour, IdRow, ImportFormat, IndexDef, IndexType, RowKey, TableId,
+    table::Table, HllFlavour, IdRow, ImportFormat, IndexDef, IndexType, MetaStoreEvent, RowKey,
+    TableId,
 };
 use crate::metastore::{Column, ColumnType, MetaStore};
 use crate::sql::cache::SqlResultCache;
@@ -21,6 +22,7 @@ use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use log;
 use sqlparser::ast::*;
+use tokio::sync::broadcast;
 
 #[async_trait]
 
@@ -565,7 +567,9 @@ impl TableCreator {
             .collect::<Result<Vec<_>, _>>()?;
 
         if let Some(threshold) = self.config_obj.compaction_readiness_chunks_threshold() {
-            self.wait_for_compaction_readiness(table, threshold).await?;
+            let mut receiver = self.cluster.job_result_listener().into_receiver();
+            self.wait_for_compaction_readiness(table, threshold, &mut receiver)
+                .await?;
         }
 
         let ready_table = self.db.table_ready(table.get_id(), true).await?;
@@ -581,49 +585,100 @@ impl TableCreator {
         &self,
         table: &IdRow<Table>,
         max_chunks_per_partition: u64,
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
     ) -> Result<(), CubeError> {
-        let poll_interval = Duration::from_secs(1);
-        loop {
-            let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            let partitions_and_chunks = self
-                .db
-                .get_active_partitions_and_chunks_by_index_id_for_select(
-                    indexes.iter().map(|i| i.get_id()).collect(),
-                )
-                .await?;
+        let table_id = table.get_id();
+        let debounce_interval = Duration::from_secs(1);
 
-            let mut ready = true;
-            for index_partitions in &partitions_and_chunks {
-                for (partition, chunks) in index_partitions {
-                    let active_chunk_count =
-                        chunks.iter().filter(|c| c.get_row().active()).count() as u64;
-                    if active_chunk_count > max_chunks_per_partition {
-                        log::debug!(
-                            "Compaction readiness: partition {} has {} active chunks, threshold is {}",
-                            partition.get_id(),
-                            active_chunk_count,
-                            max_chunks_per_partition,
-                        );
-                        ready = false;
-                        break;
-                    }
+        if self
+            .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
+            .await?
+        {
+            return Ok(());
+        }
+
+        loop {
+            match receiver.recv().await {
+                Ok(MetaStoreEvent::CompactionResult {
+                    table_id: event_table_id,
+                }) if event_table_id == table_id => {}
+                Ok(_) => continue,
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    log::warn!(
+                        "Compaction readiness listener for table {} lagged by {} events",
+                        table_id,
+                        n,
+                    );
                 }
-                if !ready {
-                    break;
+                Err(broadcast::error::RecvError::Closed) => {
+                    return Err(CubeError::internal(format!(
+                        "Metastore event channel closed while waiting for compaction readiness of table {}",
+                        table_id,
+                    )));
                 }
             }
 
-            if ready {
-                log::debug!(
-                    "Compaction readiness: table {} is ready (all partitions within threshold {})",
-                    table.get_id(),
-                    max_chunks_per_partition,
-                );
+            tokio::time::sleep(debounce_interval).await;
+            Self::drain_compaction_events(receiver, table_id);
+
+            if self
+                .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
+                .await?
+            {
                 return Ok(());
             }
-
-            tokio::time::sleep(poll_interval).await;
         }
+    }
+
+    fn drain_compaction_events(receiver: &mut broadcast::Receiver<MetaStoreEvent>, table_id: u64) {
+        loop {
+            match receiver.try_recv() {
+                Ok(MetaStoreEvent::CompactionResult {
+                    table_id: event_table_id,
+                }) if event_table_id == table_id => continue,
+                Ok(_) => continue,
+                Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                Err(broadcast::error::TryRecvError::Empty)
+                | Err(broadcast::error::TryRecvError::Closed) => break,
+            }
+        }
+    }
+
+    async fn check_partition_chunks_within_threshold(
+        &self,
+        table_id: u64,
+        max_chunks_per_partition: u64,
+    ) -> Result<bool, CubeError> {
+        let indexes = self.db.get_table_indexes(table_id).await?;
+        let partitions_and_chunks = self
+            .db
+            .get_active_partitions_and_chunks_by_index_id_for_select(
+                indexes.iter().map(|i| i.get_id()).collect(),
+            )
+            .await?;
+
+        for index_partitions in &partitions_and_chunks {
+            for (partition, chunks) in index_partitions {
+                let active_chunk_count =
+                    chunks.iter().filter(|c| c.get_row().active()).count() as u64;
+                if active_chunk_count > max_chunks_per_partition {
+                    log::debug!(
+                        "Compaction readiness: partition {} has {} active chunks, threshold is {}",
+                        partition.get_id(),
+                        active_chunk_count,
+                        max_chunks_per_partition,
+                    );
+                    return Ok(false);
+                }
+            }
+        }
+
+        log::debug!(
+            "Compaction readiness: table {} is ready (all partitions within threshold {})",
+            table_id,
+            max_chunks_per_partition,
+        );
+        Ok(true)
     }
 }
 
