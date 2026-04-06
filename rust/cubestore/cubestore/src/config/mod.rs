@@ -557,6 +557,8 @@ pub trait ConfigObj: DIService {
 
     fn create_table_max_retries(&self) -> u64;
 
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
+
     fn max_joined_partitions(&self) -> usize;
 
     fn max_joined_partitions_message(&self) -> &str;
@@ -665,6 +667,7 @@ pub struct ConfigObjImpl {
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
     pub create_table_max_retries: u64,
+    pub compaction_readiness_chunks_threshold: Option<u64>,
     pub max_joined_partitions: usize,
     pub max_joined_partitions_message: String,
 }
@@ -1052,6 +1055,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn create_table_max_retries(&self) -> u64 {
         self.create_table_max_retries
+    }
+
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64> {
+        self.compaction_readiness_chunks_threshold
     }
 
     fn max_joined_partitions(&self) -> usize {
@@ -1607,6 +1614,9 @@ impl Config {
                     50000,
                 ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
+                compaction_readiness_chunks_threshold: env_optparse(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
+                ),
                 max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }),
@@ -1756,6 +1766,7 @@ impl Config {
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
                 create_table_max_retries: 3,
+                compaction_readiness_chunks_threshold: None,
                 max_joined_partitions: 5,
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }

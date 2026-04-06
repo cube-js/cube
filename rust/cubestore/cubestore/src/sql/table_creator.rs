@@ -19,6 +19,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
+use log;
 use sqlparser::ast::*;
 
 #[async_trait]
@@ -563,6 +564,10 @@ impl TableCreator {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
+        if let Some(threshold) = self.config_obj.compaction_readiness_chunks_threshold() {
+            self.wait_for_compaction_readiness(table, threshold).await?;
+        }
+
         let ready_table = self.db.table_ready(table.get_id(), true).await?;
 
         if let Some(trace_obj) = trace_obj.as_ref() {
@@ -570,6 +575,55 @@ impl TableCreator {
         }
 
         Ok(FinalizeExternalTableResult::Ok)
+    }
+
+    async fn wait_for_compaction_readiness(
+        &self,
+        table: &IdRow<Table>,
+        max_chunks_per_partition: u64,
+    ) -> Result<(), CubeError> {
+        let poll_interval = Duration::from_secs(1);
+        loop {
+            let indexes = self.db.get_table_indexes(table.get_id()).await?;
+            let partitions_and_chunks = self
+                .db
+                .get_active_partitions_and_chunks_by_index_id_for_select(
+                    indexes.iter().map(|i| i.get_id()).collect(),
+                )
+                .await?;
+
+            let mut ready = true;
+            for index_partitions in &partitions_and_chunks {
+                for (partition, chunks) in index_partitions {
+                    let active_chunk_count =
+                        chunks.iter().filter(|c| c.get_row().active()).count() as u64;
+                    if active_chunk_count > max_chunks_per_partition {
+                        log::debug!(
+                            "Compaction readiness: partition {} has {} active chunks, threshold is {}",
+                            partition.get_id(),
+                            active_chunk_count,
+                            max_chunks_per_partition,
+                        );
+                        ready = false;
+                        break;
+                    }
+                }
+                if !ready {
+                    break;
+                }
+            }
+
+            if ready {
+                log::debug!(
+                    "Compaction readiness: table {} is ready (all partitions within threshold {})",
+                    table.get_id(),
+                    max_chunks_per_partition,
+                );
+                return Ok(());
+            }
+
+            tokio::time::sleep(poll_interval).await;
+        }
     }
 }
 
