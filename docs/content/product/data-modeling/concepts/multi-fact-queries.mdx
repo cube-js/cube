@@ -61,7 +61,7 @@ cubes:
         sql: "{orders}.customer_id = {customers.id}"
       - name: dates
         relationship: many_to_one
-        sql: "{orders}.created_date = {dates.date}"
+        sql: "DATE_TRUNC('day', {orders}.created_at) = {dates.date}"
 
     dimensions:
       - name: id
@@ -91,7 +91,7 @@ cubes:
         sql: "{returns}.customer_id = {customers.id}"
       - name: dates
         relationship: many_to_one
-        sql: "{returns}.created_date = {dates.date}"
+        sql: "DATE_TRUNC('day', {returns}.created_at) = {dates.date}"
 
     dimensions:
       - name: id
@@ -115,9 +115,21 @@ cube(`customers`, {
   sql_table: `customers`,
 
   dimensions: {
-    id: { type: `number`, sql: `id`, primary_key: true },
-    name: { type: `string`, sql: `name` },
-    city: { type: `string`, sql: `city` }
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    name: {
+      sql: `name`,
+      type: `string`
+    },
+
+    city: {
+      sql: `city`,
+      type: `string`
+    }
   }
 })
 
@@ -125,7 +137,11 @@ cube(`dates`, {
   sql_table: `dates`,
 
   dimensions: {
-    date: { type: `time`, sql: `date`, primary_key: true }
+    date: {
+      sql: `date`,
+      type: `time`,
+      primary_key: true
+    }
   }
 })
 
@@ -137,21 +153,40 @@ cube(`orders`, {
       relationship: `many_to_one`,
       sql: `${orders}.customer_id = ${customers.id}`
     },
+
     dates: {
       relationship: `many_to_one`,
-      sql: `${orders}.created_date = ${dates.date}`
+      sql: `DATE_TRUNC('day', ${orders}.created_at) = ${dates.date}`
     }
   },
 
   dimensions: {
-    id: { type: `number`, sql: `id`, primary_key: true },
-    customer_id: { type: `number`, sql: `customer_id` },
-    status: { type: `string`, sql: `status` }
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    customer_id: {
+      sql: `customer_id`,
+      type: `number`
+    },
+
+    status: {
+      sql: `status`,
+      type: `string`
+    }
   },
 
   measures: {
-    count: { type: `count` },
-    total_amount: { type: `sum`, sql: `amount` }
+    count: {
+      type: `count`
+    },
+
+    total_amount: {
+      sql: `amount`,
+      type: `sum`
+    }
   }
 })
 
@@ -163,20 +198,35 @@ cube(`returns`, {
       relationship: `many_to_one`,
       sql: `${returns}.customer_id = ${customers.id}`
     },
+
     dates: {
       relationship: `many_to_one`,
-      sql: `${returns}.created_date = ${dates.date}`
+      sql: `DATE_TRUNC('day', ${returns}.created_at) = ${dates.date}`
     }
   },
 
   dimensions: {
-    id: { type: `number`, sql: `id`, primary_key: true },
-    customer_id: { type: `number`, sql: `customer_id` }
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    customer_id: {
+      sql: `customer_id`,
+      type: `number`
+    }
   },
 
   measures: {
-    count: { type: `count` },
-    total_refund: { type: `sum`, sql: `refund_amount` }
+    count: {
+      type: `count`
+    },
+
+    total_refund: {
+      sql: `refund_amount`,
+      type: `sum`
+    }
   }
 })
 ```
@@ -283,10 +333,11 @@ For example, given a query for `orders_count`, `orders_total_amount`,
 
 ### 2. Join on common dimensions
 
-The results of the subqueries are joined together using a `FULL JOIN` on all
-common dimension columns — in this case, `name`, `city`, and `date`. This ensures
-that all rows from both fact tables are represented, even when a customer has
-orders but no returns, or vice versa.
+The results of the subqueries are joined with `FULL JOIN` semantics on all
+common dimension columns — in this case, `name`, `city`, and `date`. This
+ensures that all rows from both fact tables are represented, even when a
+customer has orders but no returns, or vice versa. The actual SQL
+implementation may vary depending on database capabilities.
 
 ### 3. Final result
 
@@ -342,7 +393,7 @@ cubes:
         sql: "{refunds}.customer_id = {customers.id}"
       - name: dates
         relationship: many_to_one
-        sql: "{refunds}.created_date = {dates.date}"
+        sql: "DATE_TRUNC('day', {refunds}.created_at) = {dates.date}"
 
     dimensions:
       - name: id
@@ -367,19 +418,30 @@ cube(`refunds`, {
       relationship: `many_to_one`,
       sql: `${refunds}.customer_id = ${customers.id}`
     },
+
     dates: {
       relationship: `many_to_one`,
-      sql: `${refunds}.created_date = ${dates.date}`
+      sql: `DATE_TRUNC('day', ${refunds}.created_at) = ${dates.date}`
     }
   },
 
   dimensions: {
-    id: { type: `number`, sql: `id`, primary_key: true }
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
   },
 
   measures: {
-    count: { type: `count` },
-    total_amount: { type: `sum`, sql: `amount` }
+    count: {
+      type: `count`
+    },
+
+    total_amount: {
+      sql: `amount`,
+      type: `sum`
+    }
   }
 })
 ```
