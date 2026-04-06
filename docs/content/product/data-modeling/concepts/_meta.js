@@ -8,5 +8,6 @@ export default {
   },
   "code-reusability-extending-cubes": "Extension",
   "polymorphic-cubes": "Polymorphic cubes",
+  "multi-fact-queries": "Multi-fact queries",
   "data-blending": "Data blending"
 }

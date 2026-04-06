@@ -82,6 +82,7 @@
                   "docs/data-modeling/concepts/working-with-joins",
                   "docs/data-modeling/concepts/code-reusability-extending-cubes",
                   "docs/data-modeling/concepts/polymorphic-cubes",
+                  "docs/data-modeling/concepts/multi-fact-queries",
                   "docs/data-modeling/concepts/data-blending"
                 ]
               },
