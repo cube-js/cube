@@ -303,6 +303,27 @@ When you query measures from both facts — such as `orders_count`,
 by common dimensions like `name`, `city`, and `date`, Cube detects the
 multiple roots and triggers a multi-fact query.
 
+## Join path requirements
+
+To ensure correct join paths within a multi-fact view, follow these rules:
+
+- **Within each root fact table**, any join paths to related cubes (e.g.,
+  `orders.line_items`) should be listed explicitly in the view. This removes
+  ambiguity about which tables are involved in each fact's subquery.
+- **Dimension tables that join to other, less granular dimension tables**
+  (e.g., `customers` joining to `regions`) should also declare those join
+  paths explicitly in the view if those dimensions are needed.
+- **Between root fact tables and root dimension tables**, one-hop joins must
+  be defined at the cube level (as shown in the `orders` and `returns` cubes
+  above, each declaring a direct join to `customers` and `dates`). This
+  allows the multi-fact view to unambiguously resolve how each fact reaches
+  each common dimension table.
+
+In the example above, both `orders` and `returns` declare direct joins to
+`customers` and `dates`. This means the view can build separate subqueries
+where each fact independently joins to the same dimension tables — without
+relying on transitive or implicit join paths.
+
 ## How multi-fact queries work
 
 Cube analyzes the join hints for each measure and groups them by their
