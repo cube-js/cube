@@ -404,9 +404,9 @@ views:
           includes: "*"
         row_level:
           filters:
-            - member: country
+            - member: users_country
               operator: equals
-              values: [ "{ userAttributes.country }", "{ userAttributes.custom_country_property }" ]
+              values: [ "{ userAttributes.country }", "{ userAttributes.customCountryProperty }" ]
 ```
 
 ```javascript title="JavaScript"
@@ -422,11 +422,11 @@ view(`deals_view`, {
       row_level: {
         filters: [
           {
-            member: `country`,
+            member: `users_country`,
             operator: `equals`,
             values: [
               userAttributes.country,
-              userAttributes.custom_country_property
+              userAttributes.customCountryProperty
             ]
           }
         ]

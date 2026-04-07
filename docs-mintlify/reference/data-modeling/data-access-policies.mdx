@@ -415,9 +415,9 @@ cubes:
       - group: manager
         row_level:
           filters:
-            - member: country
+            - member: users_country
               operator: equals
-              values: [ "{ userAttributes.country }", "{ userAttributes.custom_country_property }" ]
+              values: [ "{ userAttributes.country }", "{ userAttributes.customCountryProperty }" ]
 ```
 
 ```javascript title="JavaScript"
@@ -430,11 +430,11 @@ cube(`orders`, {
       row_level: {
         filters: [
           {
-            member: `country`,
+            member: `users_country`,
             operator: `equals`,
             values: [
               userAttributes.country,
-              userAttributes.custom_country_property
+              userAttributes.customCountryProperty
             ]
           }
         ]
