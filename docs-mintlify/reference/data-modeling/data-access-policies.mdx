@@ -399,6 +399,55 @@ cube(`orders`, {
 
 </CodeGroup>
 
+You can also pass multiple values in the `values` array to match against several
+user attributes at once. This is useful when you need to check a dimension
+against more than one attribute, for example, when a user may have access based
+on multiple properties:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+    
+    access_policy:
+      - group: manager
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values:
+                - "{ userAttributes.country }"
+                - "{ userAttributes.secondary_country }"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `manager`,
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [
+              userAttributes.country,
+              userAttributes.secondary_country
+            ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
 For convenience, row filters are configured using the same format as [filters in
 REST API][ref-rest-query-filters] queries, allowing to use the same set of
 [filter operators][ref-rest-query-ops], e.g., `equals`, `contains`, `gte`, etc.

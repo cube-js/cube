@@ -385,6 +385,61 @@ view(`deals_view`, {
 
 </CodeGroup>
 
+### Filter by multiple user attributes
+
+You can pass multiple values in the `values` array to match a dimension against
+more than one user attribute. This is useful when users may have access based on
+multiple properties, such as a primary and secondary country:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: deals_view
+    # ...
+    
+    access_policy:
+      - group: sales
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values:
+                - "{ userAttributes.country }"
+                - "{ userAttributes.secondary_country }"
+```
+
+```javascript title="JavaScript"
+view(`deals_view`, {
+  // ...
+  
+  access_policy: [
+    {
+      group: `sales`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [
+              userAttributes.country,
+              userAttributes.secondary_country
+            ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
 ### Mask sensitive members
 
 You can mask sensitive members for most users while granting full access to
