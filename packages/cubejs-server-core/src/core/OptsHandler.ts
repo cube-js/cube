@@ -64,6 +64,13 @@ export class OptsHandler {
   private decoratedFactory = false;
 
   /**
+   * Returns true if the user provided a custom driverFactory.
+   */
+  public isCustomDriverFactory(): boolean {
+    return !this.decoratedFactory;
+  }
+
+  /**
    * driverFactory function result type.
    */
   private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';

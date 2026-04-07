@@ -602,7 +602,7 @@ export class CubejsServerCore {
        */
       async (dataSource = 'default', preAggregations = false) => {
         const requiredSeparatePreAggDriver = preAggregations && hasPreAggregationsEnvVars(dataSource);
-        const usePreAgg = requiredSeparatePreAggDriver && !this.options.driverFactory;
+        const usePreAgg = requiredSeparatePreAggDriver && !this.optsHandler.isCustomDriverFactory();
 
         const factoryKey = usePreAgg ? `${dataSource}@pre_agg` : dataSource;
 
@@ -610,7 +610,7 @@ export class CubejsServerCore {
           return driverPromise[factoryKey];
         }
 
-        if (requiredSeparatePreAggDriver && this.options.driverFactory) {
+        if (requiredSeparatePreAggDriver && this.optsHandler.isCustomDriverFactory()) {
           this.logger('Pre-aggregation driver conflict', {
             error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
             dataSource,
