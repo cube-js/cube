@@ -1224,6 +1224,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         undefined,
+        expect.any(String),
       );
     });
 
@@ -1264,6 +1265,7 @@ describe('API Gateway', () => {
         'stale-while-revalidate',
         'America/Los_Angeles',
         undefined,
+        expect.any(String),
       );
     });
 
@@ -1300,7 +1302,75 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         true,
+        expect.any(String),
       );
+    });
+
+    test('request id is propagated from x-request-id header', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .set('x-request-id', 'test-request-id-12345')
+        .send({
+          query: 'SELECT id FROM test LIMIT 1'
+        })
+        .responseType('text')
+        .expect(200);
+
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 1',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        'test-request-id-12345',
+      );
+    });
+
+    test('request id is auto-generated when no header is provided', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query: any, stream: any, securityContext: any, cacheMode: any, timezone: any, throwContinueWait: any, requestId: any) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 1'
+        })
+        .responseType('text')
+        .expect(200);
+
+      const requestId = execSqlMock.mock.calls[0][6];
+      expect(requestId).toBeDefined();
+      expect(requestId).toMatch(/^[0-9a-f-]+-span-1$/);
     });
   });
 });
