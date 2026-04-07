@@ -597,26 +597,30 @@ impl TableCreator {
             return Ok(());
         }
 
+        let mut has_pending_events = false;
         loop {
-            match receiver.recv().await {
-                Ok(MetaStoreEvent::CompactionResult {
-                    table_id: event_table_id,
-                }) if event_table_id == table_id => {}
-                Ok(_) => continue,
-                Err(broadcast::error::RecvError::Lagged(n)) => {
-                    log::warn!(
-                        "Compaction readiness listener for table {} lagged by {} events",
-                        table_id,
-                        n,
-                    );
-                }
-                Err(broadcast::error::RecvError::Closed) => {
-                    return Err(CubeError::internal(format!(
-                        "Metastore event channel closed while waiting for compaction readiness of table {}",
-                        table_id,
-                    )));
+            if !has_pending_events {
+                match receiver.recv().await {
+                    Ok(MetaStoreEvent::CompactionResult {
+                        table_id: event_table_id,
+                    }) if event_table_id == table_id => {}
+                    Ok(_) => continue,
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        log::warn!(
+                            "Compaction readiness listener for table {} lagged by {} events",
+                            table_id,
+                            n,
+                        );
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        return Err(CubeError::internal(format!(
+                            "Metastore event channel closed while waiting for compaction readiness of table {}",
+                            table_id,
+                        )));
+                    }
                 }
             }
+            has_pending_events = false;
 
             if self
                 .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
@@ -626,22 +630,31 @@ impl TableCreator {
             }
 
             tokio::time::sleep(debounce_interval).await;
-            Self::drain_compaction_events(receiver, table_id);
+            has_pending_events = Self::drain_compaction_events(receiver, table_id);
         }
     }
 
-    fn drain_compaction_events(receiver: &mut broadcast::Receiver<MetaStoreEvent>, table_id: u64) {
+    fn drain_compaction_events(
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+        table_id: u64,
+    ) -> bool {
+        let mut found = false;
         loop {
             match receiver.try_recv() {
                 Ok(MetaStoreEvent::CompactionResult {
                     table_id: event_table_id,
-                }) if event_table_id == table_id => continue,
-                Ok(_) => continue,
-                Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                }) if event_table_id == table_id => {
+                    found = true;
+                }
+                Ok(_) => {}
+                Err(broadcast::error::TryRecvError::Lagged(_)) => {
+                    found = true;
+                }
                 Err(broadcast::error::TryRecvError::Empty)
                 | Err(broadcast::error::TryRecvError::Closed) => break,
             }
         }
+        found
     }
 
     async fn check_partition_chunks_within_threshold(
