@@ -11,7 +11,99 @@ On the left side, you can select a semantic view you would like to query. Inside
 
 ## Filtering
 
-Dimensions and measures can be added as filters to focus on specific rows of data.
+Dimensions and measures can be added as filters to focus on specific
+rows of data. You can add a filter by clicking the **funnel** icon next
+to any dimension or measure in the left pane, or by using the
+**Filters** pane above your results.
+
+### How filters work
+
+Filters restrict the data returned by your query. Depending on whether
+you filter on a dimension or a measure, they behave differently:
+
+- **Dimension filters** restrict the raw data _before_ any
+  aggregation. They translate to a SQL `WHERE` clause.
+- **Measure filters** restrict results _after_ aggregation. They
+  translate to a SQL `HAVING` clause.
+
+### Available operators
+
+The operators available in the filter depend on the type of the member
+you are filtering.
+
+#### String dimensions
+
+| Operator | Description |
+| --- | --- |
+| equals | Exact match. Supports multiple values. |
+| does not equal | Excludes exact matches. |
+| contains | Case-insensitive wildcard match. |
+| does not contain | Excludes wildcard matches. |
+| starts with | Matches values beginning with the input. |
+| does not start with | Excludes values beginning with the input. |
+| ends with | Matches values ending with the input. |
+| does not end with | Excludes values ending with the input. |
+| is set | Value is not `NULL`. |
+| is not set | Value is `NULL`. |
+
+#### Number dimensions
+
+| Operator | Description |
+| --- | --- |
+| equals | Exact numeric match. Supports multiple values. |
+| does not equal | Excludes exact matches. |
+| greater than | Greater than a value. |
+| greater than or equal to | Greater than or equal to a value. |
+| less than | Less than a value. |
+| less than or equal to | Less than or equal to a value. |
+| is set | Value is not `NULL`. |
+| is not set | Value is `NULL`. |
+
+#### Time dimensions
+
+| Operator | Description |
+| --- | --- |
+| equals | Exact timestamp match. |
+| does not equal | Excludes exact matches. |
+| in date range | Within a start and end date. |
+| not in date range | Outside a start and end date. |
+| before date | Strictly before a timestamp. |
+| before or on date | Before or equal to a timestamp. |
+| after date | Strictly after a timestamp. |
+| after or on date | After or equal to a timestamp. |
+
+#### Measures
+
+| Operator | Description |
+| --- | --- |
+| equals | Exact match. |
+| does not equal | Excludes exact matches. |
+| greater than | Greater than a value. |
+| greater than or equal to | Greater than or equal to a value. |
+| less than | Less than a value. |
+| less than or equal to | Less than or equal to a value. |
+| is set | Value is not `NULL`. |
+| is not set | Value is `NULL`. |
+
+### Combining filters
+
+By default, all filters are combined with **AND** logic, meaning every
+filter condition must be met. You can also use **OR** logic to match
+rows that satisfy _any_ of the conditions. Filters support nesting, so
+you can build complex expressions such as "country is US _or_ (city
+contains San _and_ age is greater than 21)".
+
+<Info>
+
+Dimension filters and measure filters cannot be combined in the same
+logical group because they apply at different stages of query execution.
+
+</Info>
+
+For the full list of filter operators and the query format used by the
+REST API, see [Filters format][ref-filters-format].
+
+[ref-filters-format]: /reference/rest-api/query-format#filters-format
 
 ## Pivoting
 
