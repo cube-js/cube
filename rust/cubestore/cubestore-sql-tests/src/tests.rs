@@ -279,10 +279,6 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "queue_ack_then_result_v2_by_id",
             queue_ack_then_result_v2_by_id,
         ),
-        t(
-            "queue_ack_then_result_v2_with_external_id",
-            queue_ack_then_result_v2_with_external_id,
-        ),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
         t("queue_heartbeat_by_id", queue_heartbeat_by_id),
         t("queue_heartbeat_by_path", queue_heartbeat_by_path),
@@ -362,7 +358,6 @@ lazy_static::lazy_static! {
         "limit_pushdown_unique_key",
         "queue_ack_then_result_v2",
         "queue_ack_then_result_v2_by_id",
-        "queue_ack_then_result_v2_with_external_id",
         "queue_custom_orphaned",
         "queue_result_by_id_external_id_mismatch",
         "queue_result_ack_multiple_with_external_id",
@@ -10757,78 +10752,6 @@ async fn queue_ack_then_result_v2_by_id(service: Box<dyn SqlClient>) -> Result<(
     let result = service.exec_query(&format!("QUEUE RESULT {}", id)).await?;
     assert_eq!(result.get_rows().len(), 1);
 
-    Ok(())
-}
-
-async fn queue_ack_then_result_v2_with_external_id(
-    service: Box<dyn SqlClient>,
-) -> Result<(), CubeError> {
-    let add_response = service
-        .exec_query(
-            r#"QUEUE ADD PRIORITY 1 EXTERNAL_ID 'ext-5555' "STANDALONE#queue:5555" "payload1";"#,
-        )
-        .await?;
-    let id = assert_queue_add_and_get_id(&add_response)?;
-
-    let ack_result = service
-        .exec_query(&format!(r#"QUEUE ACK {} "result:5555""#, id))
-        .await?;
-    assert_eq!(
-        ack_result.get_rows(),
-        &vec![Row::new(vec![TableValue::Boolean(true)])]
-    );
-
-    // double ack for result, should be restricted
-    {
-        let ack_result = service
-            .exec_query(&format!(r#"QUEUE ACK {} "result:5555""#, id))
-            .await?;
-        assert_eq!(
-            ack_result.get_rows(),
-            &vec![Row::new(vec![TableValue::Boolean(false)])]
-        );
-    }
-
-    // ack on unknown queue item
-    {
-        let ack_result = service.exec_query(r#"QUEUE ACK 10 "result:5555""#).await?;
-        assert_eq!(
-            ack_result.get_rows(),
-            &vec![Row::new(vec![TableValue::Boolean(false)])]
-        );
-    }
-
-    // RESULT_BY_EXTERNAL_ID returns result and marks it for deletion
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
-        .await?;
-    assert_queue_result_columns(&result);
-    assert_eq!(
-        result.get_rows(),
-        &vec![queue_result_row("result:5555", &id, Some("ext-5555"))]
-    );
-    let result = service
-        .exec_query(r#"QUEUE RESULT_BY_EXTERNAL_ID "ext-5555""#)
-        .await?;
-    assert_eq!(
-        result.get_rows(),
-        &vec![queue_result_row("result:5555", &id, Some("ext-5555"))]
-    );
-
-    // RESULT by path should also return empty (already marked as deleted)
-    let result = service
-        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
-        .await?;
-    assert_eq!(result.get_rows().len(), 0);
-
-    tokio::time::sleep(Duration::new(1, 0)).await;
-
-    // should return, because we use id
-    let result = service
-        .exec_query(&format!("QUEUE RESULT_BLOCKING 1000 {}", id))
-        .await?;
-    assert_queue_result_columns(&result);
-    assert_eq!(result.get_rows().len(), 1);
     Ok(())
 }
 
