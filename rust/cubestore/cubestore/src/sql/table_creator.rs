@@ -597,30 +597,12 @@ impl TableCreator {
             return Ok(());
         }
 
-        let mut has_pending_events = false;
+        let fallback_interval = Duration::from_secs(5);
+        let mut skip_wait = false;
         loop {
-            if !has_pending_events {
-                match receiver.recv().await {
-                    Ok(MetaStoreEvent::CompactionResult {
-                        table_id: event_table_id,
-                    }) if event_table_id == table_id => {}
-                    Ok(_) => continue,
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        log::warn!(
-                            "Compaction readiness listener for table {} lagged by {} events",
-                            table_id,
-                            n,
-                        );
-                    }
-                    Err(broadcast::error::RecvError::Closed) => {
-                        return Err(CubeError::internal(format!(
-                            "Metastore event channel closed while waiting for compaction readiness of table {}",
-                            table_id,
-                        )));
-                    }
-                }
+            if !skip_wait {
+                Self::wait_for_compaction_event(receiver, table_id, fallback_interval).await?;
             }
-            has_pending_events = false;
 
             if self
                 .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
@@ -630,7 +612,47 @@ impl TableCreator {
             }
 
             tokio::time::sleep(debounce_interval).await;
-            has_pending_events = Self::drain_compaction_events(receiver, table_id);
+            skip_wait = Self::drain_compaction_events(receiver, table_id);
+        }
+    }
+
+    async fn wait_for_compaction_event(
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+        table_id: u64,
+        fallback_interval: Duration,
+    ) -> Result<(), CubeError> {
+        loop {
+            tokio::select! {
+                result = receiver.recv() => {
+                    match result {
+                        Ok(MetaStoreEvent::CompactionResult {
+                            table_id: event_table_id,
+                        }) if event_table_id == table_id => return Ok(()),
+                        Ok(_) => continue,
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            log::warn!(
+                                "Compaction readiness listener for table {} lagged by {} events",
+                                table_id,
+                                n,
+                            );
+                            return Ok(());
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            return Err(CubeError::internal(format!(
+                                "Metastore event channel closed while waiting for compaction readiness of table {}",
+                                table_id,
+                            )));
+                        }
+                    }
+                }
+                _ = tokio::time::sleep(fallback_interval) => {
+                    log::debug!(
+                        "Compaction readiness: fallback timer fired for table {}, checking status",
+                        table_id,
+                    );
+                    return Ok(());
+                }
+            }
         }
     }
 
