@@ -389,7 +389,7 @@ view(`deals_view`, {
 
 You can pass multiple values in the `values` array to match a dimension against
 more than one user attribute. This is useful when users may have access based on
-multiple properties, such as a primary and secondary country:
+multiple properties, such as a country and a custom country property:
 
 <CodeGroup>
 
@@ -406,9 +406,7 @@ views:
           filters:
             - member: country
               operator: equals
-              values:
-                - "{ userAttributes.country }"
-                - "{ userAttributes.secondary_country }"
+              values: [ "{ userAttributes.country }", "{ userAttributes.custom_country_property }" ]
 ```
 
 ```javascript title="JavaScript"
@@ -428,7 +426,7 @@ view(`deals_view`, {
             operator: `equals`,
             values: [
               userAttributes.country,
-              userAttributes.secondary_country
+              userAttributes.custom_country_property
             ]
           }
         ]

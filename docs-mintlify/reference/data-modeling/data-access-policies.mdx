@@ -417,9 +417,7 @@ cubes:
           filters:
             - member: country
               operator: equals
-              values:
-                - "{ userAttributes.country }"
-                - "{ userAttributes.secondary_country }"
+              values: [ "{ userAttributes.country }", "{ userAttributes.custom_country_property }" ]
 ```
 
 ```javascript title="JavaScript"
@@ -436,7 +434,7 @@ cube(`orders`, {
             operator: `equals`,
             values: [
               userAttributes.country,
-              userAttributes.secondary_country
+              userAttributes.custom_country_property
             ]
           }
         ]
