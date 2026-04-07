@@ -618,15 +618,15 @@ impl TableCreator {
                 }
             }
 
-            tokio::time::sleep(debounce_interval).await;
-            Self::drain_compaction_events(receiver, table_id);
-
             if self
                 .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
                 .await?
             {
                 return Ok(());
             }
+
+            tokio::time::sleep(debounce_interval).await;
+            Self::drain_compaction_events(receiver, table_id);
         }
     }
 
