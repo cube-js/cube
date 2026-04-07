@@ -677,9 +677,9 @@ pub trait InfoSchemaTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError>;
+    ) -> Result<Vec<Self::T>, CubeError>;
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>>;
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef>;
 
     fn schema(&self) -> Vec<Field>;
 }
@@ -711,11 +711,7 @@ macro_rules! base_info_schema_table_def {
             ) -> Result<datafusion::arrow::record_batch::RecordBatch, crate::CubeError> {
                 let rows = self.rows(ctx, limit).await?;
                 let schema = self.schema_ref();
-                let columns = self.columns();
-                let columns = columns
-                    .into_iter()
-                    .map(|c| c(rows.clone()))
-                    .collect::<Vec<_>>();
+                let columns = self.columns(rows);
                 Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
                     schema, columns,
                 )?)

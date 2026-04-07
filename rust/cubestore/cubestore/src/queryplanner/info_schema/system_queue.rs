@@ -4,7 +4,7 @@ use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanArray, Int64Array, StringArray, TimestampNanosecondArray,
+    ArrayRef, BooleanBuilder, Int64Builder, StringBuilder, TimestampNanosecondBuilder,
 };
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
@@ -19,8 +19,8 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.cache_store.queue_all(limit).await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.cache_store.queue_all(limit).await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -52,96 +52,52 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut prefix_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut created_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut status_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut priority_builder = Int64Builder::with_capacity(num_rows);
+        let mut heartbeat_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut orphaned_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut value_builder = StringBuilder::with_capacity(num_rows, num_rows * 128);
+        let mut extra_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut process_id_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut exclusive_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut external_id_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+
+        for row in rows.into_iter() {
+            let item = row.item.get_row();
+            id_builder.append_value(item.get_key());
+            prefix_builder.append_option(item.get_prefix().as_deref());
+            created_builder.append_value(timestamp_nanos_or_panic(item.get_created()));
+            status_builder.append_value(format!("{:?}", item.get_status()));
+            priority_builder.append_value(*item.get_priority());
+            heartbeat_builder
+                .append_option(item.get_heartbeat().as_ref().map(timestamp_nanos_or_panic));
+            orphaned_builder
+                .append_option(item.get_orphaned().as_ref().map(timestamp_nanos_or_panic));
+            value_builder.append_option(row.payload.as_deref());
+            extra_builder.append_option(item.get_extra().as_deref());
+            process_id_builder.append_option(item.get_process_id().as_deref());
+            exclusive_builder.append_value(item.get_exclusive());
+            external_id_builder.append_option(item.get_external_id().as_deref());
+        }
+
         vec![
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| Some(row.item.get_row().get_key())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| row.item.get_row().get_prefix().clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from_iter_values(
-                    items
-                        .iter()
-                        .map(|row| timestamp_nanos_or_panic(row.item.get_row().get_created())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter_values(
-                    items
-                        .iter()
-                        .map(|row| format!("{:?}", row.item.get_row().get_status())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(Int64Array::from_iter_values(
-                    items
-                        .iter()
-                        .map(|row| row.item.get_row().get_priority().clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from_iter(items.iter().map(
-                    |row| {
-                        row.item
-                            .get_row()
-                            .get_heartbeat()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from_iter(items.iter().map(
-                    |row| {
-                        row.item
-                            .get_row()
-                            .get_orphaned()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| row.payload.as_ref()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| row.item.get_row().get_extra().clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| row.item.get_row().get_process_id().clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(BooleanArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| Some(row.item.get_row().get_exclusive())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| row.item.get_row().get_external_id().clone()),
-                ))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(prefix_builder.finish()),
+            Arc::new(created_builder.finish()),
+            Arc::new(status_builder.finish()),
+            Arc::new(priority_builder.finish()),
+            Arc::new(heartbeat_builder.finish()),
+            Arc::new(orphaned_builder.finish()),
+            Arc::new(value_builder.finish()),
+            Arc::new(extra_builder.finish()),
+            Arc::new(process_id_builder.finish()),
+            Arc::new(exclusive_builder.finish()),
+            Arc::new(external_id_builder.finish()),
         ]
     }
 }
