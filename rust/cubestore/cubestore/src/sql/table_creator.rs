@@ -566,12 +566,7 @@ impl TableCreator {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
-        let is_streaming = table
-            .get_row()
-            .locations()
-            .map(|locs| locs.iter().any(|l| Table::is_stream_location(l)))
-            .unwrap_or(false);
-        if !is_streaming {
+        if table.get_row().stream_offset().is_none() {
             if let Some(threshold) = self.config_obj.compaction_readiness_chunks_threshold() {
                 let mut receiver = self.cluster.job_result_listener().into_receiver();
                 self.wait_for_compaction_readiness(table, threshold, &mut receiver)
