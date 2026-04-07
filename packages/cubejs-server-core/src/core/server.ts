@@ -601,15 +601,20 @@ export class CubejsServerCore {
        * Driver factory function `DriverFactoryByDataSource`.
        */
       async (dataSource = 'default', preAggregations = false) => {
-        // Only create a separate pre-agg driver when credentials are actually
-        // configured (custom driverFactory or PRE_AGGREGATIONS env vars).
-        const usePreAgg = preAggregations && (
-          !!this.options.driverFactory || hasPreAggregationsEnvVars(dataSource)
-        );
-        const factoryKey = usePreAgg ? `${dataSource}__pre_agg` : dataSource;
+        const requiredSeparatePreAggDriver = preAggregations && hasPreAggregationsEnvVars(dataSource);
+        const usePreAgg = requiredSeparatePreAggDriver && !this.options.driverFactory;
+
+        const factoryKey = usePreAgg ? `${dataSource}@pre_agg` : dataSource;
 
         if (driverPromise[factoryKey]) {
           return driverPromise[factoryKey];
+        }
+
+        if (requiredSeparatePreAggDriver && this.options.driverFactory) {
+          this.logger('Pre-aggregation driver conflict', {
+            error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
+            dataSource,
+          });
         }
 
         // eslint-disable-next-line no-return-assign

@@ -354,11 +354,9 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Driver type.
    */
-  dbType: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_TYPE', dataSource, preAggregations)).asString()
+  dbType: ({ dataSource }: DataSourceOpts) => (
+    // We don't support different driverType for pre-aggregations right now
+    get(keyByDataSource('CUBEJS_DB_TYPE', dataSource, false)).asString()
   ),
 
   /**
