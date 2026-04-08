@@ -1,4 +1,4 @@
-import {format as d3Format, formatLocale, FormatLocaleDefinition, FormatLocaleObject} from 'd3-format';
+import { format as d3Format, formatLocale, FormatLocaleDefinition, FormatLocaleObject } from 'd3-format';
 import { timeFormat } from 'd3-time-format';
 
 import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
@@ -85,7 +85,9 @@ export type FormatValueMember = {
 };
 
 export type FormatValueOptions = FormatValueMember & {
+  /** Locale tag (e.g. 'en-US', 'de-DE', 'nl-NL'). Defaults to the runtime's locale via Intl.NumberFormat. */
   locale?: string,
+  /** String to return for null/undefined values. Defaults to '∅'. */
   emptyPlaceholder?: string;
 };
 
