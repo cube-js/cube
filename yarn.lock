@@ -8395,6 +8395,11 @@
   resolved "https://registry.yarnpkg.com/@types/d3-ease/-/d3-ease-3.0.2.tgz#e28db1bfbfa617076f7770dd1d9a48eaa3b6c51b"
   integrity sha512-NcV1JjO5oDzoK26oMzbILE6HW7uVXOHLQvHshBUW4UMdZGfiY6v5BeQwh9a9tCzv+CeefZQHJt5SRgK154RtiA==
 
+"@types/d3-format@^3":
+  version "3.0.4"
+  resolved "https://registry.yarnpkg.com/@types/d3-format/-/d3-format-3.0.4.tgz#b1e4465644ddb3fdf3a263febb240a6cd616de90"
+  integrity sha512-fALi2aI6shfg7vM5KiR1wNJnZ7r6UuggVqtDA+xiEdPZQwy/trcQaHnwShLuLdta2rTymCNpxYTiMZX/e09F4g==
+
 "@types/d3-interpolate@^3.0.1":
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/@types/d3-interpolate/-/d3-interpolate-3.0.4.tgz#412b90e84870285f2ff8a846c6eb60344f12a41c"
@@ -8420,6 +8425,11 @@
   integrity sha512-5KKk5aKGu2I+O6SONMYSNflgiP0WfZIQvVUMan50wHsLG1G94JlxEVnCpQARfTtzytuY0p/9PXXZb3I7giofIA==
   dependencies:
     "@types/d3-path" "*"
+
+"@types/d3-time-format@^4":
+  version "4.0.3"
+  resolved "https://registry.yarnpkg.com/@types/d3-time-format/-/d3-time-format-4.0.3.tgz#d6bc1e6b6a7db69cccfbbdd4c34b70632d9e9db2"
+  integrity sha512-5xg9rC+wWL8kdDj153qZcsJ0FWiFt0J5RB6LYUNZjwSnesfblqrI/bJ1wBdJ8OQfncgbJG5+2F+qfqnqyzYxyg==
 
 "@types/d3-time@*", "@types/d3-time@^3.0.0":
   version "3.0.3"
@@ -12778,6 +12788,11 @@ d3-ease@^3.0.1:
   resolved "https://registry.yarnpkg.com/d3-format/-/d3-format-3.1.0.tgz#9260e23a28ea5cb109e93b21a06e24e2ebd55641"
   integrity sha512-YyUI6AEuY/Wpt8KWLgZHsIU86atmikuoOmCfommt0LYHiQSPjvX2AcFc38PX0CBpr2RCyZhjex+NS/LPOv6YqA==
 
+d3-format@^3.1.0:
+  version "3.1.2"
+  resolved "https://registry.yarnpkg.com/d3-format/-/d3-format-3.1.2.tgz#01fdb46b58beb1f55b10b42ad70b6e344d5eb2ae"
+  integrity sha512-AJDdYOdnyRDV5b6ArilzCPPwc1ejkHcoyFarqlPqT7zRYjhavcT3uSrqcMvsgh2CgoPbK3RCwyHaVyxYcP2Arg==
+
 "d3-interpolate@1.2.0 - 3", d3-interpolate@^3.0.1:
   version "3.0.1"
   resolved "https://registry.yarnpkg.com/d3-interpolate/-/d3-interpolate-3.0.1.tgz#3c47aa5b32c5b3dfb56ef3fd4342078a632b400d"
@@ -12808,7 +12823,7 @@ d3-shape@^3.1.0:
   dependencies:
     d3-path "^3.1.0"
 
-"d3-time-format@2 - 4":
+"d3-time-format@2 - 4", d3-time-format@^4.1.0:
   version "4.1.0"
   resolved "https://registry.yarnpkg.com/d3-time-format/-/d3-time-format-4.1.0.tgz#7ab5257a5041d11ecb4fe70a5c7d16a195bb408a"
   integrity sha512-dJxPBlzC7NugB2PDLwo9Q8JiTR3M3e4/XANkreKSUxF8vvXKqm1Yfq4Q5dl8budlunRVlUUaDUgFt7eA8D6NLg==
