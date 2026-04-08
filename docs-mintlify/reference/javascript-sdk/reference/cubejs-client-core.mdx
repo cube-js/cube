@@ -745,6 +745,12 @@ shortTitle | string |
 title | string |
 type | string |
 
+### `CacheMode`
+
+> **CacheMode**: *"stale-if-slow" | "stale-while-revalidate" | "must-revalidate" | "no-cache"*
+
+Cache mode options for query execution. See [cache control][ref-cache-control] for details on available strategies.
+
 ### `BinaryFilter`
 
 Name | Type |
@@ -810,6 +816,7 @@ yValues? | string[] |
 
 Name | Type | Optional? | Description |
 ------ | ------ | ------ | --- |
+`cache` | [`CacheMode`](#types-cache-mode) | ✅ Yes | Server-side cache policy for query execution. Does not control client-side caching. See [cache control][ref-cache-control] for details on available strategies. |
 `castNumerics` | `boolean` | ✅ Yes | Pass `true` if you'd like all members with the `number` type to be automatically converted to JavaScript `Number` type. Note that this is a potentially unsafe operation since numbers more than [`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer] or less than `Number.MIN_SAFE_INTEGER` can't be represented as JavaScript `Number` |
 `mutexKey` | `string` | ✅ Yes | Key to store the current request's MUTEX inside the `mutexObj`. MUTEX object is used to reject orphaned queries results when new queries are sent. For example: if two queries are sent with the same `mutexKey` only the last one will return results. |
 `mutexObj` | `Object` | ✅ Yes | Object to store MUTEX |
@@ -1118,3 +1125,4 @@ values? | never |
 
 [ref-query-format]: /reference/rest-api/query-format
 [ref-security]: /docs/data-modeling/access-control
+[ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
