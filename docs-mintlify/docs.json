@@ -52,6 +52,7 @@
                 "root": "docs/explore-analyze/workbooks/index",
                 "pages": [
                   "docs/explore-analyze/workbooks/querying-data",
+                  "docs/explore-analyze/workbooks/calculated-fields",
                   "docs/explore-analyze/workbooks/source-sql-tabs",
                   "docs/explore-analyze/workbooks/charts"
                 ]
