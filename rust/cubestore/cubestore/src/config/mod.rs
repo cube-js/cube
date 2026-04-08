@@ -1270,7 +1270,7 @@ impl Config {
             Some(256 << 20),
         ) as u64;
 
-        Config {
+        let result = Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::var("CUBESTORE_DATA_DIR")
@@ -1620,7 +1620,9 @@ impl Config {
                 max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }),
-        }
+        };
+        result.validate_config();
+        result
     }
 
     pub fn test(name: &str) -> Config {
@@ -1778,9 +1780,25 @@ impl Config {
         update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
     ) -> Config {
         let new_config = self.config_obj.as_ref().clone();
-        Self {
+        let config = Self {
             injector: self.injector.clone(),
             config_obj: Arc::new(update_config(new_config)),
+        };
+        config.validate_config();
+        config
+    }
+
+    fn validate_config(&self) {
+        if let Some(readiness) = self.config_obj.compaction_readiness_chunks_threshold {
+            let compaction = self.config_obj.compaction_chunks_count_threshold;
+            if readiness < compaction {
+                panic!(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD ({}) must not be lower than \
+                     CUBESTORE_CHUNKS_COUNT_THRESHOLD ({}), otherwise compaction will never \
+                     reduce chunks below the readiness threshold",
+                    readiness, compaction,
+                );
+            }
         }
     }
 
