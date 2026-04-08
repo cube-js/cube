@@ -189,13 +189,32 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        CubeError::internal(v.to_string())
+        match v {
+            datafusion::error::DataFusionError::External(e) => match e.downcast::<CubeError>() {
+                Ok(e) => *e,
+                Err(e) => match e.downcast::<arrow::error::ArrowError>() {
+                    Ok(e) => CubeError::from(*e),
+                    Err(e) => CubeError::internal(e.to_string()),
+                },
+            },
+            datafusion::error::DataFusionError::ArrowError(e) => CubeError::from(e),
+            _ => CubeError::internal(v.to_string()),
+        }
     }
 }
 
 impl From<arrow::error::ArrowError> for CubeError {
     fn from(v: arrow::error::ArrowError) -> Self {
-        CubeError::internal(v.to_string())
+        match v {
+            arrow::error::ArrowError::ExternalError(e) => match e.downcast::<CubeError>() {
+                Ok(e) => *e,
+                Err(e) => match e.downcast::<datafusion::error::DataFusionError>() {
+                    Ok(e) => CubeError::from(*e),
+                    Err(e) => CubeError::internal(e.to_string()),
+                },
+            },
+            _ => CubeError::internal(v.to_string()),
+        }
     }
 }
 

@@ -621,7 +621,9 @@ impl CubeScanMemoryStream {
                 } else {
                     err.message
                 };
-                err.message = format!("Database Execution Error: {}", err.message);
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    err.message = format!("Database Execution Error: {}", err.message);
+                }
                 Some(Err(ArrowError::ExternalError(Box::new(err))))
             }
             Some(None) => None,
@@ -744,7 +746,9 @@ async fn load_data(
                 } else {
                     err.message
                 };
-                err.message = format!("Database Execution Error: {}", err.message);
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    err.message = format!("Database Execution Error: {}", err.message);
+                }
                 ArrowError::ExternalError(Box::new(err))
             })?;
         let response = result.first();

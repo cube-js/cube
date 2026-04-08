@@ -451,25 +451,27 @@ async fn handle_sql_query(
                     .await?;
             }
             Err(err) => {
-                session_clone
-                    .session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        span_id.clone(),
-                        session_clone.state.auth_context().unwrap(),
-                        session_clone.state.get_load_request_meta("sql"),
-                        "Cube SQL Error".to_string(),
-                        serde_json::json!({
-                            "query": {
-                                "sql": sql_query
-                            },
-                            "apiType": "sql",
-                            "duration": span_id.as_ref().unwrap().duration(),
-                            "error": err.message,
-                        }),
-                    )
-                    .await?;
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    session_clone
+                        .session_manager
+                        .server
+                        .transport
+                        .log_load_state(
+                            span_id.clone(),
+                            session_clone.state.auth_context().unwrap(),
+                            session_clone.state.get_load_request_meta("sql"),
+                            "Cube SQL Error".to_string(),
+                            serde_json::json!({
+                                "query": {
+                                    "sql": sql_query
+                                },
+                                "apiType": "sql",
+                                "duration": span_id.as_ref().unwrap().duration(),
+                                "error": err.message,
+                            }),
+                        )
+                        .await?;
+                }
             }
         }
 
@@ -584,6 +586,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             write: js_stream_write_fn,
         };
 
+        let request_id_for_error = request_id.clone();
+
         let result = handle_sql_query(
             services,
             native_auth_ctx,
@@ -612,6 +616,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                 Err(err) => {
                     let mut error_response = Map::new();
                     error_response.insert("error".into(), err.to_string().into());
+                    if let Some(req_id) = &request_id_for_error {
+                        error_response.insert("requestId".into(), req_id.clone().into());
+                    }
                     let error_message = format!(
                         "{}{}",
                         serde_json::to_string(&serde_json::Value::Object(error_response))
