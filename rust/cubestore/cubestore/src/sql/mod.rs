@@ -5386,28 +5386,25 @@ mod tests {
                     .start_test(async move |services| {
                         let service = services.sql_service;
 
+                        let total_rows = 200;
+                        let files_count = 20;
+                        let rows_per_file = total_rows / files_count;
+
                         let paths = {
                             let dir = env::temp_dir();
-                            let path_1 = dir.clone().join("compaction-ready-1.csv");
-                            let path_2 = dir.clone().join("compaction-ready-2.csv");
-
-                            let mut file1 = File::create(path_1.clone()).unwrap();
-                            file1.write_all("id,value\n".as_bytes()).unwrap();
-                            for i in 0..10 {
-                                file1
-                                    .write_all(format!("{},{}\n", i, i * 10).as_bytes())
-                                    .unwrap();
+                            let mut paths = Vec::new();
+                            for f in 0..files_count {
+                                let path = dir.clone().join(format!("compaction-ready-{}.csv", f));
+                                let mut file = File::create(path.clone()).unwrap();
+                                file.write_all("id,value\n".as_bytes()).unwrap();
+                                let start = f * rows_per_file;
+                                for i in start..start + rows_per_file {
+                                    file.write_all(format!("{},{}\n", i, i * 10).as_bytes())
+                                        .unwrap();
+                                }
+                                paths.push(path);
                             }
-
-                            let mut file2 = File::create(path_2.clone()).unwrap();
-                            file2.write_all("id,value\n".as_bytes()).unwrap();
-                            for i in 10..20 {
-                                file2
-                                    .write_all(format!("{},{}\n", i, i * 10).as_bytes())
-                                    .unwrap();
-                            }
-
-                            vec![path_1, path_2]
+                            paths
                         };
 
                         service
@@ -5431,7 +5428,10 @@ mod tests {
                             .exec_query("SELECT count(*) FROM test.compaction_ready")
                             .await
                             .unwrap();
-                        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(total_rows as i64)])
+                        );
 
                         let indexes = services
                             .meta_store
