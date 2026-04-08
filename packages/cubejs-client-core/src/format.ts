@@ -38,9 +38,17 @@ function getCurrentD3Locale(locale: string, currencyCode = 'USD'): FormatLocaleO
   return localeCache[key];
 }
 
-function getCurrentLocale(): string {
-  return new Intl.NumberFormat().resolvedOptions().locale;
+function detectLocale() {
+  try {
+    return new Intl.NumberFormat().resolvedOptions().locale;
+  } catch (e) {
+    console.error('Failed to detect locale', e);
+
+    return 'en-US';
+  }
 }
+
+const currentLocale = detectLocale();
 
 const DEFAULT_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S';
 const DEFAULT_DATE_FORMAT = '%Y-%m-%d';
@@ -93,7 +101,7 @@ export type FormatValueOptions = FormatValueMember & {
 
 export function formatValue(
   value: any,
-  { type, format, currency = 'USD', granularity, locale = getCurrentLocale(), emptyPlaceholder = '∅' }: FormatValueOptions
+  { type, format, currency = 'USD', granularity, locale = currentLocale, emptyPlaceholder = '∅' }: FormatValueOptions
 ): string {
   if (value === null || value === undefined) {
     return emptyPlaceholder;
