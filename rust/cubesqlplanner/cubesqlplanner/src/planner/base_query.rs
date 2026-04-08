@@ -2,14 +2,25 @@ use super::query_tools::QueryTools;
 use super::top_level_planner::TopLevelPlanner;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::NativeType;
 use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
+use serde::Serialize;
 use std::rc::Rc;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreAggregationUsageInfo {
+    cube_name: String,
+    pre_aggregation_name: String,
+    placeholder: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    date_range: Option<Vec<String>>,
+    external: bool,
+}
 
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
@@ -59,12 +70,12 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             self.cubestore_support_multistage,
         );
 
-        let (sql, used_pre_aggregations) = planner.plan()?;
+        let (sql, usages) = planner.plan()?;
 
-        let is_external = if !used_pre_aggregations.is_empty() {
-            used_pre_aggregations
+        let is_external = if !usages.is_empty() {
+            usages
                 .iter()
-                .all(|pre_aggregation| pre_aggregation.external())
+                .all(|usage| usage.pre_aggregation.external())
         } else {
             false
         };
@@ -77,20 +88,36 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let res = self.context.empty_array()?;
         res.set(0, result_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
-        if let Some(used_pre_aggregation) = used_pre_aggregations.first() {
-            let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
-                used_pre_aggregation.cube_name().clone(),
-                used_pre_aggregation.name().clone(),
-            )?;
-            res.set(
-                2,
-                pre_aggregation_obj
-                    .as_any()
-                    .downcast::<NativePreAggregationObj<IT>>()
-                    .unwrap()
-                    .to_native(self.context.clone())?,
-            )?;
+
+        if !usages.is_empty() {
+            let base_tools = self.query_tools.base_tools();
+            let usages_info: Vec<PreAggregationUsageInfo> = usages
+                .iter()
+                .map(|usage| {
+                    let pre_agg = &usage.pre_aggregation;
+                    let name = pre_agg.name().clone();
+                    let cube_name = pre_agg.cube_name().clone();
+                    let placeholder = base_tools
+                        .pre_aggregation_table_name(cube_name.clone(), name.clone())
+                        .map(|base| match usage.index {
+                            idx => format!("{}__usage_{}", base, idx),
+                        })
+                        .unwrap_or_default();
+                    PreAggregationUsageInfo {
+                        cube_name,
+                        pre_aggregation_name: name,
+                        placeholder,
+                        date_range: usage
+                            .date_range
+                            .as_ref()
+                            .map(|(from, to)| vec![from.clone(), to.clone()]),
+                        external: pre_agg.external(),
+                    }
+                })
+                .collect();
+            res.set(2, usages_info.to_native(self.context.clone())?)?;
         }
+
         let result = NativeObjectHandle::new(res.into_object());
 
         Ok(result)

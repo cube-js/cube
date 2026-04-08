@@ -22,6 +22,8 @@ pub struct PreAggregation {
     granularity: Option<String>,
     source: Rc<PreAggregationSource>,
     cube_name: String,
+    #[builder(default)]
+    usage_index: Option<usize>,
 }
 
 impl PreAggregation {
@@ -63,6 +65,10 @@ impl PreAggregation {
 
     pub fn cube_name(&self) -> &String {
         &self.cube_name
+    }
+
+    pub fn usage_index(&self) -> Option<usize> {
+        self.usage_index
     }
 }
 

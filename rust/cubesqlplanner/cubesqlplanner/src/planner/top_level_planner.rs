@@ -2,8 +2,8 @@ use super::planners::QueryPlanner;
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::logical_plan::OriginalSqlCollector;
-use crate::logical_plan::PreAggregation;
 use crate::logical_plan::PreAggregationOptimizer;
+use crate::logical_plan::PreAggregationUsage;
 use crate::logical_plan::Query;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -29,17 +29,16 @@ impl TopLevelPlanner {
         }
     }
 
-    pub fn plan(&self) -> Result<(String, Vec<Rc<PreAggregation>>), CubeError> {
+    pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let logical_plan = query_planner.plan()?;
 
-        let (optimized_plan, used_pre_aggregations) =
-            self.try_pre_aggregations(logical_plan.clone())?;
+        let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
 
-        let is_external = if !used_pre_aggregations.is_empty() {
-            used_pre_aggregations
+        let is_external = if !usages.is_empty() {
+            usages
                 .iter()
-                .all(|pre_aggregation| pre_aggregation.external())
+                .all(|usage| usage.pre_aggregation.external())
         } else {
             false
         };
@@ -62,13 +61,13 @@ impl TopLevelPlanner {
 
         let sql = physical_plan.to_sql(&templates)?;
 
-        Ok((sql, used_pre_aggregations))
+        Ok((sql, usages))
     }
 
     fn try_pre_aggregations(
         &self,
         plan: Rc<Query>,
-    ) -> Result<(Rc<Query>, Vec<Rc<PreAggregation>>), CubeError> {
+    ) -> Result<(Rc<Query>, Vec<PreAggregationUsage>), CubeError> {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
@@ -82,11 +81,9 @@ impl TopLevelPlanner {
                 disable_external_pre_aggregations,
                 pre_aggregation_id,
             )? {
-                if pre_aggregation_optimizer.get_used_pre_aggregations().len() == 1 {
-                    (
-                        result,
-                        pre_aggregation_optimizer.get_used_pre_aggregations(),
-                    )
+                let usages = pre_aggregation_optimizer.take_usages();
+                if !usages.is_empty() {
+                    (result, usages)
                 } else {
                     (plan.clone(), Vec::new())
                 }

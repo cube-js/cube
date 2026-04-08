@@ -959,10 +959,16 @@ export class BaseQuery {
     try {
       const buildResult = nativeBuildSqlAndParams(queryParams);
 
-      const [query, params, preAggregation] = buildResult;
+      const [query, params, preAggregationUsages] = buildResult;
       const paramsArray = [...params];
-      if (preAggregation) {
-        this.preAggregations.preAggregationForQuery = preAggregation;
+      if (preAggregationUsages && Array.isArray(preAggregationUsages) && preAggregationUsages.length > 0) {
+        this.preAggregations.preAggregationUsages = preAggregationUsages;
+        // Backward compat: set preAggregationForQuery from first usage
+        const first = preAggregationUsages[0];
+        this.preAggregations.preAggregationForQuery = this.getPreAggregationByName(
+          first.cubeName,
+          first.preAggregationName,
+        );
       }
       return [query, paramsArray];
     } catch (e) {
@@ -1009,8 +1015,13 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    const [, , preAggregation] = buildResult;
-    return preAggregation;
+    const [, , preAggregationUsages] = buildResult;
+    if (preAggregationUsages && Array.isArray(preAggregationUsages) && preAggregationUsages.length > 0) {
+      this.preAggregations.preAggregationUsages = preAggregationUsages;
+      const first = preAggregationUsages[0];
+      return this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    }
+    return preAggregationUsages;
   }
 
   allCubeMembers(path) {

@@ -29,6 +29,7 @@ pub struct PreAggregationTable {
     pub cube_alias: String,
     pub name: String,
     pub alias: Option<String>,
+    pub usage_index: Option<usize>,
 }
 
 #[derive(Clone, Debug)]

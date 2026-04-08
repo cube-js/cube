@@ -265,6 +265,7 @@ impl PreAggregationsCompiler {
                 cube_alias,
                 name: name.name.clone(),
                 alias: static_data.sql_alias.clone(),
+                usage_index: None,
             })
         };
 

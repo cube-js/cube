@@ -1,6 +1,6 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::logical_plan::PreAggregation;
+use crate::logical_plan::{PreAggregation, PreAggregationUsage};
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregationSource, PreAggregationTable};
 use crate::plan::Filter;
@@ -382,7 +382,7 @@ impl TestContext {
     pub fn build_sql_with_used_pre_aggregations(
         &self,
         query: &str,
-    ) -> Result<(String, Vec<Rc<PreAggregation>>), cubenativeutils::CubeError> {
+    ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml(query);
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryProperties::try_new(ctx.query_tools.clone(), options)?;
@@ -448,9 +448,10 @@ impl TestContext {
     async fn create_pre_agg_tables(
         &self,
         client: &tokio_postgres::Client,
-        pre_aggregations: &[Rc<PreAggregation>],
+        pre_aggregations: &[PreAggregationUsage],
     ) {
-        for pre_agg in pre_aggregations {
+        for usage in pre_aggregations {
+            let pre_agg = &usage.pre_aggregation;
             let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
             let yaml = Self::build_pre_agg_query_yaml(pre_agg);
 

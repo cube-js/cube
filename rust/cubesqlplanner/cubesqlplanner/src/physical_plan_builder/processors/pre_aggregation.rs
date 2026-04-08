@@ -26,9 +26,13 @@ impl PreAggregationProcessor<'_> {
     ) -> Result<SingleAliasedSource, CubeError> {
         let query_tools = self.builder.query_tools();
         let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
-        let table_name = query_tools
+        let base_table_name = query_tools
             .base_tools()
             .pre_aggregation_table_name(table.cube_name.clone(), name.clone())?;
+        let table_name = match table.usage_index {
+            Some(idx) => format!("{}__usage_{}", base_table_name, idx),
+            None => base_table_name,
+        };
         let alias = PlanSqlTemplates::member_alias_name(&table.cube_name, &name, &None);
         let res = SingleAliasedSource::new_from_table_reference(
             table_name,
