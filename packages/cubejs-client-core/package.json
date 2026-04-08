@@ -31,6 +31,7 @@
     "watch": "tsc -w",
     "test": "npm run unit",
     "unit": "vitest run --coverage",
+    "bench": "vitest bench",
     "lint": "eslint src/* test/ --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
