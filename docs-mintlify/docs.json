@@ -70,6 +70,12 @@
             ]
           },
           {
+            "group": "Organize content",
+            "pages": [
+              "docs/organize-content/folders"
+            ]
+          },
+          {
             "group": "Data Modeling",
             "pages": [
               "docs/data-modeling/overview",
