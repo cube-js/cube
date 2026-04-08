@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'async_hooks';
-import crypto from 'crypto';
 import vm from 'vm';
 import fs from 'fs';
 import os from 'os';
@@ -9,7 +8,7 @@ import R from 'ramda';
 import workerpool from 'workerpool';
 import { LRUCache } from 'lru-cache';
 
-import { FileContent, getEnv, isNativeSupported, SchemaFileRepository } from '@cubejs-backend/shared';
+import { FileContent, getEnv, isNativeSupported, SchemaFileRepository, defaultHasher } from '@cubejs-backend/shared';
 import { NativeInstance, PythonCtx, transpileJs, transpileYaml } from '@cubejs-backend/native';
 import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
@@ -728,7 +727,7 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, compilerId, jinjaUsed }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    const cacheKey = defaultHasher().update(file.content).digest('hex');
 
     if (this.compiledYamlCache.has(cacheKey)) {
       const content = this.compiledYamlCache.get(cacheKey)!;
@@ -779,7 +778,7 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    const cacheKey = defaultHasher().update(file.content).digest('hex');
 
     let renderedFileContent: string;
 
@@ -861,7 +860,7 @@ export class DataSchemaCompiler {
   }
 
   private getJsScript(file: FileContent): vm.Script {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    const cacheKey = defaultHasher().update(file.content).digest('hex');
 
     if (this.compiledScriptCache.has(cacheKey)) {
       return this.compiledScriptCache.get(cacheKey)!;

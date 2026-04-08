@@ -1,5 +1,4 @@
 /* eslint-disable global-require,no-return-assign */
-import crypto from 'crypto';
 import fs from 'fs-extra';
 import { LRUCache } from 'lru-cache';
 import isDocker from 'is-docker';
@@ -13,6 +12,7 @@ import {
 import {
   CancelableInterval,
   createCancelableInterval,
+  defaultHasher,
   formatDuration,
   getEnv,
   assertDataSource,
@@ -239,7 +239,7 @@ export class CubejsServerCore {
 
       if (!this.projectFingerprint) {
         try {
-          this.projectFingerprint = crypto.createHash('md5')
+          this.projectFingerprint = defaultHasher()
             .update(JSON.stringify(fs.readJsonSync('package.json')))
             .digest('hex');
         } catch (e) {

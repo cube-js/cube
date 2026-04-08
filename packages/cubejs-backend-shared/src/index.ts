@@ -28,3 +28,4 @@ export * from './PerfTracker';
 export * from './disposedProxy';
 export * from './logger';
 export * from './pool';
+export * from './hasher';

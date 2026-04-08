@@ -11,8 +11,7 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
-import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
-import crypto from 'crypto';
+import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists, defaultHasher } from '@cubejs-backend/shared';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
@@ -647,7 +646,7 @@ export class DevServer {
   }
 
   protected getIdentifier(apiSecret: string): string {
-    return crypto.createHash('md5')
+    return defaultHasher()
       .update(apiSecret)
       .digest('hex')
       .replace(/[^\d]/g, '')
