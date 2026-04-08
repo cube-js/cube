@@ -66,6 +66,15 @@ describe('formatValue', () => {
     expect(formatValue('2024-03-15T14:30:45.000', { type: 'time' })).toBe('2024-03-15 14:30:45');
   });
 
+  it('format with nl-NL locale', () => {
+    const locale = 'nl-NL';
+    expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'EUR', locale })).toBe('€1.234,56');
+    expect(formatValue(0, { type: 'number', format: 'currency', currency: 'EUR', locale })).toBe('€0');
+    expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'USD', locale })).toBe('US$1.234,56');
+    expect(formatValue(1234.56, { type: 'number', format: 'number', locale })).toBe('1.234,56');
+    expect(formatValue(1234.56, { type: 'number', locale })).toBe('1.234,56');
+  });
+
   it('default fallback', () => {
     expect(formatValue('hello', { type: 'string' })).toBe('hello');
     expect(formatValue(42, { type: 'number' })).toBe('42');
