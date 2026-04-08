@@ -7,11 +7,18 @@ describe('formatValue', () => {
     expect(formatValue(undefined, { type: 'number' })).toBe('∅');
   });
 
-  it('format: currency', () => {
+  it('format: currency (defaults to USD)', () => {
     expect(formatValue(0, { type: 'number', format: 'currency' })).toBe('$0');
     expect(formatValue(-42.5, { type: 'number', format: 'currency' })).toBe('−$42.5');
     expect(formatValue('1234.56', { type: 'number', format: 'currency' })).toBe('$1,234.56');
     expect(formatValue(1234.56, { type: 'number', format: 'currency' })).toBe('$1,234.56');
+  });
+
+  it('format: currency with currency code', () => {
+    expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'EUR' })).toBe('€1,234.56');
+    expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'GBP' })).toBe('£1,234.56');
+    expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'JPY' })).toBe('¥1,234.56');
+    expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'USD' })).toBe('$1,234.56');
   });
 
   it('format: percent', () => {

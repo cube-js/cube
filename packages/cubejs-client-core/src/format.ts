@@ -1,4 +1,4 @@
-import { format as d3Format } from 'd3-format';
+import { format as d3Format, formatLocale, FormatLocaleDefinition } from 'd3-format';
 import { timeFormat } from 'd3-time-format';
 
 import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
@@ -6,6 +6,27 @@ import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
 const DEFAULT_NUMBER_FORMAT = ',.2~f';
 const DEFAULT_CURRENCY_FORMAT = '$,.2~f';
 const DEFAULT_PERCENT_FORMAT = '.2~%';
+
+// d3-format en-US defaults — serves as the base for all locales
+const DEFAULT_LOCALE: FormatLocaleDefinition = {
+  decimal: '.',
+  thousands: ',',
+  grouping: [3],
+  currency: ['$', ''],
+};
+
+function getCurrencySymbol(code: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: code })
+    .formatToParts(0)
+    .find((part) => part.type === 'currency')?.value || code;
+}
+
+function createLocale(currencyCode: string) {
+  return formatLocale({
+    ...DEFAULT_LOCALE,
+    currency: [getCurrencySymbol(currencyCode), ''],
+  });
+}
 
 const DEFAULT_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S';
 const DEFAULT_DATE_FORMAT = '%Y-%m-%d';
@@ -52,7 +73,7 @@ export type FormatValueOptions = {
 
 export function formatValue(
   value: any,
-  { type, format, currency, granularity, emptyPlaceholder  = '∅'}: FormatValueOptions
+  { type, format, currency = 'USD', granularity, emptyPlaceholder = '∅' }: FormatValueOptions
 ): string {
   if (value === null || value === undefined) {
     return emptyPlaceholder;
@@ -74,7 +95,7 @@ export function formatValue(
   if (typeof format === 'string') {
     switch (format) {
       case 'currency':
-        return d3Format(DEFAULT_CURRENCY_FORMAT)(parseNumber(value));
+        return createLocale(currency).format(DEFAULT_CURRENCY_FORMAT)(parseNumber(value));
       case 'percent':
         return d3Format(DEFAULT_PERCENT_FORMAT)(parseNumber(value));
       case 'number':
@@ -94,7 +115,7 @@ export function formatValue(
   }
 
   if (type === 'number') {
-    return d3Format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
+    return createLocale(currency).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
   }
 
   return String(value);
