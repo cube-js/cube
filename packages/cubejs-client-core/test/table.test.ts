@@ -1,6 +1,3 @@
-/* globals describe, expect, test */
-
-import 'jest';
 import ResultSet from '../src/ResultSet';
 import { PivotConfig } from '../src/types';
 

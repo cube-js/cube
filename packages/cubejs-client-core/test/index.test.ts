@@ -4,14 +4,13 @@
  * @fileoverview CubeApi class unit tests.
  */
 
-/* globals describe,test,expect,beforeEach,jest */
-
+import { vi, MockedClass } from 'vitest';
 import { CubeApi, LoadMethodOptions, LoadResponse } from '../src/index';
 import ResultSet from '../src/ResultSet';
 
-jest.mock('../src/ResultSet');
+vi.mock('../src/ResultSet');
 
-const MockedResultSet = ResultSet as jest.MockedClass<typeof ResultSet>;
+const MockedResultSet = ResultSet as MockedClass<typeof ResultSet>;
 
 class CubeApiTest extends CubeApi {
   public loadResponseInternal(response: LoadResponse<any>, options: LoadMethodOptions | null = {}): ResultSet<any> {

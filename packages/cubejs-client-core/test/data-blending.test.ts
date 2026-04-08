@@ -1,7 +1,3 @@
-/* globals describe, test, expect */
-
-import 'jest';
-
 import ResultSet from '../src/ResultSet';
 import { loadResponse, loadResponseWithoutDateRange } from './fixtures/datablending/load-responses.json';
 
