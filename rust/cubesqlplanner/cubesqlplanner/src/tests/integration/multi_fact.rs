@@ -538,9 +538,6 @@ async fn test_multi_fact_view_two_facts_with_measure_filter() {
     let schema = MockSchema::from_yaml_file("common/integration_multi_fact_view.yaml");
     let ctx = TestContext::new(schema).unwrap();
 
-    // Two measures from different facts + measure filter on one of them.
-    // View with two facts joined to a shared dimension (periods).
-    // Reproduces: "Can't find join path" when measure filter pulls in a second fact.
     let query = indoc! {"
         measures:
           - activity.impressions_total_clicks
