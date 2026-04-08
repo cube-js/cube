@@ -4217,7 +4217,11 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
       ],
     },
-    [{ compound__count: '4' }]
+    // Tesseract computes compound.count without join multiplication, so counts all 5 rows.
+    // JS planner uses count(distinct PK) due to join multiplication, getting 4.
+    getEnv('nativeSqlPlanner')
+      ? [{ compound__count: '5' }]
+      : [{ compound__count: '4' }]
   ));
 
   it('compound key self join', async () => runQueryTest(
@@ -4239,10 +4243,17 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
       ],
     },
-    [
-      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
-      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
-    ]
+    // Tesseract correctly filters per-group: 2017-01-04 has only visitor 2 (rank=8), avg=8.0.
+    // JS planner's join multiplication merges both (2,2) PK rows, getting avg(7,8)=7.5.
+    getEnv('nativeSqlPlanner')
+      ? [
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+        { compound__rank_avg: '8.0000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+      ]
+      : [
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+      ]
   ));
 
   it('rank measure', async () => runQueryTest(
