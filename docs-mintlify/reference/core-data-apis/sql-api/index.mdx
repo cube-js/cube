@@ -198,12 +198,19 @@ post-processing][ref-queries-wpp], or [queries with pushdown][ref-queries-wpd].
 
 By default, query results are loaded in a single batch. However, a more effective
 *streaming mode* can be used for large result sets. To enable it, set the
-`CUBESQL_STREAM_MODE` environment variable to `true`.
+[`CUBESQL_STREAM_MODE`](/reference/configuration/environment-variables#cubesql_stream_mode)
+environment variable to `true`.
 
 <Info>
 
 When the streaming mode is enabled, the maximum [row limit][ref-queries-row-limit]
-does not apply to SQL API queries. They can return an unlimited number of rows.
+does not apply to SQL API queries with an explicit `LIMIT` clause. This means
+you can use a very large `LIMIT` value to retrieve large result sets.
+
+If a query does not include an explicit `LIMIT` clause,
+[`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](/reference/configuration/environment-variables#cubejs_db_query_default_limit)
+still applies even in streaming mode. To retrieve large result sets without an
+explicit `LIMIT`, increase `CUBEJS_DB_QUERY_DEFAULT_LIMIT` as needed.
 
 </Info>
 

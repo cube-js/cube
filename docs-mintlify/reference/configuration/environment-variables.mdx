@@ -911,7 +911,9 @@ specified in an API query.
 
 ## `CUBEJS_DB_QUERY_LIMIT`
 
-The maximum [row limit][ref-row-limit] in the result set.
+The maximum [row limit][ref-row-limit] in the result set. An explicit limit in a
+query cannot exceed this value, except for [SQL API][ref-sql-api] queries when
+[streaming mode][ref-sql-api-streaming] is enabled.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1296,7 +1298,7 @@ option](/reference/configuration/config#allow_ungrouped_without_primary_key).
 
 <Info>
 
-When query push-own in the SQL API is enabled via the `CUBESQL_SQL_PUSH_DOWN`
+When query push-down in the SQL API is enabled via the `CUBESQL_SQL_PUSH_DOWN`
 environment variable, this option is enabled as well for the best user experience.
 
 </Info>
@@ -1312,6 +1314,10 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 ## `CUBESQL_STREAM_MODE`
 
 If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
+When enabled, SQL API queries with an explicit `LIMIT` clause can exceed the
+maximum row limit set by
+[`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit).
+Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](#cubejs_db_query_default_limit).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
