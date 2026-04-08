@@ -532,3 +532,31 @@ async fn test_non_multiplied_multi_join() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_view_two_facts_with_measure_filter() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_view.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    // Two measures from different facts + measure filter on one of them.
+    // View with two facts joined to a shared dimension (periods).
+    // Reproduces: "Can't find join path" when measure filter pulls in a second fact.
+    let query = indoc! {"
+        measures:
+          - activity.total_amount
+          - activity.impressions_total_clicks
+        dimensions:
+          - activity.date_id
+        filters:
+          - member: activity.total_amount
+            operator: set
+        order:
+          - id: activity.date_id
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, "integration_multi_fact_view_tables.sql").await {
+        insta::assert_snapshot!(result);
+    }
+}
