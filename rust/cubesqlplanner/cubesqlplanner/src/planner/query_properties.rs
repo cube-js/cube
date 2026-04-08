@@ -533,9 +533,8 @@ impl QueryProperties {
             .add_dimensions(&self.time_dimensions)
             .add_filters(&self.time_dimensions_filters)
             .add_filters(&self.dimensions_filters)
-            .add_filters(&self.measures_filters)
             .add_filters(&self.segments)
-            .build(&self.measures)?;
+            .build(&self.all_used_measures()?)?;
         self.multi_fact_join_groups =
             MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)?;
         Ok(())

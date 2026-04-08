@@ -543,7 +543,6 @@ async fn test_multi_fact_view_two_facts_with_measure_filter() {
     // Reproduces: "Can't find join path" when measure filter pulls in a second fact.
     let query = indoc! {"
         measures:
-          - activity.total_amount
           - activity.impressions_total_clicks
         dimensions:
           - activity.date_id
@@ -556,7 +555,10 @@ async fn test_multi_fact_view_two_facts_with_measure_filter() {
 
     ctx.build_sql(query).unwrap();
 
-    if let Some(result) = ctx.try_execute_pg(query, "integration_multi_fact_view_tables.sql").await {
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_multi_fact_view_tables.sql")
+        .await
+    {
         insta::assert_snapshot!(result);
     }
 }
