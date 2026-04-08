@@ -1,0 +1,209 @@
+---
+title: Layered access policies with overlapping groups
+description: Combine a base group for member access with regional groups that add row-level filters, avoiding the OR-semantics pitfall where a permissive policy overrides restrictive ones.
+---
+
+## Use case
+
+You manage access through an identity provider (e.g., Okta) where users belong
+to a base group like `viewer` and optionally a regional group like
+`viewer_north_america`. You want the base group to grant member-level access
+while regional groups layer on row-level filters that restrict which rows a user
+can see.
+
+The challenge: when a user belongs to both groups, Cube combines matching
+policies with **OR semantics** for row-level filters. A base policy with _no_
+row filter is maximally permissive, so it effectively overrides the regional
+filter. The user sees all rows instead of only their region.
+
+## Data modeling
+
+Consider an `orders` cube with a `country` dimension:
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'US' AS country UNION ALL
+      SELECT 2, 200, 'CA' UNION ALL
+      SELECT 3, 300, 'MX' UNION ALL
+      SELECT 4, 400, 'DE' UNION ALL
+      SELECT 5, 500, 'JP'
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: country
+        sql: "{CUBE}.country"
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: "{CUBE}.amount"
+        type: sum
+```
+
+And a view that exposes it:
+
+```yaml
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+```
+
+### The problem
+
+A naive approach assigns member access to the base group and a row filter to the
+regional group:
+
+```yaml
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    access_policy:
+      - group: viewer
+        member_level:
+          includes: "*"
+
+      - group: viewer_north_america
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["US", "CA", "MX"]
+```
+
+A user in both `viewer` and `viewer_north_america` matches both policies. The
+`viewer` policy has no row filter (all rows allowed), and the
+`viewer_north_america` policy filters to North American countries. Because
+row-level filters from multiple matching policies combine with OR, the
+permissive `viewer` policy wins and the user sees all rows.
+
+### The solution
+
+Add a row-level filter to the base group that matches **no rows**. This makes the base
+policy restrictive by default, so it never overrides regional filters:
+
+```yaml
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    access_policy:
+      - group: viewer
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["__NONE__"]
+
+      - group: viewer_north_america
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["US", "CA", "MX"]
+```
+
+The `viewer` policy now filters `country = '__NONE__'`, a value that doesn't
+exist in the data. On its own, this grants access to zero rows.
+
+When a user belongs to both groups, Cube combines the two row filters with OR:
+
+```sql
+WHERE (country = '__NONE__') OR (country IN ('US', 'CA', 'MX'))
+```
+
+The first condition matches nothing, so only the regional filter takes effect.
+The user sees exactly the rows allowed by their regional group.
+
+## Adding more regions
+
+Scale this pattern by adding a policy per regional group. The base `viewer`
+policy continues to act as the member-access gateway while granting no rows on
+its own:
+
+```yaml
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    access_policy:
+      - group: viewer
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["__NONE__"]
+
+      - group: viewer_north_america
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["US", "CA", "MX"]
+
+      - group: viewer_europe
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["DE", "FR", "GB"]
+
+      - group: viewer_asia
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: ["JP", "KR", "SG"]
+```
+
+A user in `viewer` + `viewer_north_america` + `viewer_europe` sees rows where
+`country` is in `US, CA, MX, DE, FR, GB`. The dummy `__NONE__` filter from the
+base group adds nothing to the result.
+
+## Result
+
+For a user in both `viewer` and `viewer_north_america`, Cube generates SQL like:
+
+```sql
+SELECT
+  count(*) "orders_view__count"
+FROM orders
+WHERE
+  (country = '__NONE__')
+  OR (country IN ('US', 'CA', 'MX'))
+LIMIT 10000
+```
+
+Only North American rows are returned. The base group grants member access
+without widening the row-level filter.
