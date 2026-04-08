@@ -20,6 +20,10 @@ To create a folder:
 You can also create folders inside existing folders to build a nested
 hierarchy. Open the parent folder first, then follow the same steps.
 
+{/* Screenshot: Workspace page with the "New folder" button visible in the
+toolbar and the folder name dialog open, showing the name input field and
+Create button. */}
+
 <Info>
 
 Folder names must be unique within the same parent folder.
@@ -55,12 +59,20 @@ Folders can contain the following content types:
 Content that is not placed in a folder appears at the root level of your
 workspace.
 
+{/* Screenshot: Workspace page showing a folder containing a mix of content
+types — at least one workbook, one dashboard, and one exploration visible
+in the list. */}
+
 ## Moving content into folders
 
 To move a workbook, dashboard, or exploration into a folder, open the
 item's action menu and select **Move**. Choose the target folder from the
 folder picker and confirm. You can also move items to the root level by
 selecting the workspace root as the destination.
+
+{/* Screenshot: The folder picker dialog that appears after clicking "Move" on
+a workbook, showing the folder tree with nested folders to choose from and
+a confirm button. */}
 
 ## Renaming folders
 
@@ -70,6 +82,9 @@ To rename a folder:
 2. Select **Rename**.
 3. Enter the new name.
 4. Click **Save**.
+
+{/* Screenshot: A folder's action menu (three-dot / context menu) open, showing
+options including Rename, Move, Share, and Delete. */}
 
 <Info>
 
@@ -111,35 +126,19 @@ any subfolders first.
 
 Folder access is controlled through three permission levels:
 
-| Permission | Allows |
+| Level | Allows |
 | --- | --- |
-| **Read** | View the folder and its contents |
-| **Edit** | Rename the folder, move content into it, and create subfolders |
-| **Manage** | Full control including moving and deleting the folder, and managing folder permissions |
+| **Can view** | View the folder and its contents |
+| **Can edit** | Rename the folder, move content into it, and create subfolders |
+| **Full access** | Full control including moving and deleting the folder, and managing folder permissions |
 
-The creator of a folder automatically receives **Manage** permission.
+The creator of a folder automatically receives **Full access**.
 
-### Permission inheritance
-
-Permissions propagate down the folder tree. When a user is granted access
-to a folder, they also gain access to all of its subfolders. The closest
-folder in the hierarchy determines the effective permission level — a
-permission set on a subfolder overrides the inherited permission from its
-parent.
-
-### Folder visibility
-
-Users can see a folder if any of the following apply:
-
-- They have been granted direct access to the folder
-- They have access to a parent or child folder (ancestor folders are
-  visible for navigation)
-- They have access to content inside the folder
-
-This ensures users can always navigate to content they have permission to
-view, even if they don't have explicit access to every folder along the
-path.
+To learn how to share folders with users, groups, or your entire
+organization — and how permissions are inherited by content inside
+folders — see [Share content][ref-sharing].
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-sharing]: /docs/organize-content/sharing
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
