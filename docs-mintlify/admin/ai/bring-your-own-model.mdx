@@ -1,0 +1,133 @@
+---
+title: Bring Your Own Model
+sidebarTitle: Bring Your Own Model
+description: Configure custom LLM providers for AI agents in Cube, including supported providers, setup, and billing implications.
+---
+
+Bring Your Own Model (BYOM) lets you connect your own LLM provider to power
+AI agents in Cube, instead of using the built-in models. This gives you full
+control over which models your agents use, where your data is processed, and
+how you manage AI costs.
+
+## Supported providers
+
+| Provider | Chat models | Embedding models |
+| --- | --- | --- |
+| **Anthropic** | Yes | No |
+| **OpenAI** | Yes | Yes |
+| **AWS Bedrock** | Yes | Yes |
+| **GCP Vertex AI** | Yes | No |
+| **Databricks** | Yes | No |
+| **Snowflake Cortex** | Yes | No |
+
+## Configuration
+
+### Step 1: Add a model
+
+Before assigning a BYOM model to an agent, you need to register it in the
+admin panel:
+
+1. Navigate to **Admin > Models**
+2. Click **Add Model**
+3. Provide a **name** for the model
+4. Select the **model type** (LLM or Embedding)
+5. Choose a **provider** and **model**
+6. Enter the required credentials for the provider
+
+### Step 2: Assign the model to an agent
+
+Once a model is registered, reference it in the agents YAML configuration by
+name or ID:
+
+```yaml
+agents:
+  - name: sales-analyst
+    llm:
+      byom:
+        name: "my-anthropic-model"
+    embedding_llm:
+      byom:
+        name: "my-bedrock-embeddings"
+```
+
+Each agent can use a different model. If no BYOM model is specified, the agent
+uses the built-in default.
+
+<Warning>
+
+Switching embedding models for an agent means existing memories stored with
+the previous embedding model will not be compatible. Memories are tied to the
+embedding model that created them.
+
+</Warning>
+
+## Network configuration
+
+When using BYOM, Cube connects to your model provider from its control plane.
+If your provider requires IP allowlisting, ensure the Cube outbound IP
+addresses are added to your allowlist.
+
+For agents running in dedicated regions, additional per-region IP addresses
+may also need to be allowlisted.
+
+## Billing
+
+When using a BYOM model, **Cube AI tokens are not consumed**. You are billed
+directly by your model provider based on their pricing.
+
+This means:
+
+- No Cube token quota is deducted for BYOM chat requests
+- No token usage is tracked in the AI Tokens Usage dashboard for BYOM requests
+- Per-seat token grants and token packages do not apply
+
+See [AI Tokens][ref-ai-tokens] for details on how token billing works with
+built-in models.
+
+## Provider-specific notes
+
+### Anthropic
+
+Supports extended thinking mode for compatible models. Configure this in the
+model settings when creating the model.
+
+### AWS Bedrock
+
+- Credentials are optional — if left empty, the default AWS credential chain
+  is used (e.g., workload identity)
+- Supports assume-role configuration for cross-account access
+- Supports inference profiles
+
+### GCP Vertex AI
+
+Requires a service account JSON key for authentication.
+
+### Databricks
+
+Requires a workspace URL and access token.
+
+### Snowflake Cortex
+
+Supports two authentication methods:
+
+- JWT authentication
+- Key-pair authentication (requires an encrypted PKCS#8 PEM private key)
+
+## Troubleshooting
+
+### Rate limit errors
+
+If you see rate limit errors, the limits are enforced by your model provider,
+not by Cube. Check your provider's rate limits and usage quotas.
+
+### Authentication errors
+
+Verify that the API key or credentials configured for the model are valid and
+have the necessary permissions.
+
+### Model not found
+
+Ensure the model ID configured in Cube matches a valid model offered by your
+provider. Model availability may vary by region.
+
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
