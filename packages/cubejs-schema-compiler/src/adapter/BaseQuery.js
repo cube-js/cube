@@ -959,16 +959,16 @@ export class BaseQuery {
     try {
       const buildResult = nativeBuildSqlAndParams(queryParams);
 
-      const [query, params, preAggregationUsages] = buildResult;
+      const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
-      if (preAggregationUsages && Array.isArray(preAggregationUsages) && preAggregationUsages.length > 0) {
-        this.preAggregations.preAggregationUsages = preAggregationUsages;
-        // Backward compat: set preAggregationForQuery from first usage
-        const first = preAggregationUsages[0];
-        this.preAggregations.preAggregationForQuery = this.getPreAggregationByName(
-          first.cubeName,
-          first.preAggregationName,
-        );
+      if (preAggResult) {
+        if (Array.isArray(preAggResult)) {
+          // Multi-usage format: array of usage info objects
+          this.preAggregations.preAggregationUsages = preAggResult;
+        } else {
+          // Single-usage format: old-style pre-aggregation object
+          this.preAggregations.preAggregationForQuery = preAggResult;
+        }
       }
       return [query, paramsArray];
     } catch (e) {
@@ -1015,13 +1015,18 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    const [, , preAggregationUsages] = buildResult;
-    if (preAggregationUsages && Array.isArray(preAggregationUsages) && preAggregationUsages.length > 0) {
-      this.preAggregations.preAggregationUsages = preAggregationUsages;
-      const first = preAggregationUsages[0];
-      return this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    const [, , preAggResult] = buildResult;
+    if (preAggResult) {
+      if (Array.isArray(preAggResult)) {
+        // Multi-usage format: array of usage info objects
+        this.preAggregations.preAggregationUsages = preAggResult;
+        const first = preAggResult[0];
+        return this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+      }
+      // Single-usage format: old-style pre-aggregation object
+      return preAggResult;
     }
-    return preAggregationUsages;
+    return undefined;
   }
 
   allCubeMembers(path) {
