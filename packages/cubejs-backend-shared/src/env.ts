@@ -654,7 +654,7 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
     preAggregations,
   }: DataSourceOpts) => {
-    const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
+    const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource, preAggregations);
     const value = get(keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource, preAggregations)).default('5s').asString();
     return convertTimeStrToSeconds(value, key);
   },
@@ -667,7 +667,7 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
     preAggregations,
   }: DataSourceOpts) => {
-    const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource);
+    const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource, preAggregations);
     const value = get(keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource, preAggregations)).asString();
     if (value) {
       return convertTimeStrToSeconds(value, key);
@@ -691,7 +691,7 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource?: string,
     preAggregations?: boolean,
   } = {}) => {
-    const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
+    const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource, preAggregations);
     const value = get(keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource, preAggregations)).default('10m').asString();
     return convertTimeStrToSeconds(value, key);
   },
