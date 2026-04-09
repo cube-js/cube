@@ -1,40 +1,40 @@
 import { getEnv, convertTimeStrToSeconds, convertSizeToBytes } from '../src/env';
 
 test('convertTimeStrToMs', () => {
-  expect(convertTimeStrToSeconds('1', 'VARIABLE_ENV')).toBe(1);
-  expect(convertTimeStrToSeconds('1s', 'VARIABLE_ENV')).toBe(1);
-  expect(convertTimeStrToSeconds('5s', 'VARIABLE_ENV')).toBe(5);
-  expect(convertTimeStrToSeconds('1m', 'VARIABLE_ENV')).toBe(1 * 60);
-  expect(convertTimeStrToSeconds('10m', 'VARIABLE_ENV')).toBe(10 * 60);
-  expect(convertTimeStrToSeconds('1h', 'VARIABLE_ENV')).toBe(60 * 60);
-  expect(convertTimeStrToSeconds('2h', 'VARIABLE_ENV')).toBe(2 * 60 * 60);
+  expect(convertTimeStrToSeconds('1')).toBe(1);
+  expect(convertTimeStrToSeconds('1s')).toBe(1);
+  expect(convertTimeStrToSeconds('5s')).toBe(5);
+  expect(convertTimeStrToSeconds('1m')).toBe(1 * 60);
+  expect(convertTimeStrToSeconds('10m')).toBe(10 * 60);
+  expect(convertTimeStrToSeconds('1h')).toBe(60 * 60);
+  expect(convertTimeStrToSeconds('2h')).toBe(2 * 60 * 60);
 });
 
 test('convertTimeStrToMs(exception)', () => {
-  expect(() => convertTimeStrToSeconds('', 'VARIABLE_ENV')).toThrowError(
-    `Value "" is not valid for VARIABLE_ENV. Must be a number in seconds or duration string (1s, 1m, 1h).`
+  expect(() => convertTimeStrToSeconds('')).toThrowError(
+    `Value "" is not valid. Must be a number in seconds or duration string (1s, 1m, 1h).`
   );
 });
 
 test('convertSizeToBytes', () => {
-  expect(convertSizeToBytes('1024', 'VARIABLE_ENV')).toBe(1024);
-  expect(convertSizeToBytes('1kb', 'VARIABLE_ENV')).toBe(1024);
-  expect(convertSizeToBytes('10KB', 'VARIABLE_ENV')).toBe(10 * 1024);
-  expect(convertSizeToBytes('1mb', 'VARIABLE_ENV')).toBe(1024 * 1024);
-  expect(convertSizeToBytes('50MB', 'VARIABLE_ENV')).toBe(50 * 1024 * 1024);
-  expect(convertSizeToBytes('1gb', 'VARIABLE_ENV')).toBe(1024 * 1024 * 1024);
-  expect(convertSizeToBytes('2GB', 'VARIABLE_ENV')).toBe(2 * 1024 * 1024 * 1024);
+  expect(convertSizeToBytes('1024')).toBe(1024);
+  expect(convertSizeToBytes('1kb')).toBe(1024);
+  expect(convertSizeToBytes('10KB')).toBe(10 * 1024);
+  expect(convertSizeToBytes('1mb')).toBe(1024 * 1024);
+  expect(convertSizeToBytes('50MB')).toBe(50 * 1024 * 1024);
+  expect(convertSizeToBytes('1gb')).toBe(1024 * 1024 * 1024);
+  expect(convertSizeToBytes('2GB')).toBe(2 * 1024 * 1024 * 1024);
 });
 
 test('convertSizeToBytes(exception)', () => {
-  expect(() => convertSizeToBytes('', 'VARIABLE_ENV')).toThrowError(
-    `Value "" is not valid for VARIABLE_ENV. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
+  expect(() => convertSizeToBytes('')).toThrowError(
+    `Value "" is not valid. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
   );
-  expect(() => convertSizeToBytes('abc', 'VARIABLE_ENV')).toThrowError(
-    `Value "abc" is not valid for VARIABLE_ENV. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
+  expect(() => convertSizeToBytes('abc')).toThrowError(
+    `Value "abc" is not valid. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
   );
-  expect(() => convertSizeToBytes('1tb', 'VARIABLE_ENV')).toThrowError(
-    `Value "1tb" is not valid for VARIABLE_ENV. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
+  expect(() => convertSizeToBytes('1tb')).toThrowError(
+    `Value "1tb" is not valid. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
   );
 });
 
@@ -43,13 +43,13 @@ describe('getEnv', () => {
     process.env.PORT = '100000000';
 
     expect(() => getEnv('port')).toThrowError(
-      'Value "100000000" is not valid for PORT. Should be lower or equal than 65535.'
+      'Should be lower or equal than 65535.'
     );
 
     process.env.PORT = '-1000';
 
     expect(() => getEnv('port')).toThrowError(
-      'Value "-1000" is not valid for PORT. Should be a positive integer.'
+      'Should be a positive integer.'
     );
   });
 
@@ -85,7 +85,7 @@ describe('getEnv', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '11fffffff';
 
     expect(() => getEnv('refreshWorkerMode')).toThrowError(
-      'Value "11fffffff" is not valid for CUBEJS_SCHEDULED_REFRESH_TIMER. Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
+      'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
     );
   });
 
@@ -134,12 +134,12 @@ describe('getEnv', () => {
   test('maxRequestSize(exception)', () => {
     process.env.CUBEJS_MAX_REQUEST_SIZE = '50kb';
     expect(() => getEnv('maxRequestSize')).toThrowError(
-      'Value "50kb" is not valid for CUBEJS_MAX_REQUEST_SIZE. Must be between 100kb and 64mb.'
+      'Must be between 100kb and 64mb.'
     );
 
     process.env.CUBEJS_MAX_REQUEST_SIZE = '100mb';
     expect(() => getEnv('maxRequestSize')).toThrowError(
-      'Value "100mb" is not valid for CUBEJS_MAX_REQUEST_SIZE. Must be between 100kb and 64mb.'
+      'Must be between 100kb and 64mb.'
     );
   });
 });
