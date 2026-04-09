@@ -626,25 +626,10 @@ const variables: Record<string, (...args: any) => any> = {
   dbMinPoolSize: ({
     dataSource,
     preAggregations,
-  }: DataSourceOpts) => {
-    if (get(keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource, preAggregations)).asString()) {
-      const min = parseInt(
-        `${get(keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource, preAggregations)).asString()}`,
-        10,
-      );
-      if (min < 0) {
-        throw new Error(
-          `The ${
-            keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource)
-          } must be a positive number or zero.`
-        );
-      }
-
-      return min;
-    }
-
-    return undefined;
-  },
+  }: DataSourceOpts) => (
+    get(keyByDataSource('CUBEJS_DB_MIN_POOL', dataSource, preAggregations))
+      .asIntPositive()
+  ),
 
   /**
    * Max polling interval. Currently used in BigQuery and Databricks.
