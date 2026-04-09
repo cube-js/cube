@@ -212,17 +212,18 @@ Example response:
 ```
 
 
-### `/api/v1/audit-log/events`
+### `/api/v1/audit-logs/export`
 
-Send a `GET` request to export [audit log][ref-audit-log] events for your
-Cube Cloud account. This endpoint allows you to programmatically retrieve
-security-related events for compliance reviews, external log aggregation,
-or integration with SIEM tools.
+Send a `GET` request to export [audit log][ref-audit-log] events as a CSV
+file. This endpoint allows you to programmatically retrieve security-related
+events for compliance reviews, external log aggregation, or integration with
+SIEM tools.
 
 <Info>
 
 Requires [Audit Log][ref-audit-log] to be enabled on the
-[Enterprise Premier plan](https://cube.dev/pricing).
+[Enterprise Premier plan](https://cube.dev/pricing). The authenticated user
+must have the `AuditLogManage` permission.
 
 </Info>
 
@@ -230,39 +231,31 @@ Query parameters:
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `offset` | Pagination offset | No |
-| `limit` | Pagination limit | No |
+| `start` | Start of the date range (ISO 8601 format, e.g., `2024-01-01`) | No |
+| `end` | End of the date range (ISO 8601 format, e.g., `2024-01-31`) | No |
+| `search` | Full-text search across event data | No |
+| `eventName` | Filter by event type (e.g., `Logged in`) | No |
+| `userEmail` | Filter by user email | No |
+
+The response is a CSV file streamed as an attachment.
 
 Example request:
 
 ```bash
 curl \
   -H "Authorization: Api-Key YOUR_API_KEY" \
-  "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-log/events"
+  -o audit_log.csv \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-logs/export?start=2024-01-01&end=2024-01-31"
 ```
 
-Example response:
+Example request with filters:
 
-```json
-{
-  "data": {
-    "events": [
-      {
-        "timestamp": "2024-01-15T10:30:00.000Z",
-        "event": "Logged in",
-        "user_email": "user@example.com",
-        "deployment_name": "My Deployment",
-        "ip_address": "192.168.1.1",
-        "attributes": {}
-      }
-    ]
-  },
-  "pagination": {
-    "offset": 0,
-    "limit": 20,
-    "total": 100
-  }
-}
+```bash
+curl \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -o audit_log.csv \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-logs/export?start=2024-01-01&end=2024-01-31&eventName=Logged+in&userEmail=user@example.com"
+```
 ```
 
 [ref-core-data-apis]: /reference/core-data-apis

@@ -94,11 +94,10 @@ current view:
 
 ## Exporting events via API
 
-You can also export audit log events programmatically using the
+You can also export audit log events as a CSV file programmatically using the
+[`/api/v1/audit-logs/export`][ref-audit-log-api] endpoint of the
 [Control Plane API][ref-control-plane-api]. This is useful for integrating
 with external log aggregation or SIEM tools.
-
-See the [`/api/v1/audit-log/events`][ref-audit-log-api] endpoint for details.
 
 ## Event types
 
@@ -117,4 +116,4 @@ Audit Log collects the following types of events:
 | [Budgets](/admin/account-billing/budgets) | `Created budget`<br/>`Deleted budget`<br/>`Updated budget` |
 
 [ref-control-plane-api]: /reference/control-plane-api
-[ref-audit-log-api]: /reference/control-plane-api#apiv1audit-logevents
+[ref-audit-log-api]: /reference/control-plane-api#apiv1audit-logsexport
