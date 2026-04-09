@@ -601,24 +601,22 @@ export class CubejsServerCore {
        * Driver factory function `DriverFactoryByDataSource`.
        */
       async (dataSource = 'default', preAggregations = false) => {
-        const requiredSeparatePreAggDriver = preAggregations && hasPreAggregationsEnvVars(dataSource);
-        const usePreAgg = requiredSeparatePreAggDriver && !this.optsHandler.isCustomDriverFactory();
-
-        const factoryKey = usePreAgg ? `${dataSource}@pre_agg` : dataSource;
-
+        const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
         if (driverPromise[factoryKey]) {
           return driverPromise[factoryKey];
         }
 
-        if (requiredSeparatePreAggDriver && this.optsHandler.isCustomDriverFactory()) {
+        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
+        const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
+
+        if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
           this.logger('Pre-aggregation driver conflict', {
             error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
             dataSource,
           });
         }
 
-        // eslint-disable-next-line no-return-assign
-        return driverPromise[factoryKey] = (async () => {
+        driverPromise[factoryKey] = (async () => {
           let driver: BaseDriver | null = null;
 
           try {
@@ -647,6 +645,10 @@ export class CubejsServerCore {
           } catch (e) {
             driverPromise[factoryKey] = null;
 
+            if (!preAggregations && !hasSeparatePreAggEnv) {
+              driverPromise[`${dataSource}@pre_agg`] = null;
+            }
+
             if (driver) {
               await driver.release();
             }
@@ -654,6 +656,13 @@ export class CubejsServerCore {
             throw e;
           }
         })();
+
+        // No separate pre-agg driver needed — share the same promise for both keys
+        if (!preAggregations && !hasSeparatePreAggEnv) {
+          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
+        }
+
+        return driverPromise[factoryKey];
       },
       {
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
