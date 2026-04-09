@@ -225,10 +225,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * you cannot call method in RedshiftDriver.constructor before super.
    */
   protected getInitialConfiguration(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    dataSource: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    preAggregations?: boolean,
+    _dataSource: string,
+    _preAggregations?: boolean,
   ): Partial<PostgresDriverConfiguration> {
     return {
       readOnly: true,
