@@ -91,6 +91,10 @@ impl TypedFilter {
         &self.values
     }
 
+    pub fn operation(&self) -> &FilterOp {
+        &self.op
+    }
+
     pub fn use_raw_values(&self) -> bool {
         self.use_raw_values
     }

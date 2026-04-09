@@ -105,6 +105,10 @@ impl BaseFilter {
         self.typed_filter.operator()
     }
 
+    pub fn operation(&self) -> &super::typed_filter::FilterOp {
+        self.typed_filter.operation()
+    }
+
     pub fn use_raw_values(&self) -> bool {
         self.typed_filter.use_raw_values()
     }

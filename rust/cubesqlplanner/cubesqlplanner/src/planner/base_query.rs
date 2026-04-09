@@ -108,7 +108,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
         if has_multiple_usages {
             // Multiple usages: group by (cubeName, name), return array of grouped infos
-            let grouped = Self::group_usages(&usages, &self.query_tools);
+            let grouped = Self::group_usages(&usages);
             res.set(2, grouped.to_native(self.context.clone())?)?;
         } else if let Some(usage) = usages.first() {
             // Single usage: return old-style pre-aggregation object for backward compat
@@ -130,11 +130,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         Ok(result)
     }
 
-    fn group_usages(
-        usages: &[PreAggregationUsage],
-        query_tools: &Rc<QueryTools>,
-    ) -> Vec<GroupedPreAggregationInfo> {
-        let base_tools = query_tools.base_tools();
+    fn group_usages(usages: &[PreAggregationUsage]) -> Vec<GroupedPreAggregationInfo> {
         let mut groups: HashMap<(String, String), GroupedPreAggregationInfo> = HashMap::new();
 
         for usage in usages {

@@ -3,7 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
-use crate::planner::filter::FilterOperator;
+use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::query_tools::QueryTools;
@@ -123,7 +123,7 @@ impl PreAggregationOptimizer {
         query: Rc<Query>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        let date_range = Self::extract_date_range(&query.filter());
+        let date_range = Self::extract_date_range(&query.filter(), &self.query_tools);
 
         if !query.multistage_members().is_empty() {
             // Nested multi-stage: recurse with full list
@@ -214,6 +214,7 @@ impl PreAggregationOptimizer {
                         )? {
                             let date_range = Self::extract_date_range(
                                 &resolver_multiplied_measures.filter,
+                                &self.query_tools,
                             );
                             let pre_aggregation_source = self.make_pre_aggregation_source(
                                 pre_aggregation,
@@ -365,15 +366,21 @@ impl PreAggregationOptimizer {
         }
     }
 
-    fn extract_date_range(filter: &LogicalFilter) -> Option<(String, String)> {
+    fn extract_date_range(
+        filter: &LogicalFilter,
+        query_tools: &Rc<QueryTools>,
+    ) -> Option<(String, String)> {
+        let precision = query_tools
+            .base_tools()
+            .driver_tools(false)
+            .ok()
+            .and_then(|dt| dt.timestamp_precision().ok())
+            .unwrap_or(3);
         for item in &filter.time_dimensions_filters {
             if let FilterItem::Item(base_filter) = item {
-                if *base_filter.filter_operator() == FilterOperator::InDateRange {
-                    let values = base_filter.values();
-                    if values.len() >= 2 {
-                        if let (Some(from), Some(to)) = (&values[0], &values[1]) {
-                            return Some((from.clone(), to.clone()));
-                        }
+                if let FilterOp::DateRange(date_range_op) = base_filter.operation() {
+                    if let Ok(formatted) = date_range_op.formatted_date_range(precision) {
+                        return Some(formatted);
                     }
                 }
             }

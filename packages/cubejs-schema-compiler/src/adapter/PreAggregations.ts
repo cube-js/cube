@@ -94,6 +94,17 @@ export type FullPreAggregationDescription = any;
  */
 export type TransformedQuery = any;
 
+export type UsageDateRangeInfo = {
+  dateRange?: [string, string];
+};
+
+export type PreAggregationUsageInfo = {
+  cubeName: string;
+  preAggregationName: string;
+  external: boolean;
+  usages: Record<string, UsageDateRangeInfo>;
+};
+
 export class PreAggregations {
   private readonly query: BaseQuery;
 
@@ -107,7 +118,7 @@ export class PreAggregations {
 
   public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
 
-  public preAggregationUsageInfos: any[] | undefined = undefined;
+  public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
@@ -171,7 +182,7 @@ export class PreAggregations {
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
 
-  private preAggregationDescriptionsForUsageInfos(usageInfos: any[]): FullPreAggregationDescription[] {
+  private preAggregationDescriptionsForUsageInfos(usageInfos: PreAggregationUsageInfo[]): FullPreAggregationDescription[] {
     return usageInfos.flatMap(usageInfo => {
       const preAggObj = this.getRollupPreAggregationByName(usageInfo.cubeName, usageInfo.preAggregationName);
       if (!preAggObj || !('preAggregationName' in preAggObj)) {
