@@ -246,10 +246,9 @@
             "group": "Deployment",
             "pages": [
               "admin/deployment/index",
+              "admin/deployment/deployment-types",
               "admin/deployment/infrastructure",
               "admin/deployment/environments",
-              "admin/deployment/deployments",
-              "admin/deployment/deployment-types",
               "admin/deployment/continuous-deployment",
               "admin/deployment/custom-domains",
               "admin/deployment/warm-up",
@@ -508,6 +507,7 @@
           {
             "group": "Deployment",
             "pages": [
+              "cube-core/architecture",
               "cube-core/deployment",
               "cube-core/running-in-production"
             ]

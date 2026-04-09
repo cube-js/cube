@@ -1,250 +1,205 @@
 ---
-description: Learn about Cube's production deployment architecture, including API instances, refresh workers, and Cube Store.
 title: Overview
+sidebarTitle: Overview
+description: Introduces Cube deployments and how to browse, create, and operate the environments that run your semantic layer.
 ---
 
-This section contains a general overview of deploying a Cube cluster in
-production. You can also check platform-specific guides for [Cube
-Cloud][ref-deploy-cubecloud] and [Docker][ref-deploy-docker].
+Deployments are top-level entities in Cube Cloud. They include the source
+code, configuration, allocated resources, API endpoints and essentially
+do all the heavy lifting, running workloads and fulfilling requests.
 
-If you are moving Cube to production, check out the [Production
-Checklist][ref-deploy-prod-list].
+## List of deployments
 
-## Components
+Each account in Cube Cloud can have multiple deployments. Once you've
+logged in, you can access the list of deployments by clicking on
+the&nbsp;**Cube Cloud** logo in the top left corner.
 
-As shown in the diagram below, a typical production deployment of Cube includes
-the following components:
+<Frame>
+  <img src="https://ucarecdn.com/cdd5831a-a8f8-4342-bc3e-25aab2c04a5b/" />
+</Frame>
 
-- One or multiple API instances
-- A Refresh Worker
-- A Cube Store cluster
+## Creating a new deployment
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Deployment Overview"
-    src="https://ucarecdn.com/b4695d0a-46a9-4552-93f8-71309de51a43/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+Creating a new deployment is an essential prerequisite to running a Cube
+project in Cube Cloud.
 
-**API Instances** process incoming API requests and query either Cube Store for
-pre-aggregated data or connected database(s) for raw data. The **Refresh
-Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
-ingests pre-aggregations built by Refresh Worker and responds to queries from
-API instances.
+After you've created your [Cube Cloud account][cube-cloud-signup],
+click&nbsp;**+ Create Deployment** in the top-right corner of your
+list of deployments to jump into the wizard. Watch the following video for
+guidance on the rest of the steps:
 
-API instances and Refresh Workers can be configured via [environment
-variables][ref-config-env] or the [`cube.js` configuration file][ref-config-js].
-They also need access to the data model files. Cube Store clusters can be
-configured via environment variables.
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/HVZ4ytDEjqc"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
-You can find an example Docker Compose configuration for a Cube deployment in
-the platform-specific guide for [Docker][ref-deploy-docker].
+All deployments within a Cube Cloud account should have uniqie names.
 
-## API instances
+## Demo deployments
 
-API instances process incoming API requests and query either Cube Store for
-pre-aggregated data or connected data sources for raw data. It is possible to
-horizontally scale API instances and use a load balancer to balance incoming
-requests between multiple API instances.
+After you've created your [Cube Cloud account][cube-cloud-signup] and
+proceeded to create a new deployment, you would be prompted to set up a
+connection to your [data source][ref-data-source].
 
-The [Cube Docker image][dh-cubejs] is used for API Instance.
+If, for any reason, you're not ready or unable to connect your staging or
+production data source at the moment, you can click&nbsp;**Create a demo
+deployment** in the yellow box:
 
-API instances can be configured via environment variables or the `cube.js`
-configuration file, and **must** have access to the data model files (as
-specified by [`schema_path`][ref-conf-ref-schemapath].
+<Frame>
+  <img src="https://ucarecdn.com/559aeebe-d20f-4510-a22c-62532b59cbcc/" />
+</Frame>
 
-## Refresh Worker
+Shortly, Cube Cloud will create and pre-configure a new deployment in your
+account. You will see it as&nbsp;**Demo deployment** in the list of
+deployments. This new deployment will be:
 
-A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in
-the background. They also keep the refresh keys up-to-date for all data models
-and pre-aggregations. Please note that the in-memory cache is just invalidated
-but not populated by Refresh Worker. In-memory cache is populated lazily during
-querying. On the other hand, pre-aggregations are eagerly populated and kept
-up-to-date by Refresh Worker.
+- Configured to use [DuckDB][ref-duckdb] as the data source.
+- Provided with a sample [data model][ref-data-model] backed with CSV files
+in a public S3 bucket.
+- Provided with an example of [dynamic data modeling][ref-dynamic-data-models]
+and programmatic [configuration options][ref-config-options].
 
-The [Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to
-make the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be
-set in the environment variables.
+Watch the following video to for a step-by-step walkthrough:
 
-## Cube Store
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/XeaZPUQRC8M"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
-Cube Store is the purpose-built pre-aggregations storage for Cube.
+Exploring the demo deployment is a great way to understand how Cube works.
+Use the [data model editor][ref-data-model] to review the data model and
+make sure to run a few queries in [Playground][ref-playground].
 
-Cube Store uses a distributed query engine architecture. In every Cube Store
-cluster:
+## Deployment overview
 
-- a one or many [router nodes](#cube-store-cube-store-router) handle incoming
-  connections, manages database metadata, builds query plans, and orchestrates
-  their execution
-- multiple [worker nodes](#cube-store-cube-store-worker) ingest warmed up data
-  and execute queries in parallel
-- a local or cloud-based blob storage keeps pre-aggregated data in columnar
-  format
+The&nbsp;**Overview** page of each deployment provides a high-level
+summary of its components and state:
+* API endpoints with URLs and connection instructions.
+* Allocated resources in line with the [deployment type][ref-deployment-types].
+* Activity log of the most recent events.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Store Router with two Cube Store Workers"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://ucarecdn.com/af8129b4-19bb-4dc1-90db-a726da367de8/" />
+</Frame>
 
-By default, Cube Store listens on the port `3030` for queries coming from Cube.
-The port could be changed by setting `CUBESTORE_HTTP_PORT` environment variable.
-In a case of using custom port, please make sure to change
-[`CUBEJS_CUBESTORE_PORT`](/reference/configuration/environment-variables#cubejs_cubestore_port) environment variable for Cube API Instances and Refresh
-Worker.
+Additionally, the bar under the&nbsp;**Cube Cloud** logo displays
+user-specific state of the deployment:
+* Branch selector displays the source code branch that is currently
+  selected and being viewed by the user.
+* **Enter Development Mode** button indicates whether a user has
+  entered the [development mode][ref-dev-mode].
 
-Both the router and worker use the [Cube Store Docker image][dh-cubestore]. The
-following environment variables should be used to manage the roles:
+## Deployment settings
 
-| Environment Variable    | Specify on Router? | Specify on Worker? |
-| ----------------------- | ------------------ | ------------------ |
-| `CUBESTORE_SERVER_NAME` | ✅ Yes              | ✅ Yes              |
-| `CUBESTORE_META_PORT`   | ✅ Yes              | —                  |
-| `CUBESTORE_WORKERS`     | ✅ Yes              | ✅ Yes              |
-| `CUBESTORE_WORKER_PORT` | —                  | ✅ Yes              |
-| `CUBESTORE_META_ADDR`   | —                  | ✅ Yes              |
+You can manage various settings of a deployment, such as [environment
+variables](#environment-variables), by navigating to the **Settings** page of the
+deployment.
 
-<Info>
+### Environment variables
 
-Looking for a deeper dive on Cube Store architecture? Check out
-[this presentation](https://docs.google.com/presentation/d/1oQ-koloag0UcL-bUHOpBXK4txpqiGl41rxhgDVrw7gw/)
-by our CTO, [Pavel][gh-pavel].
+You can configure environment variables by navigating to **Settings → Environment
+variables** where you can add, edit, or remove environment variables for your
+deployment.
 
-</Info>
+For convenience, environment variables are split into two lists: ones that relate to
+the [data source][ref-data-sources] configuration and all other variables.
+Browsing environment variables is reflected in the [Audit Log][ref-audit-log].
 
-### Cube Store Router
+<Frame>
+  <img src="https://ucarecdn.com/e7d6cbc3-ed83-492c-9376-dee501ae747a/" />
+</Frame>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Store Router with two Cube Store Workers"
-    src="https://ucarecdn.com/bfc4f46a-09c2-4e2d-a8e8-8bb6177bb5ff/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+## Cube version
 
-The Router in a Cube Store cluster is responsible for receiving queries from
-Cube, managing metadata for the Cube Store cluster, and query planning and
-distribution for the Workers. It also [provides a MySQL-compatible
-interface][ref-caching-inspect-sql] that can be used to query pre-aggregations
-from Cube Store directly. Cube **only** communicates with the Router, and does
-not interact with Workers directly.
+Each [environment][ref-environments] within a Cube Cloud deployment runs a specific
+version of Cube that depends on the environment type and the selected [update
+channel](#update-channels).
 
-[ref-caching-inspect-sql]: /docs/pre-aggregations/using-pre-aggregations#inspecting-pre-aggregations
-### Cube Store Worker
+### Current version
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Store Router with two Cube Store Workers"
-    src="https://ucarecdn.com/bedc67d5-b8ab-447f-8d7a-0176487e02a5/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+You can check the current version of Cube that your deployment (environment) runs by
+navigating to **Overview → Resources & Logs → Cube API**:
 
-Workers in a Cube Store cluster receive and execute subqueries from the Router,
-and directly interact with the underlying distributed storage for insertions,
-selections and pre-aggregation warmup. Workers **do not** interact with each
-other directly, and instead rely on the Router to distribute queries and manage
-any associated metadata.
+<Frame>
+  <img src="https://ucarecdn.com/83a5010a-3c02-4ce1-8e4f-fdbb2efc6a90/" />
+</Frame>
 
-### Scaling
+### Update channels
 
-Although Cube Store _can_ be run in single-instance mode, this is often
-unsuitable for production deployments. For high concurrency and data throughput,
-we **strongly** recommend running Cube Store as a cluster of multiple instances
-instead. Because the storage layer is decoupled from the query processing
-engine, you can horizontally scale your Cube Store cluster for as much
-concurrency as you require.
+Cube Cloud provides two update channels:
 
-A sample Docker Compose stack setting Cube Store cluster up might look like:
+* **LTS channel** for infrequent [long-term support][ref-lts] releases with
+critical fixes.
+* **Regular channel** for regular releases, which occur more frequently and
+contain both fixes and new features.
 
-```yaml
-services:
-  cubestore_router:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
-      - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_PORT=9999
-      - CUBESTORE_SERVER_NAME=cubestore_router:9999
-    volumes:
-      - .cubestore:/cube/data
-    depends_on:
-      - cubestore_worker_1
-      - cubestore_worker_2
+You can view or change the update channel by navigating to **Settings →
+General → Cube version**:
 
-  cubestore_worker_1:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
-      - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
-      - CUBESTORE_WORKER_PORT=10001
-      - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore_router:9999
-    volumes:
-      - .cubestore:/cube/data
+<Frame>
+  <img src="https://ucarecdn.com/3ef5fa36-4b27-437c-aa70-dbc0aa01255d/" />
+</Frame>
 
-  cubestore_worker_2:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
-      - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
-      - CUBESTORE_WORKER_PORT=10002
-      - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore_router:9999
-    volumes:
-      - .cubestore:/cube/data
-```
+You can select a specific version in the drop-down. Only versions that have been used by
+a deployment during the last 6 months are available in the list.
 
-### Storage
+There's an option to **Upgrade automatically to new patch versions**, which is
+available for both update channels. When it's turned on, an upgrade will occur if a new
+[patch version][link-semver] is available in the selected channel. To trigger an upgrade,
+deploy a new build to the [production environment][ref-environments-prod] or change its
+settings, e.g., by updating environment variables of the Cube Cloud deployment.
 
-Cube Store makes use of a separate storage layer for storing metadata as well as
-for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
-and Google Cloud, or if desired, a local path on the server if all nodes of a
-cluster run on a single machine.
+Generally, it's recommended to use the _regular channel_ to get the latest updates.
+You can _pin the version_ to a specific one by turning the **Upgrade automatically...**
+toggle off.
 
-A simplified example using AWS S3 might look like:
+If you choose to pin the version, make sure to upgrade periodically, especially when the
+next [minor version][ref-distribution-versions] is released. If you use the _LTS channel_,
+make sure to upgrade to the latest [LTS version][ref-lts] every few months.
 
-```yaml
-services:
-  cubestore_router:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_SERVER_NAME=cubestore_router:9999
-      - CUBESTORE_META_PORT=9999
-      - CUBESTORE_WORKERS=cubestore_worker_1:9001
-      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
-      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
-      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
-      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
-  cubestore_worker_1:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
-      - CUBESTORE_WORKER_PORT=9001
-      - CUBESTORE_META_ADDR=cubestore_router:9999
-      - CUBESTORE_WORKERS=cubestore_worker_1:9001
-      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
-      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
-      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
-      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
-    depends_on:
-      - cubestore_router
-```
+## Resource consumption
+
+Cube Cloud deployments only consume resources when they are needed to run workloads:
+
+* For the [production environment][ref-environments-prod], resources are always consumed
+unless a deployment is [suspended][ref-auto-sus].
+* For any other [environment][ref-environments], a development instance is allocated
+while it's active. After a period of inactivity, the development instance is deallocated.
+* For pre-aggregations, Cube Store workers are allocated while there's some
+  activity related to pre-aggregations, e.g., API endpoints are serving
+  requests to pre-aggregations, pre-aggregations are being built, etc.
+  After a period of inactivity, Cube Store workers are deallocated.
+
+Please refer to [total cost examples][ref-total-cost] to learn more about
+resource consumption in different scenarios.
 
 
-[dh-cubejs]: https://hub.docker.com/r/cubejs/cube
-[dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore
-[ref-deploy-prod-list]: /docs/deployment/production-checklist
-[ref-deploy-cubecloud]: /docs/deployment/cloud
-[ref-deploy-docker]: /docs/deployment/core
-[ref-config-env]: /reference/configuration/environment-variables
-[ref-config-js]: /reference/configuration/config
-[ref-conf-ref-schemapath]: /reference/configuration/config#schema_path
-[gh-pavel]: https://github.com/paveltiunov
+[cube-cloud-signup]: https://cubecloud.dev/auth/signup
+[ref-deployment-types]: /docs/deployment/cloud/deployment-types
+[ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-auto-sus]: /docs/deployment/cloud/auto-suspension
+[ref-total-cost]: /admin/account-billing/pricing#total-cost-examples
+[ref-data-source]: /admin/connect-to-data/data-sources
+[ref-duckdb]: /admin/connect-to-data/data-sources/duckdb
+[ref-data-model]: /docs/data-modeling/overview
+[ref-dynamic-data-models]: /docs/data-modeling/dynamic
+[ref-config-options]: /admin/connect-to-data#configuration-options
+[ref-data-model]: /docs/data-modeling/data-model-ide
+[ref-playground]: /docs/workspace/playground
+[ref-environments]: /admin/deployment/environments
+[ref-environments-prod]: /admin/deployment/environments#production-environment
+[ref-lts]: /docs/distribution#long-term-support
+[link-semver]: https://semver.org
+[ref-data-sources]: /admin/connect-to-data/data-sources
+[ref-audit-log]: /admin/monitoring/audit-log
+[ref-distribution-versions]: /docs/distribution#versions

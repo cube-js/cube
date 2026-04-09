@@ -1,56 +1,55 @@
 ---
 title: Deployment types
-description: "Cube Cloud provides you with three deployment types:"
+sidebarTitle: Deployment types
+description: "Cube provides three deployment types: Development, Production, and Multi-cluster."
 ---
 
-* [Development instance](#development-instance) — designed for development use
-cases.
-* [Production cluster](#production-cluster) — designed for production workloads
-and high-availability.
-* [Production multi-cluster](#production-multi-cluster) — designed for
-demanding production workloads, high-scalability, high-availaility, and
-advanced multi-tenancy configurations.
+* [Development](#development) — designed for development use cases.
+* [Production](#production) — designed for production workloads and
+high-availability.
+* [Multi-cluster](#multi-cluster) — designed for demanding production workloads,
+high-scalability, high-availability, and advanced multi-tenancy configurations.
 
-## Development instance
+## Development
 
 <Info>
 
 Available for free, no credit card required. Your free trial is limited to 2
-development instances and only 1,000 queries per day. Upgrade to
+development deployments and only 1,000 queries per day. Upgrade to
 [any paid plan](https://cube.dev/pricing) to unlock all features.
 
 </Info>
 
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level architecture diagram of a Cube Cloud Development Instance"
+    alt="High-level architecture diagram of a Development deployment"
     src="https://ucarecdn.com/adaa000a-c562-4eb4-9687-6f57f0f4c22b/"
     style={{ border: "none" }}
     width="100%"
   />
 </div>
 
-Development instances are designed for development use cases only. This makes it
-easy to get started with Cube Cloud quickly, and also allows you to build and
+Development deployments are designed for development use cases only. This makes
+it easy to get started with Cube quickly, and also allows you to build and
 query pre-aggregations on-demand.
 
-Development instances don't have dedicated [refresh workers][ref-refresh-worker]
+Development deployments don't have dedicated [refresh workers][ref-refresh-worker]
 and, consequently, they do not refresh pre-aggregations on schedule.
 
-Development instances do not provide high-availability nor do they guarantee
-fast response times. Development instances also [auto-suspend][ref-auto-sus]
-after 30 minutes of inactivity, which can cause the first request after the instance
-wakes up to take additional time to process. They also have [limits][ref-limits]
-on the maximum number of queries per day and the maximum number of Cube Store
-Workers. We **strongly** advise not using a development instance in a production
-environment, it is for testing and learning about Cube only and will not deliver
-a production-level experience for your users.
+Development deployments do not provide high-availability nor do they guarantee
+fast response times. Development deployments also [auto-suspend][ref-auto-sus]
+after 30 minutes of inactivity, which can cause the first request after the
+deployment wakes up to take additional time to process. They also have
+[limits][ref-limits] on the maximum number of queries per day and the maximum
+number of Cube Store Workers. We **strongly** advise not using a Development
+deployment in a production environment, it is for testing and learning about
+Cube only and will not deliver a production-level experience for your users.
 
-You can try a Cube Cloud development instance by
-[signing up for Cube Cloud](https://cubecloud.dev/auth/signup) to try it free
+You can try a Development deployment by
+[signing up for Cube](https://cubecloud.dev/auth/signup) to try it free
 (no credit card required).
 
-## Production cluster
+## Production
 
 <Info>
 
@@ -61,24 +60,24 @@ You can also choose a [deployment tier](/admin/account-billing/pricing#deploymen
 
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level architecture diagram of a Cube Cloud Production Cluster"
+    alt="High-level architecture diagram of a Production deployment"
     src="https://ucarecdn.com/fcb57d7a-09ee-4854-9282-db443a5ee61d/"
     style={{ border: "none" }}
     width="100%"
   />
 </div>
 
-Production Clusters are designed to support high-availability production
+Production deployments are designed to support high-availability production
 workloads. It consists of several key components, including starting with 2 Cube
 API instances, 1 Cube Refresh Worker and 2 Cube Store Routers - all of which run
-on dedicated infrastructure. The cluster can automatically scale to meet the
+on dedicated infrastructure. The deployment can automatically scale to meet the
 needs of your workload by adding more components as necessary; check the page on
 [scalability][ref-scalability] to learn more.
 
-## Production multi-cluster
+## Multi-cluster
 
-Production multi-cluster deployments are designed for demanding production
-workloads, high-scalability, high-availaility, and large [multi-tenancy][ref-multitenancy]
+Multi-cluster deployments are designed for demanding production workloads,
+high-scalability, high-availability, and large [multi-tenancy][ref-multitenancy]
 configurations, e.g., with more than 100 tenants.
 
 <Info>
@@ -88,27 +87,27 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 </Info>
 
 It provides you with two options:
-* Scale the number of [production cluster](#production-cluster) deployments
-serving your workload, allowing to route requests over up to 10 production
-clusters and up to 100 API instances.
+* Scale the number of [Production](#production) deployments serving your
+workload, allowing to route requests over up to 10 production deployments and
+up to 100 API instances.
 * Optionally, scale the number of Cube Store routers, allowing for increased
 Cube Store querying performance.
 
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level architecture diagram of a Cube Cloud Production Multi-Cluster"
+    alt="High-level architecture diagram of a Multi-cluster deployment"
     src="https://ucarecdn.com/0ab1eb5c-7aba-4e9c-8951-1998d4b714f0/"
     style={{ border: "none" }}
     width="100%"
   />
 </div>
 
-Each production cluster is billed separately, and all production clusters can
-use auto-scaling to match demand.
+Each production deployment is billed separately, and all production deployments
+can use auto-scaling to match demand.
 
-### Configuring production multi-cluster
+### Configuring Multi-cluster
 
-To switch your Cube Cloud deployment to production multi-cluster, navigate to
+To switch your deployment to Multi-cluster, navigate to
 **Settings → General**, select it under **Type**, and confirm
 with **✓**:
 
@@ -116,7 +115,7 @@ with **✓**:
   <img src="https://ucarecdn.com/30e357ce-4252-4676-bb1d-e46eb1f753ef/" />
 </Frame>
 
-To set the number of production clusters within your production multi-cluster
+To set the number of production deployments within your Multi-cluster
 deployment, navigate to **Settings → Configuration** and edit
 **Number of clusters**.
 
@@ -124,18 +123,18 @@ deployment, navigate to **Settings → Configuration** and edit
   <img src="https://ucarecdn.com/1da76aca-200a-410a-b84c-59b3d14ced9f/" />
 </Frame>
 
-### Routing traffic between production clusters
+### Routing traffic between production deployments
 
-Cube Cloud routes requests between multiple production clusters within a
-production multi-cluster deployment based on [`context_to_app_id`][ref-ctx-to-app-id].
+Cube routes requests between multiple production deployments within a
+Multi-cluster deployment based on [`context_to_app_id`][ref-ctx-to-app-id].
 In most cases, it should return an identifier that does not change over time
 for each tenant.
 
 The following implementation will make sure that all requests from a
-particular tenant are always routed to the same production cluster. This
-approach ensures that only one production cluster keeps compiled data model
+particular tenant are always routed to the same production deployment. This
+approach ensures that only one production deployment keeps compiled data model
 cache for each tenant and serves its requests. It allows to reduce the
-footprint of the compiled data model cache on individual production clusters.
+footprint of the compiled data model cache on individual production deployments.
 
 <CodeGroup>
 
@@ -161,8 +160,10 @@ module.exports = {
 
 If your implementation of `context_to_app_id` returns identifiers that change
 over time for each tenant, requests from one tenant would likely hit multiple
-production clusters and you would not have the benefit of reduced memory footprint.
-Also you might see 502 or timeout errors in case of different cluster nodes would return different `context_to_app_id` results for the same request.
+production deployments and you would not have the benefit of reduced memory
+footprint. Also you might see 502 or timeout errors in case of different
+deployment nodes would return different `context_to_app_id` results for the
+same request.
 
 </Warning>
 
@@ -172,7 +173,7 @@ To switch a deployment's type, go to the deployment's **Settings** screen
 and select from the available options:
 
 <Frame>
-  <img src="https://ucarecdn.com/fbde6a1e-734a-4091-8edd-922dc1ee7e1c/" alt="Cube Cloud Deployment Settings page showing Development Instance, Production Cluster, and Production Multi-Cluster options" />
+  <img src="https://ucarecdn.com/fbde6a1e-734a-4091-8edd-922dc1ee7e1c/" alt="Deployment Settings page showing Development, Production, and Multi-cluster options" />
 </Frame>
 
 [ref-ctx-to-app-id]: /reference/configuration/config#context_to_app_id
@@ -180,4 +181,4 @@ and select from the available options:
 [ref-scalability]: /docs/deployment/cloud/scalability
 [ref-multitenancy]: /admin/connect-to-data/multitenancy
 [ref-auto-sus]: /docs/deployment/cloud/auto-suspension
-[ref-refresh-worker]: /docs/deployment#refresh-worker
+[ref-refresh-worker]: /cube-core/architecture#refresh-worker
