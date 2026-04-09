@@ -333,9 +333,10 @@
           {
             "group": "Account & Billing",
             "pages": [
+              "admin/account-billing/ai-tokens",
               "admin/account-billing/api-keys",
+              "admin/account-billing/billing-faq",
               "admin/account-billing/budgets",
-              "admin/account-billing/pricing",
               "admin/account-billing/distribution",
               "admin/account-billing/support"
             ]
