@@ -83,7 +83,8 @@ export function formatValue(
     }
 
     if (format.type === 'custom-time') {
-      return timeFormat(format.value)(new Date(value));
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? 'Invalid date' : timeFormat(format.value)(date);
     }
 
     // { type: 'link', label: string } — return value as string
@@ -108,8 +109,10 @@ export function formatValue(
 
   // No explicit format — infer from type
   if (type === 'time') {
-    const fmt = getTimeFormatByGrain(granularity);
-    return timeFormat(fmt)(new Date(value));
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Invalid date';
+
+    return timeFormat(getTimeFormatByGrain(granularity))(date);
   }
 
   if (type === 'number') {

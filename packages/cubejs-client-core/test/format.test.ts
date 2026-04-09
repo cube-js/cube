@@ -82,6 +82,17 @@ describe('formatValue', () => {
     expect(formatValue(1234567.89, { type: 'number', locale })).toBe('12,34,567.89');
   });
 
+  it('invalid date input returns Invalid date', () => {
+    expect(formatValue('not-a-date', { type: 'time' })).toBe('Invalid date');
+    expect(formatValue('not-a-date', { type: 'time', granularity: 'day' })).toBe('Invalid date');
+    expect(formatValue('not-a-date', { type: 'time', format: { type: 'custom-time', value: '%Y-%m-%d' } })).toBe('Invalid date');
+  });
+
+  it('custom emptyPlaceholder', () => {
+    expect(formatValue(null, { type: 'number', emptyPlaceholder: 'N/A' })).toBe('N/A');
+    expect(formatValue(undefined, { type: 'time', emptyPlaceholder: '-' })).toBe('-');
+  });
+
   it('default fallback', () => {
     expect(formatValue('hello', { type: 'string' })).toBe('hello');
     expect(formatValue(42, { type: 'number' })).toBe('42');
