@@ -8,8 +8,8 @@ describe('formatValue', () => {
   });
 
   it('format: currency (defaults to USD)', () => {
-    expect(formatValue(0, { type: 'number', format: 'currency' })).toBe('$0');
-    expect(formatValue(-42.5, { type: 'number', format: 'currency' })).toBe('−$42.5');
+    expect(formatValue(0, { type: 'number', format: 'currency' })).toBe('$0.00');
+    expect(formatValue(-42.5, { type: 'number', format: 'currency' })).toBe('−$42.50');
     expect(formatValue('1234.56', { type: 'number', format: 'currency' })).toBe('$1,234.56');
     expect(formatValue(1234.56, { type: 'number', format: 'currency' })).toBe('$1,234.56');
   });
@@ -23,14 +23,14 @@ describe('formatValue', () => {
 
   it('format: percent', () => {
     expect(formatValue(0.1234, { type: 'number', format: 'percent' })).toBe('12.34%');
-    expect(formatValue(0, { type: 'number', format: 'percent' })).toBe('0%');
-    expect(formatValue(1, { type: 'number', format: 'percent' })).toBe('100%');
+    expect(formatValue(0, { type: 'number', format: 'percent' })).toBe('0.00%');
+    expect(formatValue(1, { type: 'number', format: 'percent' })).toBe('100.00%');
   });
 
   it('format: number', () => {
     expect(formatValue(1234567.89, { type: 'number', format: 'number' })).toBe('1,234,567.89');
-    expect(formatValue(1234, { type: 'number', format: 'number' })).toBe('1,234');
-    expect(formatValue('999.1', { type: 'number', format: 'number' })).toBe('999.1');
+    expect(formatValue(1234, { type: 'number', format: 'number' })).toBe('1,234.00');
+    expect(formatValue('999.1', { type: 'number', format: 'number' })).toBe('999.10');
   });
 
   it('format: custom-numeric', () => {
@@ -69,7 +69,7 @@ describe('formatValue', () => {
   it('format with nl-NL locale', () => {
     const locale = 'nl-NL';
     expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'EUR', locale })).toBe('€1.234,56');
-    expect(formatValue(0, { type: 'number', format: 'currency', currency: 'EUR', locale })).toBe('€0');
+    expect(formatValue(0, { type: 'number', format: 'currency', currency: 'EUR', locale })).toBe('€0,00');
     expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'USD', locale })).toBe('US$1.234,56');
     expect(formatValue(1234.56, { type: 'number', format: 'number', locale })).toBe('1.234,56');
     expect(formatValue(1234.56, { type: 'number', locale })).toBe('1.234,56');
@@ -95,7 +95,7 @@ describe('formatValue', () => {
 
   it('default fallback', () => {
     expect(formatValue('hello', { type: 'string' })).toBe('hello');
-    expect(formatValue(42, { type: 'number' })).toBe('42');
+    expect(formatValue(42, { type: 'number' })).toBe('42.00');
     expect(formatValue(true, { type: 'boolean' })).toBe('true');
     expect(formatValue('', { type: 'string' })).toBe('');
   });

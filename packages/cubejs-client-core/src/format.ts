@@ -4,9 +4,11 @@ import { getD3NumericLocale } from './format-d3-numeric-locale';
 
 import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
 
-const DEFAULT_NUMBER_FORMAT = ',.2~f';
-const DEFAULT_CURRENCY_FORMAT = '$,.2~f';
-const DEFAULT_PERCENT_FORMAT = '.2~%';
+// Default d3-format specifiers — aligned with the named _2 formats
+// (number_2, currency_2, percent_2) in named-numeric-formats.ts
+const DEFAULT_NUMBER_FORMAT = ',.2f';
+const DEFAULT_CURRENCY_FORMAT = '$,.2f';
+const DEFAULT_PERCENT_FORMAT = '.2%';
 
 function detectLocale() {
   try {
