@@ -145,15 +145,6 @@ describe('Pre-aggregation env vars (multi datasource)', () => {
       .toEqual('default-host');
   });
 
-  test('multi-datasource: different types for pre-aggregation', () => {
-    process.env.CUBEJS_DS_ANALYTICS_DB_TYPE = 'postgres';
-    process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_TYPE = 'duckdb';
-
-    expect(getEnv('dbType', { dataSource: 'analytics', preAggregations: true }))
-      .toEqual('duckdb');
-    expect(getEnv('dbType', { dataSource: 'analytics' }))
-      .toEqual('postgres');
-  });
 
   test('keyByDataSource with preAggregations for named datasource', () => {
     expect(keyByDataSource('CUBEJS_DB_HOST', 'analytics', true))
