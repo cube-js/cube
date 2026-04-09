@@ -963,10 +963,13 @@ export class BaseQuery {
       const paramsArray = [...params];
       if (preAggResult) {
         if (Array.isArray(preAggResult)) {
-          // Multi-usage format: array of usage info objects
-          this.preAggregations.preAggregationUsages = preAggResult;
+          // Grouped usage info objects (multiple usages)
+          this.preAggregations.preAggregationUsageInfos = preAggResult;
+          const first = preAggResult[0];
+          this.preAggregations.preAggregationForQuery =
+            this.getPreAggregationByName(first.cubeName, first.preAggregationName);
         } else {
-          // Single-usage format: old-style pre-aggregation object
+          // Single-usage: old-style pre-aggregation object
           this.preAggregations.preAggregationForQuery = preAggResult;
         }
       }
@@ -1018,12 +1021,12 @@ export class BaseQuery {
     const [, , preAggResult] = buildResult;
     if (preAggResult) {
       if (Array.isArray(preAggResult)) {
-        // Multi-usage format: array of usage info objects
-        this.preAggregations.preAggregationUsages = preAggResult;
+        // Grouped usage info objects (multiple usages)
+        this.preAggregations.preAggregationUsageInfos = preAggResult;
         const first = preAggResult[0];
         return this.getPreAggregationByName(first.cubeName, first.preAggregationName);
       }
-      // Single-usage format: old-style pre-aggregation object
+      // Single-usage: old-style pre-aggregation object
       return preAggResult;
     }
     return undefined;

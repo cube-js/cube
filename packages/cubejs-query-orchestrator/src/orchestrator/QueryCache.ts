@@ -115,7 +115,7 @@ export type PreAggTableToTempTable = [
   TempTable,
 ];
 
-export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
+export type PreAggTableToTempTableNames = [string, { targetTableName: string; usageTargetTableNames?: Record<string, string>; }];
 
 export type CacheKeyItem = string | string[] | QueryWithParams | QueryWithParams[] | undefined;
 
@@ -428,10 +428,17 @@ export class QueryCache {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => (
-        QueryCache.replaceAll(tableName, targetTableName, query)
-      ),
+    let replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
+      (query, [tableName, { targetTableName, usageTargetTableNames }]) => {
+        // First replace usage-specific placeholders (e.g. tableName__usage_0)
+        if (usageTargetTableNames) {
+          for (const [suffix, usageTargetName] of Object.entries(usageTargetTableNames)) {
+            query = QueryCache.replaceAll(`${tableName}${suffix}`, usageTargetName, query);
+          }
+        }
+        // Then replace base table name for any remaining references
+        return QueryCache.replaceAll(tableName, targetTableName, query);
+      },
       keyQuery
     );
     return Array.isArray(queryAndParams)

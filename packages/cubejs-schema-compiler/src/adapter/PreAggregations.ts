@@ -107,7 +107,7 @@ export class PreAggregations {
 
   public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
 
-  public preAggregationUsages: any[] | undefined = undefined;
+  public preAggregationUsageInfos: any[] | undefined = undefined;
 
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
@@ -138,11 +138,11 @@ export class PreAggregations {
   private preAggregationsDescriptionLocal(): FullPreAggregationDescription[] {
     const isInPreAggregationQuery = this.query.options.preAggregationQuery;
     if (!isInPreAggregationQuery) {
-      // Tesseract multi-usage path: generate per-usage descriptions with unique placeholders
-      if (this.preAggregationUsages && this.preAggregationUsages.length > 0) {
-        return this.preAggregationDescriptionsForUsages(this.preAggregationUsages);
-      }
       const preAggregationForQuery = this.findPreAggregationForQuery();
+      // Check usageInfos after findPreAggregationForQuery (which may populate them)
+      if (this.preAggregationUsageInfos && this.preAggregationUsageInfos.length > 0) {
+        return this.preAggregationDescriptionsForUsageInfos(this.preAggregationUsageInfos);
+      }
       if (preAggregationForQuery) {
         return this.preAggregationDescriptionsFor(preAggregationForQuery);
       }
@@ -171,22 +171,20 @@ export class PreAggregations {
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
 
-  private preAggregationDescriptionsForUsages(usages: any[]): FullPreAggregationDescription[] {
-    return usages.flatMap(usage => {
-      const preAggObj = this.getRollupPreAggregationByName(usage.cubeName, usage.preAggregationName);
+  private preAggregationDescriptionsForUsageInfos(usageInfos: any[]): FullPreAggregationDescription[] {
+    return usageInfos.flatMap(usageInfo => {
+      const preAggObj = this.getRollupPreAggregationByName(usageInfo.cubeName, usageInfo.preAggregationName);
       if (!preAggObj || !('preAggregationName' in preAggObj)) {
         return [];
       }
       const foundPreAgg = preAggObj as PreAggregationForQuery;
 
-      // Generate description via the standard path
+      // One description per physical pre-aggregation, with usageMapping attached
       const descriptions = this.preAggregationDescriptionsFor(foundPreAgg);
 
-      // Override tableName and matchedTimeDimensionDateRange for each description
       return descriptions.map(desc => ({
         ...desc,
-        tableName: usage.placeholder,
-        matchedTimeDimensionDateRange: usage.dateRange || desc.matchedTimeDimensionDateRange,
+        usageMapping: usageInfo.usages, // { "__usage_0": { dateRange }, "__usage_1": { dateRange } }
       }));
     });
   }

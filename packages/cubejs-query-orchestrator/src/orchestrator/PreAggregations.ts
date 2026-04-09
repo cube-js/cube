@@ -149,6 +149,7 @@ export type LoadPreAggregationResult = {
   rollupLambdaId?: string;
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
+  usageTargetTableNames?: Record<string, string>;
 };
 
 export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
@@ -192,6 +193,7 @@ export type PreAggregationDescription = {
   sealAt?: string;
   rollupLambdaId?: string;
   lastRollupLambda?: boolean;
+  usageMapping?: Record<string, { dateRange?: QueryDateRange }>;
 };
 
 export const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
