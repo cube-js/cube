@@ -1,5 +1,6 @@
 export {
   getEnv,
+  getEnvFn,
   assertDataSource,
   keyByDataSource,
   isDockerImage,

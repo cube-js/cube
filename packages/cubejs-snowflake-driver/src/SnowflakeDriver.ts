@@ -4,7 +4,7 @@
  * @fileoverview The `SnowflakeDriver` and related types declaration.
  */
 
-import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, ExportBucketType } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, RowStatement } from 'snowflake-sdk';
 import {
   BaseDriver,
@@ -26,7 +26,7 @@ import crypto from 'crypto';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
-const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
+const SUPPORTED_BUCKET_TYPES: ExportBucketType[] = ['s3', 'gcs', 'azure'];
 
 type HydrationConfiguration = {
   types: string[], toValue: (column: Column) => ((value: any) => any) | null
@@ -109,23 +109,23 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
 // User can create own stage to pass permission restrictions.
 interface SnowflakeDriverExportAWS {
   bucketType: 's3',
-  bucketName: string,
+  bucketName?: string,
   keyId?: string,
   secretKey?: string,
-  region: string,
+  region?: string,
   integrationName?: string,
 }
 
 interface SnowflakeDriverExportGCS {
   bucketType: 'gcs',
-  integrationName: string,
-  bucketName: string,
-  credentials: any,
+  integrationName?: string,
+  bucketName?: string,
+  credentials?: any,
 }
 
 interface SnowflakeDriverExportAzure {
   bucketType: 'azure',
-  bucketName: string,
+  bucketName?: string,
   azureKey?: string,
   sasToken?: string,
   integrationName?: string,
@@ -148,9 +148,9 @@ export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDr
 
 interface SnowflakeDriverOptions {
   host?: string,
-  account: string,
-  username: string,
-  password: string,
+  account?: string,
+  username?: string,
+  password?: string,
   region?: string,
   warehouse?: string,
   role?: string,
@@ -275,7 +275,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         privateKey = privateKeyObject.export({
           format: 'pem',
           type: 'pkcs8'
-        });
+        }).toString();
       }
     }
 
@@ -572,7 +572,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
-    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.exportBucket.bucketType as string)) {
+    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.exportBucket.bucketType)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.exportBucket.bucketType
       }`);
@@ -735,7 +735,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private exportOptionsClause(options: UnloadOptions): string {
     const { bucketType } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
-    const optionsToExport: Record<string, string> = {
+    const optionsToExport: Record<string, string | undefined> = {
       HEADER: 'false',
       INCLUDE_QUERY_ID: 'true',
       MAX_FILE_SIZE: (options.maxFileSize * 1024 * 1024).toFixed(),

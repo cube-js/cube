@@ -49,7 +49,7 @@ type RequireOne<T, K extends keyof T> = {
 export class CubejsServer {
   protected readonly core: CubeCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort' | 'serverHeadersTimeout' | 'serverKeepAliveTimeout'>;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http'>;
 
   protected server: GracefulHttpServer | null = null;
 
@@ -64,7 +64,7 @@ export class CubejsServer {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
-      pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
+      pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort') || undefined,
       gatewayPort: config.gatewayPort || getEnv('nativeApiGatewayPort'),
       serverHeadersTimeout: config.serverHeadersTimeout ?? getEnv('serverHeadersTimeout'),
       serverKeepAliveTimeout: config.serverKeepAliveTimeout ?? getEnv('serverKeepAliveTimeout'),
@@ -85,7 +85,7 @@ export class CubejsServer {
     return new CubeCore(config, systemOptions);
   }
 
-  public async listen(options: http.ServerOptions = {}): Promise<{app: Express, port: number, server: GracefulHttpServer, version: any }> {
+  public async listen(options: http.ServerOptions = {}): Promise<{app: Express, port: number | string, server: GracefulHttpServer, version: any }> {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');

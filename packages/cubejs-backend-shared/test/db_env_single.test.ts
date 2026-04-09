@@ -441,20 +441,20 @@ describe('Single datasources', () => {
 
   test('getEnv("dbExportBucketType")', () => {
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default1';
-    expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('dbExportBucketType', { dataSource: 'postgres' })).toEqual('default1');
-    expect(getEnv('dbExportBucketType', { dataSource: 'wrong' })).toEqual('default1');
+    expect(getEnv('dbExportBucketType', { dataSource: 'default', supported: ['default1'] as any })).toEqual('default1');
+    expect(getEnv('dbExportBucketType', { dataSource: 'postgres', supported: ['default1'] as any })).toEqual('default1');
+    expect(getEnv('dbExportBucketType', { dataSource: 'wrong', supported: ['default1'] as any })).toEqual('default1');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'default',
-      supported: ['default1'],
+      supported: ['default1'] as any,
     })).toEqual('default1');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'postgres',
-      supported: ['default1'],
+      supported: ['default1'] as any,
     })).toEqual('default1');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'wrong',
-      supported: ['default1'],
+      supported: ['default1'] as any,
     })).toEqual('default1');
     expect(() => getEnv('dbExportBucketType', {
       dataSource: 'default',
@@ -470,20 +470,20 @@ describe('Single datasources', () => {
     })).toThrow('The CUBEJS_DB_EXPORT_BUCKET_TYPE must be one of the [].');
 
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default2';
-    expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('dbExportBucketType', { dataSource: 'postgres' })).toEqual('default2');
-    expect(getEnv('dbExportBucketType', { dataSource: 'wrong' })).toEqual('default2');
+    expect(getEnv('dbExportBucketType', { dataSource: 'default', supported: ['default2'] as any })).toEqual('default2');
+    expect(getEnv('dbExportBucketType', { dataSource: 'postgres', supported: ['default2'] as any })).toEqual('default2');
+    expect(getEnv('dbExportBucketType', { dataSource: 'wrong', supported: ['default2'] as any })).toEqual('default2');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'default',
-      supported: ['default2'],
+      supported: ['default2'] as any,
     })).toEqual('default2');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'postgres',
-      supported: ['default2'],
+      supported: ['default2'] as any,
     })).toEqual('default2');
     expect(getEnv('dbExportBucketType', {
       dataSource: 'wrong',
-      supported: ['default2'],
+      supported: ['default2'] as any,
     })).toEqual('default2');
     expect(() => getEnv('dbExportBucketType', {
       dataSource: 'default',
@@ -499,9 +499,9 @@ describe('Single datasources', () => {
     })).toThrow('The CUBEJS_DB_EXPORT_BUCKET_TYPE must be one of the [].');
 
     delete process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE;
-    expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('dbExportBucketType', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('dbExportBucketType', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('dbExportBucketType', { dataSource: 'default', supported: [] })).toBeUndefined();
+    expect(getEnv('dbExportBucketType', { dataSource: 'postgres', supported: [] })).toBeUndefined();
+    expect(getEnv('dbExportBucketType', { dataSource: 'wrong', supported: [] })).toBeUndefined();
     expect(getEnv('dbExportBucketType', {
       dataSource: 'default',
       supported: [],

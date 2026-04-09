@@ -19,9 +19,9 @@ import { Mutex } from 'async-mutex';
 import { KsqlQuery } from './KsqlQuery';
 
 type KsqlDriverOptions = {
-  url: string,
-  username: string,
-  password: string,
+  url?: string,
+  username?: string,
+  password?: string,
   kafkaHost?: string,
   kafkaUser?: string,
   kafkaPassword?: string,
@@ -150,10 +150,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     const url = `${this.config.url}${path}`;
     try {
       return await axios.post(url, body, {
-        auth: {
+        auth: this.config.username && this.config.password ? {
           username: this.config.username,
           password: this.config.password,
-        },
+        } : undefined,
       });
     } catch (e) {
       throw new Error(
@@ -173,6 +173,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
+
     const { data } = await this.apiQuery('/ksql', {
       ksql: `${formatSql(query, values)};`,
       ...(options.streamOffset ? {

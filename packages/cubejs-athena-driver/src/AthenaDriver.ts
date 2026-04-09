@@ -87,7 +87,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
   private athena: Athena;
 
-  private schema: string;
+  private schema: string | undefined;
 
   /**
    * Class constructor.

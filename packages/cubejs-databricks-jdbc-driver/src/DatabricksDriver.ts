@@ -5,7 +5,7 @@
  */
 
 import fetch from 'node-fetch';
-import { assertDataSource, getEnv, LoggerFn } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, getEnvFn, LoggerFn } from '@cubejs-backend/shared';
 import {
   DatabaseStructure,
   DriverCapabilities,
@@ -25,7 +25,7 @@ import {
   resolveJDBCDriver
 } from './helpers';
 
-const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
+const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'] as const;
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -37,7 +37,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     /**
      * Export bucket type.
      */
-    bucketType?: string,
+    bucketType?: 's3' | 'gcs' | 'azure',
 
     /**
      * Export bucket path.
@@ -204,10 +204,14 @@ export class DatabricksDriver extends JDBCDriver {
       assertDataSource('default');
 
     let showSparkProtocolWarn = false;
-    let url: string =
+    let url =
       conf?.url ||
       getEnv('databricksUrl', { dataSource }) ||
       getEnv('jdbcUrl', { dataSource });
+    if (!url) {
+      throw new Error('url is required for Databricks');
+    }
+
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
@@ -265,7 +269,7 @@ export class DatabricksDriver extends JDBCDriver {
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
+        getEnvFn('dbExportBucketType')({ supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket:
         conf?.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -759,7 +763,7 @@ export class DatabricksDriver extends JDBCDriver {
    * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions) {
-    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
+    if (!this.config.bucketType || !SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
       }`);

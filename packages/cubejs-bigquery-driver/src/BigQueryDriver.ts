@@ -111,6 +111,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
+    const bigqueryCredentials = getEnv('bigqueryCredentials', { dataSource });
+
     this.options = {
       scopes: [
         'https://www.googleapis.com/auth/bigquery',
@@ -118,10 +120,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       ],
       projectId: getEnv('bigqueryProjectId', { dataSource }),
       keyFilename: getEnv('bigqueryKeyFile', { dataSource }),
-      credentials: getEnv('bigqueryCredentials', { dataSource })
+      credentials: bigqueryCredentials
         ? JSON.parse(
           Buffer.from(
-            getEnv('bigqueryCredentials', { dataSource }),
+            bigqueryCredentials,
             'base64',
           ).toString('utf8')
         )

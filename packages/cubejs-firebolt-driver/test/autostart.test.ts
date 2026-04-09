@@ -1,7 +1,7 @@
 import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { DriverTests } from '@cubejs-backend/testing-shared';
 
-import { Firebolt } from 'firebolt-sdk';
+import { Firebolt, ConnectionOptions } from 'firebolt-sdk';
 import { version } from 'firebolt-sdk/package.json';
 import { FireboltDriver } from '../src';
 
@@ -37,10 +37,22 @@ describe('FireboltDriver autostart', () => {
     const dataSource = assertDataSource('default');
 
     const username = getEnv('dbUser', { dataSource });
-    const auth = username.includes('@')
-      ? { username, password: getEnv('dbPass', { dataSource }) }
-      : { client_id: username, client_secret: getEnv('dbPass', { dataSource }) };
+    if (!username) {
+      throw new Error('username is required for Firebolt');
+    }
+
+    const password = getEnv('dbPass', { dataSource });
+    if (!password) {
+      throw new Error('password is required for Firebolt');
+    }
+
+    const auth: ConnectionOptions['auth'] = username.includes('@')
+      ? { username, password }
+      : { client_id: username, client_secret: password };
     const engineName = getEnv('fireboltEngineName', { dataSource });
+    if (!engineName) {
+      throw new Error('engineName is required for Firebolt');
+    }
     const firebolt = Firebolt({
       apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
     });

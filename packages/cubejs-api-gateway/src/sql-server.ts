@@ -361,8 +361,8 @@ export class SQLServer {
   }
 
   protected createDefaultCheckSqlAuthFn(options: SQLServerOptions): CheckSQLAuthFn {
-    let allowedUser: string | null = options.sqlUser || getEnv('sqlUser');
-    let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword');
+    let allowedUser: string | null = options.sqlUser || getEnv('sqlUser') || null;
+    let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword') || null;
 
     if (!getEnv('devMode')) {
       if (!allowedUser) {

@@ -4,7 +4,7 @@
  * @fileoverview The `RedshiftDriver` and related types declaration.
  */
 
-import { assertDataSource, getEnv } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, getEnvFn, ExportBucketType } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration, type PgQueryResult, PgClient, PgClientConfig } from '@cubejs-backend/postgres-driver';
 import {
   DatabaseStructure,
@@ -93,7 +93,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     const clusterIdentifier = getEnv('redshiftClusterIdentifier', { dataSource });
     const dbPass = getEnv('dbPass', { dataSource });
     const dbUser = getEnv('dbUser', { dataSource });
+
     const dbName = getEnv('dbName', { dataSource });
+    if (!dbName) {
+      throw new Error('CUBEJS_DB_NAME is required for Redshift');
+    }
 
     let credentialsProvider: RedshiftCredentialsProvider;
 
@@ -106,9 +110,19 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         dbName,
       });
     } else {
+      const user = config.user || dbUser;
+      if (!user) {
+        throw new Error('CUBEJS_DB_USER is required for Redshift');
+      }
+
+      const password = config.password || dbPass;
+      if (!password) {
+        throw new Error('CUBEJS_DB_PASS is required for Redshift');
+      }
+
       credentialsProvider = new RedshiftPlainCredentialsProvider(
-        config.user || dbUser,
-        config.password || dbPass,
+        user,
+        password,
         dbName
       );
     }
@@ -331,11 +345,9 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   protected getExportBucket(
     dataSource: string,
   ): RedshiftDriverExportAWS | undefined {
-    const supportedBucketTypes = ['s3'];
-
     const requiredExportBucket: Partial<RedshiftDriverExportRequiredAWS> = {
-      bucketType: getEnv('dbExportBucketType', {
-        supported: supportedBucketTypes,
+      bucketType: getEnvFn('dbExportBucketType')({
+        supported: ['s3'],
         dataSource,
       }),
       bucketName: getEnv('dbExportBucket', { dataSource }),
@@ -350,12 +362,6 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     };
 
     if (exportBucket.bucketType) {
-      if (!supportedBucketTypes.includes(exportBucket.bucketType)) {
-        throw new Error(
-          `Unsupported EXPORT_BUCKET_TYPE, supported: ${supportedBucketTypes.join(',')}`
-        );
-      }
-
       // Make sure the required keys are set
       const emptyRequiredKeys = Object.keys(requiredExportBucket)
         .filter((key: string) => requiredExportBucket[<keyof RedshiftDriverExportRequiredAWS>key] === undefined);

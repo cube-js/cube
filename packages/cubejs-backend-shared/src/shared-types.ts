@@ -20,3 +20,16 @@ no-cache — AKA “forceRefresh”
   Returns fresh data from the database, even if it takes minutes and many “Continue wait” intervals
 */
 export type CacheMode = 'stale-if-slow' | 'stale-while-revalidate' | 'must-revalidate' | 'no-cache';
+
+export type ApiScopes =
+  'graphql' |
+  'meta' |
+  'data' |
+  'sql' |
+  'jobs';
+
+export type ExportBucketType =
+  's3' |
+  'gcp' |
+  'gcs' |
+  'azure';

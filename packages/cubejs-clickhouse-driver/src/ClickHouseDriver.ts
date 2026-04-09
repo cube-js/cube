@@ -7,6 +7,7 @@
 import {
   getEnv,
   assertDataSource,
+  ExportBucketType,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
@@ -35,7 +36,7 @@ import sqlstring from 'sqlstring';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
 
-const SUPPORTED_BUCKET_TYPES = ['s3'];
+const SUPPORTED_BUCKET_TYPES: ExportBucketType[] = ['s3'];
 
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
@@ -94,14 +95,14 @@ export interface ClickHouseDriverOptions {
 }
 
 interface ClickhouseDriverExportRequiredAWS {
-  bucketType: 's3',
+  bucketType: ExportBucketType,
   bucketName: string,
   region: string,
 }
 
 interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequiredAWS {
-  keyId: string,
-  secretKey: string,
+  keyId?: string,
+  secretKey?: string,
 }
 
 interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
@@ -109,8 +110,8 @@ interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
 
 type ClickHouseDriverConfig = {
   url: string,
-  username: string,
-  password: string,
+  username?: string,
+  password?: string,
   readOnly: boolean,
   database: string,
   requestTimeout: number,
@@ -505,7 +506,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   protected getExportBucket(
     dataSource: string,
   ): ClickhouseDriverExportAWS | null {
-    const requiredExportBucket: ClickhouseDriverExportRequiredAWS = {
+    const requiredExportBucket: Partial<ClickhouseDriverExportRequiredAWS> = {
       bucketType: getEnv('dbExportBucketType', {
         supported: SUPPORTED_BUCKET_TYPES,
         dataSource,
@@ -514,7 +515,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       region: getEnv('dbExportBucketAwsRegion', { dataSource }),
     };
 
-    const exportBucket: ClickhouseDriverExportAWS = {
+    const exportBucket: Partial<ClickhouseDriverExportAWS> = {
       ...requiredExportBucket,
       keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
       secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
@@ -536,7 +537,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         );
       }
 
-      return exportBucket;
+      return exportBucket as ClickhouseDriverExportAWS;
     }
 
     return null;
@@ -620,13 +621,13 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
     await this.command(formattedQuery);
 
+    const { keyId, secretKey, region } = this.config.exportBucket;
     const csvFile = await this.extractUnloadedFilesFromS3(
       {
-        credentials: {
-          accessKeyId: this.config.exportBucket.keyId,
-          secretAccessKey: this.config.exportBucket.secretKey,
-        },
-        region: this.config.exportBucket.region,
+        credentials: keyId && secretKey
+          ? { accessKeyId: keyId, secretAccessKey: secretKey }
+          : undefined,
+        region,
       },
       bucketName,
       exportPrefix,

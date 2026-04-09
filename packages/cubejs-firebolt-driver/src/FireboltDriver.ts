@@ -87,13 +87,22 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       assertDataSource('default');
 
     const username = getEnv('dbUser', { dataSource });
-    const auth = username.includes('@')
-      ? { username, password: getEnv('dbPass', { dataSource }) }
-      : { client_id: username, client_secret: getEnv('dbPass', { dataSource }) };
+    if (!username) {
+      throw new Error('username is required for Firebolt');
+    }
+
+    const password = getEnv('dbPass', { dataSource });
+    if (!password) {
+      throw new Error('password is required for Firebolt');
+    }
+
+    const auth: ConnectionOptions['auth'] = username.includes('@')
+      ? { username, password }
+      : { client_id: username, client_secret: password };
 
     this.config = {
       readOnly: true,
-      requestTimeout: getEnv('dbQueryTimeout') * 1000,
+      requestTimeout: getEnv('dbQueryTimeout', { dataSource }) * 1000,
       apiEndpoint:
         getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
       ...config,

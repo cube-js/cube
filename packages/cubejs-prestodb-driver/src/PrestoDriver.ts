@@ -15,7 +15,8 @@ import {
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
-  assertDataSource,
+  getEnvFn,
+  assertDataSource, ExportBucketType,
 } from '@cubejs-backend/shared';
 
 import { Transform, TransformCallback } from 'stream';
@@ -41,20 +42,21 @@ export type PrestoDriverExportBucket = {
 
 export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   host?: string;
-  port?: string;
+  port?: string | number;
   catalog?: string;
   schema?: string;
   user?: string;
   // eslint-disable-next-line camelcase
   custom_auth?: string;
   // eslint-disable-next-line camelcase
-  basic_auth?: { user: string, password: string };
+  basic_auth?: { user: string, password?: string };
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
 };
 
-const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
+const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'] as const;
+
 /**
  * Presto driver class.
  */
@@ -84,11 +86,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
-    const dbUser = getEnv('dbUser', { dataSource });
-    const dbPassword = getEnv('dbPass', { dataSource });
+    const basicAuth = getEnv('dbBasicAuth', { dataSource });
     const authToken = getEnv('prestoAuthToken', { dataSource });
 
-    if (authToken && dbPassword) {
+    if (authToken && basicAuth) {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
@@ -103,11 +104,11 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       schema:
         getEnv('dbName', { dataSource }) ||
         getEnv('dbSchema', { dataSource }),
-      user: dbUser,
+      user: getEnv('dbUser', { dataSource }),
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
-      ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
+      ...(basicAuth ? { basic_auth: basicAuth } : {}),
       ssl: this.getSslOptions(dataSource),
-      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
+      bucketType: getEnvFn('dbExportBucketType')({ supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
       accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource }),
       secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
@@ -309,7 +310,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       throw new Error('Export bucket is not configured.');
     }
 
-    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
+    if (!this.config.bucketType || !SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
       }`);
