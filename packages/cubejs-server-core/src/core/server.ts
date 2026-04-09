@@ -622,11 +622,6 @@ export class CubejsServerCore {
           let driver: BaseDriver | null = null;
 
           try {
-            this.logger('Initializing data source connection', {
-              dataSource,
-              preAggregations: usePreAgg || false,
-            });
-
             driver = await this.resolveDriver(
               {
                 ...context,
@@ -642,11 +637,6 @@ export class CubejsServerCore {
               }
 
               await driver.testConnection();
-
-              this.logger('Data source connection initialized', {
-                dataSource,
-                preAggregations: usePreAgg || undefined,
-              });
 
               return driver;
             }
