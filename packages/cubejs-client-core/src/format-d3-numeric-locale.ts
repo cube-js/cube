@@ -60,34 +60,26 @@ function getCurrencySymbol(locale: string | undefined, currencyCode: string): [s
   }
 }
 
-function deriveGrouping(locale?: string): number[] {
-  // Use a large number so that multiple grouping boundaries are visible.
-  // en-US  → "1,234,567,890" → [3,3,3,3]  → d3 shorthand [3]
-  // en-IN  → "1,23,45,67,890" → [3,2,2,2] → d3 shorthand [3,2]
-  const parts = new Intl.NumberFormat(locale).formatToParts(1234567890);
-  const integerSegments = parts
+function deriveGrouping(locale: string): number[] {
+  // en-US  → "1,234,567,890" → sizes [1,3,3,3] → [3]
+  // en-IN  → "1,23,45,67,890" → sizes [1,2,2,2,3] → [3,2]
+  const sizes = new Intl.NumberFormat(locale).formatToParts(1234567890)
     .filter((p) => p.type === 'integer')
     .map((p) => p.value.length);
 
-  if (integerSegments.length <= 1) {
+  if (sizes.length <= 1) {
     return [3];
   }
 
-  // Drop the leading (most-significant) segment — it's a partial remainder,
-  // not a real group size (e.g. the "1" in "1,234,567,890").
-  // d3 reads the array left-to-right (least-significant group first),
-  // and repeats the last entry for all remaining groups.
-  const groups = integerSegments.slice(1).reverse();
+  // d3 repeats the last array element for all remaining groups,
+  // so we only need the two rightmost (least-significant) group sizes.
+  const first = sizes[sizes.length - 1];
+  const second = sizes[sizes.length - 2];
 
-  // Trim trailing duplicates so d3's repeat-last-element rule covers them.
-  while (groups.length > 1 && groups[groups.length - 1] === groups[groups.length - 2]) {
-    groups.pop();
-  }
-
-  return groups;
+  return first === second ? [first] : [first, second];
 }
 
-function getD3NumericLocaleFromIntl(locale?: string, currencyCode = 'USD'): FormatLocaleDefinition {
+function getD3NumericLocaleFromIntl(locale: string, currencyCode = 'USD'): FormatLocaleDefinition {
   const nf = new Intl.NumberFormat(locale);
   const numParts = nf.formatToParts(1234567.89);
   const find = (type: string) => numParts.find((p) => p.type === type)?.value ?? '';
