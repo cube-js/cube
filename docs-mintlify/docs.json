@@ -658,6 +658,13 @@
       "href": "https://cubecloud.dev/auth/signup"
     }
   },
+  "seo": {
+    "indexing": "all",
+    "metatags": {
+      "og:type": "website",
+      "og:site_name": "Cube Documentation"
+    }
+  },
   "footer": {
     "socials": {
       "x": "https://x.com/the_cube_dev",

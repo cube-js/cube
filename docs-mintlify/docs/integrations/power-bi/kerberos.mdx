@@ -79,7 +79,7 @@ In the following example, the web service (`HTTP`) SPN on the
 `redundant-brohman.gcp-us-central1.cubecloudapp.dev` domain is registered for the
 `mdax-api-svc-account` user in the `CUBE` domain:
 
-```
+```bash
 setspn -S HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev CUBE\mdax-api-svc-account
 ```
 
@@ -91,7 +91,7 @@ token.
 First, use the [`ktpass` command][link-ktpass] to generate the keytab file. You will be
 prompted to enter the password for the specified user:
 
-```
+```bash
 ktpass /out kerberos.keytab /princ HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev@CUBE.DEV /mapuser mdax-api-svc-account /crypto All /ptype KRB5_NT_PRINCIPAL /pass *
 ```
 

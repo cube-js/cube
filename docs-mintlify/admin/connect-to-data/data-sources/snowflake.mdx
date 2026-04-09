@@ -12,7 +12,7 @@ description: "Snowflake is a popular cloud-based data platform."
 In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role
 used by Cube. Cube requires the role to have `USAGE` on databases and schemas
 and `SELECT` on tables. An example configuration:
-```
+```sql
 GRANT USAGE ON DATABASE ABC TO ROLE XYZ;
 GRANT USAGE ON ALL SCHEMAS IN DATABASE ABC TO ROLE XYZ;
 GRANT USAGE ON FUTURE SCHEMAS IN DATABASE ABC TO ROLE XYZ;

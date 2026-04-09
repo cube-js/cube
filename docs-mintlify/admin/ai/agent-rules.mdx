@@ -18,15 +18,15 @@ Agent Rules in Cube provide a powerful way to customize and control how AI agent
 - Domain-specific terminology
 
 **Example Always Rules:**
-```
+```text
 Sales efficiency is deal size divided by sales cycle length
 ```
 
-```
+```text
 When analyzing customer data, always consider seasonality patterns from our retail business
 ```
 
-```
+```text
 Revenue should be calculated using our standard GAAP accounting principles
 ```
 
@@ -41,15 +41,15 @@ Revenue should be calculated using our standard GAAP accounting principles
 - Scenario-specific instructions
 
 **Example Agent Requested Rules:**
-```
+```text
 If you asked to analyze sales efficiency start with correlation to WSE
 ```
 
-```
+```text
 For customer segmentation analysis, use RFM methodology (Recency, Frequency, Monetary)
 ```
 
-```
+```text
 When analyzing marketing performance, compare against industry benchmarks where available
 ```
 
@@ -77,13 +77,13 @@ When analyzing marketing performance, compare against industry benchmarks where 
 ### Domain-Specific Rules
 
 **E-commerce Example:**
-```
+```text
 Always Rule: "Customer lifetime value equals average order value × purchase frequency × customer lifespan"
 Agent Requested: "For cart abandonment analysis, segment by device type and traffic source"
 ```
 
 **SaaS Example:**
-```
+```text
 Always Rule: "MRR growth rate should exclude one-time charges and setup fees"
 Agent Requested: "When analyzing churn, differentiate between voluntary and involuntary churn"
 ```
@@ -92,7 +92,7 @@ Agent Requested: "When analyzing churn, differentiate between voluntary and invo
 
 Rules should provide context that agents might not inherently understand about your business:
 
-```
+```text
 Always Rule: "Our peak season is Q4, with 40% of annual revenue typically occurring in December"
 Agent Requested: "For inventory analysis, consider our 6-week lead time for international suppliers"
 ```
@@ -111,7 +111,7 @@ Based on the rule configuration system, when multiple rules could apply to the s
 ### Example Conflict Scenarios
 
 **Scenario 1: Direct Contradiction**
-```
+```text
 Rule A (Always): "Revenue recognition follows monthly billing cycles"
 Rule B (Always): "Revenue should be recognized quarterly"
 
@@ -119,7 +119,7 @@ Resolution: The agent will flag this conflict and may ask for clarification
 ```
 
 **Scenario 2: Complementary Rules**
-```
+```text
 Rule A (Always): "Sales efficiency is deal size divided by sales cycle length"
 Rule B (Agent Requested): "When analyzing sales efficiency, include pipeline velocity metrics"
 
@@ -127,7 +127,7 @@ Resolution: Both rules work together - B provides additional context to A
 ```
 
 **Scenario 3: Specificity Override**
-```
+```text
 Rule A (Always): "Use standard deviation for all variance calculations"
 Rule B (Agent Requested): "For customer behavior analysis, use median absolute deviation instead of standard deviation"
 
