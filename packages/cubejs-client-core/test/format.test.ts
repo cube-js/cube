@@ -75,6 +75,13 @@ describe('formatValue', () => {
     expect(formatValue(1234.56, { type: 'number', locale })).toBe('1.234,56');
   });
 
+  it('format with en-IN locale (non-uniform digit grouping)', () => {
+    const locale = 'en-IN';
+    expect(formatValue(1234567.89, { type: 'number', format: 'number', locale })).toBe('12,34,567.89');
+    expect(formatValue(1234567.89, { type: 'number', format: 'currency', currency: 'INR', locale })).toBe('₹12,34,567.89');
+    expect(formatValue(1234567.89, { type: 'number', locale })).toBe('12,34,567.89');
+  });
+
   it('default fallback', () => {
     expect(formatValue('hello', { type: 'string' })).toBe('hello');
     expect(formatValue(42, { type: 'number' })).toBe('42');
