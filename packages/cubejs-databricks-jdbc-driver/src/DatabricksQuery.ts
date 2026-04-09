@@ -178,7 +178,7 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.TRUNC = 'CASE WHEN ({{ args[0] }}) >= 0 THEN FLOOR({{ args_concat }}) ELSE CEIL({{ args_concat }}) END';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
-    templates.expressions.extract = '{% if date_part|lower == "epoch" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
+    templates.expressions.extract = '{% if date_part|lower == "epoch" %}unix_timestamp({{ expr }}){% elif date_part|lower == "isodow" %}EXTRACT(DAYOFWEEK_ISO FROM {{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
