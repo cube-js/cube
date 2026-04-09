@@ -92,6 +92,14 @@ current view:
   <img src="https://ucarecdn.com/794dcf79-4268-46ad-8077-f2675dede9d0/" />
 </Frame>
 
+## Exporting events via API
+
+You can also export audit log events programmatically using the
+[Control Plane API][ref-control-plane-api]. This is useful for integrating
+with external log aggregation or SIEM tools.
+
+See the [`/api/v1/audit-log/events`][ref-audit-log-api] endpoint for details.
+
 ## Event types
 
 Audit Log collects the following types of events:
@@ -107,3 +115,6 @@ Audit Log collects the following types of events:
 | Branches and [dev mode](/docs/data-modeling/dev-mode) | `Created Git branch`<br/>`Deleted Git branch`<br/>`Entered dev mode`<br/>`Exited dev mode`<br/>`Pulled changes to data model`<br/>`Committed and merged changes to data model`<br/>`Merged changes to data model`<br/>`Reverted changes to data model in branch` |
 | [Continuous deployment](/docs/deployment/cloud/continuous-deployment) | `Requested connection of GitHub account`<br/>`Connected deployment to GitHub repository`<br/>`Generated SSH key for deployment`<br/>`Connected deployment to Git upstream`<br/>`Generated Git credentials for Cube Cloud repository`<br/>`Generated webhook token for Git repository`<br/>`Received a Git hook`<br/>`Started uploading files`<br/>`Finished uploading files`<br/>`Triggered new build` |
 | [Budgets](/admin/account-billing/budgets) | `Created budget`<br/>`Deleted budget`<br/>`Updated budget` |
+
+[ref-control-plane-api]: /reference/control-plane-api
+[ref-audit-log-api]: /reference/control-plane-api#apiv1audit-logevents

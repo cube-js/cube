@@ -1,12 +1,12 @@
 ---
 title: Control Plane API
-description: REST surface for automating Cube Cloud deployments, environments, and JWT issuance for Core Data API access.
+description: REST surface for automating Cube Cloud deployments, environments, JWT issuance, and audit log export.
 ---
 
 Control Plane API enables programmatic management of [deployments][ref-deployments]
 and [environments][ref-environments] in Cube Cloud. You can use it to list
-deployments, manage environments, and generate JWT tokens for accessing
-[Core Data APIs][ref-core-data-apis].
+deployments, manage environments, generate JWT tokens for accessing
+[Core Data APIs][ref-core-data-apis], and export [audit log][ref-audit-log] events.
 
 <Info>
 
@@ -212,6 +212,59 @@ Example response:
 ```
 
 
+### `/api/v1/audit-log/events`
+
+Send a `GET` request to export [audit log][ref-audit-log] events for your
+Cube Cloud account. This endpoint allows you to programmatically retrieve
+security-related events for compliance reviews, external log aggregation,
+or integration with SIEM tools.
+
+<Info>
+
+Requires [Audit Log][ref-audit-log] to be enabled on the
+[Enterprise Premier plan](https://cube.dev/pricing).
+
+</Info>
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `offset` | Pagination offset | No |
+| `limit` | Pagination limit | No |
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-log/events"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "events": [
+      {
+        "timestamp": "2024-01-15T10:30:00.000Z",
+        "event": "Logged in",
+        "user_email": "user@example.com",
+        "deployment_name": "My Deployment",
+        "ip_address": "192.168.1.1",
+        "attributes": {}
+      }
+    ]
+  },
+  "pagination": {
+    "offset": 0,
+    "limit": 20,
+    "total": 100
+  }
+}
+```
+
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-metadata-api]: /reference/core-data-apis/rest-api/reference#metadata-api
@@ -219,3 +272,4 @@ Example response:
 [ref-environments]: /admin/workspace/environments
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-security-context]: /docs/data-modeling/access-control/context
+[ref-audit-log]: /admin/monitoring/audit-log
