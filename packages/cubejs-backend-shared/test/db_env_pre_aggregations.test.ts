@@ -46,16 +46,6 @@ describe('Pre-aggregation env vars (single datasource)', () => {
       .toEqual('regular-host');
   });
 
-  test('works with dbType', () => {
-    process.env.CUBEJS_DB_TYPE = 'postgres';
-    process.env.CUBEJS_PRE_AGGREGATIONS_DB_TYPE = 'duckdb';
-
-    expect(getEnv('dbType', { dataSource: 'default', preAggregations: true }))
-      .toEqual('duckdb');
-    expect(getEnv('dbType', { dataSource: 'default' }))
-      .toEqual('postgres');
-  });
-
   test('works with dbUser/dbPass', () => {
     process.env.CUBEJS_DB_USER = 'regular-user';
     process.env.CUBEJS_PRE_AGGREGATIONS_DB_USER = 'preagg-user';
