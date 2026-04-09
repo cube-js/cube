@@ -3,6 +3,8 @@
     "pre-agg-credentials": {
       "cube": {
         "environment": {
+          "CUBEJS_PRE_AGGREGATIONS_DB_HOST": "data",
+          "CUBEJS_PRE_AGGREGATIONS_DB_NAME": "test",
           "CUBEJS_PRE_AGGREGATIONS_DB_USER": "test_preagg",
           "CUBEJS_PRE_AGGREGATIONS_DB_PASS": "test_preagg"
         }
