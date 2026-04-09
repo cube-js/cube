@@ -1,5 +1,6 @@
-import { format as d3Format, formatLocale, FormatLocaleDefinition, FormatLocaleObject } from 'd3-format';
+import { format as d3Format } from 'd3-format';
 import { timeFormat } from 'd3-time-format';
+import { getD3NumericLocale } from './format-d3-numeric-locale';
 
 import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
 
@@ -7,42 +8,11 @@ const DEFAULT_NUMBER_FORMAT = ',.2~f';
 const DEFAULT_CURRENCY_FORMAT = '$,.2~f';
 const DEFAULT_PERCENT_FORMAT = '.2~%';
 
-function getD3LocaleFromIntl(locale?: string, currencyCode = 'USD'): FormatLocaleDefinition {
-  const nf = new Intl.NumberFormat(locale);
-  const numParts = nf.formatToParts(1234567.89);
-  const find = (type: string) => numParts.find((p) => p.type === type)?.value ?? '';
-
-  const cf = new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode });
-  const currencyParts = cf.formatToParts(1);
-  const currencySymbol = currencyParts.find((p) => p.type === 'currency')?.value ?? currencyCode;
-  const firstMeaningfulType = currencyParts.find((p) => !['literal', 'nan'].includes(p.type))?.type;
-  const symbolIsPrefix = firstMeaningfulType === 'currency';
-
-  return {
-    decimal: find('decimal') || '.',
-    thousands: find('group') || ',',
-    grouping: [3],
-    currency: symbolIsPrefix ? [currencySymbol, ''] : ['', currencySymbol],
-  };
-}
-
-const localeCache: Record<string, FormatLocaleObject> = Object.create(null);
-
-function getCurrentD3Locale(locale: string, currencyCode = 'USD'): FormatLocaleObject {
-  const key = `${locale}:${currencyCode}`;
-  if (localeCache[key]) {
-    return localeCache[key];
-  }
-
-  localeCache[key] = formatLocale(getD3LocaleFromIntl(locale, currencyCode));
-  return localeCache[key];
-}
-
 function detectLocale() {
   try {
     return new Intl.NumberFormat().resolvedOptions().locale;
   } catch (e) {
-    console.error('Failed to detect locale', e);
+    console.warn('Failed to detect locale', e);
 
     return 'en-US';
   }
@@ -123,11 +93,11 @@ export function formatValue(
   if (typeof format === 'string') {
     switch (format) {
       case 'currency':
-        return getCurrentD3Locale(locale, currency).format(DEFAULT_CURRENCY_FORMAT)(parseNumber(value));
+        return getD3NumericLocale(locale, currency).format(DEFAULT_CURRENCY_FORMAT)(parseNumber(value));
       case 'percent':
-        return getCurrentD3Locale(locale, currency).format(DEFAULT_PERCENT_FORMAT)(parseNumber(value));
+        return getD3NumericLocale(locale).format(DEFAULT_PERCENT_FORMAT)(parseNumber(value));
       case 'number':
-        return getCurrentD3Locale(locale, currency).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
+        return getD3NumericLocale(locale).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
       case 'imageUrl':
       case 'id':
       case 'link':
@@ -143,7 +113,7 @@ export function formatValue(
   }
 
   if (type === 'number') {
-    return getCurrentD3Locale(locale, currency).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
+    return getD3NumericLocale(locale, currency).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
   }
 
   return String(value);
