@@ -149,7 +149,7 @@ export function hasPreAggregationsEnvVars(dataSource?: string): boolean {
     : `CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`;
 
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith(prefix)) {
+    if (key.startsWith(prefix) && key !== `${prefix}SCHEMA`) {
       return true;
     }
   }

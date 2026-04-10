@@ -147,6 +147,7 @@ describe('Pre-aggregation env vars (multi datasource)', () => {
 describe('hasPreAggregationsEnvVars', () => {
   afterEach(() => {
     delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
     delete process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST;
     delete process.env.CUBEJS_DATASOURCES;
   });
@@ -163,6 +164,11 @@ describe('hasPreAggregationsEnvVars', () => {
   test('returns true when a PRE_AGGREGATIONS var is set for named datasource', () => {
     process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST = 'some-host';
     expect(hasPreAggregationsEnvVars('analytics')).toBe(true);
+  });
+
+  test('ignores CUBEJS_PRE_AGGREGATIONS_SCHEMA', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_preaggs';
+    expect(hasPreAggregationsEnvVars('default')).toBe(false);
   });
 
   test('returns false for non-matching datasource', () => {
