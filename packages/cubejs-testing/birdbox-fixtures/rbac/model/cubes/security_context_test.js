@@ -66,6 +66,47 @@ cube('sc_interpolation_test', {
   },
 });
 
+cube('sc_ua_mask_test', {
+  sql_table: 'public.line_items',
+
+  dimensions: {
+    id: {
+      sql: 'id',
+      type: 'number',
+      primary_key: true,
+    },
+    product_id: {
+      sql: 'product_id',
+      type: 'number',
+    },
+    masked_price: {
+      sql: 'price',
+      type: 'number',
+      mask: {
+        sql: `CAST(${userAttributes.tenantId} AS INTEGER)`,
+      },
+    },
+  },
+
+  measures: {
+    count: {
+      type: 'count',
+    },
+  },
+
+  accessPolicy: [
+    {
+      role: '*',
+      memberLevel: {
+        includes: [],
+      },
+      memberMasking: {
+        includes: '*',
+      },
+    },
+  ],
+});
+
 cube('sc_groups_shorthand_test', {
   sql_table: 'public.line_items',
 
