@@ -2281,6 +2281,7 @@ const variables: Record<string, (...args: any) => any> = {
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('true')
     .asBoolStrict(),
+  queueExternalId: () => get('CUBEJS_QUEUE_EXTERNAL_ID').default('false').asBool(),
   scheduledRefreshDefault: () => get(
     'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
   ).default('true').asBoolStrict(),
