@@ -9,8 +9,8 @@
   },
   "favicon": "/favicon.svg",
   "banner": {
-    "content": "This is an upcoming version of the Cube documentation. For the current version, visit [cube.dev/docs](https://cube.dev/docs)",
-    "dismissible": false
+    "content": "🟣 Agentic Analytics Summit — April 29, 2026 — Online. Registration is open! [Join now →](https://cube.dev/events/agentic-analytics-summit)",
+    "dismissible": true
   },
   "navigation": {
     "tabs": [
