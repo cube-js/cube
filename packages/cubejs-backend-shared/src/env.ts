@@ -143,8 +143,8 @@ type DataSourceOpts = { dataSource: string, preAggregations?: boolean };
 /**
  * Checks if at least one PRE_AGGREGATIONS env var is set for a given data source.
  */
-export function hasPreAggregationsEnvVars(dataSource?: string): boolean {
-  const prefix = (!dataSource || dataSource === 'default')
+export function hasPreAggregationsEnvVars(dataSource: string = 'default'): boolean {
+  const prefix = dataSource === 'default'
     ? 'CUBEJS_PRE_AGGREGATIONS_'
     : `CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`;
 
