@@ -379,32 +379,6 @@ describe('Transpilers', () => {
     expect(transpiledMaskSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.userAttributes');
   });
 
-  it('CubePropContextTranspiler mask.sql should always have CUBE as default parameter', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
-        cube(\`Test\`, {
-          sql: 'SELECT * FROM users',
-          dimensions: {
-            userId: {
-              sql: \`userId\`,
-              type: 'string'
-            },
-            masked_dim: {
-              sql: \`price\`,
-              type: 'number',
-              mask: {
-                sql: \`-1\`,
-              }
-            }
-          }
-        })
-    `);
-
-    await compiler.compile();
-
-    const transpiledMaskSql = (cubeEvaluator.cubeFromPath('Test').dimensions.masked_dim as any).mask.sql;
-    expect(transpiledMaskSql!.toString()).toMatch('CUBE');
-  });
-
   it('CubePropContextTranspiler mask.sql with CUBE reference should resolve correctly', async () => {
     const compilers = prepareJsCompiler(`
         cube(\`Test\`, {

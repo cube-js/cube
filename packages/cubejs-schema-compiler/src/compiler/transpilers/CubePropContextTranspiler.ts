@@ -37,8 +37,6 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.mask\.sql$/,
 ];
 
-const maskSqlPattern = /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.mask\.sql$/;
-
 export const transpiledFields: Set<String> = new Set<String>();
 
 transpiledFieldsPatterns?.forEach((r) => {
@@ -78,11 +76,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     };
   }
 
-  protected transformObjectProperty(path: NodePath<t.ObjectProperty>, resolveSymbol: SymbolResolver, ensureCubeParam = false) {
-    CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, path.get('value'), ensureCubeParam);
+  protected transformObjectProperty(path: NodePath<t.ObjectProperty>, resolveSymbol: SymbolResolver) {
+    CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, path.get('value'));
   }
 
-  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => any, value: NodePath<any>, ensureCubeParam = false) {
+  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => any, value: NodePath<any>) {
     // If the current value is already an arrow function, update its parameters and keep the body
     if (t.isArrowFunctionExpression(value.node)) {
       const bodyPath = value.get('body') as NodePath<any>;
@@ -90,10 +88,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         resolveSymbol,
         bodyPath,
       );
-
-      if (ensureCubeParam && !knownIds.includes('CUBE')) {
-        knownIds.push('CUBE');
-      }
 
       value.replaceWith(
         t.arrowFunctionExpression(
@@ -107,10 +101,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         resolveSymbol,
         value,
       );
-
-      if (ensureCubeParam && !knownIds.includes('CUBE')) {
-        knownIds.push('CUBE');
-      }
 
       value.replaceWith(
         t.arrowFunctionExpression(
@@ -145,8 +135,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
           // eslint-disable-next-line no-restricted-syntax
           for (const p of transpiledFieldsPatterns) {
             if (fullPath.match(p)) {
-              const isMaskSql = maskSqlPattern.test(fullPath);
-              this.transformObjectProperty(path, resolveSymbol, isMaskSql);
+              this.transformObjectProperty(path, resolveSymbol);
               return;
             }
           }

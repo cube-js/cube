@@ -154,9 +154,8 @@ export class YamlCompiler {
       for (const p of transpiledFieldsPatterns) {
         const fullPath = propertyPath.join('.');
         if (fullPath.match(p)) {
-          const isMaskSql = /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.mask\.sql$/.test(fullPath);
           if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
-            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport, isMaskSql);
+            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
           } else if (typeof obj === 'string') {
             return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
           } else if (Array.isArray(obj)) {
@@ -274,9 +273,9 @@ export class YamlCompiler {
     return result.join('');
   }
 
-  private parsePythonIntoArrowFunction(codeString: string, cubeName, originalObj, errorsReport: ErrorReporter, ensureCubeParam = false) {
+  private parsePythonIntoArrowFunction(codeString: string, cubeName, originalObj, errorsReport: ErrorReporter) {
     const ast = this.parsePythonAndTranspileToJs(codeString, errorsReport);
-    return this.astIntoArrowFunction(ast as any, codeString, cubeName, undefined, ensureCubeParam);
+    return this.astIntoArrowFunction(ast as any, codeString, cubeName);
   }
 
   private parsePythonAndTranspileToJs(codeString: string, errorsReport: ErrorReporter): t.Program | t.NullLiteral {
@@ -294,7 +293,7 @@ export class YamlCompiler {
     return t.nullLiteral();
   }
 
-  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName, resolveSymbol?: (string) => any, ensureCubeParam = false) {
+  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName, resolveSymbol?: (string) => any) {
     const initialJs = babelGenerator(input, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
@@ -312,7 +311,7 @@ export class YamlCompiler {
 
     const traverseObj = {
       Program: (babelPath) => {
-        CubePropContextTranspiler.replaceValueWithArrowFunction(<(string) => any>resolveSymbol, babelPath.get('body')[0].get('expression'), ensureCubeParam);
+        CubePropContextTranspiler.replaceValueWithArrowFunction(<(string) => any>resolveSymbol, babelPath.get('body')[0].get('expression'));
       },
     };
 
