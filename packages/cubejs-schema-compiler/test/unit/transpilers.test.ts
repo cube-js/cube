@@ -379,6 +379,70 @@ describe('Transpilers', () => {
     expect(transpiledMaskSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.userAttributes');
   });
 
+  it('CubePropContextTranspiler mask.sql should always have CUBE as default parameter', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            },
+            masked_dim: {
+              sql: \`price\`,
+              type: 'number',
+              mask: {
+                sql: \`-1\`,
+              }
+            }
+          }
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledMaskSql = (cubeEvaluator.cubeFromPath('Test').dimensions.masked_dim as any).mask.sql;
+    expect(transpiledMaskSql!.toString()).toMatch('CUBE');
+  });
+
+  it('CubePropContextTranspiler mask.sql with CUBE reference should resolve correctly', async () => {
+    const compilers = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql_table: 'public.test',
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: 'number',
+              primary_key: true,
+            },
+            secret: {
+              sql: \`secret_val\`,
+              type: 'string',
+              mask: {
+                sql: \`CONCAT('***', RIGHT(CAST(\${CUBE}.secret_val AS TEXT), 2))\`,
+              }
+            }
+          },
+          measures: {
+            count: { type: 'count' }
+          }
+        })
+    `);
+
+    await compilers.compiler.compile();
+
+    const query = new PostgresQuery(
+      compilers,
+      {
+        measures: ['Test.count'],
+        dimensions: ['Test.secret'],
+        maskedMembers: ['Test.secret'],
+      }
+    );
+    const sql = query.buildSqlAndParams();
+    expect(sql[0]).toContain('"test".secret_val');
+  });
+
   it('CubePropContextTranspiler should not transform groups shorthand when a cube member named groups exists', async () => {
     const { cubeEvaluator, compiler } = prepareJsCompiler(`
         cube(\`Test\`, {

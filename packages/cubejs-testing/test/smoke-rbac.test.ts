@@ -832,6 +832,17 @@ describe('Cube RBAC Engine', () => {
         expect(row.masked_price).toBe(1);
       }
     });
+
+    test('CUBE context in mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_cube_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
+        expect(row.masked_product).toBeLessThan(0);
+      }
+    });
   });
 
   describe('SECURITY_CONTEXT.cubeCloud features via REST API', () => {
@@ -907,6 +918,19 @@ describe('Cube RBAC Engine', () => {
         // mask.sql is CAST(${userAttributes.tenantId} AS INTEGER)
         // sc_test user has tenantId = '1', so masked_price should be 1
         expect(row['sc_ua_mask_test.masked_price']).toBe(1);
+      }
+    });
+
+    test('CUBE context in mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_cube_mask_test.count'],
+        dimensions: ['sc_cube_mask_test.masked_product'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
+        expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
       }
     });
   });

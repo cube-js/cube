@@ -234,11 +234,19 @@ impl DimensionSymbol {
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        self.kind.get_dependencies()
+        let mut deps = self.kind.get_dependencies();
+        if let Some(mask) = &self.mask_sql {
+            mask.extract_symbol_deps(&mut deps);
+        }
+        deps
     }
 
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        self.kind.get_cube_refs()
+        let mut refs = self.kind.get_cube_refs();
+        if let Some(mask) = &self.mask_sql {
+            refs.extend(mask.get_cube_refs());
+        }
+        refs
     }
 
     pub fn cube_name(&self) -> String {

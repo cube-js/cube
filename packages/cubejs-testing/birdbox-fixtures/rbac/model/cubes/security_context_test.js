@@ -107,6 +107,43 @@ cube('sc_ua_mask_test', {
   ],
 });
 
+cube('sc_cube_mask_test', {
+  sql_table: 'public.line_items',
+
+  dimensions: {
+    id: {
+      sql: 'id',
+      type: 'number',
+      primary_key: true,
+    },
+    masked_product: {
+      sql: `${CUBE}.product_id`,
+      type: 'number',
+      mask: {
+        sql: `${CUBE}.product_id * -1`,
+      },
+    },
+  },
+
+  measures: {
+    count: {
+      type: 'count',
+    },
+  },
+
+  accessPolicy: [
+    {
+      role: '*',
+      memberLevel: {
+        includes: [],
+      },
+      memberMasking: {
+        includes: '*',
+      },
+    },
+  ],
+});
+
 cube('sc_groups_shorthand_test', {
   sql_table: 'public.line_items',
 

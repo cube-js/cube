@@ -332,6 +332,9 @@ impl MeasureSymbol {
         if let Some(case) = &self.case {
             case.extract_symbol_deps(&mut deps);
         }
+        if let Some(mask) = &self.mask_sql {
+            mask.extract_symbol_deps(&mut deps);
+        }
         deps
     }
 
@@ -348,6 +351,9 @@ impl MeasureSymbol {
         }
         if let Some(case) = &self.case {
             case.extract_cube_refs(&mut refs);
+        }
+        if let Some(mask) = &self.mask_sql {
+            refs.extend(mask.get_cube_refs());
         }
         refs
     }
