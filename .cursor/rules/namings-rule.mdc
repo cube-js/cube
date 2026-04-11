@@ -1,7 +1,6 @@
 ---
-description: Product naming conventions for Cube documentation
 globs: docs-mintlify/**
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Product Naming Conventions
@@ -16,3 +15,29 @@ alwaysApply: false
 - **Development** — development deployment type (legacy: "Development instance")
 - **Production** — production deployment type (legacy: "Production cluster")
 - **Multi-cluster** — multi-cluster production deployment type (legacy: "Production multi-cluster")
+
+# Product Taxonomy
+Make sure to use correct terms.
+
+- **Account**
+  - **Deployment**
+    - **Analytics Chat**
+    - **Workbook**
+      - Tab
+      - Dashboard builder
+    - **Dashboard**
+      - Scheduled refresh
+    - **Semantic Model**
+      - Semantic Model IDE (short: "IDE")
+      - Semantic Model Agent
+    - **Explore**
+      - Explorations
+    - **API**
+      - Embed APIs
+      - Core Data APIs
+      - Management APIs
+        - Orchestration API
+  - **Embedding**
+    - Private embedding
+    - Signed embedding
+    - Creator Mode
