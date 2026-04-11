@@ -582,7 +582,8 @@
                   "recipes/data-modeling/funnels",
                   "recipes/data-modeling/cohort-retention",
                   "recipes/data-modeling/xirr",
-                  "recipes/data-modeling/dbt"
+                  "recipes/data-modeling/dbt",
+                  "recipes/data-modeling/custom-order"
                 ]
               }
             ]
