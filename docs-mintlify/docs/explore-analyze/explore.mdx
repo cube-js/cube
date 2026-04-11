@@ -3,9 +3,7 @@ title: Explore
 description: Self-serve data exploration from Analytics Chat, dashboards, or any semantic view — governed by your data model, shareable via URL.
 ---
 
-Explore is a quick way to explore data in your semantic layer either by point and click or with an AI agent. Unlike workbooks, Explore doesn't require you to create a workbook—you can start exploring immediately from dashboard, analytics chat or any semantic view.
-
-Explore state is saved to the URL, making it easy to share your exploration with another user. When you're ready to build a more permanent analysis, you can convert your exploration to a [workbook](/docs/explore-analyze/workbooks).
+Explore is a quick way to explore data in your semantic layer either by point and click or with an AI agent. Unlike workbooks, Explore doesn't require you to create a workbook—you can start exploring immediately from a dashboard, Analytics Chat, or any semantic view.
 
 Explore leverages your data model definitions, ensuring that all queries use consistent metrics, respect access control policies, and benefit from pre-aggregations for fast performance.
 
@@ -17,14 +15,14 @@ You can start exploring from three places in Cube:
 
 When the AI agent returns a query result in Analytics Chat, click **Explore** to open that result in an exploration. This allows you to further analyze and visualize the data returned by the AI agent.
 
-<iframe
-  width="100%"
-  height="400"
-  src=""
-  title="Product video"
-  frameBorder="0"
-  allowFullScreen
-/>
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="w-full aspect-video rounded-xl"
+  src="https://lgo0ecceic.ucarecd.net/edf19a6e-76ac-4b90-be9a-53fa68b0f704/"
+></video>
 
 ### Exploring from a published dashboard
 
@@ -43,4 +41,37 @@ Navigate to the **Explore** page in the sidebar. From here, you can select any s
 
 The functionality in Explore is similar to when working with semantic views in workbooks. You can build visualizations, pivot tables, and tables by selecting measures and dimensions from your semantic views, apply filters, group and aggregate data.
 
-Explore state is saved in the URL, making it easy to share your exploration with other users by simply copying and sharing the URL. When you're ready to build a more permanent analysis, you can [convert your exploration to a workbook](/docs/explore-analyze/workbooks).
+Explore state is also saved in the URL, making it easy to share your exploration with other users by simply copying and sharing the link.
+
+## Saving explorations
+
+You can save an exploration so you can return to it later without
+re-building your query.
+
+- **Save** — For an unsaved exploration, click **Save** to open the
+  **Save Exploration** dialog. Give your exploration a name and click
+  **Save**. The exploration is now persisted and appears in your
+  workspace.
+- **Save (existing)** — After you modify a previously saved exploration,
+  click **Save** to update it in place.
+- **Save as** — For a saved exploration, open the chevron menu next to
+  **Save** and choose **Save as...** to create a copy under a new name.
+
+You can also rename a saved exploration at any time by clicking its title
+in the header and typing a new name.
+
+## Converting to a workbook
+
+When you're ready to build a more permanent analysis, you can convert
+your exploration to a [workbook](/docs/explore-analyze/workbooks). Click
+**Convert to workbook** to create a new workbook with your exploration
+as its first tab.
+
+## Copying to clipboard
+
+You can copy an exploration to your clipboard and paste it as a new tab
+in any [workbook](/docs/explore-analyze/workbooks). Click the chevron
+next to **Convert to workbook** and select **Copy to Clipboard**.
+
+Then navigate to the target workbook and press **Cmd+V** (macOS) or
+**Ctrl+V** (Windows/Linux) to paste the exploration as a new tab.
