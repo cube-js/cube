@@ -1030,6 +1030,127 @@ describe('Cube RBAC Engine', () => {
   });
 });
 
+describe('Cube RBAC Engine [Tesseract]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'false',
+        NODE_ENV: 'production',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
+        CUBESQL_SQL_PUSH_DOWN: 'true',
+      },
+      {
+        schemaDir: 'rbac/model',
+        cubejsConfig: 'rbac/cube.js',
+      }
+    );
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  describe('Shorthand and mask tests via SQL API [Tesseract]', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('sc_test', 'sc_test_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('userAttributes shorthand in mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_ua_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.masked_price).toBe(1);
+      }
+    });
+
+    test('CUBE context in mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_cube_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.masked_product).toBeLessThan(0);
+      }
+    });
+  });
+
+  describe('Shorthand and mask tests via REST API [Tesseract]', () => {
+    let scClient: CubeApi;
+
+    const SC_TEST_TOKEN = sign({
+      cubeCloud: {
+        userAttributes: {
+          tenantId: '1',
+        },
+        groups: ['1', '2'],
+      },
+      auth: {
+        username: 'sc_test',
+        userAttributes: {},
+        roles: [],
+        groups: [],
+      },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+      expiresIn: '2 days'
+    });
+
+    beforeAll(async () => {
+      scClient = cubejs(async () => SC_TEST_TOKEN, {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+    });
+
+    test('userAttributes shorthand in mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_ua_mask_test.count'],
+        dimensions: ['sc_ua_mask_test.masked_price'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['sc_ua_mask_test.masked_price']).toBe(1);
+      }
+    });
+
+    test('CUBE context in mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_cube_mask_test.count'],
+        dimensions: ['sc_cube_mask_test.masked_product'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+      }
+    });
+  });
+});
+
 describe('Cube RBAC Engine [dev mode]', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
