@@ -1767,7 +1767,8 @@ GROUP BY
             &"SELECT MEASURE(SUM(count)) FROM KibanaSampleDataEcommerce".to_string(),
             meta.clone(),
             get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
-        ).await;
+        )
+        .await;
 
         let err_msg = create_query.err().unwrap().message();
         assert!(
@@ -1786,7 +1787,8 @@ GROUP BY
             &"SELECT MEASURE(COUNT(count)) FROM KibanaSampleDataEcommerce".to_string(),
             meta.clone(),
             get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
-        ).await;
+        )
+        .await;
 
         let err_msg = create_query.err().unwrap().message();
         assert!(
@@ -1805,7 +1807,8 @@ GROUP BY
             &"SELECT MEASURE(AVG(avgPrice)) FROM KibanaSampleDataEcommerce".to_string(),
             meta.clone(),
             get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
-        ).await;
+        )
+        .await;
 
         let err_msg = create_query.err().unwrap().message();
         assert!(
@@ -1820,7 +1823,8 @@ GROUP BY
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(count) FROM KibanaSampleDataEcommerce".to_string(),
             DatabaseProtocol::PostgreSQL,
-        ).await;
+        )
+        .await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(

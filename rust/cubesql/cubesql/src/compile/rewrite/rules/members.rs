@@ -156,16 +156,19 @@ impl RewriteRules for MemberRules {
             transforming_chain_rewrite(
                 "measure-nested-aggregate-error",
                 member_replacer("?aggr_expr", "?alias_to_cube", "?aliases"),
-                vec![("?aggr_expr", udaf_expr(
-                    MEASURE_UDAF_NAME,
-                    vec![agg_fun_expr(
-                        "?inner_fun",
-                        vec!["?inner_arg"],
-                        "?inner_distinct",
-                        "?inner_within_group",
-                    )],
-                    "AggregateUDFExprDistinct:false",
-                ))],
+                vec![(
+                    "?aggr_expr",
+                    udaf_expr(
+                        MEASURE_UDAF_NAME,
+                        vec![agg_fun_expr(
+                            "?inner_fun",
+                            vec!["?inner_arg"],
+                            "?inner_distinct",
+                            "?inner_within_group",
+                        )],
+                        "AggregateUDFExprDistinct:false",
+                    ),
+                )],
                 "?error".to_string(),
                 Self::transform_nested_aggregate_error(
                     "?inner_fun",
@@ -777,16 +780,19 @@ impl MemberRules {
                 "?old_member",
                 "?member_pushdown_replacer_alias_to_cube",
             ),
-            vec![("?aggr_expr", udaf_expr(
-                MEASURE_UDAF_NAME,
-                vec![agg_fun_expr(
-                    "?inner_fun",
-                    vec!["?inner_arg"],
-                    "?inner_distinct",
-                    "?inner_within_group",
-                )],
-                "AggregateUDFExprDistinct:false",
-            ))],
+            vec![(
+                "?aggr_expr",
+                udaf_expr(
+                    MEASURE_UDAF_NAME,
+                    vec![agg_fun_expr(
+                        "?inner_fun",
+                        vec!["?inner_arg"],
+                        "?inner_distinct",
+                        "?inner_within_group",
+                    )],
+                    "AggregateUDFExprDistinct:false",
+                ),
+            )],
             "?error".to_string(),
             Self::transform_nested_aggregate_error_pushdown(
                 "?inner_fun",
@@ -2091,14 +2097,9 @@ impl MemberRules {
         let error_out_var = var!(error_out_var);
 
         move |egraph, subst| {
-            for fun in
-                var_iter!(egraph[subst[inner_fun_var]], AggregateFunctionExprFun).cloned()
-            {
-                for alias_to_cube in var_iter!(
-                    egraph[subst[alias_to_cube_var]],
-                    MemberReplacerAliasToCube
-                )
-                .cloned()
+            for fun in var_iter!(egraph[subst[inner_fun_var]], AggregateFunctionExprFun).cloned() {
+                for alias_to_cube in
+                    var_iter!(egraph[subst[alias_to_cube_var]], MemberReplacerAliasToCube).cloned()
                 {
                     let fun_name = MemberRules::get_agg_type(Some(&fun), false)
                         .unwrap_or_else(|| format!("{:?}", fun))
@@ -2136,9 +2137,7 @@ impl MemberRules {
         let error_out_var = var!(error_out_var);
 
         move |egraph, subst| {
-            for fun in
-                var_iter!(egraph[subst[inner_fun_var]], AggregateFunctionExprFun).cloned()
-            {
+            for fun in var_iter!(egraph[subst[inner_fun_var]], AggregateFunctionExprFun).cloned() {
                 for alias_to_cube in var_iter!(
                     egraph[subst[alias_to_cube_var]],
                     MemberPushdownReplacerAliasToCube
