@@ -843,6 +843,18 @@ describe('Cube RBAC Engine', () => {
         expect(row.masked_product).toBeLessThan(0);
       }
     });
+
+    test('userAttributes shorthand in YAML mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM yaml_ua_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // sc_test user has tenantId = '1', so the CASE WHEN evaluates to true
+        // and masked_status should be the actual product_id (positive)
+        expect(row.masked_status).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('SECURITY_CONTEXT.cubeCloud features via REST API', () => {
@@ -931,6 +943,19 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
         expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+      }
+    });
+
+    test('userAttributes shorthand in YAML mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_ua_mask_test.count'],
+        dimensions: ['yaml_ua_mask_test.masked_status'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        // sc_test user has tenantId = '1', so masked_status should be actual product_id
+        expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
       }
     });
   });
@@ -1097,6 +1122,16 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         expect(row.masked_product).toBeLessThan(0);
       }
     });
+
+    test('userAttributes shorthand in YAML mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM yaml_ua_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.masked_status).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('Shorthand and mask tests via REST API [Tesseract]', () => {
@@ -1146,6 +1181,18 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+      }
+    });
+
+    test('userAttributes shorthand in YAML mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_ua_mask_test.count'],
+        dimensions: ['yaml_ua_mask_test.masked_status'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
       }
     });
   });

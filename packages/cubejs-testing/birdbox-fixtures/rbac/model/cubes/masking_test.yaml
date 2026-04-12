@@ -106,6 +106,32 @@ cubes:
         member_level:
           includes: []
 
+  - name: yaml_ua_mask_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: masked_status
+        sql: product_id
+        type: number
+        mask:
+          sql: "CASE WHEN { userAttributes.tenantId } = '1' THEN {CUBE}.product_id ELSE -1 END"
+
+    measures:
+      - name: count
+        type: count
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
 views:
   # View with full access at view level - but cube masking still applies (RLS pattern)
   # Excludes members with {CUBE} references in SQL (secret_string, secret_boolean)

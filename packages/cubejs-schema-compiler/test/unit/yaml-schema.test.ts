@@ -1,4 +1,5 @@
 import { prepareYamlCompiler } from './PrepareCompiler';
+import { PostgresQuery } from '../../src';
 
 describe('Yaml Schema Testing', () => {
   describe('Duplicate member detection', () => {
@@ -1112,6 +1113,124 @@ cubes:
       } catch (e: any) {
         expect(e.message).toContain('format');
       }
+    });
+  });
+
+  describe('Mask SQL with shorthand', () => {
+    it('userAttributes shorthand in mask sql should compile and resolve', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+        mask:
+          sql: "CASE WHEN { userAttributes.hasStatusAccess } THEN {CUBE}.status ELSE '***' END"
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      `);
+
+      await compilers.compiler.compile();
+
+      const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.status;
+      const maskSql = (dim as any).mask.sql.toString();
+      expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.userAttributes.hasStatusAccess');
+      expect(maskSql).toContain('CUBE');
+      expect(maskSql).not.toMatch(/[^.}]userAttributes\.hasStatusAccess/);
+
+      const query = new PostgresQuery(
+        compilers,
+        {
+          measures: ['orders.count'],
+          dimensions: ['orders.status'],
+          maskedMembers: ['orders.status'],
+          contextSymbols: {
+            securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
+          }
+        }
+      );
+      const sql = query.buildSqlAndParams();
+      expect(sql[0]).toContain('"orders".status');
+      expect(sql[0]).toContain('CASE WHEN');
+    });
+
+    it('user_attributes shorthand in mask sql should compile and resolve', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+        mask:
+          sql: "CASE WHEN { user_attributes.hasStatusAccess } THEN {CUBE}.status ELSE '***' END"
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      `);
+
+      await compilers.compiler.compile();
+
+      const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.status;
+      const maskSql = (dim as any).mask.sql.toString();
+      expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.userAttributes.hasStatusAccess');
+    });
+
+    it('groups shorthand in mask sql should compile and resolve', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: secret
+        sql: price
+        type: number
+        mask:
+          sql: "CASE WHEN {CUBE}.product_id IN ({groups}) THEN {CUBE}.price ELSE -1 END"
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      `);
+
+      await compilers.compiler.compile();
+
+      const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.secret;
+      const maskSql = (dim as any).mask.sql.toString();
+      expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.groups');
     });
   });
 });
