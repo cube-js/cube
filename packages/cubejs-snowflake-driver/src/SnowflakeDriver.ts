@@ -874,7 +874,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           reject(err);
           return;
         }
-        const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+        const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
         const types: {name: string, type: string}[] =
           this.getTypes(stmt);
         if (rows?.length && Object.keys(hydrationMap).length) {
@@ -922,7 +922,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }));
     const types: {name: string, type: string}[] =
       this.getTypes(stmt);
-    const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+    const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
     if (Object.keys(hydrationMap).length) {
       const rowStream = new HydrationStream(hydrationMap);
       stmt.streamRows().pipe(rowStream);
@@ -944,7 +944,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private getTypes(stmt: RowStatement) {
-    return stmt.getColumns().map((column) => {
+    return (stmt.getColumns() ?? []).map((column) => {
       const type = {
         name: column.getName().toLowerCase(),
         type: '',
@@ -999,7 +999,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         }
 
         if (rehydrate && rows?.length) {
-          const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+          const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
           if (Object.keys(hydrationMap).length) {
             for (const row of rows) {
               for (const [field, toValue] of Object.entries(hydrationMap)) {
