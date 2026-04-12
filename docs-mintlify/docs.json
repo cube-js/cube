@@ -141,6 +141,7 @@
           {
             "group": "Integrations",
             "pages": [
+              "docs/integrations/slack",
               "docs/integrations/tableau",
               {
                 "group": "Power BI",
