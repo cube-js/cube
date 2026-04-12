@@ -75,6 +75,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -89,19 +94,20 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    const clusterIdentifier = getEnv('redshiftClusterIdentifier', { dataSource });
-    const dbPass = getEnv('dbPass', { dataSource });
-    const dbUser = getEnv('dbUser', { dataSource });
-    const dbName = getEnv('dbName', { dataSource });
+    const clusterIdentifier = getEnv('redshiftClusterIdentifier', { dataSource, preAggregations });
+    const dbPass = getEnv('dbPass', { dataSource, preAggregations });
+    const dbUser = getEnv('dbUser', { dataSource, preAggregations });
+    const dbName = getEnv('dbName', { dataSource, preAggregations });
 
     let credentialsProvider: RedshiftCredentialsProvider;
 
     if (clusterIdentifier && !dbPass && !config.password) {
       credentialsProvider = new RedshiftIAMCredentialsProvider({
-        region: getEnv('redshiftAwsRegion', { dataSource }),
-        assumeRoleArn: getEnv('redshiftAssumeRoleArn', { dataSource }),
-        assumeRoleExternalId: getEnv('redshiftAssumeRoleExternalId', { dataSource }),
+        region: getEnv('redshiftAwsRegion', { dataSource, preAggregations }),
+        assumeRoleArn: getEnv('redshiftAssumeRoleArn', { dataSource, preAggregations }),
+        assumeRoleExternalId: getEnv('redshiftAssumeRoleExternalId', { dataSource, preAggregations }),
         clusterIdentifier,
         dbName,
       });
@@ -269,11 +275,12 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    */
   protected getInitialConfiguration(
     dataSource: string,
+    preAggregations?: boolean,
   ): Partial<RedshiftDriverConfiguration> {
     return {
       // @todo It's not possible to support UNLOAD in readOnly mode, because we need column types (CREATE TABLE?)
       readOnly: false,
-      exportBucket: this.getExportBucket(dataSource),
+      exportBucket: this.getExportBucket(dataSource, preAggregations),
     };
   }
 
@@ -330,6 +337,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   protected getExportBucket(
     dataSource: string,
+    preAggregations?: boolean,
   ): RedshiftDriverExportAWS | undefined {
     const supportedBucketTypes = ['s3'];
 
@@ -337,16 +345,17 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       bucketType: getEnv('dbExportBucketType', {
         supported: supportedBucketTypes,
         dataSource,
+        preAggregations,
       }),
-      bucketName: getEnv('dbExportBucket', { dataSource }),
-      region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+      bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
+      region: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
     };
 
     const exportBucket: Partial<RedshiftDriverExportAWS> = {
       ...requiredExportBucket,
-      keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
-      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
-      unloadArn: getEnv('redshiftUnloadArn', { dataSource }),
+      keyId: getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
+      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
+      unloadArn: getEnv('redshiftUnloadArn', { dataSource, preAggregations }),
     };
 
     if (exportBucket.bucketType) {

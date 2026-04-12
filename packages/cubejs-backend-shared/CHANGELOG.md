@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+### Features
+
+- **mssql-driver:** Support use named timezones ([#10582](https://github.com/cube-js/cube/issues/10582)) ([ee788f4](https://github.com/cube-js/cube/commit/ee788f4f843073eb26bf07e101f83084e653270f))
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
 ## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
 
 **Note:** Version bump only for package @cubejs-backend/shared

@@ -34,6 +34,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.join_graph()?,
             options.static_data().timezone.clone(),
             options.static_data().export_annotated_sql,
+            options
+                .static_data()
+                .convert_tz_for_raw_time_dimension
+                .unwrap_or(false),
             options.static_data().masked_members.clone(),
             options.static_data().member_to_alias.clone(),
         )?;

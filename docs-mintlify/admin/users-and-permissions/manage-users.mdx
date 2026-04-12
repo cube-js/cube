@@ -1,0 +1,119 @@
+---
+title: Manage users
+description: Add users to your Cube Cloud account, assign roles, and control their access.
+---
+
+Use the **Admin → Users** page to add people to your Cube Cloud account,
+change their roles, and control what they can access.
+
+<Info>
+
+Only users with the Admin role can manage other users.
+
+</Info>
+
+## The user list
+
+The user list displays all users in your account along with their roles
+and status. Use the search bar to filter users by name or email.
+
+## Inviting users
+
+To invite a new user:
+
+1. Navigate to **Admin → Users**.
+2. Click **Add User**.
+3. Enter the user's email address.
+4. Select a [role][ref-roles] for the user: Admin, Developer, Explorer, or
+   Viewer.
+5. Optionally, assign one or more [custom roles][ref-custom-roles].
+6. Click **Create** to send the invitation.
+
+After the user is created, an invitation link is generated. You can copy the
+link and share it with the user. The user must visit the link to set their
+password and activate their account.
+
+### Resending invitations
+
+If a user hasn't activated their account, you can resend or copy the
+invitation link from the user list.
+
+## Managing individual users
+
+Click on a user in the user list to access their settings page. From here,
+you can:
+
+- Update the user's name
+- Change their [role][ref-roles] (Admin, Developer, Explorer, or Viewer)
+- Assign or remove [custom roles][ref-custom-roles]
+- Add the user to [user groups][ref-groups]
+- Set [user attribute][ref-attributes] values for data access control
+
+### Changing a user's role
+
+To change a user's role:
+
+1. Navigate to **Admin → Users** and click on the user.
+2. Select a new role from the role dropdown.
+3. Save the changes.
+
+Alternatively, you can change a user's role directly from the user list
+using the role dropdown.
+
+<Info>
+
+Admin roles are billed at the developer rate.
+
+</Info>
+
+## Deactivating and reactivating users
+
+Deactivating a user revokes their access to Cube Cloud without permanently
+removing their account. The user's active sessions are terminated immediately.
+
+To deactivate a user:
+
+1. Navigate to **Admin → Users**.
+2. Click the actions menu for the user.
+3. Select **Deactivate**.
+
+<Warning>
+
+You cannot deactivate yourself or the last active Admin user.
+
+</Warning>
+
+To reactivate a deactivated user, follow the same steps and select
+**Activate**. The user can then log in again with their existing credentials.
+
+## Deleting users
+
+Deleting a user permanently removes their account from Cube Cloud.
+
+To delete a user:
+
+1. Navigate to **Admin → Users**.
+2. Click the actions menu for the user.
+3. Select **Delete**.
+
+<Warning>
+
+You cannot delete your own account. Deleting a user is irreversible.
+
+</Warning>
+
+## Provisioning users via SCIM
+
+If your organization uses an identity provider such as [Okta][ref-okta] or
+[Microsoft Entra ID][ref-entra-id], you can automate user provisioning and
+deprovisioning through SCIM. See the [SSO & Identity Providers][ref-sso]
+documentation for setup instructions.
+
+
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-attributes]: /admin/users-and-permissions/user-attributes
+[ref-groups]: /admin/users-and-permissions/user-groups
+[ref-sso]: /admin/sso
+[ref-okta]: /admin/sso/okta/scim
+[ref-entra-id]: /admin/sso/microsoft-entra-id/scim

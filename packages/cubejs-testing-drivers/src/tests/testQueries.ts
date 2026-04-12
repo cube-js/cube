@@ -234,6 +234,20 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       });
     });
 
+    // https://github.com/cube-js/cube/issues/10601
+    execute('querying ECommerce: dimensions + filter-only by TD to get empty results', async () => {
+      const response = await client.load({
+        dimensions: [
+          'ECommerce.city',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          dateRange: ['2099-01-01', '2099-12-31'],
+        }],
+      });
+      expect(response.rawData()).toEqual([]);
+    });
+
     execute('querying Customers: dimensions', async () => {
       const response = await client.load({
         dimensions: [

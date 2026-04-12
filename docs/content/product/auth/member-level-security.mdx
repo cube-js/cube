@@ -10,6 +10,16 @@ Defining whether users have access to [cubes][ref-cubes] and [views][ref-views] 
 similar to defining access to database tables; defining whether they have access
 to dimensions and measures — to columns.
 
+<WarningBox>
+
+Just like in many SQL databases where table-level column policies are not
+inherited by views, member-level access policies defined on cubes are **not**
+applied when querying through views. Only the member-level policies defined on
+the view itself will take effect. Make sure to define access policies on your
+views directly.
+
+</WarningBox>
+
 __By default, all cubes, views, and their members are *public*,__ meaning that they
 can be accessed by any users and they are also visible during data model introspection.
 

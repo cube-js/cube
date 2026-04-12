@@ -7,6 +7,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeA.id",
+      "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -26,6 +27,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.other_id",
+      "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -53,6 +55,7 @@ Object {
       "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeA.count_a",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -75,6 +78,7 @@ Object {
       "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeB.count_b",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -110,6 +114,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeB.other_id",
+      "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -137,6 +142,7 @@ Object {
       "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeA.count_a",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -159,6 +165,7 @@ Object {
       "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeB.count_b",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -194,6 +201,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeA.id",
+      "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -213,6 +221,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.id",
+      "currency": undefined,
       "description": "Description for CubeB.id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -232,6 +241,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.other_id",
+      "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -259,6 +269,7 @@ Object {
       "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeA.count_a",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -281,6 +292,7 @@ Object {
       "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeB.count_b",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -316,6 +328,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeB.other_id",
+      "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
       "granularities": undefined,
@@ -343,6 +356,7 @@ Object {
       "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeA.count_a",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {
@@ -365,6 +379,7 @@ Object {
       "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
+      "currency": undefined,
       "description": "Description for CubeB.count_b",
       "drillMembers": Array [],
       "drillMembersGrouped": Object {

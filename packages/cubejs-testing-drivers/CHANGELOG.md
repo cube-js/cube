@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **bigquery:** Align time series output type to TIMESTAMP for tesseract planner, thanks [@tlangton3](https://github.com/tlangton3) ([#10645](https://github.com/cube-js/cube/issues/10645)) ([05ab975](https://github.com/cube-js/cube/commit/05ab9752a03cd9ca2095cf96133e3c896d5ed455)), closes [cube-js/cube#10642](https://github.com/cube-js/cube/issues/10642)
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+### Bug Fixes
+
+- skip annotation check for filter-only time dimensions, thanks [@jwils](https://github.com/jwils) ([#10603](https://github.com/cube-js/cube/issues/10603)) ([98e3c19](https://github.com/cube-js/cube/commit/98e3c19e5d70cfdb1c705d58a87c88524e78d416)), closes [#10590](https://github.com/cube-js/cube/issues/10590) [#10601](https://github.com/cube-js/cube/issues/10601)
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
 ## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

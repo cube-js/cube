@@ -1,11 +1,9 @@
-/* globals jest, describe, expect, it */
-
-import 'jest';
+import { vi } from 'vitest';
 import { defaultHeuristics } from '../src/utils';
 
-jest.mock('moment-range', () => {
-  const Moment = jest.requireActual('moment');
-  const MomentRange = jest.requireActual('moment-range');
+vi.mock('moment-range', async () => {
+  const Moment = await vi.importActual('moment');
+  const MomentRange: any = await vi.importActual('moment-range');
   const moment = MomentRange.extendMoment(Moment);
   return {
     extendMoment: () => moment,

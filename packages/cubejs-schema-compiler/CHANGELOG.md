@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **bigquery:** Align time series output type to TIMESTAMP for tesseract planner, thanks [@tlangton3](https://github.com/tlangton3) ([#10645](https://github.com/cube-js/cube/issues/10645)) ([05ab975](https://github.com/cube-js/cube/commit/05ab9752a03cd9ca2095cf96133e3c896d5ed455)), closes [cube-js/cube#10642](https://github.com/cube-js/cube/issues/10642)
+- **tesseract:** Issue with filters over multi-fact measure ([#10650](https://github.com/cube-js/cube/issues/10650)) ([7169d39](https://github.com/cube-js/cube/commit/7169d39b440e7cabe181cfecebd589880aee51ec))
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+### Bug Fixes
+
+- SECURITY_CONTEXT renders empty strings on filter with enabled Tesseract ([#10576](https://github.com/cube-js/cube/issues/10576)) ([6d9afac](https://github.com/cube-js/cube/commit/6d9afac3e16a5c8a948887270f0304f78a736c5f))
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+### Features
+
+- **tesseract:** Support multiple time dimensions in pre-aggregations ([#10599](https://github.com/cube-js/cube/issues/10599)) ([c773953](https://github.com/cube-js/cube/commit/c77395389038f384a686a8f2cee3cc39249d51af))
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+### Bug Fixes
+
+- **cube:** Quarter intervals in postgres ([#10580](https://github.com/cube-js/cube/issues/10580)) ([defc186](https://github.com/cube-js/cube/commit/defc186c39d447a24914e7b1d924095c8761dabf))
+- **tesseract:** Filter by multi-stage measure ([#10579](https://github.com/cube-js/cube/issues/10579)) ([4a4b67f](https://github.com/cube-js/cube/commit/4a4b67f50fcf6ced8ddb493ec90b3dc9f4c93b1e))
+- **tesseract:** Tesseract should respect convertTzForRawTimeDimension ([#10585](https://github.com/cube-js/cube/issues/10585)) ([515eeae](https://github.com/cube-js/cube/commit/515eeaef4abf554a3291b8a4d2603240281915a3))
+
+### Features
+
+- **cubesql:** Support PatchMeasure for view measures ([#10571](https://github.com/cube-js/cube/issues/10571)) ([3bfe812](https://github.com/cube-js/cube/commit/3bfe8121be684fb08e22e27efb59877734276dba))
+- **mssql-driver:** Support use named timezones ([#10582](https://github.com/cube-js/cube/issues/10582)) ([ee788f4](https://github.com/cube-js/cube/commit/ee788f4f843073eb26bf07e101f83084e653270f))
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+### Features
+
+- Expose alias for named numeric format ([#10568](https://github.com/cube-js/cube/issues/10568)) ([662bc58](https://github.com/cube-js/cube/commit/662bc581c38c87eddb40505dd1847f1f2c79bac9))
+- **schema-compiler:** Support currency for numeric measures and dimensions ([#10561](https://github.com/cube-js/cube/issues/10561)) ([5fc721f](https://github.com/cube-js/cube/commit/5fc721f98429cc46395673b03283c501a59c5cdd))
+- **schema-compiler:** Support predefined named numeric formats ([#10563](https://github.com/cube-js/cube/issues/10563)) ([f060f5c](https://github.com/cube-js/cube/commit/f060f5c6a8a8c5cfe1b06be79f4c189520d3453b))
+
 ## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **backend-native:** Fix `Continue wait` SQL API over HTTP event reporting ([#10649](https://github.com/cube-js/cube/issues/10649)) ([18d1e65](https://github.com/cube-js/cube/commit/18d1e65e7b7195de634dc74b17e2bc824ae0e3cf))
+- **bigquery:** Align time series output type to TIMESTAMP for tesseract planner, thanks [@tlangton3](https://github.com/tlangton3) ([#10645](https://github.com/cube-js/cube/issues/10645)) ([05ab975](https://github.com/cube-js/cube/commit/05ab9752a03cd9ca2095cf96133e3c896d5ed455)), closes [cube-js/cube#10642](https://github.com/cube-js/cube/issues/10642)
+- **cubestore:** Typo in metric name, thanks [@borqq](https://github.com/borqq) ([#10637](https://github.com/cube-js/cube/issues/10637)) ([b91073e](https://github.com/cube-js/cube/commit/b91073e31cfaa312fa1e9971b9cc2bb6fccd712a))
+- **playground:** Multiple percent-formatted values by 100 before display, thanks [@hank-sq](https://github.com/hank-sq) ([#10624](https://github.com/cube-js/cube/issues/10624)) ([6f79820](https://github.com/cube-js/cube/commit/6f798204219bbb975fd3d7123f35e182f55fd9bb)), closes [#10623](https://github.com/cube-js/cube/issues/10623)
+- **tesseract:** Issue with filters over multi-fact measure ([#10650](https://github.com/cube-js/cube/issues/10650)) ([7169d39](https://github.com/cube-js/cube/commit/7169d39b440e7cabe181cfecebd589880aee51ec))
+
+### Features
+
+- **api-gateway:** propagate request ID for REST /cubesql endpoint ([#10633](https://github.com/cube-js/cube/issues/10633)) ([1bce74b](https://github.com/cube-js/cube/commit/1bce74bc1ec6dac8f3eae5cf9d76a2e9915123e3))
+- **client-core:** Introduce formating API ([#10653](https://github.com/cube-js/cube/issues/10653)) ([971b9f6](https://github.com/cube-js/cube/commit/971b9f66c77bff50428fa065ddb8d99f3065fc3a))
+- **cubestore:** add configurable compaction readiness threshold for table creation ([#10629](https://github.com/cube-js/cube/issues/10629)) ([cc9b488](https://github.com/cube-js/cube/commit/cc9b488c101d23b5746743653c53cb1617302af9))
+- **cubestore:** Queue - re-scope external_id uniqueness per path ([#10635](https://github.com/cube-js/cube/issues/10635)) ([4a9453b](https://github.com/cube-js/cube/commit/4a9453b3d42c44d0c2c2cc4bcdba9de4ccb26d81))
+
+### Performance Improvements
+
+- **client-core:** Optimize pivot axisValues and add benchmarks ([#10648](https://github.com/cube-js/cube/issues/10648)) ([0f3a79b](https://github.com/cube-js/cube/commit/0f3a79bfd27a3f807aedb80dd73655b91d8fcbf1))
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+### Bug Fixes
+
+- SECURITY_CONTEXT renders empty strings on filter with enabled Tesseract ([#10576](https://github.com/cube-js/cube/issues/10576)) ([6d9afac](https://github.com/cube-js/cube/commit/6d9afac3e16a5c8a948887270f0304f78a736c5f))
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+### Bug Fixes
+
+- skip annotation check for filter-only time dimensions, thanks [@jwils](https://github.com/jwils) ([#10603](https://github.com/cube-js/cube/issues/10603)) ([98e3c19](https://github.com/cube-js/cube/commit/98e3c19e5d70cfdb1c705d58a87c88524e78d416)), closes [#10590](https://github.com/cube-js/cube/issues/10590) [#10601](https://github.com/cube-js/cube/issues/10601)
+
+### Features
+
+- **tesseract:** Support multiple time dimensions in pre-aggregations ([#10599](https://github.com/cube-js/cube/issues/10599)) ([c773953](https://github.com/cube-js/cube/commit/c77395389038f384a686a8f2cee3cc39249d51af))
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+### Bug Fixes
+
+- cached GraphQL schema can result in missing members if used with access policies ([#10590](https://github.com/cube-js/cube/issues/10590)) ([c95317b](https://github.com/cube-js/cube/commit/c95317be96d51d381dfd4c782d88205b3f5730bb))
+- **cube:** Quarter intervals in postgres ([#10580](https://github.com/cube-js/cube/issues/10580)) ([defc186](https://github.com/cube-js/cube/commit/defc186c39d447a24914e7b1d924095c8761dabf))
+- **tesseract:** Filter by multi-stage measure ([#10579](https://github.com/cube-js/cube/issues/10579)) ([4a4b67f](https://github.com/cube-js/cube/commit/4a4b67f50fcf6ced8ddb493ec90b3dc9f4c93b1e))
+- **tesseract:** Tesseract should respect convertTzForRawTimeDimension ([#10585](https://github.com/cube-js/cube/issues/10585)) ([515eeae](https://github.com/cube-js/cube/commit/515eeaef4abf554a3291b8a4d2603240281915a3))
+
+### Features
+
+- **cubesql:** Support PatchMeasure for view measures ([#10571](https://github.com/cube-js/cube/issues/10571)) ([3bfe812](https://github.com/cube-js/cube/commit/3bfe8121be684fb08e22e27efb59877734276dba))
+- **mssql-driver:** Support use named timezones ([#10582](https://github.com/cube-js/cube/issues/10582)) ([ee788f4](https://github.com/cube-js/cube/commit/ee788f4f843073eb26bf07e101f83084e653270f))
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+### Features
+
+- **cubesql:** Expose format in /v1/cubesql schema response ([#10555](https://github.com/cube-js/cube/issues/10555)) ([f8d79a2](https://github.com/cube-js/cube/commit/f8d79a2e8c0e1fb291d7d55a21cb329c387605a4))
+- Expose alias for named numeric format ([#10568](https://github.com/cube-js/cube/issues/10568)) ([662bc58](https://github.com/cube-js/cube/commit/662bc581c38c87eddb40505dd1847f1f2c79bac9))
+- **schema-compiler:** Support currency for numeric measures and dimensions ([#10561](https://github.com/cube-js/cube/issues/10561)) ([5fc721f](https://github.com/cube-js/cube/commit/5fc721f98429cc46395673b03283c501a59c5cdd))
+- **schema-compiler:** Support predefined named numeric formats ([#10563](https://github.com/cube-js/cube/issues/10563)) ([f060f5c](https://github.com/cube-js/cube/commit/f060f5c6a8a8c5cfe1b06be79f4c189520d3453b))
+
+### Reverts
+
+- Revert "chore: test td" ([5b6f8d6](https://github.com/cube-js/cube/commit/5b6f8d66cb3786cc27f6f693d5715b430437eeb1))
+
 ## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
 
 ### Bug Fixes

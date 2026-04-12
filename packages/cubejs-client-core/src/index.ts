@@ -910,3 +910,5 @@ export * from './HttpTransport';
 export * from './utils';
 export * from './time';
 export * from './types';
+// We don't export it for now, because size of builds for cjs/umd users will be affected
+// export * from './format';

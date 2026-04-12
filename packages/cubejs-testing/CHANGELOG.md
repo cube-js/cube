@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+### Bug Fixes
+
+- SECURITY_CONTEXT renders empty strings on filter with enabled Tesseract ([#10576](https://github.com/cube-js/cube/issues/10576)) ([6d9afac](https://github.com/cube-js/cube/commit/6d9afac3e16a5c8a948887270f0304f78a736c5f))
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+### Bug Fixes
+
+- cached GraphQL schema can result in missing members if used with access policies ([#10590](https://github.com/cube-js/cube/issues/10590)) ([c95317b](https://github.com/cube-js/cube/commit/c95317be96d51d381dfd4c782d88205b3f5730bb))
+
+### Features
+
+- **cubesql:** Support PatchMeasure for view measures ([#10571](https://github.com/cube-js/cube/issues/10571)) ([3bfe812](https://github.com/cube-js/cube/commit/3bfe8121be684fb08e22e27efb59877734276dba))
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+### Features
+
+- **cubesql:** Expose format in /v1/cubesql schema response ([#10555](https://github.com/cube-js/cube/issues/10555)) ([f8d79a2](https://github.com/cube-js/cube/commit/f8d79a2e8c0e1fb291d7d55a21cb329c387605a4))
+- **schema-compiler:** Support currency for numeric measures and dimensions ([#10561](https://github.com/cube-js/cube/issues/10561)) ([5fc721f](https://github.com/cube-js/cube/commit/5fc721f98429cc46395673b03283c501a59c5cdd))
+
+### Reverts
+
+- Revert "chore: test td" ([5b6f8d6](https://github.com/cube-js/cube/commit/5b6f8d66cb3786cc27f6f693d5715b430437eeb1))
+
 ## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
 
 **Note:** Version bump only for package @cubejs-backend/testing

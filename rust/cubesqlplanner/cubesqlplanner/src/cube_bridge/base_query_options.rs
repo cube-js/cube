@@ -74,6 +74,8 @@ pub struct BaseQueryOptionsStatic {
     pub disable_external_pre_aggregations: bool,
     #[serde(rename = "preAggregationId")]
     pub pre_aggregation_id: Option<String>,
+    #[serde(rename = "convertTzForRawTimeDimension")]
+    pub convert_tz_for_raw_time_dimension: Option<bool>,
     #[serde(rename = "maskedMembers")]
     pub masked_members: Option<Vec<String>>,
     #[serde(rename = "memberToAlias", default)]

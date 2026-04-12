@@ -290,12 +290,15 @@ class ApiGateway {
         );
 
         const compilerApi = await this.getCompilerApi(req.context);
+
+        // Cache unfiltered schema - RBAC enforcement happens at query execution time
+        // via annotation-based validation in the Rust result transform layer
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig(req.context, {
+          const metaConfig = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
+            skipVisibilityPatch: true,
           });
-          metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
           schema = makeSchema(metaConfig);
           compilerApi.setGraphQLSchema(schema);
         }
@@ -451,7 +454,7 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait);
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because

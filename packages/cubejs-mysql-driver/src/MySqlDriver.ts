@@ -105,6 +105,11 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -123,17 +128,18 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const { pool, ...restConfig } = config;
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      socketPath: getEnv('dbSocketPath', { dataSource }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      socketPath: getEnv('dbSocketPath', { dataSource, preAggregations }),
       timezone: 'Z',
-      ssl: this.getSslOptions(dataSource),
+      ssl: this.getSslOptions(dataSource, preAggregations),
       dateStrings: true,
       readOnly: true,
       ...restConfig,
@@ -168,7 +174,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       min: 0,
       max:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,

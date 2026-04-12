@@ -1,0 +1,128 @@
+---
+title: AI Tokens
+sidebarTitle: AI Tokens
+description: Understand how AI token usage works in Cube, including per-seat grants, token packages, and usage tracking.
+---
+
+AI features in Cube use a token-based system to measure and manage consumption.
+
+## Overview
+
+Cube's [AI-powered features][ref-ai-overview] consume tokens based on the
+resources required to complete each request. Token allocation differs by
+customer type:
+
+- **Self-serve customers** receive [per-seat token grants](#per-seat-token-grants)
+  equal to half of their seat price, with optional
+  [on-demand consumption](#on-demand-consumption) beyond that
+- **Order form customers** can purchase [pooled token packages](#token-packages)
+
+## Token consumption
+
+Token usage depends on several factors:
+
+- **Task complexity** — More complex questions, multi-step analysis, or larger
+  datasets consume more tokens than simple lookups. Each message in a session
+  carries prior context, so longer sessions compound usage.
+- **Data model context** — Cube sends context from your data model to the LLM
+  to improve answer accuracy. Larger models with more fields and descriptions
+  use more tokens per request.
+- **AI model** — More capable models consume more tokens per request than
+  lighter models.
+
+Not all AI features consume tokens. The list of features that consume tokens
+is subject to change as the product evolves.
+
+
+## Per-seat token grants
+
+Self-serve customers on paid plans receive **per-seat token grants** equal to
+**half of the seat price**. Each user is awarded an individual monthly token
+allocation based on their role:
+
+| Example | Seat price | Monthly token grant |
+| --- | --- | --- |
+| Developer at $100/month | $100 | $50 |
+| Explorer at $60/month | $60 | $30 |
+| Viewer at $20/month | $20 | $10 |
+
+Per-seat grants:
+
+- Are assigned to the individual user
+- Reset each billing cycle
+- Cannot be transferred, shared, or rolled over
+
+### On-demand consumption
+
+When a self-serve user exceeds their monthly per-seat grant, usage
+automatically continues as **on-demand consumption**. On-demand usage is billed
+through the credit card on file.
+
+Administrators can set a **monthly on-demand spending limit** to control
+additional costs. This limit caps the total on-demand spend across the account
+for each billing cycle.
+
+## Token packages
+
+Order form customers can purchase **pooled add-on token packages**. Token
+packages are added to a shared pool accessible by all users in the account.
+
+- Each package is valid for the duration of the contract or until fully
+  consumed, whichever comes first
+- Multiple active packages can be combined
+- Packages do not auto-renew
+
+Contact your account executive for details on purchasing token packages.
+
+## Free tier
+
+Each user on a free plan receives an individual monthly token allowance. This
+allowance resets at the start of each calendar month.
+
+## Tracking usage
+
+Administrators can monitor token consumption through the **AI Tokens Usage**
+tab in the billing settings page. The dashboard shows:
+
+- Total token usage over time
+- Remaining allocation from per-seat grants and token packages
+- Breakdown by usage dimension
+
+## When limits are reached
+
+When a user exhausts all available token sources (per-seat grant and token
+packages), AI requests will return an error indicating the token limit has been
+exceeded.
+
+- **Administrators** are directed to the billing page to purchase additional
+  token packages
+- **Non-admin users** are prompted to contact their account administrator to
+  increase token quotas
+
+## FAQ
+
+### Do tokens roll over?
+
+- **Per-seat grants** reset each billing cycle and do not roll over
+- **Token packages** remain active for the duration of the contract
+
+### Can I bring my own AI model?
+
+Yes. When using a [Bring Your Own Model (BYOM)][ref-byom] configuration, AI
+requests bypass the token quota system entirely — no tokens are consumed or
+tracked for those requests. You are billed directly by your model provider.
+
+### Why does a single prompt sometimes use more tokens than expected?
+
+Cube's AI features use an agentic architecture. A single prompt may trigger
+multiple internal steps — such as searching the data model, building a query,
+and summarizing results — each of which consumes tokens independently.
+
+### Why does the same question use different amounts of tokens?
+
+Token usage can vary between identical prompts due to differences in
+conversation context (earlier messages in the session) or the AI choosing a
+different reasoning path.
+
+[ref-ai-overview]: /admin/ai/index
+[ref-byom]: /admin/ai/bring-your-own-model

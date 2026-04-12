@@ -1,6 +1,3 @@
-/* globals describe, test, expect */
-
-import 'jest';
 import ResultSet from '../src/ResultSet';
 
 const loadResponses = [

@@ -60,6 +60,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string;
+  aggType?: string,
   sql(): string;
   ownedByCube: boolean;
   rollingWindow?: any

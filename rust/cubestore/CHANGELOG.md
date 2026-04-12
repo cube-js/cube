@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **cubestore:** Typo in metric name, thanks [@borqq](https://github.com/borqq) ([#10637](https://github.com/cube-js/cube/issues/10637)) ([b91073e](https://github.com/cube-js/cube/commit/b91073e31cfaa312fa1e9971b9cc2bb6fccd712a))
+
+### Features
+
+- **cubestore:** add configurable compaction readiness threshold for table creation ([#10629](https://github.com/cube-js/cube/issues/10629)) ([cc9b488](https://github.com/cube-js/cube/commit/cc9b488c101d23b5746743653c53cb1617302af9))
+- **cubestore:** Queue - re-scope external_id uniqueness per path ([#10635](https://github.com/cube-js/cube/issues/10635)) ([4a9453b](https://github.com/cube-js/cube/commit/4a9453b3d42c44d0c2c2cc4bcdba9de4ccb26d81))
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
 
 ### Bug Fixes

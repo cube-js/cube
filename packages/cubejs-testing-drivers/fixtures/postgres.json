@@ -1,4 +1,21 @@
 {
+  "extendedEnvs": {
+    "pre-agg-credentials": {
+      "cube": {
+        "environment": {
+          "CUBEJS_PRE_AGGREGATIONS_DB_HOST": "data",
+          "CUBEJS_PRE_AGGREGATIONS_DB_NAME": "test",
+          "CUBEJS_PRE_AGGREGATIONS_DB_USER": "test_preagg",
+          "CUBEJS_PRE_AGGREGATIONS_DB_PASS": "test_preagg"
+        }
+      },
+      "data": {
+        "volumes": [
+          "../fixtures/postgresql-init.sql:/docker-entrypoint-initdb.d/postgresql-init.sql"
+        ]
+      }
+    }
+  },
   "cube": {
     "environment": {
       "CUBEJS_API_SECRET": "mysupersecret",

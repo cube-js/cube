@@ -130,7 +130,9 @@ impl YamlSchema {
             }
 
             for meas_entry in cube.measures {
-                let meas_rc = meas_entry.definition.build();
+                let meas_rc = meas_entry
+                    .definition
+                    .build_with_cube_name(Some(&cube_builder.cube_name()));
                 let meas_def = Rc::try_unwrap(meas_rc)
                     .ok()
                     .expect("Rc should have single owner");

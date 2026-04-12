@@ -8,7 +8,8 @@ use crate::import::ImportService;
 use crate::metastore::job::JobType;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::{
-    table::Table, HllFlavour, IdRow, ImportFormat, IndexDef, IndexType, RowKey, TableId,
+    table::Table, HllFlavour, IdRow, ImportFormat, IndexDef, IndexType, MetaStoreEvent, RowKey,
+    TableId,
 };
 use crate::metastore::{Column, ColumnType, MetaStore};
 use crate::sql::cache::SqlResultCache;
@@ -19,7 +20,9 @@ use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
+use log;
 use sqlparser::ast::*;
+use tokio::sync::broadcast;
 
 #[async_trait]
 
@@ -563,6 +566,19 @@ impl TableCreator {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
+        let has_streaming_location = table
+            .get_row()
+            .locations()
+            .map(|locs| locs.iter().any(|l| Table::is_stream_location(l)))
+            .unwrap_or(false);
+        if !has_streaming_location {
+            if let Some(threshold) = self.config_obj.compaction_readiness_chunks_threshold() {
+                let mut receiver = self.cluster.job_result_listener().into_receiver();
+                self.wait_for_compaction_readiness(table, threshold, &mut receiver)
+                    .await?;
+            }
+        }
+
         let ready_table = self.db.table_ready(table.get_id(), true).await?;
 
         if let Some(trace_obj) = trace_obj.as_ref() {
@@ -570,6 +586,141 @@ impl TableCreator {
         }
 
         Ok(FinalizeExternalTableResult::Ok)
+    }
+
+    async fn wait_for_compaction_readiness(
+        &self,
+        table: &IdRow<Table>,
+        max_chunks_per_partition: u64,
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+    ) -> Result<(), CubeError> {
+        let table_id = table.get_id();
+        let debounce_interval = Duration::from_secs(1);
+
+        if self
+            .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
+            .await?
+        {
+            return Ok(());
+        }
+
+        let fallback_interval = Duration::from_secs(5);
+        let mut skip_wait = false;
+        loop {
+            if !skip_wait {
+                Self::wait_for_compaction_event(receiver, table_id, fallback_interval).await?;
+            }
+
+            if self
+                .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
+                .await?
+            {
+                return Ok(());
+            }
+
+            tokio::time::sleep(debounce_interval).await;
+            skip_wait = Self::drain_compaction_events(receiver, table_id);
+        }
+    }
+
+    async fn wait_for_compaction_event(
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+        table_id: u64,
+        fallback_interval: Duration,
+    ) -> Result<(), CubeError> {
+        loop {
+            tokio::select! {
+                result = receiver.recv() => {
+                    match result {
+                        Ok(MetaStoreEvent::CompactionResult {
+                            table_id: event_table_id,
+                        }) if event_table_id == table_id => return Ok(()),
+                        Ok(_) => continue,
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            log::warn!(
+                                "Compaction readiness listener for table {} lagged by {} events",
+                                table_id,
+                                n,
+                            );
+                            return Ok(());
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            return Err(CubeError::internal(format!(
+                                "Metastore event channel closed while waiting for compaction readiness of table {}",
+                                table_id,
+                            )));
+                        }
+                    }
+                }
+                _ = tokio::time::sleep(fallback_interval) => {
+                    log::debug!(
+                        "Compaction readiness: fallback timer fired for table {}, checking status",
+                        table_id,
+                    );
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    fn drain_compaction_events(
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+        table_id: u64,
+    ) -> bool {
+        let mut found = false;
+        loop {
+            match receiver.try_recv() {
+                Ok(MetaStoreEvent::CompactionResult {
+                    table_id: event_table_id,
+                }) if event_table_id == table_id => {
+                    found = true;
+                }
+                Ok(_) => {}
+                Err(broadcast::error::TryRecvError::Lagged(_)) => {
+                    found = true;
+                }
+                Err(broadcast::error::TryRecvError::Empty)
+                | Err(broadcast::error::TryRecvError::Closed) => break,
+            }
+        }
+        found
+    }
+
+    async fn check_partition_chunks_within_threshold(
+        &self,
+        table_id: u64,
+        max_chunks_per_partition: u64,
+    ) -> Result<bool, CubeError> {
+        let indexes = self.db.get_table_indexes(table_id).await?;
+        let partitions_and_chunks = self
+            .db
+            .get_active_partitions_and_chunks_by_index_id_for_select(
+                indexes.iter().map(|i| i.get_id()).collect(),
+            )
+            .await?;
+
+        for index_partitions in &partitions_and_chunks {
+            for (partition, chunks) in index_partitions {
+                let active_chunk_count =
+                    chunks.iter().filter(|c| c.get_row().active()).count() as u64;
+                if active_chunk_count > max_chunks_per_partition {
+                    log::debug!(
+                        "Compaction readiness: partition {} has {} active chunks, threshold is {}",
+                        partition.get_id(),
+                        active_chunk_count,
+                        max_chunks_per_partition,
+                    );
+                    return Ok(false);
+                }
+            }
+        }
+
+        log::debug!(
+            "Compaction readiness: table {} is ready (all partitions within threshold {})",
+            table_id,
+            max_chunks_per_partition,
+        );
+        Ok(true)
     }
 }
 

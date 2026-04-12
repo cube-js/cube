@@ -193,6 +193,11 @@ export class QueryQueue {
       ...executeOptions,
     };
 
+    if (options.requestId) {
+      const idx = options.requestId.lastIndexOf('-span-');
+      options.externalId = idx !== -1 ? options.requestId.substring(0, idx) : options.requestId;
+    }
+
     if (this.skipQueue) {
       const queryDef = {
         queryHandler,
@@ -233,7 +238,7 @@ export class QueryQueue {
       // Result here won't be fetched for a forced build query and a jobbed build
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
-      let result = !query.forceBuild && await queueConnection.getResult(queryKey);
+      let result = !query.forceBuild && await queueConnection.getResult(queryKey, options.externalId);
       if (result && !result.streamResult) {
         return this.parseResult(result);
       }

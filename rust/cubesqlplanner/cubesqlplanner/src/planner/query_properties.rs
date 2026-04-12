@@ -533,9 +533,8 @@ impl QueryProperties {
             .add_dimensions(&self.time_dimensions)
             .add_filters(&self.time_dimensions_filters)
             .add_filters(&self.dimensions_filters)
-            .add_filters(&self.measures_filters)
             .add_filters(&self.segments)
-            .build(&self.measures)?;
+            .build(&self.all_used_measures()?)?;
         self.multi_fact_join_groups =
             MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)?;
         Ok(())
@@ -659,18 +658,26 @@ impl QueryProperties {
         if exclude_time_dimensions {
             dimensions.chain(measures).collect_vec()
         } else {
-            let time_dimensions = self.time_dimensions.iter().map(|d| {
-                /* if let Ok(td) = d.as_time_dimension() {
-                    td.base_symbol().clone()
-                } else { */
-                d.clone()
-                //}
-            });
+            let time_dimensions = self.time_dimensions.iter().map(|d| d.clone());
             dimensions
                 .chain(time_dimensions)
                 .chain(measures)
                 .collect_vec()
         }
+    }
+
+    pub fn all_used_symbols(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let mut members = vec![];
+        members.extend(self.time_dimensions.iter().cloned());
+        members.extend(self.dimensions.iter().cloned());
+        self.fill_all_filter_symbols(&mut members);
+        members.extend(self.all_used_measures()?);
+
+        let res = members
+            .into_iter()
+            .unique_by(|m| m.full_name())
+            .collect_vec();
+        Ok(res)
     }
 
     pub fn get_member_symbols(
@@ -707,22 +714,6 @@ impl QueryProperties {
             }
         }
     }
-
-    /* pub fn group_by(&self) -> Vec<Expr> {
-        if self.ungrouped {
-            vec![]
-        } else {
-            self.dimensions
-                .iter()
-                .map(|f| Expr::Member(MemberExpression::new(f.clone())))
-                .chain(
-                    self.time_dimensions
-                        .iter()
-                        .map(|f| Expr::Member(MemberExpression::new(f.clone()))),
-                )
-                .collect()
-        }
-    } */
 
     pub fn default_order(
         dimensions: &Vec<Rc<MemberSymbol>>,

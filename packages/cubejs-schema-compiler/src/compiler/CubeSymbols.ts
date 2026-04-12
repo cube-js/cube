@@ -35,6 +35,7 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  currency?: string;
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
@@ -1479,35 +1480,79 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {
+    const methods = (paramValue) => ({
+      filter: (column) => {
+        if (paramValue) {
+          if (Array.isArray(paramValue)) {
+            const values = paramValue.map(allocateParam);
+            if (typeof column === 'function') {
+              return column(values);
+            } else {
+              return `${column} IN (${values.join(', ')})`;
+            }
+          } else {
+            const value = allocateParam(paramValue);
+            if (typeof column === 'function') {
+              return column(value);
+            } else {
+              return `${column} = ${value}`;
+            }
+          }
+        } else {
+          return '1 = 1';
+        }
+      },
+      requiredFilter: (column) => {
+        if (!paramValue) {
+          throw new UserError(`Filter for ${column} is required`);
+        }
+        return methods(paramValue).filter(column);
+      },
+      unsafeValue: () => paramValue,
+      toString: () => {
+        if (paramValue !== undefined && paramValue !== null) {
+          return Array.isArray(paramValue)
+            ? paramValue.map(allocateParam).join(',')
+            : String(allocateParam(paramValue));
+        }
+        return '';
+      },
+      [Symbol.toPrimitive]: () => {
+        if (paramValue !== undefined && paramValue !== null) {
+          return Array.isArray(paramValue)
+            ? paramValue.map(allocateParam).join(',')
+            : String(allocateParam(paramValue));
+        }
+        return '';
+      }
+    });
+
+    // Chainable proxy for undefined/null values: supports both method calls
+    // (filter, unsafeValue, etc.) and further property chaining for deeply
+    // nested paths like SECURITY_CONTEXT.cubeCloud.tenantId.filter(...)
+    // when the security context is empty during compilation/dep resolution.
+    const undefinedChainableHandler: ProxyHandler<any> = {
+      get: (target, name) => {
+        if (name in target || typeof name === 'symbol') return target[name];
+        return new Proxy(methods(undefined), undefinedChainableHandler);
+      }
+    };
+
     return new Proxy(symbols, {
       get: (target, name) => {
         const propValue = target[name];
-        const methods = (paramValue) => ({
-          filter: (column) => {
-            if (paramValue) {
-              const value = Array.isArray(paramValue) ?
-                paramValue.map(allocateParam) :
-                allocateParam(paramValue);
-              if (typeof column === 'function') {
-                return column(value);
-              } else {
-                return `${column} = ${value}`;
-              }
-            } else {
-              return '1 = 1';
-            }
-          },
-          requiredFilter: (column) => {
-            if (!paramValue) {
-              throw new UserError(`Filter for ${column} is required`);
-            }
-            return methods(paramValue).filter(column);
-          },
-          unsafeValue: () => paramValue
-        });
-        return methods(target)[name] ||
-          typeof propValue === 'object' && propValue !== null && CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam) ||
-          methods(propValue);
+        const methodOnTarget = methods(target)[name];
+        if (methodOnTarget) return methodOnTarget;
+
+        if (typeof propValue === 'object' && propValue !== null) {
+          return CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam);
+        }
+
+        if (propValue !== undefined && propValue !== null) {
+          return methods(propValue);
+        }
+
+        return new Proxy(methods(undefined), undefinedChainableHandler);
       }
     });
   }

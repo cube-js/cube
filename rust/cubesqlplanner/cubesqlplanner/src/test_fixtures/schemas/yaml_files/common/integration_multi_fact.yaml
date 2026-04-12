@@ -1,4 +1,15 @@
 cubes:
+    - name: regions
+      sql: "SELECT * FROM regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
     - name: customers
       sql: "SELECT * FROM customers"
       joins:
@@ -11,6 +22,9 @@ cubes:
           - name: reviews
             relationship: one_to_many
             sql: "{customers}.id = {reviews.customer_id}"
+          - name: regions
+            relationship: many_to_one
+            sql: "{customers}.region_id = {regions.id}"
       dimensions:
           - name: id
             type: number
@@ -28,6 +42,14 @@ cubes:
       measures:
           - name: count
             type: count
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+          - name: total_lifetime_value_for_east
+            type: sum
+            sql: lifetime_value
+            filters:
+              - sql: "{regions.name} = 'East'"
 
     - name: orders
       sql: "SELECT * FROM orders"

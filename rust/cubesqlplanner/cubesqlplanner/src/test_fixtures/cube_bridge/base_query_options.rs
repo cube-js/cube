@@ -69,6 +69,8 @@ pub struct MockBaseQueryOptions {
     #[builder(default)]
     pre_aggregation_id: Option<String>,
     #[builder(default)]
+    convert_tz_for_raw_time_dimension: Option<bool>,
+    #[builder(default)]
     masked_members: Option<Vec<String>>,
     #[builder(default)]
     member_to_alias: Option<HashMap<String, String>>,
@@ -91,6 +93,7 @@ impl_static_data!(
     cubestore_support_multistage,
     disable_external_pre_aggregations,
     pre_aggregation_id,
+    convert_tz_for_raw_time_dimension,
     masked_members,
     member_to_alias
 );

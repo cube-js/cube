@@ -549,32 +549,6 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::ResultByExternalId { key } => {
-                let ack_result = self
-                    .cachestore
-                    .queue_result_by_external_id(key.value)
-                    .await?;
-
-                let rows = if let Some(ack_result) = ack_result {
-                    vec![ack_result.into_queue_result_row()]
-                } else {
-                    vec![]
-                };
-
-                (
-                    Arc::new(DataFrame::new(
-                        vec![
-                            Column::new("payload".to_string(), ColumnType::String, 0),
-                            Column::new("type".to_string(), ColumnType::String, 1),
-                            Column::new("id".to_string(), ColumnType::String, 2),
-                            Column::new("external_id".to_string(), ColumnType::String, 3),
-                        ],
-                        rows,
-                    )),
-                    None,
-                    true,
-                )
-            }
             QueueCommand::ResultBlocking { timeout, key } => {
                 let ack_result = self.cachestore.queue_result_blocking(key, timeout).await?;
 

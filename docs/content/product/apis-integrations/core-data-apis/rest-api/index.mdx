@@ -264,13 +264,19 @@ Cube REST API has basic errors and HTTP Error codes for all requests.
 
 ### Request span annotation
 
-For monitoring tools such as Cube Cloud proper request span annotation should be
-provided in `x-request-id` header of a request. Each request id should consist
-of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
-whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
-should be unique for each separate request. `spanId` should define user
-interaction span such us `Continue wait` retry cycle and it's value shouldn't
-change during one single interaction.
+Both [`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints
+support request span annotation for monitoring and tracing.
+
+You can provide a request ID via the `x-request-id` header or the `traceparent`
+header. Each request ID should consist of two parts: `spanId` and
+`requestSequenceId` which define `x-request-id` as whole:
+`${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header should
+be unique for each separate request. `spanId` should define user interaction span
+such as `Continue wait` retry cycle and its value shouldn't change during one
+single interaction.
+
+If neither header is provided, Cube auto-generates a request ID in the
+`${uuid}-span-1` format.
 
 ## Cache control
 

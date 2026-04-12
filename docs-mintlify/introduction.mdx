@@ -1,0 +1,66 @@
+---
+title: Introduction
+description: Cube is the business intelligence platform powered by the open-source semantic layer.
+---
+
+ Introduction
+
+Cube is the business intelligence platform powered by the open-source semantic layer.
+
+Cube uses AI agents to build data models and enable data consumers to perform analysis. Use AI to quickly build semantic layer and fully control the analytics context.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/gvDy37p7AZ0"
+  title="Cube Introduction"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+Cube is a new generation of a business intelligence and embedded analytics platform built to be used by both humans and AI agents. It empowers different personas across your organization:
+
+- **Data Engineers** can quickly curate data models with AI assistance, accelerating the development and maintenance of semantic layers
+- **Data Analysts** can perform deep analysis with AI assistance, diving into complex data relationships and patterns
+- **Business Users** benefit from workbooks and dashboards that Cube can automatically build and maintain
+
+## How is Cube different?
+
+At the foundation of Cube's agentic analytics platform is an [open-source semantic layer](https://github.com/cube-js/cube) — the critical infrastructure that enables both AI agents and humans to work with trusted, consistent data.
+
+### Semantic SQL
+
+Unlike other tools, Cube AI agents don't query the data warehouse directly. Instead, they query the semantic layer using Semantic SQL, creating a trusted proxy architecture.
+
+<img
+  src="https://lgo0ecceic.ucarecd.net/97dd04e5-f534-424e-8d6b-e6e0c19fd95f/"
+  alt="Semantic SQL architecture"
+/>
+
+### Semantic layer architecture
+
+#### Code-first
+
+A code-first approach is essential for both traditional data engineering and agentic analytics. Managing data models, configurations, and policies as code enables the same proven practices that power modern software development.
+
+Everything within Cube — from configurations to data models to access control policies — is managed through code.
+
+#### Data Modeling
+
+The data model provides the knowledge graph that AI agents use to understand your business. Cube's data model is **code-first** and **dataset-centric**, inspired by dimensional modeling. You work with two types of objects:
+
+- **Cubes** represent business entities such as customers, line items, and orders
+- **Views** sit on top of the data graph of cubes, creating facades that data consumers interact with
+
+#### Access Control
+
+Access control ensures that AI agents respect the same data security policies as human users. Cube's code-first approach enables data teams to define access control policies with Python or JavaScript.
+
+#### Caching
+
+Caching enables AI agents to deliver fast, interactive experiences without overwhelming your data infrastructure. Cube implements caching through **pre-aggregations** — rollup tables that accelerate query responses and reduce data warehouse costs.
+
+#### APIs
+
+APIs enable AI agents, applications, and tools to interact with the semantic layer through standard protocols: **REST**, **GraphQL**, and **SQL**.

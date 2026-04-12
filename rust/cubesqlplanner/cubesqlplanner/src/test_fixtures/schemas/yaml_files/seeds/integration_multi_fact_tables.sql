@@ -2,11 +2,19 @@ DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS returns CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS regions CASCADE;
+
+CREATE TABLE regions (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
 
 CREATE TABLE customers (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     city TEXT NOT NULL,
+    region_id INTEGER NOT NULL REFERENCES regions(id),
+    lifetime_value NUMERIC(10, 2) NOT NULL,
     created_at TIMESTAMP NOT NULL
 );
 
@@ -33,11 +41,15 @@ CREATE TABLE reviews (
     created_at TIMESTAMP NOT NULL
 );
 
-INSERT INTO customers (id, name, city, created_at) VALUES
-    (1, 'Alice', 'New York', '2025-01-15 10:00:00'),
-    (2, 'Bob', 'Boston', '2025-02-01 12:00:00'),
-    (3, 'Charlie', 'Chicago', '2025-02-15 09:00:00'),
-    (4, 'Diana', 'New York', '2025-03-01 08:00:00');
+INSERT INTO regions (id, name) VALUES
+    (1, 'East'),
+    (2, 'Midwest');
+
+INSERT INTO customers (id, name, city, region_id, lifetime_value, created_at) VALUES
+    (1, 'Alice', 'New York', 1, 1000.00, '2025-01-15 10:00:00'),
+    (2, 'Bob', 'Boston', 1, 2000.00, '2025-02-01 12:00:00'),
+    (3, 'Charlie', 'Chicago', 2, 500.00, '2025-02-15 09:00:00'),
+    (4, 'Diana', 'New York', 1, 1500.00, '2025-03-01 08:00:00');
 
 INSERT INTO orders (id, customer_id, status, amount, created_at) VALUES
     (1, 1, 'completed', 100.00, '2025-03-01 10:00:00'),

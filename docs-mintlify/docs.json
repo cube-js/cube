@@ -1,0 +1,625 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Cube Documentation",
+  "colors": {
+    "primary": "#7A77FF",
+    "light": "#A5A3FF",
+    "dark": "#5856D6"
+  },
+  "favicon": "/favicon.svg",
+  "banner": {
+    "content": "🟣 Agentic Analytics Summit — April 29, 2026 — Online. Registration is open! [Join now →](https://cube.dev/events/agentic-analytics-summit)",
+    "dismissible": true
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "docs/introduction",
+              {
+                "group": "Getting Started",
+                "pages": [
+                  "docs/getting-started/connect-your-data",
+                  "docs/getting-started/use-analytics-chat",
+                  "docs/getting-started/create-workbooks-and-dashboards",
+                  "docs/getting-started/develop-in-ide",
+                  "docs/getting-started/embed-analytics"
+                ]
+              },
+              {
+                "group": "Migrate from Cube Core",
+                "pages": [
+                  "docs/getting-started/migrate-from-core",
+                  "docs/getting-started/migrate-from-core/upload-with-cli",
+                  "docs/getting-started/migrate-from-core/import-github-repository",
+                  "docs/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
+                  "docs/getting-started/migrate-from-core/import-git-repository-via-ssh",
+                  "docs/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Explore & Analyze",
+            "pages": [
+              {
+                "group": "Workbooks",
+                "root": "docs/explore-analyze/workbooks/index",
+                "pages": [
+                  "docs/explore-analyze/workbooks/querying-data",
+                  "docs/explore-analyze/workbooks/calculated-fields",
+                  "docs/explore-analyze/workbooks/source-sql-tabs",
+                  "docs/explore-analyze/workbooks/charts"
+                ]
+              },
+              "docs/explore-analyze/explore",
+              "docs/explore-analyze/analytics-chat"
+            ]
+          },
+          {
+            "group": "Present & Share",
+            "pages": [
+              "docs/explore-analyze/dashboards",
+              "docs/explore-analyze/scheduled-refreshes",
+              "docs/explore-analyze/notifications"
+            ]
+          },
+          {
+            "group": "Organize content",
+            "pages": [
+              "docs/organize-content/folders",
+              "docs/organize-content/sharing"
+            ]
+          },
+          {
+            "group": "Data Modeling",
+            "pages": [
+              "docs/data-modeling/overview",
+              {
+                "group": "Concepts",
+                "root": "docs/data-modeling/concepts/index",
+                "pages": [
+                  "docs/data-modeling/concepts/syntax",
+                  "docs/data-modeling/concepts/calculated-members",
+                  "docs/data-modeling/concepts/multi-stage-calculations",
+                  "docs/data-modeling/concepts/working-with-joins",
+                  "docs/data-modeling/concepts/code-reusability-extending-cubes",
+                  "docs/data-modeling/concepts/polymorphic-cubes",
+                  "docs/data-modeling/concepts/multi-fact-queries",
+                  "docs/data-modeling/concepts/data-blending"
+                ]
+              },
+              "docs/data-modeling/ai-context",
+              {
+                "group": "Access Control",
+                "pages": [
+                  "docs/data-modeling/access-control/index",
+                  "docs/data-modeling/data-access-policies",
+                  "docs/data-modeling/access-control/row-level-security",
+                  "docs/data-modeling/access-control/member-level-security",
+                  "docs/data-modeling/access-control/context"
+                ]
+              },
+              
+              {
+                "group": "Dynamic Data Models",
+                "pages": [
+                  "docs/data-modeling/dynamic",
+                  "docs/data-modeling/dynamic/jinja",
+                  "docs/data-modeling/dynamic/javascript",
+                  "docs/data-modeling/dynamic/code-reusability-export-and-import",
+                  "docs/data-modeling/dynamic/schema-execution-environment"
+                ]
+              },
+              {
+                "group": "Developing Model",
+                "pages": [
+                  "docs/data-modeling/visual-modeler",
+                  "docs/data-modeling/data-model-ide",
+                  "docs/data-modeling/dev-mode",
+                  "docs/data-modeling/sql-runner"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Pre-aggregations",
+            "pages": [
+              "docs/pre-aggregations/index",
+              "docs/pre-aggregations/getting-started-pre-aggregations",
+              "docs/pre-aggregations/using-pre-aggregations",
+              "docs/pre-aggregations/matching-pre-aggregations",
+              "docs/pre-aggregations/refreshing-pre-aggregations",
+              "docs/pre-aggregations/lambda-pre-aggregations"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "docs/integrations/tableau",
+              {
+                "group": "Power BI",
+                "root": "docs/integrations/power-bi/index",
+                "pages": [
+                  "docs/integrations/power-bi/kerberos",
+                  "docs/integrations/power-bi/ntlm"
+                ]
+              },
+              "docs/integrations/microsoft-excel",
+              "docs/integrations/google-sheets",
+              "docs/integrations/snowflake-semantic-views",
+              {
+                "group": "Semantic Layer Sync",
+                "root": "docs/integrations/semantic-layer-sync/index",
+                "pages": [
+                  "docs/integrations/semantic-layer-sync/superset",
+                  "docs/integrations/semantic-layer-sync/preset",
+                  "docs/integrations/semantic-layer-sync/tableau"
+                ]
+              },
+              "reference/mcp-server"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Admin",
+        "groups": [
+          {
+            "group": "Connect to data",
+            "pages": [
+              "admin/connect-to-data/index",
+              {
+                "group": "Data Sources",
+                "root": "admin/connect-to-data/data-sources/index",
+                "pages": [
+                  "admin/connect-to-data/data-sources/aws-athena",
+                  "admin/connect-to-data/data-sources/aws-redshift",
+                  "admin/connect-to-data/data-sources/clickhouse",
+                  "admin/connect-to-data/data-sources/databricks-jdbc",
+                  "admin/connect-to-data/data-sources/druid",
+                  "admin/connect-to-data/data-sources/duckdb",
+                  "admin/connect-to-data/data-sources/elasticsearch",
+                  "admin/connect-to-data/data-sources/firebolt",
+                  "admin/connect-to-data/data-sources/google-bigquery",
+                  "admin/connect-to-data/data-sources/hive",
+                  "admin/connect-to-data/data-sources/ksqldb",
+                  "admin/connect-to-data/data-sources/materialize",
+                  "admin/connect-to-data/data-sources/mongodb",
+                  "admin/connect-to-data/data-sources/ms-fabric",
+                  "admin/connect-to-data/data-sources/ms-sql",
+                  "admin/connect-to-data/data-sources/mysql",
+                  "admin/connect-to-data/data-sources/oracle",
+                  "admin/connect-to-data/data-sources/pinot",
+                  "admin/connect-to-data/data-sources/postgres",
+                  "admin/connect-to-data/data-sources/presto",
+                  "admin/connect-to-data/data-sources/questdb",
+                  "admin/connect-to-data/data-sources/risingwave",
+                  "admin/connect-to-data/data-sources/singlestore",
+                  "admin/connect-to-data/data-sources/snowflake",
+                  "admin/connect-to-data/data-sources/sqlite",
+                  "admin/connect-to-data/data-sources/trino",
+                  "admin/connect-to-data/data-sources/vertica"
+                ]
+              },
+              "admin/connect-to-data/multiple-data-sources",
+              "admin/connect-to-data/concurrency"
+            ]
+          },
+          {
+            "group": "Users & Permissions",
+            "pages": [
+              "admin/users-and-permissions/manage-users",
+              "admin/users-and-permissions/roles-and-permissions",
+              "admin/users-and-permissions/user-attributes",
+              "admin/users-and-permissions/user-groups",
+              "admin/users-and-permissions/custom-roles"
+            ]
+          },
+          {
+            "group": "SSO & Identity Providers",
+            "pages": [
+              "admin/sso/index",
+              "admin/sso/google-workspace",
+              {
+                "group": "Microsoft Entra ID",
+                "pages": [
+                  "admin/sso/microsoft-entra-id/saml",
+                  "admin/sso/microsoft-entra-id/scim"
+                ]
+              },
+              {
+                "group": "Okta",
+                "pages": [
+                  "admin/sso/okta/saml",
+                  "admin/sso/okta/scim"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "admin/deployment/index",
+              "admin/deployment/deployment-types",
+              "admin/deployment/infrastructure",
+              "admin/deployment/environments",
+              "admin/deployment/continuous-deployment",
+              "admin/deployment/custom-domains",
+              "admin/deployment/warm-up",
+              "admin/deployment/auto-suspension",
+              "admin/deployment/scalability",
+              "admin/deployment/encryption-keys",
+              "admin/deployment/limits",
+              {
+                "group": "VPC",
+                "root": "admin/deployment/vpc/index",
+                "pages": [
+                  "admin/deployment/vpc/gcp",
+                  {
+                    "group": "AWS",
+                    "root": "admin/deployment/vpc/aws/index",
+                    "pages": [
+                      "admin/deployment/vpc/aws/private-link",
+                      "admin/deployment/vpc/aws/vpc-peering"
+                    ]
+                  },
+                  {
+                    "group": "Azure",
+                    "root": "admin/deployment/vpc/azure/index",
+                    "pages": [
+                      "admin/deployment/vpc/azure/private-link",
+                      "admin/deployment/vpc/azure/vpc-peering"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "BYOC",
+                "root": "admin/deployment/byoc/index",
+                "pages": [
+                  "admin/deployment/byoc/azure",
+                  {
+                    "group": "AWS",
+                    "root": "admin/deployment/byoc/aws/index",
+                    "pages": [
+                      "admin/deployment/byoc/aws/deployment",
+                      "admin/deployment/byoc/aws/privatelink"
+                    ]
+                  },
+                  "admin/deployment/byoc/gcp/deployment"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Monitoring",
+            "pages": [
+              "admin/monitoring/query-history",
+              "admin/monitoring/pre-aggregations",
+              "admin/monitoring/performance",
+              "admin/monitoring/audit-log",
+              "admin/monitoring/chats-history",
+              "admin/monitoring/query-history-export",
+              {
+                "group": "Monitoring Integrations",
+                "root": "admin/monitoring/monitoring-integrations/index",
+                "pages": [
+                  "admin/monitoring/monitoring-integrations/cloudwatch",
+                  "admin/monitoring/monitoring-integrations/s3",
+                  "admin/monitoring/monitoring-integrations/datadog",
+                  "admin/monitoring/monitoring-integrations/grafana-cloud",
+                  "admin/monitoring/monitoring-integrations/new-relic"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "AI",
+            "pages": [
+              "admin/ai/index",
+              "admin/ai/spaces-agents-models",
+              "admin/ai/agent-rules",
+              "admin/ai/bring-your-own-model",
+              "admin/ai/memory-isolation",
+              "admin/ai/yaml-config"
+            ]
+          },
+         
+          {
+            "group": "Account & Billing",
+            "pages": [
+              "admin/account-billing/ai-tokens",
+              "admin/account-billing/api-keys",
+              "admin/account-billing/billing-faq",
+              "admin/account-billing/budgets",
+              "admin/account-billing/distribution",
+              "admin/account-billing/support"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Embedding",
+        "groups": [
+          {
+            "group": "Embedding",
+            "pages": [
+              "embedding/index",
+              "embedding/private-embedding",
+              "embedding/signed-embedding",
+              "embedding/creator-mode",
+              "embedding/react-embed-sdk",
+              "embedding/vizard"
+            ]
+          },
+          {
+            "group": "Using Core Data APIs",
+            "pages": [
+              {
+                "group": "Authentication",
+                "pages": [
+                  "embedding/authentication/jwt",
+                  "embedding/authentication/security-context",
+                  "embedding/authentication/auth0",
+                  "embedding/authentication/aws-cognito"
+                ]
+              },
+              "embedding/multitenancy"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Data Modeling",
+            "pages": [
+              "reference/data-modeling/cube",
+              "reference/data-modeling/view",
+              "reference/data-modeling/measures",
+              "reference/data-modeling/dimensions",
+              "reference/data-modeling/hierarchies",
+              "reference/data-modeling/segments",
+              "reference/data-modeling/joins",
+              "reference/data-modeling/pre-aggregations",
+              "reference/data-modeling/data-access-policies",
+              "reference/data-modeling/context-variables",
+              {
+                "group": "Packages",
+                "pages": [
+                  "reference/data-modeling/cube-package",
+                  "reference/data-modeling/cube_dbt",
+                  "reference/data-modeling/lkml2cube"
+                ] 
+              }
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "reference/configuration/environment-variables",
+              "reference/configuration/config"
+            ]
+          },
+          {
+            "group": "Core Data APIs",
+            "pages": [
+              "reference/core-data-apis/index",
+              "reference/core-data-apis/queries",
+              {
+                "group": "SQL API",
+                "root": "reference/core-data-apis/sql-api/index",
+                "pages": [
+                  "reference/core-data-apis/sql-api/query-format",
+                  "reference/core-data-apis/sql-api/joins",
+                  "reference/core-data-apis/sql-api/security",
+                  "reference/core-data-apis/sql-api/reference"
+                ]
+              },
+              {
+                "group": "REST API",
+                "root": "reference/core-data-apis/rest-api/index",
+                "pages": [
+                  "reference/core-data-apis/rest-api/query-format",
+                  "reference/core-data-apis/rest-api/reference"
+                ]
+              },
+              {
+                "group": "GraphQL API",
+                "root": "reference/core-data-apis/graphql-api/index",
+                "pages": [
+                  "reference/core-data-apis/graphql-api/reference"
+                ]
+              },
+              {
+                "group": "DAX API",
+                "root": "reference/core-data-apis/dax-api/index",
+                "pages": [
+                  "reference/core-data-apis/dax-api/reference"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Embed APIs",
+            "pages": [
+              "reference/embed-apis/index",
+              "reference/embed-apis/chat-api",
+              "reference/embed-apis/generate-session"
+            ]
+          },
+          {
+            "group": "Other APIs",
+            "pages": [
+              "reference/control-plane-api",
+              {
+                "group": "Orchestration API",
+                "root": "reference/orchestration-api/index",
+                "pages": [
+                  "reference/orchestration-api/airflow",
+                  "reference/orchestration-api/dagster",
+                  "reference/orchestration-api/prefect"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "JavaScript SDK",
+            "pages": [
+              "reference/javascript-sdk",
+              "reference/javascript-sdk/react",
+              "reference/javascript-sdk/vue",
+              "reference/javascript-sdk/angular",
+              {
+                "group": "SDK Reference",
+                "pages": [
+                  "reference/javascript-sdk/reference/cubejs-client-core",
+                  "reference/javascript-sdk/reference/cubejs-client-react",
+                  "reference/javascript-sdk/reference/cubejs-client-vue",
+                  "reference/javascript-sdk/reference/cubejs-client-ngx",
+                  "reference/javascript-sdk/reference/cubejs-client-ws-transport"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Cube Core",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "cube-core/index",
+              "cube-core/getting-started",
+              "cube-core/getting-started/create-a-project",
+              "cube-core/getting-started/query-data",
+              "cube-core/getting-started/add-a-pre-aggregation",
+              "cube-core/getting-started/learn-more"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "cube-core/architecture",
+              "cube-core/deployment",
+              "cube-core/running-in-production"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Recipes",
+        "groups": [
+          {
+            "group": "Topics",
+            "pages": [
+              "recipes/index",
+              {
+                "group": "API",
+                "pages": [
+                  "recipes/core-data-api/getting-unique-values-for-a-field",
+                  "recipes/core-data-api/cast-numerics",
+                  "recipes/core-data-api/sorting",
+                  "recipes/core-data-api/pagination",
+                  "recipes/core-data-api/drilldowns",
+                  "recipes/core-data-api/real-time-data-fetch",
+                  "recipes/core-data-api/cloud-groups-and-user-attributes"
+                ]
+              },
+              {
+                "group": "AI",
+                "pages": [
+                  "recipes/ai/agent-to-agent"
+                ]
+              },
+              {
+                "group": "Pre-aggregations",
+                "pages": [
+                  "recipes/pre-aggregations/non-additivity",
+                  "recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range",
+                  "recipes/pre-aggregations/disabling-pre-aggregations",
+                  "recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
+                  "recipes/pre-aggregations/refreshing-select-partitions",
+                  "recipes/pre-aggregations/joining-multiple-data-sources"
+                ]
+              },
+              {
+                "group": "Configuration",
+                "pages": [
+                  "recipes/configuration/environment-variables",
+                  "recipes/configuration/using-ssl-connections-to-data-source",
+                  "recipes/configuration/data-store-cost-saving-guide",
+                  "recipes/configuration/multiple-sources-same-schema",
+                  "recipes/configuration/custom-data-model-per-tenant"
+                ]
+              },
+              {
+                "group": "Data Modeling",
+                "pages": [
+                  "recipes/data-modeling/style-guide",
+                  "recipes/data-modeling/designing-metrics",
+                  "recipes/data-modeling/percentiles",
+                  "recipes/data-modeling/nested-aggregates",
+                  "recipes/data-modeling/filtered-aggregates",
+                  "recipes/data-modeling/period-over-period",
+                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+                  "recipes/data-modeling/using-dynamic-measures",
+                  "recipes/data-modeling/dynamic-union-tables",
+                  "recipes/data-modeling/string-time-dimensions",
+                  "recipes/data-modeling/custom-granularity",
+                  "recipes/data-modeling/custom-calendar",
+                  "recipes/data-modeling/entity-attribute-value",
+                  "recipes/data-modeling/snapshots",
+                  "recipes/data-modeling/active-users",
+                  "recipes/data-modeling/event-analytics",
+                  "recipes/data-modeling/funnels",
+                  "recipes/data-modeling/cohort-retention",
+                  "recipes/data-modeling/xirr",
+                  "recipes/data-modeling/dbt",
+                  "recipes/data-modeling/custom-order"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "styling": {
+    "codeblocks": "dark"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Community",
+        "href": "https://slack.cube.dev"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://cubecloud.dev/auth/signup"
+    }
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/the_cube_dev",
+      "github": "https://github.com/cube-js/cube",
+      "linkedin": "https://www.linkedin.com/company/cube-dev"
+    }
+  },
+  "redirects": [
+  ]
+}

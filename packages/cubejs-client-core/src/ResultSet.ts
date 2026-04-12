@@ -336,18 +336,23 @@ export default class ResultSet<T extends Record<string, any> = any> {
 
   private axisValues(axis: string[], resultIndex = 0) {
     const { query } = this.loadResponses[resultIndex];
+    const axisWithoutMeasures = axis.filter(d => d !== 'measures');
+    const measures = axis.includes('measures') ? (query.measures || []) : [];
 
     return (row: Record<string, any>) => {
-      const value = (measure?: string) => axis
-        .filter(d => d !== 'measures')
-        .map((d: string) => {
+      const value = (measure?: string) => {
+        const result = axisWithoutMeasures.map((d: string) => {
           const val = row[d];
           return val != null ? val : null;
-        })
-        .concat(measure ? [measure] : []);
+        });
+        if (measure) {
+          result.push(measure);
+        }
+        return result;
+      };
 
-      if (axis.find(d => d === 'measures') && (query.measures || []).length) {
-        return (query.measures || []).map(value);
+      if (measures.length > 0) {
+        return measures.map(value);
       }
 
       return [value()];
@@ -566,8 +571,11 @@ export default class ResultSet<T extends Record<string, any> = any> {
         }
       }
 
+      const xAxisValues = this.axisValues(normalizedPivotConfig.x, resultIndex);
+      const yAxisValues = this.axisValues(normalizedPivotConfig.y, resultIndex);
+
       const xGrouped: [string, { xValues: string[], row: Record<string, any> }[]][] = pipe(
-        map((row: Record<string, any>) => this.axisValues(normalizedPivotConfig.x, resultIndex)(row).map(xValues => ({ xValues, row }))),
+        map((row: Record<string, any>) => xAxisValues(row).map(xValues => ({ xValues, row }))),
         unnest,
         groupByXAxis
       )(this.timeDimensionBackwardCompatibleData(resultIndex));
@@ -575,7 +583,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
       const yValuesMap: Record<string, any> = {};
       xGrouped.forEach(([, rows]) => {
         rows.forEach(({ row }) => {
-          this.axisValues(normalizedPivotConfig.y, resultIndex)(row).forEach((values) => {
+          yAxisValues(row).forEach((values) => {
             if (Object.keys(row).length > 0) {
               yValuesMap[values.join()] = values;
             }
@@ -584,14 +592,14 @@ export default class ResultSet<T extends Record<string, any> = any> {
       });
       const allYValues = Object.values(yValuesMap);
 
-      const measureOnX = Boolean((normalizedPivotConfig.x).find(d => d === 'measures'));
+      const measureOnX = normalizedPivotConfig.x.includes('measures');
 
       return xGrouped.map(([, rows]) => {
         const { xValues } = rows[0];
         const yGrouped: Record<string, any> = {};
 
         rows.forEach(({ row }) => {
-          const arr = this.axisValues(normalizedPivotConfig.y, resultIndex)(row).map(yValues => ({ yValues, row }));
+          const arr = yAxisValues(row).map(yValues => ({ yValues, row }));
           arr.forEach((res) => {
             yGrouped[this.axisValuesString(res.yValues)] = res;
           });

@@ -360,3 +360,31 @@ async fn test_multiple_time_dimensions() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_convert_tz_for_raw_time_dimensions() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.created_at
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        order:
+          - id: orders.created_at
+        timezone: \"America/Los_Angeles\"
+        convert_tz_for_raw_time_dimension: true
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_basic_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}

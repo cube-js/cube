@@ -945,4 +945,173 @@ cubes:
 
     await compiler.compile();
   });
+
+  describe('Currency property', () => {
+    it('measure with currency in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: currency
+          currency: usd
+      `);
+
+      await compiler.compile();
+
+      const { measures } = metaTransformer.cubes[0].config;
+      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
+      expect(totalAmount).toBeDefined();
+      expect(totalAmount!.currency).toBe('USD');
+      expect(totalAmount!.format).toBe('currency');
+    });
+
+    it('number dimension with currency in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          currency: eur
+      `);
+
+      await compiler.compile();
+
+      const { dimensions } = metaTransformer.cubes[0].config;
+      const price = dimensions.find((d) => d.name === 'Orders.price');
+      expect(price).toBeDefined();
+      expect(price!.currency).toBe('EUR');
+    });
+
+    it('non-number dimension with currency in YAML - error', async () => {
+      const { compiler } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: status
+          sql: status
+          type: string
+          currency: usd
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('"currency" property can only be used with dimensions of type "number"');
+      }
+    });
+  });
+
+  describe('Named numeric formats', () => {
+    it('measure with named format in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: accounting_2
+        - name: bytes
+          sql: bytes
+          type: sum
+          format: abbr_3
+      `);
+
+      await compiler.compile();
+
+      const { measures } = metaTransformer.cubes[0].config;
+      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
+      expect(totalAmount).toBeDefined();
+      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2f', alias: 'accounting_2' });
+
+      const bytes = measures.find((m) => m.name === 'Orders.bytes');
+      expect(bytes).toBeDefined();
+      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3s', alias: 'abbr_3' });
+    });
+
+    it('number dimension with named format in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          format: currency_1
+        - name: population
+          sql: population
+          type: number
+          format: abbr
+      `);
+
+      await compiler.compile();
+
+      const { dimensions } = metaTransformer.cubes[0].config;
+      const price = dimensions.find((d) => d.name === 'Orders.price');
+      expect(price).toBeDefined();
+      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1f', alias: 'currency_1' });
+
+      const population = dimensions.find((d) => d.name === 'Orders.population');
+      expect(population).toBeDefined();
+      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2s', alias: 'abbr' });
+    });
+
+    it('invalid named format in YAML - error', async () => {
+      const { compiler } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: unknown_format
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('format');
+      }
+    });
+  });
 });

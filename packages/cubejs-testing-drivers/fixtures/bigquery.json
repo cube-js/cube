@@ -205,9 +205,6 @@
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
-    "querying BigECommerce: rolling window by 2 day without date range",
-    "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD without date range",
     "SQL API: reuse params",
     "SQL API: Complex Rollup",
     "SQL API: Rollup with aliases",
@@ -216,9 +213,6 @@
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
     "pre-aggregations Customers: running total without time dimension",
-    "querying BigECommerce: rolling count_distinct_approx window by 2 day",
-    "querying BigECommerce: rolling count_distinct_approx window by 2 week",
-    "querying BigECommerce: rolling count_distinct_approx window by 2 month",
     "querying BigECommerce: totalProfitYearAgo",
     "querying BigECommerce: SeveralMultiStageMeasures",
     "SQL API: post-aggregate percentage of total",
@@ -235,7 +229,6 @@
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "SQL API: SQL push down push to cube quoted alias",
     "querying BigECommerce: rolling window YTD (month + week)",
-    "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: rolling window YTD without granularity"
+    "querying BigECommerce: rolling window YTD (month + week + no gran)"
   ]
 }

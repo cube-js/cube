@@ -132,7 +132,47 @@ impl PreAggregationsCompiler {
         } else {
             Vec::new()
         };
-        let time_dimensions = if let Some(refs) = description.time_dimension_reference()? {
+        let time_dimensions = if let Some(td_refs) = description.time_dimension_references()? {
+            let mut resolved = Vec::new();
+            for td_ref in td_refs.iter() {
+                let dims = Self::symbols_from_ref(
+                    self.query_tools.clone(),
+                    &name.cube_name,
+                    td_ref.dimension()?,
+                    Self::check_is_time_dimension,
+                )?;
+                let base_symbol = dims.first().ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "No time dimension symbols resolved for pre-aggregation '{:?}'",
+                        name
+                    ))
+                })?;
+                resolved.push((
+                    base_symbol.clone(),
+                    td_ref.static_data().granularity.clone(),
+                ));
+            }
+            let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+            let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+            let mut result = Vec::new();
+            for (base_symbol, granularity) in resolved {
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &base_symbol.cube_name(),
+                    &base_symbol.name(),
+                    Some(granularity.clone()),
+                )?;
+                let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    base_symbol,
+                    Some(granularity),
+                    granularity_obj,
+                    None,
+                ));
+                result.push(symbol);
+            }
+            result
+        } else if let Some(refs) = description.time_dimension_reference()? {
             let dims = Self::symbols_from_ref(
                 self.query_tools.clone(),
                 &name.cube_name,

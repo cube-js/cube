@@ -98,6 +98,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -121,14 +126,15 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const poolConfig: PgClientConfig = {
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
       ...config
     };
 
@@ -147,12 +153,12 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }, {
       min: config.minPoolSize ||
         config.min ||
-        getEnv('dbMinPoolSize', { dataSource }) ||
+        getEnv('dbMinPoolSize', { dataSource, preAggregations }) ||
         0,
       max:
         config.maxPoolSize ||
         config.max ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: config.evictionRunIntervalMillis || 10000,
       softIdleTimeoutMillis: config.softIdleTimeoutMillis || 30000,
@@ -166,9 +172,9 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.pool.on('factoryDestroyError', (err) => this.databasePoolError(err));
 
     this.config = <Partial<Config>>{
-      ...this.getInitialConfiguration(dataSource),
-      executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      ...this.getInitialConfiguration(dataSource, preAggregations),
+      executionTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       ...config,
     };
     this.enabled = true;
@@ -219,8 +225,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * you cannot call method in RedshiftDriver.constructor before super.
    */
   protected getInitialConfiguration(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    dataSource: string,
+    _dataSource: string,
+    _preAggregations?: boolean,
   ): Partial<PostgresDriverConfiguration> {
     return {
       readOnly: true,

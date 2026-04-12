@@ -307,9 +307,9 @@
     algoliasearch "^4.17.0"
     classnames "^2.3.2"
 
-"@cube-dev/purple-banner@https://github.com/cubedevinc/purple-banner/releases/download/v2.0.22/cube-dev-purple-banner-2.0.22.tgz":
-  version "2.0.22"
-  resolved "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.22/cube-dev-purple-banner-2.0.22.tgz#551241f8290e72fd4612f84e0040e4e3d67c9d23"
+"@cube-dev/purple-banner@https://github.com/cubedevinc/purple-banner/releases/download/v2.0.23/cube-dev-purple-banner-2.0.23.tgz":
+  version "2.0.23"
+  resolved "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.23/cube-dev-purple-banner-2.0.23.tgz#e290998448bb45e878b703eccf78b6f52e090e23"
   dependencies:
     classnames "^2.3.1"
     dayjs "^1.11.7"
@@ -1484,9 +1484,9 @@ better-react-mathjax@^2.3.0:
     mathjax-full "^3.2.2"
 
 brace-expansion@^5.0.2:
-  version "5.0.2"
-  resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-5.0.2.tgz#b6c16d0791087af6c2bc463f52a8142046c06b6f"
-  integrity sha512-Pdk8c9poy+YhOgVWw1JNN22/HcivgKWwpxKq04M/jTmHyCZn12WPJebZxdjSa5TmBqISrUSgNYU3eRORljfCCw==
+  version "5.0.5"
+  resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-5.0.5.tgz#dcc3a37116b79f3e1b46db994ced5d570e930fdb"
+  integrity sha512-VZznLgtwhn+Mact9tfiwx64fA9erHH/MCXEUfB/0bX/6Fz6ny5EGTXYltMocqg4xFAQZtnO3DHWWXi8RiuN7cQ==
   dependencies:
     balanced-match "^4.0.2"
 
@@ -4329,9 +4329,9 @@ wicked-good-xpath@1.3.0:
   integrity sha512-Gd9+TUn5nXdwj/hFsPVx5cuHHiF5Bwuc30jZ4+ronF1qHK5O7HD0sgmXWSEgwKquT3ClLoKPVbO6qGwVwLzvAw==
 
 yaml@^2.3.2:
-  version "2.8.2"
-  resolved "https://registry.yarnpkg.com/yaml/-/yaml-2.8.2.tgz#5694f25eca0ce9c3e7a9d9e00ce0ddabbd9e35c5"
-  integrity sha512-mplynKqc1C2hTVYxd0PU2xQAc22TI1vShAYGksCCfxbn/dFwnHTNi1bvYsBTkhdUNtGIf5xNOg938rrSSYvS9A==
+  version "2.8.3"
+  resolved "https://registry.yarnpkg.com/yaml/-/yaml-2.8.3.tgz#a0d6bd2efb3dd03c59370223701834e60409bd7d"
+  integrity sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg==
 
 zod@^4.1.12:
   version "4.3.6"

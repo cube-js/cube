@@ -557,6 +557,8 @@ pub trait ConfigObj: DIService {
 
     fn create_table_max_retries(&self) -> u64;
 
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
+
     fn max_joined_partitions(&self) -> usize;
 
     fn max_joined_partitions_message(&self) -> &str;
@@ -665,6 +667,7 @@ pub struct ConfigObjImpl {
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
     pub create_table_max_retries: u64,
+    pub compaction_readiness_chunks_threshold: Option<u64>,
     pub max_joined_partitions: usize,
     pub max_joined_partitions_message: String,
 }
@@ -1054,6 +1057,10 @@ impl ConfigObj for ConfigObjImpl {
         self.create_table_max_retries
     }
 
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64> {
+        self.compaction_readiness_chunks_threshold
+    }
+
     fn max_joined_partitions(&self) -> usize {
         self.max_joined_partitions
     }
@@ -1263,7 +1270,7 @@ impl Config {
             Some(256 << 20),
         ) as u64;
 
-        Config {
+        let result = Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::var("CUBESTORE_DATA_DIR")
@@ -1607,10 +1614,15 @@ impl Config {
                     50000,
                 ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
+                compaction_readiness_chunks_threshold: env_optparse(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
+                ),
                 max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }),
-        }
+        };
+        result.validate_config();
+        result
     }
 
     pub fn test(name: &str) -> Config {
@@ -1756,6 +1768,7 @@ impl Config {
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
                 create_table_max_retries: 3,
+                compaction_readiness_chunks_threshold: None,
                 max_joined_partitions: 5,
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }
@@ -1767,9 +1780,25 @@ impl Config {
         update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
     ) -> Config {
         let new_config = self.config_obj.as_ref().clone();
-        Self {
+        let config = Self {
             injector: self.injector.clone(),
             config_obj: Arc::new(update_config(new_config)),
+        };
+        config.validate_config();
+        config
+    }
+
+    fn validate_config(&self) {
+        if let Some(readiness) = self.config_obj.compaction_readiness_chunks_threshold {
+            let compaction = self.config_obj.compaction_chunks_count_threshold;
+            if readiness < compaction {
+                panic!(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD ({}) must not be lower than \
+                     CUBESTORE_CHUNKS_COUNT_THRESHOLD ({}), otherwise compaction will never \
+                     reduce chunks below the readiness threshold",
+                    readiness, compaction,
+                );
+            }
         }
     }
 

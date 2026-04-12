@@ -4,9 +4,6 @@
  * @fileoverview ResultSet class unit tests.
  */
 
-/* globals describe,test,expect */
-
-import 'jest';
 import ResultSet from '../src/ResultSet';
 import { TimeDimension } from '../src';
 import { DescriptiveQueryResponse } from './helpers';

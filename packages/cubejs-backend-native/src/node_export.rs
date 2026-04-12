@@ -51,6 +51,8 @@ pub(crate) struct SchemaColumn {
     column_type: ColumnType,
     #[serde(skip_serializing_if = "Option::is_none")]
     format: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,
 }
 
 impl SQLInterface {
@@ -238,9 +240,10 @@ async fn handle_sql_query(
     cache_mode: &str,
     timezone: Option<String>,
     throw_continue_wait: bool,
+    request_id: Option<String>,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
-        Uuid::new_v4().to_string(),
+        request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
         serde_json::json!({ "sql": sql_query }),
     )));
 
@@ -335,25 +338,32 @@ async fn handle_sql_query(
             let mut columns = Vec::with_capacity(stream.schema().fields().len());
 
             for field in stream.schema().fields().iter() {
-                let format = field
+                let (format, currency) = field
                     .metadata()
                     .and_then(|m| m.get("member_name"))
                     .and_then(|member_name| {
                         meta_context
                             .find_measure_with_name(member_name)
-                            .and_then(|m| m.format.as_ref())
+                            .map(|m| (m.format.as_ref(), m.currency.as_ref()))
                             .or_else(|| {
                                 meta_context
                                     .find_dimension_with_name(member_name)
-                                    .and_then(|d| d.format.as_ref())
+                                    .map(|d| (d.format.as_ref(), d.currency.as_ref()))
                             })
                     })
-                    .and_then(|fmt| serde_json::to_value(fmt.as_ref()).ok());
+                    .map(|(fmt, cur)| {
+                        (
+                            fmt.and_then(|f| serde_json::to_value(f.as_ref()).ok()),
+                            cur.cloned(),
+                        )
+                    })
+                    .unwrap_or((None, None));
 
                 columns.push(SchemaColumn {
                     name: field.name().clone(),
                     column_type: arrow_to_column_type(field.data_type().clone())?,
                     format,
+                    currency,
                 });
             }
 
@@ -441,25 +451,27 @@ async fn handle_sql_query(
                     .await?;
             }
             Err(err) => {
-                session_clone
-                    .session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        span_id.clone(),
-                        session_clone.state.auth_context().unwrap(),
-                        session_clone.state.get_load_request_meta("sql"),
-                        "Cube SQL Error".to_string(),
-                        serde_json::json!({
-                            "query": {
-                                "sql": sql_query
-                            },
-                            "apiType": "sql",
-                            "duration": span_id.as_ref().unwrap().duration(),
-                            "error": err.message,
-                        }),
-                    )
-                    .await?;
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    session_clone
+                        .session_manager
+                        .server
+                        .transport
+                        .log_load_state(
+                            span_id.clone(),
+                            session_clone.state.auth_context().unwrap(),
+                            session_clone.state.get_load_request_meta("sql"),
+                            "Cube SQL Error".to_string(),
+                            serde_json::json!({
+                                "query": {
+                                    "sql": sql_query
+                                },
+                                "apiType": "sql",
+                                "duration": span_id.as_ref().unwrap().duration(),
+                                "error": err.message,
+                            }),
+                        )
+                        .await?;
+                }
             }
         }
 
@@ -519,6 +531,20 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => false,
     };
 
+    let request_id: Option<String> = match cx.argument::<JsValue>(7) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                None
+            } else {
+                match val.downcast::<JsString, _>(&mut cx) {
+                    Ok(v) => Some(v.value(&mut cx)),
+                    Err(_) => None,
+                }
+            }
+        }
+        Err(_) => None,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -560,6 +586,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             write: js_stream_write_fn,
         };
 
+        let request_id_for_error = request_id.clone();
+
         let result = handle_sql_query(
             services,
             native_auth_ctx,
@@ -569,6 +597,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             &cache_mode,
             timezone,
             throw_continue_wait,
+            request_id,
         )
         .await;
 
@@ -587,6 +616,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                 Err(err) => {
                     let mut error_response = Map::new();
                     error_response.insert("error".into(), err.to_string().into());
+                    if let Some(req_id) = &request_id_for_error {
+                        error_response.insert("requestId".into(), req_id.clone().into());
+                    }
                     let error_message = format!(
                         "{}{}",
                         serde_json::to_string(&serde_json::Value::Object(error_response))

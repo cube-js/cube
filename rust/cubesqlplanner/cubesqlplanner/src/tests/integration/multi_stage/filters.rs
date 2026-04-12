@@ -173,3 +173,28 @@ async fn test_filter_on_multi_stage_measure() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_on_only_multi_stage_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        dimensions:
+          - orders.status
+          - orders.category
+        filters:
+          - member: orders.amount_reduce_category
+            operator: gt
+            values:
+              - "200"
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

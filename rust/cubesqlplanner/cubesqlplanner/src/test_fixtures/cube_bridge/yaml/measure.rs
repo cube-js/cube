@@ -49,8 +49,29 @@ struct YamlOrderBy {
     dir: String,
 }
 
+fn qualify_references(refs: Option<Vec<String>>, cube_name: Option<&str>) -> Option<Vec<String>> {
+    match cube_name {
+        Some(cn) => refs.map(|v| {
+            v.into_iter()
+                .map(|r| {
+                    if r.contains('.') {
+                        r
+                    } else {
+                        format!("{}.{}", cn, r)
+                    }
+                })
+                .collect()
+        }),
+        None => refs,
+    }
+}
+
 impl YamlMeasureDefinition {
     pub fn build(self) -> Rc<MockMeasureDefinition> {
+        self.build_with_cube_name(None)
+    }
+
+    pub fn build_with_cube_name(self, cube_name: Option<&str>) -> Rc<MockMeasureDefinition> {
         let case = self.case.map(|cv| match cv {
             YamlCaseVariant::Case(case_def) => Rc::new(CaseVariant::Case(case_def.build())),
             YamlCaseVariant::CaseSwitch(switch_def) => {
@@ -95,9 +116,12 @@ impl YamlMeasureDefinition {
             MockMeasureDefinition::builder()
                 .measure_type(self.measure_type)
                 .multi_stage(self.multi_stage)
-                .reduce_by_references(self.reduce_by_references)
-                .add_group_by_references(self.add_group_by_references)
-                .group_by_references(self.group_by_references)
+                .reduce_by_references(qualify_references(self.reduce_by_references, cube_name))
+                .add_group_by_references(qualify_references(
+                    self.add_group_by_references,
+                    cube_name,
+                ))
+                .group_by_references(qualify_references(self.group_by_references, cube_name))
                 .time_shift_references(self.time_shift_references)
                 .rolling_window(self.rolling_window)
                 .sql_opt(self.sql)

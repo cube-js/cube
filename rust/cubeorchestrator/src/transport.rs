@@ -99,6 +99,8 @@ pub struct ExtendedDimensionFormat {
     pub format_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +186,9 @@ pub struct ConfigItem {
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<DimensionFormat>,
+    /// ISO 4217 currency code in uppercase (e.g. USD, EUR)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -218,6 +223,9 @@ pub struct AnnotatedConfigItem {
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<DimensionFormat>,
+    /// ISO 4217 currency code in uppercase (e.g. USD, EUR)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -341,6 +349,19 @@ mod tests {
     }
 
     #[test]
+    fn test_dimension_format_custom_numeric_with_alias() {
+        let json = json!({"type": "custom-numeric", "value": ".2%", "alias": "percent_2"});
+        let format: DimensionFormat = serde_json::from_value(json).unwrap();
+
+        // Round-trip
+        let serialized = serde_json::to_value(&format).unwrap();
+        assert_eq!(
+            serialized,
+            json!({"type": "custom-numeric", "value": ".2%", "alias": "percent_2"})
+        );
+    }
+
+    #[test]
     fn test_dimension_format_custom_time() {
         let json = json!({"type": "custom-time", "value": "%Y-%m-%d %H:%M:%S"});
         let format: DimensionFormat = serde_json::from_value(json).unwrap();
@@ -361,5 +382,52 @@ mod tests {
         // Round-trip
         let serialized = serde_json::to_value(&format).unwrap();
         assert_eq!(serialized, json!({"type": "link", "label": "Click"}));
+    }
+
+    #[test]
+    fn test_config_item_with_currency() {
+        let json = json!({
+            "title": "Total Amount",
+            "shortTitle": "Amount",
+            "type": "number",
+            "format": "currency",
+            "currency": "USD",
+            "drillMembers": [],
+            "drillMembersGrouped": { "measures": [], "dimensions": [] }
+        });
+        let item: ConfigItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.currency, Some("USD".to_string()));
+
+        let serialized = serde_json::to_value(&item).unwrap();
+        assert_eq!(serialized["currency"], "USD");
+    }
+
+    #[test]
+    fn test_config_item_without_currency() {
+        let json = json!({
+            "title": "Count",
+            "shortTitle": "Count",
+            "type": "number"
+        });
+        let item: ConfigItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.currency, None);
+
+        let serialized = serde_json::to_value(&item).unwrap();
+        assert!(serialized.get("currency").is_none());
+    }
+
+    #[test]
+    fn test_annotated_config_item_with_currency() {
+        let json = json!({
+            "title": "Price",
+            "shortTitle": "Price",
+            "type": "number",
+            "currency": "EUR"
+        });
+        let item: AnnotatedConfigItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.currency, Some("EUR".to_string()));
+
+        let serialized = serde_json::to_value(&item).unwrap();
+        assert_eq!(serialized["currency"], "EUR");
     }
 }

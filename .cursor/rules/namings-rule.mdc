@@ -1,0 +1,18 @@
+---
+description: Product naming conventions for Cube documentation
+globs: docs-mintlify/**
+alwaysApply: false
+---
+
+# Product Naming Conventions
+
+- **Cube Core** — our open-source product
+- **Cube** — our commercial product (default name in most contexts)
+- **Cube cloud platform** — use only when you need to explicitly differentiate the commercial product from Cube Core
+- **Cube Cloud** — legacy naming, do not use in new content
+
+# Deployment Type Naming
+
+- **Development** — development deployment type (legacy: "Development instance")
+- **Production** — production deployment type (legacy: "Production cluster")
+- **Multi-cluster** — multi-cluster production deployment type (legacy: "Production multi-cluster")

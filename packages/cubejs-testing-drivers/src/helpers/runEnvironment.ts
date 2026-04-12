@@ -173,6 +173,12 @@ export async function runEnvironment(
         CUBEJS_DB_HOST: '127.0.0.1',
         CUBEJS_DB_PORT: `${mappedDataPort}`,
       });
+      if (process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST) {
+        cliEnv.withEnvironment({
+          CUBEJS_PRE_AGGREGATIONS_DB_HOST: '127.0.0.1',
+          CUBEJS_PRE_AGGREGATIONS_DB_PORT: `${mappedDataPort}`,
+        });
+      }
     }
     await cliEnv.up();
   }

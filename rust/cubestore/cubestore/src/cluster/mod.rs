@@ -867,6 +867,10 @@ pub struct JobResultListener {
 }
 
 impl JobResultListener {
+    pub fn into_receiver(self) -> Receiver<MetaStoreEvent> {
+        self.receiver
+    }
+
     pub async fn wait_for_job_result(
         self,
         row_key: RowKey,

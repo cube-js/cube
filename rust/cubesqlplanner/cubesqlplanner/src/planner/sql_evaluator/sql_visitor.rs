@@ -13,6 +13,7 @@ pub struct SqlEvaluatorVisitor {
     query_tools: Rc<QueryTools>,
     cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
+    ignore_tz_convert: bool,
 }
 
 impl SqlEvaluatorVisitor {
@@ -25,7 +26,14 @@ impl SqlEvaluatorVisitor {
             query_tools,
             cube_ref_evaluator,
             all_filters,
+            ignore_tz_convert: false,
         }
+    }
+
+    pub fn with_ignore_tz_convert(&self) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.ignore_tz_convert = true;
+        self_copy
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -46,6 +54,10 @@ impl SqlEvaluatorVisitor {
             templates,
         )?;
         Ok(result)
+    }
+
+    pub fn ignore_tz_convert(&self) -> bool {
+        self.ignore_tz_convert
     }
 
     pub fn evaluate_cube_ref(

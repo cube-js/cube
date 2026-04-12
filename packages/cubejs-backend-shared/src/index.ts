@@ -2,6 +2,7 @@ export {
   getEnv,
   assertDataSource,
   keyByDataSource,
+  hasPreAggregationsEnvVars,
   isDockerImage,
   convertSizeToBytes,
 } from './env';

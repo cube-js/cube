@@ -299,16 +299,6 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_result(key, external_id).await
     }
 
-    async fn queue_result_by_external_id(
-        &self,
-        external_id: String,
-    ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.init()
-            .await?
-            .queue_result_by_external_id(external_id)
-            .await
-    }
-
     async fn queue_result_blocking(
         &self,
         key: QueueKey,

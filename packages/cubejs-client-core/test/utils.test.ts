@@ -1,7 +1,3 @@
-/* globals describe, expect, test */
-
-import 'jest';
-
 import { defaultOrder } from '../src/utils';
 import { dayRange, TIME_SERIES } from '../src/time';
 

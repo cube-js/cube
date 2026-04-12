@@ -35,6 +35,8 @@ pub struct YamlBaseQueryOptions {
     pub disable_external_pre_aggregations: Option<bool>,
     #[serde(default)]
     pub pre_aggregation_id: Option<String>,
+    #[serde(default)]
+    pub convert_tz_for_raw_time_dimension: Option<bool>,
     #[serde(default, rename = "joinHints")]
     pub join_hints: Option<Vec<Vec<String>>>,
     #[serde(default, rename = "memberToAlias")]

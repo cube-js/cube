@@ -782,6 +782,109 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('SECURITY_CONTEXT.cubeCloud features via SQL API', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('sc_test', 'sc_test_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('filter with scalar value generates equality (tenantId)', async () => {
+      const res = await connection.query(
+        'SELECT * FROM security_context_test'
+      );
+      expect(res.rows.length).toBe(1);
+    });
+
+    test('filter with array value generates IN clause (groups)', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_array_filter_test'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('toString interpolation renders as param in SQL', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_interpolation_test'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('groups shorthand in access policy row filter', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_groups_shorthand_test'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('SECURITY_CONTEXT.cubeCloud features via REST API', () => {
+    let scClient: CubeApi;
+
+    const SC_TEST_TOKEN = sign({
+      cubeCloud: {
+        userAttributes: {
+          tenantId: '1',
+        },
+        groups: ['1', '2'],
+      },
+      auth: {
+        username: 'sc_test',
+        userAttributes: {},
+        roles: [],
+        groups: [],
+      },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+      expiresIn: '2 days'
+    });
+
+    beforeAll(async () => {
+      scClient = cubejs(async () => SC_TEST_TOKEN, {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+    });
+
+    test('filter with scalar value (tenantId) via REST', async () => {
+      const result = await scClient.load({
+        measures: ['security_context_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['security_context_test.count']).toBeDefined();
+    });
+
+    test('filter with array value (groups) generates IN clause via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_array_filter_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['sc_array_filter_test.count']).toBeDefined();
+    });
+
+    test('toString interpolation via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_interpolation_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['sc_interpolation_test.count']).toBeDefined();
+    });
+
+    test('groups shorthand access policy via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_groups_shorthand_test.count'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBe(1);
+      expect(rows[0]['sc_groups_shorthand_test.count']).toBeDefined();
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;
@@ -811,9 +914,6 @@ describe('Cube RBAC Engine', () => {
     });
 
     test('line_items hidden price_dim', async () => {
-      // When querying hidden members, row-level security denies access
-      // by filtering out all rows (returns empty result)
-      // TODO we should evaluate member access before the query runs and bounce early with an error
       let query: Query = {
         measures: ['line_items.count'],
         dimensions: ['line_items.price_dim'],
@@ -821,9 +921,13 @@ describe('Cube RBAC Engine', () => {
           'line_items.price_dim': 'asc',
         },
       };
-      const hiddenMemberResult = await client.load(query, {});
-      // Row-level security denies access by returning empty results
-      expect(hiddenMemberResult.rawData()).toEqual([]);
+      let error = '';
+      try {
+        await client.load(query, {});
+      } catch (e: any) {
+        error = e.toString();
+      }
+      expect(error).toContain('You requested hidden member');
 
       query = {
         measures: ['line_items_view_no_policy.count'],
@@ -848,17 +952,21 @@ describe('Cube RBAC Engine', () => {
       }
       expect(error).toContain('You requested hidden member');
 
-      let result = await defaultClient.load({
-        measures: ['orders_view.count'],
-        dimensions: ['orders_view.created_at'],
-        order: {
-          'orders_view.created_at': 'asc',
-        },
-      });
-      // It should only return one value allowed by the default policy
-      expect(result.rawData()).toMatchSnapshot('orders_view_rest');
+      error = '';
+      try {
+        await defaultClient.load({
+          measures: ['orders_view.count'],
+          dimensions: ['orders_view.created_at'],
+          order: {
+            'orders_view.created_at': 'asc',
+          },
+        });
+      } catch (e: any) {
+        error = e.toString();
+      }
+      expect(error).toContain('You requested hidden member');
 
-      result = await defaultClient.load({
+      const result = await defaultClient.load({
         measures: ['orders_open.count'],
         dimensions: ['orders_open.created_at'],
         order: {

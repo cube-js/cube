@@ -18,8 +18,9 @@ import type { ContextEvaluator } from './ContextEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
+import { resolveNamedNumericFormat } from './named-numeric-formats';
 
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type CustomNumericFormat = { type: 'custom-numeric'; value: string; alias?: string };
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
 export type DimensionLinkFormat = { type: 'link'; label?: string };
 export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
@@ -40,6 +41,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   cumulative?: boolean;
   aggType?: string;
   keyReference?: string;
+  currency?: string;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -69,6 +71,7 @@ export type MeasureConfig = {
   description?: string;
   shortTitle: string;
   format?: MeasureFormat;
+  currency?: string;
   cumulativeTotal: boolean;
   cumulative: boolean;
   type: string;
@@ -92,6 +95,7 @@ export type DimensionConfig = {
   shortTitle: string;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  currency?: string;
   meta?: any;
   isVisible: boolean;
   public: boolean;
@@ -263,6 +267,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 ? true
                 : extendedDimDef.suggestFilterValues,
             format: this.transformDimensionFormat(extendedDimDef),
+            currency: extendedDimDef.currency?.toUpperCase(),
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -381,6 +386,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
       description: extendedMetricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
       format: this.transformMeasureFormat(extendedMetricDef.format),
+      currency: extendedMetricDef.currency?.toUpperCase(),
       cumulativeTotal: isCumulative,
       cumulative: isCumulative,
       type,
@@ -403,40 +409,54 @@ export class CubeToMetaTransformer implements CompilerInterface {
     return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
   }
 
-  private transformDimensionFormat({ format, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
-    if (!format || typeof format === 'object') {
-      return format;
+  private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
+    if (!formatOrName || typeof formatOrName === 'object') {
+      return formatOrName;
     }
 
+    // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
+    const resolved = resolveNamedNumericFormat(formatOrName);
+    if (resolved) {
+      return { type: 'custom-numeric', value: resolved, alias: formatOrName };
+    }
+
+    // Existing standard formats stay as-is (breaking change to convert these)
     const standardFormats = ['imageUrl', 'currency', 'percent', 'number', 'id'];
-    if (standardFormats.includes(format)) {
-      return format;
+    if (standardFormats.includes(formatOrName)) {
+      return formatOrName;
     }
 
     // Custom time format for time dimensions
     if (type === 'time') {
-      return { type: 'custom-time', value: format };
+      return { type: 'custom-time', value: formatOrName };
     }
 
-    // Custom numeric format for number dimensions
+    // Custom numeric format for number dimensions (raw d3-format specifier)
     if (type === 'number') {
-      return { type: 'custom-numeric', value: format };
+      return { type: 'custom-numeric', value: formatOrName };
     }
 
-    return format;
+    return formatOrName;
   }
 
-  private transformMeasureFormat(format: string | undefined): MeasureFormat | undefined {
-    if (!format) {
+  private transformMeasureFormat(formatOrName: string | undefined): MeasureFormat | undefined {
+    if (!formatOrName) {
       return undefined;
     }
 
-    const standardFormats = ['percent', 'currency', 'number'];
-    if (standardFormats.includes(format)) {
-      return format;
+    // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
+    const resolved = resolveNamedNumericFormat(formatOrName);
+    if (resolved) {
+      return { type: 'custom-numeric', value: resolved, alias: formatOrName };
     }
 
-    // Custom numeric format
-    return { type: 'custom-numeric', value: format };
+    // Existing standard formats stay as-is (breaking change to convert these)
+    const standardFormats = ['percent', 'currency', 'number'];
+    if (standardFormats.includes(formatOrName)) {
+      return formatOrName;
+    }
+
+    // Custom numeric format (raw d3-format specifier)
+    return { type: 'custom-numeric', value: formatOrName };
   }
 }

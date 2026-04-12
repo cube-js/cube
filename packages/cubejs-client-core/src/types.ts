@@ -14,8 +14,18 @@ export type GranularityAnnotation = {
   origin?: string;
 };
 
-export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type DimensionCustomTimeFormat = {
+  type: 'custom-time';
+  /** POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S'). See https://d3js.org/d3-time-format */
+  value: string;
+};
+export type CustomNumericFormat = {
+  type: 'custom-numeric';
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format */
+  value: string;
+  /** Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used. */
+  alias?: string;
+};
 export type DimensionLinkFormat = { type: 'link'; label: string };
 export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
   | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
@@ -27,6 +37,8 @@ export type Annotation = {
   type: string;
   meta?: any;
   format?: DimensionFormat | MeasureFormat;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -384,6 +396,8 @@ export type TCubeMeasure = BaseCubeMember & {
     dimensions: string[];
   };
   format?: 'currency' | 'percent';
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
 };
 
 export type CubeTimeDimensionGranularity = {
@@ -395,6 +409,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   key?: string;
 };
 

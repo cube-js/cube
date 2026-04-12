@@ -92,6 +92,19 @@ pub fn evaluate_with_context(
     visitor.apply(node, node_processor, templates)
 }
 
+pub fn evaluate_filter_with_context(
+    node: &Rc<MemberSymbol>,
+    context: Rc<VisitorContext>,
+    templates: &PlanSqlTemplates,
+) -> Result<String, CubeError> {
+    let visitor = context
+        .make_visitor(context.query_tools())
+        .with_ignore_tz_convert();
+    let node_processor = context.node_processor();
+
+    visitor.apply(node, node_processor, templates)
+}
+
 pub fn evaluate_sql_call_with_context(
     sql_call: &Rc<SqlCall>,
     context: Rc<VisitorContext>,

@@ -232,6 +232,25 @@ views:
       },
     ],
     { joinGraph, cubeEvaluator, compiler }));
+    it('multi stage measure filter', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.status'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year'
+        }
+      ],
+      filters: [
+        { member: 'orders.cagr_1_y', operator: 'gt', values: ['1.5'] }
+      ],
+      timezone: 'UTC'
+    }, [
+      {
+        orders__date_year: '2023-01-01T00:00:00.000Z',
+        orders__status: 'completed',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
   } else {
     // This test is working only in tesseract
     test.skip('multi stage over sub query', () => { expect(1).toBe(1); });

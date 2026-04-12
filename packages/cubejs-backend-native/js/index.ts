@@ -438,10 +438,10 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean): Promise<void> => {
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId);
 };
 
 // TODO parse result from native code

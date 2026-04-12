@@ -233,6 +233,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -251,14 +256,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    let privateKey = getEnv('snowflakePrivateKey', { dataSource });
+    let privateKey = getEnv('snowflakePrivateKey', { dataSource, preAggregations });
 
     if (privateKey) {
       // If the private key is encrypted - we need to decrypt it before passing to
       // snowflake sdk.
       if (privateKey.includes('BEGIN ENCRYPTED PRIVATE KEY')) {
-        const keyPasswd = getEnv('snowflakePrivateKeyPass', { dataSource });
+        const keyPasswd = getEnv('snowflakePrivateKeyPass', { dataSource, preAggregations });
 
         if (!keyPasswd) {
           throw new Error(
@@ -283,26 +289,26 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: false,
-      host: getEnv('snowflakeHost', { dataSource }),
-      account: getEnv('snowflakeAccount', { dataSource }),
-      region: getEnv('snowflakeRegion', { dataSource }),
-      warehouse: getEnv('snowflakeWarehouse', { dataSource }),
-      role: getEnv('snowflakeRole', { dataSource }),
-      clientSessionKeepAlive: getEnv('snowflakeSessionKeepAlive', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      username: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
-      oauthToken: getEnv('snowflakeOAuthToken', { dataSource }),
-      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
-      privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
-      privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
+      host: getEnv('snowflakeHost', { dataSource, preAggregations }),
+      account: getEnv('snowflakeAccount', { dataSource, preAggregations }),
+      region: getEnv('snowflakeRegion', { dataSource, preAggregations }),
+      warehouse: getEnv('snowflakeWarehouse', { dataSource, preAggregations }),
+      role: getEnv('snowflakeRole', { dataSource, preAggregations }),
+      clientSessionKeepAlive: getEnv('snowflakeSessionKeepAlive', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      username: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      authenticator: getEnv('snowflakeAuthenticator', { dataSource, preAggregations }),
+      oauthToken: getEnv('snowflakeOAuthToken', { dataSource, preAggregations }),
+      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource, preAggregations }),
+      privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource, preAggregations }),
+      privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource, preAggregations }),
       ...(privateKey ? { privateKey } : {}),
-      exportBucket: this.getExportBucket(dataSource),
+      exportBucket: this.getExportBucket(dataSource, preAggregations),
       resultPrefetch: 1,
-      executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
-      identIgnoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource }),
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      executionTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
+      identIgnoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource, preAggregations }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       application: 'CubeDev_Cube',
       ...config
     };
@@ -328,18 +334,19 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   protected createExportBucket(
     dataSource: string,
     bucketType: string,
+    preAggregations?: boolean,
   ): SnowflakeDriverExportBucket {
     if (bucketType === 's3') {
       // integrationName is optional for s3
-      const integrationName = getEnv('dbExportIntegration', { dataSource });
+      const integrationName = getEnv('dbExportIntegration', { dataSource, preAggregations });
       // keyId and secretKey are optional for s3 if IAM role is used
-      const keyId = getEnv('dbExportBucketAwsKey', { dataSource });
-      const secretKey = getEnv('dbExportBucketAwsSecret', { dataSource });
+      const keyId = getEnv('dbExportBucketAwsKey', { dataSource, preAggregations });
+      const secretKey = getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations });
 
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket', { dataSource }),
-        region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+        bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
+        region: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
         ...(integrationName !== undefined && { integrationName }),
         ...(keyId !== undefined && { keyId }),
         ...(secretKey !== undefined && { secretKey }),
@@ -350,17 +357,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       // integrationName is required for gcs as the only possible way in snowflake
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket', { dataSource }),
-        integrationName: getEnv('dbExportIntegration', { dataSource }),
-        credentials: getEnv('dbExportGCSCredentials', { dataSource }),
+        bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
+        integrationName: getEnv('dbExportIntegration', { dataSource, preAggregations }),
+        credentials: getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
       };
     }
 
     if (bucketType === 'azure') {
       // integrationName is optional for azure
-      const integrationName = getEnv('dbExportIntegration', { dataSource });
+      const integrationName = getEnv('dbExportIntegration', { dataSource, preAggregations });
       // sasToken is optional for azure if storage integration is used
-      const sasToken = getEnv('dbExportAzureSasToken', { dataSource });
+      const sasToken = getEnv('dbExportAzureSasToken', { dataSource, preAggregations });
 
       if (!integrationName && !sasToken) {
         throw new Error(
@@ -369,17 +376,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       }
 
       // azureKey is optional if DefaultAzureCredential() is used
-      const azureKey = getEnv('dbExportBucketAzureKey', { dataSource });
+      const azureKey = getEnv('dbExportBucketAzureKey', { dataSource, preAggregations });
 
       // These 3 options make sense in case you want to authorize to Azure from
       // application running in the k8s environment.
-      const clientId = getEnv('dbExportBucketAzureClientId', { dataSource });
-      const tenantId = getEnv('dbExportBucketAzureTenantId', { dataSource });
-      const tokenFilePath = getEnv('dbExportBucketAzureTokenFilePAth', { dataSource });
+      const clientId = getEnv('dbExportBucketAzureClientId', { dataSource, preAggregations });
+      const tenantId = getEnv('dbExportBucketAzureTenantId', { dataSource, preAggregations });
+      const tokenFilePath = getEnv('dbExportBucketAzureTokenFilePAth', { dataSource, preAggregations });
 
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket', { dataSource }),
+        bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
         ...(integrationName !== undefined && { integrationName }),
         ...(sasToken !== undefined && { sasToken }),
         ...(azureKey !== undefined && { azureKey }),
@@ -410,15 +417,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected getExportBucket(
     dataSource: string,
+    preAggregations?: boolean,
   ): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       dataSource,
+      preAggregations,
       supported: SUPPORTED_BUCKET_TYPES,
     });
     if (bucketType) {
       const exportBucket = this.createExportBucket(
         dataSource,
         bucketType,
+        preAggregations,
       );
 
       const emptyKeys = Object.keys(exportBucket)

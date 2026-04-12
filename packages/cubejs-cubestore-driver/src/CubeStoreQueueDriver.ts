@@ -16,7 +16,7 @@ import {
   GetActiveAndToProcessResponse,
   QueryKeysTuple,
 } from '@cubejs-backend/base-driver';
-import { getProcessUid } from '@cubejs-backend/shared';
+import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
@@ -38,11 +38,23 @@ type CubeStoreListResponse = {
   status: string
 };
 
-class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
+export class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
+  private readonly externalIdEnabled: boolean;
+
   public constructor(
     protected readonly driver: CubeStoreDriver,
     protected readonly options: QueueDriverOptions,
-  ) { }
+  ) {
+    this.externalIdEnabled = getEnv('queueExternalId');
+  }
+
+  public async useExternalId(): Promise<boolean> {
+    if (this.externalIdEnabled) {
+      return this.driver.hasCapability('queueExternalId');
+    }
+
+    return false;
+  }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
     return hashQueryKey(queryKey, this.options.processUid);
@@ -53,9 +65,9 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async addToQueue(
-    keyScore: number,
+    _keyScore: number,
     queryKey: QueryKey,
-    orphanedTime: number,
+    _orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
@@ -79,11 +91,16 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       values.push(options.orphanedTimeout);
     }
 
+    const useExternalId = options.externalId && await this.useExternalId();
+    if (useExternalId) {
+      values.push(options.externalId!);
+    }
+
     values.push(this.prefixKey(this.redisHash(queryKey)));
     values.push(JSON.stringify(data));
 
     const exclusive = queryKey.persistent && await this.driver.hasCapability('queueExclusive');
-    const rows = await this.driver.query(`QUEUE ADD${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''} ? ?`, values);
+    const rows = await this.driver.query(`QUEUE ADD${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''}${useExternalId ? ' EXTERNAL_ID ?' : ''} ? ?`, values);
     if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
@@ -200,10 +217,17 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return [active, toProcess, defs];
   }
 
-  public async getResult(queryKey: QueryKey): Promise<unknown> {
-    const rows = await this.driver.query('QUEUE RESULT ?', [
-      this.prefixKey(this.redisHash(queryKey)),
-    ]);
+  public async getResult(queryKey: QueryKey, externalId?: string): Promise<unknown> {
+    const params: string[] = [];
+
+    const passExternalId = externalId && await this.useExternalId();
+    if (passExternalId) {
+      params.push(externalId);
+    }
+
+    params.push(this.prefixKey(this.redisHash(queryKey)));
+
+    const rows = await this.driver.query(`QUEUE RESULT ${passExternalId ? 'EXTERNAL_ID ? ' : ''}?`, params);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResult');
     }

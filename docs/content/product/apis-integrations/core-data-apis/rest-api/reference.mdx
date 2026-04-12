@@ -335,6 +335,11 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
+This endpoint supports [request span annotation][ref-request-span]. You can
+pass the `x-request-id` or `traceparent` HTTP header to propagate your
+request ID through the entire SQL execution chain for tracing and monitoring.
+If neither header is provided, Cube auto-generates a request ID.
+
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, and optionally
 `lastRefreshTime` indicating when the data was last refreshed.
@@ -379,6 +384,18 @@ Response:
 ```json
 {"schema":[{"name":"full_name","column_type":"String"},{"name":"wins","column_type":"Int64"},{"name":"avg_position","column_type":"Double"}],"lastRefreshTime":"2025-01-13T12:00:00.000Z"}
 {"data":[["Max VERSTAPPEN","10","3.730769230769231"],["Lando NORRIS","4","4"],["Charles LECLERC","4","4.730769230769231"],["Oscar PIASTRI","3","4.8076923076923075"],["Andrea Kimi ANTONELLI","0","5"]]}
+```
+
+Request with a custom request ID for tracing:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "x-request-id: my-trace-id-span-1" \
+  -d '{"query": "SELECT 123 AS value"}' \
+  http://localhost:4000/cubejs-api/v1/cubesql
 ```
 
 ## `{base_path}/v1/pre-aggregations/jobs`
@@ -883,3 +900,4 @@ Keep-Alive: timeout=5
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /product/apis-integrations/control-plane-api
 [self-metadata-api]: #metadata-api
+[ref-request-span]: /product/apis-integrations/rest-api#request-span-annotation

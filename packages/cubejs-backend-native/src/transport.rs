@@ -275,10 +275,15 @@ impl TransportService for NodeBridgeTransport {
             .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let req_id_spanned = if request_id.contains("-span-") {
+            request_id.clone()
+        } else {
+            format!("{}-span-1", request_id)
+        };
 
         let extra = serde_json::to_string(&LoadRequest {
             request: TransportRequest {
-                id: format!("{}-span-{}", request_id, 1),
+                id: req_id_spanned,
                 meta: Some(meta.clone()),
             },
             query: query.clone(),
@@ -363,9 +368,14 @@ impl TransportService for NodeBridgeTransport {
 
         loop {
             req_seq_id += 1;
+            let req_id_spanned = if request_id.contains("-span-") {
+                request_id.clone()
+            } else {
+                format!("{}-span-{}", request_id, req_seq_id)
+            };
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, req_seq_id),
+                    id: req_id_spanned,
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -564,6 +574,11 @@ impl TransportService for NodeBridgeTransport {
 
         loop {
             req_seq_id += 1;
+            let req_id_spanned = if request_id.contains("-span-") {
+                request_id.clone()
+            } else {
+                format!("{}-span-{}", request_id, req_seq_id)
+            };
             let native_auth = ctx
                 .as_any()
                 .downcast_ref::<NativeSQLAuthContext>()
@@ -571,7 +586,7 @@ impl TransportService for NodeBridgeTransport {
 
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, req_seq_id),
+                    id: req_id_spanned,
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -659,15 +674,18 @@ impl TransportService for NodeBridgeTransport {
             .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
-        let request_id = span_id
+        let mut request_id = span_id
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+        if !request_id.contains("-span-") {
+            request_id = format!("{}-span-1", request_id);
+        }
         call_raw_js_with_channel_as_callback(
             self.channel.clone(),
             self.log_load_event.clone(),
             LogEvent {
                 request: TransportRequest {
-                    id: format!("{}-span-1", request_id),
+                    id: request_id,
                     meta: Some(meta_fields.clone()),
                 },
                 session: SessionContext {

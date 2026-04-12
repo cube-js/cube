@@ -49,7 +49,7 @@ impl MultiStageQueryPlanner {
     > {
         let multi_stage_members = self
             .query_properties
-            .all_members(false)
+            .all_used_symbols()?
             .into_iter()
             .filter_map(|memb| -> Option<Result<_, CubeError>> {
                 match has_multi_stage_members(&memb, false) {

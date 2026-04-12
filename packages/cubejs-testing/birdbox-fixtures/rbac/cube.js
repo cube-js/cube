@@ -186,6 +186,29 @@ module.exports = {
         },
       };
     }
+    if (user === 'sc_test') {
+      if (password && password !== 'sc_test_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          cubeCloud: {
+            userAttributes: {
+              tenantId: '1',
+            },
+            groups: ['1', '2'],
+          },
+          auth: {
+            username: 'sc_test',
+            userAttributes: {},
+            roles: [],
+            groups: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };

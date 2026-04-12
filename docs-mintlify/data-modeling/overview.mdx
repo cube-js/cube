@@ -1,0 +1,87 @@
+---
+title: Data Modeling Overview
+description: Learn how to define your semantic layer with Cube data models.
+---
+
+ Data Modeling
+
+Data modeling in Cube is the process of defining your semantic layer — the business logic, metrics, and relationships that sit between your data warehouse and your data consumers.
+
+## Key concepts
+
+Cube's data model is built around two main objects:
+
+### Cubes
+
+Cubes represent business entities (e.g., `orders`, `customers`, `products`). They define:
+
+- **Measures** — aggregated values like `count`, `sum`, `avg`
+- **Dimensions** — attributes used for grouping and filtering
+- **Joins** — relationships between cubes
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: public.orders
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        type: sum
+        sql: amount
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+### Views
+
+Views are curated datasets built on top of cubes. They select specific measures and dimensions to create focused data products:
+
+```yaml
+views:
+  - name: order_summary
+    cubes:
+      - join_path: orders
+        includes:
+          - count
+          - total_amount
+          - status
+          - created_at
+
+      - join_path: orders.customers
+        includes:
+          - name: company
+```
+
+## Code-first approach
+
+Cube data models are defined in YAML or JavaScript files, managed through version control:
+
+<Steps>
+  <Step title="Define cubes">
+    Create cube files in the `model/` directory with your business entities.
+  </Step>
+  <Step title="Define relationships">
+    Add joins between cubes to establish entity relationships.
+  </Step>
+  <Step title="Create views">
+    Build views that combine cubes into focused data products.
+  </Step>
+  <Step title="Test and deploy">
+    Use development mode to test, then deploy to production.
+  </Step>
+</Steps>
