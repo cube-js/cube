@@ -58,6 +58,7 @@
                 ]
               },
               "docs/explore-analyze/explore",
+              "docs/explore-analyze/calculated-fields",
               "docs/explore-analyze/analytics-chat"
             ]
           },
