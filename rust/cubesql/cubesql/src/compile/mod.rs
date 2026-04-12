@@ -1759,6 +1759,83 @@ GROUP BY
     }
 
     #[tokio::test]
+    async fn measure_nested_sum_rejected() {
+        init_testing_logger();
+
+        let meta = get_test_tenant_ctx();
+        let create_query = convert_sql_to_cube_query(
+            &"SELECT MEASURE(SUM(count)) FROM KibanaSampleDataEcommerce".to_string(),
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        ).await;
+
+        let err_msg = create_query.err().unwrap().message();
+        assert!(
+            err_msg.contains("Nested aggregate functions inside MEASURE()"),
+            "Expected nested aggregate error, got: {}",
+            err_msg,
+        );
+    }
+
+    #[tokio::test]
+    async fn measure_nested_count_rejected() {
+        init_testing_logger();
+
+        let meta = get_test_tenant_ctx();
+        let create_query = convert_sql_to_cube_query(
+            &"SELECT MEASURE(COUNT(count)) FROM KibanaSampleDataEcommerce".to_string(),
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        ).await;
+
+        let err_msg = create_query.err().unwrap().message();
+        assert!(
+            err_msg.contains("Nested aggregate functions inside MEASURE()"),
+            "Expected nested aggregate error, got: {}",
+            err_msg,
+        );
+    }
+
+    #[tokio::test]
+    async fn measure_nested_avg_rejected() {
+        init_testing_logger();
+
+        let meta = get_test_tenant_ctx();
+        let create_query = convert_sql_to_cube_query(
+            &"SELECT MEASURE(AVG(avgPrice)) FROM KibanaSampleDataEcommerce".to_string(),
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        ).await;
+
+        let err_msg = create_query.err().unwrap().message();
+        assert!(
+            err_msg.contains("Nested aggregate functions inside MEASURE()"),
+            "Expected nested aggregate error, got: {}",
+            err_msg,
+        );
+    }
+
+    #[tokio::test]
+    async fn measure_without_nesting_still_works() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MEASURE(count) FROM KibanaSampleDataEcommerce".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn powerbi_contains_filter() {
         init_testing_logger();
 

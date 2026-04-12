@@ -153,6 +153,27 @@ impl RewriteRules for MemberRules {
                 None,
                 None,
             ),
+            transforming_chain_rewrite(
+                "measure-nested-aggregate-error",
+                member_replacer("?aggr_expr", "?alias_to_cube", "?aliases"),
+                vec![("?aggr_expr", udaf_expr(
+                    MEASURE_UDAF_NAME,
+                    vec![agg_fun_expr(
+                        "?inner_fun",
+                        vec!["?inner_arg"],
+                        "?inner_distinct",
+                        "?inner_within_group",
+                    )],
+                    "AggregateUDFExprDistinct:false",
+                ))],
+                "?error".to_string(),
+                Self::transform_nested_aggregate_error(
+                    "?inner_fun",
+                    "?alias_to_cube",
+                    "?aggr_expr",
+                    "?error",
+                ),
+            ),
             transforming_rewrite(
                 "push-down-aggregate",
                 aggregate(
@@ -748,6 +769,32 @@ impl MemberRules {
                 )
             },
         );
+
+        rules.push(transforming_chain_rewrite(
+            "member-pushdown-replacer-udaf-nested-aggregate-error",
+            member_pushdown_replacer(
+                "?aggr_expr",
+                "?old_member",
+                "?member_pushdown_replacer_alias_to_cube",
+            ),
+            vec![("?aggr_expr", udaf_expr(
+                MEASURE_UDAF_NAME,
+                vec![agg_fun_expr(
+                    "?inner_fun",
+                    vec!["?inner_arg"],
+                    "?inner_distinct",
+                    "?inner_within_group",
+                )],
+                "AggregateUDFExprDistinct:false",
+            ))],
+            "?error".to_string(),
+            Self::transform_nested_aggregate_error_pushdown(
+                "?inner_fun",
+                "?member_pushdown_replacer_alias_to_cube",
+                "?aggr_expr",
+                "?error",
+            ),
+        ));
 
         rules.push(transforming_chain_rewrite(
             "member-pushdown-date-trunc",
@@ -2030,6 +2077,96 @@ impl MemberRules {
                 "?measure",
             ),
         )
+    }
+
+    fn transform_nested_aggregate_error(
+        inner_fun_var: &'static str,
+        alias_to_cube_var: &'static str,
+        aggr_expr_var: &'static str,
+        error_out_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static {
+        let inner_fun_var = var!(inner_fun_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let aggr_expr_var = var!(aggr_expr_var);
+        let error_out_var = var!(error_out_var);
+
+        move |egraph, subst| {
+            for fun in
+                var_iter!(egraph[subst[inner_fun_var]], AggregateFunctionExprFun).cloned()
+            {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    MemberReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    let fun_name = MemberRules::get_agg_type(Some(&fun), false)
+                        .unwrap_or_else(|| format!("{:?}", fun))
+                        .to_uppercase();
+                    subst.insert(
+                        error_out_var,
+                        add_member_error(
+                            egraph,
+                            format!(
+                                "Nested aggregate functions inside MEASURE() are not supported. \
+                                Use MEASURE(column) or {}(column) instead of MEASURE({}(...))",
+                                fun_name, fun_name
+                            ),
+                            1,
+                            subst[aggr_expr_var],
+                            alias_to_cube,
+                        ),
+                    );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_nested_aggregate_error_pushdown(
+        inner_fun_var: &'static str,
+        alias_to_cube_var: &'static str,
+        aggr_expr_var: &'static str,
+        error_out_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static {
+        let inner_fun_var = var!(inner_fun_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let aggr_expr_var = var!(aggr_expr_var);
+        let error_out_var = var!(error_out_var);
+
+        move |egraph, subst| {
+            for fun in
+                var_iter!(egraph[subst[inner_fun_var]], AggregateFunctionExprFun).cloned()
+            {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    MemberPushdownReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    let fun_name = MemberRules::get_agg_type(Some(&fun), false)
+                        .unwrap_or_else(|| format!("{:?}", fun))
+                        .to_uppercase();
+                    subst.insert(
+                        error_out_var,
+                        add_member_error(
+                            egraph,
+                            format!(
+                                "Nested aggregate functions inside MEASURE() are not supported. \
+                                Use MEASURE(column) or {}(column) instead of MEASURE({}(...))",
+                                fun_name, fun_name
+                            ),
+                            1,
+                            subst[aggr_expr_var],
+                            alias_to_cube,
+                        ),
+                    );
+                    return true;
+                }
+            }
+            false
+        }
     }
 
     fn can_remove_cast(
