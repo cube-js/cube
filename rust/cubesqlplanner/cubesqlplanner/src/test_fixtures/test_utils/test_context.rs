@@ -1,8 +1,8 @@
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::logical_plan::{PreAggregation, PreAggregationUsage};
+use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
-use crate::logical_plan::{PreAggregationSource, PreAggregationTable};
+use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
 use crate::plan::Filter;
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::query_tools::QueryTools;
@@ -429,6 +429,11 @@ impl TestContext {
             .query_tools
             .build_sql_and_params(&raw_sql, true, &templates)
             .expect("Failed to build SQL and params");
+
+        // Strip __usage_N suffixes from SQL, same as base_query.rs does for single usage
+        let sql = pre_aggregations
+            .iter()
+            .fold(sql, |s, u| s.replace(&format!("__usage_{}", u.index), ""));
 
         let final_sql = Self::inline_params(&sql, &params);
 
