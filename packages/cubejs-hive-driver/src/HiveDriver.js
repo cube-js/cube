@@ -11,7 +11,7 @@ const {
 } = require('@cubejs-backend/shared');
 const jshs2 = require('jshs2');
 const SqlString = require('sqlstring');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { BaseDriver, createPoolName } = require('@cubejs-backend/base-driver');
 const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
 
@@ -82,8 +82,9 @@ class HiveDriver extends BaseDriver {
     };
 
     const configuration = new Configuration(this.config);
-    
-    this.pool = new Pool('hive', {
+
+    const poolName = createPoolName('hive', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         const idl = new IDLContainer();
         await idl.initialize(configuration);
