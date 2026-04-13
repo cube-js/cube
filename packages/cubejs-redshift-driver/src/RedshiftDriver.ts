@@ -124,9 +124,9 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     this.credentials = credentialsProvider;
   }
 
-  protected override async createConnection(poolConfig: PgClientConfig): Promise<PgClient> {
+  protected async createConnection(poolConfig: PgClientConfig, poolName: string): Promise<PgClient> {
     const { user, password } = await this.credentials.getCredentials();
-    return super.createConnection({ ...poolConfig, user, password });
+    return super.createConnection({ ...poolConfig, user, password }, poolName);
   }
 
   protected primaryKeysQuery() {
