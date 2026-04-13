@@ -7,11 +7,10 @@
 import genericPool, { Pool as GenericPool, Factory, Options } from 'generic-pool';
 
 export class PoolTimeoutError extends Error {
-  public readonly poolName: string = 'PoolTimeoutError';
-
-  public constructor(poolName: string) {
+  public constructor(
+    protected readonly poolName: string
+  ) {
     super(`ResourceRequest timed out (${poolName})`);
-    this.poolName = poolName;
   }
 }
 
