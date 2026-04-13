@@ -875,6 +875,71 @@ async fn test_multi_stage_separate_pre_aggregations() {
     }
 }
 
+// --- Multi-stage with separate pre-aggregations and time shift ---
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
+    let schema = MockSchema::from_yaml_file("common/multi_stage_pre_agg_time_shift_test.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count_prev_month
+          - orders.revenue_reduce_status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - \"2025-01-01\"
+              - \"2025-03-31\"
+        cubestoreSupportMultistage: true
+    "};
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 2, "Expected 2 pre-aggregation usages");
+
+    // Find usages by pre-aggregation name
+    let count_usage = pre_aggrs
+        .iter()
+        .find(|u| u.pre_aggregation.name() == "count_rollup")
+        .expect("Expected count_rollup usage");
+    let revenue_usage = pre_aggrs
+        .iter()
+        .find(|u| u.pre_aggregation.name() == "revenue_rollup")
+        .expect("Expected revenue_rollup usage");
+
+    // count_prev_month has time_shift prior 1 month, so date range should be shifted back
+    // TODO: currently time_shift is not propagated to date_range — fix in optimizer
+    assert_eq!(
+        count_usage.date_range,
+        Some(("2024-12-01T00:00:00.000".to_string(), "2025-02-28T23:59:59.999".to_string())),
+        "count_rollup should have date range shifted 1 month prior"
+    );
+
+    // revenue_reduce_status has no time shift, so original date range
+    assert_eq!(
+        revenue_usage.date_range,
+        Some(("2025-01-01T00:00:00.000".to_string(), "2025-03-31T23:59:59.999".to_string())),
+        "revenue_rollup should have original date range"
+    );
+
+    if let Some(result) = ctx
+        .try_execute_pg(
+            query_yaml,
+            "multi_stage_pre_agg_time_shift_tables.sql",
+        )
+        .await
+    {
+        insta::assert_snapshot!(
+            "multi_stage_separate_pre_aggs_time_shift_pg_result",
+            result
+        );
+    }
+}
+
 // --- rollupJoin with calculated measures through view ---
 
 #[test]

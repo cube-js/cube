@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
+assertion_line: 936
+expression: result
+snapshot_kind: text
+---
+orders__created_at_month | orders__count_prev_month | orders__revenue_reduce_status
+-------------------------+--------------------------+------------------------------
+2025-01-01 00:00:00      | 2                        | 250.00                       
+2025-02-01 00:00:00      | 2                        | 750.00                       
+2025-03-01 00:00:00      | 3                        | 750.00

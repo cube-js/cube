@@ -6,8 +6,10 @@ use crate::plan::FilterItem;
 use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
+use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::time_dimension::QueryDateTime;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -122,8 +124,10 @@ impl PreAggregationOptimizer {
         &mut self,
         query: Rc<Query>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+        time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         let date_range = Self::extract_date_range(&query.filter(), &self.query_tools);
+        let date_range = self.apply_time_shifts_to_date_range(date_range, time_shifts);
 
         if !query.multistage_members().is_empty() {
             // Nested multi-stage: recurse with full list
@@ -163,6 +167,7 @@ impl PreAggregationOptimizer {
                         if let Some(rewritten) = self.try_rewrite_leaf_query(
                             multi_stage_leaf_measure.query.clone(),
                             compiled_pre_aggregations,
+                            &multi_stage_leaf_measure.time_shifts,
                         )? {
                             let new_leaf = Rc::new(MultiStageLeafMeasure {
                                 measure: multi_stage_leaf_measure.measure.clone(),
@@ -386,6 +391,38 @@ impl PreAggregationOptimizer {
             }
         }
         None
+    }
+
+    /// Shift date_range by the negated time_shift interval.
+    /// The SQL renders `column + interval`, so to get the actual data range
+    /// we need `date_range - interval`.
+    fn apply_time_shifts_to_date_range(
+        &self,
+        date_range: Option<(String, String)>,
+        time_shifts: &TimeShiftState,
+    ) -> Option<(String, String)> {
+        let (from, to) = date_range?;
+        if time_shifts.is_empty() {
+            return Some((from, to));
+        }
+
+        // Use the first shift's interval (multi-stage typically has one time dimension)
+        let interval = time_shifts
+            .dimensions_shifts
+            .values()
+            .find_map(|shift| shift.interval.as_ref())?;
+
+        let tz = self.query_tools.timezone();
+        let shifted_from = QueryDateTime::from_date_str(tz, &from)
+            .and_then(|dt| dt.add_interval(&-interval.clone()))
+            .map(|dt| dt.default_format())
+            .unwrap_or(from);
+        let shifted_to = QueryDateTime::from_date_str(tz, &to)
+            .and_then(|dt| dt.add_interval(&-interval.clone()))
+            .map(|dt| dt.default_format())
+            .unwrap_or(to);
+
+        Some((shifted_from, shifted_to))
     }
 
     fn is_schema_and_filters_match(
