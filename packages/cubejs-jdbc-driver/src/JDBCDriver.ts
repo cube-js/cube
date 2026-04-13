@@ -12,6 +12,7 @@ import {
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
+  createPoolName,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   StreamOptions,
@@ -138,7 +139,8 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    this.pool = new Pool('jdbc', {
+    const poolName = createPoolName('jdbc', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         await initMvn(await this.getCustomClassPath());
 

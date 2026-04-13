@@ -13,6 +13,7 @@ import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field }
 import { Readable } from 'stream';
 import {
   BaseDriver,
+  createPoolName,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   DriverInterface,
@@ -100,7 +101,9 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       flags: ['-CONNECT_ATTRS'],
       ...mongoBIDriverConfiguration
     };
-    this.pool = new Pool('mongobi', {
+
+    const poolName = createPoolName('mongobi', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         const conn: Connection = createConnection(this.config);
 

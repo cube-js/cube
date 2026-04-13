@@ -23,6 +23,7 @@ import {
   DownloadTableMemoryData,
   DriverCapabilities,
   TableColumn,
+  createPoolName,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -144,7 +145,9 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       readOnly: true,
       ...restConfig,
     };
-    this.pool = new Pool('mysql', {
+
+    const poolName = createPoolName('mysql', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         const conn: any = mysql.createConnection(this.config);
         const connect = promisify(conn.connect.bind(conn));
