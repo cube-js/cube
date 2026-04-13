@@ -144,6 +144,54 @@ cube('sc_cube_mask_test', {
   ],
 });
 
+cube('sc_joined_mask_test', {
+  sql_table: 'public.line_items',
+
+  joins: {
+    orders: {
+      relationship: 'many_to_one',
+      sql: `${orders}.id = ${sc_joined_mask_test}.order_id`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: 'id',
+      type: 'number',
+      primary_key: true,
+    },
+    order_id: {
+      sql: `${CUBE}.order_id`,
+      type: 'number',
+    },
+    masked_order_id: {
+      sql: `${CUBE}.order_id`,
+      type: 'number',
+      mask: {
+        sql: `${orders.id}`,
+      },
+    },
+  },
+
+  measures: {
+    count: {
+      type: 'count',
+    },
+  },
+
+  accessPolicy: [
+    {
+      role: '*',
+      memberLevel: {
+        includes: [],
+      },
+      memberMasking: {
+        includes: '*',
+      },
+    },
+  ],
+});
+
 cube('sc_groups_shorthand_test', {
   sql_table: 'public.line_items',
 

@@ -855,6 +855,18 @@ describe('Cube RBAC Engine', () => {
         expect(row.masked_status).toBeGreaterThan(0);
       }
     });
+
+    test('joined cube reference in mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_joined_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // mask.sql is ${orders.id} which joins orders and returns orders.id
+        // Since line_items.order_id = orders.id (join condition), the values should match
+        expect(row.masked_order_id).toBe(row.order_id);
+      }
+    });
   });
 
   describe('SECURITY_CONTEXT.cubeCloud features via REST API', () => {
@@ -956,6 +968,20 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         // sc_test user has tenantId = '1', so masked_status should be actual product_id
         expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
+      }
+    });
+
+    test('joined cube reference in mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_joined_mask_test.count'],
+        dimensions: ['sc_joined_mask_test.order_id', 'sc_joined_mask_test.masked_order_id'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['sc_joined_mask_test.masked_order_id']).toBe(
+          row['sc_joined_mask_test.order_id']
+        );
       }
     });
   });
@@ -1132,6 +1158,16 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         expect(row.masked_status).toBeGreaterThan(0);
       }
     });
+
+    test('joined cube reference in mask sql', async () => {
+      const res = await connection.query(
+        'SELECT * FROM sc_joined_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.masked_order_id).toBe(row.order_id);
+      }
+    });
   });
 
   describe('Shorthand and mask tests via REST API [Tesseract]', () => {
@@ -1193,6 +1229,20 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
+      }
+    });
+
+    test('joined cube reference in mask sql via REST', async () => {
+      const result = await scClient.load({
+        measures: ['sc_joined_mask_test.count'],
+        dimensions: ['sc_joined_mask_test.order_id', 'sc_joined_mask_test.masked_order_id'],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['sc_joined_mask_test.masked_order_id']).toBe(
+          row['sc_joined_mask_test.order_id']
+        );
       }
     });
   });
