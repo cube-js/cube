@@ -147,9 +147,14 @@ const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
   text: () => true
 };
 
-/**
- * Base driver class.
- */
+export function createPoolName(driverName: string, dataSource: string, preAggregations: boolean = false): string {
+  if (preAggregations) {
+    return `${driverName}#${dataSource}@preAggregations`;
+  }
+
+  return `${driverName}#${dataSource}`;
+}
+
 export abstract class BaseDriver implements DriverInterface {
   private readonly testConnectionTimeoutValue: number = 10000;
 

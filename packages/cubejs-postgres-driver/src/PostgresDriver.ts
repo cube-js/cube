@@ -13,10 +13,11 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
+import { ConnectionError, PostgresError } from './errors';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
@@ -138,8 +139,9 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       ...config
     };
 
-    this.pool = new Pool<PgClient>('postgres', {
-      create: async () => this.createConnection(poolConfig),
+    const poolName = createPoolName('postgres', dataSource, preAggregations);
+    this.pool = new Pool<PgClient>(poolName, {
+      create: async () => this.createConnection(poolConfig, poolName),
       validate: async (client) => {
         if (client.isEnding() || client.isEnded()) {
           return false;
@@ -180,10 +182,15 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.enabled = true;
   }
 
-  protected async createConnection(poolConfig: PgClientConfig): Promise<PgClient> {
+  protected async createConnection(poolConfig: PgClientConfig, poolName: string): Promise<PgClient> {
     const client = new PgClient(poolConfig);
     client.on('error', (err) => this.databasePoolError(err));
-    await client.connect();
+
+    try {
+      await client.connect();
+    } catch (e: unknown) {
+      throw new ConnectionError(e as Error, poolName);
+    }
 
     return client;
   }
@@ -275,7 +282,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       await conn.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
       if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
-        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
+        throw new PostgresError(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`, { cause: e as Error });
       }
 
       throw e;
@@ -328,7 +335,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return fields.map((f) => {
       const postgresType = this.getPostgresTypeForField(f.dataTypeID);
       if (!postgresType) {
-        throw new Error(
+        throw new PostgresError(
           `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`
         );
       }
@@ -384,7 +391,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/buffer-writer.ts#L32-L37
     const length = (values?.length ?? 0);
     if (length >= 65536) {
-      throw new Error(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
+      throw new PostgresError(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
     }
   }
 
@@ -417,7 +424,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     if (quotedTableName.length > 63) {
-      throw new Error('PostgreSQL can not work with table names longer than 63 symbols. ' +
+      throw new PostgresError('PostgreSQL can not work with table names longer than 63 symbols. ' +
         `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
     }
     return super.createTable(quotedTableName, columns);
@@ -460,7 +467,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     indexesSql: IndexesSQL
   ) {
     if (!tableData.rows) {
-      throw new Error(`${this.constructor} driver supports only rows upload`);
+      throw new PostgresError(`${this.constructor} driver supports only rows upload`);
     }
 
     await this.createTable(table, columns);
