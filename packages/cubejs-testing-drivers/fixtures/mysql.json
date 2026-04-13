@@ -192,6 +192,7 @@
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ],
@@ -212,6 +213,7 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "SQL API: Timeshift measure from cube",
