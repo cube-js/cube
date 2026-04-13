@@ -233,11 +233,7 @@ impl DimensionSymbol {
     }
 
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
-        Box::new(
-            self.kind
-                .iter_sql_calls()
-                .chain(self.mask_sql.iter())
-        )
+        Box::new(self.kind.iter_sql_calls().chain(self.mask_sql.iter()))
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
