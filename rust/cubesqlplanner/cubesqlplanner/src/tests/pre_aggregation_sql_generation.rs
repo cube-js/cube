@@ -834,6 +834,47 @@ async fn test_multi_stage_count_distinct_sum_by_quarter_with_pre_aggregation() {
     }
 }
 
+// --- Multi-stage with separate pre-aggregations ---
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_separate_pre_aggregations() {
+    let schema = MockSchema::from_yaml_file("common/multi_stage_separate_pre_aggs_test.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count_reduce_status
+          - orders.revenue_reduce_status
+        cubestoreSupportMultistage: true
+    "};
+
+    let (_sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 2, "Expected 2 pre-aggregation usages");
+
+    let names: Vec<&str> = pre_aggrs
+        .iter()
+        .map(|u| u.pre_aggregation.name().as_str())
+        .collect();
+    assert!(names.contains(&"count_rollup"), "Expected count_rollup, got {:?}", names);
+    assert!(names.contains(&"revenue_rollup"), "Expected revenue_rollup, got {:?}", names);
+
+    if let Some(result) = ctx
+        .try_execute_pg(
+            query_yaml,
+            "multi_stage_separate_pre_aggs_tables.sql",
+        )
+        .await
+    {
+        insta::assert_snapshot!(
+            "multi_stage_separate_pre_aggs_pg_result",
+            result
+        );
+    }
+}
+
 // --- rollupJoin with calculated measures through view ---
 
 #[test]
