@@ -2689,5 +2689,14 @@ from
       `);
       expect(res.rows).toMatchSnapshot();
     });
+
+    executePg('SQL API: EXTRACT DOW from column reference in SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT MEASURE(BigECommerce.totalQuantity) as qty
+        FROM BigECommerce
+        WHERE EXTRACT(DOW FROM BigECommerce.orderDate) = 3
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
   });
 }
