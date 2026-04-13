@@ -2846,14 +2846,19 @@ export class BaseQuery {
     return R.pipe(
       R.map(f => f.getMembers()),
       R.flatten,
-      R.map(s => (
-        (cache || this.compilerCache).cache(
+      R.map(s => {
+        const memberPath = s.path() ? s.path().join('.') : null;
+        const hasSqlMask = memberPath &&
+          this.maskedMembers && this.maskedMembers.size > 0 &&
+          this.maskedMembers.has(memberPath) &&
+          s.definition()?.mask && typeof s.definition().mask === 'object' && s.definition().mask.sql;
+        return (cache || (hasSqlMask ? this.queryCache : this.compilerCache)).cache(
           ['collectFrom'].concat(methodCacheKey).concat(
-            s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
+            memberPath ? [memberPath] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
-        )
-      )),
+        );
+      }),
       R.unnest,
       R.uniq,
       R.filter(R.identity)
