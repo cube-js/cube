@@ -914,7 +914,6 @@ async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
         .expect("Expected revenue_rollup usage");
 
     // count_prev_month has time_shift prior 1 month, so date range should be shifted back
-    // TODO: currently time_shift is not propagated to date_range — fix in optimizer
     assert_eq!(
         count_usage.date_range,
         Some((

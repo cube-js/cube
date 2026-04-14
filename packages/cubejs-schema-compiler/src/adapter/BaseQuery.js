@@ -961,18 +961,7 @@ export class BaseQuery {
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
-      if (preAggResult) {
-        if (Array.isArray(preAggResult)) {
-          // Grouped usage info objects (multiple usages)
-          this.preAggregations.preAggregationUsageInfos = preAggResult;
-          const first = preAggResult[0];
-          this.preAggregations.preAggregationForQuery =
-            this.getPreAggregationByName(first.cubeName, first.preAggregationName);
-        } else {
-          // Single-usage: old-style pre-aggregation object
-          this.preAggregations.preAggregationForQuery = preAggResult;
-        }
-      }
+      this.applyNativePreAggResult(preAggResult);
       return [query, paramsArray];
     } catch (e) {
       if (e.name === 'TesseractUserError') {
@@ -1019,17 +1008,20 @@ export class BaseQuery {
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
     const [, , preAggResult] = buildResult;
-    if (preAggResult) {
-      if (Array.isArray(preAggResult)) {
-        // Grouped usage info objects (multiple usages)
-        this.preAggregations.preAggregationUsageInfos = preAggResult;
-        const first = preAggResult[0];
-        return this.getPreAggregationByName(first.cubeName, first.preAggregationName);
-      }
-      // Single-usage: old-style pre-aggregation object
-      return preAggResult;
+    this.applyNativePreAggResult(preAggResult);
+    return this.preAggregations.preAggregationForQuery;
+  }
+
+  applyNativePreAggResult(preAggResult) {
+    if (!preAggResult) return;
+    if (Array.isArray(preAggResult)) {
+      this.preAggregations.preAggregationUsageInfos = preAggResult;
+      const first = preAggResult[0];
+      this.preAggregations.preAggregationForQuery =
+        this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    } else {
+      this.preAggregations.preAggregationForQuery = preAggResult;
     }
-    return undefined;
   }
 
   allCubeMembers(path) {
