@@ -1411,6 +1411,29 @@ impl CachedTables {
         }
     }
 
+    pub fn upsert_table_by_id(&self, table_id: u64, entry: TablePath) {
+        let mut guard = self.tables.lock().unwrap();
+        let Some(cached) = guard.as_mut() else {
+            return;
+        };
+
+        let tables = Arc::make_mut(cached);
+        if let Some(idx) = tables.iter().position(|tp| tp.table.get_id() == table_id) {
+            tables.remove(idx);
+        }
+
+        // Paranoid check
+        if entry.table.get_row().is_ready() {
+            tables.push(entry);
+        } else {
+            debug_assert!(
+                false,
+                "upsert_table_by_id called with non-ready table (id: {})",
+                table_id
+            );
+        }
+    }
+
     pub fn remove_by_table_id_or_reset(&self, table_id: u64) {
         let mut guard = self.tables.lock().unwrap();
         let Some(cached) = guard.as_mut() else {
@@ -2199,6 +2222,7 @@ impl MetaStore for RocksMetaStore {
                     RocksMetaStore::drop_table_impl(exists_table.get_id(), db_ref.clone(), batch_pipe)?;
                 }
             }
+
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
@@ -2392,14 +2416,19 @@ impl MetaStore for RocksMetaStore {
             let entry =
                 rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?;
 
-            let table_to_move = entry.get_row().clone();
-            batch_pipe.set_post_commit_callback(move |metastore| {
-                metastore
-                    .cached_tables
-                    .update_table_by_id_or_reset(id, |tp| {
-                        tp.table = IdRow::new(tp.table.get_id(), table_to_move);
-                    });
-            });
+            if is_ready {
+                let schema = SchemaRocksTable::new(db_ref)
+                    .get_row_or_not_found(entry.get_row().get_schema_id())?;
+                let table_path = TablePath::new(Arc::new(schema), entry.clone());
+
+                batch_pipe.set_post_commit_callback(move |metastore| {
+                    metastore.cached_tables.upsert_table_by_id(id, table_path);
+                });
+            } else {
+                batch_pipe.set_post_commit_callback(move |metastore| {
+                    metastore.cached_tables.remove_by_table_id_or_reset(id);
+                });
+            }
 
             Ok(entry)
         })
