@@ -5013,14 +5013,11 @@ mod tests {
     use std::{env, fs};
 
     #[tokio::test]
-    async fn test_post_commit_callback_on_success() {
+    async fn test_post_commit_callback_on_success() -> Result<(), CubeError> {
         let config = Config::test("test_post_commit_callback_on_success");
-        let store_path = env::current_dir()
-            .unwrap()
-            .join("test_post_commit_callback_on_success-local");
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join("test_post_commit_callback_on_success-remote");
+        let store_path = env::current_dir()?.join("test_post_commit_callback_on_success-local");
+        let remote_store_path =
+            env::current_dir()?.join("test_post_commit_callback_on_success-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5029,8 +5026,7 @@ mod tests {
             store_path.join("metastore").as_path(),
             BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
             config.config_obj(),
-        )
-        .unwrap();
+        )?;
 
         // Test 1: callback fires on successful writing
         {
@@ -5043,8 +5039,7 @@ mod tests {
                     });
                     Ok(())
                 })
-                .await
-                .unwrap();
+                .await?;
 
             assert!(
                 called.load(std::sync::atomic::Ordering::SeqCst),
@@ -5074,6 +5069,8 @@ mod tests {
 
         let _ = fs::remove_dir_all(store_path);
         let _ = fs::remove_dir_all(remote_store_path);
+
+        Ok(())
     }
 
     #[test]
@@ -5090,10 +5087,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn schema_test() {
+    async fn schema_test() -> Result<(), CubeError> {
         let config = Config::test("schema_test");
-        let store_path = env::current_dir().unwrap().join("test-local");
-        let remote_store_path = env::current_dir().unwrap().join("test-remote");
+        let store_path = env::current_dir()?.join("test-local");
+        let remote_store_path = env::current_dir()?.join("test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5103,23 +5100,13 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            let schema_1 = meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            let schema_1 = meta_store.create_schema("foo".to_string(), false).await?;
             println!("New id: {}", schema_1.id);
-            let schema_2 = meta_store
-                .create_schema("bar".to_string(), false)
-                .await
-                .unwrap();
+            let schema_2 = meta_store.create_schema("bar".to_string(), false).await?;
             println!("New id: {}", schema_2.id);
-            let schema_3 = meta_store
-                .create_schema("boo".to_string(), false)
-                .await
-                .unwrap();
+            let schema_3 = meta_store.create_schema("boo".to_string(), false).await?;
             println!("New id: {}", schema_3.id);
 
             let schema_1_id = schema_1.id;
@@ -5131,34 +5118,16 @@ mod tests {
                 .await
                 .is_err());
 
-            assert_eq!(
-                meta_store.get_schema("foo".to_string()).await.unwrap(),
-                schema_1
-            );
-            assert_eq!(
-                meta_store.get_schema("bar".to_string()).await.unwrap(),
-                schema_2
-            );
-            assert_eq!(
-                meta_store.get_schema("boo".to_string()).await.unwrap(),
-                schema_3
-            );
+            assert_eq!(meta_store.get_schema("foo".to_string()).await?, schema_1);
+            assert_eq!(meta_store.get_schema("bar".to_string()).await?, schema_2);
+            assert_eq!(meta_store.get_schema("boo".to_string()).await?, schema_3);
+
+            assert_eq!(meta_store.get_schema_by_id(schema_1_id).await?, schema_1);
+            assert_eq!(meta_store.get_schema_by_id(schema_2_id).await?, schema_2);
+            assert_eq!(meta_store.get_schema_by_id(schema_3_id).await?, schema_3);
 
             assert_eq!(
-                meta_store.get_schema_by_id(schema_1_id).await.unwrap(),
-                schema_1
-            );
-            assert_eq!(
-                meta_store.get_schema_by_id(schema_2_id).await.unwrap(),
-                schema_2
-            );
-            assert_eq!(
-                meta_store.get_schema_by_id(schema_3_id).await.unwrap(),
-                schema_3
-            );
-
-            assert_eq!(
-                meta_store.get_schemas().await.unwrap(),
+                meta_store.get_schemas().await?,
                 vec![
                     IdRow::new(
                         1,
@@ -5184,8 +5153,7 @@ mod tests {
             assert_eq!(
                 meta_store
                     .rename_schema("foo".to_string(), "foo1".to_string())
-                    .await
-                    .unwrap(),
+                    .await?,
                 IdRow::new(
                     schema_1_id,
                     Schema {
@@ -5195,7 +5163,7 @@ mod tests {
             );
             assert!(meta_store.get_schema("foo".to_string()).await.is_err());
             assert_eq!(
-                meta_store.get_schema("foo1".to_string()).await.unwrap(),
+                meta_store.get_schema("foo1".to_string()).await?,
                 IdRow::new(
                     schema_1_id,
                     Schema {
@@ -5204,7 +5172,7 @@ mod tests {
                 )
             );
             assert_eq!(
-                meta_store.get_schema_by_id(schema_1_id).await.unwrap(),
+                meta_store.get_schema_by_id(schema_1_id).await?,
                 IdRow::new(
                     schema_1_id,
                     Schema {
@@ -5221,8 +5189,7 @@ mod tests {
             assert_eq!(
                 meta_store
                     .rename_schema_by_id(schema_2_id, "bar1".to_string())
-                    .await
-                    .unwrap(),
+                    .await?,
                 IdRow::new(
                     schema_2_id,
                     Schema {
@@ -5232,7 +5199,7 @@ mod tests {
             );
             assert!(meta_store.get_schema("bar".to_string()).await.is_err());
             assert_eq!(
-                meta_store.get_schema("bar1".to_string()).await.unwrap(),
+                meta_store.get_schema("bar1".to_string()).await?,
                 IdRow::new(
                     schema_2_id,
                     Schema {
@@ -5241,7 +5208,7 @@ mod tests {
                 )
             );
             assert_eq!(
-                meta_store.get_schema_by_id(schema_2_id).await.unwrap(),
+                meta_store.get_schema_by_id(schema_2_id).await?,
                 IdRow::new(
                     schema_2_id,
                     Schema {
@@ -5250,25 +5217,16 @@ mod tests {
                 )
             );
 
-            assert_eq!(
-                meta_store.delete_schema("bar1".to_string()).await.unwrap(),
-                ()
-            );
+            meta_store.delete_schema("bar1".to_string()).await?;
             assert!(meta_store.delete_schema("bar1".to_string()).await.is_err());
             assert!(meta_store.delete_schema("bar".to_string()).await.is_err());
 
             assert!(meta_store.get_schema("bar1".to_string()).await.is_err());
             assert!(meta_store.get_schema("bar".to_string()).await.is_err());
 
-            assert_eq!(
-                meta_store.delete_schema_by_id(schema_3_id).await.unwrap(),
-                ()
-            );
+            meta_store.delete_schema_by_id(schema_3_id).await?;
             assert!(meta_store.delete_schema_by_id(schema_2_id).await.is_err());
-            assert_eq!(
-                meta_store.delete_schema_by_id(schema_1_id).await.unwrap(),
-                ()
-            );
+            meta_store.delete_schema_by_id(schema_1_id).await?;
             assert!(meta_store.delete_schema_by_id(schema_1_id).await.is_err());
             assert!(meta_store.get_schema("foo".to_string()).await.is_err());
             assert!(meta_store.get_schema("foo1".to_string()).await.is_err());
@@ -5276,13 +5234,15 @@ mod tests {
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn non_empty_schema_test() {
+    async fn non_empty_schema_test() -> Result<(), CubeError> {
         let config = Config::test("non_empty_schema_test");
-        let store_path = env::current_dir().unwrap().join("test-local-ne-schema");
-        let remote_store_path = env::current_dir().unwrap().join("test-remote-ne-schema");
+        let store_path = env::current_dir()?.join("test-local-ne-schema");
+        let remote_store_path = env::current_dir()?.join("test-remote-ne-schema");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5291,18 +5251,11 @@ mod tests {
             store_path.join("metastore").as_path(),
             BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
             config.config_obj(),
-        )
-        .unwrap();
+        )?;
 
-        let schema1 = meta_store
-            .create_schema("foo".to_string(), false)
-            .await
-            .unwrap();
+        let schema1 = meta_store.create_schema("foo".to_string(), false).await?;
 
-        let _schema2 = meta_store
-            .create_schema("foo2".to_string(), false)
-            .await
-            .unwrap();
+        let _schema2 = meta_store.create_schema("foo2".to_string(), false).await?;
         let mut columns = Vec::new();
         columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
 
@@ -5327,8 +5280,7 @@ mod tests {
                 false,
                 None,
             )
-            .await
-            .unwrap();
+            .await?;
 
         let _table2 = meta_store
             .create_table(
@@ -5351,8 +5303,7 @@ mod tests {
                 false,
                 None,
             )
-            .await
-            .unwrap();
+            .await?;
 
         assert!(meta_store
             .delete_schema_by_id(schema1.get_id())
@@ -5362,13 +5313,15 @@ mod tests {
 
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn index_repair_test() {
+    async fn index_repair_test() -> Result<(), CubeError> {
         let config = Config::test("index_repair_test");
-        let store_path = env::current_dir().unwrap().join("index_repair_test-local");
-        let remote_store_path = env::current_dir().unwrap().join("index_repair_test-remote");
+        let store_path = env::current_dir()?.join("index_repair_test-local");
+        let remote_store_path = env::current_dir()?.join("index_repair_test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5378,19 +5331,14 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo".to_string(), false).await?;
 
             meta_store
                 .store
                 .db
-                .delete(RowKey::Table(TableId::Schemas, 1).to_bytes())
-                .unwrap();
+                .delete(RowKey::Table(TableId::Schemas, 1).to_bytes())?;
 
             let result = meta_store.get_schema("foo".to_string()).await;
             println!("{:?}", result);
@@ -5400,28 +5348,27 @@ mod tests {
 
             println!("Keys in db");
             for kv_res in iterator {
-                let (key, _) = kv_res.unwrap();
+                let (key, _) = kv_res?;
                 println!("Key {:?}", RowKey::from_bytes(&key));
             }
 
             sleep(Duration::from_millis(300));
 
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo".to_string(), false).await?;
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn table_test() {
+    async fn table_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
         let config = Config::test("table_test");
-        let store_path = env::current_dir().unwrap().join("test-table-local");
-        let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
+        let store_path = env::current_dir()?.join("test-table-local");
+        let remote_store_path = env::current_dir()?.join("test-table-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5430,13 +5377,9 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            let schema_1 = meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            let schema_1 = meta_store.create_schema("foo".to_string(), false).await?;
             let mut columns = Vec::new();
             columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
             columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
@@ -5476,8 +5419,7 @@ mod tests {
                     false,
                     None,
                 )
-                .await
-                .unwrap();
+                .await?;
             let table1_id = table1.id;
 
             assert!(schema_1.id == table1.get_row().get_schema_id());
@@ -5508,8 +5450,7 @@ mod tests {
             assert_eq!(
                 meta_store
                     .get_table("foo".to_string(), "boo".to_string())
-                    .await
-                    .unwrap(),
+                    .await?,
                 table1
             );
 
@@ -5521,25 +5462,22 @@ mod tests {
                 None,
                 None,
                 Index::index_type_default(),
-            )
-            .unwrap();
+            )?;
             let expected_res = vec![IdRow::new(1, expected_index)];
-            assert_eq!(meta_store.get_table_indexes(1).await.unwrap(), expected_res);
+            assert_eq!(meta_store.get_table_indexes(1).await?, expected_res);
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
     #[tokio::test]
-    async fn default_index_field_positions_test() {
+    async fn default_index_field_positions_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
         let config = Config::test("default_index_field_positions_test");
-        let store_path = env::current_dir()
-            .unwrap()
-            .join("test-default-index-positions-local");
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join("test-default-index-positions-remote");
+        let store_path = env::current_dir()?.join("test-default-index-positions-local");
+        let remote_store_path = env::current_dir()?.join("test-default-index-positions-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5548,13 +5486,9 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo".to_string(), false).await?;
             let mut columns = Vec::new();
             columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
             columns.push(Column::new("col2".to_string(), ColumnType::Bytes, 1));
@@ -5594,8 +5528,7 @@ mod tests {
                     false,
                     None,
                 )
-                .await
-                .unwrap();
+                .await?;
             let table1_id = table1.id;
 
             let expected_columns = vec![
@@ -5614,26 +5547,23 @@ mod tests {
                 None,
                 None,
                 Index::index_type_default(),
-            )
-            .unwrap();
+            )?;
             let expected_res = vec![IdRow::new(1, expected_index)];
-            assert_eq!(meta_store.get_table_indexes(1).await.unwrap(), expected_res);
+            assert_eq!(meta_store.get_table_indexes(1).await?, expected_res);
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn table_with_aggregate_index_test() {
+    async fn table_with_aggregate_index_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
         let config = Config::test("table_with_aggregate_index_test");
-        let store_path = env::current_dir()
-            .unwrap()
-            .join("test-table-aggregate-local");
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join("test-table-aggregate-remote");
+        let store_path = env::current_dir()?.join("test-table-aggregate-local");
+        let remote_store_path = env::current_dir()?.join("test-table-aggregate-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5642,13 +5572,9 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo".to_string(), false).await?;
             let mut columns = Vec::new();
             columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
             columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
@@ -5687,16 +5613,14 @@ mod tests {
                     false,
                     None,
                 )
-                .await
-                .unwrap();
+                .await?;
 
             let table_id = table1.get_id();
 
             assert_eq!(
                 meta_store
                     .get_table("foo".to_string(), "boo".to_string())
-                    .await
-                    .unwrap(),
+                    .await?,
                 table1
             );
 
@@ -5716,7 +5640,7 @@ mod tests {
                 )
             );
 
-            let indexes = meta_store.get_table_indexes(table_id).await.unwrap();
+            let indexes = meta_store.get_table_indexes(table_id).await?;
             assert_eq!(indexes.len(), 2);
             let ind = indexes
                 .into_iter()
@@ -5817,19 +5741,18 @@ mod tests {
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn table_with_default_index_no_measures_test() {
+    async fn table_with_default_index_no_measures_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
         let config = Config::test("table_with_default_index_no_measures_test");
-        let store_path = env::current_dir()
-            .unwrap()
-            .join("test-table-default-index-no-measure-local");
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join("test-table-default-index-no-measure-remote");
+        let store_path = env::current_dir()?.join("test-table-default-index-no-measure-local");
+        let remote_store_path =
+            env::current_dir()?.join("test-table-default-index-no-measure-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -5838,13 +5761,9 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo".to_string(), false).await?;
             let mut columns = Vec::new();
             columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
             columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
@@ -5878,20 +5797,18 @@ mod tests {
                     false,
                     None,
                 )
-                .await
-                .unwrap();
+                .await?;
 
             let table_id = table1.get_id();
 
             assert_eq!(
                 meta_store
                     .get_table("foo".to_string(), "boo".to_string())
-                    .await
-                    .unwrap(),
+                    .await?,
                 table1
             );
 
-            let indexes = meta_store.get_table_indexes(table_id).await.unwrap();
+            let indexes = meta_store.get_table_indexes(table_id).await?;
             assert_eq!(indexes.len(), 1);
             let ind = &indexes[0];
 
@@ -5915,10 +5832,12 @@ mod tests {
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn cold_start_test() {
+    async fn cold_start_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
         {
@@ -5928,76 +5847,60 @@ mod tests {
             let _ = fs::remove_dir_all(config.remote_dir());
 
             let services = config.configure().await;
-            services.start_processing_loops().await.unwrap();
+            services.start_processing_loops().await?;
             services
                 .meta_store
                 .create_schema("foo1".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .run_upload()
-                .await
-                .unwrap();
+                .await?;
             services
                 .meta_store
                 .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .upload_check_point()
-                .await
-                .unwrap();
+                .await?;
             services
                 .meta_store
                 .create_schema("bar".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .run_upload()
-                .await
-                .unwrap();
-            services.stop_processing_loops().await.unwrap();
+                .await?;
+            services.stop_processing_loops().await?;
 
             Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
-            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
         }
 
         {
             let config = Config::test("cold_start_test");
 
             let services2 = config.configure().await;
-            services2
-                .meta_store
-                .get_schema("foo1".to_string())
-                .await
-                .unwrap();
-            services2
-                .meta_store
-                .get_schema("foo".to_string())
-                .await
-                .unwrap();
-            services2
-                .meta_store
-                .get_schema("bar".to_string())
-                .await
-                .unwrap();
+            services2.meta_store.get_schema("foo1".to_string()).await?;
+            services2.meta_store.get_schema("foo".to_string()).await?;
+            services2.meta_store.get_schema("bar".to_string()).await?;
 
-            fs::remove_dir_all(config.local_dir()).unwrap();
-            fs::remove_dir_all(config.remote_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
+            fs::remove_dir_all(config.remote_dir())?;
         }
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn get_snapshots_list() {
+    async fn get_snapshots_list() -> Result<(), CubeError> {
         {
             let config = Config::test("get_snapshots_list");
 
@@ -6005,86 +5908,76 @@ mod tests {
             let _ = fs::remove_dir_all(config.remote_dir());
 
             let services = config.configure().await;
-            services.start_processing_loops().await.unwrap();
+            services.start_processing_loops().await?;
             let snapshots = services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .get_snapshots_list()
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(snapshots.len(), 0);
             services
                 .meta_store
                 .create_schema("foo1".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(snapshots.len(), 0);
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .upload_check_point()
-                .await
-                .unwrap();
+                .await?;
             let snapshots = services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .get_snapshots_list()
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(snapshots.len(), 1);
             assert!(snapshots[0].current);
             services
                 .meta_store
                 .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .upload_check_point()
-                .await
-                .unwrap();
+                .await?;
             let snapshots = services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .get_snapshots_list()
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(snapshots.len(), 2);
             assert!(!snapshots[0].current);
             assert!(snapshots[1].current);
             services
                 .meta_store
                 .create_schema("bar".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .upload_check_point()
-                .await
-                .unwrap();
+                .await?;
             let snapshots = services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .get_snapshots_list()
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(snapshots.len(), 3);
             assert!(!snapshots[0].current);
             assert!(!snapshots[1].current);
             assert!(snapshots[2].current);
-            services.stop_processing_loops().await.unwrap();
+            services.stop_processing_loops().await?;
 
             Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
-            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
         }
 
         {
@@ -6096,18 +5989,19 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .get_snapshots_list()
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(snapshots.len(), 3);
             assert!(!snapshots[0].current);
             assert!(!snapshots[1].current);
             assert!(snapshots[2].current);
-            fs::remove_dir_all(config.local_dir()).unwrap();
-            fs::remove_dir_all(config.remote_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
+            fs::remove_dir_all(config.remote_dir())?;
         }
+
+        Ok(())
     }
     #[tokio::test]
-    async fn set_current_snapshot() {
+    async fn set_current_snapshot() -> Result<(), CubeError> {
         init_test_logger().await;
 
         {
@@ -6117,27 +6011,24 @@ mod tests {
             let _ = fs::remove_dir_all(config.remote_dir());
 
             let services = config.configure().await;
-            services.start_processing_loops().await.unwrap();
+            services.start_processing_loops().await?;
             let rocks_meta_store = services.rocks_meta_store.as_ref().unwrap();
             services
                 .meta_store
                 .create_schema("foo1".to_string(), false)
-                .await
-                .unwrap();
-            rocks_meta_store.upload_check_point().await.unwrap();
+                .await?;
+            rocks_meta_store.upload_check_point().await?;
             services
                 .meta_store
                 .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
-            rocks_meta_store.upload_check_point().await.unwrap();
+                .await?;
+            rocks_meta_store.upload_check_point().await?;
             services
                 .meta_store
                 .create_schema("bar".to_string(), false)
-                .await
-                .unwrap();
-            rocks_meta_store.upload_check_point().await.unwrap();
-            let snapshots = services.meta_store.get_snapshots_list().await.unwrap();
+                .await?;
+            rocks_meta_store.upload_check_point().await?;
+            let snapshots = services.meta_store.get_snapshots_list().await?;
             assert_eq!(snapshots.len(), 3);
             assert!(!snapshots[0].current);
             assert!(!snapshots[1].current);
@@ -6170,42 +6061,33 @@ mod tests {
             services
                 .meta_store
                 .create_schema("bar_after".to_string(), false)
-                .await
-                .unwrap();
-            rocks_meta_store.upload_check_point().await.unwrap();
-            rocks_meta_store.run_upload().await.unwrap();
+                .await?;
+            rocks_meta_store.upload_check_point().await?;
+            rocks_meta_store.run_upload().await?;
 
-            let snapshots = services.meta_store.get_snapshots_list().await.unwrap();
+            let snapshots = services.meta_store.get_snapshots_list().await?;
             assert_eq!(snapshots.len(), 3);
             assert!(!snapshots[0].current);
             assert!(snapshots[1].current);
             assert!(!snapshots[2].current);
 
-            services.stop_processing_loops().await.unwrap();
+            services.stop_processing_loops().await?;
 
             Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
-            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
         }
 
         {
             let config = Config::test("set_current_snapshot");
 
             let services2 = config.configure().await;
-            let snapshots = services2.meta_store.get_snapshots_list().await.unwrap();
+            let snapshots = services2.meta_store.get_snapshots_list().await?;
             assert_eq!(snapshots.len(), 3);
             assert!(!snapshots[0].current);
             assert!(snapshots[1].current);
             assert!(!snapshots[2].current);
-            services2
-                .meta_store
-                .get_schema("foo1".to_string())
-                .await
-                .unwrap();
-            services2
-                .meta_store
-                .get_schema("foo".to_string())
-                .await
-                .unwrap();
+            services2.meta_store.get_schema("foo1".to_string()).await?;
+            services2.meta_store.get_schema("foo".to_string()).await?;
             assert!(services2
                 .meta_store
                 .get_schema("bar".to_string())
@@ -6223,45 +6105,34 @@ mod tests {
                 .await;
             assert!(res.is_ok());
             Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
-            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
         }
 
         {
             let config = Config::test("set_current_snapshot");
 
             let services3 = config.configure().await;
-            let snapshots = services3.meta_store.get_snapshots_list().await.unwrap();
+            let snapshots = services3.meta_store.get_snapshots_list().await?;
             assert_eq!(snapshots.len(), 3);
             assert!(!snapshots[0].current);
             assert!(!snapshots[1].current);
             assert!(snapshots[2].current);
-            services3
-                .meta_store
-                .get_schema("foo1".to_string())
-                .await
-                .unwrap();
-            services3
-                .meta_store
-                .get_schema("foo".to_string())
-                .await
-                .unwrap();
-            services3
-                .meta_store
-                .get_schema("bar".to_string())
-                .await
-                .unwrap();
+            services3.meta_store.get_schema("foo1".to_string()).await?;
+            services3.meta_store.get_schema("foo".to_string()).await?;
+            services3.meta_store.get_schema("bar".to_string()).await?;
             services3
                 .meta_store
                 .get_schema("bar_after".to_string())
-                .await
-                .unwrap();
-            fs::remove_dir_all(config.local_dir()).unwrap();
-            fs::remove_dir_all(config.remote_dir()).unwrap();
+                .await?;
+            fs::remove_dir_all(config.local_dir())?;
+            fs::remove_dir_all(config.remote_dir())?;
         }
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn upload_logs_without_snapshots() {
+    async fn upload_logs_without_snapshots() -> Result<(), CubeError> {
         let config = Config::test("upload_logs_without_snapshots");
 
         let _ = fs::remove_dir_all(config.local_dir());
@@ -6269,7 +6140,7 @@ mod tests {
 
         let services = config.configure().await;
 
-        services.start_processing_loops().await.unwrap();
+        services.start_processing_loops().await?;
         let rocks_meta_store = services.rocks_meta_store.as_ref().unwrap();
         let remote_fs = services
             .injector
@@ -6278,29 +6149,26 @@ mod tests {
         services
             .meta_store
             .create_schema("foo1".to_string(), false)
-            .await
-            .unwrap();
-        rocks_meta_store.run_upload().await.unwrap();
+            .await?;
+        rocks_meta_store.run_upload().await?;
         services
             .meta_store
             .create_schema("foo".to_string(), false)
-            .await
-            .unwrap();
-        rocks_meta_store.run_upload().await.unwrap();
-        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
+            .await?;
+        rocks_meta_store.run_upload().await?;
+        let uploaded = remote_fs.list("metastore-".to_string()).await?;
         assert!(uploaded.is_empty());
 
-        rocks_meta_store.upload_check_point().await.unwrap();
+        rocks_meta_store.upload_check_point().await?;
 
         services
             .meta_store
             .create_schema("bar".to_string(), false)
-            .await
-            .unwrap();
+            .await?;
 
-        rocks_meta_store.run_upload().await.unwrap();
+        rocks_meta_store.run_upload().await?;
 
-        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await?;
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -6309,9 +6177,9 @@ mod tests {
 
         assert_eq!(logs_uploaded.len(), 1);
 
-        rocks_meta_store.run_upload().await.unwrap();
+        rocks_meta_store.run_upload().await?;
 
-        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await?;
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -6323,12 +6191,11 @@ mod tests {
         services
             .meta_store
             .create_schema("bar2".to_string(), false)
-            .await
-            .unwrap();
+            .await?;
 
-        rocks_meta_store.run_upload().await.unwrap();
+        rocks_meta_store.run_upload().await?;
 
-        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await?;
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -6339,10 +6206,12 @@ mod tests {
 
         let _ = fs::remove_dir_all(config.local_dir());
         let _ = fs::remove_dir_all(config.remote_dir());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn log_replay_ordering() {
+    async fn log_replay_ordering() -> Result<(), CubeError> {
         init_test_logger().await;
 
         {
@@ -6352,27 +6221,24 @@ mod tests {
             let _ = fs::remove_dir_all(config.remote_dir());
 
             let services = config.configure().await;
-            services.start_processing_loops().await.unwrap();
+            services.start_processing_loops().await?;
             services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .upload_check_point()
-                .await
-                .unwrap();
+                .await?;
             for i in 0..100 {
                 let schema = services
                     .meta_store
                     .create_schema(format!("foo{}", i), false)
-                    .await
-                    .unwrap();
+                    .await?;
                 services
                     .rocks_meta_store
                     .as_ref()
                     .unwrap()
                     .run_upload()
-                    .await
-                    .unwrap();
+                    .await?;
                 let table = services
                     .meta_store
                     .create_table(
@@ -6395,62 +6261,51 @@ mod tests {
                         false,
                         None,
                     )
-                    .await
-                    .unwrap();
+                    .await?;
                 services
                     .rocks_meta_store
                     .as_ref()
                     .unwrap()
                     .run_upload()
-                    .await
-                    .unwrap();
-                services
-                    .meta_store
-                    .drop_table(table.get_id())
-                    .await
-                    .unwrap();
+                    .await?;
+                services.meta_store.drop_table(table.get_id()).await?;
                 services
                     .rocks_meta_store
                     .as_ref()
                     .unwrap()
                     .run_upload()
-                    .await
-                    .unwrap();
+                    .await?;
                 services
                     .meta_store
                     .delete_schema_by_id(schema.get_id())
-                    .await
-                    .unwrap();
+                    .await?;
                 services
                     .rocks_meta_store
                     .as_ref()
                     .unwrap()
                     .run_upload()
-                    .await
-                    .unwrap();
+                    .await?;
             }
-            services.stop_processing_loops().await.unwrap();
+            services.stop_processing_loops().await?;
             Delay::new(Duration::from_millis(2000)).await;
-            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
         }
 
         {
             let config = Config::test("log_replay_ordering");
 
             let services2 = config.configure().await;
-            let tables = services2
-                .meta_store
-                .get_tables_with_path(true)
-                .await
-                .unwrap();
+            let tables = services2.meta_store.get_tables_with_path(true).await?;
             assert_eq!(tables.len(), 0);
             let _ = fs::remove_dir_all(config.local_dir());
             let _ = fs::remove_dir_all(config.remote_dir());
         }
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn discard_logs() {
+    async fn discard_logs() -> Result<(), CubeError> {
         {
             let config = Config::test("discard_logs");
 
@@ -6458,19 +6313,17 @@ mod tests {
             let _ = fs::remove_dir_all(config.remote_dir());
 
             let services = config.configure().await;
-            services.start_processing_loops().await.unwrap();
+            services.start_processing_loops().await?;
             services
                 .meta_store
                 .create_schema("foo1".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             while !services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .has_pending_changes()
-                .await
-                .unwrap()
+                .await?
             {
                 futures_timer::Delay::new(Duration::from_millis(100)).await;
             }
@@ -6479,20 +6332,17 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .run_upload()
-                .await
-                .unwrap();
+                .await?;
             services
                 .meta_store
                 .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             while !services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .has_pending_changes()
-                .await
-                .unwrap()
+                .await?
             {
                 futures_timer::Delay::new(Duration::from_millis(100)).await;
             }
@@ -6501,20 +6351,17 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .upload_check_point()
-                .await
-                .unwrap();
+                .await?;
             services
                 .meta_store
                 .create_schema("bar".to_string(), false)
-                .await
-                .unwrap();
+                .await?;
             while !services
                 .rocks_meta_store
                 .as_ref()
                 .unwrap()
                 .has_pending_changes()
-                .await
-                .unwrap()
+                .await?
             {
                 futures_timer::Delay::new(Duration::from_millis(100)).await;
             }
@@ -6523,19 +6370,17 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .run_upload()
-                .await
-                .unwrap();
-            services.stop_processing_loops().await.unwrap();
+                .await?;
+            services.stop_processing_loops().await?;
 
             Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
-            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),
                 "metastore-".to_string(),
             )
-            .await
-            .unwrap();
-            let re = Regex::new(r"(\d+).flex").unwrap();
+            .await?;
+            let re = Regex::new(r"(\d+).flex")?;
             let last_log = list
                 .iter()
                 .filter(|f| re.captures(f.remote_path()).is_some())
@@ -6550,37 +6395,30 @@ mod tests {
             println!("Truncating {:?}", file_path);
             let file = std::fs::OpenOptions::new()
                 .write(true)
-                .open(file_path.clone())
-                .unwrap();
-            println!("Size {}", file.metadata().unwrap().len());
-            file.set_len(50).unwrap();
+                .open(file_path.clone())?;
+            println!("Size {}", file.metadata()?.len());
+            file.set_len(50)?;
         }
 
         {
             let config = Config::test("discard_logs");
 
             let services2 = config.configure().await;
-            services2
-                .meta_store
-                .get_schema("foo1".to_string())
-                .await
-                .unwrap();
-            services2
-                .meta_store
-                .get_schema("foo".to_string())
-                .await
-                .unwrap();
+            services2.meta_store.get_schema("foo1".to_string()).await?;
+            services2.meta_store.get_schema("foo".to_string()).await?;
 
-            fs::remove_dir_all(config.local_dir()).unwrap();
-            fs::remove_dir_all(config.remote_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir())?;
+            fs::remove_dir_all(config.remote_dir())?;
         }
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn swap_chunks() {
+    async fn swap_chunks() -> Result<(), CubeError> {
         let config = Config::test("swap_chunks");
-        let store_path = env::current_dir().unwrap().join("swap_chunks_test-local");
-        let remote_store_path = env::current_dir().unwrap().join("swap_chunks_test-remote");
+        let store_path = env::current_dir()?.join("swap_chunks_test-local");
+        let remote_store_path = env::current_dir()?.join("swap_chunks_test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -6589,12 +6427,8 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            )?;
+            meta_store.create_schema("foo".to_string(), false).await?;
             let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
             meta_store
                 .create_table(
@@ -6617,37 +6451,32 @@ mod tests {
                     false,
                     None,
                 )
-                .await
-                .unwrap();
-            let partition = meta_store.get_partition(1).await.unwrap();
+                .await?;
+            let partition = meta_store.get_partition(1).await?;
 
             //============= trying to swap same source chunks twice ==============
 
             let mut source_ids: Vec<u64> = Vec::new();
             let ch = meta_store
                 .create_chunk(partition.get_id(), 10, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             source_ids.push(ch.get_id());
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await?;
 
             let ch = meta_store
                 .create_chunk(partition.get_id(), 16, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             source_ids.push(ch.get_id());
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await?;
 
             let dest_chunk = meta_store
                 .create_chunk(partition.get_id(), 26, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(dest_chunk.get_row().active(), false);
 
             let dest_chunk2 = meta_store
                 .create_chunk(partition.get_id(), 26, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(dest_chunk2.get_row().active(), false);
 
             meta_store
@@ -6656,15 +6485,14 @@ mod tests {
                     vec![(dest_chunk.get_id(), Some(26))],
                     None,
                 )
-                .await
-                .unwrap();
+                .await?;
 
             for id in source_ids.iter() {
-                let ch = meta_store.get_chunk(id.to_owned()).await.unwrap();
+                let ch = meta_store.get_chunk(id.to_owned()).await?;
                 assert_eq!(ch.get_row().active(), false);
             }
 
-            let ch = meta_store.get_chunk(dest_chunk.get_id()).await.unwrap();
+            let ch = meta_store.get_chunk(dest_chunk.get_id()).await?;
             assert_eq!(ch.get_row().active(), true);
 
             meta_store
@@ -6680,17 +6508,15 @@ mod tests {
             let mut source_ids: Vec<u64> = Vec::new();
             let ch = meta_store
                 .create_chunk(partition.get_id(), 10, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             source_ids.push(ch.get_id());
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await?;
 
             let ch = meta_store
                 .create_chunk(partition.get_id(), 16, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             source_ids.push(ch.get_id());
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await?;
 
             meta_store
                 .swap_chunks(
@@ -6704,7 +6530,7 @@ mod tests {
                 );
 
             for id in source_ids.iter() {
-                let ch = meta_store.get_chunk(id.to_owned()).await.unwrap();
+                let ch = meta_store.get_chunk(id.to_owned()).await?;
                 assert_eq!(ch.get_row().active(), true);
             }
         }
@@ -6712,22 +6538,20 @@ mod tests {
         assert!(true);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn delete_old_snapshots() {
+    async fn delete_old_snapshots() -> Result<(), CubeError> {
         let metastore_snapshots_lifetime_secs = 1;
         let config = Config::test("delete_old_snapshots").update_config(|mut obj| {
             obj.metastore_snapshots_lifetime = metastore_snapshots_lifetime_secs;
             obj.minimum_metastore_snapshots_count = 2;
             obj
         });
-        let store_path = env::current_dir()
-            .unwrap()
-            .join("delete_old_snapshots-local");
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join("delete_old_snapshots-remote");
+        let store_path = env::current_dir()?.join("delete_old_snapshots-local");
+        let remote_store_path = env::current_dir()?.join("delete_old_snapshots-remote");
         let _ = fs::remove_dir_all(&store_path);
         let _ = fs::remove_dir_all(&remote_store_path);
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -6736,56 +6560,38 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
 
-            // let list = remote_fs.list("metastore-".to_owned()).await.unwrap();
+            // let list = remote_fs.list("metastore-".to_owned()).await?;
             // assert_eq!(0, list.len(), "remote fs list: {:?}", list);
 
             let uploaded =
-                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
-                    .await
-                    .unwrap();
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore").await?;
             assert_eq!(uploaded.len(), 0);
 
-            meta_store
-                .create_schema("foo1".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo1".to_string(), false).await?;
 
-            meta_store.upload_check_point().await.unwrap();
+            meta_store.upload_check_point().await?;
             let uploaded1 =
-                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
-                    .await
-                    .unwrap();
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore").await?;
 
             assert_eq!(uploaded1.len(), 1);
 
-            meta_store
-                .create_schema("foo2".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo2".to_string(), false).await?;
 
-            meta_store.upload_check_point().await.unwrap();
+            meta_store.upload_check_point().await?;
 
             let uploaded2 =
-                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
-                    .await
-                    .unwrap();
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore").await?;
 
             assert_eq!(uploaded2.len(), 2);
 
-            meta_store
-                .create_schema("foo3".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo3".to_string(), false).await?;
 
-            meta_store.upload_check_point().await.unwrap();
+            meta_store.upload_check_point().await?;
 
             let uploaded3 =
-                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
-                    .await
-                    .unwrap();
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore").await?;
 
             assert_eq!(
                 uploaded3.len(),
@@ -6794,21 +6600,16 @@ mod tests {
                 uploaded3.keys().join(", ")
             );
 
-            meta_store
-                .create_schema("foo4".to_string(), false)
-                .await
-                .unwrap();
+            meta_store.create_schema("foo4".to_string(), false).await?;
 
             tokio::time::sleep(Duration::from_millis(
                 metastore_snapshots_lifetime_secs * 1000 + 100,
             ))
             .await;
-            meta_store.upload_check_point().await.unwrap();
+            meta_store.upload_check_point().await?;
 
             let uploaded4 =
-                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
-                    .await
-                    .unwrap();
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore").await?;
 
             // Should have 2 remaining snapshots because 2 is the minimum.
             assert_eq!(uploaded4.len(), 2);
@@ -6816,17 +6617,15 @@ mod tests {
 
         let _ = fs::remove_dir_all(&store_path);
         let _ = fs::remove_dir_all(&remote_store_path);
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn swap_active_partitions() {
+    async fn swap_active_partitions() -> Result<(), CubeError> {
         let config = Config::test("swap_active_partitions");
-        let store_path = env::current_dir()
-            .unwrap()
-            .join("swap_active_partitions_test-local");
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join("swap_active_partitions_test-remote");
+        let store_path = env::current_dir()?.join("swap_active_partitions_test-local");
+        let remote_store_path = env::current_dir()?.join("swap_active_partitions_test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -6835,12 +6634,8 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
+            )?;
+            meta_store.create_schema("foo".to_string(), false).await?;
             let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
             meta_store
                 .create_table(
@@ -6863,29 +6658,25 @@ mod tests {
                     false,
                     None,
                 )
-                .await
-                .unwrap();
-            let partition = meta_store.get_partition(1).await.unwrap();
+                .await?;
+            let partition = meta_store.get_partition(1).await?;
 
             let mut source_chunks: Vec<IdRow<Chunk>> = Vec::new();
             let ch = meta_store
                 .create_chunk(partition.get_id(), 10, None, None, true)
-                .await
-                .unwrap();
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+                .await?;
+            meta_store.chunk_uploaded(ch.get_id()).await?;
             source_chunks.push(ch);
 
             let ch = meta_store
                 .create_chunk(partition.get_id(), 16, None, None, true)
-                .await
-                .unwrap();
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+                .await?;
+            meta_store.chunk_uploaded(ch.get_id()).await?;
             source_chunks.push(ch);
 
             let dest_partition = meta_store
                 .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
+                .await?;
 
             meta_store
                 .swap_active_partitions(
@@ -6893,34 +6684,22 @@ mod tests {
                     vec![(dest_partition.clone(), 10)],
                     vec![(26, (None, None), (None, None))],
                 )
-                .await
-                .unwrap();
+                .await?;
             assert_eq!(
-                meta_store
-                    .get_partition(1)
-                    .await
-                    .unwrap()
-                    .get_row()
-                    .is_active(),
+                meta_store.get_partition(1).await?.get_row().is_active(),
                 false
             );
             assert_eq!(
                 meta_store
                     .get_partition(dest_partition.get_id())
-                    .await
-                    .unwrap()
+                    .await?
                     .get_row()
                     .is_active(),
                 true
             );
             for c in source_chunks.iter() {
                 assert_eq!(
-                    meta_store
-                        .get_chunk(c.get_id())
-                        .await
-                        .unwrap()
-                        .get_row()
-                        .active(),
+                    meta_store.get_chunk(c.get_id()).await?.get_row().active(),
                     false
                 );
             }
@@ -6930,22 +6709,19 @@ mod tests {
             let mut source_chunks: Vec<IdRow<Chunk>> = Vec::new();
             let ch = meta_store
                 .create_chunk(partition.clone().get_id(), 10, None, None, true)
-                .await
-                .unwrap();
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+                .await?;
+            meta_store.chunk_uploaded(ch.get_id()).await?;
             source_chunks.push(ch);
 
             let ch = meta_store
                 .create_chunk(partition.get_id(), 16, None, None, true)
-                .await
-                .unwrap();
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+                .await?;
+            meta_store.chunk_uploaded(ch.get_id()).await?;
             source_chunks.push(ch);
 
             let dest_partition = meta_store
                 .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
+                .await?;
 
             match meta_store
                 .swap_active_partitions(
@@ -6967,27 +6743,23 @@ mod tests {
 
             let partition = meta_store
                 .get_active_partitions_by_index_id(1)
-                .await
-                .unwrap()
+                .await?
                 .first()
                 .unwrap()
                 .to_owned();
             let ch = meta_store
                 .create_chunk(partition.clone().get_id(), 10, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             source_chunks.push(ch);
 
             let ch = meta_store
                 .create_chunk(partition.get_id(), 16, None, None, true)
-                .await
-                .unwrap();
+                .await?;
             source_chunks.push(ch);
 
             let dest_partition = meta_store
                 .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
+                .await?;
 
             let dest_row_count = partition.get_row().main_table_row_count() + 26;
 
@@ -7010,23 +6782,20 @@ mod tests {
 
             let partition = meta_store
                 .get_active_partitions_by_index_id(1)
-                .await
-                .unwrap()
+                .await?
                 .first()
                 .unwrap()
                 .to_owned();
             let ch = meta_store
                 .create_chunk(partition.clone().get_id(), 10, None, None, true)
-                .await
-                .unwrap();
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+                .await?;
+            meta_store.chunk_uploaded(ch.get_id()).await?;
             source_chunks.push(ch);
 
             let ch = meta_store
                 .create_chunk(partition.get_id(), 16, None, None, true)
-                .await
-                .unwrap();
-            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+                .await?;
+            meta_store.chunk_uploaded(ch.get_id()).await?;
             source_chunks.push(ch);
 
             let dest_row_count = partition.get_row().main_table_row_count() + 26;
@@ -7049,13 +6818,15 @@ mod tests {
         assert!(true);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn job_priority_test() {
+    async fn job_priority_test() -> Result<(), CubeError> {
         let config = Config::test("job_priority_test");
-        let store_path = env::current_dir().unwrap().join("test-job-priority-local");
-        let remote_store_path = env::current_dir().unwrap().join("test-job-priority-remote");
+        let store_path = env::current_dir()?.join("test-job-priority-local");
+        let remote_store_path = env::current_dir()?.join("test-job-priority-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -7064,40 +6835,35 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .unwrap();
+            )?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 1),
                     JobType::InMemoryChunksCompaction,
                     "node1".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 1),
                     JobType::PartitionCompaction,
                     "node1".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 2),
                     JobType::PartitionCompaction,
                     "node1".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 3),
                     JobType::InMemoryChunksCompaction,
                     "node1".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
 
             meta_store
                 .add_job(Job::new(
@@ -7105,37 +6871,32 @@ mod tests {
                     JobType::PartitionCompaction,
                     "node2".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 12),
                     JobType::PartitionCompaction,
                     "node2".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 13),
                     JobType::InMemoryChunksCompaction,
                     "node2".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
             meta_store
                 .add_job(Job::new(
                     RowKey::Table(TableId::Partitions, 11),
                     JobType::InMemoryChunksCompaction,
                     "node2".to_string(),
                 ))
-                .await
-                .unwrap();
+                .await?;
 
             let job = meta_store
                 .start_processing_job("node1".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
             assert_eq!(
@@ -7145,8 +6906,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node1".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
             assert_eq!(
@@ -7156,8 +6916,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node1".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
             assert_eq!(
@@ -7167,8 +6926,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node1".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
             assert_eq!(
@@ -7178,8 +6936,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node2".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
             assert_eq!(
@@ -7189,8 +6946,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node2".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
             assert_eq!(
@@ -7200,8 +6956,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node2".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
             assert_eq!(
@@ -7211,8 +6966,7 @@ mod tests {
 
             let job = meta_store
                 .start_processing_job("node2".to_string(), false)
-                .await
-                .unwrap()
+                .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
             assert_eq!(
@@ -7222,6 +6976,8 @@ mod tests {
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
     }
 }
 

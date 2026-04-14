@@ -214,6 +214,12 @@ impl From<ParserError> for CubeError {
     }
 }
 
+impl From<regex::Error> for CubeError {
+    fn from(v: regex::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
 impl From<ParquetError> for CubeError {
     fn from(v: ParquetError) -> Self {
         CubeError::from_error(v.to_string())
