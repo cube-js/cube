@@ -211,11 +211,12 @@ export class PreAggregations {
 
     for (const usage of Object.values(usages)) {
       if (usage.dateRange) {
-        if (!minDate || usage.dateRange[0] < minDate) {
-          minDate = usage.dateRange[0];
+        const [from, to] = usage.dateRange;
+        if (!minDate || from < minDate) {
+          minDate = from;
         }
-        if (!maxDate || usage.dateRange[1] > maxDate) {
-          maxDate = usage.dateRange[1];
+        if (!maxDate || to > maxDate) {
+          maxDate = to;
         }
       }
     }
