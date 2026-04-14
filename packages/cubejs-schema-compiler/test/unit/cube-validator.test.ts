@@ -1616,6 +1616,7 @@ describe('Cube Validation', () => {
           ab2: { sql: () => 'bytes', type: 'sum', format: 'abbr_2' },
           acc: { sql: () => 'amount', type: 'sum', format: 'accounting' },
           acc0: { sql: () => 'amount', type: 'sum', format: 'accounting_0' },
+          ident: { sql: () => 'order_id', type: 'count', format: 'id' },
         },
         fileName: 'fileName',
       };
@@ -1638,6 +1639,7 @@ describe('Cube Validation', () => {
           bal: { sql: () => 'bal', type: 'number', format: 'accounting' },
           dec: { sql: () => 'dec', type: 'number', format: 'decimal_4' },
           dec2: { sql: () => 'dec2', type: 'number', format: 'decimal' },
+          ident: { sql: () => 'ident', type: 'number', format: 'id' },
         },
         fileName: 'fileName',
       };

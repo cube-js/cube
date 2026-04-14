@@ -1,6 +1,6 @@
 // Predefined named numeric formats and their d3-format specifiers.
 //
-// "number", "percent", "currency", and "id" (without _X suffix) are already handled
+// "number", "percent", and "currency" (without _X suffix) are already handled
 // as separate format types in the existing API contract. Converting them to named
 // formats here would be a breaking change. Only the _X suffixed variants are named.
 export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
@@ -52,6 +52,9 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   abbr_4: '.4s',
   abbr_5: '.5s',
   abbr_6: '.6s',
+
+  // id: grouped integer (no decimals)
+  id: '.0f',
 
   // accounting (negative in parens): (,.Xf
   // Alias to accounting_2

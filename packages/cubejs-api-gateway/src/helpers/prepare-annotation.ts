@@ -55,6 +55,7 @@ const STANDARD_FORMAT_SPECIFIERS: Record<string, { name: string; specifier: stri
   number: { name: 'number', specifier: ',.2f' },
   abbr: { name: 'abbr', specifier: '.2s' },
   accounting: { name: 'accounting', specifier: '(,.2f' },
+  id: { name: 'id', specifier: '.0f' },
 };
 
 const DEFAULT_FORMAT_DESCRIPTION: FormatDescription = {

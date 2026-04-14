@@ -368,6 +368,27 @@ describe('prepareAnnotation helpers', () => {
       });
     });
 
+    test('formatDescription for standard id format', () => {
+      const result = prepareAnnotation([{
+        config: ({
+          name: 'cube_name',
+          title: 'cube name',
+          measures: [{
+            name: 'cube_name.orderId',
+            type: 'number',
+            format: 'id',
+          }],
+        }) as { name: string; title: string; },
+      }], {
+        measures: ['cube_name.orderId'],
+      });
+
+      expect((result.measures['cube_name.orderId'] as any).formatDescription).toEqual({
+        name: 'id',
+        specifier: '.0f',
+      });
+    });
+
     test('formatDescription for named custom-numeric format', () => {
       const result = prepareAnnotation([{
         config: ({

@@ -239,8 +239,8 @@ describe('transformMetaExtended helpers', () => {
     expect(handledJoins?.length).toBe(2);
     expect(handledJoins?.[0].name).toBe('PlaygroundUsers');
     expect(handledJoins?.[1].name).toBe('IpEnrich');
-    expect(handledJoins?.[0].sql).toBe('`{CUBE}.id = {PlaygroundUsers.anonymous}`');
-    expect(handledJoins?.[1].sql).toBe('`{CUBE.email} = {IpEnrich.email}`');
+    expect(handledJoins?.[0].sql).toBe("'{CUBE}.id = {PlaygroundUsers.anonymous}'");
+    expect(handledJoins?.[1].sql).toBe("'{CUBE.email} = {IpEnrich.email}'");
   });
 
   test('transformPreAggregations', () => {
