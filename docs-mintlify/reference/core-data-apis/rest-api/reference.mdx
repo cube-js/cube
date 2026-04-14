@@ -243,6 +243,118 @@ Response:
 }
 ```
 
+## `{base_path}/v1/convert-query`
+
+Takes an API query in the specified input format and converts it to the specified
+output format. Currently, only conversion from [SQL API][ref-sql-api] queries to
+[REST API][ref-rest-api] queries is supported.
+
+This endpoint is useful for translating SQL API queries into equivalent REST API
+queries that can be used with the [`/v1/load`][self-load] endpoint.
+
+Request parameters (JSON body):
+
+| Parameter, type | Description | Required |
+| --- | --- | --- |
+| `input`, `string` | Input query format. Use `sql` for [SQL API][ref-sql-api] queries | ✅ Yes |
+| `output`, `string` | Output query format. Use `rest` for [REST API][ref-rest-api] queries | ✅ Yes |
+| `query`, `string` | Input query in the specified format | ✅ Yes |
+
+The response will contain a JSON object with the following properties:
+
+| Property, type | Description |
+| --- | --- |
+| `status`, `string` | Query conversion status, `ok` or `error` |
+| `query`, `object` | Converted query in the [REST API query format][ref-query-format] (only present when `status` is `ok`) |
+| `error`, `string` | Error message (only present when `status` is `error`) |
+
+An error will be returned if the input query can't be converted to the specified
+output format, e.g., if the SQL API query requires post-processing on top of
+REST API capabilities or if the SQL API query results in multiple REST API queries.
+
+### Example
+
+Request to convert a SQL API query to a REST API query:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "sql", "output": "rest", "query": "SELECT MEASURE(total_amount) FROM orders"}' \
+  http://localhost:4000/cubejs-api/v1/convert-query
+```
+
+Successful response:
+
+```json
+{
+  "status": "ok",
+  "query": {
+    "measures": [
+      "orders.total_amount"
+    ],
+    "dimensions": [],
+    "segments": [],
+    "order": []
+  }
+}
+```
+
+Request to convert a SQL API query with a filter:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "sql", "output": "rest", "query": "SELECT MEASURE(total_amount) FROM orders WHERE status = '\''foo'\''"}' \
+  http://localhost:4000/cubejs-api/v1/convert-query
+```
+
+Successful response:
+
+```json
+{
+  "status": "ok",
+  "query": {
+    "measures": [
+      "orders.total_amount"
+    ],
+    "dimensions": [],
+    "filters": [
+      {
+        "member": "orders.status",
+        "operator": "equals",
+        "values": ["foo"]
+      }
+    ],
+    "segments": [],
+    "order": []
+  }
+}
+```
+
+Request with a query that can't be converted:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "sql", "output": "rest", "query": "SELECT AVG(count) FROM (SELECT COUNT(*) AS count FROM orders) AS t"}' \
+  http://localhost:4000/cubejs-api/v1/convert-query
+```
+
+Error response:
+
+```json
+{
+  "status": "error",
+  "error": "Provided sql query can not be converted to rest query."
+}
+```
+
 ## `{base_path}/v1/meta`
 
 <Info>
@@ -883,4 +995,6 @@ Keep-Alive: timeout=5
 [ref-time-zone]: /reference/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
+[ref-query-format]: /reference/core-data-apis/rest-api/query-format
 [self-metadata-api]: #metadata-api
+[self-load]: #base_pathv1load
