@@ -3507,7 +3507,7 @@ export class BaseQuery {
   }
 
   escapeStringLiteral(str) {
-    return `'${str.replace(/'/g, "''")}'`;
+    return `'${str.replace(/'/g, '\'\'')}'`;
   }
 
   autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {
