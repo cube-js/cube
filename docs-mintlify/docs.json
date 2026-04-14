@@ -325,6 +325,7 @@
             "pages": [
               "admin/ai/index",
               "admin/ai/spaces-agents-models",
+              "admin/ai/bring-your-own-llm",
               "admin/ai/agent-rules",
               "admin/ai/bring-your-own-model",
               "admin/ai/memory-isolation",
