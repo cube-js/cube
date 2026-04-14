@@ -1392,8 +1392,9 @@ impl CachedTables {
             return;
         };
 
-        let tables = Arc::make_mut(cached);
-        let Some(idx) = tables.iter().position(|tp| tp.table.get_id() == table_id) else {
+        // Check existence on the immutable Arc first to avoid a wasted
+        // deep-clone from make_mut when the entry is absent.
+        let Some(idx) = cached.iter().position(|tp| tp.table.get_id() == table_id) else {
             log::warn!(
                 "Table with id: {} not found in cache, completely resetting cache",
                 table_id
@@ -1403,6 +1404,7 @@ impl CachedTables {
             return;
         };
 
+        let tables = Arc::make_mut(cached);
         f(&mut tables[idx]);
 
         // Remove entry if it's no longer ready (cache only stores ready tables)
