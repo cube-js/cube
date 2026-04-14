@@ -121,8 +121,7 @@ impl PreAggregationOptimizer {
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        let date_range =
-            Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts);
+        let date_range = Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts);
 
         if !query.multistage_members().is_empty() {
             // Nested multi-stage: recurse with full list
