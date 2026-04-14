@@ -94,15 +94,34 @@ fn spawn_creds_refresh_loop(
     region: Region,
     fs: &Arc<S3RemoteFs>,
 ) {
-    // Refresh credentials. TODO: use expiration time.
-    let refresh_every = refresh_interval_from_env();
+    // When AWS_WEB_IDENTITY_TOKEN_FILE is set and no explicit access keys are
+    // provided, the credential chain falls through to STS
+    // AssumeRoleWithWebIdentity.  STS session credentials expire (~1 hour), so
+    // we poll the token file for changes every 30 seconds instead of the
+    // default 3-hour static-credential refresh.
+    let token_file = env::var("AWS_WEB_IDENTITY_TOKEN_FILE").ok();
+    let is_web_identity = access_key.is_none() && token_file.is_some();
+
+    let refresh_every = if is_web_identity {
+        Duration::from_secs(30)
+    } else {
+        refresh_interval_from_env()
+    };
+
     if refresh_every.as_secs() == 0 {
         return;
     }
 
     let fs = Arc::downgrade(fs);
+    let mut last_modified = token_file
+        .as_ref()
+        .and_then(|f| std::fs::metadata(f).ok()?.modified().ok());
+
     std::thread::spawn(move || {
-        log::debug!("Started S3 credentials refresh loop");
+        log::debug!(
+            "Started S3 credentials refresh loop (web_identity={})",
+            is_web_identity
+        );
         loop {
             std::thread::sleep(refresh_every);
             let fs = match fs.upgrade() {
@@ -112,6 +131,19 @@ fn spawn_creds_refresh_loop(
                 }
                 Some(fs) => fs,
             };
+
+            // In web identity mode, only refresh when the token file changed.
+            if let Some(ref file) = token_file {
+                let current_modified = std::fs::metadata(file)
+                    .ok()
+                    .and_then(|m| m.modified().ok());
+                if current_modified == last_modified {
+                    continue;
+                }
+                last_modified = current_modified;
+                info!("Web identity token file changed, refreshing S3 credentials");
+            }
+
             let c = match Credentials::new(
                 access_key.as_deref(),
                 secret_key.as_deref(),
