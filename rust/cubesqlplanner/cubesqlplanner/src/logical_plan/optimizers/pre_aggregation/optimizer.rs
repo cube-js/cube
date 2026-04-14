@@ -121,8 +121,8 @@ impl PreAggregationOptimizer {
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        let date_range = Self::extract_date_range(&query.filter(), &self.query_tools);
-        let date_range = self.apply_time_shifts_to_date_range(date_range, time_shifts);
+        let date_range =
+            Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts);
 
         if !query.multistage_members().is_empty() {
             // Nested multi-stage: recurse with full list
@@ -212,6 +212,7 @@ impl PreAggregationOptimizer {
                             let date_range = Self::extract_date_range(
                                 &resolver_multiplied_measures.filter,
                                 &self.query_tools,
+                                &TimeShiftState::default(),
                             );
                             let pre_aggregation_source = self.make_pre_aggregation_source(
                                 pre_aggregation,
@@ -366,6 +367,7 @@ impl PreAggregationOptimizer {
     fn extract_date_range(
         filter: &LogicalFilter,
         query_tools: &Rc<QueryTools>,
+        time_shifts: &TimeShiftState,
     ) -> Option<(String, String)> {
         let precision = query_tools
             .base_tools()
@@ -376,45 +378,32 @@ impl PreAggregationOptimizer {
         for item in &filter.time_dimensions_filters {
             if let FilterItem::Item(base_filter) = item {
                 if let FilterOp::DateRange(date_range_op) = base_filter.operation() {
-                    if let Ok(formatted) = date_range_op.formatted_date_range(precision) {
-                        return Some(formatted);
+                    if let Ok((from, to)) = date_range_op.formatted_date_range(precision) {
+                        // Apply time shift for this dimension if present.
+                        // SQL renders `column + interval`, so actual data range is `date - interval`.
+                        if let Some(interval) = time_shifts
+                            .dimensions_shifts
+                            .get(&base_filter.member_name())
+                            .and_then(|s| s.interval.as_ref())
+                        {
+                            let tz = query_tools.timezone();
+                            let neg = -interval.clone();
+                            let shifted_from = QueryDateTime::from_date_str(tz, &from)
+                                .and_then(|dt| dt.add_interval(&neg))
+                                .map(|dt| dt.default_format())
+                                .unwrap_or(from);
+                            let shifted_to = QueryDateTime::from_date_str(tz, &to)
+                                .and_then(|dt| dt.add_interval(&neg))
+                                .map(|dt| dt.default_format())
+                                .unwrap_or(to);
+                            return Some((shifted_from, shifted_to));
+                        }
+                        return Some((from, to));
                     }
                 }
             }
         }
         None
-    }
-
-    /// Shift date_range by the negated time_shift interval.
-    /// The SQL renders `column + interval`, so to get the actual data range
-    /// we need `date_range - interval`.
-    fn apply_time_shifts_to_date_range(
-        &self,
-        date_range: Option<(String, String)>,
-        time_shifts: &TimeShiftState,
-    ) -> Option<(String, String)> {
-        let (from, to) = date_range?;
-        if time_shifts.is_empty() {
-            return Some((from, to));
-        }
-
-        // Use the first shift's interval (multi-stage typically has one time dimension)
-        let interval = time_shifts
-            .dimensions_shifts
-            .values()
-            .find_map(|shift| shift.interval.as_ref())?;
-
-        let tz = self.query_tools.timezone();
-        let shifted_from = QueryDateTime::from_date_str(tz, &from)
-            .and_then(|dt| dt.add_interval(&-interval.clone()))
-            .map(|dt| dt.default_format())
-            .unwrap_or(from);
-        let shifted_to = QueryDateTime::from_date_str(tz, &to)
-            .and_then(|dt| dt.add_interval(&-interval.clone()))
-            .map(|dt| dt.default_format())
-            .unwrap_or(to);
-
-        Some((shifted_from, shifted_to))
     }
 
     fn is_schema_and_filters_match(
