@@ -94,6 +94,7 @@
                   "docs/data-modeling/concepts/data-blending"
                 ]
               },
+              "docs/data-modeling/views",
               "docs/data-modeling/ai-context",
               {
                 "group": "Access Control",
