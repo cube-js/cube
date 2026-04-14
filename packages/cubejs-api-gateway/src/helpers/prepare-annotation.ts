@@ -28,10 +28,9 @@ type ConfigItem = {
   shortTitle: string;
   description: string;
   type: string;
-  format: any;
+  format: string;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
-  formatDescription?: { name: string; specifier: string; currency?: string };
   meta: any;
   drillMembers?: any[];
   drillMembersGrouped?: any;
@@ -65,7 +64,6 @@ const annotation = (
     type: config.type,
     format: config.format,
     currency: config.currency,
-    ...(config.formatDescription ? { formatDescription: config.formatDescription } : {}),
     meta: config.meta,
     ...(memberType === MemberTypeEnum.MEASURES ? {
       drillMembers: config.drillMembers,
