@@ -10,6 +10,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -30,6 +34,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -63,6 +71,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeA.count_a",
@@ -86,6 +98,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeB.count_b",
@@ -117,6 +133,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -150,6 +170,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeA.count_a",
@@ -173,6 +197,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeB.count_b",
@@ -204,6 +232,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -224,6 +256,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeB.id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -244,6 +280,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -277,6 +317,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeA.count_a",
@@ -300,6 +344,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeB.count_b",
@@ -331,6 +379,10 @@ Object {
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "granularities": undefined,
       "isVisible": true,
       "key": undefined,
@@ -364,6 +416,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeA.count_a",
@@ -387,6 +443,10 @@ Object {
         "measures": Array [],
       },
       "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
       "isVisible": true,
       "meta": Object {
         "key": "Meta.key for CubeB.count_b",

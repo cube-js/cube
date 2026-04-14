@@ -26,6 +26,28 @@ export type DimensionLinkFormat = { type: 'link'; label?: string };
 export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
 export type MeasureFormat = string | CustomNumericFormat;
 
+export type FormatDescription = {
+  name: string;
+  specifier: string;
+  currency?: string;
+};
+
+const STANDARD_FORMAT_SPECIFIERS: Record<string, { name: string; specifier: string }> = {
+  percent: { name: 'percent', specifier: '.2%' },
+  currency: { name: 'currency', specifier: '$,.2f' },
+  number: { name: 'number', specifier: ',.2f' },
+  abbr: { name: 'abbr', specifier: '.2s' },
+  accounting: { name: 'accounting', specifier: '(,.2f' },
+  id: { name: 'id', specifier: '.0f' },
+};
+
+const DEFAULT_FORMAT_DESCRIPTION: FormatDescription = {
+  name: 'number',
+  specifier: ',.2f',
+};
+
+const EXCLUDED_MEASURE_TYPES = new Set(['string', 'boolean', 'time']);
+
 // Extended types for cube symbols with all runtime properties
 export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   description?: string;
@@ -71,6 +93,7 @@ export type MeasureConfig = {
   description?: string;
   shortTitle: string;
   format?: MeasureFormat;
+  formatDescription?: FormatDescription;
   currency?: string;
   cumulativeTotal: boolean;
   cumulative: boolean;
@@ -95,6 +118,7 @@ export type DimensionConfig = {
   shortTitle: string;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  formatDescription?: FormatDescription;
   currency?: string;
   meta?: any;
   isVisible: boolean;
@@ -255,19 +279,23 @@ export class CubeToMetaTransformer implements CompilerInterface {
             ? this.isVisible(extendedDimDef, !extendedDimDef.primaryKey)
             : false;
           const granularitiesObj = extendedDimDef.granularities;
+          const dimType = this.dimensionDataType(extendedDimDef.type || 'string');
+          const dimFormat = this.transformDimensionFormat(extendedDimDef);
+          const dimCurrency = extendedDimDef.currency?.toUpperCase();
 
           return {
             name: `${cubeName}.${dimensionName}`,
             title: this.title(cubeTitle, nameToDimension, false),
-            type: this.dimensionDataType(extendedDimDef.type || 'string'),
+            type: dimType,
             description: extendedDimDef.description,
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               extendedDimDef.suggestFilterValues == null
                 ? true
                 : extendedDimDef.suggestFilterValues,
-            format: this.transformDimensionFormat(extendedDimDef),
-            currency: extendedDimDef.currency?.toUpperCase(),
+            format: dimFormat,
+            formatDescription: this.resolveFormatDescription(dimFormat, dimType, false, dimCurrency),
+            currency: dimCurrency,
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -380,13 +408,17 @@ export class CubeToMetaTransformer implements CompilerInterface {
       }
     }
 
+    const format = this.transformMeasureFormat(extendedMetricDef.format);
+    const currency = extendedMetricDef.currency?.toUpperCase();
+
     return {
       name,
       title: this.title(cubeTitle, nameToMetric, false),
       description: extendedMetricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
-      format: this.transformMeasureFormat(extendedMetricDef.format),
-      currency: extendedMetricDef.currency?.toUpperCase(),
+      format,
+      formatDescription: this.resolveFormatDescription(format, type, true, currency),
+      currency,
       cumulativeTotal: isCumulative,
       cumulative: isCumulative,
       type,
@@ -458,5 +490,44 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     // Custom numeric format (raw d3-format specifier)
     return { type: 'custom-numeric', value: formatOrName };
+  }
+
+  /**
+   * Resolves a format into a FormatDescription.
+   * - Measures: returned for all types except string, boolean, and time.
+   * - Dimensions: returned only for number type.
+   */
+  private resolveFormatDescription(
+    format: MeasureFormat | DimensionFormat | undefined,
+    type: string,
+    isMeasure: boolean,
+    currency?: string,
+  ): FormatDescription | undefined {
+    if (isMeasure) {
+      if (EXCLUDED_MEASURE_TYPES.has(type)) {
+        return undefined;
+      }
+    } else if (type !== 'number') {
+      return undefined;
+    }
+
+    let desc: FormatDescription;
+
+    if (format && typeof format === 'object' && format.type === 'custom-numeric') {
+      desc = {
+        name: format.alias || 'custom',
+        specifier: format.value,
+      };
+    } else if (typeof format === 'string' && STANDARD_FORMAT_SPECIFIERS[format]) {
+      desc = { ...STANDARD_FORMAT_SPECIFIERS[format] };
+    } else {
+      desc = { ...DEFAULT_FORMAT_DESCRIPTION };
+    }
+
+    if (currency) {
+      desc.currency = currency;
+    }
+
+    return desc;
   }
 }

@@ -20,90 +20,6 @@ type GranularityMeta = {
   origin?: string;
 };
 
-type CustomNumericFormat = {
-  type: 'custom-numeric';
-  value: string;
-  alias?: string;
-};
-
-type CustomTimeFormat = {
-  type: 'custom-time';
-  value: string;
-};
-
-type LinkFormat = {
-  type: 'link';
-  label: string;
-};
-
-type MemberFormat =
-  | string
-  | CustomNumericFormat
-  | CustomTimeFormat
-  | LinkFormat
-  | undefined;
-
-type FormatDescription = {
-  name: string;
-  specifier: string;
-  currency?: string;
-};
-
-const STANDARD_FORMAT_SPECIFIERS: Record<string, { name: string; specifier: string }> = {
-  percent: { name: 'percent', specifier: '.2%' },
-  currency: { name: 'currency', specifier: '$,.2f' },
-  number: { name: 'number', specifier: ',.2f' },
-  abbr: { name: 'abbr', specifier: '.2s' },
-  accounting: { name: 'accounting', specifier: '(,.2f' },
-  id: { name: 'id', specifier: '.0f' },
-};
-
-const DEFAULT_FORMAT_DESCRIPTION: FormatDescription = {
-  name: 'number',
-  specifier: ',.2f',
-};
-
-const EXCLUDED_MEASURE_TYPES = new Set(['string', 'boolean', 'time']);
-
-/**
- * Resolves a format value (string or object) into a FormatDescription.
- * - Measures: returned for all types except string, boolean, and time.
- * - Dimensions: returned only for number type.
- */
-function resolveFormatDescription(
-  format: MemberFormat,
-  type: string,
-  memberType: MemberType,
-  currency?: string,
-): FormatDescription | undefined {
-  if (memberType === MemberTypeEnum.MEASURES) {
-    if (EXCLUDED_MEASURE_TYPES.has(type)) {
-      return undefined;
-    }
-  } else if (type !== 'number') {
-    return undefined;
-  }
-
-  let desc: FormatDescription;
-
-  if (format && typeof format === 'object' && format.type === 'custom-numeric') {
-    desc = {
-      name: format.alias || 'custom',
-      specifier: format.value,
-    };
-  } else if (typeof format === 'string' && STANDARD_FORMAT_SPECIFIERS[format]) {
-    desc = { ...STANDARD_FORMAT_SPECIFIERS[format] };
-  } else {
-    desc = { ...DEFAULT_FORMAT_DESCRIPTION };
-  }
-
-  if (currency) {
-    desc.currency = currency;
-  }
-
-  return desc;
-}
-
 /**
  * Annotation item for cube's member.
  */
@@ -112,10 +28,10 @@ type ConfigItem = {
   shortTitle: string;
   description: string;
   type: string;
-  format: MemberFormat;
+  format: any;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
-  formatDescription?: FormatDescription;
+  formatDescription?: { name: string; specifier: string; currency?: string };
   meta: any;
   drillMembers?: any[];
   drillMembersGrouped?: any;
@@ -142,8 +58,6 @@ const annotation = (
   if (!config) {
     return undefined;
   }
-  const formatDescription = resolveFormatDescription(config.format, config.type, memberType, config.currency);
-
   return [typeof member === 'string' ? member : memberWithoutGranularity, {
     title: config.title,
     shortTitle: config.shortTitle,
@@ -151,7 +65,7 @@ const annotation = (
     type: config.type,
     format: config.format,
     currency: config.currency,
-    ...(formatDescription ? { formatDescription } : {}),
+    ...(config.formatDescription ? { formatDescription: config.formatDescription } : {}),
     meta: config.meta,
     ...(memberType === MemberTypeEnum.MEASURES ? {
       drillMembers: config.drillMembers,

@@ -241,7 +241,7 @@ describe('prepareAnnotation helpers', () => {
   });
 
   describe('formatDescription in annotations', () => {
-    test('default formatDescription for number measure without format', () => {
+    test('passes through formatDescription from config', () => {
       const result = prepareAnnotation([{
         config: ({
           name: 'cube_name',
@@ -249,6 +249,7 @@ describe('prepareAnnotation helpers', () => {
           measures: [{
             name: 'cube_name.count',
             type: 'number',
+            formatDescription: { name: 'number', specifier: ',.2f' },
           }],
         }) as { name: string; title: string; },
       }], {
@@ -261,28 +262,7 @@ describe('prepareAnnotation helpers', () => {
       });
     });
 
-    test('formatDescription for standard percent format', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.rate',
-            type: 'number',
-            format: 'percent',
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.rate'],
-      });
-
-      expect((result.measures['cube_name.rate'] as any).formatDescription).toEqual({
-        name: 'percent',
-        specifier: '.2%',
-      });
-    });
-
-    test('formatDescription for standard currency format with currency code', () => {
+    test('passes through formatDescription with currency', () => {
       const result = prepareAnnotation([{
         config: ({
           name: 'cube_name',
@@ -292,6 +272,7 @@ describe('prepareAnnotation helpers', () => {
             type: 'number',
             format: 'currency',
             currency: 'EUR',
+            formatDescription: { name: 'currency', specifier: '$,.2f', currency: 'EUR' },
           }],
         }) as { name: string; title: string; },
       }], {
@@ -305,133 +286,7 @@ describe('prepareAnnotation helpers', () => {
       });
     });
 
-    test('formatDescription for standard number format', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.total',
-            type: 'number',
-            format: 'number',
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.total'],
-      });
-
-      expect((result.measures['cube_name.total'] as any).formatDescription).toEqual({
-        name: 'number',
-        specifier: ',.2f',
-      });
-    });
-
-    test('formatDescription for standard abbr format', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.visits',
-            type: 'number',
-            format: 'abbr',
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.visits'],
-      });
-
-      expect((result.measures['cube_name.visits'] as any).formatDescription).toEqual({
-        name: 'abbr',
-        specifier: '.2s',
-      });
-    });
-
-    test('formatDescription for standard accounting format', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.balance',
-            type: 'number',
-            format: 'accounting',
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.balance'],
-      });
-
-      expect((result.measures['cube_name.balance'] as any).formatDescription).toEqual({
-        name: 'accounting',
-        specifier: '(,.2f',
-      });
-    });
-
-    test('formatDescription for standard id format', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.orderId',
-            type: 'number',
-            format: 'id',
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.orderId'],
-      });
-
-      expect((result.measures['cube_name.orderId'] as any).formatDescription).toEqual({
-        name: 'id',
-        specifier: '.0f',
-      });
-    });
-
-    test('formatDescription for named custom-numeric format', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.growth',
-            type: 'number',
-            format: { type: 'custom-numeric', value: '.2%', alias: 'percent_2' },
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.growth'],
-      });
-
-      expect((result.measures['cube_name.growth'] as any).formatDescription).toEqual({
-        name: 'percent_2',
-        specifier: '.2%',
-      });
-    });
-
-    test('formatDescription for custom d3-format specifier (no alias)', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.custom',
-            type: 'number',
-            format: { type: 'custom-numeric', value: '$,.0f' },
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.custom'],
-      });
-
-      expect((result.measures['cube_name.custom'] as any).formatDescription).toEqual({
-        name: 'custom',
-        specifier: '$,.0f',
-      });
-    });
-
-    test('no formatDescription for string dimension', () => {
+    test('omits formatDescription when not in config', () => {
       const result = prepareAnnotation([{
         config: ({
           name: 'cube_name',
@@ -446,25 +301,6 @@ describe('prepareAnnotation helpers', () => {
       });
 
       expect((result.dimensions['cube_name.label'] as any).formatDescription).toBeUndefined();
-    });
-
-    test('default formatDescription for measure without explicit type', () => {
-      const result = prepareAnnotation([{
-        config: ({
-          name: 'cube_name',
-          title: 'cube name',
-          measures: [{
-            name: 'cube_name.bar',
-          }],
-        }) as { name: string; title: string; },
-      }], {
-        measures: ['cube_name.bar'],
-      });
-
-      expect((result.measures['cube_name.bar'] as any).formatDescription).toEqual({
-        name: 'number',
-        specifier: ',.2f',
-      });
     });
   });
 });
