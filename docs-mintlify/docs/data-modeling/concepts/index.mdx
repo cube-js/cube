@@ -3,11 +3,13 @@ title: Concepts
 description: Learn foundational OLAP concepts like cubes, dimensions, measures, and joins used in Cube data modeling.
 ---
 
- Concepts
+Cube's key concepts are [cubes](#cubes), [views](#views), and members
+([measures](#measures), [dimensions](#dimensions)). This page is intended
+for both newcomers and regular users to refresh their understanding.
 
-Cube borrows a lot of terminology from [OLAP
-theory][wiki-olap], and this document is intended for both newcomers and regular
-users to refresh their understanding.
+<Frame>
+  <img src="https://lgo0ecceic.ucarecd.net/cdfe8858-f01d-4c25-af32-26502db62f1c/" />
+</Frame>
 
 We'll use a sample e-commerce database with two tables, `orders` and
 `line_items` to illustrate the concepts throughout this page:
@@ -135,10 +137,6 @@ _Views_ sit on top of the data graph of cubes and create a facade of your whole
 data model with which data consumers can interact. They are useful for defining
 metrics, managing governance and data access, and controlling ambiguous join
 paths.
-
-<Frame>
-  <img src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
-</Frame>
 
 Views do **not** define their own members. Instead, they reference cubes by
 specific join paths and include their members.
@@ -834,7 +832,7 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-subquery-dimensions]: /docs/data-modeling/concepts/calculated-members#subquery-dimensions
 [ref-calculated-measures]: /docs/data-modeling/concepts/calculated-members#calculated-measures
 [ref-working-with-joins]: /docs/data-modeling/concepts/working-with-joins
-[wiki-olap]: https://en.wikipedia.org/wiki/Online_analytical_processing
+
 [wiki-view-sql]: https://en.wikipedia.org/wiki/View_(SQL)
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
 [ref-syntax-references]: /docs/data-modeling/syntax#references
