@@ -91,10 +91,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             .query_tools
             .build_sql_and_params(&sql, true, &templates)?;
 
-        let has_multiple_usages = usages.len() > 1;
-
         // For single usage, strip __usage_N suffix from SQL to maintain backward compat
-        let final_sql = if !has_multiple_usages && usages.len() == 1 {
+        let final_sql = if usages.len() == 1 {
             result_sql.replace(&format!("__usage_{}", usages[0].index), "")
         } else {
             result_sql
@@ -104,7 +102,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         res.set(0, final_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
 
-        if has_multiple_usages {
+        if usages.len() > 1 {
             // Multiple usages: group by (cubeName, name), return array of grouped infos
             let grouped = Self::group_usages(&usages);
             res.set(2, grouped.to_native(self.context.clone())?)?;
