@@ -30,6 +30,8 @@ const STANDARD_FORMAT_SPECIFIERS: Record<string, { name: string; specifier: stri
   percent: { name: 'percent', specifier: '.2%' },
   currency: { name: 'currency', specifier: '$,.2f' },
   number: { name: 'number', specifier: ',.2f' },
+  abbr: { name: 'abbr', specifier: '.2s' },
+  accounting: { name: 'accounting', specifier: '(,.2f' },
 };
 
 const DEFAULT_FORMAT_DESCRIPTION: FormatDescription = {

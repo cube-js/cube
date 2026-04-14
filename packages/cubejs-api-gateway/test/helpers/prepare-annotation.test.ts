@@ -330,6 +330,48 @@ describe('prepareAnnotation helpers', () => {
       });
     });
 
+    test('formatDescription for standard abbr format', () => {
+      const result = prepareAnnotation([{
+        config: ({
+          name: 'cube_name',
+          title: 'cube name',
+          measures: [{
+            name: 'cube_name.visits',
+            type: 'number',
+            format: 'abbr',
+          }],
+        }) as { name: string; title: string; },
+      }], {
+        measures: ['cube_name.visits'],
+      });
+
+      expect((result.measures['cube_name.visits'] as any).formatDescription).toEqual({
+        name: 'abbr',
+        specifier: '.2s',
+      });
+    });
+
+    test('formatDescription for standard accounting format', () => {
+      const result = prepareAnnotation([{
+        config: ({
+          name: 'cube_name',
+          title: 'cube name',
+          measures: [{
+            name: 'cube_name.balance',
+            type: 'number',
+            format: 'accounting',
+          }],
+        }) as { name: string; title: string; },
+      }], {
+        measures: ['cube_name.balance'],
+      });
+
+      expect((result.measures['cube_name.balance'] as any).formatDescription).toEqual({
+        name: 'accounting',
+        specifier: '(,.2f',
+      });
+    });
+
     test('formatDescription for named custom-numeric format', () => {
       const result = prepareAnnotation([{
         config: ({
