@@ -305,9 +305,11 @@ export class PreAggregationPartitionRangeLoader {
         usageTargetTableNames = {};
         for (const [suffix, usageInfo] of Object.entries(this.preAggregation.usageMapping)) {
           if (usageInfo.dateRange && this.preAggregation.partitionGranularity) {
-            // Load partition ranges specific to this usage's dateRange
+            // Load partition ranges specific to this usage's dateRange.
+            // Use partitionRange (generated locally via timeSeries, always in DEFAULT_TS_FORMAT)
+            // instead of buildRangeEnd (from DB, may include Z suffix depending on driver timestampFormat).
             const usageDateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
-              [loadResults[0]?.buildRangeEnd ? loadResults[0].partitionRange?.[0] : null, loadResults[loadResults.length - 1]?.buildRangeEnd || null] as QueryDateRange,
+              [loadResults[0]?.partitionRange?.[0] || null, loadResults[loadResults.length - 1]?.partitionRange?.[1] || null] as QueryDateRange,
               usageInfo.dateRange as QueryDateRange,
             );
             if (usageDateRange) {
