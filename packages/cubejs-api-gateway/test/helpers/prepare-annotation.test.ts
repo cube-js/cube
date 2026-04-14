@@ -157,14 +157,12 @@ describe('prepareAnnotation helpers', () => {
       'cube_name.member': {
         description: undefined,
         format: undefined,
-        formatDescription: { name: 'number', specifier: ',.2f' },
         meta: undefined,
         shortTitle: undefined,
         title: undefined,
         type: undefined,
       }
     });
-
 
     // query timeDimensions
     expect(
@@ -186,7 +184,6 @@ describe('prepareAnnotation helpers', () => {
       'cube_name.member': {
         description: undefined,
         format: undefined,
-        formatDescription: { name: 'number', specifier: ',.2f' },
         meta: undefined,
         shortTitle: undefined,
         title: undefined,
@@ -195,7 +192,6 @@ describe('prepareAnnotation helpers', () => {
       'cube_name.member.day': {
         description: undefined,
         format: undefined,
-        formatDescription: { name: 'number', specifier: ',.2f' },
         meta: undefined,
         shortTitle: undefined,
         title: undefined,
@@ -414,7 +410,7 @@ describe('prepareAnnotation helpers', () => {
       });
     });
 
-    test('default formatDescription for string dimension without format', () => {
+    test('no formatDescription for string dimension', () => {
       const result = prepareAnnotation([{
         config: ({
           name: 'cube_name',
@@ -428,13 +424,10 @@ describe('prepareAnnotation helpers', () => {
         dimensions: ['cube_name.label'],
       });
 
-      expect((result.dimensions['cube_name.label'] as any).formatDescription).toEqual({
-        name: 'number',
-        specifier: ',.2f',
-      });
+      expect((result.dimensions['cube_name.label'] as any).formatDescription).toBeUndefined();
     });
 
-    test('default formatDescription for member without type or format', () => {
+    test('default formatDescription for measure without explicit type', () => {
       const result = prepareAnnotation([{
         config: ({
           name: 'cube_name',
@@ -453,5 +446,4 @@ describe('prepareAnnotation helpers', () => {
       });
     });
   });
-
 });

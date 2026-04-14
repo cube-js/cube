@@ -1276,7 +1276,7 @@ describe('API Gateway', () => {
       const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
         // Simulate writing error to the stream
         stream.write(`${JSON.stringify({
-          error: "Continue wait"
+          error: 'Continue wait'
         })}\n`);
         stream.end();
       });

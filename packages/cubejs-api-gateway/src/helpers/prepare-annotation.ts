@@ -39,14 +39,27 @@ const DEFAULT_FORMAT_DESCRIPTION: FormatDescription = {
   specifier: ',.2f',
 };
 
+const EXCLUDED_MEASURE_TYPES = new Set(['string', 'boolean', 'time']);
+
 /**
  * Resolves a format value (string or object) into a FormatDescription.
- * Always returns a description, falling back to the default number format.
+ * - Measures: returned for all types except string, boolean, and time.
+ * - Dimensions: returned only for number type.
  */
 function resolveFormatDescription(
   format: any,
+  type: string,
+  memberType: MemberType,
   currency?: string,
-): FormatDescription {
+): FormatDescription | undefined {
+  if (memberType === MemberTypeEnum.MEASURES) {
+    if (EXCLUDED_MEASURE_TYPES.has(type)) {
+      return undefined;
+    }
+  } else if (type !== 'number') {
+    return undefined;
+  }
+
   let desc: FormatDescription;
 
   if (format && typeof format === 'object' && format.type === 'custom-numeric') {
@@ -78,7 +91,7 @@ type ConfigItem = {
   format: string;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
-  formatDescription: FormatDescription;
+  formatDescription?: FormatDescription;
   meta: any;
   drillMembers?: any[];
   drillMembersGrouped?: any;
@@ -105,7 +118,7 @@ const annotation = (
   if (!config) {
     return undefined;
   }
-  const formatDescription = resolveFormatDescription(config.format, config.currency);
+  const formatDescription = resolveFormatDescription(config.format, config.type, memberType, config.currency);
 
   return [typeof member === 'string' ? member : memberWithoutGranularity, {
     title: config.title,
@@ -114,7 +127,7 @@ const annotation = (
     type: config.type,
     format: config.format,
     currency: config.currency,
-    formatDescription,
+    ...(formatDescription ? { formatDescription } : {}),
     meta: config.meta,
     ...(memberType === MemberTypeEnum.MEASURES ? {
       drillMembers: config.drillMembers,

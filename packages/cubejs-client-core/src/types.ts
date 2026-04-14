@@ -51,7 +51,7 @@ export type Annotation = {
   meta?: any;
   format?: DimensionFormat | MeasureFormat;
   /** Resolved format description with the predefined name and d3-format specifier */
-  formatDescription: FormatDescription;
+  formatDescription?: FormatDescription;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
   drillMembers?: any[];
