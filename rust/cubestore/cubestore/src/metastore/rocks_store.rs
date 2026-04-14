@@ -1034,7 +1034,7 @@ impl RocksStore {
             + 'static,
         R: Send + Sync + 'static,
     {
-        self.write_operation_impl::<F, R, ()>(&self.rw_loop_default_cf, op_name, f, None)
+        self.write_operation_impl::<F, R, ()>(&self.rw_loop_default_cf, op_name, f, ())
             .await
     }
 
@@ -1043,7 +1043,7 @@ impl RocksStore {
         rw_loop: &RocksStoreRWLoop,
         op_name: &'static str,
         f: F,
-        store: Option<S>,
+        store: S,
     ) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>, &mut BatchPipe<'a, S>) -> Result<R, CubeError>
@@ -1082,9 +1082,7 @@ impl RocksStore {
                     Ok(res) => {
                         let (events, callback) = batch.batch_write_rows()?;
                         if let Some(cb) = callback {
-                            if let Some(ref s) = store {
-                                cb(s);
-                            }
+                            cb(&store);
                         }
                         tx.send(Ok((res, events))).map_err(|_| {
                             CubeError::internal(format!(

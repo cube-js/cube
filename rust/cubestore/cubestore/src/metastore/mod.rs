@@ -1526,12 +1526,7 @@ impl RocksMetaStore {
         R: Send + Sync + 'static,
     {
         self.store
-            .write_operation_impl(
-                &self.store.rw_loop_default_cf,
-                op_name,
-                f,
-                Some(self.clone()),
-            )
+            .write_operation_impl(&self.store.rw_loop_default_cf, op_name, f, self.clone())
             .await
     }
 

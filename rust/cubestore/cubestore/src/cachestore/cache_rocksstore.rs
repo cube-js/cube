@@ -505,7 +505,7 @@ impl RocksCacheStore {
         R: Send + Sync + 'static,
     {
         self.store
-            .write_operation_impl::<F, R, ()>(&self.rw_loop_queue_cf, op_name, f, None)
+            .write_operation_impl::<F, R, ()>(&self.rw_loop_queue_cf, op_name, f, ())
             .await
     }
 
