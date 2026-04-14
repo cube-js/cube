@@ -20,6 +20,29 @@ type GranularityMeta = {
   origin?: string;
 };
 
+type CustomNumericFormat = {
+  type: 'custom-numeric';
+  value: string;
+  alias?: string;
+};
+
+type CustomTimeFormat = {
+  type: 'custom-time';
+  value: string;
+};
+
+type LinkFormat = {
+  type: 'link';
+  label: string;
+};
+
+type MemberFormat =
+  | string
+  | CustomNumericFormat
+  | CustomTimeFormat
+  | LinkFormat
+  | undefined;
+
 type FormatDescription = {
   name: string;
   specifier: string;
@@ -47,7 +70,7 @@ const EXCLUDED_MEASURE_TYPES = new Set(['string', 'boolean', 'time']);
  * - Dimensions: returned only for number type.
  */
 function resolveFormatDescription(
-  format: any,
+  format: MemberFormat,
   type: string,
   memberType: MemberType,
   currency?: string,
@@ -88,7 +111,7 @@ type ConfigItem = {
   shortTitle: string;
   description: string;
   type: string;
-  format: string;
+  format: MemberFormat;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
   formatDescription?: FormatDescription;
