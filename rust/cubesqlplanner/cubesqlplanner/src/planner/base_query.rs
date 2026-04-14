@@ -159,6 +159,12 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             );
         }
 
-        groups.into_values().collect()
+        let mut result: Vec<_> = groups.into_values().collect();
+        result.sort_by(|a, b| {
+            a.cube_name
+                .cmp(&b.cube_name)
+                .then(a.pre_aggregation_name.cmp(&b.pre_aggregation_name))
+        });
+        result
     }
 }
