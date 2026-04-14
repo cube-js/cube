@@ -1090,100 +1090,7 @@ cubes:
       expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2s', alias: 'abbr' });
     });
 
-    it('measure formatDescription with named format', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
-      cubes:
-      - name: Orders
-        sql: "select * from tbl"
-        dimensions:
-        - name: id
-          sql: id
-          type: number
-          primary_key: true
-        measures:
-        - name: total_amount
-          sql: amount
-          type: sum
-          format: accounting_2
-        - name: bytes
-          sql: bytes
-          type: sum
-          format: abbr_3
-      `);
-
-      await compiler.compile();
-
-      const { measures } = metaTransformer.cubes[0].config;
-      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
-      expect(totalAmount!.formatDescription).toEqual({ name: 'accounting_2', specifier: '(,.2f' });
-
-      const bytes = measures.find((m) => m.name === 'Orders.bytes');
-      expect(bytes!.formatDescription).toEqual({ name: 'abbr_3', specifier: '.3s' });
-    });
-
-    it('measure formatDescription with standard format and currency', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
-      cubes:
-      - name: Orders
-        sql: "select * from tbl"
-        dimensions:
-        - name: id
-          sql: id
-          type: number
-          primary_key: true
-        measures:
-        - name: revenue
-          sql: amount
-          type: sum
-          format: currency
-          currency: eur
-        - name: rate
-          sql: rate
-          type: number
-          format: percent
-        - name: count
-          sql: id
-          type: count
-      `);
-
-      await compiler.compile();
-
-      const { measures } = metaTransformer.cubes[0].config;
-      const revenue = measures.find((m) => m.name === 'Orders.revenue');
-      expect(revenue!.formatDescription).toEqual({ name: 'currency', specifier: '$,.2f', currency: 'EUR' });
-
-      const rate = measures.find((m) => m.name === 'Orders.rate');
-      expect(rate!.formatDescription).toEqual({ name: 'percent', specifier: '.2%' });
-
-      const count = measures.find((m) => m.name === 'Orders.count');
-      expect(count!.formatDescription).toEqual({ name: 'number', specifier: ',.2f' });
-    });
-
-    it('measure formatDescription with custom d3 specifier', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
-      cubes:
-      - name: Orders
-        sql: "select * from tbl"
-        dimensions:
-        - name: id
-          sql: id
-          type: number
-          primary_key: true
-        measures:
-        - name: total_amount
-          sql: amount
-          type: sum
-          format: "$,.0f"
-      `);
-
-      await compiler.compile();
-
-      const { measures } = metaTransformer.cubes[0].config;
-      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
-      expect(totalAmount!.formatDescription).toEqual({ name: 'custom', specifier: '$,.0f' });
-    });
-
-    it('dimension formatDescription only for number type', async () => {
+    it('formatDescription for all format variants', async () => {
       const { compiler, metaTransformer } = prepareYamlCompiler(`
       cubes:
       - name: Orders
@@ -1203,46 +1110,68 @@ cubes:
         - name: created_at
           sql: created_at
           type: time
-      `);
-
-      await compiler.compile();
-
-      const { dimensions } = metaTransformer.cubes[0].config;
-      const price = dimensions.find((d) => d.name === 'Orders.price');
-      expect(price!.formatDescription).toEqual({ name: 'currency_1', specifier: '$,.1f' });
-
-      const status = dimensions.find((d) => d.name === 'Orders.status');
-      expect(status!.formatDescription).toBeUndefined();
-
-      const createdAt = dimensions.find((d) => d.name === 'Orders.created_at');
-      expect(createdAt!.formatDescription).toBeUndefined();
-
-      const id = dimensions.find((d) => d.name === 'Orders.id');
-      expect(id!.formatDescription).toEqual({ name: 'number', specifier: ',.2f' });
-    });
-
-    it('measure formatDescription with id format', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
-      cubes:
-      - name: Orders
-        sql: "select * from tbl"
-        dimensions:
-        - name: id
-          sql: id
-          type: number
-          primary_key: true
         measures:
+        - name: count
+          sql: id
+          type: count
+        - name: revenue
+          sql: amount
+          type: sum
+          format: currency
+          currency: eur
+        - name: rate
+          sql: rate
+          type: number
+          format: percent
+        - name: total
+          sql: amount
+          type: sum
+          format: number
+        - name: bytes
+          sql: bytes
+          type: sum
+          format: abbr_3
+        - name: balance
+          sql: balance
+          type: sum
+          format: accounting_2
         - name: order_id
           sql: id
           type: number
           format: id
+        - name: custom_amount
+          sql: amount
+          type: sum
+          format: "$,.0f"
       `);
 
       await compiler.compile();
 
-      const { measures } = metaTransformer.cubes[0].config;
-      const orderId = measures.find((m) => m.name === 'Orders.order_id');
-      expect(orderId!.formatDescription).toEqual({ name: 'id', specifier: '.0f' });
+      const { measures, dimensions } = metaTransformer.cubes[0].config;
+
+      const pick = (list: any[], name: string) => {
+        const m = list.find((x) => x.name === name);
+        return { format: m?.format, formatDescription: m?.formatDescription, currency: m?.currency };
+      };
+
+      expect({
+        measures: {
+          count_no_format: pick(measures, 'Orders.count'),
+          revenue_currency: pick(measures, 'Orders.revenue'),
+          rate_percent: pick(measures, 'Orders.rate'),
+          total_number: pick(measures, 'Orders.total'),
+          bytes_abbr_3: pick(measures, 'Orders.bytes'),
+          balance_accounting_2: pick(measures, 'Orders.balance'),
+          order_id_id: pick(measures, 'Orders.order_id'),
+          custom_amount_d3: pick(measures, 'Orders.custom_amount'),
+        },
+        dimensions: {
+          id_number_no_format: pick(dimensions, 'Orders.id'),
+          price_currency_1: pick(dimensions, 'Orders.price'),
+          status_string: pick(dimensions, 'Orders.status'),
+          created_at_time: pick(dimensions, 'Orders.created_at'),
+        },
+      }).toMatchSnapshot();
     });
 
     it('invalid named format in YAML - error', async () => {

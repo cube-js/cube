@@ -1,0 +1,120 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Yaml Schema Testing Named numeric formats formatDescription for all format variants 1`] = `
+Object {
+  "dimensions": Object {
+    "created_at_time": Object {
+      "currency": undefined,
+      "format": undefined,
+      "formatDescription": undefined,
+    },
+    "id_number_no_format": Object {
+      "currency": undefined,
+      "format": undefined,
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
+    },
+    "price_currency_1": Object {
+      "currency": undefined,
+      "format": Object {
+        "alias": "currency_1",
+        "type": "custom-numeric",
+        "value": "$,.1f",
+      },
+      "formatDescription": Object {
+        "name": "currency_1",
+        "specifier": "$,.1f",
+      },
+    },
+    "status_string": Object {
+      "currency": undefined,
+      "format": undefined,
+      "formatDescription": undefined,
+    },
+  },
+  "measures": Object {
+    "balance_accounting_2": Object {
+      "currency": undefined,
+      "format": Object {
+        "alias": "accounting_2",
+        "type": "custom-numeric",
+        "value": "(,.2f",
+      },
+      "formatDescription": Object {
+        "name": "accounting_2",
+        "specifier": "(,.2f",
+      },
+    },
+    "bytes_abbr_3": Object {
+      "currency": undefined,
+      "format": Object {
+        "alias": "abbr_3",
+        "type": "custom-numeric",
+        "value": ".3s",
+      },
+      "formatDescription": Object {
+        "name": "abbr_3",
+        "specifier": ".3s",
+      },
+    },
+    "count_no_format": Object {
+      "currency": undefined,
+      "format": undefined,
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
+    },
+    "custom_amount_d3": Object {
+      "currency": undefined,
+      "format": Object {
+        "type": "custom-numeric",
+        "value": "$,.0f",
+      },
+      "formatDescription": Object {
+        "name": "custom",
+        "specifier": "$,.0f",
+      },
+    },
+    "order_id_id": Object {
+      "currency": undefined,
+      "format": Object {
+        "alias": "id",
+        "type": "custom-numeric",
+        "value": ".0f",
+      },
+      "formatDescription": Object {
+        "name": "id",
+        "specifier": ".0f",
+      },
+    },
+    "rate_percent": Object {
+      "currency": undefined,
+      "format": "percent",
+      "formatDescription": Object {
+        "name": "percent",
+        "specifier": ".2%",
+      },
+    },
+    "revenue_currency": Object {
+      "currency": "EUR",
+      "format": "currency",
+      "formatDescription": Object {
+        "currency": "EUR",
+        "name": "currency",
+        "specifier": "$,.2f",
+      },
+    },
+    "total_number": Object {
+      "currency": undefined,
+      "format": "number",
+      "formatDescription": Object {
+        "name": "number",
+        "specifier": ",.2f",
+      },
+    },
+  },
+}
+`;
