@@ -498,14 +498,14 @@ impl RocksCacheStore {
         f: F,
     ) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+        F: for<'a> FnOnce(DbTableRef<'a>, &mut BatchPipe<'a>) -> Result<R, CubeError>
             + Send
             + Sync
             + 'static,
         R: Send + Sync + 'static,
     {
         self.store
-            .write_operation_impl::<F, R>(&self.rw_loop_queue_cf, op_name, f)
+            .write_operation_impl::<F, R, ()>(&self.rw_loop_queue_cf, op_name, f, None)
             .await
     }
 

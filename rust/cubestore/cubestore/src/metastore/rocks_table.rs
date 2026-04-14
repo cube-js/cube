@@ -498,11 +498,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     }
 
     /// @internal Do not use this method directly, please use insert or insert_with_pk
-    fn do_insert(
+    fn do_insert<S>(
         &self,
         row_id: Option<u64>,
         row: Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         row.serialize(&mut ser).unwrap();
@@ -550,19 +550,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(IdRow::new(row_id, row))
     }
 
-    fn insert_with_pk(
+    fn insert_with_pk<S>(
         &self,
         row_id: u64,
         row: Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         self.do_insert(Some(row_id), row, batch_pipe)
     }
 
-    fn insert(
+    fn insert<S>(
         &self,
         row: Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         self.do_insert(None, row, batch_pipe)
     }
@@ -911,34 +911,34 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         self.get_row_by_index_opt(row_key, secondary_index, true)
     }
 
-    fn update_with_fn(
+    fn update_with_fn<S>(
         &self,
         row_id: u64,
         update_fn: impl FnOnce(&Self::T) -> Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         let new_row = update_fn(&row.get_row());
         self.update(row_id, new_row, &row.get_row(), batch_pipe)
     }
 
-    fn update_with_res_fn(
+    fn update_with_res_fn<S>(
         &self,
         row_id: u64,
         update_fn: impl FnOnce(&Self::T) -> Result<Self::T, CubeError>,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         let new_row = update_fn(&row.get_row())?;
         self.update(row_id, new_row, &row.get_row(), batch_pipe)
     }
 
-    fn update(
+    fn update<S>(
         &self,
         row_id: u64,
         new_row: Self::T,
         old_row: &Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(&old_row, row_id)?;
         for row in deleted_row {
@@ -969,7 +969,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(IdRow::new(row_id, new_row))
     }
 
-    fn truncate(&self, batch_pipe: &mut BatchPipe) -> Result<(), CubeError> {
+    fn truncate<S>(&self, batch_pipe: &mut BatchPipe<'_, S>) -> Result<(), CubeError> {
         let iter = self.table_scan(self.snapshot())?;
 
         for item in iter {
@@ -981,13 +981,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(())
     }
 
-    fn update_extended_ttl_secondary_index<'a, K: Debug>(
+    fn update_extended_ttl_secondary_index<'a, K: Debug, S>(
         &self,
         row_id: u64,
         secondary_index: &'a impl RocksSecondaryIndex<Self::T, K>,
         secondary_key_hash: SecondaryKeyHash,
         extended: RocksSecondaryIndexValueTTLExtended,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<bool, CubeError>
     where
         K: Hash,
@@ -1025,15 +1025,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
     }
 
-    fn delete(&self, row_id: u64, batch_pipe: &mut BatchPipe) -> Result<IdRow<Self::T>, CubeError> {
+    fn delete<S>(
+        &self,
+        row_id: u64,
+        batch_pipe: &mut BatchPipe<'_, S>,
+    ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         self.delete_row(row, batch_pipe)
     }
 
-    fn try_delete(
+    fn try_delete<S>(
         &self,
         row_id: u64,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<Option<IdRow<Self::T>>, CubeError> {
         if let Some(row) = self.get_row(row_id)? {
             Ok(Some(self.delete_row(row, batch_pipe)?))
@@ -1042,10 +1046,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
     }
 
-    fn delete_row(
+    fn delete_row<S>(
         &self,
         row: IdRow<Self::T>,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(row.get_row(), row.get_id())?;
         batch_pipe.add_event(MetaStoreEvent::Delete(Self::table_id(), row.get_id()));
