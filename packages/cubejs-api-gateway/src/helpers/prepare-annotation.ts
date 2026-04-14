@@ -49,7 +49,7 @@ function resolveFormatDescription(
 
   if (format && typeof format === 'object' && format.type === 'custom-numeric') {
     desc = {
-      name: format.alias || 'number',
+      name: format.alias || 'custom',
       specifier: format.value,
     };
   } else if (typeof format === 'string' && STANDARD_FORMAT_SPECIFIERS[format]) {

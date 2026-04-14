@@ -33,7 +33,7 @@ export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFor
 
 type FormatDescriptionBaseName = 'number' | 'percent' | 'currency' | 'abbr' | 'accounting';
 type FormatDescriptionPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-type FormatDescriptionName = FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
+type FormatDescriptionName = 'custom' | FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
 
 export type FormatDescription = {
   /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */

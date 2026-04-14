@@ -351,7 +351,7 @@ describe('prepareAnnotation helpers', () => {
       });
     });
 
-    test('formatDescription for custom-numeric format without alias', () => {
+    test('formatDescription for custom d3-format specifier (no alias)', () => {
       const result = prepareAnnotation([{
         config: ({
           name: 'cube_name',
@@ -367,7 +367,7 @@ describe('prepareAnnotation helpers', () => {
       });
 
       expect((result.measures['cube_name.custom'] as any).formatDescription).toEqual({
-        name: 'number',
+        name: 'custom',
         specifier: '$,.0f',
       });
     });
