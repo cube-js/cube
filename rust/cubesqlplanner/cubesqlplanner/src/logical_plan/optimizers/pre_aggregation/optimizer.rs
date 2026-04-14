@@ -74,16 +74,11 @@ impl PreAggregationOptimizer {
         };
 
         if !plan.multistage_members().is_empty() && self.allow_multi_stage {
-            return self
-                .try_rewrite_query_with_multistages(&plan, &filtered_pre_aggregations);
+            return self.try_rewrite_query_with_multistages(&plan, &filtered_pre_aggregations);
         }
 
         for pre_aggregation in filtered_pre_aggregations.iter() {
-            let new_query = self.try_rewrite_simple_query(
-                &plan,
-                pre_aggregation,
-                None,
-            )?;
+            let new_query = self.try_rewrite_simple_query(&plan, pre_aggregation, None)?;
             if new_query.is_some() {
                 return Ok(new_query);
             }
@@ -135,11 +130,8 @@ impl PreAggregationOptimizer {
         }
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
-            let result = self.try_rewrite_simple_query(
-                &query,
-                pre_aggregation,
-                date_range.clone(),
-            )?;
+            let result =
+                self.try_rewrite_simple_query(&query, pre_aggregation, date_range.clone())?;
             if result.is_some() {
                 return Ok(result);
             }

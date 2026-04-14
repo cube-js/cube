@@ -858,20 +858,22 @@ async fn test_multi_stage_separate_pre_aggregations() {
         .iter()
         .map(|u| u.pre_aggregation.name().as_str())
         .collect();
-    assert!(names.contains(&"count_rollup"), "Expected count_rollup, got {:?}", names);
-    assert!(names.contains(&"revenue_rollup"), "Expected revenue_rollup, got {:?}", names);
+    assert!(
+        names.contains(&"count_rollup"),
+        "Expected count_rollup, got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"revenue_rollup"),
+        "Expected revenue_rollup, got {:?}",
+        names
+    );
 
     if let Some(result) = ctx
-        .try_execute_pg(
-            query_yaml,
-            "multi_stage_separate_pre_aggs_tables.sql",
-        )
+        .try_execute_pg(query_yaml, "multi_stage_separate_pre_aggs_tables.sql")
         .await
     {
-        insta::assert_snapshot!(
-            "multi_stage_separate_pre_aggs_pg_result",
-            result
-        );
+        insta::assert_snapshot!("multi_stage_separate_pre_aggs_pg_result", result);
     }
 }
 
@@ -915,28 +917,28 @@ async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
     // TODO: currently time_shift is not propagated to date_range — fix in optimizer
     assert_eq!(
         count_usage.date_range,
-        Some(("2024-12-01T00:00:00.000".to_string(), "2025-02-28T23:59:59.999".to_string())),
+        Some((
+            "2024-12-01T00:00:00.000".to_string(),
+            "2025-02-28T23:59:59.999".to_string()
+        )),
         "count_rollup should have date range shifted 1 month prior"
     );
 
     // revenue_reduce_status has no time shift, so original date range
     assert_eq!(
         revenue_usage.date_range,
-        Some(("2025-01-01T00:00:00.000".to_string(), "2025-03-31T23:59:59.999".to_string())),
+        Some((
+            "2025-01-01T00:00:00.000".to_string(),
+            "2025-03-31T23:59:59.999".to_string()
+        )),
         "revenue_rollup should have original date range"
     );
 
     if let Some(result) = ctx
-        .try_execute_pg(
-            query_yaml,
-            "multi_stage_pre_agg_time_shift_tables.sql",
-        )
+        .try_execute_pg(query_yaml, "multi_stage_pre_agg_time_shift_tables.sql")
         .await
     {
-        insta::assert_snapshot!(
-            "multi_stage_separate_pre_aggs_time_shift_pg_result",
-            result
-        );
+        insta::assert_snapshot!("multi_stage_separate_pre_aggs_time_shift_pg_result", result);
     }
 }
 

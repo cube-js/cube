@@ -36,9 +36,7 @@ impl TopLevelPlanner {
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
 
         let is_external = if !usages.is_empty() {
-            usages
-                .iter()
-                .all(|usage| usage.pre_aggregation.external())
+            usages.iter().all(|usage| usage.pre_aggregation.external())
         } else {
             false
         };

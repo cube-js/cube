@@ -81,9 +81,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let (sql, usages) = planner.plan()?;
 
         let is_external = if !usages.is_empty() {
-            usages
-                .iter()
-                .all(|usage| usage.pre_aggregation.external())
+            usages.iter().all(|usage| usage.pre_aggregation.external())
         } else {
             false
         };
@@ -141,12 +139,14 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
             let suffix = format!("__usage_{}", usage.index);
 
-            let group = groups.entry(key).or_insert_with(|| GroupedPreAggregationInfo {
-                cube_name,
-                pre_aggregation_name: name,
-                external: pre_agg.external(),
-                usages: HashMap::new(),
-            });
+            let group = groups
+                .entry(key)
+                .or_insert_with(|| GroupedPreAggregationInfo {
+                    cube_name,
+                    pre_aggregation_name: name,
+                    external: pre_agg.external(),
+                    usages: HashMap::new(),
+                });
 
             group.usages.insert(
                 suffix,
