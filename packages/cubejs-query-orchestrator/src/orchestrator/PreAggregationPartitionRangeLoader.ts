@@ -319,7 +319,7 @@ export class PreAggregationPartitionRangeLoader {
               });
               const usageTableNames = usagePartitions.map(r => r.targetTableName);
               if (usageTableNames.length === 1) {
-                usageTargetTableNames[suffix] = usageTableNames[0];
+                [usageTargetTableNames[suffix]] = usageTableNames;
               } else if (usageTableNames.length > 0) {
                 const usageUnion = usageTableNames
                   .map(t => `SELECT * FROM ${t}`)

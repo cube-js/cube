@@ -428,7 +428,7 @@ export class QueryCache {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
-    let replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
+    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName, usageTargetTableNames }]) => {
         // First replace usage-specific placeholders (e.g. tableName__usage_0)
         if (usageTargetTableNames) {
