@@ -1393,7 +1393,7 @@ impl CachedTables {
         };
 
         let tables = Arc::make_mut(cached);
-        let Some(entry) = tables.iter_mut().find(|tp| tp.table.get_id() == table_id) else {
+        let Some(idx) = tables.iter().position(|tp| tp.table.get_id() == table_id) else {
             log::warn!(
                 "Table with id: {} not found in cache, completely resetting cache",
                 table_id
@@ -1403,11 +1403,11 @@ impl CachedTables {
             return;
         };
 
-        f(entry);
+        f(&mut tables[idx]);
 
         // Remove entry if it's no longer ready (cache only stores ready tables)
-        if !entry.table.get_row().is_ready() {
-            tables.retain(|tp| tp.table.get_id() != table_id);
+        if !tables[idx].table.get_row().is_ready() {
+            tables.swap_remove(idx);
         }
     }
 
