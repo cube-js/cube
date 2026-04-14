@@ -193,11 +193,34 @@ export class PreAggregations {
       // One description per physical pre-aggregation, with usageMapping attached
       const descriptions = this.preAggregationDescriptionsFor(foundPreAgg);
 
+      // Compute the union of all usage date ranges so that partitions cover
+      // every usage (e.g. time_shift may require earlier partitions).
+      const mergedDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
+
       return descriptions.map(desc => ({
         ...desc,
-        usageMapping: usageInfo.usages, // { "__usage_0": { dateRange }, "__usage_1": { dateRange } }
+        usageMapping: usageInfo.usages,
+        ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
       }));
     });
+  }
+
+  private static mergeUsageDateRanges(usages: Record<string, UsageDateRangeInfo>): [string, string] | null {
+    let minDate: string | null = null;
+    let maxDate: string | null = null;
+
+    for (const usage of Object.values(usages)) {
+      if (usage.dateRange) {
+        if (!minDate || usage.dateRange[0] < minDate) {
+          minDate = usage.dateRange[0];
+        }
+        if (!maxDate || usage.dateRange[1] > maxDate) {
+          maxDate = usage.dateRange[1];
+        }
+      }
+    }
+
+    return minDate && maxDate ? [minDate, maxDate] : null;
   }
 
   private preAggregationDescriptionsFor(foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
