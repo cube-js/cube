@@ -76,7 +76,7 @@ type ConfigItem = {
   format: string;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
-  formatDescription?: FormatDescription;
+  formatDescription: FormatDescription;
   meta: any;
   drillMembers?: any[];
   drillMembersGrouped?: any;
