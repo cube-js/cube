@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/api-gateway",
-  "description": "Cube.js API Gateway",
+  "description": "Cube API Gateway",
   "author": "Cube Dev, Inc.",
   "version": "1.6.33",
   "repository": {

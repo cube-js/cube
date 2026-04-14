@@ -31,12 +31,27 @@ export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | '
   | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
 export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFormat;
 
+type FormatDescriptionBaseName = 'number' | 'percent' | 'currency' | 'abbr' | 'accounting';
+type FormatDescriptionPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type FormatDescriptionName = FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
+
+export type FormatDescription = {
+  /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */
+  name: FormatDescriptionName;
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f'). See https://d3js.org/d3-format */
+  specifier: string;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR). Present when a currency format is used. */
+  currency?: string;
+};
+
 export type Annotation = {
   title: string;
   shortTitle: string;
   type: string;
   meta?: any;
   format?: DimensionFormat | MeasureFormat;
+  /** Resolved format description with the predefined name and d3-format specifier */
+  formatDescription?: FormatDescription;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
   drillMembers?: any[];

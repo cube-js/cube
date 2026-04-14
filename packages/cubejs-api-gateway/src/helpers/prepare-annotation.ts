@@ -20,6 +20,51 @@ type GranularityMeta = {
   origin?: string;
 };
 
+type FormatDescription = {
+  name: string;
+  specifier: string;
+  currency?: string;
+};
+
+const STANDARD_FORMAT_SPECIFIERS: Record<string, { name: string; specifier: string }> = {
+  percent: { name: 'percent', specifier: '.2%' },
+  currency: { name: 'currency', specifier: '$,.2f' },
+  number: { name: 'number', specifier: ',.2f' },
+};
+
+const DEFAULT_FORMAT_DESCRIPTION: FormatDescription = {
+  name: 'number',
+  specifier: ',.2f',
+};
+
+/**
+ * Resolves a format value (string or object) into a FormatDescription.
+ * Always returns a description, falling back to the default number format.
+ */
+function resolveFormatDescription(
+  format: any,
+  currency?: string,
+): FormatDescription {
+  let desc: FormatDescription;
+
+  if (format && typeof format === 'object' && format.type === 'custom-numeric') {
+    desc = {
+      name: format.alias || 'number',
+      specifier: format.value,
+    };
+  } else if (typeof format === 'string' && STANDARD_FORMAT_SPECIFIERS[format]) {
+    desc = { ...STANDARD_FORMAT_SPECIFIERS[format] };
+  } else {
+    desc = { ...DEFAULT_FORMAT_DESCRIPTION };
+  }
+
+  if (currency) {
+    desc.currency = currency;
+  }
+
+  return desc;
+}
+
 /**
  * Annotation item for cube's member.
  */
@@ -31,6 +76,7 @@ type ConfigItem = {
   format: string;
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
+  formatDescription?: FormatDescription;
   meta: any;
   drillMembers?: any[];
   drillMembersGrouped?: any;
@@ -57,6 +103,8 @@ const annotation = (
   if (!config) {
     return undefined;
   }
+  const formatDescription = resolveFormatDescription(config.format, config.currency);
+
   return [typeof member === 'string' ? member : memberWithoutGranularity, {
     title: config.title,
     shortTitle: config.shortTitle,
@@ -64,6 +112,7 @@ const annotation = (
     type: config.type,
     format: config.format,
     currency: config.currency,
+    formatDescription,
     meta: config.meta,
     ...(memberType === MemberTypeEnum.MEASURES ? {
       drillMembers: config.drillMembers,
