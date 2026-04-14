@@ -5017,6 +5017,70 @@ mod tests {
     use std::time::Duration;
     use std::{env, fs};
 
+    #[tokio::test]
+    async fn test_post_commit_callback_on_success() {
+        let config = Config::test("test_post_commit_callback_on_success");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test_post_commit_callback_on_success-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test_post_commit_callback_on_success-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let meta_store = RocksMetaStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+        )
+        .unwrap();
+
+        // Test 1: callback fires on successful writing
+        {
+            let called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let called_clone = called.clone();
+            meta_store
+                .write_operation("test_success", move |_db_ref, batch_pipe| {
+                    batch_pipe.set_post_commit_callback(move |_metastore| {
+                        called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+                    });
+                    Ok(())
+                })
+                .await
+                .unwrap();
+
+            assert!(
+                called.load(std::sync::atomic::Ordering::SeqCst),
+                "post-commit callback should fire on successful write"
+            );
+        }
+
+        // Test 2: callback does NOT fire when the closure returns Err
+        {
+            let called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let called_clone = called.clone();
+            let result: Result<(), _> = meta_store
+                .write_operation("test_failure", move |_db_ref, batch_pipe| {
+                    batch_pipe.set_post_commit_callback(move |_metastore| {
+                        called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+                    });
+                    Err(CubeError::user("intentional error".to_string()))
+                })
+                .await;
+
+            assert!(result.is_err());
+            assert!(
+                !called.load(std::sync::atomic::Ordering::SeqCst),
+                "post-commit callback should NOT fire when write fails"
+            );
+        }
+
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
+    }
+
     #[test]
     fn macro_test() {
         let s = Schema {
