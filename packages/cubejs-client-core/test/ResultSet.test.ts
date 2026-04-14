@@ -119,6 +119,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '1 year',
             title: '1 year',
@@ -146,6 +147,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '1 year',
             title: '1 year',
@@ -173,6 +175,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '1 year',
             title: '1 year',
@@ -203,6 +206,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '2 months',
             title: '2 months',
@@ -233,6 +237,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '2 months',
             title: '2 months',
@@ -263,6 +268,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '2 months',
             title: '2 months',
@@ -296,6 +302,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '1 months 2 weeks 3 days',
             title: '1 months 2 weeks 3 days',
@@ -324,6 +331,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '3 weeks',
             title: '3 weeks',
@@ -353,6 +361,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: 'two_mo_3w_4d_5h_6m_7s',
             title: 'two_mo_3w_4d_5h_6m_7s',
@@ -389,6 +398,7 @@ describe('ResultSet', () => {
           title: 'Time Dimension',
           shortTitle: 'TD',
           type: 'time',
+          formatDescription: { name: 'number', specifier: ',.2f' },
           granularity: {
             name: '10 minutes 15 seconds',
             title: '10 minutes 15 seconds',
