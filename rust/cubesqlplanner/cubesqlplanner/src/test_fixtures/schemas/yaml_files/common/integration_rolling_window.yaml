@@ -85,6 +85,19 @@ cubes:
             rolling_window:
                 type: to_date
                 granularity: month
+          - name: rolling_avg_to_date
+            type: avg
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: month
+          - name: rolling_sum_to_date_multistage
+            multi_stage: true
+            type: sum
+            sql: "{total_amount}"
+            rolling_window:
+                type: to_date
+                granularity: month
           # Cat 2 — different aggregation types (all trailing 7 day)
           - name: rolling_count_7d
             type: count

@@ -166,7 +166,49 @@ async fn test_to_date_no_granularity() {
     "#};
 
     let result = ctx.build_sql(query);
-    // to_date without query granularity — may work or error
+    match result {
+        Ok(_sql) => {
+            if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+                insta::assert_snapshot!(result);
+            }
+        }
+        Err(e) => {
+            insta::assert_snapshot!("to_date_no_granularity_error", e.to_string());
+        }
+    }
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_no_granularity_multistage() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_to_date_multistage
+    "#};
+
+    let result = ctx.build_sql(query);
+    match result {
+        Ok(_sql) => {
+            if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+                insta::assert_snapshot!(result);
+            }
+        }
+        Err(e) => {
+            insta::assert_snapshot!("to_date_no_granularity_error", e.to_string());
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_avg_no_time_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_avg_to_date
+    "#};
+
+    let result = ctx.build_sql(query);
     match result {
         Ok(_sql) => {
             if let Some(result) = ctx.try_execute_pg(query, SEED).await {

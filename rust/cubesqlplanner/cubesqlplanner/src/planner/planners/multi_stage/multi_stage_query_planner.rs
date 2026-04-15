@@ -473,15 +473,21 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
+                let base_member = MemberSymbol::new_measure(measure.new_unrolling());
+
                 if time_dimensions.is_empty() {
                     let base_state =
                         self.replace_date_range_for_rolling_window(&rolling_window, state.clone())?;
-                    let rolling_base = self.add_rolling_window_base(
-                        member.clone(),
-                        base_state,
-                        ungrouped,
-                        descriptions,
-                    )?;
+                    let rolling_base = if !measure.is_multi_stage() {
+                        self.add_rolling_window_base(base_member, base_state, false, descriptions)?
+                    } else {
+                        self.make_queries_descriptions(
+                            base_member,
+                            base_state,
+                            descriptions,
+                            resolved_multi_stage_dimensions,
+                        )?
+                    };
                     return Ok(Some(rolling_base));
                 }
                 let uniq_time_dimensions = time_dimensions
@@ -504,7 +510,6 @@ impl MultiStageQueryPlanner {
                     &rolling_window,
                     state.clone(),
                 )?;
-                let base_member = MemberSymbol::new_measure(measure.new_unrolling());
 
                 let time_series =
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?;
