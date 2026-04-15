@@ -3,6 +3,7 @@ use super::{
     SimpleQueryPlanner,
 };
 use crate::logical_plan::*;
+use crate::planner::planners::multi_stage::CteState;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
@@ -27,23 +28,22 @@ impl QueryPlanner {
             planner.plan()
         } else {
             let request = self.request.clone();
-            let multiplied_measures_query_planner =
-                MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
-            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let (multiplied_resolver, regular_leaf_members, regular_leaf_refs) =
-                multiplied_measures_query_planner.plan_queries()?;
+            let mut cte_state = CteState::new();
 
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
-            let (multi_stage_members, multi_stage_refs) = if self.request.allow_multi_stage() {
-                multi_stage_query_planner.plan_queries()?
-            } else {
-                (vec![], vec![])
-            };
+            if self.request.allow_multi_stage() {
+                multi_stage_query_planner.plan_queries(&mut cte_state)?;
+            }
 
-            let all_members = [multi_stage_members, regular_leaf_members].concat();
-            let all_refs = [multi_stage_refs, regular_leaf_refs].concat();
+            let multiplied_measures_query_planner =
+                MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
+            let multiplied_resolver =
+                multiplied_measures_query_planner.plan_queries(&mut cte_state)?;
 
+            let (all_members, all_refs) = cte_state.into_results();
+
+            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
             let result = full_key_aggregate_planner.plan_logical_plan(
                 multiplied_resolver,
                 all_refs,

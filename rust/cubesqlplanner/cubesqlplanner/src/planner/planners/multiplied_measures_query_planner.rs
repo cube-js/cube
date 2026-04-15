@@ -1,7 +1,7 @@
 use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::logical_plan::*;
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::{CteState, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
@@ -38,14 +38,8 @@ impl MultipliedMeasuresQueryPlanner {
 
     pub fn plan_queries(
         &self,
-    ) -> Result<
-        (
-            Option<Rc<ResolveMultipliedMeasures>>,
-            Vec<Rc<LogicalMultiStageMember>>,
-            Vec<Rc<MultiStageSubqueryRef>>,
-        ),
-        CubeError,
-    > {
+        cte_state: &mut CteState,
+    ) -> Result<Option<Rc<ResolveMultipliedMeasures>>, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
@@ -54,8 +48,6 @@ impl MultipliedMeasuresQueryPlanner {
 
         let full_key_aggregate_measures = &self.full_key_aggregate_measures;
 
-        let mut regular_leaf_members = Vec::new();
-        let mut regular_leaf_refs = Vec::new();
         let mut aggregate_multiplied_subqueries = Vec::new();
 
         if !full_key_aggregate_measures.regular_measures.is_empty() {
@@ -64,9 +56,9 @@ impl MultipliedMeasuresQueryPlanner {
                 .compute_join_multi_fact_groups_with_measures(
                     &full_key_aggregate_measures.regular_measures,
                 )?;
-            for (i, (join, measures)) in join_multi_fact_groups.groups().iter().enumerate() {
+            for (join, measures) in join_multi_fact_groups.groups().iter() {
                 let query = self.regular_measures_subquery(measures, join.clone())?;
-                let cte_name = format!("regular_cte_{}", i);
+                let cte_name = cte_state.next_cte_name();
 
                 let leaf = Rc::new(MultiStageLeafMeasure {
                     measures: measures.clone(),
@@ -79,7 +71,7 @@ impl MultipliedMeasuresQueryPlanner {
                     name: cte_name.clone(),
                     member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
                 });
-                regular_leaf_members.push(member);
+                cte_state.add_member(member);
 
                 let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
@@ -89,7 +81,7 @@ impl MultipliedMeasuresQueryPlanner {
                         .schema(ref_schema)
                         .build(),
                 );
-                regular_leaf_refs.push(subquery_ref);
+                cte_state.add_subquery_ref(subquery_ref);
             }
         }
 
@@ -145,7 +137,7 @@ impl MultipliedMeasuresQueryPlanner {
             }))
         };
 
-        Ok((multiplied_resolver, regular_leaf_members, regular_leaf_refs))
+        Ok(multiplied_resolver)
     }
 
     fn aggregate_subquery_plan(
