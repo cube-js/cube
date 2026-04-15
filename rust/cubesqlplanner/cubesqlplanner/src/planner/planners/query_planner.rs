@@ -41,8 +41,8 @@ impl QueryPlanner {
                 (vec![], vec![])
             };
 
-            let all_members = [regular_leaf_members, multi_stage_members].concat();
-            let all_refs = [regular_leaf_refs, multi_stage_refs].concat();
+            let all_members = [multi_stage_members, regular_leaf_members].concat();
+            let all_refs = [multi_stage_refs, regular_leaf_refs].concat();
 
             let result = full_key_aggregate_planner.plan_logical_plan(
                 multiplied_resolver,
