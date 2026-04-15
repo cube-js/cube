@@ -121,16 +121,21 @@ impl PreAggregationOptimizer {
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        let date_range = Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts);
-
         if !query.multistage_members().is_empty() {
             // Nested multi-stage: recurse with full list
             return self.try_rewrite_query_with_multistages(&query, compiled_pre_aggregations);
         }
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            let external = pre_aggregation.external.unwrap_or(false);
+            let date_range = Self::extract_date_range(
+                &query.filter(),
+                &self.query_tools,
+                time_shifts,
+                external,
+            );
             let result =
-                self.try_rewrite_simple_query(&query, pre_aggregation, date_range.clone())?;
+                self.try_rewrite_simple_query(&query, pre_aggregation, date_range)?;
             if result.is_some() {
                 return Ok(result);
             }
@@ -212,6 +217,7 @@ impl PreAggregationOptimizer {
                                 &resolver_multiplied_measures.filter,
                                 &self.query_tools,
                                 &TimeShiftState::default(),
+                                pre_aggregation.external.unwrap_or(false),
                             );
                             let pre_aggregation_source = self.make_pre_aggregation_source(
                                 pre_aggregation,
@@ -259,6 +265,17 @@ impl PreAggregationOptimizer {
         } else {
             query.source().clone()
         };
+
+        // Reject mixed external/non-external pre-aggregation usages
+        let new_usages = &self.usages[saved_usages_len..];
+        if !new_usages.is_empty() {
+            let first_external = new_usages[0].external();
+            if new_usages.iter().any(|u| u.external() != first_external) {
+                self.usages.truncate(saved_usages_len);
+                self.usage_counter = saved_counter;
+                return Ok(None);
+            }
+        }
 
         let result = Query::builder()
             .multistage_members(rewritten_multistages)
@@ -367,10 +384,11 @@ impl PreAggregationOptimizer {
         filter: &LogicalFilter,
         query_tools: &Rc<QueryTools>,
         time_shifts: &TimeShiftState,
+        external: bool,
     ) -> Option<(String, String)> {
         let precision = query_tools
             .base_tools()
-            .driver_tools(false)
+            .driver_tools(external)
             .ok()
             .and_then(|dt| dt.timestamp_precision().ok())
             .unwrap_or(3);
