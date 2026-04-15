@@ -917,7 +917,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
     const schema: Record<string, any> = {};
 
     const extractFields = (key: string) => {
-      const { title, shortTitle, type, format, meta } = flatMeta[key] || {};
+      const { title, shortTitle, type, format, meta, currency, granularity } = flatMeta[key] || {};
 
       return {
         key,
@@ -925,7 +925,9 @@ export default class ResultSet<T extends Record<string, any> = any> {
         shortTitle,
         type,
         format,
-        meta
+        meta,
+        currency,
+        granularity: granularity?.name,
       };
     };
 

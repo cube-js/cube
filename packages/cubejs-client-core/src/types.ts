@@ -343,6 +343,10 @@ export type TableColumn = {
   title: string;
   shortTitle: string;
   format?: any;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR). Carried over from the annotation for currency-formatted members. */
+  currency?: string;
+  /** Granularity name (e.g. 'day', 'month', 'year'). Carried over from the annotation for time dimensions. */
+  granularity?: string;
   children?: TableColumn[];
 };
 

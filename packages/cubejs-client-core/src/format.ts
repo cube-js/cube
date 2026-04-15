@@ -79,6 +79,18 @@ export function formatValue(
     return emptyPlaceholder;
   }
 
+  if (type === 'boolean') {
+    if (typeof value === 'boolean') {
+      return value.toString();
+    }
+
+    if (typeof value === 'number') {
+      return Boolean(value).toString();
+    }
+
+    return String(value);
+  }
+
   if (format && typeof format === 'object') {
     if (format.type === 'custom-numeric') {
       return d3Format(format.value)(parseNumber(value));

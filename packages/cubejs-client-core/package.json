@@ -13,9 +13,20 @@
   "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
   "exports": {
-    "types": "./dist/src/index.d.ts",
-    "import": "./dist/src/index.js",
-    "require": "./dist/cubejs-client-core.cjs.js"
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./dist/cubejs-client-core.cjs.js"
+    },
+    "./format": {
+      "types": "./dist/src/format.d.ts",
+      "import": "./dist/src/format.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "format": ["./dist/src/format.d.ts"]
+    }
   },
   "dependencies": {
     "core-js": "^3.6.5",
