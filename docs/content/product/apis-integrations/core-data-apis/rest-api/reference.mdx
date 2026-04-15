@@ -242,6 +242,71 @@ Response:
 }
 ```
 
+## `{base_path}/v1/convert-query`
+
+Takes an API query in the specified input format and converts it to the specified
+output format. Currently, only conversion from [SQL API][ref-sql-api] queries to
+[REST API][ref-rest-api] queries is supported.
+
+This endpoint is useful for translating SQL API queries into equivalent REST API
+queries that can be used with the [`/v1/load`](#base_pathv1load) endpoint.
+
+Request parameters (JSON body):
+
+| Parameter, type | Description | Required |
+| --- | --- | --- |
+| `input`, `string` | Input query format. Use `sql` for [SQL API][ref-sql-api] queries | ✅ Yes |
+| `output`, `string` | Output query format. Use `rest` for [REST API][ref-rest-api] queries | ✅ Yes |
+| `query`, `string` | Input query in the specified format | ✅ Yes |
+
+The response will contain a JSON object with the following properties:
+
+| Property, type | Description |
+| --- | --- |
+| `status`, `string` | Query conversion status, `ok` or `error` |
+| `query`, `object` | Converted query in the [REST API query format][ref-rest-api-query-format] (only present when `status` is `ok`) |
+| `error`, `string` | Error message (only present when `status` is `error`) |
+
+An error will be returned if the input query can't be converted to the specified
+output format, e.g., if the SQL API query requires post-processing on top of
+REST API capabilities or if the SQL API query results in multiple REST API queries.
+
+### Example
+
+Request to convert a SQL API query with a filter:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "sql", "output": "rest", "query": "SELECT MEASURE(total_amount) FROM orders WHERE status = '\''foo'\''"}' \
+  http://localhost:4000/cubejs-api/v1/convert-query
+```
+
+Successful response:
+
+```json
+{
+  "status": "ok",
+  "query": {
+    "measures": [
+      "orders.total_amount"
+    ],
+    "dimensions": [],
+    "filters": [
+      {
+        "member": "orders.status",
+        "operator": "equals",
+        "values": ["foo"]
+      }
+    ],
+    "segments": [],
+    "order": []
+  }
+}
+```
+
 ## `{base_path}/v1/meta`
 
 <InfoBox>
@@ -889,6 +954,7 @@ Keep-Alive: timeout=5
 [ref-datasources]: /product/configuration/advanced/multiple-data-sources
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api
+[ref-rest-api-query-format]: /product/apis-integrations/rest-api/query-format
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-query-wpp]: /product/apis-integrations/queries#query-with-post-processing
 [ref-query-wpd]: /product/apis-integrations/queries#query-with-pushdown
