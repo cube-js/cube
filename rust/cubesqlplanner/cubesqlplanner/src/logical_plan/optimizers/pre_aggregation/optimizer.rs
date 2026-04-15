@@ -161,7 +161,7 @@ impl PreAggregationOptimizer {
                             &multi_stage_leaf_measure.time_shifts,
                         )? {
                             let new_leaf = Rc::new(MultiStageLeafMeasure {
-                                measure: multi_stage_leaf_measure.measure.clone(),
+                                measures: multi_stage_leaf_measure.measures.clone(),
                                 render_measure_as_state: multi_stage_leaf_measure
                                     .render_measure_as_state
                                     .clone(),

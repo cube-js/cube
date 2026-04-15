@@ -69,7 +69,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let cte_name = format!("regular_cte_{}", i);
 
                 let leaf = Rc::new(MultiStageLeafMeasure {
-                    measure: measures[0].clone(),
+                    measures: measures.clone(),
                     render_measure_as_state: false,
                     render_measure_for_ungrouped: false,
                     time_shifts: TimeShiftState::default(),
