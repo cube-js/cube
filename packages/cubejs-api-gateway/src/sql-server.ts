@@ -85,7 +85,7 @@ export class SQLServer {
   }
 
   public async rest4sql(sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> {
-    return rest4sql(this.sqlInterfaceInstance!, sqlQuery, securityContext);
+    return rest4sql(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
