@@ -123,8 +123,9 @@ export function formatValue(
         return getD3NumericLocale(locale).format(DEFAULT_PERCENT_FORMAT)(parseNumber(value));
       case 'number':
         return getD3NumericLocale(locale).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
-      case 'imageUrl':
       case 'id':
+        return d3Format('.0f')(parseNumber(value));
+      case 'imageUrl':
       case 'link':
       default:
         return String(value);
