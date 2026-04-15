@@ -419,7 +419,7 @@ class ApiGateway {
       });
     }));
 
-    app.post(`${this.basePath}/v1/convert`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+    app.post(`${this.basePath}/v1/convert-query`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
       await this.convertQuery({
         payload: req.body,
         context: req.context,

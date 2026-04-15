@@ -344,7 +344,7 @@ describe('SQL API', () => {
 
     describe('Query convert API', () => {
       async function generateSql(query: string) {
-        const response = await fetch(`${birdbox.configuration.apiUrl}/convert`, {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/convert-query`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1051,7 +1051,7 @@ filter_subq AS (
         COUNT(DISTINCT CASE
           WHEN status = 'shipped' THEN orderCount
         END) AS new_count_distinct
-        
+
         /* Works but testing Postgres does not include "hll_hash_any" function
         APPROX_DISTINCT(CASE
           WHEN status = 'shipped' THEN approxOrderCount
