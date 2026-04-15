@@ -1,0 +1,131 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM bkt_orders"
+
+      dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+
+          - name: customer_id
+            sql: customer_id
+            type: number
+
+          - name: created_at
+            sql: created_at
+            type: time
+
+          - name: change_type
+            sql: "CONCAT('Revenue is ', {revenue_change_type})"
+            multi_stage: true
+            type: string
+            add_group_by:
+                - orders.customer_id
+
+          - name: change_type_complex
+            sql: >
+              CASE
+                WHEN {revenue_year_ago} IS NULL THEN 'New'
+                WHEN {revenue} > {revenue_year_ago} THEN 'Grow'
+                ELSE 'Down'
+              END
+            multi_stage: true
+            type: string
+            add_group_by:
+                - orders.customer_id
+
+          - name: change_type_complex_with_join
+            sql: >
+              CASE
+                WHEN {revenue_year_ago} IS NULL THEN 'New'
+                WHEN {revenue} > {revenue_year_ago} THEN 'Grow'
+                ELSE 'Down'
+              END
+            multi_stage: true
+            type: string
+            add_group_by:
+                - first_date.customer_id
+
+          - name: change_type_concat
+            sql: "CONCAT({change_type_complex}, '-test')"
+            type: string
+            multi_stage: true
+
+          - name: two_dims_concat
+            sql: "CONCAT({change_type_complex}, '-', {first_date.customer_type2})"
+            type: string
+            multi_stage: true
+
+      measures:
+          - name: count
+            type: count
+
+          - name: revenue
+            sql: revenue
+            type: sum
+
+          - name: revenue_year_ago
+            sql: "{revenue}"
+            multi_stage: true
+            type: number
+            time_shift:
+                - timeDimension: orders.created_at
+                  interval: 1 year
+                  type: prior
+
+          - name: revenue_change_type
+            sql: >
+              CASE
+                WHEN {revenue_year_ago} IS NULL THEN 'New'
+                WHEN {revenue} > {revenue_year_ago} THEN 'Grow'
+                ELSE 'Down'
+              END
+            type: string
+
+    - name: first_date
+      sql: "SELECT * FROM bkt_first_date"
+
+      joins:
+          - name: orders
+            sql: "{first_date.customer_id} = {orders.customer_id}"
+            relationship: one_to_many
+
+      dimensions:
+          - name: customer_id
+            sql: customer_id
+            type: number
+
+          - name: created_at
+            sql: created_at
+            type: time
+
+          - name: customer_type
+            sql: >
+              CASE
+                WHEN {orders.revenue} < 10000 THEN 'Low'
+                WHEN {orders.revenue} < 20000 THEN 'Medium'
+                ELSE 'Top'
+              END
+            multi_stage: true
+            type: string
+            add_group_by:
+                - first_date.customer_id
+
+          - name: customer_type2
+            sql: >
+              CASE
+                WHEN {orders.revenue} < 3000 THEN 'Low'
+                ELSE 'Top'
+              END
+            multi_stage: true
+            type: string
+            add_group_by:
+                - first_date.customer_id
+
+          - name: customer_type_concat
+            sql: "CONCAT('Customer type: ', {customer_type})"
+            multi_stage: true
+            type: string
+            add_group_by:
+                - first_date.customer_id
