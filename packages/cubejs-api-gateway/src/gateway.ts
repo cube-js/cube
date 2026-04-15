@@ -1619,7 +1619,7 @@ class ApiGateway {
       }
 
       if (convertQuery.output !== 'rest') {
-        throw new Error(`Unexpected output parameter value '${convertQuery.input}'`);
+        throw new Error(`Unexpected output parameter value '${convertQuery.output}'`);
       }
 
       const result = await this.sqlServer.rest4sql(convertQuery.query, context.securityContext);
