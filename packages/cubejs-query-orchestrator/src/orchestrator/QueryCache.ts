@@ -436,8 +436,14 @@ export class QueryCache {
             query = QueryCache.replaceAll(`${tableName}${suffix}`, usageTargetName, query);
           }
         }
-        // Then replace base table name for any remaining references
-        return QueryCache.replaceAll(tableName, targetTableName, query);
+        // Replace base table name only when there are no usage-specific replacements.
+        // When usageTargetTableNames is present, all SQL references already use __usage_N suffixes
+        // and the base replacement would incorrectly match inside already-replaced target names
+        // (e.g. turning "preagg20200101_hash" into "preagg20200101_hash20200101_hash").
+        if (!usageTargetTableNames || Object.keys(usageTargetTableNames).length === 0) {
+          return QueryCache.replaceAll(tableName, targetTableName, query);
+        }
+        return query;
       },
       keyQuery
     );
