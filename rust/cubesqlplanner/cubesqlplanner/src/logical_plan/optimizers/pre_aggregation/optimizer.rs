@@ -128,14 +128,9 @@ impl PreAggregationOptimizer {
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
             let external = pre_aggregation.external.unwrap_or(false);
-            let date_range = Self::extract_date_range(
-                &query.filter(),
-                &self.query_tools,
-                time_shifts,
-                external,
-            );
-            let result =
-                self.try_rewrite_simple_query(&query, pre_aggregation, date_range)?;
+            let date_range =
+                Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
+            let result = self.try_rewrite_simple_query(&query, pre_aggregation, date_range)?;
             if result.is_some() {
                 return Ok(result);
             }
