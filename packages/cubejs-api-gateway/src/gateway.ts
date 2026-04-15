@@ -421,7 +421,7 @@ class ApiGateway {
 
     app.post(`${this.basePath}/v1/convert`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
       await this.convertQuery({
-        convertQuery: req.body,
+        payload: req.body,
         context: req.context,
         res: this.resToResultFn(res)
       });
@@ -1610,30 +1610,30 @@ class ApiGateway {
     };
   }
 
-  protected async convertQuery({ convertQuery, context, res }: QueryConvertRequest) {
+  protected async convertQuery({ payload, context, res }: QueryConvertRequest) {
     try {
       await this.assertApiScope('sql', context.securityContext);
 
-      if (convertQuery.input !== 'sql') {
-        throw new Error(`Unexpected input parameter value '${convertQuery.input}'`);
+      if (payload.input !== 'sql') {
+        throw new Error(`Unexpected input parameter value '${payload.input}'`);
       }
 
-      if (convertQuery.output !== 'rest') {
-        throw new Error(`Unexpected output parameter value '${convertQuery.output}'`);
+      if (payload.output !== 'rest') {
+        throw new Error(`Unexpected output parameter value '${payload.output}'`);
       }
 
-      if (typeof convertQuery.query !== 'string' || !convertQuery.query.trim()) {
+      if (typeof payload.query !== 'string' || !payload.query.trim()) {
         throw new Error('query parameter must be a non-empty string');
       }
 
-      const result = await this.sqlServer.rest4sql(convertQuery.query, context.securityContext);
+      const result = await this.sqlServer.rest4sql(payload.query, context.securityContext);
 
       await res(result);
     } catch (e: any) {
       this.handleError({
         e,
         context,
-        query: convertQuery,
+        query: payload,
         res,
       });
     }

@@ -149,7 +149,7 @@ type ConvertQuery = {
 };
 
 type QueryConvertRequest = BaseRequest & {
-  convertQuery: ConvertQuery;
+  payload: ConvertQuery;
 };
 
 type SqlApiRequest = BaseRequest & {
