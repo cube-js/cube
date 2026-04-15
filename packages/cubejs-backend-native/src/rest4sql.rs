@@ -155,15 +155,6 @@ pub fn rest4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     // Note: if the spawned task panics or is aborted before settling,
     // Neon's Drop implementation for Deferred automatically rejects the promise on the JS side.
     runtime.spawn(async move {
-    // We don't want to just waste whole thread (doesn't really matter main or worker or libuv thread pool)
-    // just busy waiting that JoinHandle
-    // TODO handle JoinError
-    //  keep JoinHandle alive in JS thread
-    //  check join handle from JS thread periodically, reject promise on JoinError
-    //  maybe register something like uv_check handle (libuv itself does not have ABI stability of N-API)
-    //  can do it relatively rare, and in a single loop for all JoinHandles
-    //  this is just a watchdog for a Very Bad case, so latency requirement can be quite relaxed
-    runtime.spawn(async move {
         let result = handle_rest4sql_query(services, native_auth_ctx, &sql_query).await;
 
         if let Err(err) = deferred.try_settle_with(&channel, move |mut cx| {
