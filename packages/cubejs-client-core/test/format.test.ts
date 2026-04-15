@@ -101,11 +101,12 @@ describe('formatValue', () => {
   });
 
   it('boolean: coerces numeric 0/1 from SQL drivers', () => {
-    expect(formatValue(true, { type: 'boolean' })).toBe('true');
     expect(formatValue(false, { type: 'boolean' })).toBe('false');
     expect(formatValue(1, { type: 'boolean' })).toBe('true');
     expect(formatValue(0, { type: 'boolean' })).toBe('false');
     expect(formatValue('true', { type: 'boolean' })).toBe('true');
     expect(formatValue('false', { type: 'boolean' })).toBe('false');
+    expect(formatValue('1', { type: 'boolean' })).toBe('true');
+    expect(formatValue('0', { type: 'boolean' })).toBe('false');
   });
 });

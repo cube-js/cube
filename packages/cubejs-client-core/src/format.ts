@@ -88,6 +88,16 @@ export function formatValue(
       return Boolean(value).toString();
     }
 
+    // Some SQL drivers return booleans as '0'/'1' or 'true'/'false' strings, It's incorrect behaivour in Cube,
+    // but let's format it as boolean for backward compatibility.
+    if (value === '0' || value === 'false') {
+      return 'false';
+    }
+
+    if (value === '1' || value === 'true') {
+      return 'true';
+    }
+
     return String(value);
   }
 
