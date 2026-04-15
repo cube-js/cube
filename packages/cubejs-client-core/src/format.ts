@@ -24,29 +24,29 @@ function detectLocale() {
 
 const currentLocale = detectLocale();
 
-const DEFAULT_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S';
-const DEFAULT_DATE_FORMAT = '%Y-%m-%d';
-const DEFAULT_DATE_MONTH_FORMAT = '%Y-%m';
-const DEFAULT_DATE_QUARTER_FORMAT = '%Y-Q%q';
-const DEFAULT_DATE_YEAR_FORMAT = '%Y';
+// d3-time-format patterns by granularity.
+const DATETIME_FORMAT_BY_GRANULARITY: Record<string, string> = {
+  second: '%Y-%m-%d %H:%M:%S',
+  minute: '%Y-%m-%d %H:%M',
+  hour: '%Y-%m-%d %H:00',
+  day: '%Y-%m-%d',
+  week: '%Y-%m-%d W%V',
+  month: '%Y %b',
+  quarter: '%Y Q%q',
+  year: '%Y',
+};
 
-function getTimeFormatByGrain(grain: string | undefined): string {
-  switch (grain) {
-    case 'day':
-    case 'week':
-      return DEFAULT_DATE_FORMAT;
-    case 'month':
-      return DEFAULT_DATE_MONTH_FORMAT;
-    case 'quarter':
-      return DEFAULT_DATE_QUARTER_FORMAT;
-    case 'year':
-      return DEFAULT_DATE_YEAR_FORMAT;
-    case 'second':
-    case 'minute':
-    case 'hour':
-    default:
-      return DEFAULT_DATETIME_FORMAT;
-  }
+const DEFAULT_DATETIME_FORMAT = DATETIME_FORMAT_BY_GRANULARITY.second;
+
+export function formatDateByGranularity(
+  timestamp: Date | string | number,
+  granularity?: string
+): string {
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+
+  const pattern = (granularity && DATETIME_FORMAT_BY_GRANULARITY[granularity]) || DEFAULT_DATETIME_FORMAT;
+  return timeFormat(pattern)(date);
 }
 
 function parseNumber(value: any): number {
@@ -136,10 +136,7 @@ export function formatValue(
 
   // No explicit format — infer from type
   if (type === 'time') {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Invalid date';
-
-    return timeFormat(getTimeFormatByGrain(granularity))(date);
+    return formatDateByGranularity(value, granularity);
   }
 
   if (type === 'number') {

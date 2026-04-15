@@ -1,5 +1,6 @@
 import React from 'react';
 import { Table } from 'antd';
+import { formatValue } from '@cubejs-client/core/format';
 
 import { useDeepMemo } from '../../hooks/deep-memo';
 
@@ -20,32 +21,20 @@ const formatTableData = (columns, data) => {
     return { ...memo, [column.dataIndex]: column };
   }, {});
 
-  function formatValue(value, { type, format }: any = {}) {
-    if (value == undefined) {
-      return value;
-    }
-
-    if (type === 'boolean') {
-      if (typeof value === 'boolean') {
-        return value.toString();
-      } else if (typeof value === 'number') {
-        return Boolean(value).toString();
-      }
-
-      return value;
-    }
-
-    if (type === 'number' && format === 'percent') {
-      return [(parseFloat(value) * 100).toFixed(2), '%'].join('');
-    }
-
-    return value.toString();
-  }
-
   function format(row) {
     return Object.fromEntries(
       Object.entries(row).map(([dataIndex, value]) => {
-        return [dataIndex, formatValue(value, typeByIndex[dataIndex])];
+        const { type, format: columnFormat, currency, granularity } = typeByIndex[dataIndex] || {};
+        return [
+          dataIndex,
+          formatValue(value, {
+            type,
+            format: columnFormat,
+            currency,
+            granularity,
+            emptyPlaceholder: '',
+          }),
+        ];
       })
     );
   }

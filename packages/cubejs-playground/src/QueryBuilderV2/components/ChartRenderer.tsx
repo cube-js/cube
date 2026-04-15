@@ -5,6 +5,7 @@ import {
   minGranularityForIntervals,
   isPredefinedGranularity,
 } from '@cubejs-client/core';
+import { formatValue, formatDateByGranularity } from '@cubejs-client/core/format';
 import { UseCubeQueryResult } from '@cubejs-client/react';
 import { Skeleton, Tag, tasty } from '@cube-dev/ui-kit';
 import { ComponentType, memo, useCallback, useMemo } from 'react';
@@ -33,7 +34,7 @@ import {
   getChartColorByIndex,
   getChartSolidColorByIndex,
 } from '../utils/chart-colors';
-import { formatDateByGranularity, formatDateByPattern } from '../utils/index';
+import { formatDateByPattern } from '../utils/index';
 
 import { LocalError } from './LocalError';
 
@@ -455,23 +456,16 @@ const TypeToChartComponent = {
                   }
                 }
               : (text: any) => {
-                  switch (typeof text) {
-                    case 'boolean':
-                      return text ? 'true' : 'false';
-                    case 'undefined':
-                    case 'object':
-                      return text === null ? <Tag>NULL</Tag> : <Tag>OBJECT</Tag>;
-                    default:
-                      if (c.type === 'boolean') {
-                        return text && text !== '0' ? 'true' : 'false';
-                      }
+                  if (text === null) return <Tag>NULL</Tag>;
+                  if (typeof text === 'object') return <Tag>OBJECT</Tag>;
+                  if (text === undefined) return '';
 
-                      if (c.format === 'percent' && text != null) {
-                        return `${(parseFloat(text) * 100).toFixed(2)}%`;
-                      }
-
-                      return text;
-                  }
+                  return formatValue(text, {
+                    type: c.type,
+                    format: c.format,
+                    currency: c.currency,
+                    granularity: c.granularity,
+                  });
                 },
           };
         })}

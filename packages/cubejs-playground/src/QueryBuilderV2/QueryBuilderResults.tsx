@@ -30,6 +30,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons';
 import { QueryOrder, TimeDimensionGranularity } from '@cubejs-client/core';
+import { formatValue, formatDateByGranularity } from '@cubejs-client/core/format';
 import {
   AriaOptionProps,
   DroppableCollectionReorderEvent,
@@ -54,13 +55,11 @@ import {
 } from 'react-stately';
 
 import { PREDEFINED_GRANULARITIES } from './values';
-import { formatCurrency, formatNumber } from './utils/formatters';
 import { useDeepMemo, useIntervalEffect } from './hooks';
 import { OutdatedLabel } from './components/OutdatedLabel';
 import { CopyButton } from './components/CopyButton';
 import { ListMemberButton } from './components/ListMemberButton';
 import { useQueryBuilderContext } from './context';
-import { formatDateByGranularity } from './utils/format-date-by-granularity';
 import { MemberBadge } from './components/Badge';
 import { MemberLabel } from './components/MemberLabel';
 import { areQueriesRelated } from './utils/query-helpers';
@@ -776,32 +775,19 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     const type = typeof value !== 'string' ? typeof value : member.type;
 
     switch (type) {
-      case 'number':
-        // @ts-ignore
-        switch (member.format) {
-          case 'currency':
-            return [
-              formatCurrency(typeof value === 'string' ? parseFloat(value) : value),
-              'number',
-            ];
-          case 'percent':
-            return [
-              `${formatNumber((typeof value === 'string' ? parseFloat(value) : value) * 100)}%`,
-              'percent',
-            ];
-          default:
-            return [formatNumber(typeof value === 'string' ? parseFloat(value) : value), 'number'];
-        }
+      case 'number': {
+        const kind = member.format === 'percent' ? 'percent' : 'number';
+        return [
+          formatValue(value, {
+            type: 'number',
+            format: member.format,
+            currency: member.currency,
+          }),
+          kind,
+        ];
+      }
       case 'time':
-        try {
-          if (granularity) {
-            return [formatDateByGranularity(new Date(value), granularity), 'time'];
-          } else {
-            return [formatDateByGranularity(new Date(value), 'second'), 'time'];
-          }
-        } catch (e: any) {
-          return [value, 'unknown'];
-        }
+        return [formatValue(value, { type: 'time', granularity }), 'time'];
       case 'boolean':
         return [value && value !== '0' && value !== 'false' ? '{{TRUE}}' : '{{FALSE}}', 'boolean'];
       default:
