@@ -1622,6 +1622,10 @@ class ApiGateway {
         throw new Error(`Unexpected output parameter value '${convertQuery.output}'`);
       }
 
+      if (typeof convertQuery.query !== 'string' || !convertQuery.query.trim()) {
+        throw new Error('query parameter must be a non-empty string');
+      }
+
       const result = await this.sqlServer.rest4sql(convertQuery.query, context.securityContext);
 
       await res(result);
