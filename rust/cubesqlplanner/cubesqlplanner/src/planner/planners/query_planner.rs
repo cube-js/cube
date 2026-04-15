@@ -30,7 +30,8 @@ impl QueryPlanner {
             let multiplied_measures_query_planner =
                 MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let multiplied_resolver = multiplied_measures_query_planner.plan_queries()?;
+            let (multiplied_resolver, regular_leaf_members, regular_leaf_refs) =
+                multiplied_measures_query_planner.plan_queries()?;
 
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
@@ -40,10 +41,13 @@ impl QueryPlanner {
                 (vec![], vec![])
             };
 
+            let all_members = [regular_leaf_members, multi_stage_members].concat();
+            let all_refs = [regular_leaf_refs, multi_stage_refs].concat();
+
             let result = full_key_aggregate_planner.plan_logical_plan(
                 multiplied_resolver,
-                multi_stage_refs,
-                multi_stage_members,
+                all_refs,
+                all_members,
             )?;
 
             Ok(result)

@@ -1,6 +1,7 @@
 use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::logical_plan::*;
+use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
@@ -35,7 +36,16 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
-    pub fn plan_queries(&self) -> Result<Option<Rc<ResolveMultipliedMeasures>>, CubeError> {
+    pub fn plan_queries(
+        &self,
+    ) -> Result<
+        (
+            Option<Rc<ResolveMultipliedMeasures>>,
+            Vec<Rc<LogicalMultiStageMember>>,
+            Vec<Rc<MultiStageSubqueryRef>>,
+        ),
+        CubeError,
+    > {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
@@ -44,7 +54,8 @@ impl MultipliedMeasuresQueryPlanner {
 
         let full_key_aggregate_measures = &self.full_key_aggregate_measures;
 
-        let mut regular_measure_subqueries = Vec::new();
+        let mut regular_leaf_members = Vec::new();
+        let mut regular_leaf_refs = Vec::new();
         let mut aggregate_multiplied_subqueries = Vec::new();
 
         if !full_key_aggregate_measures.regular_measures.is_empty() {
@@ -53,10 +64,32 @@ impl MultipliedMeasuresQueryPlanner {
                 .compute_join_multi_fact_groups_with_measures(
                     &full_key_aggregate_measures.regular_measures,
                 )?;
-            for (join, measures) in join_multi_fact_groups.groups() {
-                let regular_subquery_logical_plan =
-                    self.regular_measures_subquery(measures, join.clone())?;
-                regular_measure_subqueries.push(regular_subquery_logical_plan);
+            for (i, (join, measures)) in join_multi_fact_groups.groups().iter().enumerate() {
+                let query = self.regular_measures_subquery(measures, join.clone())?;
+                let cte_name = format!("regular_cte_{}", i);
+
+                let leaf = Rc::new(MultiStageLeafMeasure {
+                    measure: measures[0].clone(),
+                    render_measure_as_state: false,
+                    render_measure_for_ungrouped: false,
+                    time_shifts: TimeShiftState::default(),
+                    query: query.clone(),
+                });
+                let member = Rc::new(LogicalMultiStageMember {
+                    name: cte_name.clone(),
+                    member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
+                });
+                regular_leaf_members.push(member);
+
+                let ref_schema = query.schema().clone();
+                let subquery_ref = Rc::new(
+                    MultiStageSubqueryRef::builder()
+                        .name(cte_name)
+                        .symbols(measures.clone())
+                        .schema(ref_schema)
+                        .build(),
+                );
+                regular_leaf_refs.push(subquery_ref);
             }
         }
 
@@ -80,24 +113,19 @@ impl MultipliedMeasuresQueryPlanner {
                 self.aggregate_subquery_plan(&cube_name, &measures, join)?;
             aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
         }
-        if regular_measure_subqueries.is_empty() && aggregate_multiplied_subqueries.is_empty() {
-            Ok(None)
+
+        let multiplied_resolver = if aggregate_multiplied_subqueries.is_empty() {
+            None
         } else {
-            let all_measures = full_key_aggregate_measures
-                .regular_measures
+            let multiplied_measures = full_key_aggregate_measures
+                .multiplied_measures
                 .iter()
-                .chain(
-                    full_key_aggregate_measures
-                        .multiplied_measures
-                        .iter()
-                        .map(|m| m.measure()),
-                )
-                .map(|m| m.clone())
+                .map(|m| m.measure().clone())
                 .collect_vec();
             let schema = LogicalSchema::default()
                 .set_time_dimensions(self.query_properties.time_dimensions().clone())
                 .set_dimensions(self.query_properties.dimensions().clone())
-                .set_measures(all_measures)
+                .set_measures(multiplied_measures)
                 .set_multiplied_measures(
                     full_key_aggregate_measures
                         .rendered_as_multiplied_measures
@@ -107,17 +135,17 @@ impl MultipliedMeasuresQueryPlanner {
             let logical_filter = Rc::new(LogicalFilter {
                 dimensions_filters: self.query_properties.dimensions_filters().clone(),
                 time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-                measures_filter: self.query_properties.measures_filters().clone(), //TODO may be reduce filters to only used measures here
+                measures_filter: self.query_properties.measures_filters().clone(),
                 segments: self.query_properties.segments().clone(),
             });
-            let result = Rc::new(ResolveMultipliedMeasures {
+            Some(Rc::new(ResolveMultipliedMeasures {
                 schema,
                 filter: logical_filter,
-                regular_measure_subqueries,
                 aggregate_multiplied_subqueries,
-            });
-            Ok(Some(result))
-        }
+            }))
+        };
+
+        Ok((multiplied_resolver, regular_leaf_members, regular_leaf_refs))
     }
 
     fn aggregate_subquery_plan(

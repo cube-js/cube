@@ -35,15 +35,6 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
                     resolve_multiplied_measures,
                 ) => {
-                    for regular_measure_query in resolve_multiplied_measures
-                        .regular_measure_subqueries
-                        .iter()
-                    {
-                        let query = self
-                            .builder
-                            .process_node(regular_measure_query.as_ref(), &context)?;
-                        data_queries.push(query);
-                    }
                     for multiplied_measure_query in resolve_multiplied_measures
                         .aggregate_multiplied_subqueries
                         .iter()
