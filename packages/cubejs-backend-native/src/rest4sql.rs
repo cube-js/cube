@@ -152,7 +152,9 @@ pub fn rest4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     let (deferred, promise) = cx.promise();
 
-    // In case spawned task panics or gets aborted before settle call it will leave permanently pending Promise in JS land
+    // Note: if the spawned task panics or is aborted before settling,
+    // Neon's Drop implementation for Deferred automatically rejects the promise on the JS side.
+    runtime.spawn(async move {
     // We don't want to just waste whole thread (doesn't really matter main or worker or libuv thread pool)
     // just busy waiting that JoinHandle
     // TODO handle JoinError
