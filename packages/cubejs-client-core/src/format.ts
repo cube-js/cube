@@ -10,6 +10,8 @@ const DEFAULT_NUMBER_FORMAT = ',.2f';
 const DEFAULT_CURRENCY_FORMAT = '$,.2f';
 const DEFAULT_PERCENT_FORMAT = '.2%';
 
+const DEFAULT_ID_FORMAT = '.0f';
+
 function detectLocale() {
   try {
     return new Intl.NumberFormat().resolvedOptions().locale;
@@ -124,7 +126,7 @@ export function formatValue(
       case 'number':
         return getD3NumericLocale(locale).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
       case 'id':
-        return d3Format('.0f')(parseNumber(value));
+        return d3Format(DEFAULT_ID_FORMAT)(parseNumber(value));
       case 'imageUrl':
       case 'link':
       default:
