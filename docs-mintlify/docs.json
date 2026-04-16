@@ -528,15 +528,31 @@
             "pages": [
               "recipes/index",
               {
-                "group": "API",
+                "group": "Data Modeling",
                 "pages": [
-                  "recipes/core-data-api/getting-unique-values-for-a-field",
-                  "recipes/core-data-api/cast-numerics",
-                  "recipes/core-data-api/sorting",
-                  "recipes/core-data-api/pagination",
-                  "recipes/core-data-api/drilldowns",
-                  "recipes/core-data-api/real-time-data-fetch",
-                  "recipes/core-data-api/cloud-groups-and-user-attributes"
+                  "recipes/data-modeling/style-guide",
+                  "recipes/data-modeling/designing-metrics",
+                  "recipes/data-modeling/percentiles",
+                  "recipes/data-modeling/nested-aggregates",
+                  "recipes/data-modeling/filtered-aggregates",
+                  "recipes/data-modeling/share-of-total",
+                  "recipes/data-modeling/period-over-period",
+                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+                  "recipes/data-modeling/using-dynamic-measures",
+                  "recipes/data-modeling/dynamic-union-tables",
+                  "recipes/data-modeling/string-time-dimensions",
+                  "recipes/data-modeling/custom-granularity",
+                  "recipes/data-modeling/custom-calendar",
+                  "recipes/data-modeling/entity-attribute-value",
+                  "recipes/data-modeling/snapshots",
+                  "recipes/data-modeling/active-users",
+                  "recipes/data-modeling/event-analytics",
+                  "recipes/data-modeling/funnels",
+                  "recipes/data-modeling/cohort-retention",
+                  "recipes/data-modeling/xirr",
+                  "recipes/data-modeling/dbt",
+                  "recipes/data-modeling/custom-order",
+                  "recipes/data-modeling/polymorphic-cubes"
                 ]
               },
               {
@@ -567,30 +583,15 @@
                 ]
               },
               {
-                "group": "Data Modeling",
+                "group": "Core Data API",
                 "pages": [
-                  "recipes/data-modeling/style-guide",
-                  "recipes/data-modeling/designing-metrics",
-                  "recipes/data-modeling/percentiles",
-                  "recipes/data-modeling/nested-aggregates",
-                  "recipes/data-modeling/filtered-aggregates",
-                  "recipes/data-modeling/period-over-period",
-                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
-                  "recipes/data-modeling/using-dynamic-measures",
-                  "recipes/data-modeling/dynamic-union-tables",
-                  "recipes/data-modeling/string-time-dimensions",
-                  "recipes/data-modeling/custom-granularity",
-                  "recipes/data-modeling/custom-calendar",
-                  "recipes/data-modeling/entity-attribute-value",
-                  "recipes/data-modeling/snapshots",
-                  "recipes/data-modeling/active-users",
-                  "recipes/data-modeling/event-analytics",
-                  "recipes/data-modeling/funnels",
-                  "recipes/data-modeling/cohort-retention",
-                  "recipes/data-modeling/xirr",
-                  "recipes/data-modeling/dbt",
-                  "recipes/data-modeling/custom-order",
-                  "recipes/data-modeling/polymorphic-cubes"
+                  "recipes/core-data-api/getting-unique-values-for-a-field",
+                  "recipes/core-data-api/cast-numerics",
+                  "recipes/core-data-api/sorting",
+                  "recipes/core-data-api/pagination",
+                  "recipes/core-data-api/drilldowns",
+                  "recipes/core-data-api/real-time-data-fetch",
+                  "recipes/core-data-api/cloud-groups-and-user-attributes"
                 ]
               }
             ]
