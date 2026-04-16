@@ -68,8 +68,8 @@ describe('formatValue', () => {
     expect(formatValue('2024-01-01T00:00:00.000', { type: 'time', granularity: 'year' })).toBe('2024');
     expect(formatValue('2024-03-11T00:00:00.000', { type: 'time', granularity: 'week' })).toBe('2024-03-11 W11');
     expect(formatValue('2024-03-01T00:00:00.000', { type: 'time', granularity: 'quarter' })).toBe('2024-Q1');
-    expect(formatValue('2024-03-15T14:00:00.000', { type: 'time', granularity: 'hour' })).toBe('2024-03-15 14:00');
-    expect(formatValue('2024-03-15T14:30:00.000', { type: 'time', granularity: 'minute' })).toBe('2024-03-15 14:30');
+    expect(formatValue('2024-03-15T14:00:00.000', { type: 'time', granularity: 'hour' })).toBe('2024-03-15 14:00:00');
+    expect(formatValue('2024-03-15T14:30:00.000', { type: 'time', granularity: 'minute' })).toBe('2024-03-15 14:30:00');
     expect(formatValue('2024-03-15T14:30:45.000', { type: 'time' })).toBe('2024-03-15 14:30:45');
   });
 
@@ -122,8 +122,8 @@ describe('formatDateByGranularity', () => {
   it('formats each predefined granularity', () => {
     const iso = '2024-03-15T14:30:45.000';
     expect(formatDateByGranularity(iso, 'second')).toBe('2024-03-15 14:30:45');
-    expect(formatDateByGranularity(iso, 'minute')).toBe('2024-03-15 14:30');
-    expect(formatDateByGranularity(iso, 'hour')).toBe('2024-03-15 14:00');
+    expect(formatDateByGranularity(iso, 'minute')).toBe('2024-03-15 14:30:45');
+    expect(formatDateByGranularity(iso, 'hour')).toBe('2024-03-15 14:30:45');
     expect(formatDateByGranularity(iso, 'day')).toBe('2024-03-15');
     expect(formatDateByGranularity(iso, 'week')).toBe('2024-03-15 W11');
     expect(formatDateByGranularity(iso, 'month')).toBe('2024 Mar');
@@ -153,7 +153,7 @@ describe('getFormat', () => {
     expect(getFormat({ type: 'time', granularity: 'day' }).formatString).toBe('%Y-%m-%d');
     expect(getFormat({ type: 'time', granularity: 'month' }).formatString).toBe('%Y %b');
     expect(getFormat({ type: 'time', granularity: 'year' }).formatString).toBe('%Y');
-    expect(getFormat({ type: 'time', granularity: 'hour' }).formatString).toBe('%Y-%m-%d %H:00');
+    expect(getFormat({ type: 'time', granularity: 'hour' }).formatString).toBe('%Y-%m-%d %H:%M:%S');
     expect(getFormat({ type: 'time' }).formatString).toBe('%Y-%m-%d %H:%M:%S');
   });
   

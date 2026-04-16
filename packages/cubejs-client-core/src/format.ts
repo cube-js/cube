@@ -25,34 +25,49 @@ function detectLocale() {
 const currentLocale = detectLocale();
 
 const DEFAULT_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S';
-const DEFAULT_DATETIME_MINUTE_FORMAT = '%Y-%m-%d %H:%M';
-const DEFAULT_DATETIME_HOUR_FORMAT = '%Y-%m-%d %H:00';
 const DEFAULT_DATE_FORMAT = '%Y-%m-%d';
 const DEFAULT_DATE_WEEK_FORMAT = '%Y-%m-%d W%V';
 const DEFAULT_DATE_MONTH_FORMAT = '%Y %b';
 const DEFAULT_DATE_QUARTER_FORMAT = '%Y-Q%q';
 const DEFAULT_DATE_YEAR_FORMAT = '%Y';
 
-function getTimeFormatByGrain(grain: string | undefined): string {
-  switch (grain) {
-    case 'day':
-      return DEFAULT_DATE_FORMAT;
-    case 'week':
-      return DEFAULT_DATE_WEEK_FORMAT;
-    case 'month':
-      return DEFAULT_DATE_MONTH_FORMAT;
-    case 'quarter':
-      return DEFAULT_DATE_QUARTER_FORMAT;
-    case 'year':
-      return DEFAULT_DATE_YEAR_FORMAT;
-    case 'hour':
-      return DEFAULT_DATETIME_HOUR_FORMAT;
-    case 'minute':
-      return DEFAULT_DATETIME_MINUTE_FORMAT;
-    case 'second':
-    default:
-      return DEFAULT_DATETIME_FORMAT;
+function getFormatByGrain(grain?: string): string {
+  // Grains that should show date and time (sub-day granularities)
+  const dateTimeGrains = ['second', 'minute', 'hour'];
+
+  // Grains that should show date only (day and above granularities)
+  const dateOnlyGrains = ['day', 'week', 'month', 'quarter', 'year'];
+
+  if (grain === 'day') {
+    return DEFAULT_DATE_FORMAT;
   }
+
+  if (grain === 'week') {
+    return DEFAULT_DATE_WEEK_FORMAT;
+  }
+
+  if (grain === 'month') {
+    return DEFAULT_DATE_MONTH_FORMAT;
+  }
+
+  if (grain === 'quarter') {
+    return DEFAULT_DATE_QUARTER_FORMAT;
+  }
+
+  if (grain === 'year') {
+    return DEFAULT_DATE_YEAR_FORMAT;
+  }
+
+  if (!grain || dateTimeGrains.includes(grain)) {
+    return DEFAULT_DATETIME_FORMAT;
+  }
+
+  if (dateOnlyGrains.includes(grain)) {
+    return DEFAULT_DATE_FORMAT;
+  }
+
+  // Fallback to datetime for unknown grains
+  return DEFAULT_DATETIME_FORMAT;
 }
 
 export function formatDateByGranularity(value: Date | string | number, granularity?: string): string {
@@ -61,7 +76,7 @@ export function formatDateByGranularity(value: Date | string | number, granulari
     return 'Invalid date';
   }
 
-  return timeFormat(getTimeFormatByGrain(granularity))(date);
+  return timeFormat(getFormatByGrain(granularity))(date);
 }
 
 function parseNumber(value: any): number {
@@ -183,7 +198,7 @@ export function getFormat(
   // No explicit format — infer from type
   if (type === 'time') {
     return {
-      formatString: getTimeFormatByGrain(granularity),
+      formatString: getFormatByGrain(granularity),
       formatFunc: (value) => formatDateByGranularity(value, granularity),
     };
   }
