@@ -5,7 +5,7 @@ use std::rc::Rc;
 pub struct ResolveMultipliedMeasures {
     pub schema: Rc<LogicalSchema>,
     pub filter: Rc<LogicalFilter>,
-    pub aggregate_multiplied_subqueries: Vec<Rc<AggregateMultipliedSubquery>>,
+    pub multiplied_cte_names: Vec<String>,
 }
 
 impl LogicalNode for ResolveMultipliedMeasures {
@@ -14,29 +14,12 @@ impl LogicalNode for ResolveMultipliedMeasures {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        self.aggregate_multiplied_subqueries
-            .iter()
-            .map(|i| i.as_plan_node())
-            .collect()
+        vec![]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        check_inputs_len(
-            &inputs,
-            self.aggregate_multiplied_subqueries.len(),
-            self.node_name(),
-        )?;
-
-        let aggregate_multiplied_subqueries = inputs
-            .iter()
-            .map(|i| AggregateMultipliedSubquery::try_from_plan_node(i.clone()))
-            .collect::<Result<_, CubeError>>()?;
-
-        Ok(Rc::new(Self {
-            schema: self.schema.clone(),
-            filter: self.filter.clone(),
-            aggregate_multiplied_subqueries,
-        }))
+        check_inputs_len(&inputs, 0, self.node_name())?;
+        Ok(self)
     }
 
     fn node_name(&self) -> &'static str {
@@ -60,9 +43,9 @@ impl PrettyPrint for ResolveMultipliedMeasures {
         self.schema.pretty_print(result, &details_state);
         result.println("filter:", &state);
         self.filter.pretty_print(result, &details_state);
-        result.println("aggregate_multiplied_subqueries:", &state);
-        for subquery in self.aggregate_multiplied_subqueries.iter() {
-            subquery.pretty_print(result, &details_state);
-        }
+        result.println(
+            &format!("multiplied_cte_names: {:?}", self.multiplied_cte_names),
+            &state,
+        );
     }
 }

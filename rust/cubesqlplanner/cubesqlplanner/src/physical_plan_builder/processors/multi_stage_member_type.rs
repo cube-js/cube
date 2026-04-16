@@ -26,6 +26,10 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMemberLogicalType>
             MultiStageMemberLogicalType::LeafMeasure(measure) => {
                 self.builder.process_node(measure.as_ref(), context)
             }
+            MultiStageMemberLogicalType::MultipliedMeasure(subquery) => {
+                let select = self.builder.process_node(subquery.as_ref(), context)?;
+                Ok(QueryPlan::Select(select))
+            }
             MultiStageMemberLogicalType::MeasureCalculation(calculation) => {
                 self.builder.process_node(calculation.as_ref(), context)
             }

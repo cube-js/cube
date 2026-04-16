@@ -48,7 +48,7 @@ impl MultipliedMeasuresQueryPlanner {
 
         let full_key_aggregate_measures = &self.full_key_aggregate_measures;
 
-        let mut aggregate_multiplied_subqueries = Vec::new();
+        let mut multiplied_cte_names = Vec::new();
 
         if !full_key_aggregate_measures.regular_measures.is_empty() {
             let join_multi_fact_groups = self
@@ -103,10 +103,29 @@ impl MultipliedMeasuresQueryPlanner {
             })?;
             let aggregate_subquery_logical_plan =
                 self.aggregate_subquery_plan(&cube_name, &measures, join)?;
-            aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
+
+            let cte_name = cte_state.next_cte_name();
+            let member = Rc::new(LogicalMultiStageMember {
+                name: cte_name.clone(),
+                member_type: MultiStageMemberLogicalType::MultipliedMeasure(
+                    aggregate_subquery_logical_plan.clone(),
+                ),
+            });
+            cte_state.add_member(member);
+
+            let ref_schema = aggregate_subquery_logical_plan.schema.clone();
+            let subquery_ref = Rc::new(
+                MultiStageSubqueryRef::builder()
+                    .name(cte_name.clone())
+                    .symbols(measures.clone())
+                    .schema(ref_schema)
+                    .build(),
+            );
+            cte_state.add_subquery_ref(subquery_ref);
+            multiplied_cte_names.push(cte_name);
         }
 
-        let multiplied_resolver = if aggregate_multiplied_subqueries.is_empty() {
+        let multiplied_resolver = if multiplied_cte_names.is_empty() {
             None
         } else {
             let multiplied_measures = full_key_aggregate_measures
@@ -133,7 +152,7 @@ impl MultipliedMeasuresQueryPlanner {
             Some(Rc::new(ResolveMultipliedMeasures {
                 schema,
                 filter: logical_filter,
-                aggregate_multiplied_subqueries,
+                multiplied_cte_names,
             }))
         };
 

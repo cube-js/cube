@@ -11,6 +11,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::time_dimension::QueryDateTime;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -250,11 +251,37 @@ impl PreAggregationOptimizer {
             } else {
                 None
             };
+            let multi_stage_subquery_refs = if matches!(
+                fk_source,
+                Some(ResolvedMultipliedMeasures::PreAggregation(_))
+            ) {
+                let multiplied_cte_names = full_key_aggregate
+                    .multiplied_measures_resolver()
+                    .as_ref()
+                    .and_then(|r| match r {
+                        ResolvedMultipliedMeasures::ResolveMultipliedMeasures(rm) => {
+                            Some(&rm.multiplied_cte_names)
+                        }
+                        _ => None,
+                    });
+                if let Some(cte_names) = multiplied_cte_names {
+                    full_key_aggregate
+                        .multi_stage_subquery_refs()
+                        .iter()
+                        .filter(|r| !cte_names.contains(r.name()))
+                        .cloned()
+                        .collect()
+                } else {
+                    full_key_aggregate.multi_stage_subquery_refs().clone()
+                }
+            } else {
+                full_key_aggregate.multi_stage_subquery_refs().clone()
+            };
             let result = FullKeyAggregate::builder()
                 .schema(full_key_aggregate.schema().clone())
                 .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
                 .multiplied_measures_resolver(fk_source)
-                .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
+                .multi_stage_subquery_refs(multi_stage_subquery_refs)
                 .build();
             Rc::new(result).into()
         } else {

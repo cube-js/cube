@@ -105,19 +105,8 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
             full_key_aggregate.multiplied_measures_resolver()
         {
             match resolved_multiplied_measures {
-                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                    resolve_multiplied_measures,
-                ) => {
-                    for multiplied_measure_query in resolve_multiplied_measures
-                        .aggregate_multiplied_subqueries
-                        .iter()
-                    {
-                        let query = self
-                            .builder
-                            .process_node(multiplied_measure_query.as_ref(), &context)?;
-                        data_queries
-                            .push((query, multiplied_measure_query.schema.measures.clone()));
-                    }
+                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
+                    // Multiplied measures are now CTEs, processed via multi_stage_subquery_refs
                 }
                 ResolvedMultipliedMeasures::PreAggregation(pre_agg_query) => {
                     let query = self
