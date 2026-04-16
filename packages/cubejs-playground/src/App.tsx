@@ -120,7 +120,7 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
           <StyledLayoutContent>
             {fatalError ? (
               <Alert
-                message="Error occured while rendering"
+                message="Error occurred while rendering"
                 description={fatalError.stack || ''}
                 type="error"
               />
