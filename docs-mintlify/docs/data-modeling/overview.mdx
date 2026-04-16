@@ -3,12 +3,6 @@ title: Getting started
 description: Build a reusable semantic layer that provides the shared context for AI agents, BI dashboards, and embedded analytics — turning warehouse tables into governed metrics and dimensions.
 ---
 
-The data model is used to transform raw data into meaningful business
-definitions and pre-aggregate data for optimal results. The data model is
-exposed through a [rich set of APIs][ref-apis] that allows end-users to
-run a wide variety of analytical queries without modifying the data model
-itself.
-
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/cdfe8858-f01d-4c25-af32-26502db62f1c/" />
 </Frame>
@@ -35,8 +29,8 @@ allows building well-organized and reusable SQL.
 
 ## 1. Creating a Cube
 
-In Cube, [cubes][ref-schema-cube] are used to organize entities and connections
-between entities. Usually one cube is created for each table in the database,
+In Cube, [cubes][ref-schema-cube] are used to organize tables and connections
+between tables. Usually one cube is created for each table in the database,
 such as `users`, `orders`, `products`, etc. In the `sql_table` parameter of the
 cube we define a base table for this cube. In our case, the base table is simply
 our `users` table.
@@ -342,7 +336,7 @@ model.
 [ref-backend-query-format]: /reference/rest-api/query-format
 [ref-demo-deployment]: /docs/deployment/cloud/deployments#demo-deployments
 [ref-apis]: /reference
-[ref-calculated-measures]: /docs/data-modeling/concepts/calculated-members#calculated-measures
+[ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-views]: /reference/data-modeling/view
 [ref-explore]: /analytics/explore
 [ref-workbooks]: /analytics/workbooks

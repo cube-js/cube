@@ -1,0 +1,421 @@
+---
+title: Multi-fact views
+description: Analyze data across multiple fact tables that share common dimensions like time or customers, without row multiplication or manual workarounds.
+---
+
+In many data models, you have multiple fact tables that share common
+dimensions but have no direct relationship to each other. For example,
+an e-commerce company tracks both orders and returns:
+
+- **`orders`** — one row per order, with `customer_id` and `created_at`
+- **`returns`** — one row per return, with `customer_id` and `created_at`
+- **`customers`** — one row per customer
+- **`dates`** — a date spine
+
+Both `orders` and `returns` join to `customers` and `dates`, but they don't
+join to each other:
+
+```
+           customers
+          /         \
+    orders           returns
+          \         /
+            dates
+```
+
+You need a report showing `orders_count`, `total_revenue`, `returns_count`,
+and `total_refunds` grouped by customer and month. But joining `orders` and
+`returns` directly would produce a cross product — every order matched with
+every return for that customer and date — inflating all counts and sums.
+
+## How multi-fact views solve this
+
+In a regular [view][ref-views], there is a single **root cube** — the first
+cube listed in the view's `cubes` array. All joins flow from this root, and
+Cube uses it as the base table in the generated SQL.
+
+Multi-fact views work differently. When a view includes measures from
+**multiple fact tables**, Cube selects the root dynamically at query time
+based on which measures are requested. Each fact table gets its own
+aggregating subquery, and the results are joined on the shared dimensions.
+No fanout, no manual workarounds.
+
+<Warning>
+
+Multi-fact views are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
+enable it.
+
+</Warning>
+
+## How to model it
+
+### 1. Define the cubes
+
+Each fact table becomes a cube with explicit joins to the shared dimension
+tables:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: customers
+    sql_table: customers
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+      - name: city
+        type: string
+        sql: city
+
+  - name: dates
+    sql_table: dates
+
+    dimensions:
+      - name: date
+        type: time
+        sql: date
+        primary_key: true
+
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+      - name: dates
+        relationship: many_to_one
+        sql: "DATE_TRUNC('day', {orders}.created_at) = {dates.date}"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        type: sum
+        sql: amount
+
+  - name: returns
+    sql_table: returns
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{returns}.customer_id = {customers.id}"
+      - name: dates
+        relationship: many_to_one
+        sql: "DATE_TRUNC('day', {returns}.created_at) = {dates.date}"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+      - name: total_refund
+        type: sum
+        sql: refund_amount
+```
+
+```javascript title="JavaScript"
+cube(`customers`, {
+  sql_table: `customers`,
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    name: { sql: `name`, type: `string` },
+    city: { sql: `city`, type: `string` }
+  }
+})
+
+cube(`dates`, {
+  sql_table: `dates`,
+
+  dimensions: {
+    date: { sql: `date`, type: `time`, primary_key: true }
+  }
+})
+
+cube(`orders`, {
+  sql_table: `orders`,
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${orders}.customer_id = ${customers.id}`
+    },
+    dates: {
+      relationship: `many_to_one`,
+      sql: `DATE_TRUNC('day', ${orders}.created_at) = ${dates.date}`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    status: { sql: `status`, type: `string` }
+  },
+
+  measures: {
+    count: { type: `count` },
+    total_amount: { sql: `amount`, type: `sum` }
+  }
+})
+
+cube(`returns`, {
+  sql_table: `returns`,
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${returns}.customer_id = ${customers.id}`
+    },
+    dates: {
+      relationship: `many_to_one`,
+      sql: `DATE_TRUNC('day', ${returns}.created_at) = ${dates.date}`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true }
+  },
+
+  measures: {
+    count: { type: `count` },
+    total_refund: { sql: `refund_amount`, type: `sum` }
+  }
+})
+```
+
+</CodeGroup>
+
+The critical detail: both `orders` and `returns` declare direct joins to
+`customers` and `dates`. This tells Cube that these dimension tables are shared
+between the two facts.
+
+### 2. Create a view
+
+The view brings both fact tables and the shared dimension tables together.
+Dimension tables are included at root-level join paths (not nested under a
+specific fact), which makes their dimensions common to both facts. Use
+`prefix` to disambiguate identically named members across fact cubes:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: customer_overview
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes:
+          - count
+          - total_amount
+      - join_path: returns
+        prefix: true
+        includes:
+          - count
+          - total_refund
+      - join_path: customers
+        includes:
+          - name
+          - city
+      - join_path: dates
+        includes:
+          - date
+```
+
+```javascript title="JavaScript"
+view(`customer_overview`, {
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: [`count`, `total_amount`]
+    },
+    {
+      join_path: returns,
+      prefix: true,
+      includes: [`count`, `total_refund`]
+    },
+    {
+      join_path: customers,
+      includes: [`name`, `city`]
+    },
+    {
+      join_path: dates,
+      includes: [`date`]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+When you query `orders_count`, `orders_total_amount`, `returns_count`, and
+`returns_total_refund` grouped by `name`, `city`, and `date`, Cube detects
+the two separate fact roots and automatically executes a multi-fact query.
+
+## What Cube does under the hood
+
+Cube executes the query in three stages:
+
+### 1. Separate aggregating subqueries
+
+Each fact table gets its own independent subquery that joins only the tables
+it needs, applies relevant filters, and aggregates by the common dimensions:
+
+- **Subquery 1** (orders): joins `orders` → `customers` and `orders` → `dates`,
+  computes `COUNT(*)` and `SUM(amount)`, grouped by `name`, `city`, `date`
+- **Subquery 2** (returns): joins `returns` → `customers` and `returns` → `dates`,
+  computes `COUNT(*)` and `SUM(refund_amount)`, grouped by `name`, `city`, `date`
+
+### 2. Join on common dimensions
+
+The subquery results are joined with `FULL JOIN` on all common dimension
+columns (`name`, `city`, `date`). This preserves rows that exist in only one
+fact table — a customer who placed orders but never returned anything still
+appears in the results.
+
+### 3. Final result
+
+The combined result shows measures from each fact table side by side:
+
+| name | city | date | orders_count | orders_total_amount | returns_count | returns_total_refund |
+| --- | --- | --- | --- | --- | --- | --- |
+| Alice | New York | 2025-01-15 | 2 | 200.00 | 0 | NULL |
+| Alice | New York | 2025-02-10 | 2 | 225.00 | 1 | 100.00 |
+| Bob | Seattle | 2025-01-20 | 3 | 550.00 | 2 | 130.00 |
+| Charlie | New York | 2025-02-05 | 0 | NULL | 2 | 100.00 |
+| Diana | Boston | 2025-03-01 | 1 | 400.00 | 0 | NULL |
+
+Charlie has no orders and Diana has no returns — both are still included
+with `NULL` values for the missing fact table.
+
+## Common patterns
+
+### Time as the shared dimension
+
+The most common multi-fact pattern uses time as the shared dimension.
+For example, you might have `page_views`, `signups`, and `purchases` that all
+have timestamps but no direct relationship. By joining each to a shared
+`dates` cube, you can analyze conversion funnels — page views vs. signups
+vs. purchases by day — without any row multiplication.
+
+### More than two fact tables
+
+Multi-fact queries are not limited to two fact tables. If a view includes
+three or more facts, each gets its own aggregating subquery, and all results
+are joined on the common dimensions.
+
+### Facts that don't share all dimensions
+
+Every root fact table must be joinable to the **same set of common dimension
+tables**. If a fact table doesn't naturally have a foreign key for one of the
+common dimensions, you can create a synthetic join:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: refunds
+    sql: >
+      SELECT *, NULL AS customer_id FROM refunds
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{refunds}.customer_id = {customers.id}"
+      - name: dates
+        relationship: many_to_one
+        sql: "DATE_TRUNC('day', {refunds}.created_at) = {dates.date}"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        type: sum
+        sql: amount
+```
+
+```javascript title="JavaScript"
+cube(`refunds`, {
+  sql: `SELECT *, NULL AS customer_id FROM refunds`,
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${refunds}.customer_id = ${customers.id}`
+    },
+    dates: {
+      relationship: `many_to_one`,
+      sql: `DATE_TRUNC('day', ${refunds}.created_at) = ${dates.date}`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true }
+  },
+
+  measures: {
+    count: { type: `count` },
+    total_amount: { sql: `amount`, type: `sum` }
+  }
+})
+```
+
+</CodeGroup>
+
+The `NULL AS customer_id` makes the join syntactically valid. Refund rows
+won't match a specific customer, but the subquery can still participate in
+the multi-fact join on the full set of common dimensions.
+
+## Filters and segments
+
+**Common dimension filters** (like `city = 'New York'` or `date > '2025-01-01'`)
+are applied to every subquery, ensuring consistent filtering across all facts.
+
+**Fact-specific filters** (like `orders.status = 'completed'`) are applied only
+to that fact's subquery. Other fact subqueries remain unaffected.
+
+**Measure filters** (like `orders_count > 1`) are applied as `HAVING`
+conditions after the subqueries are joined.
+
+[Segments][ref-segments] that belong to a specific fact table are applied only
+to that fact's subquery.
+
+## Join path requirements
+
+- Each fact cube must declare **direct joins** to all shared dimension tables
+- Dimension tables should be included in the view at **root-level join paths**,
+  not nested under a specific fact (e.g., `customers`, not `orders.customers`)
+- Use `prefix` on fact cubes to disambiguate identically named members
+
+[ref-views]: /docs/data-modeling/views
+[ref-view-ref]: /reference/data-modeling/view
+[ref-segments]: /reference/data-modeling/segments
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[link-tesseract]: https://cube.dev/blog/introducing-tesseract

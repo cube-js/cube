@@ -81,21 +81,24 @@
             "pages": [
               "docs/data-modeling/overview",
               {
-                "group": "Concepts",
-                "root": "docs/data-modeling/concepts/index",
+                "group": "Views",
+                "root": "docs/data-modeling/views",
                 "pages": [
-                  "docs/data-modeling/concepts/syntax",
-                  "docs/data-modeling/concepts/calculated-members",
-                  "docs/data-modeling/concepts/multi-stage-calculations",
-                  "docs/data-modeling/concepts/working-with-joins",
-                  "docs/data-modeling/concepts/code-reusability-extending-cubes",
-                  "docs/data-modeling/concepts/polymorphic-cubes",
-                  "docs/data-modeling/concepts/multi-fact-queries",
-                  "docs/data-modeling/concepts/data-blending"
+                  "docs/data-modeling/multi-fact-views"
                 ]
               },
-              "docs/data-modeling/views",
+              {
+                "group": "Cubes",
+                "root": "docs/data-modeling/cubes",
+                "pages": [
+                  "docs/data-modeling/extending-cubes"
+                ]
+              },
+              "docs/data-modeling/joins",
+              "docs/data-modeling/measures",
+              "docs/data-modeling/dimensions",
               "docs/data-modeling/ai-context",
+              "docs/data-modeling/concepts/syntax",
               {
                 "group": "Access Control",
                 "pages": [
@@ -586,7 +589,8 @@
                   "recipes/data-modeling/cohort-retention",
                   "recipes/data-modeling/xirr",
                   "recipes/data-modeling/dbt",
-                  "recipes/data-modeling/custom-order"
+                  "recipes/data-modeling/custom-order",
+                  "recipes/data-modeling/polymorphic-cubes"
                 ]
               }
             ]
