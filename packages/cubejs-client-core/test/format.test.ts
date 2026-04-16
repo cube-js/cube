@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatValue } from '../src/format';
+import { formatValue, formatDateByGranularity, getFormat } from '../src/format';
 
 describe('formatValue', () => {
   it('format null', () => {
@@ -64,11 +64,12 @@ describe('formatValue', () => {
 
   it('type-based fallback: time with grain', () => {
     expect(formatValue('2024-03-15T00:00:00.000', { type: 'time', granularity: 'day' })).toBe('2024-03-15');
-    expect(formatValue('2024-03-01T00:00:00.000', { type: 'time', granularity: 'month' })).toBe('2024-03');
+    expect(formatValue('2024-03-01T00:00:00.000', { type: 'time', granularity: 'month' })).toBe('2024 Mar');
     expect(formatValue('2024-01-01T00:00:00.000', { type: 'time', granularity: 'year' })).toBe('2024');
-    expect(formatValue('2024-03-11T00:00:00.000', { type: 'time', granularity: 'week' })).toBe('2024-03-11');
+    expect(formatValue('2024-03-11T00:00:00.000', { type: 'time', granularity: 'week' })).toBe('2024-03-11 W11');
     expect(formatValue('2024-03-01T00:00:00.000', { type: 'time', granularity: 'quarter' })).toBe('2024-Q1');
-    expect(formatValue('2024-03-15T14:00:00.000', { type: 'time', granularity: 'hour' })).toBe('2024-03-15 14:00:00');
+    expect(formatValue('2024-03-15T14:00:00.000', { type: 'time', granularity: 'hour' })).toBe('2024-03-15 14:00');
+    expect(formatValue('2024-03-15T14:30:00.000', { type: 'time', granularity: 'minute' })).toBe('2024-03-15 14:30');
     expect(formatValue('2024-03-15T14:30:45.000', { type: 'time' })).toBe('2024-03-15 14:30:45');
   });
 
@@ -114,5 +115,92 @@ describe('formatValue', () => {
     expect(formatValue('false', { type: 'boolean' })).toBe('false');
     expect(formatValue('1', { type: 'boolean' })).toBe('true');
     expect(formatValue('0', { type: 'boolean' })).toBe('false');
+  });
+});
+
+describe('formatDateByGranularity', () => {
+  it('formats each predefined granularity', () => {
+    const iso = '2024-03-15T14:30:45.000';
+    expect(formatDateByGranularity(iso, 'second')).toBe('2024-03-15 14:30:45');
+    expect(formatDateByGranularity(iso, 'minute')).toBe('2024-03-15 14:30');
+    expect(formatDateByGranularity(iso, 'hour')).toBe('2024-03-15 14:00');
+    expect(formatDateByGranularity(iso, 'day')).toBe('2024-03-15');
+    expect(formatDateByGranularity(iso, 'week')).toBe('2024-03-15 W11');
+    expect(formatDateByGranularity(iso, 'month')).toBe('2024 Mar');
+    expect(formatDateByGranularity(iso, 'quarter')).toBe('2024-Q1');
+    expect(formatDateByGranularity(iso, 'year')).toBe('2024');
+  });
+
+  it('accepts Date, ISO string, and epoch-number inputs', () => {
+    const date = new Date('2024-03-15T00:00:00.000');
+    expect(formatDateByGranularity(date, 'day')).toBe('2024-03-15');
+    expect(formatDateByGranularity(date.getTime(), 'day')).toBe('2024-03-15');
+    expect(formatDateByGranularity('2024-03-15T00:00:00.000', 'day')).toBe('2024-03-15');
+  });
+
+  it('falls back to second-grain format for missing or unknown granularity', () => {
+    expect(formatDateByGranularity('2024-03-15T14:30:45.000')).toBe('2024-03-15 14:30:45');
+    expect(formatDateByGranularity('2024-03-15T14:30:45.000', 'decade' as any)).toBe('2024-03-15 14:30:45');
+  });
+
+  it('returns "Invalid date" on bad input', () => {
+    expect(formatDateByGranularity('not-a-date', 'day')).toBe('Invalid date');
+  });
+});
+
+describe('getFormat', () => {
+  it('time dimension: returns d3 format string per granularity', () => {
+    expect(getFormat({ type: 'time', granularity: 'day' }).formatString).toBe('%Y-%m-%d');
+    expect(getFormat({ type: 'time', granularity: 'month' }).formatString).toBe('%Y %b');
+    expect(getFormat({ type: 'time', granularity: 'year' }).formatString).toBe('%Y');
+    expect(getFormat({ type: 'time', granularity: 'hour' }).formatString).toBe('%Y-%m-%d %H:00');
+    expect(getFormat({ type: 'time' }).formatString).toBe('%Y-%m-%d %H:%M:%S');
+  });
+  
+  it('time dimension: formatFunc delegates to formatDateByGranularity', () => {
+    const { formatFunc } = getFormat({ type: 'time', granularity: 'month' });
+    expect(formatFunc('2024-03-01T00:00:00.000')).toBe('2024 Mar');
+  });
+
+  it('number with currency format', () => {
+    const { formatString, formatFunc } = getFormat({ type: 'number', format: 'currency' });
+    expect(formatString).toBe('$,.2f');
+    expect(formatFunc(1234.56)).toBe('$1,234.56');
+    expect(formatFunc('1234.56')).toBe('$1,234.56');
+  });
+
+  it('number with percent format', () => {
+    const { formatString, formatFunc } = getFormat({ type: 'number', format: 'percent' });
+    expect(formatString).toBe('.2%');
+    expect(formatFunc(0.1234)).toBe('12.34%');
+  });
+
+  it('number with no explicit format falls back to default number format', () => {
+    const { formatString, formatFunc } = getFormat({ type: 'number' });
+    expect(formatString).toBe(',.2f');
+    expect(formatFunc(1234.56)).toBe('1,234.56');
+  });
+
+  it('custom-numeric format exposes the spec as formatString', () => {
+    const { formatString, formatFunc } = getFormat({ type: 'number', format: { type: 'custom-numeric', value: '.2s' } });
+    expect(formatString).toBe('.2s');
+    expect(formatFunc(1500)).toBe('1.5k');
+  });
+
+  it('custom-time format exposes the spec as formatString', () => {
+    const { formatString, formatFunc } = getFormat({ type: 'time', format: { type: 'custom-time', value: '%Y-%m-%d' } });
+    expect(formatString).toBe('%Y-%m-%d');
+    expect(formatFunc('2024-03-15T10:30:00.000')).toBe('2024-03-15');
+  });
+
+  it('string fallback returns identity formatFunc', () => {
+    const { formatString, formatFunc } = getFormat({ type: 'string' });
+    expect(formatString).toBeNull();
+    expect(formatFunc('hello')).toBe('hello');
+  });
+
+  it('locale option is honored by formatFunc', () => {
+    const { formatFunc } = getFormat({ type: 'number', format: 'currency', currency: 'EUR' }, { locale: 'nl-NL' });
+    expect(formatFunc(1234.56)).toBe('€1.234,56');
   });
 });

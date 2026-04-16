@@ -2,36 +2,22 @@ import { formatLocale } from 'd3-format';
 
 import type { FormatLocaleDefinition, FormatLocaleObject } from 'd3-format';
 
-import enUS from 'd3-format/locale/en-US.json';
-import enGB from 'd3-format/locale/en-GB.json';
-import zhCN from 'd3-format/locale/zh-CN.json';
-import esES from 'd3-format/locale/es-ES.json';
-import esMX from 'd3-format/locale/es-MX.json';
-import deDE from 'd3-format/locale/de-DE.json';
-import jaJP from 'd3-format/locale/ja-JP.json';
-import frFR from 'd3-format/locale/fr-FR.json';
-import ptBR from 'd3-format/locale/pt-BR.json';
-import koKR from 'd3-format/locale/ko-KR.json';
-import itIT from 'd3-format/locale/it-IT.json';
-import nlNL from 'd3-format/locale/nl-NL.json';
-import ruRU from 'd3-format/locale/ru-RU.json';
-
 // Pre-built d3 locale definitions for the most popular locales.
 // Used as a fallback when Intl is unavailable (e.g. some edge runtimes).
-export const formatD3NumericLocale: Record<string, FormatLocaleDefinition> = {
-  'en-US': enUS as unknown as FormatLocaleDefinition,
-  'en-GB': enGB as unknown as FormatLocaleDefinition,
-  'zh-CN': zhCN as unknown as FormatLocaleDefinition,
-  'es-ES': esES as unknown as FormatLocaleDefinition,
-  'es-MX': esMX as unknown as FormatLocaleDefinition,
-  'de-DE': deDE as unknown as FormatLocaleDefinition,
-  'ja-JP': jaJP as unknown as FormatLocaleDefinition,
-  'fr-FR': frFR as unknown as FormatLocaleDefinition,
-  'pt-BR': ptBR as unknown as FormatLocaleDefinition,
-  'ko-KR': koKR as unknown as FormatLocaleDefinition,
-  'it-IT': itIT as unknown as FormatLocaleDefinition,
-  'nl-NL': nlNL as unknown as FormatLocaleDefinition,
-  'ru-RU': ruRU as unknown as FormatLocaleDefinition,
+export const formatD3NumericLocale: Record<string, Omit<FormatLocaleDefinition, 'currency'>> = {
+  'en-US': { decimal: '.', thousands: ',', grouping: [3] },
+  'en-GB': { decimal: '.', thousands: ',', grouping: [3] },
+  'zh-CN': { decimal: '.', thousands: ',', grouping: [3] },
+  'es-ES': { decimal: ',', thousands: '.', grouping: [3] },
+  'es-MX': { decimal: '.', thousands: ',', grouping: [3] },
+  'de-DE': { decimal: ',', thousands: '.', grouping: [3] },
+  'ja-JP': { decimal: '.', thousands: ',', grouping: [3] },
+  'fr-FR': { decimal: ',', thousands: '\u00a0', grouping: [3], percent: '\u202f%' },
+  'pt-BR': { decimal: ',', thousands: '.', grouping: [3] },
+  'ko-KR': { decimal: '.', thousands: ',', grouping: [3] },
+  'it-IT': { decimal: ',', thousands: '.', grouping: [3] },
+  'nl-NL': { decimal: ',', thousands: '.', grouping: [3] },
+  'ru-RU': { decimal: ',', thousands: '\u00a0', grouping: [3] },
 };
 
 const currencySymbols: Record<string, string> = {
@@ -45,7 +31,7 @@ const currencySymbols: Record<string, string> = {
   RUB: '₽',
 };
 
-function getCurrencySymbol(locale: string | undefined, currencyCode: string): [string, string] {
+function getCurrencyOverride(locale: string | undefined, currencyCode: string): [string, string] {
   try {
     const cf = new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode });
     const currencyParts = cf.formatToParts(1);
@@ -88,7 +74,7 @@ function getD3NumericLocaleFromIntl(locale: string, currencyCode = 'USD'): Forma
     decimal: find('decimal') || '.',
     thousands: find('group') || ',',
     grouping: deriveGrouping(locale),
-    currency: getCurrencySymbol(locale, currencyCode),
+    currency: getCurrencyOverride(locale, currencyCode),
   };
 }
 
@@ -103,14 +89,17 @@ export function getD3NumericLocale(locale: string, currencyCode = 'USD'): Format
   let definition: FormatLocaleDefinition;
 
   if (formatD3NumericLocale[locale]) {
-    definition = { ...formatD3NumericLocale[locale], currency: getCurrencySymbol(locale, currencyCode) };
+    definition = { ...formatD3NumericLocale[locale], currency: getCurrencyOverride(locale, currencyCode) };
   } else {
     try {
       definition = getD3NumericLocaleFromIntl(locale, currencyCode);
     } catch (e: unknown) {
       console.warn('Failed to generate d3 local via Intl, failing back to en-US', e);
 
-      definition = formatD3NumericLocale['en-US'];
+      definition = {
+        ...formatD3NumericLocale['en-US'],
+        currency: getCurrencyOverride(locale, currencyCode)
+      };
     }
   }
 

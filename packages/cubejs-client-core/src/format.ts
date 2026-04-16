@@ -25,28 +25,43 @@ function detectLocale() {
 const currentLocale = detectLocale();
 
 const DEFAULT_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S';
+const DEFAULT_DATETIME_MINUTE_FORMAT = '%Y-%m-%d %H:%M';
+const DEFAULT_DATETIME_HOUR_FORMAT = '%Y-%m-%d %H:00';
 const DEFAULT_DATE_FORMAT = '%Y-%m-%d';
-const DEFAULT_DATE_MONTH_FORMAT = '%Y-%m';
+const DEFAULT_DATE_WEEK_FORMAT = '%Y-%m-%d W%V';
+const DEFAULT_DATE_MONTH_FORMAT = '%Y %b';
 const DEFAULT_DATE_QUARTER_FORMAT = '%Y-Q%q';
 const DEFAULT_DATE_YEAR_FORMAT = '%Y';
 
 function getTimeFormatByGrain(grain: string | undefined): string {
   switch (grain) {
     case 'day':
-    case 'week':
       return DEFAULT_DATE_FORMAT;
+    case 'week':
+      return DEFAULT_DATE_WEEK_FORMAT;
     case 'month':
       return DEFAULT_DATE_MONTH_FORMAT;
     case 'quarter':
       return DEFAULT_DATE_QUARTER_FORMAT;
     case 'year':
       return DEFAULT_DATE_YEAR_FORMAT;
-    case 'second':
-    case 'minute':
     case 'hour':
+      return DEFAULT_DATETIME_HOUR_FORMAT;
+    case 'minute':
+      return DEFAULT_DATETIME_MINUTE_FORMAT;
+    case 'second':
     default:
       return DEFAULT_DATETIME_FORMAT;
   }
+}
+
+export function formatDateByGranularity(value: Date | string | number, granularity?: string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+
+  return timeFormat(getTimeFormatByGrain(granularity))(date);
 }
 
 function parseNumber(value: any): number {
@@ -73,78 +88,125 @@ export type FormatValueOptions = FormatValueMember & {
   emptyPlaceholder?: string;
 };
 
-export function formatValue(
-  value: any,
-  { type, format, currency = 'USD', granularity, locale = currentLocale, emptyPlaceholder = '∅' }: FormatValueOptions
-): string {
-  if (value === null || value === undefined) {
-    return emptyPlaceholder;
+export type GetFormatOptions = {
+  locale?: string;
+};
+
+export type GetFormatResult = {
+  formatString: string | null;
+  formatFunc: (value: any) => string;
+};
+
+function formatBoolean(value: any): string {
+  if (typeof value === 'boolean') {
+    return value.toString();
   }
 
+  if (typeof value === 'number') {
+    return Boolean(value).toString();
+  }
+
+  // Some SQL drivers return booleans as '0'/'1' or 'true'/'false' strings, It's incorrect behaivour in Cube,
+  // but let's format it as boolean for backward compatibility.
+  if (value === '0' || value === 'false') {
+    return 'false';
+  }
+
+  if (value === '1' || value === 'true') {
+    return 'true';
+  }
+
+  return String(value);
+}
+
+export function getFormat(
+  member: FormatValueMember,
+  { locale = currentLocale }: GetFormatOptions = {}
+): GetFormatResult {
+  const { type, format, currency = 'USD', granularity } = member;
+
   if (type === 'boolean') {
-    if (typeof value === 'boolean') {
-      return value.toString();
-    }
-
-    if (typeof value === 'number') {
-      return Boolean(value).toString();
-    }
-
-    // Some SQL drivers return booleans as '0'/'1' or 'true'/'false' strings, It's incorrect behaivour in Cube,
-    // but let's format it as boolean for backward compatibility.
-    if (value === '0' || value === 'false') {
-      return 'false';
-    }
-
-    if (value === '1' || value === 'true') {
-      return 'true';
-    }
-
-    return String(value);
+    return { formatString: null, formatFunc: formatBoolean };
   }
 
   if (format && typeof format === 'object') {
     if (format.type === 'custom-numeric') {
-      return d3Format(format.value)(parseNumber(value));
+      return {
+        formatString: format.value,
+        formatFunc: (value) => d3Format(format.value)(parseNumber(value)),
+      };
     }
 
     if (format.type === 'custom-time') {
-      const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? 'Invalid date' : timeFormat(format.value)(date);
+      return {
+        formatString: format.value,
+        formatFunc: (value) => {
+          const date = new Date(value);
+          return Number.isNaN(date.getTime()) ? 'Invalid date' : timeFormat(format.value)(date);
+        },
+      };
     }
 
     // { type: 'link', label: string } — return value as string
-    return String(value);
+    return { formatString: null, formatFunc: (value) => String(value) };
   }
 
   if (typeof format === 'string') {
     switch (format) {
       case 'currency':
-        return getD3NumericLocale(locale, currency).format(DEFAULT_CURRENCY_FORMAT)(parseNumber(value));
+        return {
+          formatString: DEFAULT_CURRENCY_FORMAT,
+          formatFunc: (value) => getD3NumericLocale(locale, currency).format(DEFAULT_CURRENCY_FORMAT)(parseNumber(value)),
+        };
       case 'percent':
-        return getD3NumericLocale(locale).format(DEFAULT_PERCENT_FORMAT)(parseNumber(value));
+        return {
+          formatString: DEFAULT_PERCENT_FORMAT,
+          formatFunc: (value) => getD3NumericLocale(locale).format(DEFAULT_PERCENT_FORMAT)(parseNumber(value)),
+        };
       case 'number':
-        return getD3NumericLocale(locale).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
+        return {
+          formatString: DEFAULT_NUMBER_FORMAT,
+          formatFunc: (value) => getD3NumericLocale(locale).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value)),
+        };
       case 'id':
-        return d3Format(DEFAULT_ID_FORMAT)(parseNumber(value));
+        return {
+          formatString: DEFAULT_ID_FORMAT,
+          formatFunc: (value) => d3Format(DEFAULT_ID_FORMAT)(parseNumber(value)),
+        };
       case 'imageUrl':
       case 'link':
       default:
-        return String(value);
+        return { formatString: null, formatFunc: (value) => String(value) };
     }
   }
 
   // No explicit format — infer from type
   if (type === 'time') {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Invalid date';
-
-    return timeFormat(getTimeFormatByGrain(granularity))(date);
+    return {
+      formatString: getTimeFormatByGrain(granularity),
+      formatFunc: (value) => formatDateByGranularity(value, granularity),
+    };
   }
 
   if (type === 'number') {
-    return getD3NumericLocale(locale, currency).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value));
+    return {
+      formatString: DEFAULT_NUMBER_FORMAT,
+      formatFunc: (value) => getD3NumericLocale(locale, currency).format(DEFAULT_NUMBER_FORMAT)(parseNumber(value)),
+    };
   }
 
-  return String(value);
+  return { formatString: null, formatFunc: (value) => String(value) };
+}
+
+export function formatValue(
+  value: any,
+  options: FormatValueOptions
+): string {
+  const { emptyPlaceholder = '∅' } = options;
+
+  if (value === null || value === undefined) {
+    return emptyPlaceholder;
+  }
+
+  return getFormat(options, { locale: options.locale }).formatFunc(value);
 }
