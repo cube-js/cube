@@ -17,7 +17,25 @@ as a dimension.
 
 Let's explore the `users` cube that contains the entities:
 
-```javascript
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: orders
+        relationship: one_to_many
+        sql: "{CUBE}.id = {orders.user_id}"
+
+    dimensions:
+      - name: name
+        sql: "first_name || ' ' || last_name"
+        type: string
+```
+
+```javascript title="JavaScript"
 cube(`users`, {
   sql_table: `users`,
 
@@ -37,12 +55,35 @@ cube(`users`, {
 })
 ```
 
+</CodeGroup>
+
 The `users` cube is joined with the `orders` cube to reflect that there might be
 many orders associated with a single user. The orders remain in various
 statuses, as reflected by the `status` dimension, and their creation dates are
 available via the `created_at` dimension:
 
-```javascript
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: user_id
+        sql: user_id
+        type: string
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript title="JavaScript"
 cube(`orders`, {
   sql_table: `orders`,
 
@@ -65,21 +106,15 @@ cube(`orders`, {
 })
 ```
 
+</CodeGroup>
+
 Currently, the dataset contains orders in the following statuses:
 
-```javascript
-[
-  {
-    "orders.status": "completed"
-  },
-  {
-    "orders.status": "processing"
-  },
-  {
-    "orders.status": "shipped"
-  }
-]
-```
+| status     |
+|------------|
+| completed  |
+| processing |
+| shipped    |
 
 Let's say that we'd like to know, for each user, the earliest creation date for
 their orders in any of these statuses. In terms of the EAV model:
@@ -101,7 +136,46 @@ not going to change often.
 Then, modeling the cube is as simple as defining a few joins (one join per
 attribute):
 
-```javascript
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users_statuses_joins
+    sql: |
+      SELECT
+        users.first_name,
+        users.last_name,
+        MIN(cOrders.created_at) AS cCreatedAt,
+        MIN(pOrders.created_at) AS pCreatedAt,
+        MIN(sOrders.created_at) AS sCreatedAt
+      FROM public.users AS users
+      LEFT JOIN public.orders AS cOrders
+        ON users.id = cOrders.user_id AND cOrders.status = 'completed'
+      LEFT JOIN public.orders AS pOrders
+        ON users.id = pOrders.user_id AND pOrders.status = 'processing'
+      LEFT JOIN public.orders AS sOrders
+        ON users.id = sOrders.user_id AND sOrders.status = 'shipped'
+      GROUP BY 1, 2
+
+    dimensions:
+      - name: name
+        sql: "first_name || ' ' || last_name"
+        type: string
+
+      - name: completed_created_at
+        sql: cCreatedAt
+        type: time
+
+      - name: processing_created_at
+        sql: pCreatedAt
+        type: time
+
+      - name: shipped_created_at
+        sql: sCreatedAt
+        type: time
+```
+
+```javascript title="JavaScript"
 cube(`users_statuses_joins`, {
   sql: `
     SELECT
@@ -144,39 +218,32 @@ cube(`users_statuses_joins`, {
 })
 ```
 
+</CodeGroup>
+
 Querying the cube would yield data like this. As we can see, every user has
 attributes that show the earliest creation date for their orders in all three
 statuses. However, some attributes don't have values (meaning that a user
 doesn't have orders in this status).
 
-```javascript
-[
-  {
-    "users_statuses_joins.name": "Ally Blanda",
-    "users_statuses_joins.completed_created_at": "2019-03-05T00:00:00.000",
-    "users_statuses_joins.processing_created_at": null,
-    "users_statuses_joins.shipped_created_at": "2019-04-06T00:00:00.000"
-  },
-  {
-    "users_statuses_joins.name": "Cayla Mayert",
-    "users_statuses_joins.completed_created_at": "2019-06-14T00:00:00.000",
-    "users_statuses_joins.processing_created_at": "2021-05-20T00:00:00.000",
-    "users_statuses_joins.shipped_created_at": null
-  },
-  {
-    "users_statuses_joins.name": "Concepcion Maggio",
-    "users_statuses_joins.completed_created_at": null,
-    "users_statuses_joins.processing_created_at": "2020-07-14T00:00:00.000",
-    "users_statuses_joins.shipped_created_at": "2019-07-19T00:00:00.000"
-  }
-]
-```
+| name               | completed_created_at | processing_created_at | shipped_created_at |
+|--------------------|---------------------:|----------------------:|-------------------:|
+| Ally Blanda        | 2019-03-05           | —                     | 2019-04-06         |
+| Cayla Mayert       | 2019-06-14           | 2021-05-20            | —                  |
+| Concepcion Maggio  | —                    | 2020-07-14            | 2019-07-19         |
 
 The drawback is that when the set of statuses changes, we'll need to amend the
 cube definition in several places: update selected values and joins in SQL as
 well as update the dimensions. Let's see how to work around that.
 
 ### Static attributes, DRY version
+
+<Note>
+
+This approach uses JavaScript-specific features — programmatic code generation
+with helper functions and `Object.assign`. It is not available in YAML data
+models.
+
+</Note>
 
 We can embrace the
 [Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
@@ -238,6 +305,13 @@ data. However, there's still a static list of statuses present in the cube's
 source code. Let's work around that next.
 
 ### Dynamic attributes
+
+<Note>
+
+This approach uses JavaScript-specific features — `asyncModule`, `require`, and
+the Node.js `pg` package. It is not available in YAML data models.
+
+</Note>
 
 We can eliminate the list of statuses from the cube's code by loading this list
 from an external source, e.g., the data source. Here's the code from the
@@ -329,10 +403,3 @@ asyncModule(async () => {
 Again, the new `users_statuses_dynamic` cube is functionally identical to the
 previously created cubes. So, querying this new cube would yield the same data
 too.
-
-## Source code
-
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/entity-attribute-value)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.

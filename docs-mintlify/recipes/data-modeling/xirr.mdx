@@ -1,6 +1,7 @@
 ---
 title: Calculating the internal rate of return (XIRR)
 description: We'd like to calculate the internal rate of return (XIRR) for a schedule of cash flows that is not necessarily periodic.
+hidden: true
 ---
 
 ## Use case
@@ -168,18 +169,6 @@ FROM (
 ```sql
 SELECT MEASURE(xirr) AS xirr
 FROM payments;
-```
-
-### REST API
-
-Regular query in the REST API that hits a pre-aggregation in Cube Store:
-
-```json
-{
-  "measures": [
-    "payments.xirr"
-  ]
-}
 ```
 
 ## Result

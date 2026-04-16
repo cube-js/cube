@@ -116,51 +116,11 @@ cube(`active_users`, {
 
 </CodeGroup>
 
-## Query
-
-We should set a `timeDimensions` with the `dateRange`.
-
-```bash
-curl cube:4000/cubejs-api/v1/load \
-  'query={
-    "measures": [
-      "active_users.monthly_active_users",
-      "active_users.weekly_active_users",
-      "active_users.daily_active_users",
-      "active_users.wau_to_mau"
-    ],
-    "timeDimensions": [
-      {
-        "dimension": "active_users.created_at",
-        "dateRange": [
-          "2020-01-01",
-          "2020-12-31"
-        ]
-      }
-    ]
-  }'
-```
-
 ## Result
 
-We got the data with our daily, weekly, and monthly active users.
+Query all four measures with a `timeDimensions` date range to get the active
+user counts for any given day. For example, for a single day in 2020:
 
-```json
-{
-  "data": [
-    {
-      "active_users.monthly_active_users": "22",
-      "active_users.weekly_active_users": "4",
-      "active_users.daily_active_users": "0",
-      "active_users.wau_to_mau": "18.1818181818181818"
-    }
-  ]
-}
-```
-
-## Source code
-
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/active-users)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+| MAU | WAU | DAU | WAU/MAU |
+|----:|----:|----:|--------:|
+|  22 |   4 |   0 |  18.18% |

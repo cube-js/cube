@@ -203,48 +203,14 @@ cube(`users`, {
 
 </CodeGroup>
 
-## Query
-
-To get the ratio result depending on the city, we need to pass the value via a
-filter in the query:
-
-```json
-{
-  "measures": [
-    "users.total_number_of_women",
-    "users.number_of_people_of_any_gender_in_the_city",
-    "users.ratio"
-  ],
-  "filters": [
-    {
-      "member": "users.city_filter",
-      "operator": "equals",
-      "values": ["Seattle"]
-    }
-  ]
-}
-```
-
 ## Result
 
-By joining the data table with itself and using the dimensions defined above, we
-can get the ratio we wanted to achieve:
+By joining the data table with itself and filtering on `city_filter`, we get the
+ratio for the chosen city without affecting the total denominator. For example,
+when filtering for Seattle:
 
-```json
-[
-  {
-    "users.total_number_of_women": "259",
-    "users.number_of_people_of_any_gender_in_the_city": "99",
-    "users.ratio": "0.38223938223938223938"
-  }
-]
-```
-
-## Source code
-
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+| total_number_of_women | number_of_people_in_city | ratio  |
+|-----------------------:|-------------------------:|-------:|
+| 259                   | 99                       | 38.22% |
 
 [ref-filter-params]: /reference/data-modeling/context-variables#filter_params

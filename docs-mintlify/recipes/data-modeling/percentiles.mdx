@@ -26,30 +26,13 @@ respectively.
 Let's explore the data in the `users` cube that contains various demographic
 information about users, including their age:
 
-```javascript
-[
-  {
-    "users.name": "Abbott, Breanne",
-    "users.age": 52
-  },
-  {
-    "users.name": "Abbott, Dallas",
-    "users.age": 43
-  },
-  {
-    "users.name": "Abbott, Gia",
-    "users.age": 36
-  },
-  {
-    "users.name": "Abbott, Tom",
-    "users.age": 39
-  },
-  {
-    "users.name": "Abbott, Ward",
-    "users.age": 67
-  }
-]
-```
+| name             | age |
+|------------------|----:|
+| Abbott, Breanne  |  52 |
+| Abbott, Dallas   |  43 |
+| Abbott, Gia      |  36 |
+| Abbott, Tom      |  39 |
+| Abbott, Ward     |  67 |
 
 Calculating the average age is as simple as defining a measure with the built-in
 [`avg` type](/reference/data-modeling/measures#type).
@@ -108,25 +91,8 @@ cube("users", {
 
 ## Result
 
-Using the measures defined above, we can explore statistics about the age of our
-users.
-
-```json
-[
-  {
-    "users.avg_age": "52.3100000000000000",
-    "users.median_age": 53,
-    "users.p95_age": 82
-  }
-]
-```
-
-For this particular dataset, the average age closely matches the median age, and
-95% of all users are younger than 82 years.
-
-## Source code
-
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/percentiles)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+Using the measures defined above, you can explore statistics about the age of
+your users. For a typical dataset, the average age closely matches the median
+age, and the 95th percentile reveals the upper bound for the vast majority of
+users — for example, if `p95_age` returns 82, then 95% of all users are
+younger than 82 years.

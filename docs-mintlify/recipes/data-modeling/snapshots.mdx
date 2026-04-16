@@ -23,40 +23,14 @@ part of the data engineering skillset.
 
 Let's explore the `statuses` cube that contains data like this:
 
-```json
-[
-  {
-    "statuses.order_id": 1,
-    "statuses.status": "shipped",
-    "statuses.changed_at": "2019-01-19T00:00:00.000"
-  },
-  {
-    "statuses.order_id": 1,
-    "statuses.status": "processing",
-    "statuses.changed_at": "2019-03-14T00:00:00.000"
-  },
-  {
-    "statuses.order_id": 1,
-    "statuses.status": "completed",
-    "statuses.changed_at": "2019-01-25T00:00:00.000"
-  },
-  {
-    "statuses.order_id": 2,
-    "statuses.status": "processing",
-    "statuses.changed_at": "2019-08-21T00:00:00.000"
-  },
-  {
-    "statuses.order_id": 2,
-    "statuses.status": "completed",
-    "statuses.changed_at": "2019-04-13T00:00:00.000"
-  },
-  {
-    "statuses.order_id": 2,
-    "statuses.status": "shipped",
-    "statuses.changed_at": "2019-03-18T00:00:00.000"
-  }
-]
-```
+| order_id | status     | changed_at          |
+|----------:|------------|---------------------|
+| 1        | shipped    | 2019-01-19 00:00:00 |
+| 1        | processing | 2019-03-14 00:00:00 |
+| 1        | completed  | 2019-01-25 00:00:00 |
+| 2        | processing | 2019-08-21 00:00:00 |
+| 2        | completed  | 2019-04-13 00:00:00 |
+| 2        | shipped    | 2019-03-18 00:00:00 |
 
 We can see that statuses change occasionally. How do we count orders that
 remained in the `shipped` status at a particular date?
@@ -153,57 +127,14 @@ dimension that indicates the `date` of a snapshot. We're also referencing the
 definition of the `statuses` cube with the
 [`sql()` property](/reference/data-modeling/cube#sql).
 
-## Query
-
-To count orders that remained in the `shipped` status at a particular date, we
-will send a query that selects a snapshot by this date and also filters by the
-status:
-
-```json
-{
-  "measures": ["status_snapshots.count"],
-  "filters": [
-    {
-      "member": "status_snapshots.date",
-      "operator": "equals",
-      "values": ["2019-04-01"]
-    },
-    {
-      "member": "status_snapshots.status",
-      "operator": "equals",
-      "values": ["shipped"]
-    }
-  ]
-}
-```
-
 ## Result
 
-If we execute a couple of such queries for distinct dates, we'll spot the
-change:
+To count orders that remained in the `shipped` status at a particular date,
+filter on both `status_snapshots.date` and `status_snapshots.status`. Running
+the same query for two different dates shows how the snapshot changes over time:
 
-```json5
-// Shipped as of April 1, 2019:
-[
-  {
-    "status_snapshots.count": 16,
-  }
-];
-```
-
-```json5
-// Shipped as of May 1, 2019:
-[
-  {
-    "status_snapshots.count": 25,
-  },
-]
-```
-
-## Source code
-
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/snapshots)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+| date       | status  | count |
+|------------|---------|------:|
+| 2019-04-01 | shipped |    16 |
+| 2019-05-01 | shipped |    25 |
 
