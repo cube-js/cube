@@ -564,7 +564,7 @@
                   "recipes/configuration/data-store-cost-saving-guide",
                   "recipes/configuration/multiple-sources-same-schema",
                   "recipes/configuration/custom-data-model-per-tenant",
-                  "recipes/configuration/databricks-oauth-authentication"
+                  "recipes/configuration/oauth-authentication"
                 ]
               },
               {
