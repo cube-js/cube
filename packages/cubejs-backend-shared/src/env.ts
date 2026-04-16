@@ -144,12 +144,29 @@ type DataSourceOpts = { dataSource: string, preAggregations?: boolean };
  * Checks if at least one PRE_AGGREGATIONS env var is set for a given data source.
  */
 export function hasPreAggregationsEnvVars(dataSource: string = 'default'): boolean {
-  const prefix = dataSource === 'default'
-    ? 'CUBEJS_PRE_AGGREGATIONS_'
-    : `CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`;
+  if (dataSource === 'default') {
+    /**
+     * Non-credential env vars that share the CUBEJS_PRE_AGGREGATIONS_ prefix
+     * but should NOT trigger separate pre-aggregation credentials.
+     */
+    const PRE_AGGREGATIONS_NON_CREDENTIAL_KEYS = new Set([
+      'CUBEJS_PRE_AGGREGATIONS_SCHEMA',
+      'CUBEJS_PRE_AGGREGATIONS_BUILDER',
+      'CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME',
+      'CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH',
+    ]);
+
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith('CUBEJS_PRE_AGGREGATIONS_') && !PRE_AGGREGATIONS_NON_CREDENTIAL_KEYS.has(key)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith(prefix) && key !== `${prefix}SCHEMA`) {
+    if (key.startsWith(`CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`)) {
       return true;
     }
   }

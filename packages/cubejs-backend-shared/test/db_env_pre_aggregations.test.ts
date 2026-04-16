@@ -148,6 +148,9 @@ describe('hasPreAggregationsEnvVars', () => {
   afterEach(() => {
     delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST;
     delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH;
     delete process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST;
     delete process.env.CUBEJS_DATASOURCES;
   });
@@ -169,6 +172,25 @@ describe('hasPreAggregationsEnvVars', () => {
   test('ignores CUBEJS_PRE_AGGREGATIONS_SCHEMA', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_preaggs';
     expect(hasPreAggregationsEnvVars('default')).toBe(false);
+  });
+
+  test('ignores CUBEJS_PRE_AGGREGATIONS_BUILDER', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
+    expect(hasPreAggregationsEnvVars('default')).toBe(false);
+  });
+
+  test('returns false when only non-credential PRE_AGGREGATIONS vars are set', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_preaggs';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME = '600';
+    process.env.CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH = 'true';
+    expect(hasPreAggregationsEnvVars('default')).toBe(false);
+  });
+
+  test('returns true when credential var is set alongside non-credential vars', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST = 'some-host';
+    expect(hasPreAggregationsEnvVars('default')).toBe(true);
   });
 
   test('returns false for non-matching datasource', () => {
