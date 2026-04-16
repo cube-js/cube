@@ -31,6 +31,12 @@ impl MeasureMatcher {
     pub fn try_match(&mut self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         match symbol.as_ref() {
             MemberSymbol::Measure(measure) => {
+                // Cumulative measures (rolling windows) require time series joins
+                // that can't be satisfied by a pre-aggregation directly —
+                // only their base (leaf) measures inside the CTE can match
+                if measure.is_cumulative() {
+                    return Ok(false);
+                }
                 if self.pre_aggregation_measures.contains(&measure.full_name())
                     && (!self.only_addictive || measure.is_addictive())
                 {

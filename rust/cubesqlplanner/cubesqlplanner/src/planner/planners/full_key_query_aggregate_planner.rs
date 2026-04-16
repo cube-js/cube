@@ -14,34 +14,15 @@ impl FullKeyAggregateQueryPlanner {
 
     pub fn plan_logical_source(
         &self,
-        resolve_multiplied_measures: Option<Rc<ResolveMultipliedMeasures>>,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
     ) -> Result<Rc<FullKeyAggregate>, CubeError> {
-        let mut multi_stage_subquery_refs = Vec::new();
-        for subquery in multi_stage_subqueries {
-            multi_stage_subquery_refs.push(subquery);
-        }
-        let resolved_multiplied_source =
-            resolve_multiplied_measures.map(|resolve_multiplied_measures| {
-                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                    resolve_multiplied_measures.clone(),
-                )
-            });
-        let measures = if let Some(multiplied_source) = &resolved_multiplied_source {
-            multiplied_source.schema().measures.clone()
-        } else {
-            Vec::new()
-        };
-
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_measures(measures)
             .into_rc();
         Ok(Rc::new(
             FullKeyAggregate::builder()
-                .multiplied_measures_resolver(resolved_multiplied_source)
-                .multi_stage_subquery_refs(multi_stage_subquery_refs)
+                .multi_stage_subquery_refs(multi_stage_subqueries)
                 .use_full_join_and_coalesce(true)
                 .schema(schema)
                 .build(),
@@ -50,12 +31,10 @@ impl FullKeyAggregateQueryPlanner {
 
     pub fn plan_logical_plan(
         &self,
-        resolve_multiplied_measures: Option<Rc<ResolveMultipliedMeasures>>,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
         all_multistage_members: Vec<Rc<LogicalMultiStageMember>>,
     ) -> Result<Rc<Query>, CubeError> {
-        let source =
-            self.plan_logical_source(resolve_multiplied_measures, multi_stage_subqueries)?;
+        let source = self.plan_logical_source(multi_stage_subqueries)?;
         let source = source.into();
 
         let multiplied_measures = self

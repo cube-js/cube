@@ -38,17 +38,13 @@ impl QueryPlanner {
 
             let multiplied_measures_query_planner =
                 MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
-            let multiplied_resolver =
-                multiplied_measures_query_planner.plan_queries(&mut cte_state)?;
+            multiplied_measures_query_planner.plan_queries(&mut cte_state)?;
 
             let (all_members, all_refs) = cte_state.into_results();
 
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result = full_key_aggregate_planner.plan_logical_plan(
-                multiplied_resolver,
-                all_refs,
-                all_members,
-            )?;
+            let result =
+                full_key_aggregate_planner.plan_logical_plan(all_refs, all_members)?;
 
             Ok(result)
         }

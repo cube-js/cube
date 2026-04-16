@@ -1,5 +1,5 @@
 use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures};
+use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
 use crate::plan::{
@@ -28,20 +28,12 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
-        if let Some(resolved_multiplied_measures) =
-            full_key_aggregate.multiplied_measures_resolver()
-        {
-            match resolved_multiplied_measures {
-                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
-                    // Multiplied measures are now CTEs, processed via multi_stage_subquery_refs
-                }
-                ResolvedMultipliedMeasures::PreAggregation(pre_agg_query) => {
-                    let query = self
-                        .builder
-                        .process_node(pre_agg_query.as_ref(), &context)?;
-                    data_queries.push(query);
-                }
-            }
+
+        if let Some(pre_agg_query) = full_key_aggregate.pre_aggregation_override() {
+            let query = self
+                .builder
+                .process_node(pre_agg_query.as_ref(), &context)?;
+            data_queries.push(query);
         }
 
         for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {

@@ -37,45 +37,12 @@ impl PrettyPrint for MultiStageSubqueryRef {
     }
 }
 
-#[derive(Clone)]
-pub enum ResolvedMultipliedMeasures {
-    ResolveMultipliedMeasures(Rc<ResolveMultipliedMeasures>),
-    PreAggregation(Rc<Query>),
-}
-
-impl ResolvedMultipliedMeasures {
-    pub fn schema(&self) -> Rc<LogicalSchema> {
-        match self {
-            ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
-                resolve_multiplied_measures.schema.clone()
-            }
-            ResolvedMultipliedMeasures::PreAggregation(simple_query) => {
-                simple_query.schema().clone()
-            }
-        }
-    }
-}
-
-impl PrettyPrint for ResolvedMultipliedMeasures {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        match self {
-            Self::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
-                resolve_multiplied_measures.pretty_print(result, state);
-            }
-            Self::PreAggregation(pre_aggregation) => {
-                result.println("PreAggregation query:", state);
-                pre_aggregation.pretty_print(result, state);
-            }
-        }
-    }
-}
-
 #[derive(Clone, TypedBuilder)]
 pub struct FullKeyAggregate {
     schema: Rc<LogicalSchema>,
     use_full_join_and_coalesce: bool,
     #[builder(default)]
-    multiplied_measures_resolver: Option<ResolvedMultipliedMeasures>,
+    pre_aggregation_override: Option<Rc<Query>>,
     #[builder(default)]
     multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
 }
@@ -89,8 +56,8 @@ impl FullKeyAggregate {
         self.use_full_join_and_coalesce
     }
 
-    pub fn multiplied_measures_resolver(&self) -> &Option<ResolvedMultipliedMeasures> {
-        &self.multiplied_measures_resolver
+    pub fn pre_aggregation_override(&self) -> &Option<Rc<Query>> {
+        &self.pre_aggregation_override
     }
 
     pub fn multi_stage_subquery_refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
@@ -98,7 +65,7 @@ impl FullKeyAggregate {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.multi_stage_subquery_refs.is_empty() && self.multiplied_measures_resolver.is_none()
+        self.multi_stage_subquery_refs.is_empty() && self.pre_aggregation_override.is_none()
     }
 }
 
@@ -108,45 +75,27 @@ impl LogicalNode for FullKeyAggregate {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        if let Some(resolver) = self.multiplied_measures_resolver() {
-            vec![match resolver {
-                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(item) => item.as_plan_node(),
-                ResolvedMultipliedMeasures::PreAggregation(item) => item.as_plan_node(),
-            }]
+        if let Some(pre_agg) = &self.pre_aggregation_override {
+            vec![pre_agg.as_plan_node()]
         } else {
             vec![]
         }
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let multiplied_measures_resolver = if self.multiplied_measures_resolver().is_none() {
+        let pre_aggregation_override = if self.pre_aggregation_override.is_none() {
             check_inputs_len(&inputs, 0, self.node_name())?;
             None
         } else {
             check_inputs_len(&inputs, 1, self.node_name())?;
-            let input_source = &inputs[0];
-
-            Some(
-                match self.multiplied_measures_resolver().as_ref().unwrap() {
-                    ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
-                        ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                            input_source.clone().into_logical_node()?,
-                        )
-                    }
-                    ResolvedMultipliedMeasures::PreAggregation(_) => {
-                        ResolvedMultipliedMeasures::PreAggregation(
-                            input_source.clone().into_logical_node()?,
-                        )
-                    }
-                },
-            )
+            Some(inputs[0].clone().into_logical_node()?)
         };
 
         Ok(Rc::new(
             Self::builder()
                 .schema(self.schema().clone())
                 .use_full_join_and_coalesce(self.use_full_join_and_coalesce())
-                .multiplied_measures_resolver(multiplied_measures_resolver)
+                .pre_aggregation_override(pre_aggregation_override)
                 .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
                 .build(),
         ))
@@ -178,9 +127,9 @@ impl PrettyPrint for FullKeyAggregate {
             ),
             &state,
         );
-        if let Some(resolve_multiplied_measures) = self.multiplied_measures_resolver() {
-            result.println("multiplied measures resolver:", &state);
-            resolve_multiplied_measures.pretty_print(result, &details_state);
+        if let Some(pre_agg) = &self.pre_aggregation_override {
+            result.println("pre_aggregation_override:", &state);
+            pre_agg.pretty_print(result, &details_state);
         }
 
         if !self.multi_stage_subquery_refs().is_empty() {

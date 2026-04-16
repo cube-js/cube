@@ -11,7 +11,6 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::time_dimension::QueryDateTime;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -193,95 +192,32 @@ impl PreAggregationOptimizer {
             return Ok(None);
         }
 
-        let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
-            let fk_source = if let Some(resolver_multiplied_measures) =
-                full_key_aggregate.multiplied_measures_resolver()
+        // Try top-level pre-aggregation match for the entire query
+        let mut top_level_match = None;
+        for pre_aggregation in compiled_pre_aggregations.iter() {
+            let external = pre_aggregation.external.unwrap_or(false);
+            let date_range = Self::extract_date_range(
+                query.filter(),
+                &self.query_tools,
+                &TimeShiftState::default(),
+                external,
+            );
+            if let Some(rewritten) =
+                self.try_rewrite_simple_query(query, pre_aggregation, date_range)?
             {
-                if let ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                    resolver_multiplied_measures,
-                ) = resolver_multiplied_measures
-                {
-                    // Try each pre-aggregation for the multiplied measures resolver
-                    let mut result_source = None;
-                    for pre_aggregation in compiled_pre_aggregations.iter() {
-                        if let Some(matched_measures) = self.is_schema_and_filters_match(
-                            &resolver_multiplied_measures.schema,
-                            &resolver_multiplied_measures.filter,
-                            pre_aggregation,
-                        )? {
-                            let date_range = Self::extract_date_range(
-                                &resolver_multiplied_measures.filter,
-                                &self.query_tools,
-                                &TimeShiftState::default(),
-                                pre_aggregation.external.unwrap_or(false),
-                            );
-                            let pre_aggregation_source = self.make_pre_aggregation_source(
-                                pre_aggregation,
-                                &matched_measures,
-                                date_range,
-                            )?;
+                top_level_match = Some(rewritten);
+                break;
+            }
+        }
 
-                            let pre_aggregation_query = Query::builder()
-                                .schema(resolver_multiplied_measures.schema.clone())
-                                .filter(resolver_multiplied_measures.filter.clone())
-                                .modifers(Rc::new(LogicalQueryModifiers {
-                                    offset: None,
-                                    limit: None,
-                                    ungrouped: false,
-                                    order_by: vec![],
-                                }))
-                                .source(pre_aggregation_source.into())
-                                .build();
-                            result_source = Some(ResolvedMultipliedMeasures::PreAggregation(
-                                Rc::new(pre_aggregation_query),
-                            ));
-                            break;
-                        }
-                    }
-                    if result_source.is_none() {
-                        // Rollback
-                        self.usages.truncate(saved_usages_len);
-                        self.usage_counter = saved_counter;
-                        return Ok(None);
-                    }
-                    result_source
-                } else {
-                    Some(resolver_multiplied_measures.clone())
-                }
-            } else {
-                None
-            };
-            let multi_stage_subquery_refs = if matches!(
-                fk_source,
-                Some(ResolvedMultipliedMeasures::PreAggregation(_))
-            ) {
-                let multiplied_cte_names = full_key_aggregate
-                    .multiplied_measures_resolver()
-                    .as_ref()
-                    .and_then(|r| match r {
-                        ResolvedMultipliedMeasures::ResolveMultipliedMeasures(rm) => {
-                            Some(&rm.multiplied_cte_names)
-                        }
-                        _ => None,
-                    });
-                if let Some(cte_names) = multiplied_cte_names {
-                    full_key_aggregate
-                        .multi_stage_subquery_refs()
-                        .iter()
-                        .filter(|r| !cte_names.contains(r.name()))
-                        .cloned()
-                        .collect()
-                } else {
-                    full_key_aggregate.multi_stage_subquery_refs().clone()
-                }
-            } else {
-                full_key_aggregate.multi_stage_subquery_refs().clone()
-            };
+        let source = if let Some(rewritten_query) = &top_level_match {
+            rewritten_multistages = vec![];
+            rewritten_query.source().clone()
+        } else if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
             let result = FullKeyAggregate::builder()
                 .schema(full_key_aggregate.schema().clone())
                 .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
-                .multiplied_measures_resolver(fk_source)
-                .multi_stage_subquery_refs(multi_stage_subquery_refs)
+                .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
                 .build();
             Rc::new(result).into()
         } else {

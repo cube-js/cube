@@ -1,5 +1,5 @@
 use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures};
+use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
 use crate::plan::{
@@ -32,25 +32,18 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         let mut data_queries = vec![];
         let mut keys_context = context.clone();
         keys_context.dimensions_query = true;
-        if let Some(resolved_multiplied_measures) =
-            full_key_aggregate.multiplied_measures_resolver()
-        {
-            match resolved_multiplied_measures {
-                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
-                    // Multiplied measures are now CTEs, processed via multi_stage_subquery_refs
-                }
-                ResolvedMultipliedMeasures::PreAggregation(pre_agg_query) => {
-                    let keys_query = self
-                        .builder
-                        .process_node(pre_agg_query.as_ref(), &keys_context)?;
-                    keys_queries.push(keys_query);
-                    let query = self
-                        .builder
-                        .process_node(pre_agg_query.as_ref(), &context)?;
-                    data_queries.push(query);
-                }
-            }
+
+        if let Some(pre_agg_query) = full_key_aggregate.pre_aggregation_override() {
+            let keys_query = self
+                .builder
+                .process_node(pre_agg_query.as_ref(), &keys_context)?;
+            keys_queries.push(keys_query);
+            let query = self
+                .builder
+                .process_node(pre_agg_query.as_ref(), &context)?;
+            data_queries.push(query);
         }
+
         for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
             let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(

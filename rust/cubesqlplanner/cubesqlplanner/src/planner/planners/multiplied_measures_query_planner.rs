@@ -36,10 +36,7 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
-    pub fn plan_queries(
-        &self,
-        cte_state: &mut CteState,
-    ) -> Result<Option<Rc<ResolveMultipliedMeasures>>, CubeError> {
+    pub fn plan_queries(&self, cte_state: &mut CteState) -> Result<(), CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
@@ -47,8 +44,6 @@ impl MultipliedMeasuresQueryPlanner {
         }
 
         let full_key_aggregate_measures = &self.full_key_aggregate_measures;
-
-        let mut multiplied_cte_names = Vec::new();
 
         if !full_key_aggregate_measures.regular_measures.is_empty() {
             let join_multi_fact_groups = self
@@ -122,41 +117,9 @@ impl MultipliedMeasuresQueryPlanner {
                     .build(),
             );
             cte_state.add_subquery_ref(subquery_ref);
-            multiplied_cte_names.push(cte_name);
         }
 
-        let multiplied_resolver = if multiplied_cte_names.is_empty() {
-            None
-        } else {
-            let multiplied_measures = full_key_aggregate_measures
-                .multiplied_measures
-                .iter()
-                .map(|m| m.measure().clone())
-                .collect_vec();
-            let schema = LogicalSchema::default()
-                .set_time_dimensions(self.query_properties.time_dimensions().clone())
-                .set_dimensions(self.query_properties.dimensions().clone())
-                .set_measures(multiplied_measures)
-                .set_multiplied_measures(
-                    full_key_aggregate_measures
-                        .rendered_as_multiplied_measures
-                        .clone(),
-                )
-                .into_rc();
-            let logical_filter = Rc::new(LogicalFilter {
-                dimensions_filters: self.query_properties.dimensions_filters().clone(),
-                time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-                measures_filter: self.query_properties.measures_filters().clone(),
-                segments: self.query_properties.segments().clone(),
-            });
-            Some(Rc::new(ResolveMultipliedMeasures {
-                schema,
-                filter: logical_filter,
-                multiplied_cte_names,
-            }))
-        };
-
-        Ok(multiplied_resolver)
+        Ok(())
     }
 
     fn aggregate_subquery_plan(
