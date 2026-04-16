@@ -109,6 +109,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
                 CubeMetaMeasure {
@@ -121,6 +122,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
                 CubeMetaMeasure {
@@ -133,6 +135,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
                 CubeMetaMeasure {
@@ -145,6 +148,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
                 CubeMetaMeasure {
@@ -157,6 +161,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
                 CubeMetaMeasure {
@@ -169,6 +174,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
             ],
@@ -230,6 +236,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
                 CubeMetaMeasure {
@@ -242,6 +249,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 },
             ],
@@ -271,6 +279,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 meta: None,
                 alias_member: None,
                 format: None,
+                format_description: None,
                 currency: None,
             }],
             segments: vec![],
@@ -303,6 +312,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
                     currency: None,
                 })
                 .chain(
@@ -317,6 +327,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -329,6 +340,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -341,6 +353,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -353,6 +366,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -365,6 +379,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                     ]
@@ -420,6 +435,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -432,6 +448,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -444,6 +461,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                     ]
@@ -460,6 +478,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -472,6 +491,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -484,6 +504,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -496,6 +517,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                         CubeMetaMeasure {
@@ -508,6 +530,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
                             currency: None,
                         },
                     ]
@@ -540,6 +563,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
             agg_type: Some("string".to_string()),
             meta: None,
             format: None,
+            format_description: None,
             currency: None,
             alias_member: None,
         }],
@@ -569,6 +593,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 agg_type: Some("sum".to_string()),
                 meta: None,
                 format: None,
+                format_description: None,
                 currency: None,
                 alias_member: None,
             },
@@ -581,6 +606,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 agg_type: Some("avg".to_string()),
                 meta: None,
                 format: None,
+                format_description: None,
                 currency: None,
                 alias_member: None,
             },
@@ -593,6 +619,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 agg_type: Some("count".to_string()),
                 meta: None,
                 format: None,
+                format_description: None,
                 currency: None,
                 alias_member: None,
             },

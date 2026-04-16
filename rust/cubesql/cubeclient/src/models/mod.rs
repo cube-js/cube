@@ -18,6 +18,8 @@ pub mod v1_cube_meta_folder;
 pub use self::v1_cube_meta_folder::V1CubeMetaFolder;
 pub mod v1_cube_meta_format;
 pub use self::v1_cube_meta_format::V1CubeMetaFormat;
+pub mod v1_cube_meta_format_description;
+pub use self::v1_cube_meta_format_description::V1CubeMetaFormatDescription;
 pub mod v1_cube_meta_hierarchy;
 pub use self::v1_cube_meta_hierarchy::V1CubeMetaHierarchy;
 pub mod v1_cube_meta_join;

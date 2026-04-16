@@ -145,6 +145,8 @@ components:
           type: "object"
         format:
           $ref: "#/components/schemas/V1CubeMetaFormat"
+        formatDescription:
+          $ref: "#/components/schemas/V1CubeMetaFormatDescription"
         currency:
           type: "string"
           description: "ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)"
@@ -180,6 +182,8 @@ components:
           type: "object"
         format:
           $ref: "#/components/schemas/V1CubeMetaFormat"
+        formatDescription:
+          $ref: "#/components/schemas/V1CubeMetaFormatDescription"
         currency:
           type: "string"
           description: "ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)"
@@ -345,6 +349,22 @@ components:
         - $ref: "#/components/schemas/V1CubeMetaCustomTimeFormat"
         - $ref: "#/components/schemas/V1CubeMetaCustomNumericFormat"
       description: Format of measure or dimension - can be a simple string format, a link configuration, a custom time format, or a custom numeric format
+    V1CubeMetaFormatDescription:
+      type: "object"
+      description: Resolved format description with the predefined name and d3-format specifier
+      required:
+        - name
+        - specifier
+      properties:
+        name:
+          type: "string"
+          description: "Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number', or 'custom' for ad-hoc specifiers"
+        specifier:
+          type: "string"
+          description: "d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f'). See https://d3js.org/d3-format"
+        currency:
+          type: "string"
+          description: "ISO 4217 currency code in uppercase (e.g. USD, EUR). Present when a currency format is used."
     V1MetaResponse:
       type: "object"
       properties:

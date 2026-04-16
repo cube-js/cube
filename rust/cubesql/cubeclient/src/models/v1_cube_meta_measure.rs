@@ -29,6 +29,8 @@ pub struct V1CubeMetaMeasure {
     pub meta: Option<serde_json::Value>,
     #[serde(rename = "format", skip_serializing_if = "Option::is_none")]
     pub format: Option<Box<models::V1CubeMetaFormat>>,
+    #[serde(rename = "formatDescription", skip_serializing_if = "Option::is_none")]
+    pub format_description: Option<Box<models::V1CubeMetaFormatDescription>>,
     #[serde(rename = "currency", skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
     /// When measure is defined in View, it keeps the original path: Cube.measure
@@ -47,6 +49,7 @@ impl V1CubeMetaMeasure {
             agg_type: None,
             meta: None,
             format: None,
+            format_description: None,
             currency: None,
             alias_member: None,
         }
