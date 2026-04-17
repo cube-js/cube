@@ -196,8 +196,8 @@ impl From<cuberockstore::rocksdb::Error> for CubeError {
     }
 }
 
-impl From<flatbuffers::InvalidFlatbuffer> for CubeError {
-    fn from(v: flatbuffers::InvalidFlatbuffer) -> Self {
+impl From<cubeshared::flatbuffers::InvalidFlatbuffer> for CubeError {
+    fn from(v: cubeshared::flatbuffers::InvalidFlatbuffer) -> Self {
         CubeError::from_debug_error(v)
     }
 }

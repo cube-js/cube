@@ -300,10 +300,10 @@ mod tests {
     use crate::CubeError;
     use datafusion::common::DFSchema;
     use datafusion::logical_expr::{EmptyRelation, LogicalPlan};
-    use flatbuffers::bitflags::_core::sync::atomic::AtomicI64;
     use futures::future::join_all;
     use futures_timer::Delay;
     use std::collections::HashMap;
+    use std::sync::atomic::AtomicI64;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::Duration;

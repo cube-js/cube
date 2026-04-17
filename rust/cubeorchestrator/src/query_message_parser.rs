@@ -3,7 +3,7 @@ use crate::{
     transport::JsRawData,
 };
 use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
-use flatbuffers::VerifierOptions;
+use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
 use neon::prelude::Finalize;
 
@@ -158,7 +158,7 @@ mod tests {
         root_as_http_message_unchecked, HttpColumnValue, HttpColumnValueArgs, HttpCommand,
         HttpMessage, HttpMessageArgs, HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs,
     };
-    use flatbuffers::FlatBufferBuilder;
+    use cubeshared::flatbuffers::FlatBufferBuilder;
 
     /// Helper function to create a test HttpMessage with a given number of rows and columns
     fn create_test_message(num_rows: usize, num_columns: usize) -> Vec<u8> {
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_parse_with_custom_verifier_options() {
         use cubeshared::codegen::root_as_http_message_with_opts;
-        use flatbuffers::VerifierOptions;
+        use cubeshared::flatbuffers::VerifierOptions;
 
         // Test that custom verifier options can handle large datasets
         let msg_data = create_test_message(33_000, 40);

@@ -28,9 +28,9 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, SendableRecordBatchStream,
 };
-use flatbuffers::bitflags::_core::any::Any;
-use flatbuffers::bitflags::_core::fmt::Formatter;
 use itertools::{EitherOrBoth, Itertools};
+use std::any::Any;
+use std::fmt::Formatter;
 
 use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::metastore::multi_index::MultiPartition;
