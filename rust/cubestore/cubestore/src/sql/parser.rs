@@ -393,7 +393,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_literal_string(&mut self) -> Result<String, ParserError> {
-        if let Token::Placeholder(placeholder) = self.parser.peek_token() {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
             match self.unwrap_placeholder(&placeholder)? {
                 QueryParameter::StringValue(s) => Ok(s),
                 other => Err(ParserError::ParserError(format!(
@@ -407,11 +407,12 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
-        if let Token::Placeholder(placeholder) = self.parser.peek_token() {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
             match self.unwrap_placeholder(&placeholder)? {
                 QueryParameter::StringValue(value) => Ok(Ident {
                     value,
                     quote_style: None,
+                    span: Span::empty(),
                 }),
                 other => Err(ParserError::ParserError(format!(
                     "Wrong parameters type, actual: {}, expected: string parameter",
@@ -482,7 +483,7 @@ impl<'a> CubeStoreParser<'a> {
     where
         <R as std::str::FromStr>::Err: std::fmt::Display,
     {
-        if let Token::Placeholder(placeholder) = self.parser.peek_token() {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
             return match self.unwrap_placeholder(&placeholder)? {
                 QueryParameter::Int64Value(value) => {
                     value.to_string().parse::<R>().map_err(|err| {
@@ -1005,7 +1006,7 @@ mod tests {
     use sqlparser::ast::Statement as SQLStatement;
 
     fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
-        let mut parser = CubeStoreParser::new(query)?;
+        let mut parser = CubeStoreParser::new(query, None)?;
         Ok(parser.parse_statement()?)
     }
 

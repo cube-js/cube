@@ -16,8 +16,8 @@ use crate::{app_metrics, CubeError};
 use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
-    HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs,
+    HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpResultSet,
+    HttpResultSetArgs, HttpRow, HttpRowArgs,
 };
 use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
@@ -129,8 +129,8 @@ impl HttpServer {
                                 user,
                                 inline_tables: InlineTables::new(),
                                 parameters: None,
-                            trace_obj: None,
-                        process_id,
+                                trace_obj: None,
+                                process_id,
                             }),
                             Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
                         }
@@ -831,7 +831,7 @@ impl HttpMessage {
     }
 
     pub async fn read<'a>(
-        http_message: crate::codegen::HttpMessage<'a>,
+        http_message: cubeshared::codegen::HttpMessage<'a>,
     ) -> Result<Self, CubeError> {
         Ok(HttpMessage {
             message_id: http_message.message_id(),
@@ -975,7 +975,6 @@ impl HttpMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
     use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};

@@ -6007,6 +6007,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
+name = "spin"
+version = "0.9.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+
+[[package]]
 name = "sqlparser"
 version = "0.54.0"
 source = "git+https://github.com/cube-js/sqlparser-rs.git?branch=cube-46.0.1#26fd2d4b7b44273f373e719dfae4bd1968216eeb"
@@ -6017,11 +6023,32 @@ dependencies = [
 ]
 
 [[package]]
-name = "sqlparser"
-version = "0.9.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=4e0053a81407e419d68ee0831708e89b8f54c0f6#4e0053a81407e419d68ee0831708e89b8f54c0f6"
+name = "sqlparser_derive"
+version = "0.3.0"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?branch=cube-46.0.1#26fd2d4b7b44273f373e719dfae4bd1968216eeb"
 dependencies = [
- "log",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "stacker"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cddb07e32ddb770749da91081d8d0ac3a16f1a569a18b20348cd371f5dead06b"
+dependencies = [
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "psm",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

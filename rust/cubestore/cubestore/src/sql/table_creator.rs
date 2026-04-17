@@ -463,7 +463,7 @@ impl TableCreator {
         let trace_obj_to_save = trace_obj.clone();
 
         let source_columns = if let Some(source_table) = source_table {
-            let mut parser = CubeStoreParser::new(&source_table)?;
+            let mut parser = CubeStoreParser::new(&source_table, None)?;
             let cols = parser
                 .parse_streaming_source_table()
                 .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
