@@ -35,42 +35,38 @@ Personal access tokens might be disabled in your Tableau site configuration.
 To enable them, navigate to the&nbsp;**Settings** page of your Tableau site
 and click&nbsp;**Enable personal access tokens**.
 
-By default, personal access tokens are configured with an expiry period of 180 days.
-Please check your Tableau site configuration for details. To customize the expiry
-period, navigate to the&nbsp;**Settings** page of your Tableau site. Please
-also make sure to renew your personal access token in time. 
+Personal access tokens expire if not used for 15 consecutive days. If used
+regularly, they expire after one year. You can customize the default expiration
+period in the&nbsp;**Settings** page of your Tableau site. Make sure to renew
+your personal access token before it expires.
 
 </Info>
 
-<Warning>
+### Tableau Cloud
 
-Personal access tokens expire if they are not used after 15 consecutive days.
-If they are used more frequently than every 15 days, they expire after one year.
-
-</Warning>
-
-You will also need to specify a `region` and a Tableau `site` name. Consider the
-following URL of a Tableau site: `https://10ax.online.tableau.com/#/site/cubedev/home`.
+For Tableau Cloud, you need to specify a `region` and a `site` name. Consider the
+following URL of a Tableau Cloud site: `https://10ax.online.tableau.com/#/site/cubedev/home`.
 In this case, the region would be `10ax` and the site name would be `cubedev`.
 
-Example configuration for Tableau:
+Example configuration for Tableau Cloud:
 
 <CodeGroup>
 
 ```python title="Python"
 from cube import config
+import os
 
 @config('semantic_layer_sync')
 def semantic_layer_sync(ctx: dict) -> list[dict]:
   return [
     {
       'type': 'tableau',
-      'name': 'Tableau Sync',
+      'name': 'Tableau Cloud Sync',
       'config': {
         'region': '10ax',
         'site': 'mytableausite',
         'personalAccessToken': 'cube-cloud',
-        'personalAccessTokenSecret': 'HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4',
+        'personalAccessTokenSecret': os.environ['CUBEJS_TABLEAU_PAT_SECRET'],
         'database': 'Cube Cloud: production-deployment',
       },
     },
@@ -83,12 +79,12 @@ module.exports = {
     return [
       {
         type: "tableau",
-        name: "Tableau Sync",
+        name: "Tableau Cloud Sync",
         config: {
           region: "10ax",
           site: "mytableausite",
           personalAccessToken: "cube-cloud",
-          personalAccessTokenSecret: "HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4",
+          personalAccessTokenSecret: process.env.CUBEJS_TABLEAU_PAT_SECRET,
           database: "Cube Cloud: production-deployment"
         }
       }
@@ -98,6 +94,73 @@ module.exports = {
 ```
 
 </CodeGroup>
+
+### Tableau Server
+
+For Tableau Server, you need to specify a `hostname`, `site`, and `apiVersion`.
+
+To find your site name, look at your Tableau Server URL: the site name is
+the value that follows `/site/` in the URL. If there is no `/site/` segment in
+the URL, you are using the Default site — leave the `site` field blank
+in the Cube Cloud configuration.
+
+Example configuration for Tableau Server:
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+import os
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'tableau',
+      'name': 'Tableau Server Sync',
+      'config': {
+        'hostname': 'tableau.example.com',
+        'site': 'mysite',
+        'apiVersion': '3.19',
+        'personalAccessToken': 'cube-cloud',
+        'personalAccessTokenSecret': os.environ['CUBEJS_TABLEAU_PAT_SECRET'],
+        'database': 'Cube Cloud: production-deployment',
+      },
+    },
+  ]
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "tableau",
+        name: "Tableau Server Sync",
+        config: {
+          hostname: "tableau.example.com",
+          site: "mysite",
+          apiVersion: "3.19",
+          personalAccessToken: "cube-cloud",
+          personalAccessTokenSecret: process.env.CUBEJS_TABLEAU_PAT_SECRET,
+          database: "Cube Cloud: production-deployment"
+        }
+      }
+    ]
+  }
+}
+```
+
+</CodeGroup>
+
+<Tip>
+
+Use environment variables to store your personal access token secret rather
+than hardcoding it in your configuration. In Python, use
+`os.environ['CUBEJS_TABLEAU_PAT_SECRET']` and in JavaScript, use
+`process.env.CUBEJS_TABLEAU_PAT_SECRET`.
+
+</Tip>
 
 When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
 to enter the user name and password for Cube Cloud. You can find them at the&nbsp;**SQL
@@ -110,7 +173,13 @@ API][tableau-api].
 
 ### Tableau Desktop
 
-Click **Download .tds** to download a Tableau [data source][tds] file:
+The recommended way to use Cube with Tableau Desktop is to connect to your
+Tableau Cloud or Tableau Server account from within Desktop and choose the
+synced data source from there. This ensures your data source stays up to date
+with any changes made through Semantic Layer Sync.
+
+Alternatively, you can download a `.tds` file to get the data model into
+Tableau Desktop. Click **Download .tds** to download a Tableau [data source][tds] file:
 
 <Frame>
   <img src="https://ucarecdn.com/4b93196e-3128-4b01-bd3f-eab8e7d8a37f/" />
@@ -118,7 +187,7 @@ Click **Download .tds** to download a Tableau [data source][tds] file:
 
 In the modal window, select one or more cubes or views and click **Download
 all selected** to download a ZIP archive with Tableau data source files, one
-per cube or view. Use can open these files in Tableau to create data sources.
+per cube or view. You can open these files in Tableau to create data sources.
 
 
 [tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
