@@ -120,7 +120,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
       'name': 'Tableau Server Sync',
       'config': {
         'hostname': 'tableau.example.com',
-        'site': 'mysite',
+        'site': '',
         'apiVersion': '3.19',
         'personalAccessToken': 'cube-cloud',
         'personalAccessTokenSecret': os.environ['CUBEJS_TABLEAU_PAT_SECRET'],
@@ -139,7 +139,7 @@ module.exports = {
         name: "Tableau Server Sync",
         config: {
           hostname: "tableau.example.com",
-          site: "mysite",
+          site: "",
           apiVersion: "3.19",
           personalAccessToken: "cube-cloud",
           personalAccessTokenSecret: process.env.CUBEJS_TABLEAU_PAT_SECRET,
