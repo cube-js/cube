@@ -21,7 +21,7 @@ If you are looking for a fully integrated platform, check out [Cube](https://cub
 />
 
 <p align="center">
-  <i>Learn more about connecting Cube to <a href="https://cube.dev/docs/config/databases?ref=github-readme" target="_blank">data sources</a> and <a href="https://cube.dev/docs/config/downstream?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i>
+  <i>Learn more about connecting Cube to <a href="https://cube.dev/cube-core/getting-started/create-a-project?ref=github-readme" target="_blank">data sources</a> and <a href="https://cube.dev/docs/integrations?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i>
 </p>
 
 Cube Core was designed to work with all SQL data sources, including cloud data warehouses like Snowflake, Databricks, and BigQuery; query engines like Presto and Amazon Athena; and application databases like Postgres. Cube Core has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
@@ -48,7 +48,7 @@ docker run -p 4000:4000 \
 
 Then, open http://localhost:4000 in your browser to continue setup.
 
-For a step-by-step guide, [see the docs](https://cube.dev/docs/getting-started-docker?ref=github-readme).
+For a step-by-step guide, [see the docs](https://cube.dev/cube-core/getting-started/create-a-project?ref=github-readme).
 
 ### Cube — Complete Modern BI Tool from Cube Core Creators
 
@@ -59,9 +59,9 @@ For a step-by-step guide, [see the docs](https://cube.dev/docs/getting-started-d
 ## Resources
 
 - [Documentation](https://cube.dev/docs?ref=github-readme)
-- [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme)
-- [Examples & Tutorials](https://cube.dev/docs/examples?ref=github-readme)
-- [Architecture](https://cube.dev/docs/product/introduction#four-layers-of-semantic-layer)
+- [Getting Started](https://cube.dev/cube-core/getting-started?ref=github-readme)
+- [Examples & Tutorials](https://cube.dev/recipes?ref=github-readme)
+- [Architecture](https://cube.dev/docs/introduction)
 
 ## Contributing
 
