@@ -155,10 +155,11 @@ module.exports = {
 
 <Tip>
 
-Use environment variables to store your personal access token secret rather
-than hardcoding it in your configuration. In Python, use
-`os.environ['CUBEJS_TABLEAU_PAT_SECRET']` and in JavaScript, use
-`process.env.CUBEJS_TABLEAU_PAT_SECRET`.
+Store your personal access token secret in an environment variable rather
+than hardcoding it in your configuration. Create a new environment variable
+called `CUBEJS_TABLEAU_PAT_SECRET` with your token secret as the value,
+then reference it using `os.environ['CUBEJS_TABLEAU_PAT_SECRET']` in Python
+or `process.env.CUBEJS_TABLEAU_PAT_SECRET` in JavaScript.
 
 </Tip>
 
