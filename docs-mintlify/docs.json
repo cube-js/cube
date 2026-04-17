@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "Cube Documentation",
   "colors": {
-    "primary": "#7A77FF",
+    "primary": "#5339CF",
     "light": "#A5A3FF",
-    "dark": "#5856D6"
+    "dark": "#716EEE"
   },
   "favicon": "/favicon.svg",
   "banner": {
