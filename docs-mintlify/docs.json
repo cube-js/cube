@@ -598,6 +598,11 @@
       }
     ]
   },
+  "integrations": {
+    "gtm": {
+      "tagId": "GTM-52W7VM2"
+    }
+  },
   "styling": {
     "codeblocks": "dark"
   },
