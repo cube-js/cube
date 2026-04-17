@@ -17,8 +17,8 @@ use cubeshared::codegen::{
     HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
     HttpRowArgs,
 };
+use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
-use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use futures_timer::Delay;
 use hex::ToHex;
@@ -909,8 +909,8 @@ mod tests {
     use cubeshared::codegen::{
         HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
     };
+    use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use datafusion::cube_ext;
-    use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
     use log::trace;
@@ -986,7 +986,7 @@ mod tests {
             3,,2020-01-03T00:00:00.000Z
             4,four,
         "};
-        let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
+        let mut builder = cubeshared::flatbuffers::FlatBufferBuilder::with_capacity(1024);
         let query_offset = builder.create_string("query");
         let mut inline_tables_offsets = Vec::with_capacity(1);
         let name_offset = builder.create_string("table");
