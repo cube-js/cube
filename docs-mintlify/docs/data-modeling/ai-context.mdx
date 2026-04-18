@@ -202,6 +202,74 @@ view(`revenue_overview`, {
 
 </CodeGroup>
 
+### Cube-level context does not propagate to views
+
+<Warning>
+
+`ai_context` defined at the **cube level** does not automatically propagate
+to views. Since a view can include members from multiple cubes, cube-level
+metadata cannot be inherited.
+
+To ensure the AI agent sees your context when querying through views,
+define `ai_context` on **individual members** (measures, dimensions) or on
+the **view itself**.
+
+</Warning>
+
+For example, if you have synonyms or acronyms defined in a cube's
+`ai_context`, the AI agent will **not** see them when users query through
+a view. Instead, define them on the relevant member or view:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: sales_overview
+    description: Sales metrics and breakdowns
+    meta:
+      ai_context: >
+        This view is for sales performance analysis.
+        LC = Lucky Charms, HNC = Honey Nut Cheerios.
+
+    cubes:
+      - join_path: orders
+        includes:
+          - name: product_name
+            meta:
+              ai_context: >
+                Common acronyms: LC = Lucky Charms,
+                HNC = Honey Nut Cheerios.
+          - total_revenue
+```
+
+```javascript title="JavaScript"
+view(`sales_overview`, {
+  description: `Sales metrics and breakdowns`,
+  meta: {
+    ai_context: `This view is for sales performance analysis.
+      LC = Lucky Charms, HNC = Honey Nut Cheerios.`
+  },
+
+  cubes: [
+    {
+      join_path: orders,
+      includes: [
+        {
+          name: `product_name`,
+          meta: {
+            ai_context: `Common acronyms: LC = Lucky Charms,
+              HNC = Honey Nut Cheerios.`
+          }
+        },
+        `total_revenue`
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
 ## Descriptions vs. AI context
 
 | | `description` | `meta.ai_context` |
@@ -277,6 +345,10 @@ cube(`orders`, {
 - **Use AI context for agent-specific guidance.** If you need to tell the AI
   agent which measure to prefer or how to interpret ambiguous terms, use
   `ai_context`.
+- **Define context on members or views, not just cubes.** Cube-level
+  `ai_context` does not propagate to views. If your users query through
+  views, place `ai_context` on individual members or on the view itself to
+  ensure the AI agent can see it.
 - **Be specific.** Vague context like "important metric" is less helpful than
   "use this measure when users ask about monthly recurring revenue."
 - **Document relationships.** Use AI context to explain how cubes relate to each
