@@ -42,8 +42,6 @@ pub struct FullKeyAggregate {
     schema: Rc<LogicalSchema>,
     use_full_join_and_coalesce: bool,
     #[builder(default)]
-    pre_aggregation_override: Option<Rc<Query>>,
-    #[builder(default)]
     multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
 }
 
@@ -56,16 +54,12 @@ impl FullKeyAggregate {
         self.use_full_join_and_coalesce
     }
 
-    pub fn pre_aggregation_override(&self) -> &Option<Rc<Query>> {
-        &self.pre_aggregation_override
-    }
-
     pub fn multi_stage_subquery_refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
         &self.multi_stage_subquery_refs
     }
 
     pub fn is_empty(&self) -> bool {
-        self.multi_stage_subquery_refs.is_empty() && self.pre_aggregation_override.is_none()
+        self.multi_stage_subquery_refs.is_empty()
     }
 }
 
@@ -75,27 +69,16 @@ impl LogicalNode for FullKeyAggregate {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        if let Some(pre_agg) = &self.pre_aggregation_override {
-            vec![pre_agg.as_plan_node()]
-        } else {
-            vec![]
-        }
+        vec![]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let pre_aggregation_override = if self.pre_aggregation_override.is_none() {
-            check_inputs_len(&inputs, 0, self.node_name())?;
-            None
-        } else {
-            check_inputs_len(&inputs, 1, self.node_name())?;
-            Some(inputs[0].clone().into_logical_node()?)
-        };
+        check_inputs_len(&inputs, 0, self.node_name())?;
 
         Ok(Rc::new(
             Self::builder()
                 .schema(self.schema().clone())
                 .use_full_join_and_coalesce(self.use_full_join_and_coalesce())
-                .pre_aggregation_override(pre_aggregation_override)
                 .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
                 .build(),
         ))
@@ -127,11 +110,6 @@ impl PrettyPrint for FullKeyAggregate {
             ),
             &state,
         );
-        if let Some(pre_agg) = &self.pre_aggregation_override {
-            result.println("pre_aggregation_override:", &state);
-            pre_agg.pretty_print(result, &details_state);
-        }
-
         if !self.multi_stage_subquery_refs().is_empty() {
             result.println("multi_stage_subquery_refs:", &state);
             for subquery_ref in self.multi_stage_subquery_refs().iter() {
