@@ -172,6 +172,7 @@ impl MultipliedMeasuresQueryPlanner {
             keys_subquery,
             dimension_subqueries: subquery_dimension_queries,
             source,
+            pre_aggregation_override: None,
         }))
     }
 

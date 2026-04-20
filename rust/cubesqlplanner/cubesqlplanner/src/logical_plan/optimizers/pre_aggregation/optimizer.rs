@@ -131,6 +131,48 @@ impl PreAggregationOptimizer {
         }
     }
 
+    // Builds a self-contained Rc<Query> wrapping a matching pre-aggregation for
+    // a node that has schema and filter but no native Rc<Query> container
+    // (e.g. AggregateMultipliedSubquery).
+    fn try_rewrite_schema_and_filter(
+        &mut self,
+        schema: &Rc<LogicalSchema>,
+        filter: &Rc<LogicalFilter>,
+        compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+    ) -> Result<Option<Rc<Query>>, CubeError> {
+        for pre_aggregation in compiled_pre_aggregations.iter() {
+            let external = pre_aggregation.external.unwrap_or(false);
+            let date_range = Self::extract_date_range(
+                filter,
+                &self.query_tools,
+                &TimeShiftState::default(),
+                external,
+            );
+            if let Some(matched_measures) =
+                self.is_schema_and_filters_match(schema, filter, pre_aggregation)?
+            {
+                let source = self.make_pre_aggregation_source(
+                    pre_aggregation,
+                    &matched_measures,
+                    date_range,
+                )?;
+                let new_query = Query::builder()
+                    .schema(schema.clone())
+                    .filter(filter.clone())
+                    .modifers(Rc::new(LogicalQueryModifiers {
+                        offset: None,
+                        limit: None,
+                        ungrouped: false,
+                        order_by: vec![],
+                    }))
+                    .source(source.into())
+                    .build();
+                return Ok(Some(Rc::new(new_query)));
+            }
+        }
+        Ok(None)
+    }
+
     fn try_rewrite_query_with_multistages(
         &mut self,
         query: &Rc<Query>,
@@ -142,6 +184,10 @@ impl PreAggregationOptimizer {
         // Save state in case we need to rollback
         let saved_usages_len = self.usages.len();
         let saved_counter = self.usage_counter;
+
+        // Multiplied-measure CTEs don't carry their own filter — logically
+        // they apply the same filter as the root query, so we match against it.
+        let root_filter = query.filter().clone();
 
         let mut rewritten_multistages = Vec::new();
         for multi_stage in query.multistage_members() {
@@ -165,6 +211,25 @@ impl PreAggregationOptimizer {
                                 query: rewritten,
                             });
                             NodeRewriteResult::rewritten(new_leaf.as_plan_node())
+                        } else {
+                            has_unrewritten_leaf = true;
+                            NodeRewriteResult::stop()
+                        }
+                    }
+                    PlanNode::AggregateMultipliedSubquery(agg) => {
+                        if let Some(rewritten) = self.try_rewrite_schema_and_filter(
+                            &agg.schema,
+                            &root_filter,
+                            compiled_pre_aggregations,
+                        )? {
+                            let new_agg = Rc::new(AggregateMultipliedSubquery {
+                                schema: agg.schema.clone(),
+                                keys_subquery: agg.keys_subquery.clone(),
+                                source: agg.source.clone(),
+                                dimension_subqueries: agg.dimension_subqueries.clone(),
+                                pre_aggregation_override: Some(rewritten),
+                            });
+                            NodeRewriteResult::rewritten(new_agg.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
                             NodeRewriteResult::stop()
