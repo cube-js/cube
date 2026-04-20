@@ -21,12 +21,13 @@ import fetch from 'node-fetch';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
 
-type CubeStoreCapability = 'queueExclusive' | 'queueExternalId';
-
-const CubeStoreCapabilityMinVersion: Record<CubeStoreCapability, string> = {
+const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
   queueExternalId: '1.6.26',
-};
+  sendableParameters: '1.6.38',
+} satisfies Record<string, string>;
+type CubeStoreCapability = keyof typeof CubeStoreCapabilityMinVersion;
+
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',

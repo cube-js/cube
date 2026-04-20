@@ -360,7 +360,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       queueId || this.prefixKey(hash),
       executionResult ? JSON.stringify(executionResult) : executionResult
     ], {
-      sendParameters: this.sendParameters
+      sendParameters: this.sendParameters && await this.driver.hasCapability('sendableParameters')
     });
     if (rows && rows.length === 1) {
       return rows[0].success === 'true';
