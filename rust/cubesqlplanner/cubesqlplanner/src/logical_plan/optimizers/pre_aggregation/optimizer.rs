@@ -73,7 +73,11 @@ impl PreAggregationOptimizer {
             compiled_pre_aggregations
         };
 
-        self.try_rewrite_query(&plan, &filtered_pre_aggregations, &TimeShiftState::default())
+        self.try_rewrite_query(
+            &plan,
+            &filtered_pre_aggregations,
+            &TimeShiftState::default(),
+        )
     }
 
     pub fn get_usages(&self) -> &Vec<PreAggregationUsage> {

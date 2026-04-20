@@ -27,9 +27,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         if let Some(override_query) = &aggregate_multiplied_subquery.pre_aggregation_override {
-            return self
-                .builder
-                .process_node(override_query.as_ref(), context);
+            return self.builder.process_node(override_query.as_ref(), context);
         }
 
         let query_tools = self.builder.query_tools();

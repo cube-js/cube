@@ -28,9 +28,7 @@ impl MultiStageMemberLogicalType {
     fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
         Ok(match self {
             Self::LeafMeasure(_) => Self::LeafMeasure(plan_node.into_logical_node()?),
-            Self::MultipliedMeasure(_) => {
-                Self::MultipliedMeasure(plan_node.into_logical_node()?)
-            }
+            Self::MultipliedMeasure(_) => Self::MultipliedMeasure(plan_node.into_logical_node()?),
             Self::MeasureCalculation(_) => Self::MeasureCalculation(plan_node.into_logical_node()?),
             Self::DimensionCalculation(_) => {
                 Self::DimensionCalculation(plan_node.into_logical_node()?)

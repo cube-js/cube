@@ -43,8 +43,7 @@ impl QueryPlanner {
             let (all_members, all_refs) = cte_state.into_results();
 
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result =
-                full_key_aggregate_planner.plan_logical_plan(all_refs, all_members)?;
+            let result = full_key_aggregate_planner.plan_logical_plan(all_refs, all_members)?;
 
             Ok(result)
         }
