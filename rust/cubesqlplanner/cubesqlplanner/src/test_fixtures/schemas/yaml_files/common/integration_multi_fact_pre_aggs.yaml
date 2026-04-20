@@ -8,6 +8,9 @@ cubes:
           - name: returns
             relationship: one_to_many
             sql: "{customers}.id = {returns.customer_id}"
+          - name: addresses
+            relationship: one_to_many
+            sql: "{customers}.id = {addresses.customer_id}"
       dimensions:
           - name: id
             type: number
@@ -25,6 +28,35 @@ cubes:
       measures:
           - name: count
             type: count
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+      pre_aggregations:
+          # Multiplied pre-agg: customer measures aggregated by joined cube dim
+          - name: customers_by_order_status
+            type: rollup
+            measures:
+                - count
+                - total_lifetime_value
+            dimensions:
+                - orders.status
+          # Cross-cube rollup: multiplied customer measure + regular orders measure.
+          # Designed to match both regular orders subquery and multiplied
+          # customers subquery in a single multi-fact + multiplied query.
+          - name: customers_and_orders_combo
+            type: rollup
+            measures:
+                - count
+                - orders.count
+            dimensions:
+                - city
+          # Multiplied customers rollup by addresses.street (one_to_many)
+          - name: customers_by_addr_street
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - addresses.street
 
     - name: orders
       sql: "SELECT * FROM orders"
@@ -61,6 +93,21 @@ cubes:
                 - total_amount
             dimensions:
                 - customers.city
+          - name: orders_by_status
+            type: rollup
+            measures:
+                - count
+                - total_amount
+            dimensions:
+                - status
+          # Multiplied orders rollup: path orders → customers → addresses
+          # passes through one_to_many, so orders.count is multiplied here.
+          - name: orders_by_addr_street
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - addresses.street
 
     - name: returns
       sql: "SELECT * FROM returns"
@@ -97,3 +144,32 @@ cubes:
                 - total_refund
             dimensions:
                 - customers.city
+
+    - name: addresses
+      sql: "SELECT * FROM addresses"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{addresses.customer_id} = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: street
+            type: string
+            sql: street
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          # Regular rollup (own cube dim)
+          - name: addresses_by_street
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - street

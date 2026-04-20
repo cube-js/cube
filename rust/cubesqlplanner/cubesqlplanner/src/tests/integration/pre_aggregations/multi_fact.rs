@@ -104,9 +104,215 @@ async fn test_multi_fact_whole_query_single_rollup_match() {
         pre_aggrs.len(),
         1,
         "Expected whole query to match a single pre-aggregation; got {:?}",
-        pre_aggrs.iter().map(|u| u.name().clone()).collect::<Vec<_>>()
+        pre_aggrs
+            .iter()
+            .map(|u| u.name().clone())
+            .collect::<Vec<_>>()
     );
     assert_eq!(pre_aggrs[0].name(), "multi_fact_combined");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_fact_plus_multiplied_separate_pre_aggs() {
+    // Same query as the fact+multiplied baseline. Two pre-aggs:
+    //   - orders.orders_by_status: regular orders subquery
+    //   - customers.customers_by_order_status: multiplied customers subquery
+    // The two subqueries can't share a single pre-aggregation because of join
+    // path differences, so each CTE gets its own usage.
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&["orders_by_status", "customers_by_order_status"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - customers.count
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+    eprintln!(
+        "\n=== Fact + multiplied separate pre-aggs SQL ===\n{}\n===========",
+        sql
+    );
+    eprintln!("Pre-agg usages: {:?}", names);
+
+    assert_eq!(
+        pre_aggrs.len(),
+        2,
+        "Expected 2 pre-aggregation usages; got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"orders_by_status"),
+        "Expected orders_by_status for regular orders subquery; got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"customers_by_order_status"),
+        "Expected customers_by_order_status for multiplied customers subquery; got {:?}",
+        names
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_whole_query_single_rollup_match() {
+    // Same multiplied query as the baseline, but the schema has a rollup
+    // pre-aggregation covering both customer measures and the cross-cube
+    // dimension. Whole query must be replaced with a single pre-aggregation.
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&["customers_by_order_status"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - customers.count
+          - customers.total_lifetime_value
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "Expected whole multiplied query to match a single pre-aggregation; got {:?}",
+        pre_aggrs
+            .iter()
+            .map(|u| u.name().clone())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(pre_aggrs[0].name(), "customers_by_order_status");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_plus_multiplied_shared_pre_agg() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&["customers_and_orders_combo", "returns_by_customer_city"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+          - customers.count
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+    eprintln!(
+        "\n=== Multi-fact + multiplied SQL ===\n{}\n===========",
+        sql
+    );
+    eprintln!("Pre-agg usages: {:?}", names);
+
+    assert_eq!(
+        pre_aggrs.len(),
+        3,
+        "Expected 3 pre-aggregation usages (orders + returns + multiplied customers); got {:?}",
+        names
+    );
+    let combo_count = names
+        .iter()
+        .filter(|n| **n == "customers_and_orders_combo")
+        .count();
+    assert_eq!(
+        combo_count, 2,
+        "Expected customers_and_orders_combo to be used twice (regular orders + multiplied customers); got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"returns_by_customer_city"),
+        "Expected returns_by_customer_city usage; got {:?}",
+        names
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_regular_plus_two_multiplied_separate_pre_aggs() {
+    // Three pre-aggs, each in its own cube:
+    //   - addresses.addresses_by_street: regular subquery (own dim)
+    //   - customers.customers_by_addr_street: multiplied customers subquery
+    //   - orders.orders_by_addr_street: multiplied orders subquery
+    //     (path orders → customers → addresses passes through one_to_many)
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&[
+            "addresses_by_street",
+            "customers_by_addr_street",
+            "orders_by_addr_street",
+        ]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - addresses.count
+          - customers.count
+          - orders.count
+        dimensions:
+          - addresses.street
+        order:
+          - id: addresses.street
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+    eprintln!(
+        "\n=== Regular + 2 multiplied separate pre-aggs SQL ===\n{}\n===========",
+        sql
+    );
+    eprintln!("Pre-agg usages: {:?}", names);
+
+    assert_eq!(
+        pre_aggrs.len(),
+        3,
+        "Expected 3 pre-aggregation usages; got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"addresses_by_street"),
+        "Expected addresses_by_street; got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"customers_by_addr_street"),
+        "Expected customers_by_addr_street; got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"orders_by_addr_street"),
+        "Expected orders_by_addr_street; got {:?}",
+        names
+    );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -137,7 +343,10 @@ async fn test_multi_fact_partial_match_rolls_back() {
         pre_aggrs.len(),
         0,
         "Expected rollback when one of multi-fact subqueries cannot match; got {:?}",
-        pre_aggrs.iter().map(|u| u.name().clone()).collect::<Vec<_>>()
+        pre_aggrs
+            .iter()
+            .map(|u| u.name().clone())
+            .collect::<Vec<_>>()
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {

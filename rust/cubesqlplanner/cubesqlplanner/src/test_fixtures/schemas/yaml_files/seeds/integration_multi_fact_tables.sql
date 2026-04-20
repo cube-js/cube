@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS addresses CASCADE;
 DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS returns CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
@@ -41,6 +42,12 @@ CREATE TABLE reviews (
     created_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE addresses (
+    id INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id),
+    street TEXT NOT NULL
+);
+
 INSERT INTO regions (id, name) VALUES
     (1, 'East'),
     (2, 'Midwest');
@@ -73,3 +80,11 @@ INSERT INTO reviews (id, customer_id, rating, created_at) VALUES
     (2, 1, 4, '2025-03-11 11:00:00'),
     (3, 4, 3, '2025-03-12 09:00:00'),
     (4, 3, 5, '2025-03-13 14:00:00');
+
+INSERT INTO addresses (id, customer_id, street) VALUES
+    (1, 1, 'Main St'),
+    (2, 1, 'Oak Ave'),
+    (3, 2, 'Elm St'),
+    (4, 3, 'Pine Rd'),
+    (5, 4, 'Maple Ln'),
+    (6, 4, 'Birch Way');
