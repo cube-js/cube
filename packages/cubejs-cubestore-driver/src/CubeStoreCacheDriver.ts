@@ -69,9 +69,6 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
     ], {
       sendParameters: this.sendParameters
     });
-    console.log('cache get', {
-      sendParameters: this.sendParameters,
-    });
     if (rows && rows.length === 1) {
       return JSON.parse(rows[0].value);
     }
@@ -81,9 +78,6 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
 
   public async set(key: string, value, expiration) {
     const strValue = JSON.stringify(value);
-    console.log('cache set', {
-      sendParameters: this.sendParameters,
-    });
     await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, strValue], {
       sendParameters: this.sendParameters
     });
@@ -95,9 +89,9 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   }
 
   public async remove(key: string) {
-    await (await this.getConnection()).query('CACHE REMOVE ?', [
-      key
-    ]);
+    await (await this.getConnection()).query('CACHE REMOVE ?', [key], {
+      sendParameters: this.sendParameters
+    });
   }
 
   public async keysStartingWith(prefix: string) {
