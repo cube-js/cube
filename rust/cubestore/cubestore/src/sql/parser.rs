@@ -411,6 +411,8 @@ impl<'a> CubeStoreParser<'a> {
 
     fn parse_literal_string(&mut self) -> Result<String, ParserError> {
         if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
             match self.unwrap_placeholder(&placeholder)? {
                 QueryParameter::StringValue(s) => Ok(s),
                 other => Err(ParserError::ParserError(format!(
@@ -425,6 +427,8 @@ impl<'a> CubeStoreParser<'a> {
 
     fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
         if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
             match self.unwrap_placeholder(&placeholder)? {
                 QueryParameter::StringValue(value) => Ok(Ident {
                     value,
@@ -501,6 +505,8 @@ impl<'a> CubeStoreParser<'a> {
         <R as std::str::FromStr>::Err: std::fmt::Display,
     {
         if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
             return match self.unwrap_placeholder(&placeholder)? {
                 QueryParameter::Int64Value(value) => {
                     value.to_string().parse::<R>().map_err(|err| {

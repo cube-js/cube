@@ -145,12 +145,12 @@ pub enum QueryParameter {
 
 impl QueryParameter {
     pub fn get_type(&self) -> &'static str {
-        match &self {
-            QueryParameter::Null => &"null",
-            QueryParameter::StringValue(_) => &"string",
-            QueryParameter::BoolValue(_) => &"bool",
-            QueryParameter::BinaryValue(_) => &"binary",
-            QueryParameter::Int64Value(_) => &"int64",
+        match self {
+            QueryParameter::Null => "null",
+            QueryParameter::StringValue(_) => "string",
+            QueryParameter::BoolValue(_) => "bool",
+            QueryParameter::BinaryValue(_) => "binary",
+            QueryParameter::Int64Value(_) => "int64",
         }
     }
 
