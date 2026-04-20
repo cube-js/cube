@@ -309,6 +309,23 @@ impl<'a> CubeStoreParser<'a> {
 
     fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
         match self.parser.peek_token().token {
+            Token::Placeholder(placeholder) => {
+                self.parser.next_token();
+
+                match self.unwrap_placeholder(&placeholder)? {
+                    QueryParameter::StringValue(v) => Ok(QueueKey::ByPath(v)),
+                    QueryParameter::Int64Value(v) => {
+                        let id = QueryParameter::Int64Value(v)
+                            .try_as_u64()
+                            .map_err(ParserError::ParserError)?;
+                        Ok(QueueKey::ById(id))
+                    }
+                    other => Err(ParserError::ParserError(format!(
+                        "Wrong parameters type, actual: {}, expected: string or integer parameter",
+                        other.get_type()
+                    ))),
+                }
+            }
             Token::Word(w) => {
                 self.parser.next_token();
 

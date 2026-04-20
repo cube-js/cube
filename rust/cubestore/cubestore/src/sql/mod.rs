@@ -153,6 +153,17 @@ impl QueryParameter {
             QueryParameter::Int64Value(_) => &"int64",
         }
     }
+
+    pub fn try_as_u64(&self) -> Result<u64, String> {
+        match self {
+            QueryParameter::Int64Value(v) => u64::try_from(*v)
+                .map_err(|err| format!("value must be a valid unsigned integer, error: {}", err)),
+            other => Err(format!(
+                "Wrong parameters type, actual: {}, expected: integer parameter",
+                other.get_type()
+            )),
+        }
+    }
 }
 
 pub type QueryParameters = Vec<QueryParameter>;
