@@ -270,7 +270,7 @@ export class WebSocketConnection {
             httpParameterValueOffset
           );
         } else {
-          throw new Error(`Parameter with type: object is not supported`);
+          throw new Error('Parameter with type: object is not supported');
         }
       }
       case 'boolean':
