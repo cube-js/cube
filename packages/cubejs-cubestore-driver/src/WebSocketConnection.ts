@@ -17,6 +17,7 @@ import {
   HttpResultSet,
   HttpTable,
   Int64Value,
+  NullValue,
   StringValue,
 } from '../codegen';
 
@@ -246,6 +247,16 @@ export class WebSocketConnection {
   }
 
   protected serializeParameter(builder: flatbuffers.Builder, parameter: unknown) {
+    if (parameter === null || parameter === undefined) {
+      const httpParameterValueOffset = NullValue.createNullValue(builder);
+
+      return HttpParameter.createHttpParameter(
+        builder,
+        HttpParameterValue.NullValue,
+        httpParameterValueOffset
+      );
+    }
+
     switch (typeof parameter) {
       case 'object':
       {
