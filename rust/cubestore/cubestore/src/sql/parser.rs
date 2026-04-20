@@ -392,7 +392,7 @@ impl<'a> CubeStoreParser<'a> {
             n
         };
 
-        if parameters.len() < placeholder_index {
+        if parameters.len() <= placeholder_index {
             return Err(ParserError::ParserError(format!(
                 "Placeholder index is out of bound, actual: {}, parameters length: {}",
                 placeholder_index,
@@ -1168,6 +1168,46 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Duplicate option: EXCLUSIVE"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_placeholder_index_out_of_bounds() -> Result<(), CubeError> {
+        // Two placeholders but only one parameter supplied — second placeholder
+        // must return a ParserError, not panic with index-out-of-bounds.
+        {
+            let mut parser = CubeStoreParser::new(
+                "QUEUE ACK ? ?",
+                Some(vec![QueryParameter::StringValue("a".to_string())]),
+            )?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("Placeholder index is out of bound"),
+                "unexpected error: {}",
+                msg
+            );
+        }
+
+        // Zero placeholders consumed but a placeholder is present in SQL with
+        // empty parameters list — must error, not panic.
+        {
+            let mut parser = CubeStoreParser::new("QUEUE ACK ?", Some(vec![]))?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("Placeholder index is out of bound"),
+                "unexpected error: {}",
+                msg
+            );
+        }
 
         Ok(())
     }
