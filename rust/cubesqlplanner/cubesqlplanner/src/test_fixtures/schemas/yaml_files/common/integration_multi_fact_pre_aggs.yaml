@@ -40,6 +40,14 @@ cubes:
                 - total_lifetime_value
             dimensions:
                 - orders.status
+          - name: customers_by_order_status_with_name
+            type: rollup
+            measures:
+                - count
+                - total_lifetime_value
+            dimensions:
+                - orders.status
+                - name
           # Cross-cube rollup: multiplied customer measure + regular orders measure.
           # Designed to match both regular orders subquery and multiplied
           # customers subquery in a single multi-fact + multiplied query.
@@ -50,6 +58,14 @@ cubes:
                 - orders.count
             dimensions:
                 - city
+          - name: customers_and_orders_combo_with_name
+            type: rollup
+            measures:
+                - count
+                - orders.count
+            dimensions:
+                - city
+                - name
           # Multiplied customers rollup by addresses.street (one_to_many)
           - name: customers_by_addr_street
             type: rollup
@@ -93,6 +109,14 @@ cubes:
                 - total_amount
             dimensions:
                 - customers.city
+          - name: orders_by_customer_city_with_name
+            type: rollup
+            measures:
+                - count
+                - total_amount
+            dimensions:
+                - customers.city
+                - customers.name
           - name: orders_by_status
             type: rollup
             measures:
@@ -144,6 +168,14 @@ cubes:
                 - total_refund
             dimensions:
                 - customers.city
+          - name: returns_by_customer_city_with_name
+            type: rollup
+            measures:
+                - count
+                - total_refund
+            dimensions:
+                - customers.city
+                - customers.name
 
     - name: addresses
       sql: "SELECT * FROM addresses"

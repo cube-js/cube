@@ -319,6 +319,152 @@ async fn test_regular_plus_two_multiplied_separate_pre_aggs() {
     }
 }
 
+// --- Filtered variants ---
+// Each test below uses the same query shape as its non-filtered counterpart
+// above but adds a filter on customers.name (not in projection) to verify
+// that pre-agg matcher handles filter-only dimensions. Filter value 'Alice'
+// narrows the seed to customer id=1 only — measure values change predictably
+// so incorrect results are easy to spot.
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_separate_pre_aggs_by_shared_dim_filtered() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&[
+            "orders_by_customer_city_with_name",
+            "returns_by_customer_city_with_name",
+        ]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+          - returns.count
+          - returns.total_refund
+        dimensions:
+          - customers.city
+        filters:
+          - dimension: customers.name
+            operator: equals
+            values:
+              - Alice
+        order:
+          - id: customers.city
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+    assert_eq!(pre_aggrs.len(), 2, "Expected 2 usages; got {:?}", names);
+    assert!(names.contains(&"orders_by_customer_city_with_name"));
+    assert!(names.contains(&"returns_by_customer_city_with_name"));
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_whole_query_single_rollup_match_filtered() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_combined_pre_agg.yaml")
+        .only_pre_aggregations(&["multi_fact_combined_with_name"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+          - returns.count
+          - returns.total_refund
+        dimensions:
+          - customers.city
+        filters:
+          - dimension: customers.name
+            operator: equals
+            values:
+              - Alice
+        order:
+          - id: customers.city
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "multi_fact_combined_with_name");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_plus_multiplied_shared_pre_agg_filtered() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&[
+            "customers_and_orders_combo_with_name",
+            "returns_by_customer_city_with_name",
+        ]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+          - customers.count
+        dimensions:
+          - customers.city
+        filters:
+          - dimension: customers.name
+            operator: equals
+            values:
+              - Alice
+        order:
+          - id: customers.city
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+    assert_eq!(pre_aggrs.len(), 3, "Expected 3 usages; got {:?}", names);
+    let combo_count = names
+        .iter()
+        .filter(|n| **n == "customers_and_orders_combo_with_name")
+        .count();
+    assert_eq!(combo_count, 2);
+    assert!(names.contains(&"returns_by_customer_city_with_name"));
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_whole_query_single_rollup_match_filtered() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&["customers_by_order_status_with_name"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - customers.count
+          - customers.total_lifetime_value
+        dimensions:
+          - orders.status
+        filters:
+          - dimension: customers.name
+            operator: equals
+            values:
+              - Alice
+        order:
+          - id: orders.status
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "customers_by_order_status_with_name");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_fact_partial_match_rolls_back() {
     // Only the orders pre-agg is enabled. Returns subquery cannot match →
