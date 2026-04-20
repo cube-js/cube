@@ -137,14 +137,9 @@ async fn test_fact_plus_multiplied_separate_pre_aggs() {
           - id: orders.status
     "};
 
-    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
 
     let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
-    eprintln!(
-        "\n=== Fact + multiplied separate pre-aggs SQL ===\n{}\n===========",
-        sql
-    );
-    eprintln!("Pre-agg usages: {:?}", names);
 
     assert_eq!(
         pre_aggrs.len(),
@@ -222,14 +217,9 @@ async fn test_multi_fact_plus_multiplied_shared_pre_agg() {
           - id: customers.city
     "};
 
-    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
 
     let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
-    eprintln!(
-        "\n=== Multi-fact + multiplied SQL ===\n{}\n===========",
-        sql
-    );
-    eprintln!("Pre-agg usages: {:?}", names);
 
     assert_eq!(
         pre_aggrs.len(),
@@ -283,14 +273,9 @@ async fn test_regular_plus_two_multiplied_separate_pre_aggs() {
           - id: addresses.street
     "};
 
-    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
 
     let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
-    eprintln!(
-        "\n=== Regular + 2 multiplied separate pre-aggs SQL ===\n{}\n===========",
-        sql
-    );
-    eprintln!("Pre-agg usages: {:?}", names);
 
     assert_eq!(
         pre_aggrs.len(),

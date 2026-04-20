@@ -168,11 +168,7 @@ async fn test_prior_month_shift_multiplied_leaf() {
               - "2024-03-31"
     "#};
 
-    let sql = ctx.build_sql(query).unwrap();
-    eprintln!(
-        "\n=== Multi-stage time_shift multiplied leaf SQL ===\n{}\n===========",
-        sql
-    );
+    ctx.build_sql(query).unwrap();
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
