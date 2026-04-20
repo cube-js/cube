@@ -5,13 +5,14 @@ DROP TABLE IF EXISTS ms_customers CASCADE;
 CREATE TABLE ms_customers (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    city TEXT NOT NULL
+    city TEXT NOT NULL,
+    lifetime_value NUMERIC(10, 2) NOT NULL
 );
 
-INSERT INTO ms_customers (id, name, city) VALUES
-    (1, 'Alice', 'New York'),
-    (2, 'Bob', 'London'),
-    (3, 'Charlie', 'Berlin');
+INSERT INTO ms_customers (id, name, city, lifetime_value) VALUES
+    (1, 'Alice',   'New York', 1000.00),
+    (2, 'Bob',     'London',   2000.00),
+    (3, 'Charlie', 'Berlin',    500.00);
 
 CREATE TABLE ms_orders (
     id INTEGER PRIMARY KEY,

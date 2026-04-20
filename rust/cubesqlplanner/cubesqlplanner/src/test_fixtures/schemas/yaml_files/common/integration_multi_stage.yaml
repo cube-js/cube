@@ -20,6 +20,24 @@ cubes:
           - name: count
             type: count
 
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+
+          # Multi-stage + time_shift measure where leaf becomes a multiplied
+          # subquery: customers has one_to_many to returns, so when leaf is
+          # grouped by returns.created_at month, customers rows are multiplied.
+          # sum(lifetime_value) forces a full AggregateMultipliedSubquery
+          # (keys-subquery + join back to customers) rather than COUNT DISTINCT.
+          - name: total_lifetime_value_prev_month_by_returns
+            type: number
+            sql: "{CUBE.total_lifetime_value}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: returns.created_at
+
     - name: orders
       sql: "SELECT * FROM ms_orders"
       joins:
