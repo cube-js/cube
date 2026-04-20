@@ -78,6 +78,42 @@ async fn test_multi_fact_separate_pre_aggs_by_shared_dim() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_whole_query_single_rollup_match() {
+    // Same multi-fact query as test_multi_fact_separate_pre_aggs_by_shared_dim,
+    // but the schema offers a single rollup pre-aggregation that covers all
+    // four measures and the shared dimension at once. Optimizer must take the
+    // simple-match path and use a single pre-aggregation for the whole query.
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_combined_pre_agg.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - orders.total_amount
+          - returns.count
+          - returns.total_refund
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "Expected whole query to match a single pre-aggregation; got {:?}",
+        pre_aggrs.iter().map(|u| u.name().clone()).collect::<Vec<_>>()
+    );
+    assert_eq!(pre_aggrs[0].name(), "multi_fact_combined");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multi_fact_partial_match_rolls_back() {
     // Only the orders pre-agg is enabled. Returns subquery cannot match →
     // optimizer must roll back and use no pre-aggregations at all.
