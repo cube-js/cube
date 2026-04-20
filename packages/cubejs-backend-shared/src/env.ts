@@ -2011,6 +2011,9 @@ const variables: Record<string, (...args: any) => any> = {
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
     .asBoolStrict(),
+  cubestoreSendableParameters: () => get('CUBEJS_CUBESTORE_SENDABLE_PARAMETERS')
+    .default('false')
+    .asBoolStrict(),
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('true')
     .asBoolStrict(),

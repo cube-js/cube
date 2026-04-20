@@ -39,13 +39,16 @@ type CubeStoreListResponse = {
 };
 
 export class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
-  private readonly externalIdEnabled: boolean;
+  protected readonly externalIdEnabled: boolean;
+
+  protected readonly sendParameters: boolean;
 
   public constructor(
     protected readonly driver: CubeStoreDriver,
     protected readonly options: QueueDriverOptions,
   ) {
     this.externalIdEnabled = getEnv('queueExternalId');
+    this.sendParameters = getEnv('cubestoreSendableParameters');
   }
 
   public async useExternalId(): Promise<boolean> {
@@ -352,11 +355,13 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
-    const rows = await this.driver.query('QUEUE ACK ? ? ', [
+    const rows = await this.driver.query('QUEUE ACK ? ?', [
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),
       executionResult ? JSON.stringify(executionResult) : executionResult
-    ]);
+    ], {
+      sendParameters: this.sendParameters && await this.driver.hasCapability('sendableParameters')
+    });
     if (rows && rows.length === 1) {
       return rows[0].success === 'true';
     }

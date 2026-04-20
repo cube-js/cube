@@ -1,4 +1,5 @@
 use crate::cachestore::{QueueItemStatus, QueueKey};
+use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
     ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
     SqlOption, Statement as SQLStatement, Value,
@@ -218,8 +219,12 @@ pub enum CacheStoreCommand {
     Persist,
 }
 
+type QueryParameterHolder = Option<QueryParameter>;
+
 pub struct CubeStoreParser<'a> {
     parser: Parser<'a>,
+    parameters: Option<Vec<QueryParameterHolder>>,
+    placeholder_index: usize,
 }
 
 macro_rules! parse_sql_options {
@@ -251,12 +256,16 @@ macro_rules! parse_sql_options {
 }
 
 impl<'a> CubeStoreParser<'a> {
-    pub fn new(sql: &str) -> Result<Self, ParserError> {
+    pub fn new(sql: &str, parameters: Option<QueryParameters>) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, sql);
         let tokens = tokenizer.tokenize()?;
+
         Ok(CubeStoreParser {
             parser: Parser::new(dialect).with_tokens(tokens),
+            parameters: parameters
+                .map(|parameters| parameters.into_iter().map(|p| Some(p)).collect()),
+            placeholder_index: 0,
         })
     }
 
@@ -300,6 +309,23 @@ impl<'a> CubeStoreParser<'a> {
 
     fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
         match self.parser.peek_token().token {
+            Token::Placeholder(placeholder) => {
+                self.parser.next_token();
+
+                match self.unwrap_placeholder(&placeholder)? {
+                    QueryParameter::StringValue(v) => Ok(QueueKey::ByPath(v)),
+                    QueryParameter::Int64Value(v) => {
+                        let id = QueryParameter::Int64Value(v)
+                            .try_as_u64()
+                            .map_err(ParserError::ParserError)?;
+                        Ok(QueueKey::ById(id))
+                    }
+                    other => Err(ParserError::ParserError(format!(
+                        "Wrong parameters type, actual: {}, expected: string or integer parameter",
+                        other.get_type()
+                    ))),
+                }
+            }
             Token::Word(w) => {
                 self.parser.next_token();
 
@@ -345,6 +371,80 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn unwrap_placeholder(&mut self, placeholder: &str) -> Result<QueryParameter, ParserError> {
+        let parameters = if let Some(parameters) = self.parameters.as_mut() {
+            parameters
+        } else {
+            return Err(ParserError::ParserError(
+                "Empty parameters, please send parameters within query".to_string(),
+            ));
+        };
+
+        let placeholder_index = if placeholder.len() > 1 && placeholder[0..1] == *"$" {
+            return Err(ParserError::ParserError(
+                "Named placeholder are not supported, please use ?".to_string(),
+            ));
+        } else {
+            let n = self.placeholder_index;
+
+            self.placeholder_index += 1;
+
+            n
+        };
+
+        if parameters.len() <= placeholder_index {
+            return Err(ParserError::ParserError(format!(
+                "Placeholder index is out of bound, actual: {}, parameters length: {}",
+                placeholder_index,
+                parameters.len()
+            )));
+        }
+
+        if let Some(v) = parameters[placeholder_index].take() {
+            Ok(v)
+        } else {
+            return Err(ParserError::ParserError(
+                "Empty parameters, please send parameters within query".to_string(),
+            ));
+        }
+    }
+
+    fn parse_literal_string(&mut self) -> Result<String, ParserError> {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::StringValue(s) => Ok(s),
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: string parameter",
+                    other.get_type()
+                ))),
+            }
+        } else {
+            self.parser.parse_literal_string()
+        }
+    }
+
+    fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::StringValue(value) => Ok(Ident {
+                    value,
+                    quote_style: None,
+                    span: Span::empty(),
+                }),
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: string parameter",
+                    other.get_type()
+                ))),
+            }
+        } else {
+            self.parser.parse_identifier()
+        }
+    }
+
     fn parse_cache(&mut self) -> Result<Statement, ParserError> {
         let method = match self.parser.next_token().token {
             Token::Word(w) => w.value.to_ascii_lowercase(),
@@ -366,23 +466,23 @@ impl<'a> CubeStoreParser<'a> {
                 };
 
                 CacheCommand::Set {
-                    key: self.parser.parse_identifier()?,
-                    value: self.parser.parse_literal_string()?,
+                    key: self.parse_identifier()?,
+                    value: self.parse_literal_string()?,
                     ttl,
                     nx,
                 }
             }
             "get" => CacheCommand::Get {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_identifier()?,
             },
             "keys" => CacheCommand::Keys {
-                prefix: self.parser.parse_identifier()?,
+                prefix: self.parse_identifier()?,
             },
             "incr" => CacheCommand::Incr {
-                path: self.parser.parse_identifier()?,
+                path: self.parse_identifier()?,
             },
             "remove" => CacheCommand::Remove {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_identifier()?,
             },
             "truncate" => CacheCommand::Truncate {},
             other => {
@@ -404,6 +504,25 @@ impl<'a> CubeStoreParser<'a> {
     where
         <R as std::str::FromStr>::Err: std::fmt::Display,
     {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            return match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::Int64Value(value) => {
+                    value.to_string().parse::<R>().map_err(|err| {
+                        ParserError::ParserError(format!(
+                            "{} must be a valid integer, error: {}",
+                            var_name, err
+                        ))
+                    })
+                }
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: int64 parameter",
+                    other.get_type()
+                ))),
+            };
+        }
+
         let is_negative = match self.parser.peek_token().token {
             Token::Minus => {
                 self.parser.next_token();
@@ -524,8 +643,8 @@ impl<'a> CubeStoreParser<'a> {
                     exclusive,
                     priority,
                     orphaned,
-                    key: self.parser.parse_identifier()?,
-                    value: self.parser.parse_literal_string()?,
+                    key: self.parse_identifier()?,
+                    value: self.parse_literal_string()?,
                     external_id,
                 }
             }
@@ -540,7 +659,7 @@ impl<'a> CubeStoreParser<'a> {
                 let result = if self.parser.parse_keyword(Keyword::NULL) {
                     None
                 } else {
-                    Some(self.parser.parse_literal_string()?)
+                    Some(self.parse_literal_string()?)
                 };
 
                 QueueCommand::Ack { key, result }
@@ -910,7 +1029,7 @@ mod tests {
     use sqlparser::ast::Statement as SQLStatement;
 
     fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
-        let mut parser = CubeStoreParser::new(query)?;
+        let mut parser = CubeStoreParser::new(query, None)?;
         Ok(parser.parse_statement()?)
     }
 
@@ -1055,6 +1174,46 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Duplicate option: EXCLUSIVE"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_placeholder_index_out_of_bounds() -> Result<(), CubeError> {
+        // Two placeholders but only one parameter supplied — second placeholder
+        // must return a ParserError, not panic with index-out-of-bounds.
+        {
+            let mut parser = CubeStoreParser::new(
+                "QUEUE ACK ? ?",
+                Some(vec![QueryParameter::StringValue("a".to_string())]),
+            )?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("Placeholder index is out of bound"),
+                "unexpected error: {}",
+                msg
+            );
+        }
+
+        // Zero placeholders consumed but a placeholder is present in SQL with
+        // empty parameters list — must error, not panic.
+        {
+            let mut parser = CubeStoreParser::new("QUEUE ACK ?", Some(vec![]))?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("Placeholder index is out of bound"),
+                "unexpected error: {}",
+                msg
+            );
+        }
 
         Ok(())
     }

@@ -134,12 +134,49 @@ impl InlineTable {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub enum QueryParameter {
+    Null,
+    StringValue(String),
+    BoolValue(bool),
+    BinaryValue(Vec<u8>),
+    Int64Value(i64),
+    Float64Value(f64),
+}
+
+impl QueryParameter {
+    pub fn get_type(&self) -> &'static str {
+        match self {
+            QueryParameter::Null => "null",
+            QueryParameter::StringValue(_) => "string",
+            QueryParameter::BoolValue(_) => "bool",
+            QueryParameter::BinaryValue(_) => "binary",
+            QueryParameter::Int64Value(_) => "int64",
+            QueryParameter::Float64Value(_) => "float64",
+        }
+    }
+
+    pub fn try_as_u64(&self) -> Result<u64, String> {
+        match self {
+            QueryParameter::Int64Value(v) => u64::try_from(*v)
+                .map_err(|err| format!("value must be a valid unsigned integer, error: {}", err)),
+            other => Err(format!(
+                "Wrong parameters type, actual: {}, expected: integer parameter",
+                other.get_type()
+            )),
+        }
+    }
+}
+
+pub type QueryParameters = Vec<QueryParameter>;
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
     pub inline_tables: InlineTables,
     pub trace_obj: Option<String>,
     pub process_id: Option<String>,
+    pub parameters: Option<QueryParameters>,
 }
 
 impl SqlQueryContext {
@@ -164,6 +201,12 @@ impl SqlQueryContext {
     pub fn with_process_id(&self, process_id: Option<String>) -> Self {
         let mut res = self.clone();
         res.process_id = process_id;
+        res
+    }
+
+    pub fn with_parameters(&self, parameters: &Option<QueryParameters>) -> Self {
+        let mut res = self.clone();
+        res.parameters = parameters.clone();
         res
     }
 }
@@ -604,18 +647,20 @@ impl SqlService for SqlServiceImpl {
     #[instrument(level = "trace", skip(self))]
     async fn exec_query_with_context(
         &self,
-        context: SqlQueryContext,
+        mut context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
             trace!("Query: '{}'", query);
         }
+
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
             return Ok(Arc::new(data_frame));
         }
+
         let ast = {
-            let mut parser = CubeStoreParser::new(query)?;
+            let mut parser = CubeStoreParser::new(query, context.parameters.take())?;
             parser.parse_statement()?
         };
         // trace!("AST is: {:?}", ast);
@@ -1242,7 +1287,7 @@ impl SqlService for SqlServiceImpl {
     ) -> Result<QueryPlans, CubeError> {
         let ast = {
             let replaced_quote = q.replace("\\'", "''");
-            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            let mut parser = CubeStoreParser::new(&replaced_quote, context.parameters)?;
             parser.parse_statement()?
         };
         match ast {
