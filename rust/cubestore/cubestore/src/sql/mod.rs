@@ -139,7 +139,7 @@ pub enum QueryParameter {
     Null,
     StringValue(String),
     BoolValue(bool),
-    BinaryValue(Vec<i8>),
+    BinaryValue(Vec<u8>),
     Int64Value(i64),
 }
 

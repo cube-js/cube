@@ -901,7 +901,7 @@ impl HttpMessage {
                                         .unwrap()
                                         .v()
                                         .iter()
-                                        .collect::<Vec<i8>>(),
+                                        .collect::<Vec<u8>>(),
                                 ),
                                 value_type => {
                                     return Err(CubeError::internal(format!(

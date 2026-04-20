@@ -13,7 +13,7 @@ table HttpMessage {
 table Int64Value { v: int64; }
 table BoolValue { v: bool; }
 table StringValue { v: string (required); }
-table BinaryValue { v: [byte] (required); }
+table BinaryValue { v: [ubyte] (required); }
 table Float64Value { v: float64; }
 table NullValue { }
 union HttpParameterValue { Int64Value, BoolValue, StringValue, BinaryValue, Float64Value, NullValue }
