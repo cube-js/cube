@@ -60,7 +60,7 @@ type CreateTableOptions = {
 };
 
 type CubeStoreQueryOptions = QueryOptions & {
-  sendParameters?: true,
+  sendParameters?: boolean,
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
