@@ -903,6 +903,9 @@ impl HttpMessage {
                                         .iter()
                                         .collect::<Vec<u8>>(),
                                 ),
+                                HttpParameterValue::Float64Value => QueryParameter::Float64Value(
+                                    http_param.value_as_float_64_value().unwrap().v(),
+                                ),
                                 value_type => {
                                     return Err(CubeError::internal(format!(
                                         "Unsupported parameter type: {:?}",

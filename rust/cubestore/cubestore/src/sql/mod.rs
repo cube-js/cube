@@ -134,13 +134,14 @@ impl InlineTable {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum QueryParameter {
     Null,
     StringValue(String),
     BoolValue(bool),
     BinaryValue(Vec<u8>),
     Int64Value(i64),
+    Float64Value(f64),
 }
 
 impl QueryParameter {
@@ -151,6 +152,7 @@ impl QueryParameter {
             QueryParameter::BoolValue(_) => "bool",
             QueryParameter::BinaryValue(_) => "binary",
             QueryParameter::Int64Value(_) => "int64",
+            QueryParameter::Float64Value(_) => "float64",
         }
     }
 
