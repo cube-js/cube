@@ -1484,6 +1484,18 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       filter: (column) => {
         if (paramValue) {
           if (Array.isArray(paramValue)) {
+            // An empty array means the user passed a filter value but
+            // nothing matches (e.g. `groups: []`). Emitting
+            // `col IN ()` produces invalid SQL in Postgres and other
+            // dialects, so fall back to `1 = 0` (or the function callback
+            // variant) to make the filter match nothing explicitly.
+            if (paramValue.length === 0) {
+              if (typeof column === 'function') {
+                return column([]);
+              } else {
+                return '1 = 0';
+              }
+            }
             const values = paramValue.map(allocateParam);
             if (typeof column === 'function') {
               return column(values);

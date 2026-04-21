@@ -421,24 +421,45 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                         }
                     }
                     ParamValue::StringVec(items) => {
-                        let values = items
-                            .iter()
-                            .map(|v| Self::process_secutity_context_value(&proxy_state, &v))
-                            .collect::<Result<Vec<_>, _>>()?;
+                        // An empty array means the user passed a filter value
+                        // but nothing matches (e.g. `groups: []`). Emitting
+                        // `col IN ()` produces invalid SQL in Postgres and
+                        // other dialects, so fall back to `1 = 0` (or the
+                        // function callback variant) to make the filter
+                        // match nothing explicitly.
+                        if items.is_empty() {
+                            if let Ok(column) = column.to_function() {
+                                let empty: Vec<String> = vec![];
+                                let native_values = empty.to_native(context)?;
+                                let result = column.call(vec![native_values])?;
+                                if let Ok(result) = result.to_string() {
+                                    result.value()?
+                                } else {
+                                    "".to_string()
+                                }
+                            } else {
+                                "1 = 0".to_string()
+                            }
+                        } else {
+                            let values = items
+                                .iter()
+                                .map(|v| Self::process_secutity_context_value(&proxy_state, &v))
+                                .collect::<Result<Vec<_>, _>>()?;
 
-                        if let Ok(column) = column.to_function() {
-                            let native_values = values.to_native(context)?;
-                            let result = column.call(vec![native_values])?;
-                            if let Ok(result) = result.to_string() {
-                                result.value()?
+                            if let Ok(column) = column.to_function() {
+                                let native_values = values.to_native(context)?;
+                                let result = column.call(vec![native_values])?;
+                                if let Ok(result) = result.to_string() {
+                                    result.value()?
+                                } else {
+                                    "".to_string()
+                                }
+                            } else if let Ok(column) = column.to_string() {
+                                let column_value = column.value()?;
+                                format!("{} IN ({})", column_value, values.join(", "))
                             } else {
                                 "".to_string()
                             }
-                        } else if let Ok(column) = column.to_string() {
-                            let column_value = column.value()?;
-                            format!("{} IN ({})", column_value, values.join(", "))
-                        } else {
-                            "".to_string()
                         }
                     }
                     ParamValue::None => {
