@@ -132,6 +132,84 @@ cubes:
         member_masking:
           includes: "*"
 
+  # Cube exercising different reference forms inside a mask.sql on a member
+  # that is re-exposed via a prefixed view. Each masked dimension encodes its
+  # reference style; the view tests exercise routing them through the view
+  # alias (e.g. `yaml_view_mask_test.base_product_id`). Mask compiles in the
+  # owning cube's context so CUBE / cross-cube references resolve the same
+  # way as on the underlying cube.
+  - name: yaml_view_mask_test_base
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+      # Reference form: {cube.member}
+      - name: masked_product_id_full_ref
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {yaml_view_mask_test_base.product_id}
+              ELSE -1
+            END
+
+      # Reference form: {CUBE.member}
+      - name: masked_product_id_cube_ref
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {CUBE.product_id}
+              ELSE -1
+            END
+
+      # Reference form: {CUBE}.column
+      - name: masked_product_id_cube_column
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {CUBE}.product_id
+              ELSE -1
+            END
+
+      # Reference form: {cube}.column (literal cube name)
+      - name: masked_product_id_cube_name
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {yaml_view_mask_test_base}.product_id
+              ELSE -1
+            END
+
+    measures:
+      - name: count
+        type: count
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
 views:
   # View with full access at view level - but cube masking still applies (RLS pattern)
   # Excludes members with {CUBE} references in SQL (secret_string, secret_boolean)
@@ -197,6 +275,34 @@ views:
           includes: "*"
         row_level:
           allow_all: true
+
+  # View re-exposing masks from yaml_view_mask_test_base through a prefixed
+  # join-path. Mirrors the user-reported scenario of a view that carries
+  # masks written with different cube reference styles; the mask must still
+  # compile and resolve against the underlying cube.
+  - name: yaml_view_mask_test
+    public: true
+
+    cubes:
+      - join_path: yaml_view_mask_test_base
+        prefix: true
+        includes:
+          - id
+          - product_id
+          - masked_product_id_full_ref
+          - masked_product_id_cube_ref
+          - masked_product_id_cube_column
+          - masked_product_id_cube_name
+          - count
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - yaml_view_mask_test_base_id
+            - yaml_view_mask_test_base_count
+        member_masking:
+          includes: "*"
 
   # View over a cube where all members are hidden.
   # The view adds its own masking policy — members that are invisible at

@@ -1316,5 +1316,108 @@ cubes:
       const maskSql = (dim as any).mask.sql.toString();
       expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.groups');
     });
+
+    // Regression tests for mask.sql authored with different cube reference
+    // styles on a cube member that is re-exposed through a prefixed view.
+    // The mask must compile against the owning cube, not the view, so:
+    //   * {cube.member}, {CUBE.member}, {CUBE}.column and {cube}.column
+    //     all resolve to the underlying cube's alias.
+    //   * The view's prefixed member ("users_city") does not collide with
+    //     mask-sql references authored as "city" on the underlying cube.
+    //   * Empty groups arrays in {groups.filter(...)} do not emit invalid
+    //     `IN ()` SQL.
+    describe('Mask SQL through prefixed view (cross-cube references)', () => {
+      const buildMaskViewCompilers = (maskThen: string) => prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    public: false
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: city_sensitive_masked
+        sql: city
+        mask:
+          sql: |
+            CASE
+              WHEN {groups.filter("'sensitive_data_access'")}
+              THEN ${maskThen}
+              ELSE '***MASKED***'
+            END
+        type: string
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: users_secure_view
+    public: true
+    cubes:
+      - join_path: users
+        prefix: true
+        includes:
+          - id
+          - city
+          - city_sensitive_masked
+          - count
+    access_policy:
+      - group: "*"
+        member_level:
+          includes:
+            - users_id
+            - users_count
+        member_masking:
+          includes: '*'
+      `);
+
+      const runBaseQuery = async (maskThen: string, groups: string[], useNativeSqlPlanner: boolean) => {
+        const compilers = buildMaskViewCompilers(maskThen);
+        await compilers.compiler.compile();
+        const query = new PostgresQuery(compilers, {
+          measures: ['users_secure_view.users_count'],
+          dimensions: ['users_secure_view.users_city_sensitive_masked'],
+          maskedMembers: ['users_secure_view.users_city_sensitive_masked'],
+          contextSymbols: {
+            securityContext: { cubeCloud: { groups } }
+          },
+          ...(useNativeSqlPlanner ? { useNativeSqlPlanner: true } : {})
+        });
+        return query.buildSqlAndParams();
+      };
+
+      const maskReferenceStyles = [
+        ['{users.city}', 'cube.member'],
+        ['{CUBE.city}', 'CUBE.member'],
+        ['{CUBE}.city', 'CUBE.column'],
+        ['{users}.city', 'cube.column'],
+      ] as const;
+
+      for (const [maskBody, label] of maskReferenceStyles) {
+        it(`legacy BaseQuery: ${label} (${maskBody}) resolves through view`, async () => {
+          const [sql] = await runBaseQuery(maskBody, ['sensitive_data_access'], false);
+          expect(sql).toContain('"users".city');
+        });
+
+        it(`tesseract: ${label} (${maskBody}) resolves through view`, async () => {
+          const [sql] = await runBaseQuery(maskBody, ['sensitive_data_access'], true);
+          expect(sql).toContain('"users".city');
+        });
+      }
+
+      it('legacy BaseQuery: empty groups array does not produce IN ()', async () => {
+        const [sql] = await runBaseQuery('{users.city}', [], false);
+        expect(sql).not.toMatch(/IN\s*\(\s*\)/);
+      });
+
+      it('tesseract: empty groups array does not produce IN ()', async () => {
+        const [sql] = await runBaseQuery('{users.city}', [], true);
+        expect(sql).not.toMatch(/IN\s*\(\s*\)/);
+      });
+    });
   });
 });

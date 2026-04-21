@@ -867,6 +867,26 @@ describe('Cube RBAC Engine', () => {
         expect(row.masked_order_id).toBeGreaterThan(0);
       }
     });
+
+    // The following tests reproduce the reported scenario where a view
+    // re-exposes cube members whose mask.sql contains cross-cube / CUBE
+    // references. The view uses prefix: true so mask.sql must compile
+    // against the owning cube, not the view, and must not trigger the
+    // "references foreign cubes" validation.
+    test('view: mask.sql {cube.member} reference resolves through prefixed view', async () => {
+      const res = await connection.query(
+        'SELECT * FROM yaml_view_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // sc_test groups=['1','2'] doesn't include 'sensitive_data_access',
+        // mask evaluates to -1 for all masked_* columns.
+        expect(row.yaml_view_mask_test_base_masked_product_id_full_ref).toBe(-1);
+        expect(row.yaml_view_mask_test_base_masked_product_id_cube_ref).toBe(-1);
+        expect(row.yaml_view_mask_test_base_masked_product_id_cube_column).toBe(-1);
+        expect(row.yaml_view_mask_test_base_masked_product_id_cube_name).toBe(-1);
+      }
+    });
   });
 
   describe('SECURITY_CONTEXT.cubeCloud features via REST API', () => {
@@ -981,6 +1001,62 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         // mask.sql references ${orders.id} from a joined cube — the join must be resolved
         expect(row['sc_joined_mask_test.masked_order_id']).toBeGreaterThan(0);
+      }
+    });
+
+    test('view: mask.sql with {cube.member} through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_full_ref',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_full_ref']).toBe(-1);
+      }
+    });
+
+    test('view: mask.sql with {CUBE.member} through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_ref',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_ref']).toBe(-1);
+      }
+    });
+
+    test('view: mask.sql with {CUBE}.column through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_column',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_column']).toBe(-1);
+      }
+    });
+
+    test('view: mask.sql with {cube}.column through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_name',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_name']).toBe(-1);
       }
     });
   });
@@ -1167,6 +1243,26 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         expect(row.masked_order_id).toBeGreaterThan(0);
       }
     });
+
+    // Reproduces the reported scenario in Tesseract: a view with
+    // prefix: true re-exposes cube members whose mask.sql uses different
+    // cube reference styles (`{cube.member}`, `{CUBE.member}`,
+    // `{CUBE}.column`, `{cube}.column`). Mask.sql must compile against the
+    // owning cube so CUBE aliases and cube-name references resolve via the
+    // underlying cube, not the view (which doesn't have a join path to
+    // itself).
+    test('view: mask.sql cross-cube references through prefixed view', async () => {
+      const res = await connection.query(
+        'SELECT * FROM yaml_view_mask_test LIMIT 5'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.yaml_view_mask_test_base_masked_product_id_full_ref).toBe(-1);
+        expect(row.yaml_view_mask_test_base_masked_product_id_cube_ref).toBe(-1);
+        expect(row.yaml_view_mask_test_base_masked_product_id_cube_column).toBe(-1);
+        expect(row.yaml_view_mask_test_base_masked_product_id_cube_name).toBe(-1);
+      }
+    });
   });
 
   describe('Shorthand and mask tests via REST API [Tesseract]', () => {
@@ -1240,6 +1336,62 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['sc_joined_mask_test.masked_order_id']).toBeGreaterThan(0);
+      }
+    });
+
+    test('view: mask.sql {cube.member} through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_full_ref',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_full_ref']).toBe(-1);
+      }
+    });
+
+    test('view: mask.sql {CUBE.member} through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_ref',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_ref']).toBe(-1);
+      }
+    });
+
+    test('view: mask.sql {CUBE}.column through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_column',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_column']).toBe(-1);
+      }
+    });
+
+    test('view: mask.sql {cube}.column through prefixed view via REST', async () => {
+      const result = await scClient.load({
+        measures: ['yaml_view_mask_test.yaml_view_mask_test_base_count'],
+        dimensions: [
+          'yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_name',
+        ],
+      });
+      const rows = result.rawData();
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row['yaml_view_mask_test.yaml_view_mask_test_base_masked_product_id_cube_name']).toBe(-1);
       }
     });
   });
