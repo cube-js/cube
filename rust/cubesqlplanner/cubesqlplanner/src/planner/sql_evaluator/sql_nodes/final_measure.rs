@@ -67,8 +67,16 @@ impl SqlNode for FinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
+                let is_multiplied = self
+                    .rendered_as_multiplied_measures
+                    .contains(&ev.full_name());
+                let wrap = ev.kind().aggregate_wrap(is_multiplied);
+                let child_visitor = match wrap {
+                    AggregateWrap::PassThrough => visitor.clone(),
+                    _ => visitor.with_arg_needs_paren_safe(false),
+                };
                 let input = self.input.to_sql(
-                    visitor,
+                    &child_visitor,
                     node,
                     query_tools.clone(),
                     node_processor.clone(),

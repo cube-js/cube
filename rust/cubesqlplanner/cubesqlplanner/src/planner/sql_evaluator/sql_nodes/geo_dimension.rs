@@ -34,14 +34,15 @@ impl SqlNode for GeoDimensionSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if let DimensionKind::Geo(geo) = ev.kind() {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let latitude_str = geo.latitude().eval(
-                        visitor,
+                        &inner_visitor,
                         node_processor.clone(),
                         query_tools.clone(),
                         templates,
                     )?;
                     let longitude_str = geo.longitude().eval(
-                        visitor,
+                        &inner_visitor,
                         node_processor.clone(),
                         query_tools.clone(),
                         templates,

@@ -34,16 +34,12 @@ impl SqlNode for TimeDimensionNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let input_sql = self.input.to_sql(
-            visitor,
-            node,
-            query_tools.clone(),
-            node_processor.clone(),
-            templates,
-        )?;
         match node.as_ref() {
             MemberSymbol::TimeDimension(ev) => {
-                let res = if let Some(granularity_obj) = ev.granularity_obj() {
+                if let Some(granularity_obj) = ev.granularity_obj() {
+                    // Short-circuits to calendar SQL — `self.input` is not used.
+                    // Propagate the outer visitor: the calendar SQL is the
+                    // expression itself, not wrapped further here.
                     if let Some(calendar_sql) = granularity_obj.calendar_sql() {
                         return calendar_sql.eval(
                             visitor,
@@ -52,7 +48,16 @@ impl SqlNode for TimeDimensionNode {
                             templates,
                         );
                     }
-
+                    // Wraps in `convert_tz(…)` and a granularity function —
+                    // safe, reset for child render.
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                    let input_sql = self.input.to_sql(
+                        &inner_visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )?;
                     let skip_convert_tz = self
                         .dimensions_with_ignored_timezone
                         .contains(&ev.full_name());
@@ -63,23 +68,48 @@ impl SqlNode for TimeDimensionNode {
                         templates.convert_tz(input_sql)?
                     };
 
-                    granularity_obj.apply_to_input_sql(templates, converted_tz)?
+                    Ok(granularity_obj.apply_to_input_sql(templates, converted_tz)?)
                 } else {
-                    input_sql
-                };
-                Ok(res)
-            }
-            MemberSymbol::Dimension(ev) => {
-                if !visitor.ignore_tz_convert()
-                    && query_tools.convert_tz_for_raw_time_dimension()
-                    && ev.dimension_type() == "time"
-                {
-                    Ok(templates.convert_tz(input_sql)?)
-                } else {
-                    Ok(input_sql)
+                    self.input.to_sql(
+                        visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )
                 }
             }
-            _ => Ok(input_sql),
+            MemberSymbol::Dimension(ev) => {
+                let wraps_convert_tz = !visitor.ignore_tz_convert()
+                    && query_tools.convert_tz_for_raw_time_dimension()
+                    && ev.dimension_type() == "time";
+                if wraps_convert_tz {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                    let input_sql = self.input.to_sql(
+                        &inner_visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )?;
+                    Ok(templates.convert_tz(input_sql)?)
+                } else {
+                    self.input.to_sql(
+                        visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )
+                }
+            }
+            _ => self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            ),
         }
     }
 

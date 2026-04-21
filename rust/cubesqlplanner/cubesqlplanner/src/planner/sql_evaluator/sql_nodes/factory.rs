@@ -1,9 +1,9 @@
 use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RenderReferencesType,
-    RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
-    UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode, RenderReferencesSqlNode,
+    RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::cube_ref_evaluator::CubeRefEvaluator;
@@ -156,8 +156,10 @@ impl SqlNodesFactory {
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
         );
+        let parenthesize_processor: Rc<dyn SqlNode> =
+            ParenthesizeSqlNode::new(auto_prefix_processor.clone());
 
-        let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
+        let measure_filter_processor = MeasureFilterSqlNode::new(parenthesize_processor.clone());
         let measure_processor = CaseSqlNode::new(measure_filter_processor.clone());
 
         let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
@@ -182,10 +184,11 @@ impl SqlNodesFactory {
             } else {
                 evaluate_sql_processor.clone()
             };
+        let default_processor: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(default_processor);
 
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
-            self.time_dimension_processor(evaluate_sql_processor.clone()),
+            self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
             measure_processor.clone(),
             default_processor,
         );
@@ -260,6 +263,8 @@ impl SqlNodesFactory {
 
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+
+        let input: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(input);
 
         let input: Rc<dyn SqlNode> =
             TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);

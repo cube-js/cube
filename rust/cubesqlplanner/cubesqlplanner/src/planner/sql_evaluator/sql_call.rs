@@ -6,6 +6,7 @@ use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{CubeNameSymbol, CubeTableSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
+use crate::utils::sql_expression_scanner::analyze_template_arg_contexts;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -117,6 +118,10 @@ pub struct SqlCall {
     filter_params: Vec<SqlCallFilterParamsItem>,
     filter_groups: Vec<SqlCallFilterGroupItem>,
     security_context: SecutityContextProps,
+    /// Per `{arg:N}` index: whether the surrounding context in the template
+    /// would make a compound substitution unsafe (requiring parentheses).
+    /// Computed once at construction from the template.
+    arg_paren_contexts: HashMap<usize, bool>,
 }
 
 impl SqlCall {
@@ -127,12 +132,26 @@ impl SqlCall {
         filter_groups: Vec<SqlCallFilterGroupItem>,
         security_context: SecutityContextProps,
     ) -> Self {
+        let arg_paren_contexts = match &template {
+            SqlTemplate::String(s) => analyze_template_arg_contexts(s),
+            SqlTemplate::StringVec(strings) => {
+                let mut merged: HashMap<usize, bool> = HashMap::new();
+                for s in strings {
+                    for (idx, needs_safe) in analyze_template_arg_contexts(s) {
+                        let entry = merged.entry(idx).or_insert(false);
+                        *entry = *entry || needs_safe;
+                    }
+                }
+                merged
+            }
+        };
         Self {
             template,
             deps,
             filter_params,
             filter_groups,
             security_context,
+            arg_paren_contexts,
         }
     }
 
@@ -254,10 +273,22 @@ impl SqlCall {
         let deps = self
             .deps
             .iter()
-            .map(|dep| match dep {
-                SqlDependency::Symbol(m) => visitor.apply(m, node_processor.clone(), templates),
-                SqlDependency::CubeRef(cr) => {
-                    visitor.evaluate_cube_ref(cr, node_processor.clone(), templates)
+            .enumerate()
+            .map(|(i, dep)| {
+                // Each arg's `arg_needs_paren_safe` flag is set by this call's
+                // template context, overriding whatever the caller's visitor
+                // carried. The caller's flag only governs wrapping of this
+                // whole SqlCall's output, handled by an enclosing Parenthesize
+                // node up the processor chain.
+                let needs_safe = *self.arg_paren_contexts.get(&i).unwrap_or(&false);
+                let arg_visitor = visitor.with_arg_needs_paren_safe(needs_safe);
+                match dep {
+                    SqlDependency::Symbol(m) => {
+                        arg_visitor.apply(m, node_processor.clone(), templates)
+                    }
+                    SqlDependency::CubeRef(cr) => {
+                        arg_visitor.evaluate_cube_ref(cr, node_processor.clone(), templates)
+                    }
                 }
             })
             .collect::<Result<Vec<_>, _>>()?;

@@ -14,6 +14,10 @@ pub struct SqlEvaluatorVisitor {
     cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
     ignore_tz_convert: bool,
+    /// When `true`, the caller (typically a `SqlCall` substitution site) expects
+    /// the rendered expression to be safe for embedding next to operators —
+    /// i.e. a compound top-level result should be wrapped in parentheses.
+    arg_needs_paren_safe: bool,
 }
 
 impl SqlEvaluatorVisitor {
@@ -27,6 +31,7 @@ impl SqlEvaluatorVisitor {
             cube_ref_evaluator,
             all_filters,
             ignore_tz_convert: false,
+            arg_needs_paren_safe: false,
         }
     }
 
@@ -34,6 +39,16 @@ impl SqlEvaluatorVisitor {
         let mut self_copy = self.clone();
         self_copy.ignore_tz_convert = true;
         self_copy
+    }
+
+    pub fn with_arg_needs_paren_safe(&self, value: bool) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.arg_needs_paren_safe = value;
+        self_copy
+    }
+
+    pub fn arg_needs_paren_safe(&self) -> bool {
+        self.arg_needs_paren_safe
     }
 
     pub fn all_filters(&self) -> Option<Filter> {

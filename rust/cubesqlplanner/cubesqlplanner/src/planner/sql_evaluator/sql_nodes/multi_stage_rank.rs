@@ -42,13 +42,14 @@ impl SqlNode for MultiStageRankNode {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
                 if m.is_multi_stage() && matches!(m.kind(), MeasureKind::Rank) {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let order_by = if !m.measure_order_by().is_empty() {
                         let sql = m
                             .measure_order_by()
                             .iter()
                             .map(|item| -> Result<String, CubeError> {
                                 let sql = item.sql_call().eval(
-                                    visitor,
+                                    &inner_visitor,
                                     node_processor.clone(),
                                     query_tools.clone(),
                                     templates,

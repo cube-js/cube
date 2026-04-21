@@ -36,15 +36,30 @@ impl SqlNode for RollingWindowNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if m.is_cumulative() {
+                let kind = m.kind();
+                let wraps_child = m.is_cumulative()
+                    && match kind {
+                        MeasureKind::Aggregated(a) => matches!(
+                            a.agg_type(),
+                            AggregationType::CountDistinctApprox
+                                | AggregationType::Sum
+                                | AggregationType::RunningTotal
+                                | AggregationType::Min
+                                | AggregationType::Max
+                        ),
+                        MeasureKind::Count(_) => true,
+                        _ => false,
+                    };
+                if wraps_child {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let input = self.input.to_sql(
-                        visitor,
+                        &inner_visitor,
                         node,
                         query_tools.clone(),
                         node_processor.clone(),
                         templates,
                     )?;
-                    match m.kind() {
+                    match kind {
                         MeasureKind::Aggregated(a)
                             if a.agg_type() == AggregationType::CountDistinctApprox =>
                         {
@@ -58,23 +73,13 @@ impl SqlNode for RollingWindowNode {
                             AggregationType::Min | AggregationType::Max => {
                                 format!("{}({})", a.agg_type().as_str(), input)
                             }
-                            _ => self.default_processor.to_sql(
-                                visitor,
-                                node,
-                                query_tools.clone(),
-                                node_processor,
-                                templates,
-                            )?,
+                            _ => unreachable!(),
                         },
-                        _ => self.default_processor.to_sql(
-                            visitor,
-                            node,
-                            query_tools.clone(),
-                            node_processor,
-                            templates,
-                        )?,
+                        _ => unreachable!(),
                     }
                 } else {
+                    // Delegates to the default processor without adding a wrap —
+                    // visitor propagates unchanged.
                     self.default_processor.to_sql(
                         visitor,
                         node,

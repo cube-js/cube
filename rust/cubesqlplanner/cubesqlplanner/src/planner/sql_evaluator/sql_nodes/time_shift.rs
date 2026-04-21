@@ -32,28 +32,47 @@ impl SqlNode for TimeShiftSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let input = self.input.to_sql(
-            visitor,
-            node,
-            query_tools.clone(),
-            node_processor.clone(),
-            templates,
-        )?;
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() && ev.is_time() {
                     if let Some(shift) = self.shifts.dimensions_shifts.get(&ev.full_name()) {
-                        let shift = shift.interval.clone().unwrap().to_sql(); // Common time shifts should always have an interval
+                        let shift = shift.interval.clone().unwrap().to_sql();
+                        let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                        let input = self.input.to_sql(
+                            &inner_visitor,
+                            node,
+                            query_tools.clone(),
+                            node_processor.clone(),
+                            templates,
+                        )?;
                         let res = templates.add_timestamp_interval(input, shift)?;
                         format!("({})", res)
                     } else {
-                        input
+                        self.input.to_sql(
+                            visitor,
+                            node,
+                            query_tools.clone(),
+                            node_processor.clone(),
+                            templates,
+                        )?
                     }
                 } else {
-                    input
+                    self.input.to_sql(
+                        visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )?
                 }
             }
-            _ => input,
+            _ => self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?,
         };
         Ok(res)
     }

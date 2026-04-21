@@ -31,10 +31,12 @@ impl CaseSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        // All sub-SQLs end up inside `CASE … END` — a safe wrap.
+        let inner_visitor = visitor.with_arg_needs_paren_safe(false);
         let mut when_then = Vec::new();
         for itm in case.items.iter() {
             let when = itm.sql.eval(
-                visitor,
+                &inner_visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
@@ -42,7 +44,7 @@ impl CaseSqlNode {
             let then = match &itm.label {
                 CaseLabel::String(s) => templates.quote_string(&s)?,
                 CaseLabel::Sql(sql) => sql.eval(
-                    visitor,
+                    &inner_visitor,
                     node_processor.clone(),
                     query_tools.clone(),
                     templates,
@@ -53,7 +55,7 @@ impl CaseSqlNode {
         let else_label = match &case.else_label {
             CaseLabel::String(s) => templates.quote_string(&s)?,
             CaseLabel::Sql(sql) => sql.eval(
-                visitor,
+                &inner_visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
@@ -69,6 +71,9 @@ impl CaseSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        // Degenerate shortcuts return the inner SQL as-is — propagate the outer
+        // visitor so an enclosing ParenthesizeSqlNode still sees the compound
+        // flag.
         if case.items.len() == 1 && case.else_sql.is_none() {
             return case.items[0].sql.eval(
                 visitor,
@@ -85,22 +90,23 @@ impl CaseSqlNode {
                 templates,
             );
         }
+        let inner_visitor = visitor.with_arg_needs_paren_safe(false);
         let expr = match &case.switch {
             CaseSwitchItem::Sql(sql_call) => sql_call.eval(
-                visitor,
+                &inner_visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
             )?,
             CaseSwitchItem::Member(member_symbol) => {
-                visitor.apply(&member_symbol, node_processor.clone(), templates)?
+                inner_visitor.apply(&member_symbol, node_processor.clone(), templates)?
             }
         };
         let mut when_then = Vec::new();
         for itm in case.items.iter() {
             let when = templates.quote_string(&itm.value)?;
             let then = itm.sql.eval(
-                visitor,
+                &inner_visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
@@ -109,7 +115,7 @@ impl CaseSqlNode {
         }
         let else_label = if let Some(else_sql) = &case.else_sql {
             Some(else_sql.eval(
-                visitor,
+                &inner_visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
