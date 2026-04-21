@@ -127,20 +127,14 @@ fn calculated_number_over_compound_calc_wraps_dep() {
     // `{calc_number_compound} * 100` — the dep renders to a compound
     // expression and must be wrapped before being embedded next to `*`.
     let sql = measure_sql(&ctx, "expr_cube.calc_number_over_compound");
-    assert_eq!(
-        sql,
-        "(sum(\"expr_cube\".a) + sum(\"expr_cube\".b)) * 100"
-    );
+    assert_eq!(sql, "(sum(\"expr_cube\".a) + sum(\"expr_cube\".b)) * 100");
 }
 
 #[test]
 fn calculated_boolean_compound_top_level_is_not_wrapped() {
     let ctx = ctx();
     let sql = measure_sql(&ctx, "expr_cube.calc_boolean_compound");
-    assert_eq!(
-        sql,
-        "sum(\"expr_cube\".a) > 0 OR sum(\"expr_cube\".b) > 0"
-    );
+    assert_eq!(sql, "sum(\"expr_cube\".a) > 0 OR sum(\"expr_cube\".b) > 0");
 }
 
 #[test]

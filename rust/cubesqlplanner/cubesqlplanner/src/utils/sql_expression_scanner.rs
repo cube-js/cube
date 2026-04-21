@@ -497,8 +497,8 @@ fn matches_any_keyword(word: &str, keywords: &[&str]) -> bool {
 
 fn is_operator_keyword(word: &str) -> bool {
     const KEYWORDS: &[&str] = &[
-        "AND", "OR", "NOT", "IS", "LIKE", "ILIKE", "RLIKE", "BETWEEN", "IN", "SIMILAR",
-        "OVERLAPS", "ESCAPE", "ANY", "ALL", "SOME", "COLLATE",
+        "AND", "OR", "NOT", "IS", "LIKE", "ILIKE", "RLIKE", "BETWEEN", "IN", "SIMILAR", "OVERLAPS",
+        "ESCAPE", "ANY", "ALL", "SOME", "COLLATE",
     ];
     matches_any_keyword(word, KEYWORDS)
 }
