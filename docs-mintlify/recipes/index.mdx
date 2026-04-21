@@ -19,16 +19,16 @@ pre-aggregations, configuration, APIs, and AI.
   <Card title="Entity-Attribute-Value model" icon="table" href="/recipes/data-modeling/entity-attribute-value">
     Shape sparse EAV warehouse tables into queryable dimensions and joins.
   </Card>
-  <Card title="Using Cube with dbt" icon="cubes" href="/recipes/data-modeling/dbt">
+  <Card title="Using Cube with dbt" icon="cube" href="/recipes/data-modeling/dbt">
     Layer Cube on dbt-built warehouse models, aligning documentation patterns with your semantic layer.
   </Card>
-  <Card title="Dynamic data models" icon="wand-magic-sparkles" href="/recipes/data-modeling/using-dynamic-measures">
+  <Card title="Dynamic data models" icon="schema" href="/recipes/data-modeling/using-dynamic-measures">
     Generate measures programmatically from changing reference data.
   </Card>
-  <Card title="Dynamic union tables" icon="layer-group" href="/recipes/data-modeling/dynamic-union-tables">
+  <Card title="Dynamic union tables" icon="stack-2" href="/recipes/data-modeling/dynamic-union-tables">
     Combine multiple database tables that relate to the same entity into a single cube.
   </Card>
-  <Card title="Custom ordering" icon="arrow-down-1-9" href="/recipes/data-modeling/custom-order">
+  <Card title="Custom ordering" icon="sort-ascending-shapes" href="/recipes/data-modeling/custom-order">
     Define a custom sort order for categorical values like pipeline stages that don't sort alphabetically.
   </Card>
 </CardGroup>
@@ -36,10 +36,10 @@ pre-aggregations, configuration, APIs, and AI.
 ## Calculations & Metrics
 
 <CardGroup cols={3}>
-  <Card title="Averages and percentiles" icon="percent" href="/recipes/data-modeling/percentiles">
+  <Card title="Averages and percentiles" icon="percentage" href="/recipes/data-modeling/percentiles">
     Model percentile-based metrics alongside averages for accurate representation of skewed distributions.
   </Card>
-  <Card title="Nested aggregates" icon="clone" href="/recipes/data-modeling/nested-aggregates">
+  <Card title="Nested aggregates" icon="layers-selected-bottom" href="/recipes/data-modeling/nested-aggregates">
     Express aggregates-of-aggregates like a median of per-group sums using joined cubes and subquery dimensions.
   </Card>
   <Card title="Filtered aggregates" icon="filter" href="/recipes/data-modeling/filtered-aggregates">
@@ -48,10 +48,10 @@ pre-aggregations, configuration, APIs, and AI.
   <Card title="Share of total" icon="chart-pie" href="/recipes/data-modeling/share-of-total">
     Compute each dimension member's contribution to the grand total or a fixed subtotal using multi-stage measures.
   </Card>
-  <Card title="Period-over-period changes" icon="arrow-trend-up" href="/recipes/data-modeling/period-over-period">
+  <Card title="Period-over-period changes" icon="trending-up" href="/recipes/data-modeling/period-over-period">
     Calculate week-over-week, month-over-month, and other period-over-period metric changes.
   </Card>
-  <Card title="Dynamic parameters" icon="sliders" href="/recipes/data-modeling/passing-dynamic-parameters-in-a-query">
+  <Card title="Dynamic parameters" icon="adjustments-horizontal" href="/recipes/data-modeling/passing-dynamic-parameters-in-a-query">
     Let users select filter values and use them in calculations without filtering the entire query.
   </Card>
 </CardGroup>
@@ -59,7 +59,7 @@ pre-aggregations, configuration, APIs, and AI.
 ## Time Series & Calendars
 
 <CardGroup cols={3}>
-  <Card title="String time dimensions" icon="font" href="/recipes/data-modeling/string-time-dimensions">
+  <Card title="String time dimensions" icon="letter-a" href="/recipes/data-modeling/string-time-dimensions">
     Work around non-timestamp time columns by casting strings to proper time dimension types.
   </Card>
   <Card title="Custom granularities" icon="clock" href="/recipes/data-modeling/custom-granularity">
@@ -90,22 +90,22 @@ pre-aggregations, configuration, APIs, and AI.
 ## Pre-Aggregations
 
 <CardGroup cols={3}>
-  <Card title="Non-additive measures" icon="square-root-variable" href="/recipes/pre-aggregations/non-additivity">
+  <Card title="Non-additive measures" icon="square-root-2" href="/recipes/pre-aggregations/non-additivity">
     Accelerate averages, distinct counts, and similar non-additive measures with pre-aggregations.
   </Card>
-  <Card title="Incremental builds" icon="bars-progress" href="/recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range">
+  <Card title="Incremental builds" icon="grid-dots" href="/recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range">
     Rebuild only the time-bounded partitions you need instead of refreshing entire rollups.
   </Card>
-  <Card title="Disabling pre-aggregations" icon="toggle-off" href="/recipes/pre-aggregations/disabling-pre-aggregations">
+  <Card title="Disabling pre-aggregations" icon="toggle-left" href="/recipes/pre-aggregations/disabling-pre-aggregations">
     Conditionally disable pre-aggregations based on environment or deployment context.
   </Card>
   <Card title="original_sql and rollups" icon="database" href="/recipes/pre-aggregations/using-originalsql-and-rollups-effectively">
     Materialize expensive SQL once with original_sql, then reuse across rollup pre-aggregations.
   </Card>
-  <Card title="Refreshing partitions" icon="arrows-rotate" href="/recipes/pre-aggregations/refreshing-select-partitions">
+  <Card title="Refreshing partitions" icon="refresh" href="/recipes/pre-aggregations/refreshing-select-partitions">
     Partition-level refresh patterns for when dimension values change after initial load.
   </Card>
-  <Card title="Multiple data sources" icon="circle-nodes" href="/recipes/pre-aggregations/joining-multiple-data-sources">
+  <Card title="Multiple data sources" icon="topology-ring-2" href="/recipes/pre-aggregations/joining-multiple-data-sources">
     Join data from different warehouses with cross-database rollup joins.
   </Card>
 </CardGroup>
@@ -119,7 +119,7 @@ pre-aggregations, configuration, APIs, and AI.
   <Card title="SSL connections" icon="lock" href="/recipes/configuration/using-ssl-connections-to-data-source">
     Enable TLS to upstream databases with custom CA bundles and client certificates.
   </Card>
-  <Card title="Optimizing data source usage" icon="gauge-high" href="/recipes/configuration/data-store-cost-saving-guide">
+  <Card title="Optimizing data source usage" icon="brand-speedtest" href="/recipes/configuration/data-store-cost-saving-guide">
     Reduce warehouse spend through pre-aggregation strategy and workload-aware settings.
   </Card>
   <Card title="Custom data source per tenant" icon="server" href="/recipes/configuration/multiple-sources-same-schema">
@@ -136,16 +136,16 @@ pre-aggregations, configuration, APIs, and AI.
   <Card title="Unique values for a field" icon="list" href="/recipes/core-data-api/getting-unique-values-for-a-field">
     Power filter dropdowns by querying distinct dimension values from Cube's data APIs.
   </Card>
-  <Card title="Numeric values on the front-end" icon="hashtag" href="/recipes/core-data-api/cast-numerics">
+  <Card title="Numeric values on the front-end" icon="hash" href="/recipes/core-data-api/cast-numerics">
     Coerce REST numeric strings into JavaScript numbers, with precision pitfalls and caveats.
   </Card>
-  <Card title="Custom sorting" icon="arrow-down-a-z" href="/recipes/core-data-api/sorting">
+  <Card title="Custom sorting" icon="sort-ascending-letters" href="/recipes/core-data-api/sorting">
     Sort query result sets by custom criteria beyond default ordering.
   </Card>
-  <Card title="Pagination" icon="book-open" href="/recipes/core-data-api/pagination">
+  <Card title="Pagination" icon="book" href="/recipes/core-data-api/pagination">
     Implement paged tables over Cube queries using limit, offset, and deterministic ordering.
   </Card>
-  <Card title="Drilldowns" icon="magnifying-glass-plus" href="/recipes/core-data-api/drilldowns">
+  <Card title="Drilldowns" icon="menu-deep" href="/recipes/core-data-api/drilldowns">
     Configure drill members and fetch detail rows behind an aggregate value.
   </Card>
   <Card title="Real-time data fetch" icon="wifi" href="/recipes/core-data-api/real-time-data-fetch">
@@ -156,7 +156,7 @@ pre-aggregations, configuration, APIs, and AI.
 ## AI
 
 <CardGroup cols={3}>
-  <Card title="Agent-to-agent with Chat API" icon="robot" href="/recipes/ai/agent-to-agent">
+  <Card title="Agent-to-agent with Chat API" icon="topology-star" href="/recipes/ai/agent-to-agent">
     Wrap the Cube Chat API as a LangChain tool so an orchestrating agent can query data on demand.
   </Card>
 </CardGroup>
