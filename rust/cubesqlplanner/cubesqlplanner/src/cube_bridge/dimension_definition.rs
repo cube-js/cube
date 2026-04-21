@@ -30,6 +30,8 @@ pub struct DimensionDefinitionStatic {
     pub values: Option<Vec<String>>,
     #[serde(rename = "primaryKey")]
     pub primary_key: Option<bool>,
+    #[serde(rename = "aliasMember")]
+    pub alias_member: Option<String>,
 }
 
 #[nativebridge::native_bridge(DimensionDefinitionStatic)]

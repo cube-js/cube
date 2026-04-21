@@ -29,6 +29,8 @@ pub struct MockDimensionDefinition {
     values: Option<Vec<String>>,
     #[builder(default)]
     primary_key: Option<bool>,
+    #[builder(default)]
+    alias_member: Option<String>,
 
     #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
@@ -54,7 +56,8 @@ impl_static_data!(
     sub_query,
     propagate_filters_to_sub_query,
     values,
-    primary_key
+    primary_key,
+    alias_member
 );
 
 impl MockDimensionDefinition {
