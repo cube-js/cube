@@ -43,6 +43,14 @@ impl MeasureMatcher {
                     self.matched_measures.insert(measure.full_name());
                     return Ok(true);
                 }
+                // Multi-stage measures carry their own aggregate semantics
+                // (time_shift, reduce_by, add_group_by, rolling window) that
+                // recursing into base dependencies silently discards. If the
+                // pre-agg doesn't materialize the multi-stage measure itself,
+                // the match only holds inside an already-rewritten leaf CTE.
+                if measure.is_multi_stage() {
+                    return Ok(false);
+                }
             }
             MemberSymbol::MemberExpression(_) => {
                 return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it

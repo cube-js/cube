@@ -34,7 +34,6 @@ cubes:
             time_shift:
                 - interval: "1 month"
                   type: prior
-                  timeDimension: returns.created_at
 
       pre_aggregations:
           # Pre-agg for the multiplied leaf subquery: base total_lifetime_value
@@ -43,6 +42,15 @@ cubes:
             type: rollup
             measures:
                 - total_lifetime_value
+            time_dimension: returns.created_at
+            granularity: month
+
+          # Pre-agg that directly materializes the multi-stage time_shift
+          # measure. Query for it should match this pre-agg as-is.
+          - name: customers_lifetime_prev_month_pre_agg
+            type: rollup
+            measures:
+                - total_lifetime_value_prev_month_by_returns
             time_dimension: returns.created_at
             granularity: month
 

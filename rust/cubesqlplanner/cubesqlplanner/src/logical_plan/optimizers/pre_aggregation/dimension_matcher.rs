@@ -202,6 +202,11 @@ impl<'a> DimensionMatcher<'a> {
             Ok(MatchState::Full)
         } else if dimension.owned_by_cube() {
             Ok(MatchState::NotMatched)
+        } else if dimension.is_multi_stage() {
+            // Multi-stage dimensions carry aggregate semantics that simple
+            // dependency recursion would discard; match only if pre-agg
+            // exposes the multi-stage dim itself.
+            Ok(MatchState::NotMatched)
         } else {
             let dependencies = dimension.get_dependencies();
             if dependencies.is_empty() {
@@ -273,6 +278,8 @@ impl<'a> DimensionMatcher<'a> {
             Ok(best_match)
         } else {
             if time_dimension.owned_by_cube() {
+                Ok(MatchState::NotMatched)
+            } else if time_dimension.is_multi_stage() {
                 Ok(MatchState::NotMatched)
             } else {
                 let mut result = if time_dimension.is_reference() {
