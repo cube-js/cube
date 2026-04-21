@@ -27,7 +27,7 @@ pub enum PlaceholderKind {
     SecurityValue,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TokenKind {
     Word,
     QuotedIdent,
@@ -343,7 +343,7 @@ impl<'a> Tokenizer<'a> {
         let delim = self.src[self.pos..self.pos + delim_len].to_string();
         self.pos += delim_len;
         while self.pos + delim_len <= self.bytes.len() {
-            if &self.src[self.pos..self.pos + delim_len] == delim {
+            if self.src[self.pos..self.pos + delim_len] == delim {
                 self.pos += delim_len;
                 return Some(Token {
                     kind: TokenKind::StringLit,
@@ -491,45 +491,29 @@ fn utf8_char_len(bytes: &[u8], pos: usize) -> usize {
     .min(bytes.len() - pos)
 }
 
-fn eq_ignore_ascii_case(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
+fn matches_any_keyword(word: &str, keywords: &[&str]) -> bool {
+    keywords.iter().any(|kw| word.eq_ignore_ascii_case(kw))
 }
 
 fn is_operator_keyword(word: &str) -> bool {
-    matches!(
-        &*word.to_ascii_uppercase(),
-        "AND"
-            | "OR"
-            | "NOT"
-            | "IS"
-            | "LIKE"
-            | "ILIKE"
-            | "RLIKE"
-            | "BETWEEN"
-            | "IN"
-            | "SIMILAR"
-            | "OVERLAPS"
-            | "ESCAPE"
-            | "ANY"
-            | "ALL"
-            | "SOME"
-            | "COLLATE"
-    )
+    const KEYWORDS: &[&str] = &[
+        "AND", "OR", "NOT", "IS", "LIKE", "ILIKE", "RLIKE", "BETWEEN", "IN", "SIMILAR",
+        "OVERLAPS", "ESCAPE", "ANY", "ALL", "SOME", "COLLATE",
+    ];
+    matches_any_keyword(word, KEYWORDS)
 }
 
 fn is_case_start(word: &str) -> bool {
-    eq_ignore_ascii_case(word, "CASE")
+    word.eq_ignore_ascii_case("CASE")
 }
 
 fn is_case_end(word: &str) -> bool {
-    eq_ignore_ascii_case(word, "END")
+    word.eq_ignore_ascii_case("END")
 }
 
 fn is_case_keyword(word: &str) -> bool {
-    matches!(
-        &*word.to_ascii_uppercase(),
-        "WHEN" | "THEN" | "ELSE" | "CASE" | "END"
-    )
+    const KEYWORDS: &[&str] = &["WHEN", "THEN", "ELSE", "CASE", "END"];
+    matches_any_keyword(word, KEYWORDS)
 }
 
 fn tokenize_all(src: &str) -> Vec<Token<'_>> {
@@ -559,17 +543,17 @@ pub fn is_top_level_compound(sql: &str) -> bool {
         if let TokenKind::Word = tok.kind {
             if is_case_start(tok.text) {
                 case_depth += 1;
-                prev_significant = Some(tok.kind.clone());
+                prev_significant = Some(tok.kind);
                 continue;
             }
             if is_case_end(tok.text) && case_depth > 0 {
                 case_depth -= 1;
-                prev_significant = Some(tok.kind.clone());
+                prev_significant = Some(tok.kind);
                 continue;
             }
         }
         if case_depth > 0 {
-            prev_significant = Some(tok.kind.clone());
+            prev_significant = Some(tok.kind);
             continue;
         }
         match &tok.kind {
@@ -585,7 +569,7 @@ pub fn is_top_level_compound(sql: &str) -> bool {
             }
             _ => {}
         }
-        prev_significant = Some(tok.kind.clone());
+        prev_significant = Some(tok.kind);
     }
     false
 }
@@ -627,8 +611,12 @@ fn is_placeholder_context_unsafe(tokens: &[Token<'_>], idx: usize) -> bool {
     let scan_end = find_right_boundary(tokens, idx, placeholder_depth).unwrap_or(tokens.len());
 
     let mut case_depth: usize = 0;
-    for i in scan_start..scan_end {
-        let tok = &tokens[i];
+    for (i, tok) in tokens
+        .iter()
+        .enumerate()
+        .skip(scan_start)
+        .take(scan_end - scan_start)
+    {
         if i == idx {
             continue;
         }

@@ -43,15 +43,13 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
                 };
                 // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
                 // (safe), other kinds pass through and must propagate the flag.
-                let inner_visitor_owned;
                 let child_visitor = if is_count_like {
-                    inner_visitor_owned = visitor.with_arg_needs_paren_safe(false);
-                    &inner_visitor_owned
+                    visitor.with_arg_needs_paren_safe(false)
                 } else {
-                    visitor
+                    visitor.clone()
                 };
                 let input = self.input.to_sql(
-                    child_visitor,
+                    &child_visitor,
                     node,
                     query_tools.clone(),
                     node_processor.clone(),
