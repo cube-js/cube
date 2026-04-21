@@ -104,7 +104,12 @@ SAML integration in Google into Cube Cloud.
 | Identity Provider Login URL | Use the **Sign on URL** value from Google Workspace         |
 | Certificate                 | Use the **Signing Certificate** value from Google Workspace |
 
-3. Scroll down and click **Save SAML Settings** to save the changes.
+3. Enable **Auto-provision new users** if you want users to be automatically
+   created in Cube on their first login via this SAML provider. New users
+   are assigned the Viewer role by default. Enable this if you are not using
+   SCIM provisioning.
+
+4. Scroll down and click **Save SAML Settings** to save the changes.
 
 ## Test SAML authentication
 

@@ -80,6 +80,13 @@ values from the Entra **Single sign-on** page:
 - **Certificate** — Paste the Base64-encoded certificate from the
   **SAML Certificates** section.
 
+In both options, also configure the following setting:
+
+- **Auto-provision new users** — When enabled, users are automatically
+  created in Cube on their first login via this SAML provider and assigned
+  the Viewer role by default. Enable this if you want to provision users
+  only when they first access Cube and you are not using SCIM provisioning.
+
 ## Configure attribute mappings
 
 To map user attributes from Entra to Cube, configure the claim URIs
