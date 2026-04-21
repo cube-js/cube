@@ -1,3 +1,4 @@
+mod auto_parentheses;
 mod common_sql_generation;
 mod compiled_member_path;
 mod cube_evaluator;

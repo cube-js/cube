@@ -42,13 +42,9 @@ impl SqlNode for ParenthesizeSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let input_sql = self.input.to_sql(
-            visitor,
-            node,
-            query_tools,
-            node_processor,
-            templates,
-        )?;
+        let input_sql = self
+            .input
+            .to_sql(visitor, node, query_tools, node_processor, templates)?;
         if visitor.arg_needs_paren_safe() && is_top_level_compound(&input_sql) {
             Ok(format!("({})", input_sql))
         } else {

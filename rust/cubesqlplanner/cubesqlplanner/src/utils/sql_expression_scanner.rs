@@ -40,10 +40,7 @@ enum TokenKind {
     Semicolon,
     CastOp,
     Operator,
-    Placeholder {
-        kind: PlaceholderKind,
-        index: usize,
-    },
+    Placeholder { kind: PlaceholderKind, index: usize },
     OpaqueBraces,
     Unknown,
 }
@@ -53,7 +50,6 @@ struct Token<'a> {
     kind: TokenKind,
     text: &'a str,
     depth: usize,
-    offset: usize,
 }
 
 struct Tokenizer<'a> {
@@ -135,8 +131,10 @@ impl<'a> Tokenizer<'a> {
         let b = self.peek(0).unwrap();
 
         // String-like prefixes: N'...', E'...', B'...', R'...', X'..., also lowercased.
-        if matches!(b, b'N' | b'n' | b'E' | b'e' | b'B' | b'b' | b'R' | b'r' | b'X' | b'x')
-            && self.peek(1) == Some(b'\'')
+        if matches!(
+            b,
+            b'N' | b'n' | b'E' | b'e' | b'B' | b'b' | b'R' | b'r' | b'X' | b'x'
+        ) && self.peek(1) == Some(b'\'')
         {
             self.pos += 1;
             return Some(self.read_quoted(offset, b'\'', true, TokenKind::StringLit));
@@ -163,7 +161,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Open('('),
                 text: &self.src[offset..self.pos],
                 depth: self.depth - 1,
-                offset,
             });
         }
         if b == b')' {
@@ -175,7 +172,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Close(')'),
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
         if b == b'[' {
@@ -185,7 +181,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Open('['),
                 text: &self.src[offset..self.pos],
                 depth: self.depth - 1,
-                offset,
             });
         }
         if b == b']' {
@@ -197,7 +192,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Close(']'),
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
         if b == b'{' {
@@ -212,7 +206,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Unknown,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
 
@@ -222,7 +215,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Comma,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
         if b == b';' {
@@ -231,7 +223,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Semicolon,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
         if b == b'.' {
@@ -240,7 +231,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Dot,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
 
@@ -250,7 +240,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::CastOp,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
 
@@ -270,7 +259,6 @@ impl<'a> Tokenizer<'a> {
                 kind: TokenKind::Operator,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             });
         }
 
@@ -281,7 +269,6 @@ impl<'a> Tokenizer<'a> {
             kind: TokenKind::Unknown,
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         })
     }
 
@@ -315,7 +302,6 @@ impl<'a> Tokenizer<'a> {
                 kind,
                 text: &self.src[offset..self.pos],
                 depth: self.depth,
-                offset,
             };
         }
         self.pos += 1;
@@ -339,7 +325,6 @@ impl<'a> Tokenizer<'a> {
             kind,
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         }
     }
 
@@ -364,7 +349,6 @@ impl<'a> Tokenizer<'a> {
                     kind: TokenKind::StringLit,
                     text: &self.src[offset..self.pos],
                     depth: self.depth,
-                    offset,
                 });
             }
             self.pos += 1;
@@ -374,7 +358,6 @@ impl<'a> Tokenizer<'a> {
             kind: TokenKind::StringLit,
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         })
     }
 
@@ -401,7 +384,6 @@ impl<'a> Tokenizer<'a> {
             kind: TokenKind::Placeholder { kind, index: idx },
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         })
     }
 
@@ -420,7 +402,6 @@ impl<'a> Tokenizer<'a> {
             kind: TokenKind::OpaqueBraces,
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         }
     }
 
@@ -432,10 +413,7 @@ impl<'a> Tokenizer<'a> {
                 continue;
             }
             if (c == b'e' || c == b'E')
-                && matches!(
-                    self.peek(1),
-                    Some(b'+') | Some(b'-') | Some(b'0'..=b'9')
-                )
+                && matches!(self.peek(1), Some(b'+') | Some(b'-') | Some(b'0'..=b'9'))
             {
                 self.pos += 1;
                 if matches!(self.peek(0), Some(b'+') | Some(b'-')) {
@@ -452,7 +430,6 @@ impl<'a> Tokenizer<'a> {
             kind: TokenKind::Number,
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         }
     }
 
@@ -464,7 +441,6 @@ impl<'a> Tokenizer<'a> {
             kind: TokenKind::Word,
             text: &self.src[offset..self.pos],
             depth: self.depth,
-            offset,
         }
     }
 }
@@ -522,7 +498,8 @@ fn eq_ignore_ascii_case(a: &str, b: &str) -> bool {
 fn is_operator_keyword(word: &str) -> bool {
     matches!(
         &*word.to_ascii_uppercase(),
-        "AND" | "OR"
+        "AND"
+            | "OR"
             | "NOT"
             | "IS"
             | "LIKE"
@@ -797,7 +774,9 @@ mod tests {
     #[test]
     fn atomic_case() {
         // Searched form.
-        assert!(!is_top_level_compound("CASE WHEN x = 1 THEN 'a' ELSE 'b' END"));
+        assert!(!is_top_level_compound(
+            "CASE WHEN x = 1 THEN 'a' ELSE 'b' END"
+        ));
         assert!(!is_top_level_compound(
             "CASE WHEN x IS NULL THEN 0 ELSE x + 1 END"
         ));
@@ -961,10 +940,7 @@ mod tests {
         assert!(!is_unsafe("CASE WHEN y = 1 THEN {arg:0} ELSE 0 END", 0));
         // But if the placeholder is inside a branch with a top-level operator,
         // that branch still produces compound context.
-        assert!(is_unsafe(
-            "CASE WHEN y = 1 THEN {arg:0} + 1 ELSE 0 END",
-            0
-        ));
+        assert!(is_unsafe("CASE WHEN y = 1 THEN {arg:0} + 1 ELSE 0 END", 0));
     }
 
     #[test]
