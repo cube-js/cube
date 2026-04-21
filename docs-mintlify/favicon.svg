@@ -1,14 +1,5 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Rounded background -->
-  <rect width="32" height="32" rx="8" fill="#7A77FF"/>
-
-  <!-- Open book -->
-  <!-- Left page -->
-  <path d="M16 10L6 7V24L16 22Z" fill="white"/>
-  <!-- Right page -->
-  <path d="M16 10L26 7V24L16 22Z" fill="#E0DFFF"/>
-  <!-- Spine shadow -->
-  <path d="M16 10V22" stroke="#5856D6" stroke-width="1.5" stroke-linecap="round"/>
-  <!-- Pink bookmark ribbon -->
-  <path d="M21 7V14L22.5 12.5L24 14V7" fill="#FF6492"/>
+<path d="M31 7V27H27C21.5679 27.0002 18 29 16 32C14 29 11 27.0002 5 27H1V7H31Z" fill="#0F0F23"/>
+<path d="M5.00117 23C8.00059 23.0002 12.0003 23.0003 15 26V7C13 4 10 3 6.00117 3L1 3V23H5.00117Z" fill="#7A77FF"/>
+<path d="M27.9988 23C23.9994 23.0002 19.9997 23.0003 17 26V7C19 4 22 3 25.9988 3L31 3V23H27.9988Z" fill="#FF6492"/>
 </svg>
