@@ -126,6 +126,7 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
       }
       this.cached = true;
     }
+
     return this.cache;
   }
 
@@ -139,7 +140,14 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
       return [this.nativeReference];
     }
 
-    return [this.jsResult];
+    // Serialize to a Buffer so the Rust side can decode via
+    // serde_json::from_slice instead of walking a JsArray through the
+    // Neon bridge with JsValueDeserializer. On 5 MB of AoO rows
+    // (~21k rows × 8 fields) the JsArray walk costs ~80 ms locally;
+    // Buffer + serde_json is ~7× faster (M3 MAX) and tracks V8's JSON.parse
+    // (~11 ms on the same payload). On a real server it should be 3-6× slower,
+    // so avoiding the JsArray walk matters even more there.
+    return [Buffer.from(JSON.stringify(this.jsResult))];
   }
 
   public setTransformData(td: any) {
