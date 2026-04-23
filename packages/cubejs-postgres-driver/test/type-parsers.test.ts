@@ -26,8 +26,12 @@ describe('type parsers', () => {
   test('timestampTzTypeParser (OID 1184)', () => {
     // positive HH-only offset (matches integration assertion)
     expect(timestampTzTypeParser('2020-01-01 00:00:00+02')).toBe('2019-12-31T22:00:00.000');
-    // zero offset
+    // zero offset — fast path (UTC session, every shape Postgres can emit)
     expect(timestampTzTypeParser('2020-01-01 00:00:00+00')).toBe('2020-01-01T00:00:00.000');
+    expect(timestampTzTypeParser('2020-01-01 00:00:00-00')).toBe('2020-01-01T00:00:00.000');
+    expect(timestampTzTypeParser('2020-01-01 00:00:00+00:00')).toBe('2020-01-01T00:00:00.000');
+    expect(timestampTzTypeParser('2020-06-15 08:15:30.250+00')).toBe('2020-06-15T08:15:30.250');
+    expect(timestampTzTypeParser('2020-06-15 08:15:30.123456+00')).toBe('2020-06-15T08:15:30.123');
     // negative HH-only offset
     expect(timestampTzTypeParser('2020-01-01 00:00:00-05')).toBe('2020-01-01T05:00:00.000');
     // HH:MM offset crossing day boundary
@@ -45,5 +49,15 @@ describe('type parsers', () => {
     expect(timestampTzTypeParser('0099-01-01 00:00:00+00')).toBe('0099-01-01T00:00:00.000');
     expect(timestampTzTypeParser('0099-01-01 00:00:00+02')).toBe('0098-12-31T22:00:00.000');
     expect(timestampTzTypeParser('0001-01-01 02:00:00+05:00')).toBe('0000-12-31T21:00:00.000');
+    // Year boundary rollover (forward / backward)
+    expect(timestampTzTypeParser('2020-12-31 23:30:00-01')).toBe('2021-01-01T00:30:00.000');
+    expect(timestampTzTypeParser('2021-01-01 00:30:00+01')).toBe('2020-12-31T23:30:00.000');
+    // Leap-year February edges
+    expect(timestampTzTypeParser('2020-02-28 23:30:00-01')).toBe('2020-02-29T00:30:00.000'); // into Feb 29 (leap)
+    expect(timestampTzTypeParser('2020-03-01 00:30:00+01')).toBe('2020-02-29T23:30:00.000'); // back to Feb 29
+    expect(timestampTzTypeParser('2021-02-28 23:30:00-01')).toBe('2021-03-01T00:30:00.000'); // non-leap skips Feb 29
+    // Centennial leap rule: 2000 IS a leap year, 1900 is NOT.
+    expect(timestampTzTypeParser('2000-02-28 23:30:00-01')).toBe('2000-02-29T00:30:00.000');
+    expect(timestampTzTypeParser('1900-02-28 23:30:00-01')).toBe('1900-03-01T00:30:00.000');
   });
 });

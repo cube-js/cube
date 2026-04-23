@@ -48,6 +48,22 @@ export const timestampTzTypeParser = (val: string): string => {
     if (c === 43 /* + */ || c === 45 /* - */) break;
   }
 
+  // Fast path: the driver pins session timezone to UTC by default, so Postgres emits `+00`,
+  // `+00:00`, or `+00:00:00` for every TIMESTAMPTZ on the wire.
+  let allZero = true;
+
+  for (let i = tzIdx + 1; i < len; i++) {
+    const c = val.charCodeAt(i);
+    if (c !== 48 /* '0' */ && c !== 58 /* ':' */) {
+      allZero = false;
+      break;
+    }
+  }
+
+  if (allZero) {
+    return timestampTypeParser(val.slice(0, tzIdx));
+  }
+
   const year = parseInt(val.slice(0, 4), 10);
   const month = parseInt(val.slice(5, 7), 10);
   const day = parseInt(val.slice(8, 10), 10);
