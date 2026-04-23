@@ -115,7 +115,7 @@ export type PreAggTableToTempTable = [
   TempTable,
 ];
 
-export type PreAggTableToTempTableNames = [string, { targetTableName: string; usageTargetTableNames?: Record<string, string>; }];
+export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
 export type CacheKeyItem = string | string[] | QueryWithParams | QueryWithParams[] | undefined;
 
@@ -429,22 +429,7 @@ export class QueryCache {
       ? queryAndParams
       : [queryAndParams, []];
     const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName, usageTargetTableNames }]) => {
-        // First replace usage-specific placeholders (e.g. tableName__usage_0)
-        if (usageTargetTableNames) {
-          for (const [suffix, usageTargetName] of Object.entries(usageTargetTableNames)) {
-            query = QueryCache.replaceAll(`${tableName}${suffix}`, usageTargetName, query);
-          }
-        }
-        // Replace base table name only when there are no usage-specific replacements.
-        // When usageTargetTableNames is present, all SQL references already use __usage_N suffixes
-        // and the base replacement would incorrectly match inside already-replaced target names
-        // (e.g. turning "preagg20200101_hash" into "preagg20200101_hash20200101_hash").
-        if (!usageTargetTableNames || Object.keys(usageTargetTableNames).length === 0) {
-          return QueryCache.replaceAll(tableName, targetTableName, query);
-        }
-        return query;
-      },
+      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
     return Array.isArray(queryAndParams)
