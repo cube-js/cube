@@ -32,6 +32,7 @@ describe('type parsers', () => {
     expect(timestampTzTypeParser('2020-01-01 00:00:00-05')).toBe('2020-01-01T05:00:00.000');
     // HH:MM offset crossing day boundary
     expect(timestampTzTypeParser('2020-01-01 23:30:00+05:30')).toBe('2020-01-01T18:00:00.000');
+    expect(timestampTzTypeParser('2020-01-01 00:00:00+05:30:15')).toBe('2019-12-31T18:29:45.000');
     // milliseconds plus HH:MM offset
     expect(timestampTzTypeParser('2020-06-15 08:15:30.250+05:45')).toBe('2020-06-15T02:30:30.250');
     // microseconds plus HH offset are truncated to ms
