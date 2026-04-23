@@ -48,19 +48,22 @@ export const timestampTzTypeParser = (val: string): string => {
     if (c === 43 /* + */ || c === 45 /* - */) break;
   }
 
-  // Fast path: the driver pins session timezone to UTC by default, so Postgres emits `+00`,
-  // `+00:00`, or `+00:00:00` for every TIMESTAMPTZ on the wire.
-  let allZero = true;
+  const sign = val.charCodeAt(tzIdx) === 43 ? 1 : -1;
+  const tzHours = parseInt(val.slice(tzIdx + 1, tzIdx + 3), 10);
+  let tzMinutes = 0;
+  let tzSeconds = 0;
 
-  for (let i = tzIdx + 1; i < len; i++) {
-    const c = val.charCodeAt(i);
-    if (c !== 48 /* '0' */ && c !== 58 /* ':' */) {
-      allZero = false;
-      break;
+  if (len > tzIdx + 3) {
+    tzMinutes = parseInt(val.slice(tzIdx + 4, tzIdx + 6), 10);
+    if (len > tzIdx + 6) {
+      tzSeconds = parseInt(val.slice(tzIdx + 7, tzIdx + 9), 10);
     }
   }
 
-  if (allZero) {
+  const offsetMs = sign * (tzHours * 3600000 + tzMinutes * 60000 + tzSeconds * 1000);
+  if (offsetMs === 0) {
+    // Fast path: the driver pins session timezone to UTC by default, so Postgres emits `+00`,
+    // `+00:00`, or `+00:00:00` for every TIMESTAMPTZ on the wire.
     return timestampTypeParser(val.slice(0, tzIdx));
   }
 
@@ -76,19 +79,6 @@ export const timestampTzTypeParser = (val: string): string => {
     // val[19] is '.'; fractional digits run from index 20 up to tzIdx.
     ms = parseInt(`${val.slice(20, 23)}00`.slice(0, 3), 10);
   }
-
-  const sign = val.charCodeAt(tzIdx) === 43 ? 1 : -1;
-  const tzHours = parseInt(val.slice(tzIdx + 1, tzIdx + 3), 10);
-  let tzMinutes = 0;
-  let tzSeconds = 0;
-  if (len > tzIdx + 3) {
-    tzMinutes = parseInt(val.slice(tzIdx + 4, tzIdx + 6), 10);
-    if (len > tzIdx + 6) {
-      tzSeconds = parseInt(val.slice(tzIdx + 7, tzIdx + 9), 10);
-    }
-  }
-
-  const offsetMs = sign * (tzHours * 3600000 + tzMinutes * 60000 + tzSeconds * 1000);
 
   // `Date.UTC(year, ...)` maps years 0-99 to 1900+year for legacy reasons,
   // which would corrupt pre-100 AD dates that Postgres can emit.
