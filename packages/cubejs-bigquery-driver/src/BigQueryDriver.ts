@@ -415,7 +415,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return null;
     }
 
-    return withResults ? job.getQueryResults() : true;
+    return withResults ? job.getQueryResults({ wrapIntegers: true }) : true;
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(
