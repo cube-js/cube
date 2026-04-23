@@ -194,7 +194,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
     }, options);
 
     return <any>(
@@ -337,7 +338,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
     });
 
     const rowStream = new HydrationStream();
