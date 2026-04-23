@@ -405,6 +405,10 @@ export type BaseCubeMember = {
   aliasMember?: string;
 };
 
+export type TCubeMeasureFilterMeta = {
+  sql?: string;
+};
+
 export type TCubeMeasure = BaseCubeMember & {
   aggType: 'count' | 'number';
   cumulative: boolean;
@@ -417,11 +421,28 @@ export type TCubeMeasure = BaseCubeMember & {
   format?: 'currency' | 'percent';
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
+  sql?: string;
+  filters?: TCubeMeasureFilterMeta[];
 };
+
+export type TCubeMeasurePlain = Omit<TCubeMeasure, 'sql' | 'filters'>;
 
 export type CubeTimeDimensionGranularity = {
   name: string;
   title: string;
+};
+
+export type TCubeDimensionCaseWhen = {
+  sql?: string;
+  label?: string | { sql?: string } | unknown;
+};
+
+export type TCubeDimensionCase = {
+  when?: TCubeDimensionCaseWhen[];
+  else?: {
+    label?: string;
+    [key: string]: unknown;
+  };
 };
 
 export type BaseCubeDimension = BaseCubeMember & {
@@ -431,6 +452,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
   key?: string;
+  sql?: string;
+  case?: TCubeDimensionCase;
 };
 
 export type CubeTimeDimension = BaseCubeDimension &
@@ -440,7 +463,15 @@ export type TCubeDimension =
   (BaseCubeDimension & { type: Exclude<BaseCubeDimension['type'], 'time'> }) |
   CubeTimeDimension;
 
-export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
+export type TCubeDimensionPlain =
+  | (Omit<BaseCubeDimension, 'sql' | 'case'> & { type: Exclude<BaseCubeDimension['type'], 'time'> })
+  | Omit<CubeTimeDimension, 'sql' | 'case'>;
+
+export type TCubeSegment = Omit<BaseCubeMember, 'type'> & {
+  sql?: string;
+};
+
+export type TCubeSegmentPlain = Omit<TCubeSegment, 'sql'>;
 
 export type NotFoundMember = {
   title: string;
@@ -474,6 +505,19 @@ export type TCubeHierarchy = {
   public?: boolean;
 };
 
+export type TCubeJoin = {
+  name: string;
+  sql?: string;
+  relationship?: string;
+} & Record<string, unknown>;
+
+export type TCubePreAggregationMeta = {
+  name: string;
+  timeDimensionReference?: string;
+  dimensionReferences?: string;
+  measureReferences?: string;
+} & Record<string, unknown>;
+
 /**
  * @deprecated use DryRunResponse
  */
@@ -493,13 +537,10 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
-export type Cube = {
+type CubeBaseFields = {
   name: string;
   title: string;
   description?: string;
-  measures: TCubeMeasure[];
-  dimensions: TCubeDimension[];
-  segments: TCubeSegment[];
   folders: TCubeFolder[];
   nestedFolders: TCubeNestedFolder[];
   hierarchies: TCubeHierarchy[];
@@ -513,10 +554,43 @@ export type Cube = {
   meta?: any;
 };
 
+/**
+ * Cube description from plain `/v1/meta` (no `extended` query param).
+ * Extended schema fields (joins, SQL snippets, pre-aggregations, etc.) are not present on this type.
+ */
+export type CubePlain = CubeBaseFields & {
+  measures: TCubeMeasurePlain[];
+  dimensions: TCubeDimensionPlain[];
+  segments: TCubeSegmentPlain[];
+};
+
+/** Cube-level fields only returned when `extended` is requested on `/v1/meta`. */
+export type CubeExtendedFields = {
+  joins?: TCubeJoin[];
+  sql?: string;
+  extends?: string;
+  fileName?: string;
+  refreshKey?: unknown;
+  preAggregations?: TCubePreAggregationMeta[];
+};
+
+/**
+ * Cube description from `/v1/meta?extended=true` (extended meta).
+ * Includes optional cube-level and member-level fields from the extended meta transform.
+ */
+export type CubeExtended = CubeBaseFields & CubeExtendedFields & {
+  measures: TCubeMeasure[];
+  dimensions: TCubeDimension[];
+  segments: TCubeSegment[];
+};
+
+/** Alias for {@link CubePlain} (default `/v1/meta` response cube shape). */
+export type Cube = CubePlain;
+
 export type CubeMap = {
-  measures: Record<string, TCubeMeasure>;
-  dimensions: Record<string, TCubeDimension>;
-  segments: Record<string, TCubeSegment>;
+  measures: Record<string, TCubeMeasurePlain>;
+  dimensions: Record<string, TCubeDimensionPlain>;
+  segments: Record<string, TCubeSegmentPlain>;
 };
 
 export type CubesMap = Record<
@@ -524,9 +598,40 @@ export type CubesMap = Record<
   CubeMap
 >;
 
-export type MetaResponse = {
-  cubes: Cube[];
+export type CubeMapExtended = {
+  measures: Record<string, TCubeMeasure>;
+  dimensions: Record<string, TCubeDimension>;
+  segments: Record<string, TCubeSegment>;
 };
+
+export type CubesMapExtended = Record<string, CubeMapExtended>;
+
+/** Response body for `GET /v1/meta` without extended meta. */
+export type MetaResponse = {
+  cubes: CubePlain[];
+};
+
+/** Response body for `GET /v1/meta?extended=true`. */
+export type MetaResponseExtended = {
+  cubes: CubeExtended[];
+};
+
+export type MetaCubeOf<T extends MetaResponse | MetaResponseExtended> = T['cubes'][number];
+
+export type CubesMapFromMeta<T extends MetaResponse | MetaResponseExtended> = Record<
+  string,
+  {
+    measures: Record<string, MetaCubeOf<T>['measures'][number]>;
+    dimensions: Record<string, MetaCubeOf<T>['dimensions'][number]>;
+    segments: Record<string, MetaCubeOf<T>['segments'][number]>;
+  }
+>;
+
+export type TCubeMemberByTypeForMeta<C extends CubePlain | CubeExtended, T extends MemberType> =
+  T extends 'measures' ? C['measures'][number]
+    : T extends 'dimensions' ? C['dimensions'][number]
+      : T extends 'segments' ? C['segments'][number]
+        : never;
 
 export type FilterOperator = {
   name: string;
@@ -538,7 +643,7 @@ export type TSourceAxis = 'x' | 'y';
 export type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
 export type TDefaultHeuristicsOptions = {
-  meta: Meta;
+  meta: Meta<MetaResponse>;
   sessionGranularity?: TimeDimensionGranularity;
 };
 

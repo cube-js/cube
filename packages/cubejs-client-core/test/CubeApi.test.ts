@@ -774,3 +774,119 @@ describe('CubeApi Mutex Cancellation', () => {
     ).rejects.toThrow(RequestError);
   });
 });
+
+describe('CubeApi meta', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  const minimalMetaResponseText = JSON.stringify({
+    cubes: [{
+      name: 'Orders',
+      title: 'Orders',
+      measures: [{
+        name: 'count',
+        title: 'Count',
+        shortTitle: 'Count',
+        type: 'number'
+      }],
+      dimensions: [{
+        name: 'status',
+        title: 'Status',
+        type: 'string'
+      }],
+      segments: []
+    }]
+  });
+
+  function mockMetaRequest(): jest.SpyInstance {
+    return jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(minimalMetaResponseText),
+        json: () => Promise.resolve(JSON.parse(minimalMetaResponseText))
+      } as any,
+      async () => undefined as any))
+    }));
+  }
+
+  describe('when no extended option is provided', () => {
+    test('omits `extended` from the meta request params', async () => {
+      const requestSpy = mockMetaRequest();
+
+      const cubeApi = new CubeApi('token', {
+        apiUrl: 'http://localhost:4000/cubejs-api/v1'
+      });
+
+      await cubeApi.meta();
+
+      expect(requestSpy).toHaveBeenCalledWith('meta', expect.any(Object));
+      expect(requestSpy.mock.calls[0]?.[1]?.extended).toBeUndefined();
+    });
+
+    test('omits `extended` when options is an empty object', async () => {
+      const requestSpy = mockMetaRequest();
+
+      const cubeApi = new CubeApi('token', {
+        apiUrl: 'http://localhost:4000/cubejs-api/v1'
+      });
+
+      await cubeApi.meta({});
+
+      expect(requestSpy.mock.calls[0]?.[1]?.extended).toBeUndefined();
+    });
+
+    test('omits `extended` when `extended` is false (presence on the wire would still enable extended meta)', async () => {
+      const requestSpy = mockMetaRequest();
+
+      const cubeApi = new CubeApi('token', {
+        apiUrl: 'http://localhost:4000/cubejs-api/v1'
+      });
+
+      await cubeApi.meta({ extended: false });
+
+      expect(requestSpy.mock.calls[0]?.[1]?.extended).toBeUndefined();
+    });
+  });
+
+  describe('when extended option is provided', () => {
+    test('passes `extended: true` in the meta request params', async () => {
+      const requestSpy = mockMetaRequest();
+
+      const cubeApi = new CubeApi('token', {
+        apiUrl: 'http://localhost:4000/cubejs-api/v1'
+      });
+
+      await cubeApi.meta({ extended: true });
+
+      expect(requestSpy).toHaveBeenCalledWith(
+        'meta',
+        expect.objectContaining({ extended: true })
+      );
+      expect(requestSpy.mock.calls[0]?.[1]?.extended).toBe(true);
+    });
+
+    test('still passes signal and baseRequestId together with `extended: true`', async () => {
+      const controller = new AbortController();
+      const { signal } = controller;
+      const baseRequestId = 'meta-extended-req';
+
+      const requestSpy = mockMetaRequest();
+
+      const cubeApi = new CubeApi('token', {
+        apiUrl: 'http://localhost:4000/cubejs-api/v1'
+      });
+
+      await cubeApi.meta({ extended: true, signal, baseRequestId });
+
+      expect(requestSpy.mock.calls[0]?.[1]).toEqual(
+        expect.objectContaining({
+          extended: true,
+          signal,
+          baseRequestId
+        })
+      );
+    });
+  });
+});

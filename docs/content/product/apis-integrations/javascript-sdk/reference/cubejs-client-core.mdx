@@ -153,11 +153,13 @@ callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#res
 
 ### `meta`
 
->  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[Meta](#meta)›*
+>  **meta**(**options?**: [MetaMethodOptions](#types-meta-method-options)): *Promise‹[Meta](#meta)›*
 
->  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[Meta](#meta)›): *void*
+>  **meta**(**options?**: [MetaMethodOptions](#types-meta-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[Meta](#meta)›): *void*
 
 Get meta description of cubes available for querying.
+
+Pass **`extended: true`** to request [extended `/v1/meta`](/product/apis-integrations/rest-api/reference#base_pathv1meta) (joins, SQL snippets, pre-aggregations, and related fields). The client only adds the `extended` query parameter when this option is `true`; omit it otherwise. Do not rely on `extended: false` on the wire—the API treats the presence of any `extended` parameter as extended mode.
 
 ### `sql`
 
@@ -816,6 +818,14 @@ Name | Type | Optional? | Description |
 `subscribe` | `boolean` | ✅ Yes | Pass `true` to use continuous fetch behavior. |
 `signal` | `AbortSignal` | ✅ Yes | AbortSignal to cancel the request. This allows you to manually abort requests using AbortController. |
 `baseRequestId` | `string` | ✅ Yes | Base request ID ([`spanId`](https://cube.dev/docs/product/apis-integrations/core-data-apis/rest-api#request-span-annotation)) to be used for the request. If not provided a random request ID will be generated. |
+
+### `MetaMethodOptions`
+
+Extends [LoadMethodOptions](#types-load-method-options).
+
+Name | Type | Optional? | Description |
+------ | ------ | ------ | --- |
+`extended` | `boolean` | ✅ Yes | Pass **`true`** to load extended meta. Omit when not needed (the client does not send `extended=false`). |
 
 ### `LoadResponse`
 

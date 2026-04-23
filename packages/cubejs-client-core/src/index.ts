@@ -12,6 +12,7 @@ import {
   LoadResponse,
   MeasureFormat,
   MetaResponse,
+  MetaResponseExtended,
   PivotQuery,
   ProgressResponse,
   Query,
@@ -61,6 +62,16 @@ export type LoadMethodOptions = {
    * Client provided request ID, if client wants to track request onb their own
    */
   baseRequestId?: string;
+};
+
+export type MetaMethodOptions = LoadMethodOptions & {
+  /**
+   * When `true`, requests extended meta from the API (joins, pre-aggregations, SQL snippets, etc.).
+   * Only pass this property when the value is `true`. Omit it when extended meta is not needed —
+   * the gateway treats the presence of any `extended` query parameter as extended mode, so
+   * sending `extended=false` would still select extended meta.
+   */
+  extended?: boolean;
 };
 
 export type DeeplyReadonly<T> = {
@@ -690,20 +701,32 @@ class CubeApi {
     );
   }
 
-  public meta(options?: LoadMethodOptions): Promise<Meta>;
+  public meta(options?: MetaMethodOptions & { extended?: false }): Promise<Meta<MetaResponse>>;
 
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+  public meta(options: MetaMethodOptions & { extended: true }): Promise<Meta<MetaResponseExtended>>;
+
+  public meta(options?: MetaMethodOptions & { extended?: false }, callback?: LoadMethodCallback<Meta<MetaResponse>>): UnsubscribeObj;
+
+  public meta(options: MetaMethodOptions & { extended: true }, callback?: LoadMethodCallback<Meta<MetaResponseExtended>>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
    */
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
+  public meta(
+    options?: MetaMethodOptions,
+    callback?: LoadMethodCallback<Meta<MetaResponse>> | LoadMethodCallback<Meta<MetaResponseExtended>>
+  ): Promise<Meta<MetaResponse>> | Promise<Meta<MetaResponseExtended>> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
+        ...(options?.extended === true ? { extended: true } : {}),
       }),
-      (body: MetaResponse) => new Meta(body),
+      (body: MetaResponse | MetaResponseExtended) => (
+        options?.extended === true
+          ? new Meta<MetaResponseExtended>(body as MetaResponseExtended)
+          : new Meta<MetaResponse>(body as MetaResponse)
+      ),
       options,
       callback
     );

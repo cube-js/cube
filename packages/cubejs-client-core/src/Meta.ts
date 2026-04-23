@@ -1,13 +1,15 @@
 import { unnest, fromPairs } from 'ramda';
 import {
-  Cube,
-  CubesMap,
+  CubeExtended,
+  CubePlain,
+  CubesMapFromMeta,
   MemberType,
+  MetaCubeOf,
   MetaResponse,
+  MetaResponseExtended,
   TCubeMeasure,
   TCubeDimension,
-  TCubeMember,
-  TCubeMemberByType,
+  TCubeMemberByTypeForMeta,
   Query,
   FilterOperator,
   TCubeSegment,
@@ -23,12 +25,15 @@ export interface CubeMemberWrapper<T> {
   members: T[];
 }
 
-export type AggregatedMembers = {
-  measures: CubeMemberWrapper<TCubeMeasure>[];
-  dimensions: CubeMemberWrapper<TCubeDimension>[];
-  segments: CubeMemberWrapper<TCubeSegment>[];
-  timeDimensions: CubeMemberWrapper<TCubeDimension>[];
+export type AggregatedMembersFor<C extends CubePlain | CubeExtended> = {
+  measures: CubeMemberWrapper<C['measures'][number]>[];
+  dimensions: CubeMemberWrapper<C['dimensions'][number]>[];
+  segments: CubeMemberWrapper<C['segments'][number]>[];
+  timeDimensions: CubeMemberWrapper<C['dimensions'][number]>[];
 };
+
+/** Plain-meta variant of {@link AggregatedMembersFor} (alias for `AggregatedMembersFor<CubePlain>`). */
+export type AggregatedMembers = AggregatedMembersFor<CubePlain>;
 
 const memberMap = (memberArray: any[]) => fromPairs(
   memberArray.map((m) => [m.name, m])
@@ -72,23 +77,23 @@ const operators = {
 /**
  * Contains information about available cubes and it's members.
  */
-export default class Meta {
+export default class Meta<T extends MetaResponse | MetaResponseExtended = MetaResponse> {
   /**
    * Raw meta response
    */
-  public readonly meta: MetaResponse;
+  public readonly meta: T;
 
   /**
    * An array of all available cubes with their members
    */
-  public readonly cubes: Cube[];
+  public readonly cubes: T['cubes'];
 
   /**
    * A map of all cubes where the key is a cube name
    */
-  public readonly cubesMap: CubesMap;
+  public readonly cubesMap: CubesMapFromMeta<T>;
 
-  public constructor(metaResponse: MetaResponse) {
+  public constructor(metaResponse: T) {
     this.meta = metaResponse;
     const { cubes } = this.meta;
     this.cubes = cubes;
@@ -110,15 +115,19 @@ export default class Meta {
    * @param _query - context query to provide filtering of members available to add to this query
    * @param memberType
    */
-  public membersForQuery(_query: DeeplyReadonly<Query> | null, memberType: MemberType): (TCubeMeasure | TCubeDimension | TCubeMember | TCubeSegment)[] {
+  public membersForQuery(_query: DeeplyReadonly<Query> | null, memberType: MemberType): (
+    TCubeMemberByTypeForMeta<MetaCubeOf<T>, 'measures'>
+    | TCubeMemberByTypeForMeta<MetaCubeOf<T>, 'dimensions'>
+    | TCubeMemberByTypeForMeta<MetaCubeOf<T>, 'segments'>
+  )[] {
     return unnest(this.cubes.map((c) => c[memberType]))
       .sort((a, b) => (a.title > b.title ? 1 : -1));
   }
 
-  public membersGroupedByCube() {
+  public membersGroupedByCube(): AggregatedMembersFor<MetaCubeOf<T>> {
     const memberKeys = ['measures', 'dimensions', 'segments', 'timeDimensions'];
 
-    return this.cubes.reduce<AggregatedMembers>(
+    return this.cubes.reduce<AggregatedMembersFor<MetaCubeOf<T>>>(
       (memo, cube) => {
         memberKeys.forEach((key) => {
           let members: TCubeMeasure[] | TCubeDimension[] | TCubeSegment[] = [];
@@ -157,7 +166,7 @@ export default class Meta {
         dimensions: [],
         segments: [],
         timeDimensions: [],
-      } as AggregatedMembers
+      } as AggregatedMembersFor<MetaCubeOf<T>>
     );
   }
 
@@ -178,10 +187,10 @@ export default class Meta {
    * @param memberType
    * @return An object containing meta information about member
    */
-  public resolveMember<T extends MemberType>(
+  public resolveMember<M extends MemberType>(
     memberName: string,
-    memberType: T | T[]
-  ): NotFoundMember | TCubeMemberByType<T> {
+    memberType: M | M[]
+  ): NotFoundMember | TCubeMemberByTypeForMeta<MetaCubeOf<T>, M> {
     const [cube] = memberName.split('.');
 
     if (!this.cubesMap[cube]) {
@@ -200,7 +209,7 @@ export default class Meta {
       };
     }
 
-    return member as TCubeMemberByType<T>;
+    return member as TCubeMemberByTypeForMeta<MetaCubeOf<T>, M>;
   }
 
   public defaultTimeDimensionNameFor(memberName: string): string | null | undefined {
