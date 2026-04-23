@@ -8,7 +8,6 @@ import { getEnv, assertDataSource, Pool, type PoolUserOptions } from '@cubejs-ba
 import { types, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
-import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
@@ -18,6 +17,7 @@ import {
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
 import { ConnectionError, PostgresError } from './errors';
+import { dateTypeParser, timestampTypeParser, timestampTzTypeParser } from './type-parsers';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
@@ -42,15 +42,6 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   hll: 'HLL_POSTGRES',
 };
 
-const timestampDataTypes = [
-  // @link TypeId.DATE
-  1082,
-  // @link TypeId.TIMESTAMP
-  1114,
-  // @link TypeId.TIMESTAMPTZ
-  1184
-];
-const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
   val.slice(2),
@@ -241,9 +232,19 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected getTypeParser = (dataTypeID: TypeId, format: TypeFormat | undefined) => {
-    const isTimestamp = timestampDataTypes.includes(dataTypeID);
-    if (isTimestamp) {
+    // @link TypeId.DATE
+    if (dataTypeID === 1082) {
+      return dateTypeParser;
+    }
+
+    // @link TypeId.TIMESTAMP
+    if (dataTypeID === 1114) {
       return timestampTypeParser;
+    }
+
+    // @link TypeId.TIMESTAMPTZ
+    if (dataTypeID === 1184) {
+      return timestampTzTypeParser;
     }
 
     const typeName = this.getPostgresTypeForField(dataTypeID);

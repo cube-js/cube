@@ -1,0 +1,40 @@
+import {
+  dateTypeParser,
+  timestampTypeParser,
+  timestampTzTypeParser,
+} from '../src/type-parsers';
+
+describe('type parsers', () => {
+  test('dateTypeParser (OID 1082)', () => {
+    expect(dateTypeParser('2020-01-01')).toBe('2020-01-01T00:00:00.000');
+    // Leap date
+    expect(dateTypeParser('2020-02-29')).toBe('2020-02-29T00:00:00.000');
+  });
+
+  test('timestampTypeParser (OID 1114)', () => {
+    // no fractional seconds
+    expect(timestampTypeParser('2020-01-01 12:34:56')).toBe('2020-01-01T12:34:56.000');
+    // millisecond precision
+    expect(timestampTypeParser('2020-01-01 12:34:56.789')).toBe('2020-01-01T12:34:56.789');
+    // microsecond precision is truncated to ms
+    expect(timestampTypeParser('2020-01-01 12:34:56.123456')).toBe('2020-01-01T12:34:56.123');
+    // sub-millisecond precision is padded
+    expect(timestampTypeParser('2020-01-01 12:34:56.5')).toBe('2020-01-01T12:34:56.500');
+    expect(timestampTypeParser('2020-01-01 12:34:56.05')).toBe('2020-01-01T12:34:56.050');
+  });
+
+  test('timestampTzTypeParser (OID 1184)', () => {
+    // positive HH-only offset (matches integration assertion)
+    expect(timestampTzTypeParser('2020-01-01 00:00:00+02')).toBe('2019-12-31T22:00:00.000');
+    // zero offset
+    expect(timestampTzTypeParser('2020-01-01 00:00:00+00')).toBe('2020-01-01T00:00:00.000');
+    // negative HH-only offset
+    expect(timestampTzTypeParser('2020-01-01 00:00:00-05')).toBe('2020-01-01T05:00:00.000');
+    // HH:MM offset crossing day boundary
+    expect(timestampTzTypeParser('2020-01-01 23:30:00+05:30')).toBe('2020-01-01T18:00:00.000');
+    // milliseconds plus HH:MM offset
+    expect(timestampTzTypeParser('2020-06-15 08:15:30.250+05:45')).toBe('2020-06-15T02:30:30.250');
+    // microseconds plus HH offset are truncated to ms
+    expect(timestampTzTypeParser('2020-06-15 08:15:30.123456-03')).toBe('2020-06-15T11:15:30.123');
+  });
+});
