@@ -112,7 +112,8 @@
                     "pages": [
                       "docs/explore-analyze/dashboards/widgets/chart",
                       "docs/explore-analyze/dashboards/widgets/text",
-                      "docs/explore-analyze/dashboards/widgets/control",
+                      "docs/explore-analyze/dashboards/widgets/filter",
+                      "docs/explore-analyze/dashboards/widgets/time-grain",
                       "docs/explore-analyze/dashboards/widgets/ai"
                     ]
                   }

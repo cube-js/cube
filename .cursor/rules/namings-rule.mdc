@@ -25,6 +25,12 @@ Make sure to use correct terms.
     - **Workbook**
       - Tab
       - Dashboard builder
+        - **Widget** (do not use "Tile")
+          - Chart widget
+          - Text widget (Markdown)
+          - Filter widget
+          - Time Grain widget
+          - AI Widget
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**
