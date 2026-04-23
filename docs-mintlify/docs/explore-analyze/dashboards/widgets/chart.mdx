@@ -1,0 +1,40 @@
+---
+title: Chart
+description: Display a report from your workbook as a visualization on the dashboard.
+---
+
+Chart widgets display a report from the source [workbook][ref-workbooks] as a visualization on the dashboard. Every chart on a dashboard is backed by a tab in the workbook — when you publish a new version of the workbook, the chart on the dashboard updates accordingly.
+
+## Adding a chart
+
+In the dashboard editor, click **Add widget** → **Chart** and pick a report from the workbook. The chart inherits the report's query, configured visualization, and styling.
+
+## Chart types
+
+You can use any of the built-in [chart types][ref-chart-types]:
+
+- [Bar](/docs/explore-analyze/charts/chart-types/bar)
+- [Line](/docs/explore-analyze/charts/chart-types/line)
+- [Area](/docs/explore-analyze/charts/chart-types/area)
+- [Scatter](/docs/explore-analyze/charts/chart-types/scatter)
+- [Pie & donut](/docs/explore-analyze/charts/chart-types/pie)
+- [Heatmap](/docs/explore-analyze/charts/chart-types/heatmap)
+- [Boxplot](/docs/explore-analyze/charts/chart-types/boxplot)
+- [Table](/docs/explore-analyze/charts/chart-types/table)
+- [KPI](/docs/explore-analyze/charts/chart-types/kpi)
+- [Map](/docs/explore-analyze/charts/chart-types/map)
+- [HTML](/docs/explore-analyze/charts/chart-types/html)
+
+Configuration such as axes, color, series mapping, tooltips, and data labels is set in the workbook and carries over to the dashboard.
+
+## Interaction with controls
+
+Chart widgets respect any [control widgets][ref-controls] placed on the same dashboard. A single filter or time grain switcher can drive multiple charts at once — the control's value is applied to every chart whose query references the targeted dimension.
+
+## Updating charts
+
+Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying tab in the workbook and publish a new version of the dashboard.
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-chart-types]: /docs/explore-analyze/charts/chart-types
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/control

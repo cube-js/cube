@@ -1,0 +1,14 @@
+{
+  "name": "cube-docs-mintlify",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cube documentation site built with Mintlify",
+  "scripts": {
+    "dev": "mintlify dev --port 3002",
+    "build": "mintlify build",
+    "broken-links": "mintlify broken-links"
+  },
+  "devDependencies": {
+    "mintlify": "^4"
+  }
+}

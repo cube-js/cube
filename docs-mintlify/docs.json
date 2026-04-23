@@ -102,7 +102,22 @@
           {
             "group": "Present & Share",
             "pages": [
-              "docs/explore-analyze/dashboards",
+              {
+                "group": "Dashboards",
+                "root": "docs/explore-analyze/dashboards/index",
+                "pages": [
+                  {
+                    "group": "Widgets",
+                    "root": "docs/explore-analyze/dashboards/widgets/index",
+                    "pages": [
+                      "docs/explore-analyze/dashboards/widgets/chart",
+                      "docs/explore-analyze/dashboards/widgets/text",
+                      "docs/explore-analyze/dashboards/widgets/control",
+                      "docs/explore-analyze/dashboards/widgets/ai"
+                    ]
+                  }
+                ]
+              },
               "docs/explore-analyze/scheduled-refreshes",
               "docs/explore-analyze/notifications"
             ]
