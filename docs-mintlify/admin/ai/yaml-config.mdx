@@ -503,7 +503,17 @@ rules:
 
 ## Certified Queries
 
-Certified queries are pre-approved SQL queries that agents can use for specific user requests.
+Certified queries are pre-approved SQL queries that serve as an **example library** provided to the agent. The agent treats them as reference examples rather than a strict set of queries it must use.
+
+<Note>
+The agent is not limited to only running certified queries. When answering a user request, the agent may:
+
+- Use a certified query directly if it matches the request
+- Use a certified query as a **starting point** and adapt it (for example, adding filters, dimensions, or measures) to fit the user's question
+- Generate a new query independently if no certified query is relevant
+
+Certified queries help guide the agent toward trusted patterns and correct business logic, but the agent retains full flexibility to construct the query that best answers the user's question.
+</Note>
 
 ```yaml
 certified_queries:
