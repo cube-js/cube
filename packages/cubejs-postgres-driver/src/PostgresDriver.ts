@@ -253,8 +253,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       return hllTypeParser;
     }
 
-    const parser = types.getTypeParser(dataTypeID, format);
-    return (val: any) => parser(val);
+    return types.getTypeParser(dataTypeID, format);
   };
 
   /**
