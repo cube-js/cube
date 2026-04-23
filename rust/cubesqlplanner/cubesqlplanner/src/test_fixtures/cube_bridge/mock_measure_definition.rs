@@ -32,8 +32,6 @@ pub struct MockMeasureDefinition {
     time_shift_references: Option<Vec<TimeShiftReference>>,
     #[builder(default)]
     rolling_window: Option<RollingWindow>,
-    #[builder(default)]
-    alias_member: Option<String>,
 
     #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
@@ -59,8 +57,7 @@ impl_static_data!(
     add_group_by_references,
     group_by_references,
     time_shift_references,
-    rolling_window,
-    alias_member
+    rolling_window
 );
 
 impl MockMeasureDefinition {

@@ -517,25 +517,6 @@ impl SymbolFactory for MeasureSymbolFactory {
             cube_evaluator,
         } = self;
 
-        // mask.sql references are written in the context of the cube that
-        // owns the measure. When a measure is exposed through a view that
-        // aliases an underlying cube member one-to-one, aliasMember carries
-        // the original owning cube's path. Compile mask.sql against that
-        // owning cube so CUBE / cross-cube references inside the mask resolve
-        // against the same cube as they do on the legacy BaseQuery path.
-        let mask_sql_cube_name = definition
-            .static_data()
-            .alias_member
-            .as_deref()
-            .and_then(|alias| alias.split('.').next())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| path.cube_name().clone());
-        let mask_sql = if let Some(mask_sql) = mask_sql {
-            Some(compiler.compile_sql_call(&mask_sql_cube_name, mask_sql)?)
-        } else {
-            None
-        };
-
         let pk_sqls = if sql.is_none() {
             cube_evaluator
                 .static_data()
@@ -593,6 +574,25 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
 
         let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
+
+        // mask.sql references are written in the context of the cube that
+        // owns the measure. When a measure is exposed through a view, the
+        // measure's sql is a direct reference to the underlying cube member;
+        // compile mask.sql against that referenced member's cube so CUBE /
+        // cross-cube references inside the mask resolve the same way as on
+        // the owning cube — and as they do on the legacy BaseQuery path,
+        // which routes mask compilation through aliasMember for the same
+        // reason.
+        let mask_sql_cube_name = sql
+            .as_ref()
+            .and_then(|s| s.resolve_direct_reference())
+            .map(|dep| dep.cube_name())
+            .unwrap_or_else(|| path.cube_name().clone());
+        let mask_sql = if let Some(mask_sql) = mask_sql {
+            Some(compiler.compile_sql_call(&mask_sql_cube_name, mask_sql)?)
+        } else {
+            None
+        };
 
         let time_shifts = if let Some(time_shift_references) =
             &definition.static_data().time_shift_references
