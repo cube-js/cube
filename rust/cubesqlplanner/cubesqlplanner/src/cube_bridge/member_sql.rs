@@ -364,6 +364,25 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         Ok(SqlCallArg::security_value(index))
     }
 
+    /// Invokes a user-provided `column` callback (e.g.
+    /// `col => \`col IN (${groups.join(', ')})\``) passed to
+    /// `SECURITY_CONTEXT.…filter()`, passing the prepared `arg` value and
+    /// returning the resulting SQL string.
+    ///
+    /// Returns an empty string if the callback result cannot be converted to
+    /// a string, matching the pre-existing behavior.
+    fn invoke_filter_column_callback<CIT: InnerTypes>(
+        column: &<CIT as InnerTypes>::Function,
+        arg: NativeObjectHandle<CIT>,
+    ) -> Result<String, CubeError> {
+        let result = column.call(vec![arg])?;
+        if let Ok(result) = result.to_string() {
+            Ok(result.value()?)
+        } else {
+            Ok("".to_string())
+        }
+    }
+
     fn security_context_filter_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         property_value: NativeObjectHandle<CIT>,
@@ -407,12 +426,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                         let value = Self::process_secutity_context_value(&proxy_state, value)?;
                         if let Ok(column) = column.to_function() {
                             let native_value = value.to_native(context.clone())?;
-                            let result = column.call(vec![native_value])?;
-                            if let Ok(result) = result.to_string() {
-                                result.value()?
-                            } else {
-                                "".to_string()
-                            }
+                            Self::invoke_filter_column_callback(&column, native_value)?
                         } else if let Ok(column) = column.to_string() {
                             let column_value = column.value()?;
                             format!("{} = {}", column_value, value)
@@ -431,12 +445,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                             if let Ok(column) = column.to_function() {
                                 let empty: Vec<String> = vec![];
                                 let native_values = empty.to_native(context)?;
-                                let result = column.call(vec![native_values])?;
-                                if let Ok(result) = result.to_string() {
-                                    result.value()?
-                                } else {
-                                    "".to_string()
-                                }
+                                Self::invoke_filter_column_callback(&column, native_values)?
                             } else {
                                 "1 = 0".to_string()
                             }
@@ -448,12 +457,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
 
                             if let Ok(column) = column.to_function() {
                                 let native_values = values.to_native(context)?;
-                                let result = column.call(vec![native_values])?;
-                                if let Ok(result) = result.to_string() {
-                                    result.value()?
-                                } else {
-                                    "".to_string()
-                                }
+                                Self::invoke_filter_column_callback(&column, native_values)?
                             } else if let Ok(column) = column.to_string() {
                                 let column_value = column.value()?;
                                 format!("{} IN ({})", column_value, values.join(", "))
