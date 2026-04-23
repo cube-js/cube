@@ -37,5 +37,13 @@ describe('type parsers', () => {
     expect(timestampTzTypeParser('2020-06-15 08:15:30.250+05:45')).toBe('2020-06-15T02:30:30.250');
     // microseconds plus HH offset are truncated to ms
     expect(timestampTzTypeParser('2020-06-15 08:15:30.123456-03')).toBe('2020-06-15T11:15:30.123');
+    // Years 100-999 take the fast Date.UTC path; pad4 preserves leading zero.
+    expect(timestampTzTypeParser('0500-06-15 12:00:00+00')).toBe('0500-06-15T12:00:00.000');
+    // Years 0-99 must NOT trigger Date.UTC's legacy "1900+year" remap
+    // (moment parity: `0099-01-01 00:00:00+02` → `0098-12-31T22:00:00.000`,
+    // not `1998-12-31T…`).
+    expect(timestampTzTypeParser('0099-01-01 00:00:00+00')).toBe('0099-01-01T00:00:00.000');
+    expect(timestampTzTypeParser('0099-01-01 00:00:00+02')).toBe('0098-12-31T22:00:00.000');
+    expect(timestampTzTypeParser('0001-01-01 02:00:00+05:00')).toBe('0000-12-31T21:00:00.000');
   });
 });

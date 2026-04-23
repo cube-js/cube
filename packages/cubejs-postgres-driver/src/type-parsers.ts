@@ -20,6 +20,17 @@ const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
 const pad3 = (n: number): string => {
   if (n < 10) return `00${n}`;
   if (n < 100) return `0${n}`;
+
+  return `${n}`;
+};
+const pad4 = (n: number): string => {
+  if (n < 1000) {
+    if (n < 10) return `000${n}`;
+    if (n < 100) return `00${n}`;
+
+    return `0${n}`;
+  }
+
   return `${n}`;
 };
 
@@ -62,9 +73,24 @@ export const timestampTzTypeParser = (val: string): string => {
   }
 
   const offsetMs = sign * (tzHours * 3600000 + tzMinutes * 60000 + tzSeconds * 1000);
-  const utc = new Date(Date.UTC(year, month - 1, day, hour, minute, second, ms) - offsetMs);
 
-  const yyyy = utc.getUTCFullYear();
+  // `Date.UTC(year, ...)` maps years 0-99 to 1900+year for legacy reasons,
+  // which would corrupt pre-100 AD dates that Postgres can emit.
+  let utc: Date;
+
+  if (year >= 100) {
+    utc = new Date(Date.UTC(year, month - 1, day, hour, minute, second, ms) - offsetMs);
+  } else {
+    utc = new Date(0);
+    utc.setUTCFullYear(year, month - 1, day);
+    utc.setUTCHours(hour, minute, second, ms);
+
+    if (offsetMs !== 0) {
+      utc.setTime(utc.getTime() - offsetMs);
+    }
+  }
+
+  const yyyy = pad4(utc.getUTCFullYear());
   const MM = pad2(utc.getUTCMonth() + 1);
   const dd = pad2(utc.getUTCDate());
   const HH = pad2(utc.getUTCHours());
