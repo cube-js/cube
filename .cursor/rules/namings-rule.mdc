@@ -45,6 +45,48 @@ Make sure to use correct terms.
       - Management APIs
         - Orchestration API
   - **Embedding**
-    - Private embedding
-    - Signed embedding
-    - Creator Mode
+    - Iframe embedding (the integration approach where Cube content is embedded via iframes)
+      - What you can embed:
+        - Dashboards
+        - Analytics Chat
+        - Creator Mode
+      - Authentication:
+        - Private embedding (auth mode for internal users with Cube accounts)
+        - Signed embedding (auth mode for external/customer-facing applications; required for Creator Mode)
+    - SDK embedding (the integration approach using the React Embed SDK)
+    - Headless embedding (the integration approach using Cube APIs directly — Embed APIs and Core Data APIs)
+
+# Embedding Terminology
+
+When categorizing embedding approaches, use these three parallel terms:
+
+- **Iframe embedding** — drop-in via iframes; Cube ships the full UI
+- **SDK embedding** — via the React Embed SDK; Cube ships components, you compose
+- **Headless embedding** — via Embed APIs and Core Data APIs; you build the UI
+
+Notes:
+- Do not use `-based` suffixes (e.g., "iframe-based embedding", "API-based embedding"). Prefer the bare terms above.
+- Use **Iframe** (capitalized at sentence start, lowercase mid-sentence). Do not use "iFrame".
+- "API-based embedding" is ambiguous because **API** has specific product meaning (Embed APIs, Core Data APIs, Management APIs, Orchestration API). Use **Headless embedding** instead.
+
+## Iframe embedding axes
+
+Iframe embedding has two independent axes:
+
+- **What you embed** (primary axis): Dashboards, Analytics Chat, Creator Mode
+- **Authentication** (secondary, cross-cutting axis): Private embedding, Signed embedding
+
+Compatibility matrix:
+
+|                  | Private embedding | Signed embedding |
+|------------------|:-----------------:|:----------------:|
+| Dashboards       | ✓                 | ✓                |
+| Analytics Chat   | ✓                 | ✓                |
+| Creator Mode     | —                 | ✓                |
+
+Page naming inside the **Iframe embedding** group:
+
+- Do not prefix page titles with "Embed" or "Embedding" — it is redundant under the group label.
+  - Use **Dashboards**, **Analytics Chat**, **Creator Mode** (not "Embed a dashboard", "Embed Analytics Chat", etc.)
+  - Use **Private embedding**, **Signed embedding** for the auth-mode pages (the word "embedding" is part of the product term itself).
+

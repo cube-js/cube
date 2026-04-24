@@ -409,11 +409,22 @@
             "group": "Embedding",
             "pages": [
               "embedding/index",
-              "embedding/private-embedding",
-              "embedding/signed-embedding",
-              "embedding/creator-mode",
-              "embedding/react-embed-sdk",
-              "embedding/vizard"
+              "embedding/react-embed-sdk"
+            ]
+          },
+          {
+            "group": "Iframe embedding",
+            "pages": [
+              "embedding/iframe/dashboards",
+              "embedding/iframe/analytics-chat",
+              "embedding/iframe/creator-mode",
+              {
+                "group": "Authentication",
+                "pages": [
+                  "embedding/iframe/auth/private",
+                  "embedding/iframe/auth/signed"
+                ]
+              }
             ]
           },
           {
@@ -691,5 +702,17 @@
     }
   },
   "redirects": [
+    {
+      "source": "/embedding/private-embedding",
+      "destination": "/embedding/iframe/auth/private"
+    },
+    {
+      "source": "/embedding/signed-embedding",
+      "destination": "/embedding/iframe/auth/signed"
+    },
+    {
+      "source": "/embedding/creator-mode",
+      "destination": "/embedding/iframe/creator-mode"
+    }
   ]
 }

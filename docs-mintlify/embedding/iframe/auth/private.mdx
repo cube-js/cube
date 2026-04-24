@@ -1,45 +1,30 @@
 ---
 title: Private embedding
-description: Private embedding is available on Premium and Enterprise plans.
+description: Authenticate iframe-embedded Cube content with users' existing Cube accounts.
 ---
 
 <Info>
   Private embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
 </Info>
 
-Private embedding is designed for **internal use cases** where team members already have Cube accounts. Simply drop an iframe into your internal tools—no API keys or complex setup required. Users will authenticate with their existing Cube credentials when accessing embedded content.
+Private embedding is designed for **internal use cases** where team members already have Cube accounts. Simply drop an iframe into your internal tools — no API keys or session generation required. Users authenticate with their existing Cube credentials when accessing embedded content.
+
+Use private embedding to embed:
+
+- [Dashboards](/embedding/iframe/dashboards)
+- [Analytics Chat](/embedding/iframe/analytics-chat)
+
+<Note>
+  Private embedding does not support [Creator Mode](/embedding/iframe/creator-mode) — use [Signed embedding](/embedding/iframe/auth/signed) instead.
+</Note>
 
 ## How it works
 
-To embed Cube content, you simply need to paste an `<iframe>` tag into your application or tool. Get the embed code and paste it wherever you want the content to appear.
+To embed Cube content with private embedding, paste an `<iframe>` tag into your application or tool. Get the embed code from Cube and paste it wherever you want the content to appear.
 
-### Analytics Chat
+When users open the page containing the iframe, they'll be prompted to sign in with their Cube credentials if they're not already authenticated. Access is then governed by their normal Cube [roles and permissions](/admin/users-and-permissions/roles-and-permissions).
 
-The embed URL for Analytics Chat is always the same:
-
-```html
-<iframe
-  title="Analytics Chat"
-  src="https://your-account.cubecloud.dev/embed/chat"
-  width="100%"
-  height="800"
-></iframe>
-```
-
-### Dashboards
-
-To embed a dashboard:
-
-1. Open your dashboard in Cube
-2. Click **Share** → **Embed**
-3. Copy the generated iframe code
-
-<img src="https://lgo0ecceic.ucarecd.net/24999bd4-1a7a-4c15-999a-848e6ec3fbe4/" alt="Share embed dialog" />
-
-Then paste the iframe code into your application.
-
-
-## Common Applications
+## Common applications
 
 ### Embedding in Notion
 

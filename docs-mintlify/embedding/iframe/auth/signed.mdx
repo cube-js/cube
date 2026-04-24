@@ -1,6 +1,6 @@
 ---
 title: Signed embedding
-description: Signed embedding is available on Premium and Enterprise plans.
+description: Authenticate iframe-embedded Cube content with secure, server-generated sessions.
 ---
 
 <Info>
@@ -16,7 +16,13 @@ Signed embedding is designed for **external, customer-facing analytics**. It use
 
 Users authenticate through your application without needing Cube accounts, providing a seamless experience. The session tokens are cryptographically signed to ensure secure access with user-specific permissions.
 
-## Getting started
+Use signed embedding to embed:
+
+- [Dashboards](/embedding/iframe/dashboards)
+- [Analytics Chat](/embedding/iframe/analytics-chat)
+- [Creator Mode](/embedding/iframe/creator-mode) (signed embedding is required)
+
+## How it works
 
 Signed embedding works through a two-step authentication flow:
 
@@ -30,13 +36,15 @@ Signed embedding works through a two-step authentication flow:
 
 This ensures secure authentication while maintaining a smooth user experience.
 
+## Getting started
+
 ### Get your API key
 
-To use the embedded chat or dashboard, you need an [API key][ref-api-keys]:
+To use signed embedding, you need an [API key][ref-api-keys]:
 
 - Go to **Access → API Keys** in your Cube admin panel
-- Generate or copy your existing API key.
-- You'll use this key to authenticate API calls for generating embed sessions.
+- Generate or copy your existing API key
+- You'll use this key to authenticate API calls for generating embed sessions
 
 ### Generate an embed session
 
@@ -83,24 +91,9 @@ const data = await session.json();
 const sessionId = data.sessionId;
 ```
 
-### Embedding via iframe
+### Embed via iframe
 
-Use the session ID to embed the chat UI or the dashboard UI in your application:
-
-```html
-<iframe
-  title="Analytics Chat"
-  src="https://your-tenant.cubecloud.dev/embed/chat?sessionId=YOUR_SESSION_ID"
-></iframe>
-```
-
-```html
-<iframe
-  title="Dashboard"
-  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
-  width="100%"
-></iframe>
-```
+Use the session ID to embed the dashboard or chat UI in your application. See [Dashboards](/embedding/iframe/dashboards) and [Analytics Chat](/embedding/iframe/analytics-chat) for the full iframe snippets.
 
 #### Complete example
 
@@ -154,31 +147,6 @@ Here's a complete HTML example that demonstrates the full flow for embedding a d
   </body>
 </html>
 ```
-
-## Pre-setting dashboard filters via URL
-
-You can pre-set dashboard filter values by adding URL parameters in the format
-`?f_<semantic_view>.<dimension>=<JSON>`. The `<semantic_view>` and `<dimension>`
-must match the internal names (not display titles) of the semantic view and
-dimension configured on the filter widget. If the filter type is omitted, it
-defaults to `equals`.
-
-Example:
-
-```text
-https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}
-```
-
-This works on both regular and published (embedded) dashboards. The filter is
-only applied if a matching filter widget for that dimension already exists on the
-dashboard.
-
-## Customize dashboard style
-
-You can customize the appearance of your dashboard — including background, widget
-styling, borders, titles, and fonts — using the **Styling** pane in the
-Dashboard Builder. Open your dashboard, click **Dashboard Builder** in the
-top bar, then click the gear icon to open the **Styling** panel.
 
 ## User attributes
 

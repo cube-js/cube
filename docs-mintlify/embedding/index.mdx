@@ -1,11 +1,11 @@
 ---
-description: Embed AI-powered analytics into your applications using iframes, the React SDK, or API-first approaches.
+description: Embed AI-powered analytics into your applications using iframes, the React Embed SDK, or a headless approach.
 title: Overview
 ---
 
 Cube provides multiple approaches for embedding AI-powered analytics into your applications — from iframe embeds to fully custom embedded analytics experiences built on Cube's APIs.
 
-## Iframe-based embedding
+## Iframe embedding
 
 <Info>
   Available on [Premium and Enterprise plans](https://cube.dev/pricing).
@@ -13,13 +13,13 @@ Cube provides multiple approaches for embedding AI-powered analytics into your a
 
 Embed Cube content using iframes for the fastest integration with minimal code. This approach works with any frontend framework and requires no additional dependencies.
 
-Iframe embedding supports [dashboards](/docs/explore-analyze/dashboards), [analytics chat](/docs/explore-analyze/analytics-chat), and the full Cube application in [creator mode](/embedding/creator-mode).
+Iframe embedding supports [dashboards](/embedding/iframe/dashboards), [Analytics Chat](/embedding/iframe/analytics-chat), and the full Cube application in [Creator Mode](/embedding/iframe/creator-mode).
 
 **Authentication options:**
-- **[Private embedding](/embedding/private-embedding)** – For internal use cases where users authenticate with their Cube accounts
-- **[Signed embedding](/embedding/signed-embedding)** – For customer-facing applications using secure, server-generated sessions for authentication
+- **[Private embedding](/embedding/iframe/auth/private)** – For internal use cases where users authenticate with their Cube accounts
+- **[Signed embedding](/embedding/iframe/auth/signed)** – For customer-facing applications using secure, server-generated sessions for authentication
 
-## React component-based embedding
+## SDK embedding
 
 <Info>
   Available on [Premium and Enterprise plans](https://cube.dev/pricing).
@@ -27,7 +27,7 @@ Iframe embedding supports [dashboards](/docs/explore-analyze/dashboards), [analy
 
 Embed Cube using the [React Embed SDK](/embedding/react-embed-sdk) for tighter integration with your React applications. Components provide more control over styling, theming, and user interactions.
 
-## API-based embedding
+## Headless embedding
 
 Build fully custom embedded analytics experiences using Cube APIs directly. This headless approach gives you complete control over data fetching, visualization, and user interface.
 
