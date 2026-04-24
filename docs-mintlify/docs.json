@@ -705,6 +705,10 @@
   },
   "redirects": [
     {
+      "source": "/admin/connect-to-data/multitenancy",
+      "destination": "/embedding/multitenancy"
+    },
+    {
       "source": "/embedding/private-embedding",
       "destination": "/embedding/iframe/auth/private"
     },
