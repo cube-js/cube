@@ -1,0 +1,68 @@
+---
+title: Customization
+description: Customize the appearance of embedded dashboards and the embedded Cube app.
+---
+
+You can customize the appearance of iframe-embedded Cube content in two ways:
+
+- **[Dashboard customization](#dashboard-customization)** — style an individual [dashboard](/embedding/iframe/dashboards) using the Styling panel in the Dashboard Builder
+- **[App customization](#app-customization)** — pass theme parameters to the [Generate Session API](/reference/embed-apis/generate-session) when embedding the full Cube app in [Creator Mode](/embedding/iframe/creator-mode)
+
+<Note>
+  Customization options will expand over time. This page documents what is supported today.
+</Note>
+
+## Dashboard customization
+
+Style an individual dashboard from the **Styling** panel in the Dashboard Builder. Settings are saved per-dashboard and apply equally to the dashboard in Cube and to its embedded view.
+
+See [Dashboards → Styling](/docs/explore-analyze/dashboards/styling) for the full list of options.
+
+## App customization
+
+When embedding the full Cube app in [Creator Mode](/embedding/iframe/creator-mode), pass an `embedTheme` object to the [Generate Session API](/reference/embed-apis/generate-session) to customize the appearance of the embedded experience.
+
+The `embedTheme` is scoped to the embed session — it is applied while the user is viewing the embedded app and reset on the next session generation.
+
+### Example
+
+```javascript
+const session = await fetch(
+  "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Api-Key ${API_KEY}`,
+    },
+    body: JSON.stringify({
+      deploymentId: DEPLOYMENT_ID,
+      externalId: "user@example.com",
+      creatorMode: true,
+      tenantId: "tenant-123",
+      tenantName: "Acme Corporation",
+      embedTheme: {
+        analyticsChat: {
+          backgroundColor: "#f4f4f5",
+          chatInput: {
+            backgroundColor: "#ffffff",
+            borderColor: "#e4e4e7",
+          },
+        },
+      },
+    }),
+  },
+);
+```
+
+### Parameters
+
+The following `embedTheme` parameters are currently supported:
+
+| Parameter                                       | Type     | Description                                            | Example       |
+|-------------------------------------------------|----------|--------------------------------------------------------|---------------|
+| `analyticsChat.backgroundColor`                 | `string` | Background color of the Analytics Chat panel.          | `"#f4f4f5"`   |
+| `analyticsChat.chatInput.backgroundColor`       | `string` | Background color of the chat input field.              | `"#ffffff"`   |
+| `analyticsChat.chatInput.borderColor`           | `string` | Border color of the chat input field.                  | `"#e4e4e7"`   |
+
+All values accept standard CSS color formats (hex, `rgb()`, named colors).

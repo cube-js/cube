@@ -115,7 +115,8 @@
                       "docs/explore-analyze/dashboards/widgets/controls",
                       "docs/explore-analyze/dashboards/widgets/ai-summary"
                     ]
-                  }
+                  },
+                  "docs/explore-analyze/dashboards/styling"
                 ]
               },
               "docs/explore-analyze/scheduled-refreshes",
@@ -418,6 +419,7 @@
               "embedding/iframe/dashboards",
               "embedding/iframe/analytics-chat",
               "embedding/iframe/creator-mode",
+              "embedding/iframe/customization",
               {
                 "group": "Authentication",
                 "pages": [
