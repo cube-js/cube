@@ -385,8 +385,8 @@
               "admin/ai/rules",
               "admin/ai/certified-queries",
               "admin/ai/memory-isolation",
-              "admin/ai/bring-your-own-model",
-              "admin/ai/multi-agent"
+              "admin/ai/multi-agent",
+              "admin/ai/bring-your-own-model"
             ]
           },
          
