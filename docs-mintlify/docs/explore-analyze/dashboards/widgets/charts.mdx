@@ -1,0 +1,30 @@
+---
+title: Charts
+description: Display reports from your workbook as visualizations on the dashboard.
+---
+
+Chart widgets display a report from the source [workbook][ref-workbooks] as a visualization on the dashboard. Every chart on a dashboard is backed by a tab in the workbook — when you publish a new version of the workbook, the chart updates accordingly.
+
+## Adding a chart
+
+In the [dashboard builder][ref-workbooks], open the **Charts** picker in the toolbar and select one or more reports from the workbook. A chart is added to the canvas for each selected report, inheriting the report's query, configured visualization, and styling.
+
+If the picker is empty, create the report first in a workbook tab — only published reports are available to add to a dashboard.
+
+## Interaction with controls
+
+Charts respect [controls][ref-controls] — filters and time grain switchers — placed on the same dashboard. A single control can drive multiple charts at once: its value is applied to every chart whose query references the targeted dimension.
+
+## Updating charts
+
+Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying report in the workbook and publish a new version of the dashboard.
+
+## Title
+
+Each chart shows the name of the underlying workbook tab as its title. To rename it, open the tab in the workbook, rename the tab, and republish the dashboard — the new name flows through to every chart backed by that tab.
+
+Use **Hide Title** in the widget's settings menu to suppress the title on the dashboard — useful when the chart's content already makes the subject obvious, or when an adjacent [text widget][ref-text] provides its own heading. Choose **Show Title** in the same menu to bring it back.
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-text]: /docs/explore-analyze/dashboards/widgets/text

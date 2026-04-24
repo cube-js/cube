@@ -110,11 +110,10 @@
                     "group": "Widgets",
                     "root": "docs/explore-analyze/dashboards/widgets/index",
                     "pages": [
-                      "docs/explore-analyze/dashboards/widgets/chart",
+                      "docs/explore-analyze/dashboards/widgets/charts",
                       "docs/explore-analyze/dashboards/widgets/text",
-                      "docs/explore-analyze/dashboards/widgets/filter",
-                      "docs/explore-analyze/dashboards/widgets/time-grain",
-                      "docs/explore-analyze/dashboards/widgets/ai"
+                      "docs/explore-analyze/dashboards/widgets/controls",
+                      "docs/explore-analyze/dashboards/widgets/ai-summary"
                     ]
                   }
                 ]

@@ -1,0 +1,39 @@
+---
+title: AI summary
+description: Generate natural-language summaries of dashboard data on demand using an AI agent.
+---
+
+AI summary widgets generate a natural-language summary of the data shown on the dashboard. Write a prompt — for example, _"Summarize the key trends and call out anything unusual"_ — and the configured [AI agent][ref-agents] produces a Markdown narrative based on the current dashboard state, including the data behind every chart and the values of any active [controls][ref-controls].
+
+## Adding an AI summary
+
+In the [dashboard builder][ref-workbooks], click **Add AI Summary** in the toolbar. The widget opens with a prompt editor — write your prompt and click **Generate Summary** to produce the first response.
+
+## Use cases
+
+- Add an executive summary at the top of a dashboard
+- Surface anomalies or notable changes since the last refresh
+- Explain numbers to stakeholders who want context without diving into the charts
+- Generate a TL;DR for periodic dashboard distributions
+
+## Writing a prompt
+
+Write the prompt as if you were briefing an analyst — describe the audience, the angle you want, and any specific things to call out. The agent has access to the full dashboard context, so you can reference charts and controls by name.
+
+## Caching
+
+Once generated, the summary is **cached** with the widget. Viewers loading the dashboard see the cached response immediately — they don't pay for regeneration on every page load.
+
+## Staleness detection
+
+The widget keeps a checksum of the dashboard state at the time of generation: the queries behind each chart, the active control values, and the chart configuration. When any of those change, the widget marks the cached summary as **stale** and shows a refresh prompt so viewers know the narrative may no longer match the data.
+
+Click the refresh icon (or open the widget menu and choose **Refresh**) to regenerate using the saved prompt against the latest state.
+
+## Choosing the agent
+
+By default, AI summaries use the agent configured at the dashboard level. You can override the agent per widget when you need a particular [agent's][ref-agents] tooling, model, or guardrails for a specific summary.
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-agents]: /admin/ai/spaces-agents-models
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls

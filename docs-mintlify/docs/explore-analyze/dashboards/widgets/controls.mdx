@@ -1,0 +1,98 @@
+---
+title: Controls
+description: Filter and time grain switcher widgets that let dashboard viewers change what's shown on the dashboard.
+---
+
+Controls are widgets that let dashboard viewers change what's shown without leaving the dashboard. The dashboard builder offers two control types — both target a dimension from your semantic model and apply the selected value to every [chart][ref-charts] on the dashboard whose query references that dimension.
+
+- [Filter](#filter) — Narrow the data shown on the dashboard
+- [Time grain switcher](#time-grain-switcher) — Change the granularity of time-based dimensions
+
+## Filter
+
+Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], click **Add Filter** in the toolbar. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
+
+### Operators by dimension type
+
+The available operators depend on the type of the underlying dimension:
+
+| Dimension type | Operators |
+|---|---|
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
+| **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
+| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+
+### Single vs. multiple selection
+
+Filters can allow either a single value or multiple values. Configure this when adding or editing the filter — multi-select is the default for string dimensions, while time and number dimensions default to a single value.
+
+### Default values
+
+You can set a default value that's applied when the dashboard loads. Defaults are useful for scoping the dashboard to "this quarter" or "the user's region" without requiring viewers to interact with the filter first.
+
+### Faceted filters
+
+When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
+
+For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
+
+## Time grain switcher
+
+Time grain switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
+
+In the [dashboard builder][ref-workbooks], click **Add Time Grain** in the toolbar. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
+
+### Allowed grains
+
+By default, viewers can choose between **day**, **week**, **month**, **quarter**, and **year**. You can narrow this list in the widget's settings to only expose the grains that make sense for the dashboard.
+
+For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day grains (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day grains, since they would bucket the entire day into a single point.
+
+Custom granularities defined in the [data model][ref-granularities] appear in the list alongside the built-in grains.
+
+### Default grain
+
+You can configure a default grain that's applied when the dashboard loads. If no default is set, charts use the grain that was saved on the underlying report — viewers can still switch grains, but the dashboard opens with each chart at its original granularity.
+
+## Visibility
+
+Each control has a **Visibility** setting that determines how it appears on the published dashboard. The setting applies to both filters and time grain switchers.
+
+| Visibility | Behavior on the published dashboard |
+|---|---|
+| **Visible** (default) | Shown on the dashboard and viewers can change its value. |
+| **Hidden** | Not shown to viewers, but the control's value is still applied to the charts it targets. Use this to scope a dashboard with a fixed value — e.g., always filter to the current quarter — without exposing the control. |
+| **Disabled** | Shown on the dashboard so viewers can see the active value, but they cannot change it. |
+
+Set the visibility from the **Visibility** dropdown when editing the control. **Hidden** controls remain visible in the dashboard builder so editors can reconfigure them, but disappear from the published view.
+
+## Interaction with charts
+
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
+
+### Controls mapping
+
+Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a dimension the chart doesn't have.
+
+Open **Controls mapping** from a chart's settings menu to inspect or override the mapping for that chart. For each control on the dashboard you can:
+
+- **Toggle the control on or off** for the chart, even when a mapping exists
+- **Pick a different dimension** from the chart's semantic view to remap the control to
+
+Three states show up in the mapping sidebar:
+
+| Status | What it means |
+|---|---|
+| **Mapped automatically** | The control's dimension exists on the chart's semantic view, so it's wired up without configuration. |
+| **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
+| **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
+
+For [time grain switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time grain pipeline.
+
+Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
+
+[ref-time-grain]: #time-grain-switcher
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
+[ref-granularities]: /docs/data-modeling/dimensions
