@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:22.22.0-bookworm-slim AS base
+FROM node:22.22.0-trixie-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -13,7 +13,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends libssl3 curl \
-       cmake python3 gcc g++ make cmake openjdk-17-jdk-headless unzip \
+       cmake python3 gcc g++ make cmake openjdk-21-jdk-headless unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
@@ -169,7 +169,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
+    && apt-get install -y ca-certificates python3.13 libpython3.13-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .

@@ -1,7 +1,7 @@
 ARG DEV_BUILD_IMAGE=cubejs/cube:build
 
 FROM $DEV_BUILD_IMAGE AS build
-FROM node:22.22.0-bookworm-slim
+FROM node:22.22.0-trixie-slim
 
 ARG IMAGE_VERSION=dev
 
@@ -11,7 +11,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     # python3 package is necessary to install `python3` executable for node-gyp
-    && apt-get install -y --no-install-recommends libssl3 python3 python3.11 libpython3.11-dev ca-certificates \
+    && apt-get install -y --no-install-recommends libssl3 python3 python3.13 libpython3.13-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production

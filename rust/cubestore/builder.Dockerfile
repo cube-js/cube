@@ -1,9 +1,9 @@
-ARG RUST_TAG=bookworm-slim
-ARG OS_NAME=bookworm
+ARG RUST_TAG=trixie-slim
+ARG OS_NAME=trixie
 
 FROM rust:$RUST_TAG AS base
 
-ARG OS_NAME=bookworm
+ARG OS_NAME=trixie
 ARG LLVM_VERSION=18
 
 RUN rustup update && \
@@ -12,13 +12,16 @@ RUN rustup update && \
 
 RUN apt update \
     && apt upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common libssl-dev pkg-config wget gnupg git apt-transport-https ca-certificates \
-    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    # https://github.com/llvm/llvm-project/issues/62475 \
-    && add-apt-repository --yes "deb https://apt.llvm.org/$OS_NAME/ llvm-toolchain-$OS_NAME-$LLVM_VERSION main" \
-    && add-apt-repository --yes "deb https://apt.llvm.org/$OS_NAME/ llvm-toolchain-$OS_NAME-$LLVM_VERSION main" \
-    && apt update \
-    && apt install -y git llvm-$LLVM_VERSION clang-$LLVM_VERSION libclang-$LLVM_VERSION-dev clang-$LLVM_VERSION lld-$LLVM_VERSION cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        libssl-dev \
+        pkg-config \
+        git \
+        ca-certificates \
+        llvm-$LLVM_VERSION \
+        clang-$LLVM_VERSION \
+        libclang-$LLVM_VERSION-dev \
+        lld-$LLVM_VERSION \
+        cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 100 \
