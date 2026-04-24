@@ -75,9 +75,9 @@ Inline certified queries accept the same properties as Markdown ones — `name`,
 
 ### Comments and agent visibility
 
-Comments in a certified query file are handled differently depending on where they appear, which lets you control whether the agent sees them:
+When the agent searches for a matching certified query, it only considers the `description` and `user_request` fields. Comments are never used for matching, but Markdown comments are included in the query content the agent reads once a query has been selected — so they can provide additional information about the query (context, caveats, or hints) that influences how the agent uses it.
 
-- **Markdown comments** (`<!-- ... -->`) in the body of the file **are included** in the content the agent reads. Use them to add context, caveats, or hints that should influence the agent's behavior.
+- **Markdown comments** (`<!-- ... -->`) in the body of the file **are included** in the content the agent reads. Use them to add extra context, caveats, or hints about the query once it's selected.
 - **YAML comments** (`# ...`) in the frontmatter **are not included** in the content the agent reads. Use them for internal notes, authorship, or review metadata that should stay hidden from the agent.
 
 ```markdown
@@ -98,7 +98,7 @@ ORDER BY 1
 ```
 
 <Tip>
-If you want the agent to pick up on guidance, put it in a Markdown comment or in the `description` field. Keep YAML comments for notes you want to leave for other developers.
+To make a query discoverable by the agent, put matching signals in `description` and `user_request` — those are the only fields used for search. Use Markdown comments for additional context the agent should consider when using the query, and keep YAML comments for notes aimed at other developers.
 </Tip>
 
 ## Writing effective certified queries
