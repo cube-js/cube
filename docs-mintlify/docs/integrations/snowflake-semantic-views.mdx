@@ -71,6 +71,40 @@ turned on in your deployment configuration and that the configured role has the
 required privileges listed above. See [Snowflake data source configuration](/admin/connect-to-data/data-sources/snowflake)
 for the full list of relevant environment variables.
 
+### Limitations
+
+Cube's data modeling layer is broader than what can be expressed natively in
+Snowflake Semantic Views today, so not every Cube view can be pushed as-is. Views
+that rely on the features below will continue to work in Cube, and the push
+wizard will flag them during validation so you can adjust them or keep them in
+Cube only.
+
+When pushing a Cube view to Snowflake, the following are currently not supported:
+
+- **Cubes without a `sql_table`.** Each cube referenced by the view must be
+  backed by a physical table. Cubes defined with an arbitrary `sql` block
+  (subqueries, CTEs, or other inline SQL) can't be pushed.
+- **Cubes without a single-column primary key.** Every cube needs a
+  `primary_key` dimension that resolves to a single physical column. Composite
+  primary keys and primary keys defined as SQL expressions aren't supported.
+- **Non-equi joins and expression-based joins.** Joins must be simple equality
+  joins between columns. Function calls (e.g., `LOWER({CUBE}.user_id) = {users.id}`),
+  inequality operators, `OR` conditions, and other expression-based join
+  conditions can't be translated.
+- **Joins that don't reference a primary key.** The referenced side of every
+  join must be the primary key of the target cube. Snowflake Semantic Views
+  requires referenced columns to be a primary or unique key.
+- **Measure types beyond the basic aggregates.** Snowflake Semantic Views
+  natively supports `count`, `count_distinct`, `sum`, `avg`, `min`, and `max`.
+  Cube measures that combine other measures, apply per-measure filters, or use
+  rolling windows don't have a direct equivalent and can't be pushed.
+- **Advanced Cube features without a Snowflake equivalent.** Segments, access
+  policies, hierarchies, time-dimension granularities, view-level filters, and
+  pre-aggregations are skipped during the push.
+
+We're working closely with Snowflake to expand coverage as Snowflake Semantic
+Views evolves.
+
 ## Benefits
 
 The Snowflake Semantic Views integration provides several advantages:
