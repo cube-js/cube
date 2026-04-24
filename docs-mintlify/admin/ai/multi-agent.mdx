@@ -1,0 +1,217 @@
+---
+title: Multi-agent
+description: Configure multiple agents within a single deployment, each with its own model, accessible views, rules, and certified queries.
+---
+
+Every Cube deployment ships with a single agent by default — see the [Overview](/admin/ai) for the standard configuration. For more advanced setups, you can configure **multiple agents** within the same deployment, each with its own model, accessible views, rules, and certified queries.
+
+Multi-agent is useful when:
+
+- Different teams need agents tuned to their own domain (e.g., a Sales Assistant and a Marketing Analyst).
+- You want specialized agents with distinct instructions or tool access in the same deployment.
+- You need to isolate context (rules, certified queries, memories) between user groups.
+
+## How it's organized
+
+Multi-agent setups use two top-level concepts:
+
+- **Spaces** — isolated environments where agents operate. A space owns its rules, certified queries, and memories.
+- **Agents** — AI assistants that operate within a space. Each agent has its own model, runtime, accessible views, and memory mode.
+
+Each agent belongs to exactly one space; multiple agents can share a space and the rules/certified queries defined there.
+
+## File structure
+
+Move beyond the default `auto` agent by defining `spaces` and `agents` arrays explicitly. Group rules and certified queries into space-named subdirectories so they target the right space:
+
+```text
+your-cube-project/
+├── model/
+│   └── cubes/
+│       └── orders.yml
+├── agents/
+│   ├── config.yml                          # Spaces and agents
+│   ├── rules/
+│   │   └── sales/
+│   │       ├── fiscal-year.md              # Rule for sales-analytics space
+│   │       └── revenue-definition.md
+│   └── certified_queries/
+│       └── sales/
+│           └── quarterly-revenue.md        # Certified query for sales-analytics space
+└── cube.py
+```
+
+You can also split YAML configuration across multiple files for better organization:
+
+```text
+agents/
+├── spaces/
+│   ├── sales.yml
+│   └── marketing.yml
+└── agents/
+    └── assistants.yml
+```
+
+All YAML and Markdown files are merged together. The system validates that space names and agent names are unique across all files.
+
+<Warning>
+  You cannot mix flat root-level properties (used for the default single-agent setup) with `spaces` or `agents` arrays in the same file. Use one style per file.
+</Warning>
+
+## Defining spaces
+
+```yaml
+spaces:
+  - name: sales-analytics          # Required: unique identifier
+    title: "Sales Analytics"       # Optional: display title
+    description: "Space for sales team analytics and reporting"
+    rules:
+      - # Rule definitions...
+    certified_queries:
+      - # Certified query definitions...
+```
+
+### Space properties
+
+| Property            | Type   | Required | Description                                |
+|---------------------|--------|:--------:|--------------------------------------------|
+| `name`              | string | Yes      | Unique identifier for the space.           |
+| `title`             | string | No       | Display title for the space.               |
+| `description`       | string | No       | Human-readable description.                |
+| `rules`             | array  | No       | Inline list of [rules](/admin/ai/rules) for the space. |
+| `certified_queries` | array  | No       | Inline list of [certified queries](/admin/ai/certified-queries) for the space. |
+
+## Defining agents
+
+```yaml
+agents:
+  - name: sales-assistant           # Required: unique identifier
+    title: "Sales Assistant"        # Optional: display title
+    description: "AI assistant for sales analytics"
+    space: sales-analytics          # Required: reference to a space
+    llm: claude_4_6_sonnet
+    runtime: plain
+    accessible_views:
+      - orders_view
+      - customers_view
+    memory_mode: user
+```
+
+### Agent properties
+
+| Property           | Type             | Required | Description                                                                                |
+|--------------------|------------------|:--------:|--------------------------------------------------------------------------------------------|
+| `name`             | string           | Yes      | Unique identifier for the agent.                                                            |
+| `title`            | string           | No       | Display title for the agent.                                                                |
+| `description`      | string           | No       | Human-readable description.                                                                 |
+| `space`            | string           | Yes      | Name of the space this agent belongs to.                                                    |
+| `llm`              | string or object | No       | LLM provider — `auto`, a [predefined model](/admin/ai#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference. |
+| `embedding_llm`    | string or object | No       | Embedding model — a predefined name or a BYOM reference.                                    |
+| `runtime`          | string           | No       | [Runtime mode](/admin/ai#runtime) — `plain` or `reasoning`.                                 |
+| `accessible_views` | array            | No       | List of view names the agent is allowed to query.                                           |
+| `memory_mode`      | string           | No       | [Memory mode](/admin/ai#memory) — `space`, `user`, or `disabled`.                           |
+
+Defaults match the defaults documented in the [Overview](/admin/ai#properties).
+
+## Targeting a space from Markdown
+
+When using multiple spaces, set the `space` property in the Markdown frontmatter of rules and certified queries to target the correct space. Files in `agents/rules/<space-name>/` and `agents/certified_queries/<space-name>/` are also picked up automatically.
+
+```markdown
+<!-- agents/rules/sales/fiscal-year.md -->
+---
+space: sales-analytics
+type: always
+---
+Always use fiscal year starting April 1st when analyzing dates.
+```
+
+If `space` is omitted and the file is not under a space-named subdirectory, the rule or certified query is added to the `auto` space.
+
+## Complete example
+
+```text
+agents/
+├── config.yml
+├── rules/
+│   └── sales/
+│       ├── fiscal-year.md
+│       └── revenue-definition.md
+└── certified_queries/
+    └── sales/
+        └── quarterly-revenue.md
+```
+
+```yaml
+# agents/config.yml
+spaces:
+  - name: sales-analytics
+    title: "Sales Analytics"
+    description: "Space for sales team analytics and reporting"
+
+  - name: marketing-analytics
+    title: "Marketing Analytics"
+    description: "Space for marketing team analytics"
+    rules:
+      - name: attribution-model
+        prompt: "Use last-touch attribution model by default for campaign analysis unless otherwise specified."
+        type: always
+
+agents:
+  - name: sales-assistant
+    title: "Sales Assistant"
+    description: "AI assistant for sales analytics and reporting"
+    space: sales-analytics
+    llm: claude_4_6_sonnet
+    runtime: plain
+    accessible_views:
+      - orders_view
+      - customers_view
+      - products_view
+    memory_mode: user
+
+  - name: sales-report-builder
+    title: "Sales Report Builder"
+    description: "Specialized agent for building sales reports"
+    space: sales-analytics
+    llm: gpt_5
+    runtime: plain
+    accessible_views:
+      - orders_view
+    memory_mode: space
+
+  - name: marketing-analyst
+    title: "Marketing Analyst"
+    description: "AI assistant for marketing analytics"
+    space: marketing-analytics
+    llm:
+      byom:
+        name: custom-marketing-model
+    memory_mode: user
+```
+
+```markdown
+<!-- agents/rules/sales/fiscal-year.md -->
+---
+space: sales-analytics
+type: always
+---
+Always use fiscal year starting April 1st when analyzing dates.
+Q1 is April–June, Q2 is July–September, Q3 is October–December, Q4 is January–March.
+```
+
+```markdown
+<!-- agents/certified_queries/sales/quarterly-revenue.md -->
+---
+space: sales-analytics
+description: "Apply when the user asks about quarterly revenue"
+user_request: "What is the revenue by quarter?"
+---
+SELECT
+  DATE_TRUNC('quarter', order_date) AS quarter,
+  SUM(amount) AS revenue
+FROM orders
+WHERE status != 'cancelled'
+GROUP BY 1
+ORDER BY 1
+```

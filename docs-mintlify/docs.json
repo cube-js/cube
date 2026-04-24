@@ -382,11 +382,11 @@
             "group": "AI",
             "pages": [
               "admin/ai/index",
-              "admin/ai/spaces-agents-models",
-              "admin/ai/agent-rules",
-              "admin/ai/bring-your-own-model",
+              "admin/ai/rules",
+              "admin/ai/certified-queries",
               "admin/ai/memory-isolation",
-              "admin/ai/yaml-config"
+              "admin/ai/bring-your-own-model",
+              "admin/ai/multi-agent"
             ]
           },
          
@@ -704,6 +704,18 @@
     }
   },
   "redirects": [
+    {
+      "source": "/admin/ai/agent-rules",
+      "destination": "/admin/ai/rules"
+    },
+    {
+      "source": "/admin/ai/yaml-config",
+      "destination": "/admin/ai"
+    },
+    {
+      "source": "/admin/ai/spaces-agents-models",
+      "destination": "/admin/ai/multi-agent"
+    },
     {
       "source": "/admin/connect-to-data/multitenancy",
       "destination": "/embedding/multitenancy"

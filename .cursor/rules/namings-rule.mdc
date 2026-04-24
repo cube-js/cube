@@ -21,6 +21,9 @@ Make sure to use correct terms.
 
 - **Account**
   - **Deployment**
+    - **Agent** (one per deployment by default; multi-agent is also supported)
+      - Rules
+      - Certified queries
     - **Analytics Chat**
     - **Workbook**
       - Tab
@@ -90,3 +93,19 @@ Page naming inside the **Iframe embedding** group:
   - Use **Dashboards**, **Analytics Chat**, **Creator Mode** (not "Embed a dashboard", "Embed Analytics Chat", etc.)
   - Use **Private embedding**, **Signed embedding** for the auth-mode pages (the word "embedding" is part of the product term itself).
 
+# Agent Terminology
+
+Every [Deployment](#product-taxonomy) ships with **one agent** by default. The agent powers AI features (Analytics Chat, ad-hoc queries, etc.) and is configured per-deployment with rules, certified queries, and other customizations. Multi-agent (multiple agents per deployment) is also supported, but the documentation primarily covers the default single-agent setup; multi-agent docs will follow.
+
+## Naming
+
+- **the agent** — default term in single-agent contexts. No qualifier needed because every deployment has exactly one by default. Example: "configure rules for the agent", "add a certified query to the agent".
+- **Cube agent** — use only when referring to the agent feature in the abstract (product-level), not a specific instance. Example: "Cube agent supports certified queries."
+- **Avoid "default agent"** — it implies non-default agents exist. Reserve this term for multi-agent docs where it contrasts with custom-created agents.
+- **Avoid "deployment agent"** — wordy and doesn't add useful contrast in multi-agent contexts.
+
+## In multi-agent contexts
+
+- Refer to specific agents by their user-given names.
+- Use **default agent** to contrast against user-created agents within a deployment.
+- Continue to use **Cube agent** for product-level / abstract references.

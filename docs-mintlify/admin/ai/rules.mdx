@@ -1,0 +1,136 @@
+---
+title: Rules
+description: Define instructions in your data model repository that guide the agent's behavior.
+---
+
+Rules are instructions that guide the agent's behavior — encoding business definitions, calculation methods, domain terminology, and analytical approaches the agent should follow when answering questions.
+
+Rules are configured as code in your [data model repository](/admin/ai#agent-configuration), alongside your cubes and views. This enables version control, code review, and consistent behavior across environments.
+
+## Rule types
+
+| Type              | When applied                                                                                  | Best for                                                              |
+|-------------------|-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| `always`          | Injected into every agent interaction.                                                        | Fundamental business definitions, default calculations, domain terms. |
+| `agent_requested` | Conditionally applied when the agent determines the rule is relevant to the current request. | Scenario-specific guidance, specialized analysis methods.             |
+
+For `agent_requested` rules, the `description` field is what the agent matches against the user's request to decide whether the rule is relevant — write it as a short summary of when this rule applies. `always` rules don't need a `description` since they're injected into every interaction regardless.
+
+## Defining rules
+
+Rules are defined as Markdown files under `agents/rules/`. Each rule lives in its own file: the YAML frontmatter holds metadata, and the Markdown body is the rule prompt.
+
+```markdown
+<!-- agents/rules/fiscal-year.md -->
+---
+type: always
+---
+Always use fiscal year starting April 1st when analyzing dates.
+Q1 is April–June, Q2 is July–September, Q3 is October–December, Q4 is January–March.
+```
+
+For `agent_requested` rules, add a `description` so the agent can decide when the rule applies:
+
+```markdown
+<!-- agents/rules/cart-abandonment.md -->
+---
+description: "Apply when the user asks about cart abandonment"
+type: agent_requested
+---
+For cart abandonment analysis, segment by device type and traffic source.
+```
+
+Files placed under a `rules/` directory are treated as rules automatically — no `kind` property is required. The `name` is inferred from the file name (e.g., `fiscal-year.md` → `fiscal-year`).
+
+### Frontmatter properties
+
+| Property      | Type   | Required | Description                                                                                                                      |
+|---------------|--------|:--------:|----------------------------------------------------------------------------------------------------------------------------------|
+| `name`        | string | No       | Unique identifier. Inferred from the file name if omitted.                                                                      |
+| `description` | string | No       | Required for `agent_requested` rules — used by the agent to decide when the rule applies. Optional and unused for `always` rules. |
+| `type`        | string | Yes      | Either `always` or `agent_requested`.                                                                                            |
+| `prompt`      | string | No       | Rule prompt. Falls back to the Markdown body if omitted.                                                                         |
+
+### Inlining rules in YAML
+
+You can also inline rules directly in `agents/config.yml` under a `rules` key:
+
+```yaml
+# agents/config.yml
+rules:
+  - name: fiscal-year
+    prompt: "Always use fiscal year starting April 1st when analyzing dates."
+    type: always
+
+  - name: efficiency-analysis
+    description: "Apply when the user asks about sales efficiency"
+    prompt: "When analyzing sales efficiency, calculate as deal size divided by sales cycle length."
+    type: agent_requested
+```
+
+Inline rules accept the same properties as Markdown rules — `name`, `description`, `prompt` (required), and `type` (required).
+
+## Writing effective rules
+
+Good rules are specific, actionable, and encode context the agent wouldn't otherwise know about your business.
+
+**Do:**
+- "Customer churn rate is customers lost ÷ total customers at the start of the period."
+- "When analyzing quarterly performance, always compare against the same quarter of the previous year."
+- "Our fiscal year starts in October."
+
+**Don't:**
+- "Be helpful." (too vague)
+- "Always be accurate." (redundant)
+- "Consider all factors." (too broad)
+
+### Domain examples
+
+**E-commerce:**
+
+```markdown
+<!-- agents/rules/customer-lifetime-value.md -->
+---
+type: always
+---
+Customer lifetime value equals average order value × purchase frequency × customer lifespan.
+```
+
+```markdown
+<!-- agents/rules/cart-abandonment.md -->
+---
+description: "Apply when the user asks about cart abandonment"
+type: agent_requested
+---
+For cart abandonment analysis, segment by device type and traffic source.
+```
+
+**SaaS:**
+
+```markdown
+<!-- agents/rules/mrr-growth.md -->
+---
+type: always
+---
+MRR growth rate excludes one-time charges and setup fees.
+```
+
+```markdown
+<!-- agents/rules/churn-segmentation.md -->
+---
+description: "Apply when the user asks about churn analysis"
+type: agent_requested
+---
+When analyzing churn, distinguish between voluntary and involuntary churn.
+```
+
+## Resolving conflicts
+
+When multiple rules could apply, follow these guidelines:
+
+1. **Review existing rules** before adding new ones to avoid contradictions.
+2. **Use specific triggers** in `agent_requested` rules so the agent knows when each rule applies.
+3. **Prefer specificity over breadth** — narrowly scoped rules override broader defaults more cleanly.
+4. **Test rule combinations** with sample queries before relying on them.
+
+If two `always` rules directly contradict each other, the agent will surface the conflict in its response. Resolve such conflicts by editing the rules in your repository and redeploying.
