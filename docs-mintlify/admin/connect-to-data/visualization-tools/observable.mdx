@@ -23,7 +23,7 @@ detailed instructions.
 ## Connect from Cube Core
 
 You can connect a Cube deployment to Observable using the [SQL API][ref-sql-api]
-or the [REST API][ref-rest-api].
+or the [REST (JSON) API][ref-rest-api].
 
 In Cube Core, the SQL API is disabled by default. Enable it and [configure
 the credentials](/reference/sql-api#configuration) to
@@ -76,11 +76,11 @@ You can also create a visualization of the executed SQL query.
   />
 </div>
 
-### Connecting via REST API
+### Connecting via REST (JSON) API
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL
+For a Cube instance publicly available at a specific `HOST`, the REST (JSON) API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
-[REST API page](/reference/rest-api) for details.
+[REST (JSON) API page](/reference/rest-api) for details.
 
 You will also need to generate a JSON Web Token that would be used to
 authenticate requests to Cube.
@@ -89,7 +89,7 @@ Please check the [Security page](/embedding/authentication/jwt#generating-json-w
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
 
-### Querying data with REST API
+### Querying data with REST (JSON) API
 
 First, add two generic **JavaScript** cells:
 
@@ -101,7 +101,7 @@ First, add two generic **JavaScript** cells:
   />
 </div>
 
-Next, copy Cube's REST API URL and the Authorization token and paste them into
+Next, copy Cube's REST (JSON) API URL and the Authorization token and paste them into
 their respective cells.
 
 ```javascript
@@ -109,7 +109,7 @@ cubeRestApi =
   "https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load";
 ```
 
-Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget
+Because the Cube REST (JSON) API has the format of `HOST/cubejs-api/v1`, don't forget
 to add the `/load` endpoint to the end of the data source API.
 
 ```javascript
@@ -172,7 +172,7 @@ Next, click the play button on the top right of the cell.
   />
 </div>
 
-You can also create a visualization of the executed REST API request.
+You can also create a visualization of the executed REST (JSON) API request.
 
 <div style={{ textAlign: "center" }}>
   <img

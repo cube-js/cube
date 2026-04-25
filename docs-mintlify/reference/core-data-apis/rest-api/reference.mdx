@@ -1,6 +1,6 @@
 ---
-title: REST API reference
-description: "The REST API provides the following endpoints."
+title: REST (JSON) API reference
+description: "The REST (JSON) API provides the following endpoints."
 ---
 
 <Info>
@@ -12,7 +12,7 @@ By default, it's `/cubejs-api`.
 
 ## `{base_path}/v1/load`
 
-Run the query to the REST API and get the results. 
+Run the query to the REST (JSON) API and get the results. 
 
 | Parameter   | Description                                                                                                           | Required |
 | ----------- | --------------------------------------------------------------------------------------------------------------------- | --- |
@@ -110,7 +110,7 @@ Request parameters:
 
 | Parameter, type | Description | Required |
 | --- | --- | --- |
-| `format`, `string` | Query format:<br/>`sql` for [SQL API][ref-sql-api] queries,<br/>`rest` for [REST API][ref-rest-api] queries (default) | ❌ No |
+| `format`, `string` | Query format:<br/>`sql` for [SQL API][ref-sql-api] queries,<br/>`rest` for [REST (JSON) API][ref-rest-api] queries (default) | ❌ No |
 | `query`, `string` | Query as an URL-encoded JSON object or SQL query | ✅ Yes |
 | `disable_post_processing`, `boolean` | Flag that affects query planning, `true` or `false` | ❌ No |
 
@@ -142,7 +142,7 @@ the query can't be run without post-processing.
 
 ### Example
 
-Request with a query in the REST API format:
+Request with a query in the REST (JSON) API format:
 
 ```bash
 curl \
@@ -247,9 +247,9 @@ Response:
 
 Takes an API query in the specified input format and converts it to the specified
 output format. Currently, only conversion from [SQL API](/reference/core-data-apis/sql-api) queries to
-[REST API](/reference/core-data-apis/rest-api) queries is supported.
+[REST (JSON) API](/reference/core-data-apis/rest-api) queries is supported.
 
-This endpoint is useful for translating SQL API queries into equivalent REST API
+This endpoint is useful for translating SQL API queries into equivalent REST (JSON) API
 queries that can be used with the [`/v1/load`](#base_path%2Fv1%2Fload) endpoint.
 
 Request parameters (JSON body):
@@ -257,7 +257,7 @@ Request parameters (JSON body):
 | Parameter, type | Description | Required |
 | --- | --- | --- |
 | `input`, `string` | Input query format. Use `sql` for [SQL API](/reference/core-data-apis/sql-api) queries | ✅ Yes |
-| `output`, `string` | Output query format. Use `rest` for [REST API](/reference/core-data-apis/rest-api) queries | ✅ Yes |
+| `output`, `string` | Output query format. Use `rest` for [REST (JSON) API](/reference/core-data-apis/rest-api) queries | ✅ Yes |
 | `query`, `string` | Input query in the specified format | ✅ Yes |
 
 The response will contain a JSON object with the following properties:
@@ -265,12 +265,12 @@ The response will contain a JSON object with the following properties:
 | Property, type | Description |
 | --- | --- |
 | `status`, `string` | Query conversion status, `ok` or `error` |
-| `query`, `object` | Converted query in the [REST API query format](/reference/core-data-apis/rest-api/query-format) (only present when `status` is `ok`) |
+| `query`, `object` | Converted query in the [REST (JSON) API query format](/reference/core-data-apis/rest-api/query-format) (only present when `status` is `ok`) |
 | `error`, `string` | Error message (only present when `status` is `error`) |
 
 An error will be returned if the input query can't be converted to the specified
 output format, e.g., if the SQL API query requires post-processing on top of
-REST API capabilities or if the SQL API query results in multiple REST API queries.
+REST (JSON) API capabilities or if the SQL API query results in multiple REST (JSON) API queries.
 
 ### Example
 

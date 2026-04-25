@@ -45,6 +45,10 @@ Make sure to use correct terms.
     - **API**
       - Embed APIs
       - Core Data APIs
+        - SQL API
+        - DAX API
+        - REST (JSON) API (transitional name; previously "REST API", will eventually become "JSON API")
+        - GraphQL API
       - Management APIs
         - Orchestration API
   - **Embedding**
@@ -92,6 +96,25 @@ Page naming inside the **Iframe embedding** group:
 - Do not prefix page titles with "Embed" or "Embedding" — it is redundant under the group label.
   - Use **Dashboards**, **Analytics Chat**, **Creator Mode** (not "Embed a dashboard", "Embed Analytics Chat", etc.)
   - Use **Private embedding**, **Signed embedding** for the auth-mode pages (the word "embedding" is part of the product term itself).
+
+# Core Data API Naming
+
+The Core Data APIs are: **SQL API**, **DAX API**, **REST (JSON) API**, and **GraphQL API**.
+
+## REST (JSON) API
+
+We are transitioning the name of our HTTP/JSON-based Core Data API:
+
+- Previous name: **REST API**
+- Current (transitional) name: **REST (JSON) API** — use this in all new and updated content
+- Future name: **JSON API**
+
+Guidance for the transitional period:
+
+- In prose, link references, headings, navigation labels, and card titles, use **REST (JSON) API** in place of **REST API**.
+- Do not change URL paths, route segments, file/directory names, code identifiers, env vars, or config option names (e.g., `/reference/core-data-apis/rest-api`, `rest-api/index.mdx`, the `rest` query format value, internal link slugs like `[ref-rest-api]`).
+- Do not rewrite third-party UI literals where "REST API" is a verbatim label in another product (e.g., Retool's `"REST API"` resource type, Budibase's `"REST API"` data source). Quote them as the third-party tool spells them.
+- Plural form ("REST APIs") is not currently used and should be avoided; refer to the API in the singular.
 
 # Agent Terminology
 

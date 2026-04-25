@@ -22,11 +22,11 @@ detailed instructions.
 
 ## Connect from Cube Core
 
-You can connect a Cube deployment to Budibase using the [REST API](/reference/rest-api).
+You can connect a Cube deployment to Budibase using the [REST (JSON) API](/reference/rest-api).
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL
+For a Cube instance publicly available at a specific `HOST`, the REST (JSON) API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
-[REST API page](/reference/rest-api) for details.
+[REST (JSON) API page](/reference/rest-api) for details.
 
 You will also need to generate a JSON Web Token that would be used to
 authenticate requests to Cube.
@@ -45,7 +45,7 @@ Create a new "REST API" data source in Budibase.
   <img src="https://ucarecdn.com/381542a0-3d74-4ad6-9f3a-599be5d369f4/" />
 </Frame>
 
-Next, add a "Authorization" header for the REST API. Copy and paste Cube's
+Next, add a "Authorization" header for the REST (JSON) API. Copy and paste Cube's
 Authorization token.
 
 <Frame>
@@ -56,7 +56,7 @@ Authorization token.
 
 Click "+ Add Query".
 
-Copy and paste the Cube REST API, including the `/load` path, in the API field.
+Copy and paste the Cube REST (JSON) API, including the `/load` path, in the API field.
 Make sure to select "POST" as the request.
 
 <Frame>

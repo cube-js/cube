@@ -495,7 +495,7 @@
                 ]
               },
               {
-                "group": "REST API",
+                "group": "REST (JSON) API",
                 "root": "reference/core-data-apis/rest-api/index",
                 "pages": [
                   "reference/core-data-apis/rest-api/query-format",

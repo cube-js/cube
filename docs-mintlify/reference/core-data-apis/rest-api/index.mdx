@@ -1,11 +1,11 @@
 ---
-title: REST API
+title: REST (JSON) API
 description: "Deliver data from Cube over HTTP to front-end apps, notebooks, low-code tools, and automated jobs."
 ---
 
- REST API
+ REST (JSON) API
 
-REST API enables Cube to deliver data over the HTTP protocol to certain kinds of
+REST (JSON) API enables Cube to deliver data over the HTTP protocol to certain kinds of
 data applications, including but not limited to the following ones:
 
 - Most commonly, front-end applications
@@ -13,15 +13,15 @@ data applications, including but not limited to the following ones:
 - [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
 - Automated jobs
 
-Often, the REST API is used to enable [embedded analytics][cube-ea] and
+Often, the REST (JSON) API is used to enable [embedded analytics][cube-ea] and
 [real-time analytics][cube-rta] use cases.
 
-See [REST API reference][ref-ref-rest-api] for the list of supported API endpoints.
+See [REST (JSON) API reference][ref-ref-rest-api] for the list of supported API endpoints.
 Also, check [query format][ref-rest-query-format] for details about query syntax.
 
 <Info>
 
-You can find a mostly complete OpenAPI documentation for the REST API in the
+You can find a mostly complete OpenAPI documentation for the REST (JSON) API in the
 linked [`openspec.yml` file][gh-cube-openspec] that you can use with tools like Swagger.
 
 </Info>
@@ -34,13 +34,13 @@ provides.
 
 </Info>
 
-REST API also provides endpoints for [GraphQL API][ref-graphql-api] and
+REST (JSON) API also provides endpoints for [GraphQL API][ref-graphql-api] and
 [Orchestration API][ref-orchestration-api]. However, they target specific use
-cases and are not considered part of the REST API.
+cases and are not considered part of the REST (JSON) API.
 
 ## Transport
 
-The REST API supports the following transports:
+The REST (JSON) API supports the following transports:
 
 | Transport | Description | When to use |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ The REST API supports the following transports:
 
 ### HTTP transport
 
-You can use the `curl` utility to execute requests to the REST API. Provide the [API
+You can use the `curl` utility to execute requests to the REST (JSON) API. Provide the [API
 token](#authentication) in the `Authorization` header:
 
 ```bash
@@ -84,7 +84,7 @@ curl \
 ```
 
 You can also use the [`jq` utility][link-jq-utility] to format responses
-from the REST API in your terminal:
+from the REST (JSON) API in your terminal:
 
 ```bash
 curl \
@@ -103,7 +103,7 @@ curl \
   http://localhost:4000/cubejs-api/v1/meta | jq
 ```
 
-You can also use the [JavaScript SDK][ref-javascript-sdk] to call the REST API
+You can also use the [JavaScript SDK][ref-javascript-sdk] to call the REST (JSON) API
 from your JavaScript applications.
 
 ### WebSocket transport
@@ -154,15 +154,15 @@ data fetch using the WebSocket transport.
 
 ## Configuration
 
-REST API is enabled by default and secured using [API scopes][self-api-scopes]
+REST (JSON) API is enabled by default and secured using [API scopes][self-api-scopes]
 and [CORS][self-cors].
 
-To find your REST API endpoint in Cube Cloud, go to the **Overview**
-page, click **API credentials**, and choose the **REST API** tab.
+To find your REST (JSON) API endpoint in Cube Cloud, go to the **Overview**
+page, click **API credentials**, and choose the **REST (JSON) API** tab.
 
 ### Base path
 
-By default, all REST API endpoints are prefixed with a base path of
+By default, all REST (JSON) API endpoints are prefixed with a base path of
 `/cubejs-api`, e.g., the `/v1/load` endpoint will be available at
 `/cubejs-api/v1/load`.
 
@@ -177,13 +177,13 @@ configuration option.
 
 ### API scopes
 
-Each REST API endpoint belongs to an API scope, e.g., the `/v1/load` endpoint
+Each REST (JSON) API endpoint belongs to an API scope, e.g., the `/v1/load` endpoint
 belongs to the `data` scope. API scopes allow to secure access to API endpoints
 by making them accessible to specific users only or disallowing access for
 everyone. By default, API endpoints in all scopes, except for `jobs`, are
 accessible for everyone.
 
-| API scope | REST API endpoints | Accessible by default? |
+| API scope | REST (JSON) API endpoints | Accessible by default? |
 | --- | --- | --- |
 | `meta`    | [`/v1/meta`][ref-ref-meta], [Metadata API][ref-ref-metadata] | ✅ Yes |
 | `data`    | [`/v1/load`][ref-ref-load], [`/v1/cubesql`][ref-ref-cubesql] | ✅ Yes |
@@ -219,7 +219,7 @@ module.exports = {
 
 ### CORS
 
-REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors]. By default,
+REST (JSON) API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors]. By default,
 requests from any origin (`*`) are allowed.
 
 You can configure CORS using the [`http.cors`][ref-config-cors] configuration
@@ -254,7 +254,7 @@ you can still use it to pass a security context.
 
 ### Error handling
 
-Cube REST API has basic errors and HTTP Error codes for all requests.
+Cube REST (JSON) API has basic errors and HTTP Error codes for all requests.
 
 | Status | Error response                 | Description                                                                                          |
 | ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
@@ -275,7 +275,7 @@ change during one single interaction.
 
 ## Cache control
 
-[`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints of the REST API
+[`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints of the REST (JSON) API
 allow to control the in-memory cache behavior. The following querying strategies with regards to
 the cache are supported:
 
@@ -288,13 +288,13 @@ the cache are supported:
 
 ## `Continue wait`
 
-If the request takes too long to be processed, the REST API responds with
+If the request takes too long to be processed, the REST (JSON) API responds with
 `{ "error": "Continue wait" }` and the status code 200.
 
 This is part of the long polling mechanism:
 - After an API instance receives a request, it adds the query to the query queue.
 - If the query takes too long to be processed, the API instance will respond with `Continue wait`. Receiving `Continue wait` doesn't mean the database query has been canceled, and it's actually still being processed by Cube.
-- Clients who received `Continue wait` should continuously retry the same query in a loop until they get a successful result. Database queries that are no longer retried by clients will be marked as orphaned and removed from the query queue. Subsequent calls to the REST API are idempotent and don't lead to scheduling new database queries if not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key].
+- Clients who received `Continue wait` should continuously retry the same query in a loop until they get a successful result. Database queries that are no longer retried by clients will be marked as orphaned and removed from the query queue. Subsequent calls to the REST (JSON) API are idempotent and don't lead to scheduling new database queries if not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key].
 
 Possible reasons of `Continue wait`:
 - The query is too heavy for the upstream database, i.e., it takes too long to be processed.
