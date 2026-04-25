@@ -166,13 +166,17 @@ impl SqlCall {
             let (filter_params, filter_groups, deps, context_values) =
                 self.prepare_template_params(visitor, node_processor, &query_tools, templates)?;
 
-            Self::substitute_template(
+            let result = Self::substitute_template(
                 template,
                 &deps,
                 &filter_params,
                 &filter_groups,
                 &context_values,
-            )
+            )?;
+            // Filter-params callbacks (e.g. FILTER_PARAMS inside a segment SQL)
+            // may produce results containing {arg:N} dep references that the
+            // first pass inserted verbatim.  A second pass resolves them.
+            Self::substitute_template(&result, &deps, &[], &[], &[])
         } else {
             Err(CubeError::internal(
                 "SqlCall::eval called for function that returns string".to_string(),
@@ -213,7 +217,12 @@ impl SqlCall {
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         };
-        Ok(result)
+        // Filter-params callbacks may produce results containing {arg:N}
+        // dep references; resolve them with a second pass.
+        result
+            .into_iter()
+            .map(|s| Self::substitute_template(&s, &deps, &[], &[], &[]))
+            .collect()
     }
 
     pub fn is_owned_by_cube(&self) -> bool {

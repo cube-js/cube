@@ -4,6 +4,7 @@ use crate::planner::filter::{BaseFilter, FilterOperator};
 use crate::planner::sql_evaluator::DebugSql;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use std::rc::Rc;
 
 #[test]
 fn test_dimension_basic() {
@@ -200,4 +201,210 @@ fn test_filter_group_and_collapsed() {
     let expected =
         "AND: [\n  {visitors.source} equals: ['google'],\n  {visitors.id} gt: ['100']\n]";
     assert_eq!(sql, expected);
+}
+
+#[test]
+fn test_find_subtree_for_members_excludes_segments_from_and_group() {
+    let schema = MockSchema::from_yaml_file("common/integration_basic.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let city_symbol = ctx.create_symbol("customers.city").unwrap();
+    let amount_symbol = ctx.create_symbol("orders.amount").unwrap();
+
+    let city_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        city_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("New York".to_string())]),
+    )
+    .unwrap();
+
+    let amount_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        amount_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Gte,
+        Some(vec![Some("100".to_string())]),
+    )
+    .unwrap();
+
+    let completed_segment = ctx.create_segment("orders.completed_orders").unwrap();
+
+    let filter_tree = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![
+            FilterItem::Item(city_filter),
+            FilterItem::Item(amount_filter),
+            FilterItem::Segment(completed_segment),
+        ],
+    )));
+
+    let city_member = city_symbol.resolve_reference_chain().full_name();
+    let amount_member = amount_symbol.resolve_reference_chain().full_name();
+    let targets = vec![&city_member, &amount_member];
+
+    let subtree = filter_tree
+        .find_subtree_for_members(&targets)
+        .expect("matching filters should still be extracted");
+
+    assert_eq!(
+        subtree.debug_sql(false),
+        "AND: [\n  {customers.city} equals: ['New York'],\n  {orders.amount} gte: ['100']\n]"
+    );
+}
+
+#[test]
+fn test_find_subtree_for_members_keeps_or_groups_all_or_nothing() {
+    let schema = MockSchema::from_yaml_file("common/integration_basic.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let city_symbol = ctx.create_symbol("customers.city").unwrap();
+
+    let city_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        city_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("New York".to_string())]),
+    )
+    .unwrap();
+
+    let completed_segment = ctx.create_segment("orders.completed_orders").unwrap();
+
+    let filter_tree = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::Or,
+        vec![
+            FilterItem::Item(city_filter),
+            FilterItem::Segment(completed_segment),
+        ],
+    )));
+
+    let city_member = city_symbol.resolve_reference_chain().full_name();
+    let targets = vec![&city_member];
+
+    assert!(
+        filter_tree.find_subtree_for_members(&targets).is_none(),
+        "partial matches should not be extracted from OR groups"
+    );
+}
+
+#[test]
+fn test_find_subtree_for_members_rejects_or_groups_with_partially_matching_children() {
+    let schema = MockSchema::from_yaml_file("common/integration_basic.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let city_symbol = ctx.create_symbol("customers.city").unwrap();
+    let amount_symbol = ctx.create_symbol("orders.amount").unwrap();
+
+    let city_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        city_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("New York".to_string())]),
+    )
+    .unwrap();
+
+    let amount_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        amount_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Gte,
+        Some(vec![Some("100".to_string())]),
+    )
+    .unwrap();
+
+    let completed_segment = ctx.create_segment("orders.completed_orders").unwrap();
+
+    let partially_matching_branch = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![
+            FilterItem::Item(city_filter),
+            FilterItem::Segment(completed_segment),
+        ],
+    )));
+
+    let filter_tree = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::Or,
+        vec![partially_matching_branch, FilterItem::Item(amount_filter)],
+    )));
+
+    let city_member = city_symbol.resolve_reference_chain().full_name();
+    let amount_member = amount_symbol.resolve_reference_chain().full_name();
+    let targets = vec![&city_member, &amount_member];
+
+    assert!(
+        filter_tree.find_subtree_for_members(&targets).is_none(),
+        "OR groups should only match when every branch matches without pruning"
+    );
+}
+
+#[test]
+fn test_find_subtree_for_members_segment_only_and_group_returns_none() {
+    let schema = MockSchema::from_yaml_file("common/integration_basic.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let completed_segment = ctx.create_segment("orders.completed_orders").unwrap();
+
+    let filter_tree = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![FilterItem::Segment(completed_segment)],
+    )));
+
+    let dummy_member = "orders.amount".to_string();
+    let targets = vec![&dummy_member];
+
+    assert!(
+        filter_tree.find_subtree_for_members(&targets).is_none(),
+        "AND group containing only segments should return None"
+    );
+}
+
+#[test]
+fn test_find_subtree_for_members_all_matching_and_group_preserves_group() {
+    let schema = MockSchema::from_yaml_file("common/integration_basic.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let city_symbol = ctx.create_symbol("customers.city").unwrap();
+    let amount_symbol = ctx.create_symbol("orders.amount").unwrap();
+
+    let city_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        city_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("New York".to_string())]),
+    )
+    .unwrap();
+
+    let amount_filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        amount_symbol.clone(),
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Gte,
+        Some(vec![Some("100".to_string())]),
+    )
+    .unwrap();
+
+    let filter_tree = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![
+            FilterItem::Item(city_filter),
+            FilterItem::Item(amount_filter),
+        ],
+    )));
+
+    let city_member = city_symbol.resolve_reference_chain().full_name();
+    let amount_member = amount_symbol.resolve_reference_chain().full_name();
+    let targets = vec![&city_member, &amount_member];
+
+    let subtree = filter_tree
+        .find_subtree_for_members(&targets)
+        .expect("fully matching AND group should be returned");
+
+    let expected_sql =
+        "AND: [\n  {customers.city} equals: ['New York'],\n  {orders.amount} gte: ['100']\n]";
+    assert_eq!(subtree.debug_sql(false), expected_sql);
+
+    assert!(
+        subtree == filter_tree,
+        "fully matching group should be structurally identical to the original"
+    );
 }
