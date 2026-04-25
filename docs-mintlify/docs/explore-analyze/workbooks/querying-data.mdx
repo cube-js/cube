@@ -58,13 +58,12 @@ The panel exposes two top-level tabs:
 - **Semantic SQL** — the query expressed against the Semantic Model (semantic views, measures, dimensions, and `MEASURE()` calls). This is the source of truth for the query and what the workbook stores.
 - **Generated SQL** — the SQL that Cube compiles from the Semantic SQL and sends to your data warehouse. Use it to understand exactly what runs against your database, debug performance, or share with a database administrator.
 
-The **Semantic SQL** tab also has a dropdown for switching between equivalent representations of the same query:
+The **Semantic SQL** tab also has a dropdown for viewing the same query in the formats accepted by Cube's [Core Data APIs][ref-core-data-apis]:
 
-- **Semantic SQL** — the [SQL API][ref-sql-api] format
 - **Semantic JSON** — the [REST (JSON) API][ref-rest-api] query format
 - **Semantic GraphQL** — the [GraphQL API][ref-graphql-api] query format
 
-The **Semantic JSON** and **Semantic GraphQL** views are convenient when you want to take a query you've built interactively in a workbook and reuse it directly through one of the [Core Data APIs][ref-core-data-apis] from your own application.
+These views are convenient when you want to take a query you've built interactively in a workbook and reuse it directly through one of the Core Data APIs from your own application.
 
 ## Editing Semantic SQL by hand
 
@@ -91,7 +90,6 @@ Currently, advanced semantic queries can be placed on dashboards, but dashboard 
 </Info>
 
 [ref-core-data-apis]: /reference/core-data-apis
-[ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
 
