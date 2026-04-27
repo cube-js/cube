@@ -569,13 +569,14 @@ impl ImportServiceImpl {
         &self,
         location: &str,
         table_id: u64,
+        table_name: &str,
         temp_dir: &Path,
     ) -> Result<(File, Option<TempPath>), CubeError> {
         if location.starts_with("http") {
             let (file, size, path) = self
                 .download_http_location(location, table_id, temp_dir)
                 .await?;
-            log::info!("Import downloaded {} ({} bytes)", location, size);
+            log::info!("Import downloaded {} ({} bytes) [table={}]", location, size, table_name);
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
@@ -583,7 +584,7 @@ impl ImportServiceImpl {
         } else if location.starts_with("temp://") {
             let temp_file = self.download_temp_file(location).await?;
             let size = temp_file.metadata().await?.len();
-            log::info!("Import downloaded {} ({} bytes)", location, size);
+            log::info!("Import downloaded {} ({} bytes) [table={}]", location, size, table_name);
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
@@ -715,7 +716,7 @@ impl ImportServiceImpl {
             })?;
 
         let (file, tmp_path) = self
-            .resolve_location(location, table.get_id(), &temp_dir)
+            .resolve_location(location, table.get_id(), table.get_row().get_table_name(), &temp_dir)
             .await?;
         let mut row_stream = format
             .row_stream(
