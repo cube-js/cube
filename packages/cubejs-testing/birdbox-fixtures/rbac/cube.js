@@ -197,10 +197,11 @@ module.exports = {
           auth: {
             username: 'region_user',
             userAttributes: {
+              hasRegionFilter: true,
               allowedProductIds: [1, 2],
             },
             roles: [],
-            groups: ['user_group', 'region_group'],
+            groups: ['user_group'],
           },
         },
       };
@@ -216,6 +217,7 @@ module.exports = {
           auth: {
             username: 'region_user_no_filter',
             userAttributes: {
+              noRegionFilter: true,
               allowedProductIds: [1, 2],
             },
             roles: [],
