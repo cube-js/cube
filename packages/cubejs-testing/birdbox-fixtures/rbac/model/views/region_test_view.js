@@ -6,20 +6,35 @@ view('region_test_view', {
   accessPolicy: [
     {
       group: 'user_group',
+      conditions: [
+        {
+          if: security_context.auth?.userAttributes?.hasRegionFilter === 'yes',
+        },
+      ],
       memberLevel: {
         includes: '*',
       },
-      rowLevel: security_context.auth?.groups?.includes('region_group')
-        ? {
-          filters: [{
-            member: 'city',
-            operator: 'equals',
-            values: [security_context.auth?.userAttributes?.region],
-          }],
-        }
-        : {
-          allowAll: true,
+      rowLevel: {
+        filters: [{
+          member: 'product_id',
+          operator: 'equals',
+          values: security_context.auth?.userAttributes?.allowedProductIds,
+        }],
+      },
+    },
+    {
+      group: 'user_group',
+      conditions: [
+        {
+          if: security_context.auth?.userAttributes?.hasRegionFilter === 'no',
         },
+      ],
+      memberLevel: {
+        includes: '*',
+      },
+      rowLevel: {
+        allowAll: true,
+      },
     },
   ],
 });

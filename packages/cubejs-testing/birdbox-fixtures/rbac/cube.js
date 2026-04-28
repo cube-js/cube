@@ -197,8 +197,8 @@ module.exports = {
           auth: {
             username: 'region_user',
             userAttributes: {
-              region: 'San Francisco',
-              hasRegionFilter: true,
+              hasRegionFilter: 'yes',
+              allowedProductIds: [1, 2],
             },
             roles: [],
             groups: ['user_group', 'region_group'],
@@ -217,8 +217,8 @@ module.exports = {
           auth: {
             username: 'region_user_no_filter',
             userAttributes: {
-              region: 'San Francisco',
-              hasRegionFilter: false,
+              hasRegionFilter: 'no',
+              allowedProductIds: [1, 2],
             },
             roles: [],
             groups: ['user_group'],

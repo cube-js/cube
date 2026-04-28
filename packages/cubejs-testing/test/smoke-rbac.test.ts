@@ -1062,18 +1062,21 @@ describe('Cube RBAC Engine', () => {
   /**
    * Group-based conditional row filtering test.
    *
-   * A view (region_test_view) wraps the region_test cube. Its access policy
-   * is scoped to the "user_group" group and conditionally applies a row filter:
-   *   - If the user also belongs to "region_group", the policy filters rows
-   *     where city equals the user's region attribute.
-   *   - If the user does NOT belong to "region_group", the policy grants
-   *     allow_all (no row filter).
+   * A view (region_test_view) wraps the region_test cube (backed by line_items).
+   * The view's access policy uses the "region_viewer" role and conditionally
+   * applies a row filter based on the hasRegionFilter user attribute:
+   *   - If hasRegionFilter === 'yes' (user is in region_group), the policy
+   *     filters rows where product_id is in the user's allowedProductIds.
+   *   - If hasRegionFilter === 'no' (user is NOT in region_group), the policy
+   *     grants allow_all (no row filter).
    *
    * Two users:
-   *   - region_user: groups = ['user_group', 'region_group'], region = 'San Francisco'
-   *     → sees only San Francisco rows
-   *   - region_user_no_filter: groups = ['user_group'], region = 'San Francisco'
-   *     → sees all rows (region attribute is ignored because region_group is absent)
+   *   - region_user: groups = ['user_group', 'region_group'],
+   *     hasRegionFilter = 'yes', allowedProductIds = [1, 2]
+   *     → sees only rows with product_id in [1, 2]
+   *   - region_user_no_filter: groups = ['user_group'],
+   *     hasRegionFilter = 'no', allowedProductIds = [1, 2]
+   *     → sees all rows (allowedProductIds is ignored because hasRegionFilter is 'no')
    */
   describe('RBAC via SQL API region group conditional row filter', () => {
     let regionConn: PgClient;
@@ -1089,13 +1092,13 @@ describe('Cube RBAC Engine', () => {
       await noFilterConn.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('user with region_group sees only rows matching their region', async () => {
+    test('user with region_group sees only rows matching their allowed product IDs', async () => {
       const res = await regionConn.query(
         'SELECT * FROM region_test_view ORDER BY id LIMIT 50'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
-        expect(row.city).toBe('San Francisco');
+        expect([1, 2]).toContain(row.product_id);
       }
     });
 
@@ -1104,19 +1107,19 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM region_test_view ORDER BY id LIMIT 50'
       );
       expect(res.rows.length).toBeGreaterThan(0);
-      const cities = new Set(res.rows.map((r: any) => r.city));
-      expect(cities.size).toBeGreaterThan(1);
+      const productIds = new Set(res.rows.map((r: any) => r.product_id));
+      expect(productIds.size).toBeGreaterThan(2);
     });
 
     test('filtered user count is less than unfiltered user count', async () => {
       const filteredRes = await regionConn.query(
-        'SELECT count FROM region_test_view'
+        'SELECT MEASURE(count) as cnt FROM region_test_view'
       );
       const unfilteredRes = await noFilterConn.query(
-        'SELECT count FROM region_test_view'
+        'SELECT MEASURE(count) as cnt FROM region_test_view'
       );
-      const filteredCount = Number(filteredRes.rows[0].count);
-      const unfilteredCount = Number(unfilteredRes.rows[0].count);
+      const filteredCount = Number(filteredRes.rows[0].cnt);
+      const unfilteredCount = Number(unfilteredRes.rows[0].cnt);
       expect(filteredCount).toBeGreaterThan(0);
       expect(unfilteredCount).toBeGreaterThan(filteredCount);
     });
