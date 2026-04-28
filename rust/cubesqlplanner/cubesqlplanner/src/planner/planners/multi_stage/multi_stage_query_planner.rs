@@ -22,7 +22,8 @@ use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use indexmap::IndexMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct MultiStageQueryPlanner {
@@ -255,16 +256,13 @@ impl MultiStageQueryPlanner {
         // `None` marks an unrestricted (open ELSE) entry: such a dependency
         // must be processed without a prefilter on switch_member, since the
         // outer CASE will dispatch by value at row level.
-        let mut order: Vec<String> = Vec::new();
-        let mut deps: HashMap<String, (Rc<MemberSymbol>, Option<Vec<String>>)> = HashMap::new();
+        let mut deps: IndexMap<String, (Rc<MemberSymbol>, Option<Vec<String>>)> = IndexMap::new();
 
         let mut record = |dep: Rc<MemberSymbol>, branch_values: Option<Vec<String>>| {
             let dep = dep.resolve_reference_chain();
-            let key = dep.full_name();
-            let entry = deps.entry(key.clone()).or_insert_with(|| {
-                order.push(key.clone());
-                (dep.clone(), Some(Vec::new()))
-            });
+            let entry = deps
+                .entry(dep.full_name())
+                .or_insert_with(|| (dep.clone(), Some(Vec::new())));
             match (&mut entry.1, branch_values) {
                 (None, _) => {} // already unrestricted
                 (slot @ Some(_), None) => *slot = None,
@@ -291,8 +289,7 @@ impl MultiStageQueryPlanner {
             }
         }
 
-        for key in &order {
-            let (dep, values) = deps.remove(key).expect("dep collected above");
+        for (_, (dep, values)) in deps {
             let mut state = new_state.clone_state();
             if let Some(values) = values {
                 if !values.is_empty() {
