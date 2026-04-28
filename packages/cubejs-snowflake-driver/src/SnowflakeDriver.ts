@@ -36,8 +36,6 @@ type UnloadResponse = {
   rows_unloaded: string
 };
 
-// Equivalent to formatToTimeZone(value, 'YYYY-MM-DDTHH:mm:ss.SSS', { timeZone: 'UTC' })
-// but ~12× faster — avoids format-string parsing on every call.
 function formatUtcTimestamp(value: Date): string {
   const y = pad4(value.getUTCFullYear());
   const mo = pad2(value.getUTCMonth() + 1);
@@ -70,26 +68,20 @@ const hydrators: HydrationConfiguration[] = [
     },
   },
   {
-    // TIMESTAMP_LTZ internally stores UTC time with a specified precision.
-    types: ['timestamp_ltz'],
-    toValue: () => (value) => (value ? formatUtcTimestamp(value) : null),
-  },
-  {
-    // TIMESTAMP_NTZ internally stores “wallclock” time with a specified precision.
-    // All operations are performed without taking any time zone into account.
-    types: ['timestamp_ntz'],
-    toValue: () => (value) => (value ? formatUtcTimestamp(value) : null),
-  },
-  {
-    // TIMESTAMP_TZ internally stores UTC time together with an associated time zone offset.
-    // When a time zone is not provided, the session time zone offset is used.
-    types: ['timestamp_tz'],
-    toValue: () => (value) => (value ? formatUtcTimestamp(value) : null),
-  },
-  {
-    // DATE — SDK returns a Date at UTC midnight; emitted as YYYY-MM-DDT00:00:00.000
-    // for output compatibility with the previous formatToTimeZone behavior.
-    types: ['date'],
+    // The TIMESTAMP_* variation associated with TIMESTAMP, default to TIMESTAMP_NTZ.
+    // DATE values arrive as Dates pinned to UTC midnight — same formatter, output
+    // stays compatible with the prior formatToTimeZone behavior.
+    types: [
+      'date',
+      // TIMESTAMP_LTZ internally stores UTC time with a specified precision.
+      'timestamp_ltz',
+      // TIMESTAMP_NTZ internally stores “wallclock” time with a specified precision.
+      // All operations are performed without taking any time zone into account.
+      'timestamp_ntz',
+      // TIMESTAMP_TZ internally stores UTC time together with an associated time zone offset.
+      // When a time zone is not provided, the session time zone offset is used.
+      'timestamp_tz',
+    ],
     toValue: () => (value) => (value ? formatUtcTimestamp(value) : null),
   },
   {
