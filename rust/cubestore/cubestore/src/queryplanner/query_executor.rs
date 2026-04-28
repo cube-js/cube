@@ -1538,9 +1538,14 @@ impl ClusterSendExec {
 
         // Budget for root partitions per batch.
         let chunk_size = if max == 0 || max <= right_active {
-            return Err(CubeError::user(
-            format!("Max number of right hand side join partitions limit is hit. Max limit is {}. Query requires {}. {}", max, right_active, config.max_joined_partitions_message())
-            ));
+            let required = right_active + 1;
+            return Err(CubeError::user(format!(
+                "Max number of joined partitions per batch limit is hit. Max limit is {}. Query requires at least {} per batch (1 on the left and {} on the right). {}",
+                max,
+                required,
+                right_active,
+                config.max_joined_partitions_message()
+            )));
         } else {
             (max - right_active).max(1)
         };
