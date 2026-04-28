@@ -9,17 +9,6 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 
-// BUG: Case/switch multi-stage measures generate incorrect SQL.
-// The leaf CTE is filtered by the first WHEN value (e.g. status = 'completed')
-// even though no such filter was specified in the query.
-// Expected: each WHEN value should produce a separate leaf CTE with its own
-// filter, then the final CTE combines results via CASE expression
-// (cross-join pattern, similar to calc_groups test).
-// Actual: only one leaf CTE with first WHEN value as filter, so only
-// 'completed' rows are processed. Result shows completed totals (300, 500, 600)
-// instead of weighted sums across all statuses (375, 600, 750).
-
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_case_switch_measure() {
     let ctx = create_context();
@@ -42,7 +31,6 @@ async fn test_case_switch_measure() {
     }
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_case_switch_with_dimension() {
     let ctx = create_context();
@@ -60,6 +48,7 @@ async fn test_case_switch_with_dimension() {
               - "2024-03-31"
         order:
           - id: orders.status
+          - id: orders.created_at
     "#};
 
     ctx.build_sql(query).unwrap();
@@ -69,7 +58,26 @@ async fn test_case_switch_with_dimension() {
     }
 }
 
-#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_dimension_only() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.status_weighted_amount
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_case_switch_with_filter() {
     let ctx = create_context();
