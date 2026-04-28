@@ -2012,7 +2012,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   cubestoreSendableParameters: () => get('CUBEJS_CUBESTORE_SENDABLE_PARAMETERS')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('true')
