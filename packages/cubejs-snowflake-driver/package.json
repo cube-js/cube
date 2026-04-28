@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-snowflake-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/src",
@@ -30,7 +30,7 @@
     "@aws-sdk/client-s3": "^3.726.0",
     "@cubejs-backend/base-driver": "1.6.39",
     "@cubejs-backend/shared": "1.6.39",
-    "snowflake-sdk": "^2.2.0"
+    "snowflake-sdk": "^2.4.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
