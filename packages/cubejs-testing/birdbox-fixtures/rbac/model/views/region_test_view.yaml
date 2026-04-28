@@ -4,9 +4,7 @@ views:
       - join_path: region_test
         includes: "*"
     access_policy:
-      - group: user_group
-        conditions:
-          - if: "{ security_context.auth.userAttributes.hasRegionFilter }"
+      - group: region_group
         member_level:
           includes: "*"
         row_level:
@@ -16,8 +14,6 @@ views:
               values: security_context.auth.userAttributes.allowedProductIds
 
       - group: user_group
-        conditions:
-          - if: "{ security_context.auth.userAttributes.noRegionFilter }"
         member_level:
           includes: "*"
         row_level:

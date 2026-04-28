@@ -1063,20 +1063,16 @@ describe('Cube RBAC Engine', () => {
    * Group-based conditional row filtering test (YAML view).
    *
    * A YAML view (region_test_view) wraps the region_test cube (backed by
-   * line_items). The view's access policy is for the "user_group" group and
-   * uses two mutually exclusive conditions to control row-level filtering:
-   *   - If security_context.auth.userAttributes.hasRegionFilter is truthy,
-   *     the policy filters rows where product_id is in allowedProductIds.
-   *   - If security_context.auth.userAttributes.noRegionFilter is truthy,
-   *     the policy grants allow_all (no row filter).
+   * line_items). The view has two group-scoped access policies:
+   *   - group: region_group — filters rows by product_id using the user's
+   *     allowedProductIds attribute.
+   *   - group: user_group — allow_all, no row filter.
    *
-   * Two users:
-   *   - region_user: groups = ['user_group'], hasRegionFilter = true,
-   *     allowedProductIds = [1, 2]
+   * Each user belongs to exactly one group so only one policy matches:
+   *   - region_user: groups = ['region_group'], allowedProductIds = [1, 2]
    *     → sees only rows with product_id in [1, 2]
-   *   - region_user_no_filter: groups = ['user_group'],
-   *     noRegionFilter = true, allowedProductIds = [1, 2]
-   *     → sees all rows (noRegionFilter is truthy, so allowAll applies)
+   *   - region_user_no_filter: groups = ['user_group']
+   *     → sees all rows
    */
   describe('RBAC via SQL API region group conditional row filter', () => {
     let regionConn: PgClient;
