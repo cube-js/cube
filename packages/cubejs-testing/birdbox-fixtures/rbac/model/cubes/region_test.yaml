@@ -1,0 +1,17 @@
+cubes:
+  - name: region_test
+    sql_table: users
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: city
+        sql: city
+        type: string
