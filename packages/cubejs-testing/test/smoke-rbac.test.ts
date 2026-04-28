@@ -1063,20 +1063,21 @@ describe('Cube RBAC Engine', () => {
    * Group-based conditional row filtering test.
    *
    * A view (region_test_view) wraps the region_test cube (backed by line_items).
-   * The view's access policy uses the "region_viewer" role and conditionally
-   * applies a row filter based on the hasRegionFilter user attribute:
-   *   - If hasRegionFilter === 'yes' (user is in region_group), the policy
-   *     filters rows where product_id is in the user's allowedProductIds.
-   *   - If hasRegionFilter === 'no' (user is NOT in region_group), the policy
-   *     grants allow_all (no row filter).
+   * The view's access policy is for the "user_group" group and uses
+   * security_context directly at the rowLevel to dynamically control the
+   * filter structure:
+   *   - If the user's groups include "region_group", the rowLevel resolves to
+   *     a filter on product_id using the user's allowedProductIds attribute.
+   *   - If the user does NOT belong to "region_group", the rowLevel resolves
+   *     to { allowAll: true } (no row filter).
    *
    * Two users:
    *   - region_user: groups = ['user_group', 'region_group'],
-   *     hasRegionFilter = 'yes', allowedProductIds = [1, 2]
+   *     allowedProductIds = [1, 2]
    *     → sees only rows with product_id in [1, 2]
    *   - region_user_no_filter: groups = ['user_group'],
-   *     hasRegionFilter = 'no', allowedProductIds = [1, 2]
-   *     → sees all rows (allowedProductIds is ignored because hasRegionFilter is 'no')
+   *     allowedProductIds = [1, 2]
+   *     → sees all rows (region_group absent, so allowAll applies)
    */
   describe('RBAC via SQL API region group conditional row filter', () => {
     let regionConn: PgClient;

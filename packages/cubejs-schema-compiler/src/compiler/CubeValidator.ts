@@ -1039,7 +1039,7 @@ const RolePolicySchema = Joi.object().keys({
   groups: Joi.array().items(Joi.string()),
   memberLevel: MemberLevelPolicySchema,
   memberMasking: MemberMaskingPolicySchema,
-  rowLevel: RowLevelPolicySchema,
+  rowLevel: Joi.alternatives().try(RowLevelPolicySchema, Joi.func()),
   conditions: Joi.array().items(Joi.object().keys({
     if: Joi.func().required(),
   })),
