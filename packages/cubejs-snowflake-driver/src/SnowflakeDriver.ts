@@ -4,7 +4,7 @@
  * @fileoverview The `SnowflakeDriver` and related types declaration.
  */
 
-import { assertDataSource, getEnv, pad2, pad3, pad4 } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, RowStatement } from 'snowflake-sdk';
 import {
   BaseDriver,
@@ -24,77 +24,14 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
+import { hydrators } from './type-parsers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
-
-type HydrationConfiguration = {
-  types: string[], toValue: (column: Column) => ((value: any) => any) | null
-};
 
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
   rows_unloaded: string
 };
-
-function formatUtcTimestamp(value: Date): string {
-  const y = pad4(value.getUTCFullYear());
-  const mo = pad2(value.getUTCMonth() + 1);
-  const d = pad2(value.getUTCDate());
-  const h = pad2(value.getUTCHours());
-  const mi = pad2(value.getUTCMinutes());
-  const s = pad2(value.getUTCSeconds());
-  const ms = pad3(value.getUTCMilliseconds());
-  return `${y}-${mo}-${d}T${h}:${mi}:${s}.${ms}`;
-}
-
-// It's not possible to declare own map converters by passing config to snowflake-sdk
-const hydrators: HydrationConfiguration[] = [
-  {
-    types: ['fixed', 'real'],
-    toValue: (column) => {
-      if (column.isNullable()) {
-        return (value) => {
-          // We use numbers as strings by fetchAsString
-          if (value === 'NULL') {
-            return null;
-          }
-
-          return value;
-        };
-      }
-
-      // Nothing to fix, let's skip this field
-      return null;
-    },
-  },
-  {
-    // The TIMESTAMP_* variation associated with TIMESTAMP, default to TIMESTAMP_NTZ.
-    // DATE values arrive as Dates pinned to UTC midnight — same formatter, output
-    // stays compatible with the prior formatToTimeZone behavior.
-    types: [
-      'date',
-      // TIMESTAMP_LTZ internally stores UTC time with a specified precision.
-      'timestamp_ltz',
-      // TIMESTAMP_NTZ internally stores “wallclock” time with a specified precision.
-      // All operations are performed without taking any time zone into account.
-      'timestamp_ntz',
-      // TIMESTAMP_TZ internally stores UTC time together with an associated time zone offset.
-      // When a time zone is not provided, the session time zone offset is used.
-      'timestamp_tz',
-    ],
-    toValue: () => (value) => (value ? formatUtcTimestamp(value) : null),
-  },
-  {
-    types: ['object'], // Workaround for HLL_SNOWFLAKE
-    toValue: () => (value) => {
-      if (!value) {
-        return null;
-      }
-
-      return JSON.stringify(value);
-    },
-  }
-];
 
 const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // It's a limitation for now, because anyway we don't work with JSON objects in Cube Store.

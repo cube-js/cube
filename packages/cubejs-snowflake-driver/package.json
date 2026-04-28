@@ -21,6 +21,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "integration": "vitest run",
+    "integration:snowflake": "vitest run",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -39,6 +41,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.39",
-    "typescript": "~5.2.2"
+    "typescript": "~5.2.2",
+    "vitest": "^4"
   }
 }
