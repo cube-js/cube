@@ -177,10 +177,7 @@ async fn handle_sql4sql_query(
 
         let transport = session.server.transport.clone();
         // todo: can we use compiler_cache?
-        let meta_context = transport
-            .meta(native_auth_ctx)
-            .await
-            .map_err(|err| CubeError::internal(format!("Failed to get meta context: {err}")))?;
+        let meta_context = transport.meta(native_auth_ctx).await?;
         let query_plan =
             convert_sql_to_cube_query(sql_query, meta_context.clone(), session.clone()).await?;
         let logical_plan = query_plan.try_as_logical_plan()?;

@@ -131,7 +131,7 @@ impl JsWriteStream {
             sender
                 .send(Some(Ok(chunk)))
                 .await
-                .map_err(|e| CubeError::user(format!("Can't send to channel: {}", e)))
+                .map_err(|e| CubeError::internal(format!("Can't send to channel: {}", e)))
         }
     }
 
@@ -147,7 +147,7 @@ impl JsWriteStream {
             sender
                 .send(None)
                 .await
-                .map_err(|e| CubeError::user(format!("Can't send to channel: {}", e)))
+                .map_err(|e| CubeError::internal(format!("Can't send to channel: {}", e)))
         }
     }
 
@@ -205,11 +205,11 @@ impl ValueObject for JsValueObject<'_> {
             .handle
             .get::<JsObject, _, _>(&mut self.cx, index as u32)
             .map_err(|e| {
-                CubeError::user(format!("Can't get object at array index {}: {}", index, e))
+                CubeError::internal(format!("Can't get object at array index {}: {}", index, e))
             })?
             .get::<JsValue, _, _>(&mut self.cx, field_name)
             .map_err(|e| {
-                CubeError::user(format!("Can't get '{}' field value: {}", field_name, e))
+                CubeError::internal(format!("Can't get '{}' field value: {}", field_name, e))
             })?;
         if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
             Ok(FieldValue::String(Cow::Owned(s.value(&mut self.cx))))
@@ -222,18 +222,18 @@ impl ValueObject for JsValueObject<'_> {
         {
             Ok(FieldValue::Null)
         } else if let Ok(b) = value.downcast::<JsArray, _>(&mut self.cx) {
-            Err(CubeError::user(format!(
+            Err(CubeError::internal(format!(
                 "Expected primitive value but found JsArray({:?})",
                 b
             )))
         } else if let Ok(b) = value.downcast::<JsDate, _>(&mut self.cx) {
             // TODO: Support it?
-            Err(CubeError::user(format!(
+            Err(CubeError::internal(format!(
                 "Expected primitive value but found JsDate({:?})",
                 b
             )))
         } else {
-            Err(CubeError::user(format!(
+            Err(CubeError::internal(format!(
                 "Expected primitive value but found: {:?}",
                 value
             )))

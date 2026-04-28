@@ -270,7 +270,7 @@ describe('SQLInterface', () => {
 
         throw new Error('Error was not passed from transport to the client');
       } catch (e: any) {
-        expect(e.code).toEqual('XX000');
+        expect(e.code).toEqual('58000');
         expect(e.message).toContain(
           'This error should be passed back to PostgreSQL client'
         );

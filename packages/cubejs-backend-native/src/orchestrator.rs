@@ -170,7 +170,7 @@ impl ValueObject for ResultWrapper {
         let value = match data {
             TransformedData::Compact { members, dataset } => {
                 let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Unexpected response from Cube, can't get {} row",
                         index
                     )));
@@ -190,7 +190,7 @@ impl ValueObject for ResultWrapper {
                 };
 
                 let Some(column) = columns.get(member_index) else {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Unexpected response from Cube, missing column for '{}'",
                         field_name
                     )));
@@ -207,7 +207,7 @@ impl ValueObject for ResultWrapper {
             }
             TransformedData::Vanilla(dataset) => {
                 let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Unexpected response from Cube, can't get {} row",
                         index
                     )));

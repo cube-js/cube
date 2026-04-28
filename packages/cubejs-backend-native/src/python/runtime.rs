@@ -160,7 +160,7 @@ impl PyRuntime {
 
         let task_result = match panic::catch_unwind(task_block) {
             Ok(Ok(r)) => Ok(r),
-            Ok(Err(err)) => Err(CubeError::user(format_python_error(err))),
+            Ok(Err(err)) => Err(CubeError::internal(format_python_error(err))),
             Err(panic_payload) => Err(CubeError::panic_with_message(
                 panic_payload,
                 "Unexpected panic while calling python function",

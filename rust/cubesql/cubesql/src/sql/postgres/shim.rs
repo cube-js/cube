@@ -448,21 +448,35 @@ impl AsyncPostgresShim {
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
             ConnectionError::CompilationError(e, _) => match e {
-                CompilationError::Unsupported(msg, meta)
-                | CompilationError::User(msg, meta)
-                | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
+                CompilationError::Unsupported(_, meta)
+                | CompilationError::User(_, meta)
+                | CompilationError::Internal(_, _, meta)
+                | CompilationError::RestApi(_, meta)
+                | CompilationError::SqlParser(_, meta)
+                | CompilationError::Planning(_, meta)
+                | CompilationError::PostProcessing(_, meta)
+                | CompilationError::Rewrite(_, meta)
+                | CompilationError::DatabaseExecution(_, meta) => (e.to_string(), meta.clone()),
                 CompilationError::Fatal(_, _) => return Err(err),
+                // Should never execute
+                CompilationError::ContinueWait => ("Continue wait".to_string(), None),
             },
             ConnectionError::Protocol(ProtocolError::IO { source, .. }, _) => match source.kind() {
                 // Propagate unrecoverable errors to top level - run_on
                 ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe => return Err(err),
                 _ => (
-                    format!("Error during processing PostgreSQL message: {}", err),
+                    format!(
+                        "Internal Error: Error during processing PostgreSQL message: {}",
+                        err
+                    ),
                     None,
                 ),
             },
             _ => (
-                format!("Error during processing PostgreSQL message: {}", err),
+                format!(
+                    "Internal Error: Error during processing PostgreSQL message: {}",
+                    err
+                ),
                 None,
             ),
         };

@@ -295,7 +295,7 @@ impl Rewriter {
                                 .graph
                                 .lookup(LogicalPlanLanguage::QueryParam([class.id]))
                                 .ok_or_else(|| {
-                                    CubeError::internal(format!(
+                                    CubeError::rewrite(format!(
                                         "Can't find param query node with id {}",
                                         class.id
                                     ))
@@ -366,7 +366,7 @@ impl Rewriter {
                     CubePlanTopDownState::new(),
                 );
                 let Some((best_cost, best)) = extractor.find_best(root) else {
-                    return Err(CubeError::internal("Unable to find best plan".to_string()));
+                    return Err(CubeError::rewrite("Unable to find best plan".to_string()));
                 };
                 log::debug!("Best cost: {:#?}", best_cost);
 
@@ -430,7 +430,7 @@ impl Rewriter {
             write_debug_states(&runner, stage)?;
         }
         if let Some(stop_reason) = stop_reason {
-            return Err(CubeError::user(format!(
+            return Err(CubeError::rewrite(format!(
                 "Can't find rewrite due to {}",
                 stop_reason
             )));

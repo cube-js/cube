@@ -7,7 +7,7 @@ use crate::{
     config::ConfigObj,
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
@@ -370,7 +370,7 @@ impl ValueObject for JsonValueObject {
         field_name: &str,
     ) -> std::result::Result<FieldValue<'_>, CubeError> {
         let Some(as_object) = self.rows[index].as_object() else {
-            return Err(CubeError::user(format!(
+            return Err(CubeError::internal(format!(
                 "Unexpected response from Cube, row is not an object: {:?}",
                 self.rows[index]
             )));
@@ -417,7 +417,7 @@ impl ColumnarValueObject for JsonColumnarValueObject {
         };
 
         let Some(column) = self.columns.get(idx) else {
-            return Err(CubeError::user(format!(
+            return Err(CubeError::internal(format!(
                 "Unexpected response from Cube, missing column for '{}'",
                 field_name
             )));
@@ -465,7 +465,7 @@ macro_rules! build_column_custom_builder {
                         $($builder_block)*
                         #[allow(unreachable_patterns)]
                         (v, _) => {
-                            return Err(CubeError::user(format!(
+                            return Err(CubeError::internal(format!(
                                 "Unable to map value {:?} to {:?}",
                                 v,
                                 $data_type
@@ -479,7 +479,7 @@ macro_rules! build_column_custom_builder {
                     match (value, &mut $builder) {
                         $($scalar_block)*
                         (v, _) => {
-                            return Err(CubeError::user(format!(
+                            return Err(CubeError::internal(format!(
                                 "Unable to map value {:?} to {:?}",
                                 v,
                                 $data_type
@@ -826,9 +826,13 @@ async fn load_data(
                 } else {
                     err.message
                 };
-                if !err.message.eq_ignore_ascii_case("continue wait") {
-                    err.message = format!("Database Execution Error: {}", err.message);
+
+                if err.message.eq_ignore_ascii_case("continue wait") {
+                    err.cause = CubeErrorCauseType::ContinueWait;
+                } else {
+                    err.cause = CubeErrorCauseType::DatabaseExecution(err.cause.meta().cloned());
                 }
+
                 ArrowError::ExternalError(Box::new(err))
             })?;
 
@@ -1251,7 +1255,7 @@ macro_rules! transform_response_body {
                     Arc::new(array)
                 }
                 t => {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Type {} is not supported in response transformation from Cube",
                         t,
                     )))
@@ -1438,7 +1442,6 @@ mod tests {
 
                 let result: V1LoadResponse = serde_json::from_str(response).unwrap();
                 convert_transport_response(result, schema.clone(), member_fields)
-                    .map_err(|err| CubeError::user(err.to_string()))
             }
 
             async fn load_stream(
