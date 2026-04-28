@@ -21,8 +21,8 @@ use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
 
