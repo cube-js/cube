@@ -1060,16 +1060,24 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
-   * Group-based conditional row filtering test (YAML view).
+   * Group-based conditional row filtering test.
    *
-   * A YAML view (region_test_view) wraps the region_test cube (backed by
-   * line_items). The view has two group-scoped access policies:
-   *   - group: region_group — filters rows by product_id using the user's
-   *     allowedProductIds attribute.
-   *   - group: user_group — allow_all, no row filter.
+   * A view (region_test_view) wraps the region_test cube (backed by
+   * line_items). Two mutually exclusive access policies for "user_group"
+   * use conditions to check security_context.auth.groups for
+   * "region_group" membership:
+   *   - If groups includes "region_group", the first policy matches and
+   *     filters rows by product_id using allowedProductIds.
+   *   - If groups does NOT include "region_group", the second policy
+   *     matches and grants allow_all.
    *
-   * Each user belongs to exactly one group so only one policy matches:
-   *   - region_user: groups = ['region_group'], allowedProductIds = [1, 2]
+   * The conditions are mutually exclusive (includes vs !includes) so
+   * only one policy ever matches per user, avoiding the union-overlap
+   * problem.
+   *
+   * Two users:
+   *   - region_user: groups = ['user_group', 'region_group'],
+   *     allowedProductIds = [1, 2]
    *     → sees only rows with product_id in [1, 2]
    *   - region_user_no_filter: groups = ['user_group']
    *     → sees all rows
