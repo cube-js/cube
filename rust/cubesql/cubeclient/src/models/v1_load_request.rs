@@ -30,7 +30,7 @@ impl V1LoadRequest {
         }
     }
 }
-///
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Cache {
     #[serde(rename = "stale-if-slow")]
