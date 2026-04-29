@@ -22,14 +22,6 @@ Shared deployments and only 1,000 queries per day. Upgrade to
 
 </Info>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="High-level architecture diagram of a Shared deployment"
-    src="https://ucarecdn.com/adaa000a-c562-4eb4-9687-6f57f0f4c22b/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
 
 Shared deployments run on compute shared with other deployments within the
 selected region, which keeps the cost low but means resources aren't reserved
@@ -63,14 +55,6 @@ Available on [all paid plans](https://cube.dev/pricing).
 
 </Info>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="High-level architecture diagram of a Dedicated deployment"
-    src="https://ucarecdn.com/fcb57d7a-09ee-4854-9282-db443a5ee61d/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
 
 Dedicated deployments run on compute dedicated exclusively to your deployment,
 giving you predictable performance and full control over capacity.
@@ -101,14 +85,6 @@ up to 100 API instances.
 * Optionally, scale the number of Cube Store routers, allowing for increased
 Cube Store querying performance.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="High-level architecture diagram of a Multi-cluster deployment"
-    src="https://ucarecdn.com/0ab1eb5c-7aba-4e9c-8951-1998d4b714f0/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
 
 Each Dedicated deployment is billed separately, and all Dedicated deployments
 can use auto-scaling to match demand.
@@ -117,19 +93,11 @@ can use auto-scaling to match demand.
 
 To switch your deployment to Multi-cluster, navigate to
 **Settings → General**, select it under **Type**, and confirm
-with **✓**:
-
-<Frame>
-  <img src="https://ucarecdn.com/30e357ce-4252-4676-bb1d-e46eb1f753ef/" />
-</Frame>
+with **✓**.
 
 To set the number of Dedicated deployments within your Multi-cluster
 deployment, navigate to **Settings → Configuration** and edit
 **Number of clusters**.
-
-<Frame>
-  <img src="https://ucarecdn.com/1da76aca-200a-410a-b84c-59b3d14ced9f/" />
-</Frame>
 
 ### Routing traffic between Dedicated deployments
 
@@ -178,11 +146,7 @@ same request.
 ## Switching between deployment types
 
 To switch a deployment's type, go to the deployment's **Settings** screen
-and select from the available options:
-
-<Frame>
-  <img src="https://ucarecdn.com/fbde6a1e-734a-4091-8edd-922dc1ee7e1c/" alt="Deployment Settings page showing Shared, Dedicated, and Multi-cluster options" />
-</Frame>
+and select from the available options.
 
 [ref-ctx-to-app-id]: /reference/configuration/config#context_to_app_id
 [ref-limits]: /docs/deployment/cloud/limits#resources
