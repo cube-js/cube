@@ -467,9 +467,11 @@ For rolling deploys where a broken data model should not be promoted to
 production, set the
 [`CUBEJS_READINESS_CHECK_DATA_MODEL`](/reference/configuration/environment-variables#cubejs_readiness_check_data_model)
 environment variable to `true`. The `/readyz` probe will then compile the
-data model for every tenant on each probe, fail with a `500` response if any
-tenant fails to compile, and let the previous (working) build continue
-serving traffic until the issue is resolved.
+data model for every tenant, fail with a `500` response if any tenant fails
+to compile, and let the previous (working) build continue serving traffic
+until the issue is resolved. Compiled schemas are cached by version, and
+probe responses are coalesced for one second, so steady-state cost is
+minimal even with many tenants.
 
 ### Appropriate cluster sizing
 

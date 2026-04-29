@@ -2794,12 +2794,21 @@ class ApiGateway {
   // fails fast and the deployment platform refuses to promote a broken
   // build. The previous (working) version keeps serving traffic.
   protected async checkDataModelCompiles(): Promise<'HEALTH' | 'DOWN'> {
-    const backgroundContexts = this.scheduledRefreshContexts
-      ? await this.scheduledRefreshContexts()
-      : [];
+    let backgroundContexts: UserBackgroundContext[];
+    try {
+      backgroundContexts = this.scheduledRefreshContexts
+        ? await this.scheduledRefreshContexts()
+        : [];
+    } catch (e: any) {
+      this.logProbeError(e, 'Internal Server Error on readiness probe (scheduledRefreshContexts)');
+      return 'DOWN';
+    }
 
     if (backgroundContexts.length === 0 && this.scheduledRefreshContexts) {
-      this.log({ type: 'Readiness probe data model check skipped — scheduledRefreshContexts returned no contexts' });
+      this.log({
+        type: 'Readiness probe data model check',
+        warning: 'scheduledRefreshContexts returned no contexts; checking with empty security context',
+      });
     }
 
     const contexts = backgroundContexts.length > 0 ? backgroundContexts : [{ securityContext: {} }];

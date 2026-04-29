@@ -1299,6 +1299,21 @@ describe('API Gateway', () => {
 
         expect(res.body).toMatchObject({ health: 'DOWN' });
       });
+
+      test('enabled, scheduledRefreshContexts itself throws → DOWN', async () => {
+        process.env.CUBEJS_READINESS_CHECK_DATA_MODEL = 'true';
+
+        const { app } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageMock(), {
+          scheduledRefreshContexts: async () => { throw new Error('Tenant directory unavailable'); },
+        });
+
+        const res = await request(app)
+          .get('/readyz')
+          .set('Content-type', 'application/json')
+          .expect(500);
+
+        expect(res.body).toMatchObject({ health: 'DOWN' });
+      });
     });
   });
 
