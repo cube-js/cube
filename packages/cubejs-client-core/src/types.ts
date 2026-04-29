@@ -149,7 +149,7 @@ export interface Query {
   // @deprecated
   renewQuery?: boolean;
   ungrouped?: boolean;
-  responseFormat?: 'compact' | 'default';
+  responseFormat?: 'compact' | 'columnar' | 'default';
   total?: boolean;
 }
 

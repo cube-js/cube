@@ -334,6 +334,7 @@ const normalizeQuery = (query, persistent, cacheMode) => {
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
+
   const validQuery = query.measures?.length ||
     query.dimensions?.length ||
     query.timeDimensions?.filter(td => !!td.granularity).length;

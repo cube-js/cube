@@ -167,7 +167,7 @@ function mutexPromise<T>(promise: Promise<T>): Promise<T | null> {
     });
 }
 
-export type ResponseFormat = 'compact' | 'default' | undefined;
+export type ResponseFormat = 'compact' | 'columnar' | 'default' | undefined;
 
 export type CubeApiOptions = {
   /**
@@ -183,7 +183,7 @@ export type CubeApiOptions = {
   pollInterval?: number;
   credentials?: TransportOptions['credentials'];
   parseDateMeasures?: boolean;
-  resType?: 'default' | 'compact';
+  resType?: 'default' | 'compact' | 'columnar';
   castNumerics?: boolean;
   /**
    * How many network errors would be retried before returning to users. Default to 0.
@@ -470,12 +470,12 @@ class CubeApi {
    */
   private patchQueryInternal(query: DeeplyReadonly<Query>, responseFormat: ResponseFormat): DeeplyReadonly<Query> {
     if (
-      responseFormat === 'compact' &&
-      query.responseFormat !== 'compact'
+      (responseFormat === 'compact' || responseFormat === 'columnar') &&
+      query.responseFormat !== responseFormat
     ) {
       return {
         ...query,
-        responseFormat: 'compact',
+        responseFormat,
       };
     } else {
       return query;
@@ -526,6 +526,21 @@ class CubeApi {
             });
             data.push(row);
           });
+          response.results[j].data = data;
+        });
+      } else if (response.results[0].query.responseFormat &&
+        response.results[0].query.responseFormat === 'columnar') {
+        response.results.forEach((result, j) => {
+          const { columns, members } = result.data as unknown as { columns: any[][]; members: string[] };
+          const rowCount = columns[0]?.length ?? 0;
+          const data: Record<string, any>[] = [];
+          for (let i = 0; i < rowCount; i++) {
+            const row: Record<string, any> = {};
+            members.forEach((m, k) => {
+              row[m] = columns[k][i];
+            });
+            data.push(row);
+          }
           response.results[j].data = data;
         });
       }
@@ -609,12 +624,12 @@ class CubeApi {
       ...options
     };
 
-    if (responseFormat === 'compact') {
+    if (responseFormat === 'compact' || responseFormat === 'columnar') {
       if (Array.isArray(query)) {
-        const patched = query.map((q) => this.patchQueryInternal(q, 'compact'));
+        const patched = query.map((q) => this.patchQueryInternal(q, responseFormat));
         return [patched as unknown as QueryType, options];
       } else {
-        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, 'compact');
+        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, responseFormat);
         return [patched as QueryType, options];
       }
     }
