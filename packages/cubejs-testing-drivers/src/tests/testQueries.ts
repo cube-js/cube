@@ -1164,12 +1164,12 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           'ECommerce.count',
         ],
         timeDimensions: [{
-          dimension: 'ECommerce.orderDate',
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
           granularity: 'month',
           dateRange: ['2020-01-01', '2020-12-31'],
         }],
         order: {
-          'ECommerce.orderDate': 'asc'
+          'ECommerce.customOrderDateNoPreAgg': 'asc'
         },
         timezone: 'Asia/Kolkata',
       });
