@@ -259,18 +259,19 @@ class ApiGateway {
       const { query, variables } = req.body;
       const compilerApi = await this.getCompilerApi(req.context);
 
-      const metaConfig = await compilerApi.metaConfig(req.context, {
+      const metaConfigResult = await compilerApi.metaConfig(req.context, {
         requestId: req.context.requestId,
       });
+      const metaConfigCubes = metaConfigResult.cubes || metaConfigResult;
 
       let schema = compilerApi.getGraphQLSchema();
       if (!schema) {
-        schema = makeSchema(metaConfig);
+        schema = makeSchema(metaConfigCubes);
         compilerApi.setGraphQLSchema(schema);
       }
 
       try {
-        const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
+        const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfigCubes, variables);
         res.json({ jsonQuery });
       } catch (e: any) {
         const stack = getEnv('devMode') ? e.stack : undefined;
@@ -296,11 +297,11 @@ class ApiGateway {
         // via annotation-based validation in the Rust result transform layer
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          const metaConfig = await compilerApi.metaConfig(req.context, {
+          const metaConfigResult = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
             skipVisibilityPatch: true,
           });
-          schema = makeSchema(metaConfig);
+          schema = makeSchema(metaConfigResult.cubes || metaConfigResult);
           compilerApi.setGraphQLSchema(schema);
         }
         return graphqlHTTP({
@@ -1965,12 +1966,12 @@ class ApiGateway {
         );
       }
 
-      let metaConfigResult = await (await this
+      const metaConfigResponse = await (await this
         .getCompilerApi(context)).metaConfig(request.context, {
         requestId: context.requestId
       });
 
-      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResponse.cubes || metaConfigResponse);
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2064,11 +2065,11 @@ class ApiGateway {
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions, cacheMode);
 
       const compilerApi = await this.getCompilerApi(context);
-      let metaConfigResult = await compilerApi.metaConfig(request.context, {
+      const metaConfigResponse2 = await compilerApi.metaConfig(request.context, {
         requestId: context.requestId
       });
 
-      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResponse2.cubes || metaConfigResponse2);
 
       const sqlQueries = await this
         .getSqlQueriesInternal(

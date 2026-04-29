@@ -103,6 +103,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],
     viewGroupCompilers: [viewGroupEvaluator],
+    metaTransformer,
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     cubeDictionary,

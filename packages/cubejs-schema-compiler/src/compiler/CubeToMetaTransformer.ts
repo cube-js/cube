@@ -15,7 +15,7 @@ import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
-import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
+import type { ViewGroupEvaluator } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
@@ -208,7 +208,9 @@ export class CubeToMetaTransformer implements CompilerInterface {
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
 
     this.queries = this.cubes;
+  }
 
+  public compileViewGroups(): void {
     this.viewGroups = this.resolveViewGroups();
   }
 
@@ -225,22 +227,21 @@ export class CubeToMetaTransformer implements CompilerInterface {
     }
 
     for (const cube of this.cubes) {
-      if (cube.config.type !== 'view') continue;
-
-      const extendedCube = this.cubeSymbols.cubeList.find(c => c.name === cube.config.name) as any;
-      const viewGroupName = extendedCube?.viewGroup;
-      if (!viewGroupName) continue;
-
-      let group = viewGroupMap.get(viewGroupName);
-      if (!group) {
-        group = { name: viewGroupName, views: [] };
-        viewGroupMap.set(viewGroupName, group);
+      if (cube.config.type === 'view') {
+        const extendedCube = this.cubeSymbols.cubeList.find(c => c.name === cube.config.name) as any;
+        const viewGroupName = extendedCube?.viewGroup;
+        if (viewGroupName) {
+          let group = viewGroupMap.get(viewGroupName);
+          if (!group) {
+            group = { name: viewGroupName, views: [] };
+            viewGroupMap.set(viewGroupName, group);
+          }
+          if (!group.views.includes(cube.config.name)) {
+            group.views.push(cube.config.name);
+          }
+          cube.config.viewGroup = viewGroupName;
+        }
       }
-      if (!group.views.includes(cube.config.name)) {
-        group.views.push(cube.config.name);
-      }
-
-      cube.config.viewGroup = viewGroupName;
     }
 
     for (const group of viewGroupMap.values()) {
