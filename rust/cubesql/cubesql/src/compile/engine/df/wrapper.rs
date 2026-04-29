@@ -3538,6 +3538,7 @@ impl WrappedSelectNode {
                 .then_some(prepared_join_subqueries),
 
             join_hints: load_request.join_hints.clone(),
+            response_format: None,
         };
 
         // TODO time dimensions, filters, segments

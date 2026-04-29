@@ -13742,7 +13742,10 @@ ORDER BY "source"."str0" ASC
     }
 
     pub(crate) fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
-        V1LoadResponse::new(vec![V1LoadResult::new(empty_annotation(), data)])
+        V1LoadResponse::new(vec![V1LoadResult::new(
+            empty_annotation(),
+            cubeclient::models::V1LoadResultData::V1LoadResultDataRow(data),
+        )])
     }
 
     #[tokio::test]

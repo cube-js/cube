@@ -11,7 +11,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
-use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse, V1LoadResult};
+use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse, V1LoadResult, V1LoadResultData};
 pub use datafusion::{
     arrow::{
         array::{
@@ -1201,7 +1201,18 @@ pub fn convert_transport_response(
                 ..
             } = result;
 
-            let mut response = JsonValueObject::new(data);
+            let rows = match *data {
+                V1LoadResultData::V1LoadResultDataRow(rows) => rows,
+                V1LoadResultData::V1LoadResultDataCompact(_)
+                | V1LoadResultData::V1LoadResultDataColumnar(_) => {
+                    return Err(CubeError::internal(
+                        "CubeSQL only supports the default (row-oriented) response format"
+                            .to_string(),
+                    ));
+                }
+            };
+
+            let mut response = JsonValueObject::new(rows);
             let updated_schema = if let Some(last_refresh_time) = last_refresh_time {
                 let mut metadata = schema.metadata().clone();
                 metadata.insert("lastRefreshTime".to_string(), last_refresh_time);

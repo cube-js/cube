@@ -18,7 +18,7 @@ pub struct V1LoadResult {
     #[serde(rename = "annotation")]
     pub annotation: Box<models::V1LoadResultAnnotation>,
     #[serde(rename = "data")]
-    pub data: Vec<serde_json::Value>,
+    pub data: Box<models::V1LoadResultData>,
     #[serde(rename = "refreshKeyValues", skip_serializing_if = "Option::is_none")]
     pub refresh_key_values: Option<Vec<serde_json::Value>>,
     #[serde(rename = "lastRefreshTime", skip_serializing_if = "Option::is_none")]
@@ -28,12 +28,12 @@ pub struct V1LoadResult {
 impl V1LoadResult {
     pub fn new(
         annotation: models::V1LoadResultAnnotation,
-        data: Vec<serde_json::Value>,
+        data: models::V1LoadResultData,
     ) -> V1LoadResult {
         V1LoadResult {
             data_source: None,
             annotation: Box::new(annotation),
-            data,
+            data: Box::new(data),
             refresh_key_values: None,
             last_refresh_time: None,
         }
