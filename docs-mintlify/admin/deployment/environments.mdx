@@ -25,7 +25,7 @@ The production environment is _always available_ unless [suspended][ref-suspend]
 ### Resources and costs
 
 Depending on the [deployment type][ref-deployment-types], the production environment
-either runs on a development instance or on a production cluster with [multiple API
+either runs on a Shared deployment or on a Dedicated deployment with [multiple API
 instances][ref-api-instance-scalability], incurring [relevant
 costs][ref-pricing-deployment-tiers].
 
@@ -59,7 +59,7 @@ regardless of user activity.
 
 ### Resources and costs
 
-Staging environments run on development instances, incurring [relevant
+Staging environments run on Shared deployments, incurring [relevant
 costs][ref-pricing-deployment-tiers]. However, they automatically suspend after 10 minutes
 of inactivity, regardless of the [availability](#availability) setting, so you are only
 charged for the time when staging environments are being used.
@@ -83,7 +83,7 @@ development mode. Otherwise, queries to this environment will fail.
 
 ### Resources and costs
 
-Development environments run on development instances, incurring [relevant
+Development environments run on Shared deployments, incurring [relevant
 costs][ref-pricing-deployment-tiers]. However, they automatically suspend after 10 minutes
 of inactivity, so you are only charged for the time when development environments are
 being used.

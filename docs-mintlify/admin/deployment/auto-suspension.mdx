@@ -23,7 +23,7 @@ deployments**. See [effects on experience][self-effects] for details.
 
 <Info>
 
-Auto-suspension is not avaiable for [production multi-clusters][ref-prod-multi-cluster].
+Auto-suspension is not avaiable for [Multi-cluster deployments][ref-prod-multi-cluster].
 
 </Info>
 
@@ -35,9 +35,9 @@ deployment when API requests start coming in again:
   <img src="https://ucarecdn.com/e9a22d59-e0af-40c5-b590-02f2566663d1/" alt="Cube Cloud auto-suspend flowchart" />
 </Frame>
 
-[Development instances][ref-deployment-dev-instance] are auto-suspended
-automatically when not in use for 30 minutes, whereas [production
-clusters][ref-deployment-prod-cluster] can auto-suspend after no API
+[Shared deployments][ref-deployment-dev-instance] are auto-suspended
+automatically when not in use for 30 minutes, whereas [Dedicated
+deployments][ref-deployment-prod-cluster] can auto-suspend after no API
 requests were received within a configurable time period.
 
 During auto-suspension, resources are monitored in 5 minute intervals. This
@@ -114,9 +114,9 @@ longer in certain situations depending on two major factors:
 Complex data models take more time to compile, and complex queries can cause
 response times to be significantly longer than usual.
 
-[ref-deployment-dev-instance]: /docs/deployment/cloud/deployment-types#development-instance
-[ref-deployment-prod-cluster]: /docs/deployment/cloud/deployment-types#production-cluster
-[ref-prod-multi-cluster]: /docs/deployment/cloud/deployment-types#production-multi-cluster
+[ref-deployment-dev-instance]: /docs/deployment/cloud/deployment-types#shared
+[ref-deployment-prod-cluster]: /docs/deployment/cloud/deployment-types#dedicated
+[ref-prod-multi-cluster]: /docs/deployment/cloud/deployment-types#multi-cluster
 [ref-deployment-pricing]: /admin/account-billing/pricing
 [ref-monitoring]: /admin/deployment/monitoring-integrations
 [ref-data-model]: /docs/data-modeling/overview
