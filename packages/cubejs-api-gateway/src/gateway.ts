@@ -2783,8 +2783,44 @@ class ApiGateway {
       }
     }
 
+    if (health === 'HEALTH' && getEnv('readinessCheckDataModel')) {
+      health = await this.checkDataModelCompiles();
+    }
+
     return this.healthResponse(res, health);
   };
+
+  // Returns 'DOWN' on the first per-tenant compile failure so the probe
+  // fails fast and the deployment platform refuses to promote a broken
+  // build. The previous (working) version keeps serving traffic.
+  protected async checkDataModelCompiles(): Promise<'HEALTH' | 'DOWN'> {
+    const backgroundContexts = this.scheduledRefreshContexts
+      ? await this.scheduledRefreshContexts()
+      : [];
+
+    if (backgroundContexts.length === 0 && this.scheduledRefreshContexts) {
+      this.log({ type: 'Readiness probe data model check skipped — scheduledRefreshContexts returned no contexts' });
+    }
+
+    const contexts = backgroundContexts.length > 0 ? backgroundContexts : [{ securityContext: {} }];
+
+    for (const backgroundContext of contexts) {
+      const requestContext: RequestContext = {
+        securityContext: backgroundContext?.securityContext || backgroundContext?.authInfo || {},
+        requestId: `readiness-${uuidv4()}`,
+      };
+
+      try {
+        const compilerApi = await this.getCompilerApi(requestContext);
+        await compilerApi.metaConfig(requestContext, { requestId: requestContext.requestId });
+      } catch (e: any) {
+        this.logProbeError(e, 'Internal Server Error on readiness probe (data model compilation)');
+        return 'DOWN';
+      }
+    }
+
+    return 'HEALTH';
+  }
 
   protected liveness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';

@@ -1186,6 +1186,120 @@ describe('API Gateway', () => {
       expect(dataSourceStorage.$testConnectionsDone).toEqual(true);
       expect(dataSourceStorage.$testOrchestratorConnectionsDone).toEqual(false);
     });
+
+    describe('readyz with CUBEJS_READINESS_CHECK_DATA_MODEL', () => {
+      const originalEnv = process.env.CUBEJS_READINESS_CHECK_DATA_MODEL;
+      const originalCompilerApiImpl = compilerApi.getMockImplementation();
+
+      afterEach(() => {
+        if (originalEnv === undefined) {
+          delete process.env.CUBEJS_READINESS_CHECK_DATA_MODEL;
+        } else {
+          process.env.CUBEJS_READINESS_CHECK_DATA_MODEL = originalEnv;
+        }
+        if (originalCompilerApiImpl) {
+          compilerApi.mockImplementation(originalCompilerApiImpl);
+        }
+        compilerApi.mockClear();
+      });
+
+      test('disabled by default — /readyz does not invoke compilerApi', async () => {
+        delete process.env.CUBEJS_READINESS_CHECK_DATA_MODEL;
+
+        const metaConfigMock = jest.fn();
+        compilerApi.mockImplementation(async () => ({ metaConfig: metaConfigMock }));
+
+        const { app } = await createApiGateway();
+        const res = await request(app)
+          .get('/readyz')
+          .set('Content-type', 'application/json')
+          .expect(200);
+
+        expect(res.body).toMatchObject({ health: 'HEALTH' });
+        expect(metaConfigMock).not.toHaveBeenCalled();
+      });
+
+      test('enabled, single tenant, healthy compile', async () => {
+        process.env.CUBEJS_READINESS_CHECK_DATA_MODEL = 'true';
+
+        const metaConfigMock = jest.fn().mockResolvedValue([]);
+        compilerApi.mockImplementation(async () => ({ metaConfig: metaConfigMock }));
+
+        const { app } = await createApiGateway();
+        const res = await request(app)
+          .get('/readyz')
+          .set('Content-type', 'application/json')
+          .expect(200);
+
+        expect(res.body).toMatchObject({ health: 'HEALTH' });
+        expect(metaConfigMock).toHaveBeenCalledTimes(1);
+      });
+
+      test('enabled, single tenant, broken compile → DOWN', async () => {
+        process.env.CUBEJS_READINESS_CHECK_DATA_MODEL = 'true';
+
+        compilerApi.mockImplementation(async () => ({
+          metaConfig: async () => { throw new Error('Compile errors: duplicate view'); },
+        }));
+
+        const { app } = await createApiGateway();
+        const res = await request(app)
+          .get('/readyz')
+          .set('Content-type', 'application/json')
+          .expect(500);
+
+        expect(res.body).toMatchObject({ health: 'DOWN' });
+      });
+
+      test('enabled, multi-tenant, all healthy', async () => {
+        process.env.CUBEJS_READINESS_CHECK_DATA_MODEL = 'true';
+
+        const metaConfigMock = jest.fn().mockResolvedValue([]);
+        compilerApi.mockImplementation(async () => ({ metaConfig: metaConfigMock }));
+
+        const { app } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageMock(), {
+          scheduledRefreshContexts: async () => [
+            { securityContext: { tenant: 'a' } },
+            { securityContext: { tenant: 'b' } },
+            { securityContext: { tenant: 'c' } },
+          ],
+        });
+
+        const res = await request(app)
+          .get('/readyz')
+          .set('Content-type', 'application/json')
+          .expect(200);
+
+        expect(res.body).toMatchObject({ health: 'HEALTH' });
+        expect(metaConfigMock).toHaveBeenCalledTimes(3);
+      });
+
+      test('enabled, multi-tenant, one tenant broken → DOWN', async () => {
+        process.env.CUBEJS_READINESS_CHECK_DATA_MODEL = 'true';
+
+        const healthy = { metaConfig: async () => [] };
+        const broken = { metaConfig: async () => { throw new Error('Compile errors: duplicate view'); } };
+        compilerApi
+          .mockImplementationOnce(async () => healthy)
+          .mockImplementationOnce(async () => broken)
+          .mockImplementation(async () => healthy);
+
+        const { app } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageMock(), {
+          scheduledRefreshContexts: async () => [
+            { securityContext: { tenant: 'a' } },
+            { securityContext: { tenant: 'b' } },
+            { securityContext: { tenant: 'c' } },
+          ],
+        });
+
+        const res = await request(app)
+          .get('/readyz')
+          .set('Content-type', 'application/json')
+          .expect(500);
+
+        expect(res.body).toMatchObject({ health: 'DOWN' });
+      });
+    });
   });
 
   describe('/v1/cubesql', () => {

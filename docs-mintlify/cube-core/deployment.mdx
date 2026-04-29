@@ -463,6 +463,14 @@ monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
 [`/livez`][ref-api-livez] API endpoints so you can check on the Cube
 deployment's health and be alerted to any issues.
 
+For rolling deploys where a broken data model should not be promoted to
+production, set the
+[`CUBEJS_READINESS_CHECK_DATA_MODEL`](/reference/configuration/environment-variables#cubejs_readiness_check_data_model)
+environment variable to `true`. The `/readyz` probe will then compile the
+data model for every tenant on each probe, fail with a `500` response if any
+tenant fails to compile, and let the previous (working) build continue
+serving traffic until the issue is resolved.
+
 ### Appropriate cluster sizing
 
 There's no one-size-fits-all when it comes to sizing a Cube cluster and its
