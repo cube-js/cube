@@ -154,6 +154,10 @@ impl ValueObject for ResultWrapper {
                 members: _members,
                 dataset,
             } => Ok(dataset.len()),
+            TransformedData::Columnar {
+                members: _members,
+                columns,
+            } => Ok(columns.first().map(|c| c.len()).unwrap_or(0)),
             TransformedData::Vanilla(dataset) => Ok(dataset.len()),
         }
     }
@@ -182,6 +186,30 @@ impl ValueObject for ResultWrapper {
                 };
 
                 row.get(member_index).unwrap_or(&DBResponsePrimitive::Null)
+            }
+            TransformedData::Columnar { members, columns } => {
+                let Some(member_index) = members.iter().position(|m| m == field_name) else {
+                    return Err(CubeError::user(format!(
+                        "Field name '{}' not found in members",
+                        field_name
+                    )));
+                };
+
+                let Some(column) = columns.get(member_index) else {
+                    return Err(CubeError::user(format!(
+                        "Unexpected response from Cube, missing column for '{}'",
+                        field_name
+                    )));
+                };
+
+                let Some(value) = column.get(index) else {
+                    return Err(CubeError::user(format!(
+                        "Unexpected response from Cube, can't get {} row",
+                        index
+                    )));
+                };
+
+                value
             }
             TransformedData::Vanilla(dataset) => {
                 let Some(row) = dataset.get(index) else {

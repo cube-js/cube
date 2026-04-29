@@ -19,7 +19,8 @@ enum QueryType {
  */
 enum ResultType {
   DEFAULT = 'default',
-  COMPACT = 'compact'
+  COMPACT = 'compact',
+  COLUMNAR = 'columnar'
 }
 
 /**

@@ -192,7 +192,7 @@ const querySchema = Joi.object().keys({
   cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   ungrouped: Joi.boolean(),
-  responseFormat: Joi.valid('default', 'compact'),
+  responseFormat: Joi.valid('default', 'compact', 'columnar'),
   subqueryJoins: Joi.array().items(subqueryJoin),
   joinHints: Joi.array().items(joinHint),
   maskedMembers: Joi.array().items(Joi.string()),

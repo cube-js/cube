@@ -322,6 +322,28 @@ pub fn get_members(
     Ok((members_map, members_arr))
 }
 
+/// Transpose a row-oriented dataset (rows of primitive arrays) into a column-oriented
+/// layout (one primitive array per member). Members slice defines column count and
+/// alignment; rows shorter than `members.len()` are padded with `Null` for the missing
+/// trailing positions.
+pub fn transpose_to_columns(
+    members: &[String],
+    dataset: Vec<Vec<DBResponsePrimitive>>,
+) -> Vec<Vec<DBResponsePrimitive>> {
+    let row_count = dataset.len();
+    let col_count = members.len();
+    let mut columns: Vec<Vec<DBResponsePrimitive>> = (0..col_count)
+        .map(|_| Vec::with_capacity(row_count))
+        .collect();
+    for row in dataset {
+        let mut row_iter = row.into_iter();
+        for col in columns.iter_mut().take(col_count) {
+            col.push(row_iter.next().unwrap_or(DBResponsePrimitive::Null));
+        }
+    }
+    columns
+}
+
 /// Convert DB response object to the compact output format.
 pub fn get_compact_row(
     members_to_alias_map: &IndexMap<String, String>,
@@ -573,6 +595,10 @@ pub enum TransformedData {
         members: Vec<String>,
         dataset: Vec<Vec<DBResponsePrimitive>>,
     },
+    Columnar {
+        members: Vec<String>,
+        columns: Vec<Vec<DBResponsePrimitive>>,
+    },
     Vanilla(Vec<IndexMap<String, DBResponsePrimitive>>),
 }
 
@@ -614,6 +640,25 @@ impl TransformedData {
                     })
                     .collect::<Result<Vec<_>>>()?;
                 Ok(TransformedData::Compact { members, dataset })
+            }
+            Some(ResultType::Columnar) => {
+                let dataset: Vec<Vec<DBResponsePrimitive>> = cube_store_result
+                    .rows
+                    .iter()
+                    .map(|row| {
+                        get_compact_row(
+                            &members_to_alias_map,
+                            annotation,
+                            query_type,
+                            &members,
+                            query.time_dimensions.as_ref(),
+                            row,
+                            &cube_store_result.columns_pos,
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let columns = transpose_to_columns(&members, dataset);
+                Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
                 let dataset: Vec<_> = cube_store_result
@@ -1575,6 +1620,65 @@ mod tests {
                             return Err(TestError(format!(
                                 "Dataset values at row {} and column {} do not match: {} != {}",
                                 i, j, left_value, right_value
+                            )));
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+            (
+                TransformedData::Columnar {
+                    members: left_members,
+                    columns: left_columns,
+                },
+                TransformedData::Columnar {
+                    members: right_members,
+                    columns: right_columns,
+                },
+            ) => {
+                let mut left_sorted_members = left_members.clone();
+                let mut right_sorted_members = right_members.clone();
+                left_sorted_members.sort();
+                right_sorted_members.sort();
+
+                if left_sorted_members != right_sorted_members {
+                    return Err(TestError("Members do not match after sorting".to_string()));
+                }
+
+                if left_columns.len() != right_columns.len() {
+                    return Err(TestError(
+                        "Column counts do not match between Columnar results".to_string(),
+                    ));
+                }
+
+                let mut member_index_map = HashMap::new();
+                for (i, member) in left_members.iter().enumerate() {
+                    if let Some(right_index) = right_members.iter().position(|x| x == member) {
+                        member_index_map.insert(i, right_index);
+                    } else {
+                        return Err(TestError("Member not found in right object".to_string()));
+                    }
+                }
+
+                for (left_idx, left_column) in left_columns.iter().enumerate() {
+                    let right_idx = *member_index_map.get(&left_idx).unwrap();
+                    let right_column = &right_columns[right_idx];
+                    if left_column.len() != right_column.len() {
+                        return Err(TestError(format!(
+                            "Column {} (member {}) row counts differ: {} != {}",
+                            left_idx,
+                            left_members[left_idx],
+                            left_column.len(),
+                            right_column.len()
+                        )));
+                    }
+                    for (row, left_value) in left_column.iter().enumerate() {
+                        let right_value = &right_column[row];
+                        if left_value != right_value {
+                            return Err(TestError(format!(
+                                "Columnar value at row {} for member '{}' differs: {} != {}",
+                                row, left_members[left_idx], left_value, right_value
                             )));
                         }
                     }
@@ -2855,5 +2959,116 @@ mod tests {
                 Ok(())
             }
         }
+    }
+
+    /// Run the same fixture through both `Compact` and `Columnar` transforms and
+    /// assert that the columnar columns are the column-major transpose of the
+    /// compact dataset. This pins the contract: same data, different orientation.
+    fn assert_columnar_matches_compact(fixture: &str) -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA.get(fixture).unwrap().clone();
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+
+        test_data.request.res_type = Some(ResultType::Compact);
+        let compact = TransformedData::transform(&test_data.request, &raw_data)?;
+        let (compact_members, compact_dataset) = match compact {
+            TransformedData::Compact { members, dataset } => (members, dataset),
+            _ => panic!("expected Compact"),
+        };
+
+        test_data.request.res_type = Some(ResultType::Columnar);
+        let columnar = TransformedData::transform(&test_data.request, &raw_data)?;
+        let (columnar_members, columnar_columns) = match columnar {
+            TransformedData::Columnar { members, columns } => (members, columns),
+            _ => panic!("expected Columnar"),
+        };
+
+        assert_eq!(
+            compact_members, columnar_members,
+            "members must match across formats"
+        );
+        assert_eq!(
+            columnar_columns.len(),
+            compact_members.len(),
+            "one column per member"
+        );
+        for (col_idx, column) in columnar_columns.iter().enumerate() {
+            assert_eq!(
+                column.len(),
+                compact_dataset.len(),
+                "column {} length must equal row count",
+                col_idx
+            );
+            for (row_idx, expected_row) in compact_dataset.iter().enumerate() {
+                assert_eq!(
+                    &column[row_idx], &expected_row[col_idx],
+                    "value at column {} row {} must match compact dataset",
+                    col_idx, row_idx
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_regular_discount_by_city_columnar() -> Result<()> {
+        assert_columnar_matches_compact("regular_discount_by_city")
+    }
+
+    #[test]
+    fn test_regular_profit_by_postal_code_columnar() -> Result<()> {
+        assert_columnar_matches_compact("regular_profit_by_postal_code")
+    }
+
+    #[test]
+    fn test_compare_date_range_count_by_order_date_columnar() -> Result<()> {
+        assert_columnar_matches_compact("compare_date_range_count_by_order_date")
+    }
+
+    #[test]
+    fn test_blending_query_multiple_granularities_columnar() -> Result<()> {
+        assert_columnar_matches_compact("blending_query_multiple_granularities")
+    }
+
+    #[test]
+    fn test_transpose_to_columns_basic() {
+        let members = vec!["a".to_string(), "b".to_string()];
+        let dataset = vec![
+            vec![
+                DBResponsePrimitive::Number(1.0),
+                DBResponsePrimitive::String("x".to_string()),
+            ],
+            vec![
+                DBResponsePrimitive::Number(2.0),
+                DBResponsePrimitive::String("y".to_string()),
+            ],
+        ];
+        let columns = transpose_to_columns(&members, dataset);
+        assert_eq!(columns.len(), 2);
+        assert_eq!(
+            columns[0],
+            vec![
+                DBResponsePrimitive::Number(1.0),
+                DBResponsePrimitive::Number(2.0),
+            ]
+        );
+        assert_eq!(
+            columns[1],
+            vec![
+                DBResponsePrimitive::String("x".to_string()),
+                DBResponsePrimitive::String("y".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_transpose_to_columns_pads_short_rows_with_null() {
+        let members = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let dataset = vec![vec![
+            DBResponsePrimitive::Number(1.0),
+            DBResponsePrimitive::String("x".to_string()),
+        ]];
+        let columns = transpose_to_columns(&members, dataset);
+        assert_eq!(columns.len(), 3);
+        assert_eq!(columns[2], vec![DBResponsePrimitive::Null]);
     }
 }

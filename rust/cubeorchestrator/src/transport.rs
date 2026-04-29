@@ -9,6 +9,7 @@ use std::{collections::HashMap, fmt::Display};
 pub enum ResultType {
     Default,
     Compact,
+    Columnar,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
