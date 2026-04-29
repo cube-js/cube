@@ -85,9 +85,46 @@ identity provider details:
   Sign-On URL** value from Okta.
 - **Certificate** — Paste the **X.509 Certificate** from Okta.
 - **Auto-provision new users** — When enabled, users are automatically
-  created in Cube on their first login via this SAML provider and assigned
-  the Viewer role by default. Enable this if you want to provision users
-  only when they first access Cube and you are not using SCIM provisioning.
+  created in Cube on their first login via this SAML provider. Enable this
+  if you want to provision users only when they first access Cube and you
+  are not using SCIM provisioning. New users receive the Viewer role by
+  default; see [Default role for new users](#default-role-for-new-users)
+  to choose a different role.
+
+## Default role for new users
+
+Auto-provisioned users — both via SAML and via [SCIM][ref-scim] — receive
+the **Viewer** role by default. To assign a different role, expand the
+**Advanced** section of the SAML configuration form and pick from
+**Default role for new users**:
+
+- **Developer**, **Explorer**, or **Viewer** — Cube's [default
+  roles][ref-roles].
+- Any [custom role][ref-custom-roles] defined in your account, listed
+  below the divider.
+
+The selected role applies **only when a user is first created** during
+provisioning. Existing users are not modified on subsequent SSO logins or
+SCIM updates. It is applied **in addition to** any roles your identity
+provider sends via the role attribute (subject to the `rolesMap`).
+
+<Info>
+
+Admin status is not assignable through this picker — Admin is controlled
+separately. To grant admin permissions, update the user's role manually
+under [Admin → Users][ref-manage-users].
+
+</Info>
+
+<Warning>
+
+If the selected role is later renamed or deleted, new users will fall
+back to the **Viewer** role until you pick a valid role here. The Viewer
+fallback applies whenever the configured default cannot be resolved —
+whether that's because no default is set or the configured role no longer
+exists.
+
+</Warning>
 
 ## Test SAML authentication
 
@@ -100,3 +137,7 @@ identity provider details:
 
 [okta-docs-create-saml-app]:
   https://help.okta.com/en-us/Content/Topics/Apps/Apps_App_Integration_Wizard_SAML.htm
+[ref-scim]: /admin/sso/okta/scim
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-manage-users]: /admin/users-and-permissions/manage-users

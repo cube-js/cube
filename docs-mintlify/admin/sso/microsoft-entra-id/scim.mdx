@@ -73,9 +73,14 @@ Cube:
 
 <Info>
 
-Users provisioned via SCIM will receive the Explorer role.
-To grant admin permissions, update the user's role manually in
-Cube under **Team & Security**.
+Users provisioned via SCIM receive the **Viewer** role by default. To
+choose a different default role (including [custom roles][ref-custom-roles]),
+see [Default role for new users][ref-saml-default-role] on the SAML setup
+page — the setting is shared between SAML and SCIM.
+
+Admin permissions cannot be assigned through this setting. To grant admin
+permissions, update the user's role manually in Cube under **Admin →
+Users**.
 
 </Info>
 
@@ -120,4 +125,6 @@ The next time the Entra application syncs, the attribute values will be
 provisioned as [user attributes][ref-user-attributes] in Cube.
 
 [ref-saml]: /admin/sso/microsoft-entra-id/saml
+[ref-saml-default-role]: /admin/sso/microsoft-entra-id/saml#default-role-for-new-users
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes

@@ -106,10 +106,45 @@ SAML integration in Google into Cube Cloud.
 
 3. Enable **Auto-provision new users** if you want users to be automatically
    created in Cube on their first login via this SAML provider. New users
-   are assigned the Viewer role by default. Enable this if you are not using
-   SCIM provisioning.
+   are assigned the Viewer role by default — see
+   [Default role for new users](#default-role-for-new-users) to choose a
+   different role. Enable this if you are not using SCIM provisioning.
 
 4. Scroll down and click **Save SAML Settings** to save the changes.
+
+## Default role for new users
+
+By default, users auto-provisioned via SAML receive the **Viewer** role.
+To assign a different role, expand the **Advanced** section of the SAML
+configuration form and pick from **Default role for new users**:
+
+- **Developer**, **Explorer**, or **Viewer** — Cube Cloud's [default
+  roles][ref-roles].
+- Any [custom role][ref-custom-roles] defined in your account, listed
+  below the divider.
+
+The selected role applies **only when a user is first created**. Existing
+users are not modified on subsequent SSO logins. It is applied **in
+addition to** any roles your identity provider sends via the role
+attribute (subject to the `rolesMap`).
+
+<Info>
+
+Admin status is not assignable through this picker — Admin is controlled
+separately. To grant admin permissions, update the user's role manually
+under [Admin → Users][ref-manage-users].
+
+</Info>
+
+<Warning>
+
+If the selected role is later renamed or deleted, new users will fall
+back to the **Viewer** role until you pick a valid role here. The Viewer
+fallback applies whenever the configured default cannot be resolved —
+whether that's because no default is set or the configured role no longer
+exists.
+
+</Warning>
 
 ## Test SAML authentication
 
@@ -118,3 +153,6 @@ To start using SAML authentication, use the
 (typically `<YOUR_CUBE_CLOUD_URL>/sso/saml`) to log in to Cube Cloud.
 
 [google-docs-create-saml-app]: https://support.google.com/a/answer/6087519?hl=en
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-manage-users]: /admin/users-and-permissions/manage-users
