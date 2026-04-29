@@ -3,19 +3,32 @@ title: Dynamic Data Models
 description: Generate data models programmatically using Jinja with Python or JavaScript for dynamic schema creation.
 ---
 
- Dynamic data models
+Cube supports authoring data models dynamically — useful for de-duplicating
+common patterns across cubes, generating models from a remote source, or
+adapting the schema per tenant at runtime.
 
-<Frame>
+Pick the approach that matches the language your data models are written in:
+
+<CardGroup cols={2}>
+  <Card title="Jinja & Python" icon="brand-python" href="/docs/data-modeling/dynamic/jinja">
+    Template YAML data models with Jinja, and use Python for loops, includes,
+    and runtime generation.
+  </Card>
+  <Card title="JavaScript" icon="brand-javascript" href="/docs/data-modeling/dynamic/javascript">
+    Generate cubes and views on-the-fly from JavaScript data models using
+    `asyncModule()`.
+  </Card>
+</CardGroup>
+
+## How it fits together
+
+The diagrams below show how YAML and JavaScript data models are parsed and
+compiled before they're served by Cube.
+
+<Frame caption="YAML data models compiled with COMPILE_CONTEXT">
   <img src="https://ucarecdn.com/44e17cc4-60cb-40c4-889b-aba17def7136/" />
 </Frame>
 
-<Frame>
+<Frame caption="JavaScript data models compiled with COMPILE_CONTEXT">
   <img src="https://ucarecdn.com/7379561c-418e-49e2-9b94-be7c13b0f2de/" />
 </Frame>
-
-<CardGroup cols={2}>
-  <Card title="Jinja & Python" img="https://static.cube.dev/icons/python.svg" href="dynamic/jinja">
-  </Card>
-  <Card title="JavaScript" img="https://static.cube.dev/icons/javascript.svg" href="dynamic/javascript">
-  </Card>
-</CardGroup>

@@ -455,10 +455,36 @@ impl TestContext {
         client: &tokio_postgres::Client,
         pre_aggregations: &[PreAggregationUsage],
     ) {
+        use std::collections::HashMap;
+
+        // Dedup usages by (cube, name): the optimizer creates a separate
+        // PreAggregationUsage per subquery with only the measures consumed in
+        // that subquery; the physical pre-agg table must expose the union.
+        let mut grouped: HashMap<(String, String), Vec<&PreAggregationUsage>> = HashMap::new();
+        let mut order: Vec<(String, String)> = Vec::new();
         for usage in pre_aggregations {
-            let pre_agg = &usage.pre_aggregation;
+            let key = (usage.cube_name().clone(), usage.name().clone());
+            if !grouped.contains_key(&key) {
+                order.push(key.clone());
+            }
+            grouped.entry(key).or_default().push(usage);
+        }
+
+        for key in &order {
+            let usages = &grouped[key];
+            let pre_agg = &usages[0].pre_aggregation;
             let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
-            let yaml = Self::build_pre_agg_query_yaml(pre_agg);
+            let mut union_measures: Vec<String> = Vec::new();
+            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+            for u in usages {
+                for m in u.pre_aggregation.measures() {
+                    let n = m.full_name();
+                    if seen.insert(n.clone()) {
+                        union_measures.push(n);
+                    }
+                }
+            }
+            let yaml = Self::build_pre_agg_query_yaml(pre_agg, &union_measures);
 
             let pa_ctx =
                 Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
@@ -522,13 +548,12 @@ impl TestContext {
     }
 
     #[cfg(feature = "integration-postgres")]
-    fn build_pre_agg_query_yaml(pre_agg: &PreAggregation) -> String {
+    fn build_pre_agg_query_yaml(pre_agg: &PreAggregation, measures: &[String]) -> String {
         let mut yaml = String::new();
 
-        let measures: Vec<String> = pre_agg.measures().iter().map(|m| m.full_name()).collect();
         if !measures.is_empty() {
             yaml.push_str("measures:\n");
-            for m in &measures {
+            for m in measures {
                 yaml.push_str(&format!("  - {}\n", m));
             }
         }

@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/bucketing.rs
+expression: result
+---
+orders__change_type | orders__created_at_year | orders__count | orders__revenue
+--------------------+-------------------------+---------------+----------------
+Revenue is Down     | 2024-01-01 00:00:00     | 6             | 20400          
+Revenue is Down     | 2025-01-01 00:00:00     | 6             | 17800          
+Revenue is Grow     | 2024-01-01 00:00:00     | 6             | 11700          
+Revenue is Grow     | 2025-01-01 00:00:00     | 6             | 14100

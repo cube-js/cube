@@ -1,9 +1,0 @@
----
-source: cubesqlplanner/src/tests/pre_aggregation_sql_generation.rs
-assertion_line: 873
-expression: result
-snapshot_kind: text
----
-orders__count_reduce_status | orders__revenue_reduce_status
-----------------------------+------------------------------
-7                           | 1750.00

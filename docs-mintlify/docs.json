@@ -37,7 +37,6 @@
               {
                 "group": "Migrate from Cube Core",
                 "pages": [
-                  "docs/getting-started/migrate-from-core",
                   "docs/getting-started/migrate-from-core/upload-with-cli",
                   "docs/getting-started/migrate-from-core/import-github-repository",
                   "docs/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
@@ -166,8 +165,8 @@
               
               {
                 "group": "Dynamic Data Models",
+                "root": "docs/data-modeling/dynamic/index",
                 "pages": [
-                  "docs/data-modeling/dynamic",
                   "docs/data-modeling/dynamic/jinja",
                   "docs/data-modeling/dynamic/javascript",
                   "docs/data-modeling/dynamic/code-reusability-export-and-import",
@@ -179,8 +178,7 @@
                 "pages": [
                   "docs/data-modeling/visual-modeler",
                   "docs/data-modeling/data-model-ide",
-                  "docs/data-modeling/dev-mode",
-                  "docs/data-modeling/sql-runner"
+                  "docs/data-modeling/dev-mode"
                 ]
               }
             ]

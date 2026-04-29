@@ -31,11 +31,25 @@ impl MeasureMatcher {
     pub fn try_match(&mut self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         match symbol.as_ref() {
             MemberSymbol::Measure(measure) => {
+                // Cumulative measures (rolling windows) require time series joins
+                // that can't be satisfied by a pre-aggregation directly —
+                // only their base (leaf) measures inside the CTE can match
+                if measure.is_cumulative() {
+                    return Ok(false);
+                }
                 if self.pre_aggregation_measures.contains(&measure.full_name())
                     && (!self.only_addictive || measure.is_addictive())
                 {
                     self.matched_measures.insert(measure.full_name());
                     return Ok(true);
+                }
+                // Multi-stage measures carry their own aggregate semantics
+                // (time_shift, reduce_by, add_group_by, rolling window) that
+                // recursing into base dependencies silently discards. If the
+                // pre-agg doesn't materialize the multi-stage measure itself,
+                // the match only holds inside an already-rewritten leaf CTE.
+                if measure.is_multi_stage() {
+                    return Ok(false);
                 }
             }
             MemberSymbol::MemberExpression(_) => {

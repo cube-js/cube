@@ -73,18 +73,11 @@ impl PreAggregationOptimizer {
             compiled_pre_aggregations
         };
 
-        if !plan.multistage_members().is_empty() && self.allow_multi_stage {
-            return self.try_rewrite_query_with_multistages(&plan, &filtered_pre_aggregations);
-        }
-
-        for pre_aggregation in filtered_pre_aggregations.iter() {
-            let new_query = self.try_rewrite_simple_query(&plan, pre_aggregation, None)?;
-            if new_query.is_some() {
-                return Ok(new_query);
-            }
-        }
-
-        Ok(None)
+        self.try_rewrite_query(
+            &plan,
+            &filtered_pre_aggregations,
+            &TimeShiftState::default(),
+        )
     }
 
     pub fn get_usages(&self) -> &Vec<PreAggregationUsage> {
@@ -93,6 +86,30 @@ impl PreAggregationOptimizer {
 
     pub fn take_usages(&mut self) -> Vec<PreAggregationUsage> {
         std::mem::take(&mut self.usages)
+    }
+
+    fn try_rewrite_query(
+        &mut self,
+        query: &Rc<Query>,
+        compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+        time_shifts: &TimeShiftState,
+    ) -> Result<Option<Rc<Query>>, CubeError> {
+        for pre_aggregation in compiled_pre_aggregations.iter() {
+            let external = pre_aggregation.external.unwrap_or(false);
+            let date_range =
+                Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
+            if let Some(rewritten) =
+                self.try_rewrite_simple_query(query, pre_aggregation, date_range)?
+            {
+                return Ok(Some(rewritten));
+            }
+        }
+
+        if self.allow_multi_stage && !query.multistage_members().is_empty() {
+            return self.try_rewrite_query_with_multistages(query, compiled_pre_aggregations);
+        }
+
+        Ok(None)
     }
 
     fn try_rewrite_simple_query(
@@ -104,35 +121,57 @@ impl PreAggregationOptimizer {
         if let Some(matched_measures) =
             self.is_schema_and_filters_match(&query.schema(), &query.filter(), pre_aggregation)?
         {
-            let mut new_query = query.as_ref().clone();
-            new_query.set_source(
-                self.make_pre_aggregation_source(pre_aggregation, &matched_measures, date_range)?
-                    .into(),
-            );
+            let source =
+                self.make_pre_aggregation_source(pre_aggregation, &matched_measures, date_range)?;
+            let new_query = Query::builder()
+                .schema(query.schema().clone())
+                .filter(query.filter().clone())
+                .modifers(query.modifers().clone())
+                .source(source.into())
+                .build();
             Ok(Some(Rc::new(new_query)))
         } else {
             Ok(None)
         }
     }
 
-    fn try_rewrite_leaf_query(
+    // Builds a self-contained Rc<Query> wrapping a matching pre-aggregation for
+    // a node that has schema and filter but no native Rc<Query> container
+    // (e.g. AggregateMultipliedSubquery).
+    fn try_rewrite_schema_and_filter(
         &mut self,
-        query: Rc<Query>,
+        schema: &Rc<LogicalSchema>,
+        filter: &Rc<LogicalFilter>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
-        time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        if !query.multistage_members().is_empty() {
-            // Nested multi-stage: recurse with full list
-            return self.try_rewrite_query_with_multistages(&query, compiled_pre_aggregations);
-        }
-
         for pre_aggregation in compiled_pre_aggregations.iter() {
             let external = pre_aggregation.external.unwrap_or(false);
-            let date_range =
-                Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
-            let result = self.try_rewrite_simple_query(&query, pre_aggregation, date_range)?;
-            if result.is_some() {
-                return Ok(result);
+            let date_range = Self::extract_date_range(
+                filter,
+                &self.query_tools,
+                &TimeShiftState::default(),
+                external,
+            );
+            if let Some(matched_measures) =
+                self.is_schema_and_filters_match(schema, filter, pre_aggregation)?
+            {
+                let source = self.make_pre_aggregation_source(
+                    pre_aggregation,
+                    &matched_measures,
+                    date_range,
+                )?;
+                let new_query = Query::builder()
+                    .schema(schema.clone())
+                    .filter(filter.clone())
+                    .modifers(Rc::new(LogicalQueryModifiers {
+                        offset: None,
+                        limit: None,
+                        ungrouped: false,
+                        order_by: vec![],
+                    }))
+                    .source(source.into())
+                    .build();
+                return Ok(Some(Rc::new(new_query)));
             }
         }
         Ok(None)
@@ -150,18 +189,22 @@ impl PreAggregationOptimizer {
         let saved_usages_len = self.usages.len();
         let saved_counter = self.usage_counter;
 
+        // Multiplied-measure CTEs don't carry their own filter — logically
+        // they apply the same filter as the root query, so we match against it.
+        let root_filter = query.filter().clone();
+
         let mut rewritten_multistages = Vec::new();
         for multi_stage in query.multistage_members() {
             let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
                 let res = match plan_node {
                     PlanNode::MultiStageLeafMeasure(multi_stage_leaf_measure) => {
-                        if let Some(rewritten) = self.try_rewrite_leaf_query(
-                            multi_stage_leaf_measure.query.clone(),
+                        if let Some(rewritten) = self.try_rewrite_query(
+                            &multi_stage_leaf_measure.query,
                             compiled_pre_aggregations,
                             &multi_stage_leaf_measure.time_shifts,
                         )? {
                             let new_leaf = Rc::new(MultiStageLeafMeasure {
-                                measure: multi_stage_leaf_measure.measure.clone(),
+                                measures: multi_stage_leaf_measure.measures.clone(),
                                 render_measure_as_state: multi_stage_leaf_measure
                                     .render_measure_as_state
                                     .clone(),
@@ -172,6 +215,25 @@ impl PreAggregationOptimizer {
                                 query: rewritten,
                             });
                             NodeRewriteResult::rewritten(new_leaf.as_plan_node())
+                        } else {
+                            has_unrewritten_leaf = true;
+                            NodeRewriteResult::stop()
+                        }
+                    }
+                    PlanNode::AggregateMultipliedSubquery(agg) => {
+                        if let Some(rewritten) = self.try_rewrite_schema_and_filter(
+                            &agg.schema,
+                            &root_filter,
+                            compiled_pre_aggregations,
+                        )? {
+                            let new_agg = Rc::new(AggregateMultipliedSubquery {
+                                schema: agg.schema.clone(),
+                                keys_subquery: agg.keys_subquery.clone(),
+                                source: agg.source.clone(),
+                                dimension_subqueries: agg.dimension_subqueries.clone(),
+                                pre_aggregation_override: Some(rewritten),
+                            });
+                            NodeRewriteResult::rewritten(new_agg.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
                             NodeRewriteResult::stop()
@@ -193,67 +255,9 @@ impl PreAggregationOptimizer {
         }
 
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
-            let fk_source = if let Some(resolver_multiplied_measures) =
-                full_key_aggregate.multiplied_measures_resolver()
-            {
-                if let ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                    resolver_multiplied_measures,
-                ) = resolver_multiplied_measures
-                {
-                    // Try each pre-aggregation for the multiplied measures resolver
-                    let mut result_source = None;
-                    for pre_aggregation in compiled_pre_aggregations.iter() {
-                        if let Some(matched_measures) = self.is_schema_and_filters_match(
-                            &resolver_multiplied_measures.schema,
-                            &resolver_multiplied_measures.filter,
-                            pre_aggregation,
-                        )? {
-                            let date_range = Self::extract_date_range(
-                                &resolver_multiplied_measures.filter,
-                                &self.query_tools,
-                                &TimeShiftState::default(),
-                                pre_aggregation.external.unwrap_or(false),
-                            );
-                            let pre_aggregation_source = self.make_pre_aggregation_source(
-                                pre_aggregation,
-                                &matched_measures,
-                                date_range,
-                            )?;
-
-                            let pre_aggregation_query = Query::builder()
-                                .schema(resolver_multiplied_measures.schema.clone())
-                                .filter(resolver_multiplied_measures.filter.clone())
-                                .modifers(Rc::new(LogicalQueryModifiers {
-                                    offset: None,
-                                    limit: None,
-                                    ungrouped: false,
-                                    order_by: vec![],
-                                }))
-                                .source(pre_aggregation_source.into())
-                                .build();
-                            result_source = Some(ResolvedMultipliedMeasures::PreAggregation(
-                                Rc::new(pre_aggregation_query),
-                            ));
-                            break;
-                        }
-                    }
-                    if result_source.is_none() {
-                        // Rollback
-                        self.usages.truncate(saved_usages_len);
-                        self.usage_counter = saved_counter;
-                        return Ok(None);
-                    }
-                    result_source
-                } else {
-                    Some(resolver_multiplied_measures.clone())
-                }
-            } else {
-                None
-            };
             let result = FullKeyAggregate::builder()
                 .schema(full_key_aggregate.schema().clone())
                 .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
-                .multiplied_measures_resolver(fk_source)
                 .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
                 .build();
             Rc::new(result).into()

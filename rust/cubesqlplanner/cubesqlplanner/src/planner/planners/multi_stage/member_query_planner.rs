@@ -404,7 +404,7 @@ impl MultiStageMemberQueryPlanner {
             QueryPlanner::new(cte_query_properties.clone(), self.query_tools.clone());
         let query = query_planner.plan()?;
         let leaf_measure_plan = MultiStageLeafMeasure {
-            measure: member_node.clone(),
+            measures: vec![member_node.clone()],
             query,
             render_measure_as_state: self.description.member().has_aggregates_on_top(),
             time_shifts: self.description.state().time_shifts().clone(),

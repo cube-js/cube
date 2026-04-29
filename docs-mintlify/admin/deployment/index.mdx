@@ -173,8 +173,8 @@ Cube Cloud deployments only consume resources when they are needed to run worklo
 
 * For the [production environment][ref-environments-prod], resources are always consumed
 unless a deployment is [suspended][ref-auto-sus].
-* For any other [environment][ref-environments], a development instance is allocated
-while it's active. After a period of inactivity, the development instance is deallocated.
+* For any other [environment][ref-environments], a Shared deployment is allocated
+while it's active. After a period of inactivity, the Shared deployment is deallocated.
 * For pre-aggregations, Cube Store workers are allocated while there's some
   activity related to pre-aggregations, e.g., API endpoints are serving
   requests to pre-aggregations, pre-aggregations are being built, etc.

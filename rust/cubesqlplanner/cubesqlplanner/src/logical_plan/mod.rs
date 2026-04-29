@@ -17,7 +17,6 @@ mod pre_aggregation;
 pub mod pretty_print;
 mod query;
 mod query_source;
-mod resolve_multiplied_measures;
 mod schema;
 pub mod visitor;
 
@@ -39,5 +38,4 @@ pub use pre_aggregation::*;
 pub use pretty_print::*;
 pub use query::*;
 pub use query_source::*;
-pub use resolve_multiplied_measures::*;
 pub use schema::*;

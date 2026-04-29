@@ -14,4 +14,3 @@ mod pre_aggregation;
 mod query;
 mod query_source;
 //mod calc_groups_cross_join;
-mod resolve_multiplied_measures;

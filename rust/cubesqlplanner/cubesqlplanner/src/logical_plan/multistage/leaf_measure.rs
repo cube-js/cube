@@ -5,7 +5,7 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct MultiStageLeafMeasure {
-    pub measure: Rc<MemberSymbol>,
+    pub measures: Vec<Rc<MemberSymbol>>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
@@ -16,7 +16,9 @@ impl PrettyPrint for MultiStageLeafMeasure {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("Leaf Measure Query", state);
         let state = state.new_level();
-        result.println(&format!("measure: {}", self.measure.full_name()), &state);
+        for measure in self.measures.iter() {
+            result.println(&format!("measure: {}", measure.full_name()), &state);
+        }
         if self.render_measure_as_state {
             result.println("render_measure_as_state: true", &state);
         }
@@ -63,7 +65,7 @@ impl LogicalNode for MultiStageLeafMeasure {
         let query = &inputs[0];
 
         Ok(Rc::new(Self {
-            measure: self.measure.clone(),
+            measures: self.measures.clone(),
             render_measure_as_state: self.render_measure_as_state,
             render_measure_for_ungrouped: self.render_measure_for_ungrouped,
             time_shifts: self.time_shifts.clone(),

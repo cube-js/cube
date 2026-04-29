@@ -1,0 +1,24 @@
+cubes:
+  - name: region_test
+    sql_table: public.line_items
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true

@@ -10,6 +10,10 @@ pub struct AggregateMultipliedSubquery {
     pub keys_subquery: Rc<KeysSubQuery>,
     pub source: AggregateMultipliedSubquerySource,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
+    // When Some, physical builder short-circuits to this query instead of
+    // rendering the native multiplied-subquery SELECT. Set by the pre-aggregation
+    // optimizer when a matching pre-aggregation replaces this CTE.
+    pub pre_aggregation_override: Option<Rc<Query>>,
 }
 
 impl LogicalNode for AggregateMultipliedSubquery {
@@ -26,6 +30,7 @@ impl LogicalNode for AggregateMultipliedSubquery {
             keys_subquery,
             source,
             dimension_subqueries,
+            pre_aggregation_override,
         } = AggregateMultipliedSubqueryInputUnPacker::new(&self, &inputs)?;
 
         let result = Self {
@@ -36,6 +41,10 @@ impl LogicalNode for AggregateMultipliedSubquery {
                 .iter()
                 .map(|itm| itm.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
+            pre_aggregation_override: match pre_aggregation_override {
+                Some(node) => Some(node.clone().into_logical_node()?),
+                None => None,
+            },
         };
 
         Ok(Rc::new(result))
@@ -66,6 +75,9 @@ impl AggregateMultipliedSubqueryInputPacker {
                 .iter()
                 .map(|itm| itm.as_plan_node()),
         );
+        if let Some(override_query) = &aggregate.pre_aggregation_override {
+            result.push(override_query.as_plan_node());
+        }
         result
     }
 }
@@ -74,6 +86,7 @@ pub struct AggregateMultipliedSubqueryInputUnPacker<'a> {
     keys_subquery: &'a PlanNode,
     source: &'a PlanNode,
     dimension_subqueries: &'a [PlanNode],
+    pre_aggregation_override: Option<&'a PlanNode>,
 }
 
 impl<'a> AggregateMultipliedSubqueryInputUnPacker<'a> {
@@ -85,17 +98,29 @@ impl<'a> AggregateMultipliedSubqueryInputUnPacker<'a> {
 
         let keys_subquery = &inputs[0];
         let source = &inputs[1];
-        let dimension_subqueries = &inputs[2..];
+        let dim_end = 2 + aggregate.dimension_subqueries.len();
+        let dimension_subqueries = &inputs[2..dim_end];
+        let pre_aggregation_override = if aggregate.pre_aggregation_override.is_some() {
+            Some(&inputs[dim_end])
+        } else {
+            None
+        };
 
         Ok(Self {
             keys_subquery,
             source,
             dimension_subqueries,
+            pre_aggregation_override,
         })
     }
 
     fn inputs_len(aggregate: &AggregateMultipliedSubquery) -> usize {
         2 + aggregate.dimension_subqueries.len()
+            + if aggregate.pre_aggregation_override.is_some() {
+                1
+            } else {
+                0
+            }
     }
 }
 
@@ -116,6 +141,10 @@ impl PrettyPrint for AggregateMultipliedSubquery {
             for subquery in self.dimension_subqueries.iter() {
                 subquery.pretty_print(result, &details_state);
             }
+        }
+        if let Some(override_query) = &self.pre_aggregation_override {
+            result.println("pre_aggregation_override:", &state);
+            override_query.pretty_print(result, &details_state);
         }
     }
 }

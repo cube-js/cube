@@ -186,6 +186,42 @@ module.exports = {
         },
       };
     }
+    if (user === 'region_user') {
+      if (password && password !== 'region_user_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'region_user',
+            userAttributes: {
+              allowedProductIds: [1, 2],
+            },
+            roles: [],
+            groups: ['user_group', 'region_group'],
+          },
+        },
+      };
+    }
+    if (user === 'region_user_no_filter') {
+      if (password && password !== 'region_user_no_filter_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'region_user_no_filter',
+            userAttributes: {},
+            roles: [],
+            groups: ['user_group'],
+          },
+        },
+      };
+    }
     if (user === 'sc_test') {
       if (password && password !== 'sc_test_password') {
         throw new Error(`Password doesn't match for ${user}`);

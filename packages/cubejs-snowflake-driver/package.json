@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-snowflake-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/src",
@@ -21,6 +21,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "integration": "vitest run",
+    "integration:snowflake": "vitest run",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -28,8 +30,7 @@
     "@aws-sdk/client-s3": "^3.726.0",
     "@cubejs-backend/base-driver": "1.6.39",
     "@cubejs-backend/shared": "1.6.39",
-    "date-fns-timezone": "^0.1.4",
-    "snowflake-sdk": "^2.2.0"
+    "snowflake-sdk": "^2.4.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.39",
-    "typescript": "~5.2.2"
+    "typescript": "~5.2.2",
+    "vitest": "^4"
   }
 }
