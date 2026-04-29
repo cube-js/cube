@@ -200,7 +200,7 @@ module.exports = {
               allowedProductIds: [1, 2],
             },
             roles: [],
-            groups: ['user_group', 'region_group'],
+            groups: ['region_group'],
           },
         },
       };
