@@ -73,5 +73,7 @@ pub mod v1_load_result_data_columnar;
 pub use self::v1_load_result_data_columnar::V1LoadResultDataColumnar;
 pub mod v1_load_result_data_compact;
 pub use self::v1_load_result_data_compact::V1LoadResultDataCompact;
+pub mod v1_load_result_data_row;
+pub use self::v1_load_result_data_row::V1LoadResultDataRow;
 pub mod v1_meta_response;
 pub use self::v1_meta_response::V1MetaResponse;
