@@ -811,6 +811,61 @@ const timeShiftItemOptional = Joi.object({
   .xor('name', 'interval')
   .and('interval', 'type');
 
+// Top-level predicate inside `filter.include`: same shape as a query-time
+// filter. We can't share `PolicyFilterSchema` directly because it lives below
+// in the file — the schemas here mirror its operator set but allow `member`
+// and `values` as plain strings/arrays (cube schema authors typically write
+// path strings for include) on top of the existing function form.
+const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
+  member: Joi.alternatives(Joi.string(), Joi.func()).required(),
+  operator: Joi.any().valid(
+    'equals',
+    'notEquals',
+    'contains',
+    'notContains',
+    'startsWith',
+    'notStartsWith',
+    'endsWith',
+    'notEndsWith',
+    'in',
+    'notIn',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'set',
+    'notSet',
+    'inDateRange',
+    'notInDateRange',
+    'onTheDate',
+    'beforeDate',
+    'beforeOrOnDate',
+    'afterDate',
+    'afterOrOnDate',
+    'measureFilter',
+  ).required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.alternatives(Joi.array(), Joi.func()).optional(),
+    otherwise: Joi.alternatives(Joi.array(), Joi.func()).required()
+  })
+});
+
+const MultiStageIncludeConditionSchema = Joi.object().keys({
+  or: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+  and: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+}).xor('or', 'and');
+
+const MultiStageFilter = Joi.object().keys({
+  mode: Joi.string().valid('relative', 'fixed'),
+  exclude: Joi.func(),
+  keepOnly: Joi.func(),
+  include: Joi.array().items(
+    MultiStageIncludeMemberFilterSchema,
+    MultiStageIncludeConditionSchema
+  ),
+});
+
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
     sql: Joi.func().required(),
@@ -858,6 +913,7 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
+      filter: MultiStageFilter,
       timeShift: Joi.alternatives().conditional(Joi.array().length(1), {
         then: Joi.array().items(timeShiftItemOptional),
         otherwise: Joi.array().items(timeShiftItemRequired)
@@ -940,6 +996,7 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
       multiStage: Joi.boolean().valid(true),
       sql: Joi.func().required(),
       addGroupBy: Joi.func(),
+      filter: MultiStageFilter,
     }),
     // TODO should be valid only for calendar cubes, but this requires significant refactoring
     // of all schemas. Left for the future when we'll switch to zod.

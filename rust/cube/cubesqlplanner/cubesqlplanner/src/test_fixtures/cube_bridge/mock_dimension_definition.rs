@@ -2,10 +2,13 @@ use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::dimension_definition::{DimensionDefinition, DimensionDefinitionStatic};
 use crate::cube_bridge::geo_item::GeoItem;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences;
 use crate::cube_bridge::timeshift_definition::TimeShiftDefinition;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::dimension::YamlDimensionDefinition;
-use crate::test_fixtures::cube_bridge::{MockGeoItem, MockMemberSql, MockTimeShiftDefinition};
+use crate::test_fixtures::cube_bridge::{
+    MockGeoItem, MockMemberSql, MockMultiStageFilterReferences, MockTimeShiftDefinition,
+};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -40,6 +43,8 @@ pub struct MockDimensionDefinition {
     longitude: Option<String>,
     #[builder(default)]
     time_shift: Option<Vec<Rc<MockTimeShiftDefinition>>>,
+    #[builder(default)]
+    filter: Option<Rc<MockMultiStageFilterReferences>>,
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
     resolved_mask_sql: Option<String>,
 }
@@ -133,6 +138,17 @@ impl DimensionDefinition for MockDimensionDefinition {
         }
     }
 
+    fn has_filter(&self) -> Result<bool, CubeError> {
+        Ok(self.filter.is_some())
+    }
+
+    fn filter(&self) -> Result<Option<Rc<dyn MultiStageFilterReferences>>, CubeError> {
+        Ok(self
+            .filter
+            .as_ref()
+            .map(|f| f.clone() as Rc<dyn MultiStageFilterReferences>))
+    }
+
     fn has_mask_sql(&self) -> Result<bool, CubeError> {
         Ok(self.resolved_mask_sql.is_some())
     }
@@ -213,6 +229,37 @@ mod tests {
         assert!(!dim.has_latitude().unwrap());
         assert!(!dim.has_longitude().unwrap());
         assert!(!dim.has_time_shift().unwrap());
+    }
+
+    #[test]
+    fn test_from_yaml_with_filter() {
+        let yaml = indoc! {"
+            type: string
+            sql: status
+            multi_stage: true
+            filter:
+              mode: fixed
+              keep_only:
+                - city
+              include:
+                - member: status
+                  operator: equals
+                  values: [active]
+        "};
+
+        let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
+
+        assert!(dim.has_filter().unwrap());
+        let filter = dim.filter().unwrap().expect("filter present");
+        let static_data = filter.static_data();
+        assert_eq!(static_data.mode.as_deref(), Some("fixed"));
+        assert!(static_data.exclude.is_none());
+        assert_eq!(static_data.keep_only, Some(vec!["city".to_string()]));
+
+        let include = static_data.include.as_ref().expect("include present");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].member.as_deref(), Some("status"));
+        assert_eq!(include[0].operator.as_deref(), Some("equals"));
     }
 
     #[test]

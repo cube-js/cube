@@ -1870,6 +1870,7 @@ cubes:
 
       await compilers.compiler.compile();
 
+
       const query = new PostgresQuery(compilers, {
         measures: ['users.count'],
         dimensions: ['users.city'],
@@ -2053,6 +2054,59 @@ cubes:
       expect(sql).toMatch(/CASE\s+WHEN/);
       expect(sql).toMatch(/product_id/);
       expect(sql).not.toMatch(/Maximum call stack/);
+    });
+  });
+
+  describe('Multi-stage filter directive', () => {
+    it('compiles YAML with filter on multi-stage measure', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: city
+        sql: city
+        type: string
+      - name: created_at
+        sql: created_at
+        type: time
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+      - name: revenue_filtered
+        sql: "{revenue}"
+        multi_stage: true
+        type: number
+        filter:
+          mode: relative
+          exclude:
+            - CUBE.status
+          include:
+            - member: orders.created_at
+              operator: afterDate
+              values:
+                - "2024-01-01"
+      `);
+
+      await compilers.compiler.compile();
+
+      const measure = compilers.cubeEvaluator.cubeFromPath('orders').measures.revenue_filtered as any;
+      expect(measure.multiStage).toBe(true);
+      expect(measure.filter).toBeDefined();
+      expect(measure.filter.mode).toBe('relative');
+      expect(typeof measure.filter.exclude).toBe('function');
+      expect(Array.isArray(measure.filter.include)).toBe(true);
+      expect(measure.filter.include[0].member).toBe('orders.created_at');
+      expect(measure.filter.include[0].operator).toBe('afterDate');
+      expect(measure.filter.include[0].values).toEqual(['2024-01-01']);
     });
   });
 });

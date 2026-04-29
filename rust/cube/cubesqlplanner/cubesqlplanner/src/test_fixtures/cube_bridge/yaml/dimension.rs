@@ -2,6 +2,7 @@ use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
+use crate::test_fixtures::cube_bridge::yaml::measure::YamlMultiStageFilter;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
 use crate::test_fixtures::cube_bridge::{
     MockDimensionDefinition, MockGranularityDefinition, MockMemberSql,
@@ -55,6 +56,8 @@ pub struct YamlDimensionDefinition {
     time_shift: Vec<YamlTimeShiftDefinition>,
     #[serde(default)]
     granularities: Vec<YamlGranularityEntry>,
+    #[serde(default)]
+    filter: Option<YamlMultiStageFilter>,
     #[serde(default)]
     mask: Option<YamlMask>,
 }
@@ -110,6 +113,8 @@ impl YamlDimensionDefinition {
             })
             .collect();
 
+        let filter = self.filter.map(|f| f.build(None));
+
         let definition = MockDimensionDefinition::builder()
             .dimension_type(self.dimension_type)
             .multi_stage(self.multi_stage)
@@ -123,6 +128,7 @@ impl YamlDimensionDefinition {
             .latitude_opt(self.latitude)
             .longitude_opt(self.longitude)
             .time_shift(time_shift)
+            .filter(filter)
             .resolved_mask_sql_opt(self.mask.map(|m| m.to_sql_string()))
             .build();
 

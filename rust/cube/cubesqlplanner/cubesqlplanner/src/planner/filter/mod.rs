@@ -5,6 +5,7 @@ pub mod filter_debug;
 pub mod filter_operator;
 pub(crate) mod operators;
 pub mod tree;
+pub mod tree_ops;
 pub mod typed_filter;
 
 pub use base_filter::BaseFilter;

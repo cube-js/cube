@@ -469,3 +469,119 @@ fn new_patched_appends_to_existing_filters() {
         original_count + new_filters.len()
     );
 }
+
+// ─── Multi-stage properties + filter directive ──────────────────────────────
+
+mod multi_stage {
+    use super::*;
+    use crate::planner::MultiStageFilterMode;
+
+    fn ctx() -> TestContext {
+        let schema = MockSchema::from_yaml_file("common/multi_stage_filter.yaml");
+        TestContext::new(schema).unwrap()
+    }
+
+    #[test]
+    fn measure_multi_stage_properties_resolved() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+
+        assert!(measure.is_multi_stage());
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        let reduce_by = ms.reduce_by.as_ref().expect("reduce_by");
+        assert_eq!(reduce_by.len(), 1);
+        assert_eq!(reduce_by[0].full_name(), "orders.status");
+
+        let add_group_by = ms.add_group_by.as_ref().expect("add_group_by");
+        assert_eq!(add_group_by.len(), 1);
+        assert_eq!(add_group_by[0].full_name(), "orders.city");
+    }
+
+    #[test]
+    fn measure_filter_directive_resolved() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+        let filter = ms.filter.as_ref().expect("filter present");
+
+        assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+
+        let exclude = filter.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
+
+        assert!(filter.keep_only.is_none());
+
+        // Include is split by classification: `revenue gt 0` (measure) +
+        // `or { city = NYC, city = SF }` (dimension OR group).
+        assert_eq!(filter.include_dimension.len(), 1);
+        assert_eq!(filter.include_measure.len(), 1);
+        assert!(filter.include_time_dimension.is_empty());
+    }
+
+    #[test]
+    fn dimension_multi_stage_filter_resolved() {
+        let ctx = ctx();
+        let d = ctx.create_dimension("orders.status_normalized").unwrap();
+        let dim = d.as_dimension().unwrap();
+
+        assert!(dim.is_multi_stage());
+        let ms = dim.multi_stage().expect("multi_stage present");
+
+        let add_group_by = ms.add_group_by.as_ref().expect("add_group_by");
+        assert_eq!(add_group_by.len(), 1);
+        assert_eq!(add_group_by[0].full_name(), "orders.status");
+
+        let filter = ms.filter.as_ref().expect("filter present");
+        assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+        let keep_only = filter.keep_only.as_ref().expect("keep_only");
+        assert_eq!(keep_only.len(), 1);
+        assert_eq!(keep_only[0].full_name(), "orders.city");
+        assert!(filter.exclude.is_none());
+        assert_eq!(filter.include_dimension.len(), 1);
+        assert!(filter.include_measure.is_empty());
+        assert!(filter.include_time_dimension.is_empty());
+        assert!(ms.reduce_by.is_none());
+        assert!(ms.group_by.is_none());
+    }
+
+    #[test]
+    fn non_multi_stage_measure_has_no_multi_stage() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue").unwrap();
+        let measure = m.as_measure().unwrap();
+
+        assert!(!measure.is_multi_stage());
+        assert!(measure.multi_stage().is_none());
+        assert!(measure.reduce_by().is_none());
+        assert!(measure.add_group_by().is_none());
+    }
+
+    #[test]
+    fn measure_filter_mode_defaults_to_relative_when_omitted() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_default_mode").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+        let filter = ms.filter.as_ref().expect("filter present");
+
+        assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+    }
+
+    #[test]
+    fn measure_filter_keep_only_and_exclude_mutually_exclusive() {
+        let schema = MockSchema::from_yaml_file("common/multi_stage_filter_invalid.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+        let err = ctx
+            .create_measure("orders.revenue_conflicting_filter")
+            .expect_err("expected error for keep_only + exclude combination");
+        assert!(
+            err.message.contains("`exclude` and `keep_only`"),
+            "unexpected error message: {}",
+            err.message
+        );
+    }
+}

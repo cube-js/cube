@@ -1,9 +1,11 @@
+use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::measure_definition::{RollingWindow, TimeShiftReference};
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
 use crate::test_fixtures::cube_bridge::{
-    MockMeasureDefinition, MockMemberOrderBy, MockStructWithSqlMember,
+    MockMeasureDefinition, MockMemberOrderBy, MockMultiStageFilterReferences,
+    MockStructWithSqlMember,
 };
 use serde::Deserialize;
 use std::rc::Rc;
@@ -25,6 +27,8 @@ pub struct YamlMeasureDefinition {
     #[serde(default)]
     rolling_window: Option<RollingWindow>,
     #[serde(default)]
+    filter: Option<YamlMultiStageFilter>,
+    #[serde(default)]
     sql: Option<String>,
     #[serde(default)]
     case: Option<YamlCaseVariant>,
@@ -36,6 +40,86 @@ pub struct YamlMeasureDefinition {
     order_by: Vec<YamlOrderBy>,
     #[serde(default)]
     mask: Option<YamlMask>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct YamlMultiStageFilter {
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    exclude: Option<Vec<String>>,
+    #[serde(default)]
+    keep_only: Option<Vec<String>>,
+    #[serde(default)]
+    include: Vec<YamlIncludeFilter>,
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlIncludeFilter {
+    #[serde(default)]
+    member: Option<String>,
+    #[serde(default)]
+    dimension: Option<String>,
+    #[serde(default)]
+    operator: Option<String>,
+    #[serde(default)]
+    values: Option<Vec<Option<String>>>,
+    #[serde(default)]
+    and: Option<Vec<YamlIncludeFilter>>,
+    #[serde(default)]
+    or: Option<Vec<YamlIncludeFilter>>,
+}
+
+impl YamlIncludeFilter {
+    fn into_native(self, cube_name: Option<&str>) -> NativeFilterItem {
+        fn qualify(s: String, cube_name: Option<&str>) -> String {
+            match cube_name {
+                Some(cn) if !s.contains('.') => format!("{}.{}", cn, s),
+                _ => s,
+            }
+        }
+        NativeFilterItem {
+            member: self.member.map(|s| qualify(s, cube_name)),
+            dimension: self.dimension.map(|s| qualify(s, cube_name)),
+            operator: self.operator,
+            values: self.values,
+            and: self.and.map(|items| {
+                items
+                    .into_iter()
+                    .map(|i| i.into_native(cube_name))
+                    .collect()
+            }),
+            or: self.or.map(|items| {
+                items
+                    .into_iter()
+                    .map(|i| i.into_native(cube_name))
+                    .collect()
+            }),
+        }
+    }
+}
+
+impl YamlMultiStageFilter {
+    pub(super) fn build(self, cube_name: Option<&str>) -> Rc<MockMultiStageFilterReferences> {
+        let include = if self.include.is_empty() {
+            None
+        } else {
+            Some(
+                self.include
+                    .into_iter()
+                    .map(|i| i.into_native(cube_name))
+                    .collect(),
+            )
+        };
+        Rc::new(
+            MockMultiStageFilterReferences::builder()
+                .mode(self.mode)
+                .exclude(qualify_references(self.exclude, cube_name))
+                .keep_only(qualify_references(self.keep_only, cube_name))
+                .include(include)
+                .build(),
+        )
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -112,6 +196,8 @@ impl YamlMeasureDefinition {
             None
         };
 
+        let filter = self.filter.map(|f| f.build(cube_name));
+
         Rc::new(
             MockMeasureDefinition::builder()
                 .measure_type(self.measure_type)
@@ -128,6 +214,7 @@ impl YamlMeasureDefinition {
                 .case(case)
                 .filters(filters)
                 .drill_filters(drill_filters)
+                .filter(filter)
                 .order_by(order_by)
                 .resolved_mask_sql_opt(self.mask.map(|m| m.to_sql_string()))
                 .build(),

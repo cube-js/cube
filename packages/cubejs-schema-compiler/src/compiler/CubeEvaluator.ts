@@ -43,6 +43,9 @@ export type DimensionDefinition = {
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
+  addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  addGroupByReferences?: string[];
+  filter?: MultiStageFilterDirective;
 };
 
 export type TimeShiftDefinition = {
@@ -59,6 +62,19 @@ export type TimeShiftDefinitionReference = {
   type?: 'next' | 'prior';
 };
 
+export type MultiStageFilterIncludeItem = any;
+
+export type MultiStageFilterDirective = {
+  mode?: 'relative' | 'fixed';
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: MultiStageFilterIncludeItem[];
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  // The native bridge reads these (not the function forms above).
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+};
+
 export type MeasureDefinition = {
   type: string;
   aggType?: string,
@@ -66,6 +82,7 @@ export type MeasureDefinition = {
   ownedByCube: boolean;
   rollingWindow?: any
   filters?: any
+  filter?: MultiStageFilterDirective;
   primaryKey?: true;
   drillFilters?: any;
   multiStage?: boolean;
@@ -591,6 +608,14 @@ export class CubeEvaluator extends CubeSymbols {
               ? { timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }
               : {}),
           }));
+        }
+        if (member.filter) {
+          if (typeof member.filter.exclude === 'function') {
+            member.filter.excludeReferences = this.evaluateReferences(cubeName, member.filter.exclude);
+          }
+          if (typeof member.filter.keepOnly === 'function') {
+            member.filter.keepOnlyReferences = this.evaluateReferences(cubeName, member.filter.keepOnly);
+          }
         }
       }
     }
