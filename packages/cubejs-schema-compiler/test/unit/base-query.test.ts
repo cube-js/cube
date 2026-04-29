@@ -3054,4 +3054,76 @@ describe('Class unit tests', () => {
       expect(params).toContain('operator');
     });
   });
+
+  describe('multi_stage median measure', () => {
+    const compilers = prepareYamlCompiler(`
+cubes:
+  - name: policies
+    sql_table: policies
+
+    dimensions:
+      - name: client_id
+        sql: client_id
+        type: string
+        primary_key: true
+
+      - name: collection_date
+        sql: collection_date
+        type: string
+
+    measures:
+      - name: _inner_policy_count
+        sql: policy_id
+        type: count_distinct
+        public: false
+
+      - name: median_policies
+        sql: "{_inner_policy_count}"
+        type: median
+        multi_stage: true
+        group_by:
+          - client_id
+          - collection_date
+`);
+
+    it('generates PERCENTILE_CONT WITHIN GROUP SQL', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['policies.median_policies'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('PERCENTILE_CONT(0.5) WITHIN GROUP');
+      expect(sql).toMatch(/ORDER BY\s+"[^"]*_inner_policy_count"/i);
+    });
+
+    it('generates a CTE query', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['policies.median_policies'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/WITH\s+cte_\d+\s+AS/i);
+    });
+
+    it('propagates filters into the inner CTE', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['policies.median_policies'],
+        timeDimensions: [],
+        filters: [{ member: 'policies.client_id', operator: 'equals', values: ['A'] }],
+      });
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/WHERE/i);
+    });
+  });
 });

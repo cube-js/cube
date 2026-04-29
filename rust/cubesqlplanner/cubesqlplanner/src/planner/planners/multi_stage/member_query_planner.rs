@@ -197,6 +197,7 @@ impl MultiStageMemberQueryPlanner {
 
         let window_function_to_use = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
+            MultiStageInodeMemberType::Median => MultiStageCalculationWindowFunction::Median,
             MultiStageInodeMemberType::Aggregate => {
                 if partition_by.len() != self.all_dimensions().len() {
                     MultiStageCalculationWindowFunction::Window
@@ -220,6 +221,7 @@ impl MultiStageMemberQueryPlanner {
 
         let calculation_type = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationType::Rank,
+            MultiStageInodeMemberType::Median => MultiStageCalculationType::Aggregate,
             MultiStageInodeMemberType::Aggregate => MultiStageCalculationType::Aggregate,
             MultiStageInodeMemberType::Calculate => MultiStageCalculationType::Calculate,
             _ => {

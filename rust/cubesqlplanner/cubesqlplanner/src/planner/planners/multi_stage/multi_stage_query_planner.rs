@@ -107,6 +107,7 @@ impl MultiStageQueryPlanner {
         let inode = if let Ok(measure) = base_member.as_measure() {
             let member_type = match measure.kind() {
                 MeasureKind::Rank => MultiStageInodeMemberType::Rank,
+                MeasureKind::Median(_) => MultiStageInodeMemberType::Median,
                 MeasureKind::Calculated(_) => MultiStageInodeMemberType::Calculate,
                 _ => MultiStageInodeMemberType::Aggregate,
             };

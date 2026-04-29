@@ -222,6 +222,20 @@ cubes:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
 
+          - name: amount_median
+            type: median
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            group_by:
+                - orders.status
+
+          - name: amount_median_by_category
+            type: median
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            group_by:
+                - orders.category
+
           - name: status_weighted_amount
             type: sum
             multi_stage: true

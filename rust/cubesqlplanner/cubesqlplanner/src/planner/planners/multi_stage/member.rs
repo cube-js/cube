@@ -87,6 +87,7 @@ impl RollingWindowDescription {
 #[derive(Clone)]
 pub enum MultiStageInodeMemberType {
     Rank,
+    Median,
     Aggregate,
     Calculate,
     Dimension,

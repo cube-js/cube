@@ -279,6 +279,49 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
+    it('median type is valid with multi_stage: true', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          median_measure: {
+            multiStage: true,
+            type: 'median',
+            sql: () => '',
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (_message: any, _e: any) => {}
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('median type is rejected without multi_stage: true', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          median_measure: {
+            type: 'median',
+            sql: () => '',
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (_message: any, _e: any) => {}
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
     it('2 timeShifts, 1 without timeDimension', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {

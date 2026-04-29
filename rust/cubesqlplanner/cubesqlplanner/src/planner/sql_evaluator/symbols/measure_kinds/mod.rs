@@ -27,6 +27,7 @@ pub enum MeasureKind {
     Aggregated(AggregatedMeasure),
     Calculated(CalculatedMeasure),
     Rank,
+    Median(Option<Rc<SqlCall>>),
 }
 
 impl MeasureKind {
@@ -42,6 +43,8 @@ impl MeasureKind {
             })
         } else if measure_type == "rank" {
             Ok(Self::Rank)
+        } else if measure_type == "median" {
+            Ok(Self::Median(member_sql))
         } else if let Some(calc_type) = CalculatedMeasureType::from_str(measure_type) {
             Ok(if let Some(sql) = member_sql {
                 Self::Calculated(CalculatedMeasure::new(calc_type, sql))
@@ -78,6 +81,10 @@ impl MeasureKind {
                 "Rank measure doesn't support direct evaluation for {}",
                 full_name
             ))),
+            Self::Median(_) => Err(CubeError::internal(format!(
+                "Median measure doesn't support direct evaluation for {}",
+                full_name
+            ))),
         }
     }
 
@@ -87,6 +94,13 @@ impl MeasureKind {
             Self::Aggregated(a) => a.get_dependencies(),
             Self::Calculated(c) => c.get_dependencies(),
             Self::Rank => vec![],
+            Self::Median(sql) => {
+                let mut deps = vec![];
+                if let Some(s) = sql {
+                    s.extract_symbol_deps(&mut deps);
+                }
+                deps
+            }
         }
     }
 
@@ -99,6 +113,9 @@ impl MeasureKind {
             Self::Aggregated(a) => Self::Aggregated(a.apply_to_deps(f)?),
             Self::Calculated(c) => Self::Calculated(c.apply_to_deps(f)?),
             Self::Rank => Self::Rank,
+            Self::Median(sql) => Self::Median(
+                sql.as_ref().map(|s| s.apply_recursive(f)).transpose()?,
+            ),
         })
     }
 
@@ -108,6 +125,7 @@ impl MeasureKind {
             Self::Aggregated(a) => a.iter_sql_calls(),
             Self::Calculated(c) => c.iter_sql_calls(),
             Self::Rank => Box::new(std::iter::empty()),
+            Self::Median(sql) => Box::new(sql.iter()),
         }
     }
 
@@ -117,6 +135,13 @@ impl MeasureKind {
             Self::Aggregated(a) => a.get_cube_refs(),
             Self::Calculated(c) => c.get_cube_refs(),
             Self::Rank => vec![],
+            Self::Median(sql) => {
+                let mut refs = vec![];
+                if let Some(s) = sql {
+                    s.extract_cube_refs(&mut refs);
+                }
+                refs
+            }
         }
     }
 
@@ -126,6 +151,7 @@ impl MeasureKind {
             Self::Aggregated(a) => a.is_owned_by_cube(),
             Self::Calculated(c) => c.is_owned_by_cube(),
             Self::Rank => false,
+            Self::Median(sql) => sql.as_ref().is_some_and(|s| s.is_owned_by_cube()),
         }
     }
 
@@ -147,6 +173,7 @@ impl MeasureKind {
             Self::Aggregated(a) => a.agg_type().as_str(),
             Self::Calculated(c) => c.calc_type().as_str(),
             Self::Rank => "rank",
+            Self::Median(_) => "median",
         }
     }
 
@@ -197,11 +224,13 @@ impl MeasureKind {
             Self::Aggregated(a) => a.member_sql(),
             Self::Calculated(c) => c.member_sql(),
             Self::Rank => None,
+            Self::Median(sql) => sql.as_ref(),
         }
     }
 
     pub fn aggregate_wrap(&self, is_multiplied: bool) -> AggregateWrap<'_> {
         match self {
+            Self::Median(_) => AggregateWrap::PassThrough,
             Self::Calculated(_) => AggregateWrap::PassThrough,
             Self::Aggregated(a) => match a.agg_type() {
                 AggregationType::NumberAgg => AggregateWrap::PassThrough,

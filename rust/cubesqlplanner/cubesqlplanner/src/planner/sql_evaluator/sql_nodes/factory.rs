@@ -1,9 +1,9 @@
 use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode, RenderReferencesSqlNode,
-    RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    MultiStageMedianNode, MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode,
+    RenderReferencesSqlNode, RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode,
+    TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::cube_ref_evaluator::CubeRefEvaluator;
@@ -28,6 +28,7 @@ pub struct SqlNodesFactory {
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
+    multi_stage_median: bool,
     rolling_window: bool,
     dimensions_with_ignored_timezone: HashSet<String>,
     use_local_tz_in_date_range: bool,
@@ -111,6 +112,10 @@ impl SqlNodesFactory {
         self.multi_stage_window = Some(partition_by);
     }
 
+    pub fn set_multi_stage_median(&mut self) {
+        self.multi_stage_median = true;
+    }
+
     pub fn add_pre_aggregation_measure_reference<T: Into<RenderReferencesType>>(
         &mut self,
         name: String,
@@ -174,6 +179,7 @@ impl SqlNodesFactory {
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
+        let measure_processor = self.add_multi_stage_median_if_needed(measure_processor);
 
         let default_processor: Rc<dyn SqlNode> =
             if !self.pre_aggregation_dimensions_references.is_empty() {
@@ -208,6 +214,14 @@ impl SqlNodesFactory {
     fn add_multi_stage_rank_if_needed(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         if let Some(partition_by) = &self.multi_stage_rank {
             MultiStageRankNode::new(default, partition_by.clone())
+        } else {
+            default
+        }
+    }
+
+    fn add_multi_stage_median_if_needed(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        if self.multi_stage_median {
+            MultiStageMedianNode::new(default)
         } else {
             default
         }

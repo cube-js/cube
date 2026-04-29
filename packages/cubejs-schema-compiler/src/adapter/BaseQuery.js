@@ -3741,6 +3741,9 @@ export class BaseQuery {
       if (symbol.type === 'rank') {
         return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
       }
+      if (symbol.type === 'median') {
+        return `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+      }
       if (!(
         R.equals(this.multiStageDimensions.map(d => d.expressionPath()), this.dimensions.map(d => d.expressionPath())) &&
         R.equals(this.multiStageTimeDimensions.map(d => d.expressionPath()), this.timeDimensions.map(d => d.expressionPath()))

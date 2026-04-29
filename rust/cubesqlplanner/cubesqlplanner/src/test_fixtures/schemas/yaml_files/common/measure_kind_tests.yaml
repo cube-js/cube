@@ -44,6 +44,10 @@ cubes:
             sql: "{CUBE.total} / {CUBE.cnt}"
           - name: rank_measure
             type: rank
+          - name: median_measure
+            type: median
+            sql: "{CUBE.total}"
+            multi_stage: true
           - name: rolling_sum
             type: sum
             sql: amount
