@@ -223,7 +223,7 @@ cubes:
                   dir: desc
 
           - name: status_weighted_amount
-            type: number
+            type: sum
             multi_stage: true
             case:
                 switch: "{CUBE.status}"

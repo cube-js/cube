@@ -21,6 +21,7 @@ use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -238,7 +239,6 @@ impl MultiStageQueryPlanner {
         Ok(())
     }
 
-    //TODO refactor needed
     fn try_make_childs_for_case_switch(
         &self,
         case: &CaseSwitchDefinition,
@@ -248,67 +248,72 @@ impl MultiStageQueryPlanner {
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         cte_state: &mut CteState,
     ) -> Result<bool, CubeError> {
-        if let CaseSwitchItem::Member(switch_member) = &case.switch {
-            let mut processed_deps = HashSet::new();
-            for itm in &case.items {
-                let mut state = new_state.clone_state();
-                let filter = BaseFilter::try_new(
-                    self.query_tools.clone(),
-                    switch_member.clone(),
-                    FilterType::Dimension,
-                    FilterOperator::Equal,
-                    Some(vec![Some(itm.value.clone())]),
-                )?;
-                state.add_dimension_filter(FilterItem::Item(filter));
-                let state = Rc::new(state);
+        let CaseSwitchItem::Member(switch_member) = &case.switch else {
+            return Ok(false);
+        };
 
-                for dep in itm.sql.get_dependencies() {
-                    let dep = dep.resolve_reference_chain();
-                    if !processed_deps.contains(&dep.full_name()) {
-                        processed_deps.insert(dep.full_name());
-                        result.push(self.make_queries_descriptions(
-                            dep,
-                            state.clone(),
-                            descriptions,
-                            resolved_multi_stage_dimensions,
-                            cte_state,
-                        )?);
+        // Collect, per dependency, the union of switch values that need it.
+        // `None` marks an unrestricted (open ELSE) entry: such a dependency
+        // must be processed without a prefilter on switch_member, since the
+        // outer CASE will dispatch by value at row level.
+        let mut deps: IndexMap<String, (Rc<MemberSymbol>, Option<Vec<String>>)> = IndexMap::new();
+
+        let mut record = |dep: Rc<MemberSymbol>, branch_values: Option<Vec<String>>| {
+            let dep = dep.resolve_reference_chain();
+            let entry = deps
+                .entry(dep.full_name())
+                .or_insert_with(|| (dep.clone(), Some(Vec::new())));
+            match (&mut entry.1, branch_values) {
+                (None, _) => {} // already unrestricted
+                (slot @ Some(_), None) => *slot = None,
+                (Some(values), Some(branch)) => {
+                    for v in branch {
+                        if !values.contains(&v) {
+                            values.push(v);
+                        }
                     }
                 }
             }
-            if let Some(else_sql) = &case.else_sql {
-                let mut state = new_state.clone_state();
-                if let Some(else_values) = case.get_else_values() {
-                    if !else_values.is_empty() {
-                        let filter = BaseFilter::try_new(
-                            self.query_tools.clone(),
-                            switch_member.clone(),
-                            FilterType::Dimension,
-                            FilterOperator::Equal,
-                            Some(else_values.into_iter().map(|v| Some(v)).collect_vec()),
-                        )?;
-                        state.add_dimension_filter(FilterItem::Item(filter));
-                    }
-                }
-                let state = Rc::new(state);
-                for dep in else_sql.get_dependencies() {
-                    let dep = dep.resolve_reference_chain();
-                    if !processed_deps.contains(&dep.full_name()) {
-                        processed_deps.insert(dep.full_name());
-                        result.push(self.make_queries_descriptions(
-                            dep,
-                            state.clone(),
-                            descriptions,
-                            resolved_multi_stage_dimensions,
-                            cte_state,
-                        )?);
-                    }
-                }
+        };
+
+        for itm in &case.items {
+            for dep in itm.sql.get_dependencies() {
+                record(dep, Some(vec![itm.value.clone()]));
             }
-            Ok(true)
-        } else {
-            Ok(false)
         }
+
+        if let Some(else_sql) = &case.else_sql {
+            let else_values = case.get_else_values();
+            for dep in else_sql.get_dependencies() {
+                record(dep.clone(), else_values.clone());
+            }
+        }
+
+        for (_, (dep, values)) in deps {
+            let mut state = new_state.clone_state();
+            if let Some(values) = values {
+                if !values.is_empty() {
+                    let filter = BaseFilter::try_new(
+                        self.query_tools.clone(),
+                        switch_member.clone(),
+                        FilterType::Dimension,
+                        FilterOperator::Equal,
+                        Some(values.into_iter().map(Some).collect_vec()),
+                    )?;
+                    state.add_dimension_filter(FilterItem::Item(filter));
+                }
+            }
+            let state = Rc::new(state);
+            result.push(self.make_queries_descriptions(
+                dep,
+                state,
+                descriptions,
+                resolved_multi_stage_dimensions,
+                cte_state,
+            )?);
+        }
+
+        Ok(true)
     }
 
     fn make_queries_descriptions(
