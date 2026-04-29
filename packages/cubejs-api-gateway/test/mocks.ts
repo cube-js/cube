@@ -81,51 +81,54 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
   },
 
   async metaConfig() {
-    return [
-      {
-        config: {
-          name: 'Foo',
-          description: 'cube from compilerApi mock',
-          measures: [
-            {
-              name: 'Foo.bar',
-              description: 'measure from compilerApi mock',
-              isVisible: true,
-            },
-          ],
-          dimensions: [
-            {
-              name: 'Foo.id',
-              description: 'id dimension from compilerApi mock',
-              isVisible: true,
-            },
-            {
-              name: 'Foo.time',
-              isVisible: true,
-            },
-            {
-              name: 'Foo.timeGranularities',
-              isVisible: true,
-              granularities: [
-                {
-                  name: 'half_year_by_1st_april',
-                  title: 'Half Year By1 St April',
-                  interval: '6 months',
-                  offset: '3 months'
-                }
-              ]
-            },
-          ],
-          segments: [
-            {
-              name: 'Foo.quux',
-              description: 'segment from compilerApi mock',
-              isVisible: true,
-            },
-          ],
+    return {
+      cubes: [
+        {
+          config: {
+            name: 'Foo',
+            description: 'cube from compilerApi mock',
+            measures: [
+              {
+                name: 'Foo.bar',
+                description: 'measure from compilerApi mock',
+                isVisible: true,
+              },
+            ],
+            dimensions: [
+              {
+                name: 'Foo.id',
+                description: 'id dimension from compilerApi mock',
+                isVisible: true,
+              },
+              {
+                name: 'Foo.time',
+                isVisible: true,
+              },
+              {
+                name: 'Foo.timeGranularities',
+                isVisible: true,
+                granularities: [
+                  {
+                    name: 'half_year_by_1st_april',
+                    title: 'Half Year By1 St April',
+                    interval: '6 months',
+                    offset: '3 months'
+                  }
+                ]
+              },
+            ],
+            segments: [
+              {
+                name: 'Foo.quux',
+                description: 'segment from compilerApi mock',
+                isVisible: true,
+              },
+            ],
+          },
         },
-      },
-    ];
+      ],
+      viewGroups: [],
+    };
   },
 
   async metaConfigExtended() {

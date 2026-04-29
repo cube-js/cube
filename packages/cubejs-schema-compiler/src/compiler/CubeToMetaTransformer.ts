@@ -15,6 +15,7 @@ import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
+import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
@@ -132,6 +133,13 @@ export type HierarchyConfig = {
   [key: string]: any;
 };
 
+export type ViewGroupConfig = {
+  name: string;
+  title?: string;
+  description?: string;
+  views: string[];
+};
+
 export type CubeConfig = {
   name: string;
   type: 'view' | 'cube';
@@ -139,6 +147,7 @@ export type CubeConfig = {
   isVisible: boolean;
   public: boolean;
   description?: string;
+  viewGroup?: string;
   connectedComponent: number;
   meta?: any;
   measures: MeasureConfig[];
@@ -162,9 +171,13 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly contextEvaluator: ContextEvaluator;
 
+  private readonly viewGroupEvaluator: ViewGroupEvaluator;
+
   private readonly joinGraph: JoinGraph;
 
   public cubes: TransformedCube[];
+
+  public viewGroups: ViewGroupConfig[];
 
   /**
    * @deprecated
@@ -175,14 +188,17 @@ export class CubeToMetaTransformer implements CompilerInterface {
     cubeValidator: CubeValidator,
     cubeEvaluator: CubeEvaluator,
     contextEvaluator: ContextEvaluator,
+    viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
+    this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
     this.cubes = [];
+    this.viewGroups = [];
     this.queries = [];
   }
 
@@ -192,6 +208,51 @@ export class CubeToMetaTransformer implements CompilerInterface {
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
 
     this.queries = this.cubes;
+
+    this.viewGroups = this.resolveViewGroups();
+  }
+
+  private resolveViewGroups(): ViewGroupConfig[] {
+    const viewGroupMap = new Map<string, ViewGroupConfig>();
+
+    for (const compiled of this.viewGroupEvaluator.compiledViewGroups) {
+      viewGroupMap.set(compiled.name, {
+        name: compiled.name,
+        title: compiled.title,
+        description: compiled.description,
+        views: [...compiled.views],
+      });
+    }
+
+    for (const cube of this.cubes) {
+      if (cube.config.type !== 'view') continue;
+
+      const extendedCube = this.cubeSymbols.cubeList.find(c => c.name === cube.config.name) as any;
+      const viewGroupName = extendedCube?.viewGroup;
+      if (!viewGroupName) continue;
+
+      let group = viewGroupMap.get(viewGroupName);
+      if (!group) {
+        group = { name: viewGroupName, views: [] };
+        viewGroupMap.set(viewGroupName, group);
+      }
+      if (!group.views.includes(cube.config.name)) {
+        group.views.push(cube.config.name);
+      }
+
+      cube.config.viewGroup = viewGroupName;
+    }
+
+    for (const group of viewGroupMap.values()) {
+      for (const viewName of group.views) {
+        const cube = this.cubes.find(c => c.config.name === viewName);
+        if (cube && !cube.config.viewGroup) {
+          cube.config.viewGroup = group.name;
+        }
+      }
+    }
+
+    return Array.from(viewGroupMap.values());
   }
 
   protected transform(cube: CubeDefinitionExtended, _errorReporter?: ErrorReporter): TransformedCube {

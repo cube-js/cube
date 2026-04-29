@@ -95,7 +95,7 @@ type ErrorResponse = {
   error: string,
 };
 
-type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponse = { cubes: any[], viewGroups?: any[], compilerId?: string };
 type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
 
 /**
