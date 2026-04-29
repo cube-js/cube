@@ -140,18 +140,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
             }
           }
         }
-
-        const keyName = path.node.key.type === 'Identifier' ? path.node.key.name
-          : path.node.key.type === 'StringLiteral' ? path.node.key.value : null;
-        if (
-          (keyName === 'rowLevel' || keyName === 'row_level') &&
-          !t.isObjectExpression(path.node.value)
-        ) {
-          const fullPath = CubePropContextTranspiler.fullPath(path);
-          if (fullPath.match(/^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)$/)) {
-            this.transformObjectProperty(path, resolveSymbol);
-          }
-        }
       }
     };
   }

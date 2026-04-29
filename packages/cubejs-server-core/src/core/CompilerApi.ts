@@ -478,29 +478,6 @@ export class CompilerApi {
     return cache.get(cacheKey);
   }
 
-  protected evaluateRawFilter(filter: any, cube: any, context: Context, cubeEvaluator: any): any {
-    const result: any = {};
-    if (filter.member) {
-      const memberName = typeof filter.member === 'function'
-        ? cubeEvaluator.evaluateContextFunction(cube, filter.member, context)
-        : filter.member;
-      const resolvedMember = memberName.includes('.') ? memberName : `${cube.name}.${memberName}`;
-      result.member = resolvedMember;
-      result.operator = filter.operator;
-      const rawValues = typeof filter.values === 'function'
-        ? cubeEvaluator.evaluateContextFunction(cube, filter.values, context)
-        : filter.values;
-      result.values = Array.isArray(rawValues) ? rawValues.map(String) : rawValues;
-    }
-    if (filter.or) {
-      result.or = filter.or.map((f: any) => this.evaluateRawFilter(f, cube, context, cubeEvaluator));
-    }
-    if (filter.and) {
-      result.and = filter.and.map((f: any) => this.evaluateRawFilter(f, cube, context, cubeEvaluator));
-    }
-    return result;
-  }
-
   protected evaluateNestedFilter(filter: any, cube: any, context: Context, cubeEvaluator: any): any {
     const result: any = {};
     if (filter.memberReference) {
@@ -729,24 +706,19 @@ export class CompilerApi {
 
         for (const policy of policiesWithMemberAccess) {
           hasAccessPermission = true;
-          let rowLevel = policy?.rowLevel;
-          const isRowLevelDynamic = typeof rowLevel === 'function';
-          if (isRowLevelDynamic) {
-            rowLevel = cubeEvaluator.evaluateContextFunction(cube, rowLevel, context);
-          }
-          (rowLevel?.filters || []).forEach((filter: any) => {
+          (policy?.rowLevel?.filters || []).forEach((filter: any) => {
             filtersMap[cubeName] = filtersMap[cubeName] || {};
+            // Create a unique key for the policy (either role, group, or groups)
             const groupValue = policy.group || policy.groups;
             const policyKey = policy.role ||
               (Array.isArray(groupValue) ? groupValue.join(',') : groupValue) ||
               'default';
             filtersMap[cubeName][policyKey] = filtersMap[cubeName][policyKey] || [];
-            const resolvedFilter = isRowLevelDynamic
-              ? this.evaluateRawFilter(filter, cube, context, cubeEvaluator)
-              : this.evaluateNestedFilter(filter, cube, context, cubeEvaluator);
-            filtersMap[cubeName][policyKey].push(resolvedFilter);
+            filtersMap[cubeName][policyKey].push(
+              this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
+            );
           });
-          if (!rowLevel || rowLevel?.allowAll) {
+          if (!policy?.rowLevel || policy?.rowLevel?.allowAll) {
             hasAllowAllForCube[cubeName] = true;
             break;
           }
