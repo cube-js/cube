@@ -13,7 +13,7 @@ Object {
       "format": undefined,
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
     },
     "price_currency_1": Object {
@@ -21,11 +21,11 @@ Object {
       "format": Object {
         "alias": "currency_1",
         "type": "custom-numeric",
-        "value": "$,.1f",
+        "value": "$,.1~f",
       },
       "formatDescription": Object {
         "name": "currency_1",
-        "specifier": "$,.1f",
+        "specifier": "$,.1~f",
       },
     },
     "status_string": Object {
@@ -40,11 +40,11 @@ Object {
       "format": Object {
         "alias": "accounting_2",
         "type": "custom-numeric",
-        "value": "(,.2f",
+        "value": "(,.2~f",
       },
       "formatDescription": Object {
         "name": "accounting_2",
-        "specifier": "(,.2f",
+        "specifier": "(,.2~f",
       },
     },
     "bytes_abbr_3": Object {
@@ -52,11 +52,11 @@ Object {
       "format": Object {
         "alias": "abbr_3",
         "type": "custom-numeric",
-        "value": ".3s",
+        "value": ".3~s",
       },
       "formatDescription": Object {
         "name": "abbr_3",
-        "specifier": ".3s",
+        "specifier": ".3~s",
       },
     },
     "count_no_format": Object {
@@ -64,7 +64,7 @@ Object {
       "format": undefined,
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
     },
     "custom_amount_d3": Object {
@@ -83,11 +83,11 @@ Object {
       "format": Object {
         "alias": "id",
         "type": "custom-numeric",
-        "value": ".0f",
+        "value": ".0~f",
       },
       "formatDescription": Object {
         "name": "id",
-        "specifier": ".0f",
+        "specifier": ".0~f",
       },
     },
     "rate_percent": Object {
@@ -95,7 +95,7 @@ Object {
       "format": "percent",
       "formatDescription": Object {
         "name": "percent",
-        "specifier": ".2%",
+        "specifier": ".2~%",
       },
     },
     "revenue_currency": Object {
@@ -104,7 +104,7 @@ Object {
       "formatDescription": Object {
         "currency": "EUR",
         "name": "currency",
-        "specifier": "$,.2f",
+        "specifier": "$,.2~f",
       },
     },
     "total_number": Object {
@@ -112,7 +112,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
     },
   },
