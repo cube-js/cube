@@ -5,11 +5,9 @@ on:
     # Run daily at 06:00 UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
-    inputs:
-      shard_count:
-        description: 'Number of shards to split tests across'
-        required: false
-        default: '8'
+
+permissions:
+  contents: read
 
 concurrency:
   group: scheduled-playwright
@@ -18,7 +16,7 @@ concurrency:
 jobs:
   playwright:
     name: 'Playwright (${{ matrix.shard }}/8)'
-    runs-on: ubuntu-24.04-8core
+    runs-on: ubuntu-latest-8-cores
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -70,7 +68,7 @@ jobs:
           yarn tsc
 
       - name: Run Playwright tests (shard ${{ matrix.shard }}/8)
-        run: npx playwright test --shard=${{ matrix.shard }}/8
+        run: npx playwright test --shard=${{ matrix.shard }}/8 --reporter=blob
 
       - name: Upload blob report
         if: always()
@@ -113,7 +111,7 @@ jobs:
           retention-days: 14
 
       - name: Slack Failure
-        if: failure()
+        if: ${{ always() && needs.playwright.result == 'failure' }}
         uses: voxmedia/github-action-slack-notify-build@v1
         with:
           channel: oss-ci
