@@ -16,6 +16,77 @@ alwaysApply: true
 - **Production** — production deployment type (legacy: "Production cluster")
 - **Multi-cluster** — multi-cluster production deployment type (legacy: "Production multi-cluster")
 
+# Plan Tier Naming
+
+Cube's commercial plan tiers, in order: **Free**, **Starter**, **Premium**,
+**Enterprise**. **Enterprise is the top tier — nothing is above it.**
+
+When describing plan availability:
+
+- ✅ "Available on the [Enterprise plan]" (single tier, top of stack)
+- ✅ "Available on [Premium and above plans]" (Premium + Enterprise)
+- ✅ "Available on [Starter and above plans]" (Starter + Premium + Enterprise)
+- ❌ Do **not** write "Enterprise and above plans" — there is nothing above
+  Enterprise. Use "Enterprise plan" (singular) instead.
+- For Enterprise-only features that require an additional purchase, use
+  "Available as an add-on on the [Enterprise plan]".
+- For features that depend on another add-on, name the dependency:
+  "Available on the [Enterprise plan] with the [Single-tenant infrastructure]
+  add-on."
+
+## Plan availability callouts
+
+Use Mintlify's `<Note>` (gray) component — **not** `<Info>` (blue) — for
+plan-availability messages. `<Info>` is the catch-all blue callout used
+heavily throughout the docs for general "by the way" notes; using a different
+color for plan gating makes it visually distinct and scannable.
+
+```mdx
+<Note>
+
+Available on the [Enterprise plan](https://cube.dev/pricing).
+
+</Note>
+```
+
+Place the callout immediately after the section heading it applies to.
+
+# Infrastructure Naming
+
+Infrastructure options are a separate, orthogonal concept from deployment types.
+A deployment of any type runs on top of one of these infrastructure options:
+
+- **Multi-tenant infrastructure** — deployments share compute and network with
+  other customers. Legacy: "Shared infrastructure".
+- **Single-tenant infrastructure** — deployments run in a dedicated VPC inside
+  a Cube Cloud account; not shared with any other customer. Legacy: "Dedicated
+  infrastructure".
+- **Single-tenant infrastructure with CSPS** — same as single-tenant, but
+  data at-rest is stored in a customer-supplied object store. Legacy:
+  "Dedicated infrastructure with CSPS".
+- **BYOC (Bring Your Own Cloud)** — Cube Cloud data plane is fully hosted in
+  the customer's cloud account.
+
+Guidance:
+
+- Always use **single-tenant** / **multi-tenant** in customer-facing prose,
+  headings, navigation labels, and card titles. These terms are an industry
+  standard and remove the naming collision with the **Shared** and **Dedicated**
+  deployment types.
+- Do **not** rename URL anchors (`#shared-infrastructure`,
+  `#dedicated-infrastructure`, `#dedicated-infrastructure-with-csps`) or
+  internal link reference IDs (e.g., `[ref-dedicated-infra]`); keep these
+  stable so external inbound links keep working. Use Mintlify's explicit
+  anchor syntax (`## Single-tenant infrastructure {#dedicated-infrastructure}`)
+  to preserve them.
+- Do **not** rename product/region identifier slugs that contain `shared`,
+  `dedicated`, or `byoc` (e.g., `aws-us-east-1-shared`, `aws-us-east-1-t-12345-prod`).
+  These are literal strings used by the product.
+- Avoid bare adjectives like "dedicated infrastructure" when you mean a
+  Dedicated **deployment type** running on its own compute. Prefer phrases
+  like "compute dedicated to your deployment" to avoid implying single-tenant
+  infrastructure.
+
 # Product Taxonomy
 Make sure to use correct terms.
 

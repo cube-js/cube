@@ -14,13 +14,13 @@ Runs on multiple Dedicated deployments.
 
 ## Shared {#shared}
 
-<Info>
+<Note>
 
 Available for free, no credit card required. Your free trial is limited to 2
 Shared deployments and only 1,000 queries per day. Upgrade to
 [any paid plan](https://cube.dev/pricing) to unlock all features.
 
-</Info>
+</Note>
 
 
 Shared deployments run on compute shared with other deployments within the
@@ -29,10 +29,10 @@ for you exclusively.
 
 <Note>
 
-If your account uses [dedicated infrastructure][ref-dedicated-infra], Shared
-deployments are only shared with your other deployments on that infrastructure
-— never with other customers. Your environment remains fully isolated at the
-infrastructure level.
+If your account uses [single-tenant infrastructure][ref-dedicated-infra],
+Shared deployments are only shared with your other deployments on that
+infrastructure — never with other customers. Your environment remains fully
+isolated at the infrastructure level.
 
 </Note>
 
@@ -58,11 +58,11 @@ You can try a Shared deployment by
 
 ## Dedicated {#dedicated}
 
-<Info>
+<Note>
 
 Available on [all paid plans](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 
 Dedicated deployments run on compute dedicated exclusively to your deployment,
@@ -71,9 +71,9 @@ giving you predictable performance and full control over capacity.
 Dedicated deployments are designed to support high-availability production
 workloads. It consists of several key components, including starting with 2 Cube
 API instances, 1 Cube Refresh Worker and 2 Cube Store Routers - all of which run
-on dedicated infrastructure. The deployment can automatically scale to meet the
-needs of your workload by adding more components as necessary; check the page on
-[scalability][ref-scalability] to learn more.
+on compute dedicated to your deployment. The deployment can automatically scale
+to meet the needs of your workload by adding more components as necessary;
+check the page on [scalability][ref-scalability] to learn more.
 
 ## Multi-cluster {#multi-cluster}
 
@@ -81,11 +81,11 @@ Multi-cluster deployments are designed for demanding production workloads,
 high-scalability, high-availability, and large [multi-tenancy][ref-multitenancy]
 configurations, e.g., with more than 100 tenants.
 
-<Info>
+<Note>
 
 Available on [Premium and above plans](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 It provides you with two options:
 * Scale the number of [Dedicated](#dedicated) deployments serving your

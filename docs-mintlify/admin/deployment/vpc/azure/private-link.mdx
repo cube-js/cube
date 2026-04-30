@@ -1,11 +1,11 @@
 ---
 title: Connecting to your VNet using Azure Private Link
 sidebarTitle: Azure Private Link
-description: Configure Azure Private Link visibility and approvals so Cube dedicated infrastructure connects to services in your VNet.
+description: Configure Azure Private Link visibility and approvals so Cube single-tenant infrastructure connects to services in your VNet.
 ---
 
 [Azure Private Link][azure-docs-private-link] enables you to access Azure PaaS services and Azure hosted customer-owned/partner services over a private endpoint in your virtual network.
-To set up a Private Link connection between Cube Cloud Dedicated Infrastructure and your own VNet,
+To set up a Private Link connection between Cube Cloud single-tenant infrastructure and your own VNet,
 you'll need to prepare a Private Link Service,
 share service details with the Cube team, and approve the incoming connection request.
 
@@ -40,9 +40,9 @@ To request establishing a Private Link connection, please share the following in
 - **Reference Name** for the record (such as "Snowflake-prod" or "databricks-dev")
 - **Ports**: a list of ports that will be accessed through this connection
 - **DNS Name** (optional): an internal DNS name of the upstream service in case SSL needs to be supported
-- **Dedicated Infrastructure Region:** Private Link requires Cube to be hosted in
-    [dedicated infrastructure][dedicated-infra]. Please specify what region the Cube Cloud
-    dedicated infrastructure should be hosted in.
+- **Single-tenant Infrastructure Region:** Private Link requires Cube to be hosted in
+    [single-tenant infrastructure][dedicated-infra]. Please specify what region the Cube Cloud
+    single-tenant infrastructure should be hosted in.
 
 If a DNS name is provided, an internal DNS record will be created pointing at the established Private Link
 connection, and the service will be addressable by that name inside the Cube Cloud infrastructure.
@@ -71,9 +71,9 @@ supplied DNS Name or an Azure internal DNS name returned to you by the Cube team
 
 ## Supported Regions
 
-Private Link connections are supported in all Azure regions where Cube Cloud dedicated infrastructure is available.
+Private Link connections are supported in all Azure regions where Cube Cloud single-tenant infrastructure is available.
 The Private Link Service and Private Endpoint must be in the same region as the Cube Cloud infrastructure.
 
 [azure-docs-private-link]: https://docs.microsoft.com/azure/private-link/
 [azure-docs-private-link-service]: https://docs.microsoft.com/azure/private-link/create-private-link-service-portal
-[dedicated-infra]: /docs/deployment/cloud/infrastructure#dedicated-infrastructure
+[dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure

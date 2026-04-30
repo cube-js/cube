@@ -3,49 +3,49 @@ title: Infrastructure Options
 description: "Cube Cloud provides four infrastructure options to host your Cube deployments:"
 ---
 
-* [Shared infrastructure](#shared-infrastructure) - your
-deployments are sharing compute resources and network with other customers.
+* [Multi-tenant infrastructure](#shared-infrastructure) - your
+deployments share compute resources and network with other customers.
 Data in-motion and data at-rest are both on the Cube Cloud side.
-* [Dedicated infrastructure](#dedicated-infrastructure) - your
+* [Single-tenant infrastructure](#dedicated-infrastructure) - your
 deployments reside in a dedicated VPC inside a Cube Cloud account and do not
 share resources with anyone else. Data in-motion and data at-rest are both on
 the Cube Cloud side.
-* [Dedicated infrastructure with CSPS](#dedicated-infrastructure-with-csps) -
-same as dedicated infrastructure, but data at-rest is stored in a customer-supplied
+* [Single-tenant infrastructure with CSPS](#dedicated-infrastructure-with-csps) -
+same as single-tenant infrastructure, but data at-rest is stored in a customer-supplied
 object store.
 * [Bring Your Own Cloud (BYOC)](#byoc) - Cube Cloud data plane is fully hosted
 in your cloud account.
 
 
-## Shared infrastructure
+## Multi-tenant infrastructure {#shared-infrastructure}
 
 This is the most common deployment option that is the easiest to get started with.
 In this scenario, everything is deployed on the Cube Cloud infrastructure in
-one of our **shared** VPCs. Cube Cloud Control Plane takes care of creating,
+one of our **multi-tenant** VPCs. Cube Cloud Control Plane takes care of creating,
 scaling, and monitoring your Cube Deployments, as well as managing Cube Store
 and persisting pre-aggregated data. This option requires the least effort to
 set up.
 
-<Info>
+<Note>
 
 Available on [all plans](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 Please note that some Enterprise features, such as VPC peering or PrivateLink are
-not available on the shared infrastructure. There's also a possibility of resource
-contention ("noisy neighbor") problem.
+not available on the multi-tenant infrastructure. There's also a possibility of
+resource contention ("noisy neighbor") problem.
 
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (shared)"
+    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (multi-tenant)"
     src="https://ucarecdn.com/35329e6b-3829-44dd-85c1-25250a8c9461/"
     style={{ border: "none" }}
     width="100%"
   />
 </div>
 
-## Dedicated infrastructure
+## Single-tenant infrastructure {#dedicated-infrastructure}
 
 It is similar to the previous option, but each customer gets a
 [Dedicated][ref-dedicated-vpc] VPC within one of Cube Cloud's own cloud
@@ -53,22 +53,22 @@ accounts that hosts only that customer's deployments. This option is great for
 most of the typical Enterprise use-cases as it provides a higher level of
 performance, as well as additional security and isolation.
 
-<Info>
+<Note>
 
-Available on [Enterprise and above plans](https://cube.dev/pricing).
+Available as an add-on on the [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (dedicated)"
+    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (single-tenant)"
     src="https://ucarecdn.com/2cc55ee4-5598-41ce-a15a-69ca683e8412/"
     style={{ border: "none" }}
     width="100%"
   />
 </div>
 
-## Dedicated infrastructure with CSPS
+## Single-tenant infrastructure with CSPS {#dedicated-infrastructure-with-csps}
 
 Cube Cloud offers a **customer-supplied pre-aggregation storage (CSPS)** that
 allows moving all data at rest to the customer
@@ -77,11 +77,12 @@ side. However, Cube Store uses a customer-provided object store for reading and
 persisting pre-aggregated data. This provides additional peace of mind when
 processing highly critical business or personal information.
 
-<Info>
+<Note>
 
-Available on the [Enterprise plan](https://cube.dev/pricing).
+Available on the [Enterprise plan](https://cube.dev/pricing) with the
+[Single-tenant infrastructure](#dedicated-infrastructure) add-on.
 
-</Info>
+</Note>
 
 
 <div style={{ textAlign: "center" }}>
@@ -98,11 +99,11 @@ Available on the [Enterprise plan](https://cube.dev/pricing).
 With [Bring Your Own Cloud](/docs/deployment/cloud/byoc) (BYOC) all the components interacting with private data are deployed on the customer infrastructure
 on a platform of choice (AWS/Azure/GCP) and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
 
-<Info>
+<Note>
 
-Available on the [Enterprise plan](https://cube.dev/pricing).
+Available as an add-on on the [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -124,16 +125,16 @@ A **Cube Cloud Region** refers to a specific cloud infrastructure instance used 
 Each Cube Cloud Region is identified by a unique identifier that contains several components:
 - **Cloud provider** (AWS, GCP, or Azure)
 - **Geographical region** (e.g., us-east-1, eu-west-1)
-- **Infrastructure type** (shared, dedicated, or BYOC)
-- **Tenant identifier** (for dedicated infrastructure)
+- **Infrastructure type** (multi-tenant, single-tenant, or BYOC)
+- **Tenant identifier** (for single-tenant infrastructure)
 - **Environment** (e.g., prod, staging)
 
 For example, a region identifier might look like:
-- `aws-us-east-1-shared` for shared infrastructure in AWS US East
-- `aws-us-east-1-t-12345-prod` for dedicated infrastructure with tenant ID 12345
+- `aws-us-east-1-shared` for multi-tenant infrastructure in AWS US East
+- `aws-us-east-1-t-12345-prod` for single-tenant infrastructure with tenant ID 12345
 - `gcp-europe-west1-t-12345-byoc` for a BYOC deployment in GCP Europe
 
-Each region also has a human-readable display name that's visible in the Cube Cloud UI. For dedicated infrastructure regions, these display names typically include the customer name and/or environment name (e.g., "Acme Corp Production (N. Virginia)" or "Acme Corp Staging (Iowa)") to help distinguish between different infrastructure instances.
+Each region also has a human-readable display name that's visible in the Cube Cloud UI. For single-tenant infrastructure regions, these display names typically include the customer name and/or environment name (e.g., "Acme Corp Production (N. Virginia)" or "Acme Corp Staging (Iowa)") to help distinguish between different infrastructure instances.
 
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/01212311-b1c5-48ce-80a2-06a923fe4eac/" />
@@ -154,7 +155,7 @@ Understanding your Cube Cloud Region is important for:
 1. **API endpoints**: Your deployment's API endpoints include the region identifier (e.g., `<deployment-id>.<region>.cubecloudapp.dev`)
 2. **Network configuration**: When setting up VPC peering, PrivateLink, or custom domains, you'll need the exact region identifier
 3. **Support requests**: Providing the correct region identifier helps Cube support team quickly locate and assist with your deployment
-4. **Infrastructure planning**: Different region types offer different capabilities (e.g., PrivateLink is only available in dedicated and BYOC regions)
+4. **Infrastructure planning**: Different region types offer different capabilities (e.g., PrivateLink is only available in single-tenant and BYOC regions)
 
 ### Finding your region identifier
 
