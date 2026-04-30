@@ -488,6 +488,132 @@ fn compute_vanilla_granularity_track<'a>(
     Some(VanillaGranularityTrack { base_member, level })
 }
 
+/// Source for one output column when materializing the [`TransformedData::Columnar`] result.
+pub(crate) enum ColumnarColumnSource {
+    /// Pull `db_row[index]` from every input row and run [`transform_value`].
+    DbColumn { index: usize },
+    /// Constant value replicated across every output row (e.g. the synthetic
+    /// `compareDateRange` column for [`QueryType::CompareDateRangeQuery`]).
+    Constant(DBResponsePrimitive),
+    /// Lookup chain failed for this member; fill the output column with `Null`
+    /// to keep one column per member (matches the null-padding behaviour of
+    /// [`transpose_to_columns`] when a row is shorter than `members`).
+    NullFilled,
+}
+
+pub(crate) struct ColumnarColumnPlan<'a> {
+    member_type: &'a str,
+    source: ColumnarColumnSource,
+}
+
+fn build_columnar_plan<'a>(
+    members: &[String],
+    members_to_alias_map: &IndexMap<String, String>,
+    annotation: &'a HashMap<String, ConfigItem>,
+    columns_pos: &IndexMap<String, usize>,
+    query_type: &QueryType,
+    time_dimensions: Option<&Vec<QueryTimeDimension>>,
+) -> Result<Vec<ColumnarColumnPlan<'a>>> {
+    let mut plan: Vec<ColumnarColumnPlan<'a>> = Vec::with_capacity(members.len());
+
+    for (i, m) in members.iter().enumerate() {
+        let is_last = i + 1 == members.len();
+
+        let resolved =
+            annotation
+                .get(m)
+                .and_then(|annotation_item| match members_to_alias_map.get(m) {
+                    Some(alias) => columns_pos
+                        .get(alias)
+                        .map(|&index| (annotation_item, index)),
+                    None => None,
+                });
+
+        if let Some((annotation_item, index)) = resolved {
+            plan.push(ColumnarColumnPlan {
+                member_type: annotation_item.member_type.as_deref().unwrap_or(""),
+                source: ColumnarColumnSource::DbColumn { index },
+            });
+            continue;
+        }
+
+        // Synthetic tail column added by `get_members` for these query types.
+        if is_last {
+            match query_type {
+                QueryType::CompareDateRangeQuery => {
+                    plan.push(ColumnarColumnPlan {
+                        member_type: "",
+                        source: ColumnarColumnSource::Constant(get_date_range_value(
+                            time_dimensions,
+                        )?),
+                    });
+                    continue;
+                }
+                QueryType::BlendingQuery => {
+                    let response_key = get_blending_response_key(time_dimensions)?;
+                    if let Some(alias) = members_to_alias_map.get(&response_key) {
+                        if let Some(&index) = columns_pos.get(alias) {
+                            // Preserve the (likely-quirky) lookup at
+                            // `get_compact_row`: member_type comes from
+                            // `annotation[alias]`, not `annotation[member]`.
+                            let member_type = annotation
+                                .get(alias)
+                                .map_or("", |a| a.member_type.as_deref().unwrap_or(""));
+                            plan.push(ColumnarColumnPlan {
+                                member_type,
+                                source: ColumnarColumnSource::DbColumn { index },
+                            });
+                            continue;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        plan.push(ColumnarColumnPlan {
+            member_type: "",
+            source: ColumnarColumnSource::NullFilled,
+        });
+    }
+
+    Ok(plan)
+}
+
+/// Materialize [`TransformedData::Columnar`] columns directly from the
+/// row-major `cube_store_result.rows` matrix.
+fn build_columnar_columns(
+    plan: &[ColumnarColumnPlan<'_>],
+    rows: &[Vec<DBResponseValue>],
+) -> Vec<Vec<DBResponsePrimitive>> {
+    let row_count = rows.len();
+    let mut columns: Vec<Vec<DBResponsePrimitive>> =
+        plan.iter().map(|_| Vec::with_capacity(row_count)).collect();
+
+    for (col_idx, plan_entry) in plan.iter().enumerate() {
+        let out = &mut columns[col_idx];
+        match &plan_entry.source {
+            ColumnarColumnSource::DbColumn { index } => {
+                for row in rows {
+                    let cell = row
+                        .get(*index)
+                        .cloned()
+                        .unwrap_or(DBResponseValue::Primitive(DBResponsePrimitive::Null));
+                    out.push(transform_value(cell, plan_entry.member_type));
+                }
+            }
+            ColumnarColumnSource::Constant(v) => {
+                out.resize(row_count, v.clone());
+            }
+            ColumnarColumnSource::NullFilled => {
+                out.resize(row_count, DBResponsePrimitive::Null);
+            }
+        }
+    }
+
+    columns
+}
+
 /// Convert DB response object to the vanilla output format.
 pub fn get_vanilla_row(
     plan: &VanillaPlan<'_>,
@@ -705,22 +831,15 @@ impl TransformedData {
                 Ok(TransformedData::Compact { members, dataset })
             }
             Some(ResultType::Columnar) => {
-                let dataset: Vec<Vec<DBResponsePrimitive>> = cube_store_result
-                    .rows
-                    .iter()
-                    .map(|row| {
-                        get_compact_row(
-                            &members_to_alias_map,
-                            annotation,
-                            query_type,
-                            &members,
-                            query.time_dimensions.as_ref(),
-                            row,
-                            &cube_store_result.columns_pos,
-                        )
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let columns = transpose_to_columns(&members, dataset);
+                let plan = build_columnar_plan(
+                    &members,
+                    &members_to_alias_map,
+                    annotation,
+                    &cube_store_result.columns_pos,
+                    query_type,
+                    query.time_dimensions.as_ref(),
+                )?;
+                let columns = build_columnar_columns(&plan, &cube_store_result.rows);
                 Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
