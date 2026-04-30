@@ -322,27 +322,6 @@ pub fn get_members(
     Ok((members_map, members_arr))
 }
 
-pub fn transpose_to_columns(
-    members: &[String],
-    dataset: Vec<Vec<DBResponsePrimitive>>,
-) -> Vec<Vec<DBResponsePrimitive>> {
-    let row_count = dataset.len();
-    let col_count = members.len();
-
-    let mut columns: Vec<Vec<DBResponsePrimitive>> = (0..col_count)
-        .map(|_| Vec::with_capacity(row_count))
-        .collect();
-
-    for row in dataset {
-        let mut row_iter = row.into_iter();
-        for col in columns.iter_mut().take(col_count) {
-            col.push(row_iter.next().unwrap_or(DBResponsePrimitive::Null));
-        }
-    }
-
-    columns
-}
-
 /// Convert DB response object to the compact output format.
 pub fn get_compact_row(
     members_to_alias_map: &IndexMap<String, String>,
@@ -496,8 +475,7 @@ pub(crate) enum ColumnarColumnSource {
     /// `compareDateRange` column for [`QueryType::CompareDateRangeQuery`]).
     Constant(DBResponsePrimitive),
     /// Lookup chain failed for this member; fill the output column with `Null`
-    /// to keep one column per member (matches the null-padding behaviour of
-    /// [`transpose_to_columns`] when a row is shorter than `members`).
+    /// to keep one column per member.
     NullFilled,
 }
 
@@ -3199,49 +3177,6 @@ mod tests {
     #[test]
     fn test_blending_query_multiple_granularities_columnar() -> Result<()> {
         assert_columnar_matches_compact("blending_query_multiple_granularities")
-    }
-
-    #[test]
-    fn test_transpose_to_columns_basic() {
-        let members = vec!["a".to_string(), "b".to_string()];
-        let dataset = vec![
-            vec![
-                DBResponsePrimitive::Number(1.0),
-                DBResponsePrimitive::String("x".to_string()),
-            ],
-            vec![
-                DBResponsePrimitive::Number(2.0),
-                DBResponsePrimitive::String("y".to_string()),
-            ],
-        ];
-        let columns = transpose_to_columns(&members, dataset);
-        assert_eq!(columns.len(), 2);
-        assert_eq!(
-            columns[0],
-            vec![
-                DBResponsePrimitive::Number(1.0),
-                DBResponsePrimitive::Number(2.0),
-            ]
-        );
-        assert_eq!(
-            columns[1],
-            vec![
-                DBResponsePrimitive::String("x".to_string()),
-                DBResponsePrimitive::String("y".to_string()),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_transpose_to_columns_pads_short_rows_with_null() {
-        let members = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let dataset = vec![vec![
-            DBResponsePrimitive::Number(1.0),
-            DBResponsePrimitive::String("x".to_string()),
-        ]];
-        let columns = transpose_to_columns(&members, dataset);
-        assert_eq!(columns.len(), 3);
-        assert_eq!(columns[2], vec![DBResponsePrimitive::Null]);
     }
 
     fn make_query_with_dims(dimensions: Option<Vec<MemberOrMemberExpression>>) -> NormalizedQuery {
