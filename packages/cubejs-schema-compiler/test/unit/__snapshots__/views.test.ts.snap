@@ -12,7 +12,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -36,7 +36,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -73,7 +73,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -100,7 +100,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -135,7 +135,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -172,7 +172,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -199,7 +199,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -234,7 +234,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -258,7 +258,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -282,7 +282,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -319,7 +319,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -346,7 +346,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -381,7 +381,7 @@ Object {
       "format": "imageUrl",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "granularities": undefined,
       "isVisible": true,
@@ -418,7 +418,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {
@@ -445,7 +445,7 @@ Object {
       "format": "number",
       "formatDescription": Object {
         "name": "number",
-        "specifier": ",.2f",
+        "specifier": ",.2~f",
       },
       "isVisible": true,
       "meta": Object {

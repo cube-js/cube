@@ -1051,11 +1051,11 @@ cubes:
       const { measures } = metaTransformer.cubes[0].config;
       const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
       expect(totalAmount).toBeDefined();
-      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2f', alias: 'accounting_2' });
+      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2~f', alias: 'accounting_2' });
 
       const bytes = measures.find((m) => m.name === 'Orders.bytes');
       expect(bytes).toBeDefined();
-      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3s', alias: 'abbr_3' });
+      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3~s', alias: 'abbr_3' });
     });
 
     it('number dimension with named format in YAML', async () => {
@@ -1083,11 +1083,11 @@ cubes:
       const { dimensions } = metaTransformer.cubes[0].config;
       const price = dimensions.find((d) => d.name === 'Orders.price');
       expect(price).toBeDefined();
-      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1f', alias: 'currency_1' });
+      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1~f', alias: 'currency_1' });
 
       const population = dimensions.find((d) => d.name === 'Orders.population');
       expect(population).toBeDefined();
-      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2s', alias: 'abbr' });
+      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2~s', alias: 'abbr' });
     });
 
     it('formatDescription for all format variants', async () => {
