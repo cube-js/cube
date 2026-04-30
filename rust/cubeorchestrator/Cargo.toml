@@ -18,7 +18,7 @@ default-features = false
 features = ["napi-1", "napi-4", "napi-6", "futures"]
 
 [dev-dependencies]
-criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+criterion = { version = "0.8", default-features = false, features = ["html_reports"] }
 
 [[bench]]
 name = "transform"
