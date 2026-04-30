@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Bug Fixes
+
+- **backend-native:** Respect `isDataQuery` flag in `cubesql` endpoint ([#10774](https://github.com/cube-js/cube/issues/10774)) ([6f3c031](https://github.com/cube-js/cube/commit/6f3c031993a292acca7d7031b18e2e31c8523d1a))
+- **cubesql:** Do not throw error on empty peer based evaluation in window aggregates ([#10776](https://github.com/cube-js/cube/issues/10776)) ([d6ca598](https://github.com/cube-js/cube/commit/d6ca598d9080ffc960a63ac5ca4e7a02486385d6))
+- **cubesql:** Preserve errors when panicking ([#10771](https://github.com/cube-js/cube/issues/10771)) ([5d571d4](https://github.com/cube-js/cube/commit/5d571d4229a5419ddf5340739c6af64b87769b2e))
+- **tesseract:** CASE handling fixes in multi-stage measures ([#10764](https://github.com/cube-js/cube/issues/10764)) ([cb66e8e](https://github.com/cube-js/cube/commit/cb66e8e755824319007f5ff90e1663c9d6f51137))
+
+### Features
+
+- Support columnar format in REST-API /v1/load ([#10775](https://github.com/cube-js/cube/issues/10775)) ([1f749cf](https://github.com/cube-js/cube/commit/1f749cf5c37d5f8dbe70fb6d785f66da02408507))
+
 ## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
 
 ### Performance Improvements

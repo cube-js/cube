@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.6.39",
+  "version": "1.6.40",
   "engines": {},
   "repository": {
     "type": "git",
@@ -55,7 +55,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.39",
+    "@cubejs-backend/linter": "1.6.40",
     "@types/d3-format": "^3",
     "@types/d3-time-format": "^4",
     "@types/moment-range": "^4.0.0",

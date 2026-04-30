@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Bug Fixes
+
+- **schema-compiler:** remove AthenaQuery.convertTz override that produces wrong timestamps on engine v3 ([#10779](https://github.com/cube-js/cube/issues/10779)) ([f395432](https://github.com/cube-js/cube/commit/f395432ea7db963da345db32d3ede7bbd38d9c68))
+
+### Features
+
+- **tesseract:** Support separate pre-aggregations for different multi-stage subqueries ([#10684](https://github.com/cube-js/cube/issues/10684)) ([46b7106](https://github.com/cube-js/cube/commit/46b71064576beb17992ef5cdc500da7f17d9baf5))
+
 ## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
 
 ### Bug Fixes

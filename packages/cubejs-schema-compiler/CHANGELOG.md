@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Bug Fixes
+
+- **schema-compiler:** remove AthenaQuery.convertTz override that produces wrong timestamps on engine v3 ([#10779](https://github.com/cube-js/cube/issues/10779)) ([f395432](https://github.com/cube-js/cube/commit/f395432ea7db963da345db32d3ede7bbd38d9c68))
+- Support not in access policy conditions ([#10767](https://github.com/cube-js/cube/issues/10767)) ([1f755a1](https://github.com/cube-js/cube/commit/1f755a10bd8140d52e9fa6c145185fd3b5835434))
+
+### Features
+
+- **tesseract:** Support separate pre-aggregations for different multi-fact subqueries ([#10718](https://github.com/cube-js/cube/issues/10718)) ([187ee17](https://github.com/cube-js/cube/commit/187ee17da2242bc2387545bbc0559620d537a443))
+- **tesseract:** Support separate pre-aggregations for different multi-stage subqueries ([#10684](https://github.com/cube-js/cube/issues/10684)) ([46b7106](https://github.com/cube-js/cube/commit/46b71064576beb17992ef5cdc500da7f17d9baf5))
+- update default number formats to trim insignificant trailing zeros ([#10782](https://github.com/cube-js/cube/issues/10782)) ([22694eb](https://github.com/cube-js/cube/commit/22694ebb25038c5089768f35d942cfa15aefb765))
+
 ## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
 
 ### Bug Fixes
