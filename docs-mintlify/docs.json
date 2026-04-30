@@ -305,7 +305,6 @@
               "admin/deployment/index",
               "admin/deployment/deployment-types",
               "admin/deployment/environments",
-              "admin/deployment/infrastructure",
               "admin/deployment/continuous-deployment",
               "admin/deployment/custom-domains",
               "admin/deployment/warm-up",
@@ -313,6 +312,7 @@
               "admin/deployment/scalability",
               "admin/deployment/encryption-keys",
               "admin/deployment/limits",
+              "admin/deployment/infrastructure",
               {
                 "group": "VPC",
                 "root": "admin/deployment/vpc/index",
