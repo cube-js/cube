@@ -49,9 +49,11 @@ impl QueryResult {
             columns_pos: IndexMap::new(),
         };
 
-        let mut opts = VerifierOptions::default();
-        opts.max_tables = 10_000_000; // Support up to 10M tables
-        opts.max_apparent_size = 1 << 31; // 2GB limit for large datasets
+        let opts = VerifierOptions {
+            max_tables: 10_000_000,     // Support up to 10M tables
+            max_apparent_size: 1 << 31, // 2GB limit for large datasets
+            ..Default::default()
+        };
 
         let http_message = root_as_http_message_with_opts(&opts, msg_data)
             .map_err(|err| ParseError::FlatBufferError(err.to_string()))?;
@@ -326,9 +328,11 @@ mod tests {
         let msg_data = create_test_message(33_000, 40);
 
         // Create custom verifier options with increased limits
-        let mut opts = VerifierOptions::default();
-        opts.max_tables = 10_000_000; // Support up to 10M tables
-        opts.max_apparent_size = 1 << 31; // 2GB limit
+        let opts = VerifierOptions {
+            max_tables: 10_000_000,     // Support up to 10M tables
+            max_apparent_size: 1 << 31, // 2GB limit
+            ..Default::default()
+        };
 
         // This should succeed with custom options
         let result = root_as_http_message_with_opts(&opts, &msg_data);
