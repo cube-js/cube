@@ -446,10 +446,17 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 
 export type RetryOptions = {
   times: number,
+  delay?: number,
+  backoffFactor?: number,
+  shouldRetry?: (err: unknown) => boolean,
+  onRetry?: (err: unknown, attempt: number) => void,
 };
 
 /**
- * High order function that do retry when async function throw an exception
+ * High order function that do retry when async function throw an exception.
+ *
+ * Supports optional delay between retries, exponential backoff, and
+ * a predicate to decide which errors are retryable.
  */
 export const asyncRetry = async <Ret>(
   fn: () => Promise<Ret>,
@@ -466,8 +473,76 @@ export const asyncRetry = async <Ret>(
       return await fn();
     } catch (e) {
       latestException = e;
+
+      const isLastAttempt = i === options.times - 1;
+      if (isLastAttempt) {
+        break;
+      }
+
+      if (options.shouldRetry && !options.shouldRetry(e)) {
+        break;
+      }
+
+      if (options.onRetry) {
+        options.onRetry(e, i + 1);
+      }
+
+      if (options.delay && options.delay > 0) {
+        const backoff = options.backoffFactor ?? 1;
+        const waitMs = options.delay * (backoff ** i);
+        await new Promise((resolve) => { setTimeout(resolve, waitMs); });
+      }
     }
   }
 
   throw latestException;
+};
+
+export type RetryFetchOptions = {
+  times?: number,
+  delay?: number,
+  backoffFactor?: number,
+  onRetry?: (err: unknown, attempt: number) => void,
+};
+
+const isTransientFetchError = (err: unknown): boolean => {
+  if (err instanceof TypeError) {
+    const msg = (err as TypeError).message || '';
+    return msg === 'fetch failed' ||
+      msg.includes('network') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('ETIMEDOUT') ||
+      msg.includes('UND_ERR_SOCKET') ||
+      msg.includes('UND_ERR_CONNECT_TIMEOUT');
+  }
+  return false;
+};
+
+/**
+ * Wraps a fetch-like function with retry logic for transient network errors.
+ * Designed for use with HTTP clients (e.g. Qdrant, external APIs) that may
+ * experience intermittent connectivity issues.
+ */
+export const retryFetch = (
+  fetchFn: typeof globalThis.fetch,
+  options: RetryFetchOptions = {},
+): typeof globalThis.fetch => {
+  const {
+    times = 3,
+    delay = 500,
+    backoffFactor = 2,
+    onRetry,
+  } = options;
+
+  return (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => asyncRetry(
+    () => fetchFn(input, init),
+    {
+      times,
+      delay,
+      backoffFactor,
+      shouldRetry: isTransientFetchError,
+      onRetry,
+    }
+  );
 };

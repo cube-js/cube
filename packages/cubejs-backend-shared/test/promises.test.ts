@@ -9,6 +9,7 @@ import {
   asyncRetry,
   asyncDebounceFn,
   asyncMemoizeBackground,
+  retryFetch,
 } from '../src';
 
 test('createCancelablePromise', async () => {
@@ -483,6 +484,206 @@ describe('asyncDebounce', () => {
 
     await doOnce('arg1', 'arg2');
     expect(called).toEqual(2);
+  });
+});
+
+describe('asyncRetry with delay and backoff', () => {
+  test('retries with delay between attempts', async () => {
+    let called = 0;
+    const start = Date.now();
+
+    const result = await asyncRetry(
+      async () => {
+        called++;
+        if (called < 3) {
+          throw new Error('transient');
+        }
+        return 42;
+      },
+      {
+        times: 5,
+        delay: 50,
+      }
+    );
+
+    const elapsed = Date.now() - start;
+    expect(result).toEqual(42);
+    expect(called).toEqual(3);
+    expect(elapsed).toBeGreaterThanOrEqual(90);
+  });
+
+  test('retries with exponential backoff', async () => {
+    let called = 0;
+    const start = Date.now();
+
+    const result = await asyncRetry(
+      async () => {
+        called++;
+        if (called < 3) {
+          throw new Error('transient');
+        }
+        return 99;
+      },
+      {
+        times: 5,
+        delay: 50,
+        backoffFactor: 2,
+      }
+    );
+
+    const elapsed = Date.now() - start;
+    expect(result).toEqual(99);
+    expect(called).toEqual(3);
+    expect(elapsed).toBeGreaterThanOrEqual(140);
+  });
+
+  test('stops retrying when shouldRetry returns false', async () => {
+    let called = 0;
+
+    try {
+      await asyncRetry(
+        async () => {
+          called++;
+          throw new Error(called === 1 ? 'retryable' : 'fatal');
+        },
+        {
+          times: 5,
+          shouldRetry: (err) => (err as Error).message === 'retryable',
+        }
+      );
+      throw new Error('should have thrown');
+    } catch (e: any) {
+      expect(e.message).toEqual('fatal');
+      expect(called).toEqual(2);
+    }
+  });
+
+  test('calls onRetry callback on each retry', async () => {
+    const retryLog: Array<{ err: string, attempt: number }> = [];
+
+    await asyncRetry(
+      async () => {
+        if (retryLog.length < 2) {
+          throw new Error(`fail-${retryLog.length}`);
+        }
+        return 'ok';
+      },
+      {
+        times: 5,
+        onRetry: (err, attempt) => {
+          retryLog.push({ err: (err as Error).message, attempt });
+        },
+      }
+    );
+
+    expect(retryLog).toEqual([
+      { err: 'fail-0', attempt: 1 },
+      { err: 'fail-1', attempt: 2 },
+    ]);
+  });
+});
+
+describe('retryFetch', () => {
+  test('returns response on success without retrying', async () => {
+    const mockResponse = { ok: true, status: 200 } as Response;
+    const mockFetch = jest.fn().mockResolvedValue(mockResponse);
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch);
+    const result = await fetchWithRetry('http://example.com/test');
+
+    expect(result).toBe(mockResponse);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('retries on TypeError: fetch failed', async () => {
+    const mockResponse = { ok: true, status: 200 } as Response;
+    const mockFetch = jest.fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValue(mockResponse);
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch, {
+      times: 3,
+      delay: 10,
+    });
+    const result = await fetchWithRetry('http://qdrant:6333/collections');
+
+    expect(result).toBe(mockResponse);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('does not retry on non-transient errors', async () => {
+    const mockFetch = jest.fn()
+      .mockRejectedValue(new Error('invalid argument'));
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch, {
+      times: 3,
+      delay: 10,
+    });
+
+    await expect(fetchWithRetry('http://qdrant:6333/collections'))
+      .rejects.toThrow('invalid argument');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('throws after exhausting all retries', async () => {
+    const mockFetch = jest.fn()
+      .mockRejectedValue(new TypeError('fetch failed'));
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch, {
+      times: 3,
+      delay: 10,
+    });
+
+    await expect(fetchWithRetry('http://qdrant:6333/collections'))
+      .rejects.toThrow('fetch failed');
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('retries on ECONNREFUSED', async () => {
+    const mockResponse = { ok: true, status: 200 } as Response;
+    const mockFetch = jest.fn()
+      .mockRejectedValueOnce(new TypeError('ECONNREFUSED'))
+      .mockResolvedValue(mockResponse);
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch, {
+      times: 3,
+      delay: 10,
+    });
+    const result = await fetchWithRetry('http://qdrant:6333/collections');
+
+    expect(result).toBe(mockResponse);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('passes input and init through to underlying fetch', async () => {
+    const mockResponse = { ok: true, status: 200 } as Response;
+    const mockFetch = jest.fn().mockResolvedValue(mockResponse);
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch);
+    const init = { method: 'POST', body: '{}' };
+    await fetchWithRetry('http://qdrant:6333/collections', init);
+
+    expect(mockFetch).toHaveBeenCalledWith('http://qdrant:6333/collections', init);
+  });
+
+  test('calls onRetry callback', async () => {
+    const mockResponse = { ok: true, status: 200 } as Response;
+    const retries: number[] = [];
+    const mockFetch = jest.fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValue(mockResponse);
+
+    const fetchWithRetry = retryFetch(mockFetch as typeof globalThis.fetch, {
+      times: 3,
+      delay: 10,
+      onRetry: (_err, attempt) => { retries.push(attempt); },
+    });
+    await fetchWithRetry('http://qdrant:6333/collections');
+
+    expect(retries).toEqual([1]);
   });
 });
 
