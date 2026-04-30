@@ -409,13 +409,22 @@ pub(crate) struct VanillaGranularityTrack<'a> {
     level: u8,
 }
 
-pub fn build_vanilla_column_plan<'a>(
+/// Plan for the entire vanilla transform: per-column entries plus a flag
+/// telling `get_vanilla_row` whether any column requires the
+/// minimal-granularity bookkeeping path.
+pub struct VanillaPlan<'a> {
+    columns: Vec<VanillaColumnPlan<'a>>,
+    has_granularity_tracking: bool,
+}
+
+pub fn build_vanilla_plan<'a>(
     columns_pos: &'a IndexMap<String, usize>,
     alias_to_member_name_map: &'a HashMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
     query: &NormalizedQuery,
-) -> Result<Vec<VanillaColumnPlan<'a>>> {
-    let mut plans = Vec::with_capacity(columns_pos.len());
+) -> Result<VanillaPlan<'a>> {
+    let mut columns = Vec::with_capacity(columns_pos.len());
+    let mut has_granularity_tracking = false;
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
             Some(m) => m.as_str(),
@@ -429,15 +438,21 @@ pub fn build_vanilla_column_plan<'a>(
         // Try to collect minimal granularity value for time dimensions without granularity
         // as there might be more than one granularity column for the same dimension.
         let granularity_track = compute_vanilla_granularity_track(member_name, query);
+        if granularity_track.is_some() {
+            has_granularity_tracking = true;
+        }
 
-        plans.push(VanillaColumnPlan {
+        columns.push(VanillaColumnPlan {
             column_index: index,
             member_name,
             member_type,
             granularity_track,
         });
     }
-    Ok(plans)
+    Ok(VanillaPlan {
+        columns,
+        has_granularity_tracking,
+    })
 }
 
 // FIXME: For now custom granularities are not supported, only common ones.
@@ -476,38 +491,49 @@ fn compute_vanilla_granularity_track<'a>(
 
 /// Convert DB response object to the vanilla output format.
 pub fn get_vanilla_row(
-    plan: &[VanillaColumnPlan<'_>],
+    plan: &VanillaPlan<'_>,
     query_type: &QueryType,
     query: &NormalizedQuery,
     db_row: &[DBResponseValue],
 ) -> Result<IndexMap<String, DBResponsePrimitive>> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
-    let mut row = IndexMap::with_capacity(plan.len() + 1);
+    let mut row = IndexMap::with_capacity(plan.columns.len() + 1);
 
-    // FIXME: For now custom granularities are not supported, only common ones.
-    // There is no granularity type/class implementation in rust yet.
-    let mut minimal_granularities: HashMap<&str, (u8, DBResponsePrimitive)> = HashMap::new();
+    if plan.has_granularity_tracking {
+        // FIXME: For now custom granularities are not supported, only common ones.
+        // There is no granularity type/class implementation in rust yet.
+        let mut minimal_granularities: HashMap<&str, (u8, DBResponsePrimitive)> = HashMap::new();
 
-    for column in plan {
-        if let Some(value) = db_row.get(column.column_index) {
-            let transformed_value = transform_value(value.clone(), column.member_type);
-            row.insert(column.member_name.to_string(), transformed_value.clone());
+        for column in &plan.columns {
+            if let Some(value) = db_row.get(column.column_index) {
+                let transformed_value = transform_value(value.clone(), column.member_type);
+                row.insert(column.member_name.to_string(), transformed_value.clone());
 
-            if let Some(track) = &column.granularity_track {
-                match minimal_granularities.get(track.base_member) {
-                    Some((existing_level, _)) if *existing_level < track.level => {}
-                    _ => {
-                        minimal_granularities
-                            .insert(track.base_member, (track.level, transformed_value));
+                if let Some(track) = &column.granularity_track {
+                    match minimal_granularities.get(track.base_member) {
+                        Some((existing_level, _)) if *existing_level < track.level => {}
+                        _ => {
+                            minimal_granularities
+                                .insert(track.base_member, (track.level, transformed_value));
+                        }
                     }
                 }
             }
         }
-    }
 
-    // Handle deprecated time dimensions without granularity
-    for (base_member, (_, value)) in minimal_granularities {
-        row.insert(base_member.to_string(), value);
+        // Handle deprecated time dimensions without granularity
+        for (base_member, (_, value)) in minimal_granularities {
+            row.insert(base_member.to_string(), value);
+        }
+    } else {
+        // Fast path: no column needs granularity bookkeeping. Skip the HashMap
+        // entirely and move the transformed value straight into the row.
+        for column in &plan.columns {
+            if let Some(value) = db_row.get(column.column_index) {
+                let transformed_value = transform_value(value.clone(), column.member_type);
+                row.insert(column.member_name.to_string(), transformed_value);
+            }
+        }
     }
 
     match query_type {
@@ -699,7 +725,7 @@ impl TransformedData {
                 Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
-                let plan = build_vanilla_column_plan(
+                let plan = build_vanilla_plan(
                     &cube_store_result.columns_pos,
                     alias_to_member_name_map,
                     annotation,
@@ -2910,7 +2936,7 @@ mod tests {
         let query = test_data.request.query.clone();
         let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
-        let plan = build_vanilla_column_plan(
+        let plan = build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
@@ -2946,13 +2972,13 @@ mod tests {
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
 
-        match build_vanilla_column_plan(
+        match build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
             &query,
         ) {
-            Ok(_) => Err(TestError("build_vanilla_column_plan() should fail ".to_string()).into()),
+            Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
                 assert!(err.to_string().contains("Missing member name for alias"));
                 Ok(())
@@ -2975,13 +3001,13 @@ mod tests {
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
 
-        match build_vanilla_column_plan(
+        match build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
             &query,
         ) {
-            Ok(_) => Err(TestError("build_vanilla_column_plan() should fail ".to_string()).into()),
+            Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
                 assert!(err.to_string().contains("You requested hidden member"));
                 Ok(())
