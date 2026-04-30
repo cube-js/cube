@@ -16,6 +16,21 @@ alwaysApply: true
 - **Production** — production deployment type (legacy: "Production cluster")
 - **Multi-cluster** — multi-cluster production deployment type (legacy: "Production multi-cluster")
 
+# Plan Tier Naming
+
+Cube's commercial plan tiers, in order: **Free**, **Starter**, **Premium**,
+**Enterprise**. **Enterprise is the top tier — nothing is above it.**
+
+When describing plan availability:
+
+- ✅ "Available on the [Enterprise plan]" (single tier, top of stack)
+- ✅ "Available on [Premium and above plans]" (Premium + Enterprise)
+- ✅ "Available on [Starter and above plans]" (Starter + Premium + Enterprise)
+- ❌ Do **not** write "Enterprise and above plans" — there is nothing above
+  Enterprise. Use "Enterprise plan" (singular) instead.
+- For Enterprise-only features that require an additional purchase, use
+  "Available as an add-on on the [Enterprise plan]".
+
 # Infrastructure Naming
 
 Infrastructure options are a separate, orthogonal concept from deployment types.
