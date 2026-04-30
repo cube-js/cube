@@ -1133,6 +1133,7 @@ const folderSchema = Joi.object().keys({
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
   viewGroup: Joi.string(),
+  viewGroups: Joi.array().items(Joi.string().required()),
   cubes: Joi.array().items(
     Joi.object().keys({
       joinPath: Joi.func().required(),

@@ -215,6 +215,7 @@ export interface CubeDefinition {
   cubes?: any;
   isView?: boolean;
   viewGroup?: string;
+  viewGroups?: string[];
   calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: ViewIncludedMember[];

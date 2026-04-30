@@ -148,6 +148,7 @@ export type CubeConfig = {
   public: boolean;
   description?: string;
   viewGroup?: string;
+  viewGroups?: string[];
   connectedComponent: number;
   meta?: any;
   measures: MeasureConfig[];
@@ -229,8 +230,20 @@ export class CubeToMetaTransformer implements CompilerInterface {
     for (const cube of this.cubes) {
       if (cube.config.type === 'view') {
         const extendedCube = this.cubeSymbols.cubeList.find(c => c.name === cube.config.name) as any;
-        const viewGroupName = extendedCube?.viewGroup;
-        if (viewGroupName) {
+
+        const groupNames: string[] = [];
+        if (extendedCube?.viewGroup) {
+          groupNames.push(extendedCube.viewGroup);
+        }
+        if (Array.isArray(extendedCube?.viewGroups)) {
+          for (const name of extendedCube.viewGroups) {
+            if (!groupNames.includes(name)) {
+              groupNames.push(name);
+            }
+          }
+        }
+
+        for (const viewGroupName of groupNames) {
           let group = viewGroupMap.get(viewGroupName);
           if (!group) {
             group = { name: viewGroupName, views: [] };
@@ -239,7 +252,13 @@ export class CubeToMetaTransformer implements CompilerInterface {
           if (!group.views.includes(cube.config.name)) {
             group.views.push(cube.config.name);
           }
-          cube.config.viewGroup = viewGroupName;
+        }
+
+        if (groupNames.length === 1) {
+          [cube.config.viewGroup] = groupNames;
+        }
+        if (groupNames.length > 0) {
+          cube.config.viewGroups = groupNames;
         }
       }
     }
@@ -247,8 +266,15 @@ export class CubeToMetaTransformer implements CompilerInterface {
     for (const group of viewGroupMap.values()) {
       for (const viewName of group.views) {
         const cube = this.cubes.find(c => c.config.name === viewName);
-        if (cube && !cube.config.viewGroup) {
-          cube.config.viewGroup = group.name;
+        if (cube) {
+          if (!cube.config.viewGroup) {
+            cube.config.viewGroup = group.name;
+          }
+          if (!cube.config.viewGroups) {
+            cube.config.viewGroups = [group.name];
+          } else if (!cube.config.viewGroups.includes(group.name)) {
+            cube.config.viewGroups.push(group.name);
+          }
         }
       }
     }
