@@ -322,25 +322,24 @@ pub fn get_members(
     Ok((members_map, members_arr))
 }
 
-/// Transpose a row-oriented dataset (rows of primitive arrays) into a column-oriented
-/// layout (one primitive array per member). Members slice defines column count and
-/// alignment; rows shorter than `members.len()` are padded with `Null` for the missing
-/// trailing positions.
 pub fn transpose_to_columns(
     members: &[String],
     dataset: Vec<Vec<DBResponsePrimitive>>,
 ) -> Vec<Vec<DBResponsePrimitive>> {
     let row_count = dataset.len();
     let col_count = members.len();
+
     let mut columns: Vec<Vec<DBResponsePrimitive>> = (0..col_count)
         .map(|_| Vec::with_capacity(row_count))
         .collect();
+
     for row in dataset {
         let mut row_iter = row.into_iter();
         for col in columns.iter_mut().take(col_count) {
             col.push(row_iter.next().unwrap_or(DBResponsePrimitive::Null));
         }
     }
+
     columns
 }
 
