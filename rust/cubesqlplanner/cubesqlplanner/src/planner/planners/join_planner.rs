@@ -1,8 +1,8 @@
 use super::CommonUtils;
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlCall;
@@ -42,10 +42,13 @@ impl JoinPlanner {
 
     pub fn make_join_logical_plan_with_join_hints(
         &self,
-        join_hints: Vec<JoinHintItem>,
+        join_hints: JoinHints,
         dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     ) -> Result<Rc<LogicalJoin>, CubeError> {
-        let join = self.query_tools.join_graph().build_join(join_hints)?;
+        let join = self
+            .query_tools
+            .join_graph()
+            .build_join(join_hints.into_items())?;
         self.make_join_logical_plan(join, dimension_subqueries)
     }
 
@@ -93,12 +96,12 @@ impl JoinPlanner {
 
     pub fn resolve_join_members_by_hints(
         &self,
-        join_hints: &Vec<JoinHintItem>,
+        join_hints: &JoinHints,
     ) -> Result<Vec<ResolvedJoinItem>, CubeError> {
         let join = self
             .query_tools
             .join_graph()
-            .build_join(join_hints.clone())?;
+            .build_join(join_hints.items().to_vec())?;
         self.resolve_join_members(join)
     }
     pub fn resolve_join_members(

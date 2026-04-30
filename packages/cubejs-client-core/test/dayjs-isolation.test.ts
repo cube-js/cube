@@ -1,6 +1,3 @@
-/* globals describe,test,expect */
-
-import 'jest';
 import dayjs from 'dayjs';
 import { internalDayjs } from '../src/time';
 

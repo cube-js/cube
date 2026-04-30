@@ -50,7 +50,7 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
   return `${prefix}${showRestParams ? `\n${restParams}` : ''}`;
 };
 
-export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { error, warning, ...restParams }: LoggerFnParams): void => {
+export const devLogger = (filterByLevel: LogLevel) => (type: string, { error, warning, ...restParams }: LoggerFnParams): void => {
   const logWarning = () => console.log(
     `${withColor(type, colors.yellow)}: ${format({ ...restParams, allSqlLines: true, showRestParams: true })} \n${withColor(warning || '', colors.yellow)}`
   );
@@ -68,13 +68,15 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
     return;
   }
 
+  // eslint-disable-next-line default-case
   switch (filterByLevel.toLowerCase()) {
     case 'trace': {
       if (!error && !warning) {
         logDetails(true);
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'info': {
       if (!error && !warning && [
         'Executing SQL',
@@ -86,27 +88,27 @@ export const devLogger = (filterByLevel: LogLevel = 'info') => (type: string, { 
         'Streaming successfully completed',
       ].includes(type)) {
         logDetails();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'warn': {
       if (!error && warning) {
         logWarning();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'error': {
       if (error) {
         logError();
+        break;
       }
-      break;
     }
-    default:
-      throw new Error(`Unknown log level: ${filterByLevel}`);
   }
 };
 
-export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string, params: LoggerFnParams): void => {
+export const prodLogger = (filterByLevel: LogLevel) => (message: string, params: LoggerFnParams): void => {
   const { error, warning } = params;
 
   if (!params.level) {
@@ -130,38 +132,53 @@ export const prodLogger = (filterByLevel: LogLevel = 'warn') => (message: string
     }));
   };
 
+  // eslint-disable-next-line default-case
   switch (filterByLevel.toLowerCase()) {
     case 'trace': {
       if (!error && !warning) {
         logMessage();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'info':
       if ([
         'REST API Request',
       ].includes(message)) {
         logMessage();
+        break;
       }
-      break;
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'warn': {
       if (!error && warning) {
         logMessage();
+        break;
       }
-      break;
     }
+    // falls through, trick from 90x, levels inheritance, David Blaine: Street Magic
     case 'error': {
       if (error) {
         logMessage();
+        break;
       }
-      break;
     }
-    default:
-      throw new Error(`Unknown log level: ${filterByLevel}`);
   }
 };
 
 export const createLogger = (production: boolean, filterByLevel: LogLevel = 'info'): LoggerFn => {
+  switch (filterByLevel.toLowerCase()) {
+    case 'trace':
+    case 'info':
+    case 'warn':
+    case 'error':
+      break;
+    // not used, but let's allow
+    case 'debug':
+      break;
+    default:
+      throw new Error(`Invalid log level: ${filterByLevel}`);
+  }
+
   if (production) {
     return prodLogger(filterByLevel);
   } else {

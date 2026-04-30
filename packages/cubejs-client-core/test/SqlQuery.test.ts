@@ -4,8 +4,6 @@
  * @fileoverview SqlQuery class unit tests.
  */
 
-/* globals describe,it,expect */
-
 import SqlQuery, { SqlQueryTuple, SqlData, SqlQueryWrapper } from '../src/SqlQuery';
 
 describe('SqlQuery', () => {

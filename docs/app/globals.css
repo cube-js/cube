@@ -241,6 +241,18 @@ header nav button:not([aria-label="Menu"]) {
   align-items: center !important;
 }
 
+/* Keep search button visible on mobile */
+header.nextra-navbar nav > div.x\:max-md\:hidden:has(button) {
+  display: flex !important;
+}
+
+/* Hide "Get started for free" button on mobile */
+@media (max-width: 767px) {
+  header.nextra-navbar nav a[href*="cubecloud.dev/auth/signup"] {
+    display: none !important;
+  }
+}
+
 /* Purple Banner wrapper - animated reveal */
 .pb-wrapper {
   --purple-banner-font: var(--font-cera-pro), system-ui, -apple-system, sans-serif;

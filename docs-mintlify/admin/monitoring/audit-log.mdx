@@ -1,0 +1,89 @@
+---
+title: Audit Log
+description: Learn how to turn on Audit Log in Cube Cloud, review security events across deployments, and download them for compliance reviews.
+---
+
+Audit Log collects, stores, and displays security-related events within a Cube Cloud
+account, across all deployments. You can use it to maintain and review a historical
+record of activity for compliance purposes.
+
+<Info>
+
+Available on the [Enterprise plan](https://cube.dev/pricing).
+
+</Info>
+
+Read below about [collected events](#event-types). Also, see how you can [enable](#configuration)
+Audit Log, [view events](#viewing-events), and [download](#downloading-events) them.
+
+
+## Configuration
+
+To enable Audit Log, navigate to the **Team & Security** page, open the
+**Audit Log** tab, and turn the **Enable Audit Log** switch on.
+
+## Viewing events
+
+### Table view
+
+Audit Log displays events in a table with the following information for each event:
+- Event timestamp in your local time zone.
+- User email, if applicable to a particular event.
+- Event name (see [event types](#event-types) for the full list).
+- Deployment name, if applicable to a particular event.
+
+
+### Extended view
+
+You can click on any event to view extended information:
+- IP address from which an event was initiated.
+- Event-specific attributes.
+
+
+#### Sanitization
+
+Audit Log uses heuristics to detect sensitive values (e.g., passwords and tokens)
+and sanitize them, i.e., replace them with `[HIDDEN]` in event-specific
+attributes. You can see that a password was sanitized on the screenshot above.
+
+If you'd like your custom environment variable to be sanitized, include one of
+the following substrings in its name: `PASS`, `SECRET`, `TOKEN`, `KEY`.
+
+### Filters
+
+You can also customize the table view with filters on the top and in the right sidebar:
+- Text input for full-text search.
+- Date range filter.
+- Filters to narrow the view down to a specific user, event, or deployment.
+
+## Downloading events
+
+You can use the **↓ CSV** button to download a CSV file with all events in the
+current view:
+
+
+## Exporting events via API
+
+You can also export audit log events as a CSV file programmatically using the
+[`/api/v1/audit-logs/export`][ref-audit-log-api] endpoint of the
+[Control Plane API][ref-control-plane-api]. This is useful for integrating
+with external log aggregation or SIEM tools.
+
+## Event types
+
+Audit Log collects the following types of events:
+
+| Category | Event type |
+| --- | --- |
+| Users | `Created user`<br/>`Deleted user`<br/>`Invited user`<br/>`Updated user profile`<br/>`Requested password reset`<br/>`Changed password` |
+| SCIM provisioning | `Created user via SCIM`<br/>`Updated user via SCIM`<br/>`Deleted user via SCIM`<br/>`Created group via SCIM`<br/>`Updated group via SCIM`<br/>`Deleted group via SCIM` |
+| [Custom roles](/admin/users-and-permissions/custom-roles) | `Created role`<br/>`Deleted role`<br/>`Updated role`<br/>`Assigned role to user`<br/>`Assigned roles to user`<br/>`Removed role from user` |
+| Authentication | `Logged in`<br/>`Logged out`<br/>`Redirected to SAML provider for login`<br/>`Logged in via SAML` |
+| Account and [single sign-on](/docs/workspace/sso) | `Updated account settings`<br/>`Updated account authentication configuration`<br/>`Updated account SAML configuration`<br/>`Uploaded identity provider metadata file` |
+| [Deployments](/docs/deployment/cloud/deployments) | `Created deployment`<br/>`Deleted deployment`<br/>`Updated deployment configuration`<br/>`Enabled SQL API for deployment`<br/>`Generated data model` |
+| Branches and [dev mode](/docs/data-modeling/dev-mode) | `Created Git branch`<br/>`Deleted Git branch`<br/>`Entered dev mode`<br/>`Exited dev mode`<br/>`Pulled changes to data model`<br/>`Committed and merged changes to data model`<br/>`Merged changes to data model`<br/>`Reverted changes to data model in branch` |
+| [Continuous deployment](/docs/deployment/cloud/continuous-deployment) | `Requested connection of GitHub account`<br/>`Connected deployment to GitHub repository`<br/>`Generated SSH key for deployment`<br/>`Connected deployment to Git upstream`<br/>`Generated Git credentials for Cube Cloud repository`<br/>`Generated webhook token for Git repository`<br/>`Received a Git hook`<br/>`Started uploading files`<br/>`Finished uploading files`<br/>`Triggered new build` |
+| [Budgets](/admin/account-billing/budgets) | `Created budget`<br/>`Deleted budget`<br/>`Updated budget` |
+
+[ref-control-plane-api]: /reference/control-plane-api
+[ref-audit-log-api]: /reference/control-plane-api#%2Fapi%2Fv1%2Faudit-logs%2Fexport

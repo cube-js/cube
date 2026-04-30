@@ -1,0 +1,75 @@
+---
+title: Billing FAQ
+sidebarTitle: Billing FAQ
+description: Frequently asked questions about Cube billing, pricing, payments, and invoices.
+---
+
+## Billing basics
+
+### How does the billing structure work?
+
+#### Self-serve customers
+
+Self-serve customers are billed monthly. The credit card on file is automatically
+charged through Stripe upon invoice generation.
+
+- Invoices bill active seats in advance for the upcoming period
+- Any seat count changes made during a previously billed period are charged in
+  arrears on a prorated basis on the next invoice, as well as billed in advance
+  on all subsequent invoices until the customer makes further adjustments
+
+#### Order form customers
+
+**Order form customers** are billed annually and upfront according to the terms
+in their signed order form.
+
+- Committed seats are billed annually
+- Overages for uncommitted seats and usage are billed in arrears separately on a
+  basis specified in the signed order form
+- Standard payment terms are **Net 30**, unless otherwise specified in the agreement
+
+### What payment methods does Cube accept?
+
+#### Self-serve customers
+
+Self-serve subscriptions must be paid by credit card via Stripe. Your card is
+automatically charged on a recurring subscription basis at the start of each
+billing cycle.
+
+<Info>
+Cube does **not** support ACH or wire transfer payments for self-serve plans.
+</Info>
+
+#### Order form customers
+
+Order form customers can pay via:
+
+- **Invoice billing** (e.g., Net 30 terms) — Payment terms are defined in your
+  executed order form and reflected on your invoice.
+- **ACH / wire transfer** — Bank details (Stripe-managed virtual accounts) are
+  listed directly on the invoice. Please reach out to
+  [support@cube.dev](mailto:support@cube.dev) if you require validation.
+- **Credit card** (via Stripe) — Order form customers may also pay by credit card.
+
+### How can I update my payment information?
+
+To update your payment information, log in to your Cube account and navigate to
+the billing settings page.
+
+If you need assistance confirming or updating your account email, please reach
+out to [support@cube.dev](mailto:support@cube.dev).
+
+### What happens if my credit card payment fails?
+
+If your credit card payment fails:
+
+1. **We automatically retry the charge** — Stripe will automatically retry the
+   payment using the card on file. Sometimes failures are temporary (e.g.,
+   insufficient funds, bank block, expired card).
+2. **You may receive an email notification** — If the payment continues to fail,
+   you'll receive an email prompting you to update your payment method.
+3. **Update your card** — You can update your card through the billing settings
+   page. Once updated, the system will automatically retry the charge.
+4. **Continued failed payments** — If payment isn't resolved after multiple
+   attempts, your account may be restricted or suspended until the outstanding
+   balance is paid.

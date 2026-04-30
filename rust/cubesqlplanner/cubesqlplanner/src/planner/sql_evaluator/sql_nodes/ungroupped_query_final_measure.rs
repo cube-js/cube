@@ -1,5 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::symbols::{AggregationType, MeasureKind};
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -32,8 +33,23 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
+                let is_count_like = match ev.kind() {
+                    MeasureKind::Count(_) => true,
+                    MeasureKind::Aggregated(a) => matches!(
+                        a.agg_type(),
+                        AggregationType::CountDistinct | AggregationType::CountDistinctApprox
+                    ),
+                    _ => false,
+                };
+                // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
+                // (safe), other kinds pass through and must propagate the flag.
+                let child_visitor = if is_count_like {
+                    visitor.with_arg_needs_paren_safe(false)
+                } else {
+                    visitor.clone()
+                };
                 let input = self.input.to_sql(
-                    visitor,
+                    &child_visitor,
                     node,
                     query_tools.clone(),
                     node_processor.clone(),
@@ -42,15 +58,10 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
 
                 if input == "*" {
                     "1".to_string()
+                } else if is_count_like {
+                    format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
                 } else {
-                    if ev.measure_type() == "count"
-                        || ev.measure_type() == "countDistinct"
-                        || ev.measure_type() == "countDistinctApprox"
-                    {
-                        format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
-                    } else {
-                        input
-                    }
+                    input
                 }
             }
             _ => {

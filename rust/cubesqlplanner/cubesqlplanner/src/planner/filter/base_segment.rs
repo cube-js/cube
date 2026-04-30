@@ -1,6 +1,5 @@
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{
-    MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
+    CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
 };
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{evaluate_with_context, VisitorContext};
@@ -24,17 +23,18 @@ impl PartialEq for BaseSegment {
 impl BaseSegment {
     pub fn try_new(
         expression: Rc<SqlCall>,
-        cube_name: String,
+        cube_symbol: Rc<CubeTableSymbol>,
         name: String,
         full_name: Option<String>,
-        query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
+        let cube_name = cube_symbol.cube_name().clone();
         let member_expression_symbol = MemberExpressionSymbol::try_new(
-            cube_name.clone(),
+            cube_symbol,
             name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             None,
-            query_tools.base_tools().clone(),
+            None,
+            vec![cube_name.clone()],
         )?;
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);

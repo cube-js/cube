@@ -266,6 +266,7 @@ jobs:
           - mssql
           - mysql
           - postgres
+          - postgres-pre-agg-credentials
           - redshift
           - redshift-export-bucket-s3
           - snowflake
@@ -293,6 +294,10 @@ jobs:
           - database: databricks-jdbc
             use_tesseract_sql_planner: true
           - database: mysql
+            use_tesseract_sql_planner: true
+          - database: clickhouse
+            use_tesseract_sql_planner: true
+          - database: mssql
             use_tesseract_sql_planner: true
       fail-fast: false
 

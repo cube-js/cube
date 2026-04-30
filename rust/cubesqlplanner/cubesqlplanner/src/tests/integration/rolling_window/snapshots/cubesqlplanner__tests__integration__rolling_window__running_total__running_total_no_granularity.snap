@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/running_total.rs
+expression: result
+---
+orders__running_total
+---------------------
+1080.00

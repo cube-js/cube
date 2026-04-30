@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+orders__status | customers__count | orders__count | orders__total_amount
+---------------+------------------+---------------+---------------------
+completed      | 3                | 5             | 1150.00             
+pending        | 2                | 3             | 225.00              
+NULL           | 1                | NULL          | NULL

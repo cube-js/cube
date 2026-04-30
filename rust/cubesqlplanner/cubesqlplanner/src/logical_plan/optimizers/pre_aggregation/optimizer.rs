@@ -3,6 +3,8 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
+use crate::planner::join_hints::JoinHints;
+use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -28,6 +30,7 @@ impl PreAggregationOptimizer {
         &mut self,
         plan: Rc<Query>,
         disable_external_pre_aggregations: bool,
+        pre_aggregation_id: Option<&str>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         let cube_names = collect_cube_names_from_node(&plan)?;
         let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
@@ -36,6 +39,12 @@ impl PreAggregationOptimizer {
             compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?;
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            if let Some(id) = pre_aggregation_id {
+                let full_name = format!("{}.{}", pre_aggregation.cube_name, pre_aggregation.name);
+                if full_name != id {
+                    continue;
+                }
+            }
             let new_query = self.try_rewrite_query(plan.clone(), pre_aggregation)?;
             if new_query.is_some() {
                 return Ok(new_query);
@@ -68,9 +77,14 @@ impl PreAggregationOptimizer {
         query: &Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        if self.is_schema_and_filters_match(&query.schema(), &query.filter(), pre_aggregation)? {
+        if let Some(matched_measures) =
+            self.is_schema_and_filters_match(&query.schema(), &query.filter(), pre_aggregation)?
+        {
             let mut new_query = query.as_ref().clone();
-            new_query.set_source(self.make_pre_aggregation_source(pre_aggregation)?.into());
+            new_query.set_source(
+                self.make_pre_aggregation_source(pre_aggregation, &matched_measures)?
+                    .into(),
+            );
             Ok(Some(Rc::new(new_query)))
         } else {
             Ok(None)
@@ -131,13 +145,13 @@ impl PreAggregationOptimizer {
                     resolver_multiplied_measures,
                 ) = resolver_multiplied_measures
                 {
-                    if self.is_schema_and_filters_match(
+                    if let Some(matched_measures) = self.is_schema_and_filters_match(
                         &resolver_multiplied_measures.schema,
                         &resolver_multiplied_measures.filter,
                         &pre_aggregation,
                     )? {
                         let pre_aggregation_source =
-                            self.make_pre_aggregation_source(pre_aggregation)?;
+                            self.make_pre_aggregation_source(pre_aggregation, &matched_measures)?;
 
                         let pre_aggregation_query = Query::builder()
                             .schema(resolver_multiplied_measures.schema.clone())
@@ -184,219 +198,41 @@ impl PreAggregationOptimizer {
         Ok(Some(Rc::new(result)))
     }
 
-    /* fn try_rewrite_multistage(
-        &mut self,
-        multi_stage_name: &String,
-        multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        rewrited_multistage: &mut HashMap<String, bool>,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<(), CubeError> {
-        if rewrited_multistage
-            .get(multi_stage_name)
-            .cloned()
-            .unwrap_or(false)
-        {
-            return Ok(());
-        }
-
-        if let Some(multi_stage_item) = multi_stage_queries
-            .iter()
-            .find(|&query| &query.name == multi_stage_name)
-            .cloned()
-        {
-            match &multi_stage_item.member_type {
-                MultiStageMemberLogicalType::LeafMeasure(multi_stage_leaf_measure) => self
-                    .try_rewrite_multistage_leaf_measure(
-                        multi_stage_name,
-                        multi_stage_leaf_measure,
-                        multi_stage_queries,
-                        rewrited_multistage,
-                        pre_aggregation,
-                    )?,
-                MultiStageMemberLogicalType::MeasureCalculation(
-                    multi_stage_measure_calculation,
-                ) => self.try_rewrite_multistage_measure_calculation(
-                    multi_stage_name,
-                    multi_stage_measure_calculation,
-                    multi_stage_queries,
-                    rewrited_multistage,
-                    pre_aggregation,
-                )?,
-                MultiStageMemberLogicalType::GetDateRange(multi_stage_get_date_range) => self
-                    .try_rewrite_multistage_get_date_range(
-                        multi_stage_name,
-                        multi_stage_get_date_range,
-                        multi_stage_queries,
-                        rewrited_multistage,
-                        pre_aggregation,
-                    )?,
-                MultiStageMemberLogicalType::TimeSeries(multi_stage_time_series) => self
-                    .try_rewrite_multistage_time_series(
-                        multi_stage_name,
-                        multi_stage_time_series,
-                        multi_stage_queries,
-                        rewrited_multistage,
-                        pre_aggregation,
-                    )?,
-                MultiStageMemberLogicalType::RollingWindow(multi_stage_rolling_window) => self
-                    .try_rewrite_multistage_rolling_window(
-                        multi_stage_name,
-                        multi_stage_rolling_window,
-                        multi_stage_queries,
-                        rewrited_multistage,
-                        pre_aggregation,
-                    )?,
-            }
-        }
-
-        Ok(())
-    }
-
-    fn try_rewrite_multistage_measure_calculation(
-        &mut self,
-        multi_stage_name: &String,
-        multi_stage_measure_calculation: &MultiStageMeasureCalculation,
-        multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        rewrited_multistage: &mut HashMap<String, bool>,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<(), CubeError> {
-        let used_multi_stage_symbols =
-            self.collect_multi_stage_symbols(&multi_stage_measure_calculation.source);
-        for (_, multi_stage_name) in used_multi_stage_symbols.iter() {
-            self.try_rewrite_multistage(
-                multi_stage_name,
-                multi_stage_queries,
-                rewrited_multistage,
-                pre_aggregation,
-            )?;
-        }
-        rewrited_multistage.insert(multi_stage_name.clone(), true);
-        Ok(())
-    }
-
-    fn try_rewrite_multistage_rolling_window(
-        &mut self,
-        multi_stage_name: &String,
-        multi_stage_rolling_window: &MultiStageRollingWindow,
-        multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        rewrited_multistage: &mut HashMap<String, bool>,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<(), CubeError> {
-        self.try_rewrite_multistage(
-            &multi_stage_rolling_window.time_series_input.name,
-            multi_stage_queries,
-            rewrited_multistage,
-            pre_aggregation,
-        )?;
-        self.try_rewrite_multistage(
-            &multi_stage_rolling_window.measure_input.name,
-            multi_stage_queries,
-            rewrited_multistage,
-            pre_aggregation,
-        )?;
-        rewrited_multistage.insert(multi_stage_name.clone(), true);
-        Ok(())
-    }
-
-    fn try_rewrite_multistage_time_series(
-        &mut self,
-        multi_stage_name: &String,
-        multi_stage_time_series: &MultiStageTimeSeries,
-        multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        rewrited_multistage: &mut HashMap<String, bool>,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<(), CubeError> {
-        if let Some(get_date_range_ref) = &multi_stage_time_series.get_date_range_multistage_ref {
-            self.try_rewrite_multistage(
-                &get_date_range_ref,
-                multi_stage_queries,
-                rewrited_multistage,
-                pre_aggregation,
-            )?;
-        }
-        rewrited_multistage.insert(multi_stage_name.clone(), true);
-        Ok(())
-    }
-
-    fn try_rewrite_multistage_get_date_range(
-        &mut self,
-        _multi_stage_name: &String,
-        _multi_stage_get_date_range: &MultiStageGetDateRange,
-        _multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        _rewrited_multistage: &mut HashMap<String, bool>,
-        _pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<(), CubeError> {
-        Ok(()) //TODO
-    }
-
-    fn try_rewrite_multistage_leaf_measure(
-        &mut self,
-        multi_stage_name: &String,
-        multi_stage_leaf_measure: &MultiStageLeafMeasure,
-        multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        rewrited_multistage: &mut HashMap<String, bool>,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<(), CubeError> {
-        if let Some(rewritten) =
-            self.try_rewrite_query(multi_stage_leaf_measure.query.clone(), pre_aggregation)?
-        {
-            let new_leaf = MultiStageLeafMeasure {
-                measure: multi_stage_leaf_measure.measure.clone(),
-                render_measure_as_state: multi_stage_leaf_measure.render_measure_as_state.clone(),
-                render_measure_for_ungrouped: multi_stage_leaf_measure
-                    .render_measure_for_ungrouped
-                    .clone(),
-                time_shifts: multi_stage_leaf_measure.time_shifts.clone(),
-                query: rewritten,
-            };
-            let new_multistage = Rc::new(LogicalMultiStageMember {
-                name: multi_stage_name.clone(),
-                member_type: MultiStageMemberLogicalType::LeafMeasure(new_leaf),
-            });
-
-            rewrited_multistage.insert(multi_stage_name.clone(), true);
-            if let Some(query) = multi_stage_queries
-                .iter_mut()
-                .find(|query| &query.name == multi_stage_name)
-            {
-                *query = new_multistage;
-            }
-            Ok(())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn collect_multi_stage_symbols(&self, source: &FullKeyAggregate) -> HashMap<String, String> {
-        let mut symbols = HashMap::new();
-        for source in source.multi_stage_subquery_refs.iter() {
-            for symbol in source.symbols.iter() {
-                symbols.insert(symbol.full_name(), source.name.clone());
-            }
-        }
-        symbols
-    } */
-
     fn make_pre_aggregation_source(
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
+        matched_measures: &HashSet<String>,
     ) -> Result<Rc<PreAggregation>, CubeError> {
+        let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
+            .measures
+            .iter()
+            .filter(|m| matched_measures.contains(&m.full_name()))
+            .cloned()
+            .collect();
         let schema = LogicalSchema {
             time_dimensions: vec![],
             dimensions: pre_aggregation
                 .dimensions
                 .iter()
                 .cloned()
-                .chain(pre_aggregation.time_dimensions.iter().map(|d| d.clone()))
+                .chain(pre_aggregation.time_dimensions.iter().cloned())
+                .chain(pre_aggregation.segments.iter().cloned())
                 .collect(),
-            measures: pre_aggregation.measures.to_vec(),
+            measures: filtered_measures.clone(),
             multiplied_measures: HashSet::new(),
         };
+        // Measures are filtered to only those actually consumed during matching.
+        // This prevents calculated measures (e.g. amount_per_count) from getting a
+        // direct column reference when they should be decomposed to base measures.
+        // Dimensions are intentionally NOT filtered: unlike measures (where
+        // sum(precomputed_ratio) != sum(a)/sum(b)), extra dimension references
+        // are harmless — they're simply unused if the query doesn't select them.
         let pre_aggregation = PreAggregation::builder()
             .name(pre_aggregation.name.clone())
             .time_dimensions(pre_aggregation.time_dimensions.clone())
             .dimensions(pre_aggregation.dimensions.clone())
-            .measures(pre_aggregation.measures.clone())
+            .segments(pre_aggregation.segments.clone())
+            .measures(filtered_measures)
             .schema(Rc::new(schema))
             .external(pre_aggregation.external.unwrap_or_default())
             .granularity(pre_aggregation.granularity.clone())
@@ -416,7 +252,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<bool, CubeError> {
+    ) -> Result<Option<HashSet<String>>, CubeError> {
         let helper = OptimizerHelper::new();
 
         let match_state = self.match_dimensions(
@@ -430,17 +266,63 @@ impl PreAggregationOptimizer {
 
         let all_measures = helper.all_measures(schema, filters);
         if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
-            return Ok(false);
+            return Ok(None);
         }
         if match_state == MatchState::NotMatched {
-            return Ok(false);
+            return Ok(None);
         }
-        let measures_match = self.try_match_measures(
+        let matched = self.try_match_measures(
             &all_measures,
             pre_aggregation,
             match_state == MatchState::Partial,
         )?;
-        Ok(measures_match)
+        if matched.is_none() {
+            return Ok(None);
+        }
+
+        if !self.are_join_paths_matching(schema, &all_measures, pre_aggregation)? {
+            return Ok(None);
+        }
+
+        Ok(matched)
+    }
+
+    fn are_join_paths_matching(
+        &self,
+        schema: &Rc<LogicalSchema>,
+        measures: &[Rc<MemberSymbol>],
+        pre_aggregation: &CompiledPreAggregation,
+    ) -> Result<bool, CubeError> {
+        let query_hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&schema.dimensions)
+            .add_dimensions(&schema.time_dimensions)
+            .build(measures)?;
+        let query_groups = MultiFactJoinGroups::try_new(self.query_tools.clone(), query_hints)?;
+        let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
+
+        for dim in schema
+            .dimensions
+            .iter()
+            .chain(schema.time_dimensions.iter())
+        {
+            let query_path = query_groups.resolve_join_path_for_dimension(dim);
+            let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_dimension(dim);
+            match (query_path, pre_aggr_path) {
+                (Some(qp), Some(pp)) if qp != pp => return Ok(false),
+                _ => {}
+            }
+        }
+
+        for measure in measures.iter() {
+            let query_path = query_groups.resolve_join_path_for_measure(measure);
+            let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_measure(measure);
+            match (query_path, pre_aggr_path) {
+                (Some(qp), Some(pp)) if qp != pp => return Ok(false),
+                _ => {}
+            }
+        }
+
+        Ok(true)
     }
 
     fn try_match_measures(
@@ -448,14 +330,14 @@ impl PreAggregationOptimizer {
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
         only_addictive: bool,
-    ) -> Result<bool, CubeError> {
-        let matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
+    ) -> Result<Option<HashSet<String>>, CubeError> {
+        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {
-                return Ok(false);
+                return Ok(None);
             }
         }
-        Ok(true)
+        Ok(Some(matcher.matched_measures().clone()))
     }
 
     fn match_dimensions(

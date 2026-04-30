@@ -1,5 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::symbols::{AggregationType, MeasureKind};
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -34,45 +35,52 @@ impl SqlNode for RollingWindowNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
-            MemberSymbol::Measure(m) => {
-                if m.is_cumulative() {
-                    let input = self.input.to_sql(
+            MemberSymbol::Measure(m) if m.is_cumulative() => {
+                let delegate = || {
+                    self.default_processor.to_sql(
                         visitor,
                         node,
                         query_tools.clone(),
                         node_processor.clone(),
                         templates,
-                    )?;
-                    if m.measure_type() == "countDistinctApprox" {
-                        templates.hll_cardinality_merge(input)?
-                    } else {
-                        if m.measure_type() == "sum"
-                            || m.measure_type() == "count"
-                            || m.measure_type() == "runningTotal"
-                        {
-                            format!("sum({})", input)
-                        } else if m.measure_type() == "min" || m.measure_type() == "max" {
-                            format!("{}({})", m.measure_type(), input)
-                        } else {
-                            self.default_processor.to_sql(
-                                visitor,
-                                node,
-                                query_tools.clone(),
-                                node_processor,
-                                templates,
-                            )?
-                        }
-                    }
-                } else {
-                    self.default_processor.to_sql(
-                        visitor,
+                    )
+                };
+                let render_input = || -> Result<String, CubeError> {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                    self.input.to_sql(
+                        &inner_visitor,
                         node,
                         query_tools.clone(),
-                        node_processor,
+                        node_processor.clone(),
                         templates,
-                    )?
+                    )
+                };
+                match m.kind() {
+                    MeasureKind::Count(_) => format!("sum({})", render_input()?),
+                    MeasureKind::Aggregated(a) => match a.agg_type() {
+                        AggregationType::CountDistinctApprox => {
+                            templates.hll_cardinality_merge(render_input()?)?
+                        }
+                        AggregationType::Sum | AggregationType::RunningTotal => {
+                            format!("sum({})", render_input()?)
+                        }
+                        AggregationType::Min | AggregationType::Max => {
+                            format!("{}({})", a.agg_type().as_str(), render_input()?)
+                        }
+                        AggregationType::Avg
+                        | AggregationType::CountDistinct
+                        | AggregationType::NumberAgg => delegate()?,
+                    },
+                    _ => delegate()?,
                 }
             }
+            MemberSymbol::Measure(_) => self.default_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor,
+                templates,
+            )?,
             _ => {
                 return Err(CubeError::internal(format!(
                     "Unexpected evaluation node type for RollingWindowNode"

@@ -1,0 +1,434 @@
+---
+title: Measures
+description: Measures compute aggregated values across rows — counts, sums, averages, and more complex calculations like rolling windows, time shifts, and rankings.
+---
+
+While [dimensions][ref-dimensions-page] describe attributes of individual rows,
+measures compute values across rows — sums, counts, averages, and other
+aggregations. Measures can aggregate columns directly (like `sum of revenue`)
+or reference other measures to create compound metrics (like `revenue / count`).
+
+<Note>
+
+See the [measures reference][ref-measures-ref] for the full list of parameters
+and configuration options.
+
+</Note>
+
+## Defining measures
+
+A measure specifies the SQL expression to aggregate and the aggregation type:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+      - name: average_amount
+        sql: amount
+        type: avg
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    count: { type: `count` },
+    total_amount: { sql: `amount`, type: `sum` },
+    average_amount: { sql: `amount`, type: `avg` }
+  }
+})
+```
+
+</CodeGroup>
+
+## Filtered measures
+
+You can apply [filters][ref-filters] to a measure to create conditional
+aggregations. Only rows matching the filter are included:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: { type: `count` },
+
+    completed_count: {
+      type: `count`,
+      filters: [{ sql: `${CUBE}.status = 'completed'` }]
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+When `completed_count` is queried, Cube generates SQL with a `CASE` expression:
+
+```sql
+SELECT
+  COUNT(CASE WHEN (orders.status = 'completed') THEN 1 END) AS completed_count
+FROM orders
+```
+
+## Calculated measures
+
+Calculated measures perform calculations on other measures using SQL functions
+and operators. They provide a way to decompose complex metrics (e.g., ratios
+or percents) into formulas involving simpler measures.
+
+### Referencing measures in the same cube
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+      - name: completed_ratio
+        sql: "1.0 * {completed_count} / NULLIF({count}, 0)"
+        type: number
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: { type: `count` },
+
+    completed_count: {
+      type: `count`,
+      filters: [{ sql: `${CUBE}.status = 'completed'` }]
+    },
+
+    completed_ratio: {
+      sql: `1.0 * ${completed_count} / NULLIF(${count}, 0)`,
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### Referencing measures from other cubes
+
+If cubes are [joined][ref-joins], you can reference measures across cubes.
+Cube generates the necessary joins automatically:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    joins:
+      - name: orders
+        sql: "{CUBE}.id = {orders}.user_id"
+        relationship: one_to_many
+
+    measures:
+      - name: count
+        type: count
+
+      - name: purchases_to_users_ratio
+        sql: "1.0 * {orders.purchases} / NULLIF({CUBE.count}, 0)"
+        type: number
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  // ...
+
+  joins: {
+    orders: {
+      sql: `${CUBE}.id = ${orders}.user_id`,
+      relationship: `one_to_many`
+    }
+  },
+
+  measures: {
+    count: { type: `count` },
+
+    purchases_to_users_ratio: {
+      sql: `1.0 * ${orders.purchases} / NULLIF(${CUBE.count}, 0)`,
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+## Multi-stage measures
+
+Multi-stage measures are calculated in two or more stages, enabling
+calculations on already-aggregated data. Each stage results in one or more
+CTEs in the generated SQL query.
+
+<Warning>
+
+Multi-stage measures are powered by Tesseract, the [next-generation data
+modeling engine][link-tesseract]. Tesseract is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
+enable it.
+
+</Warning>
+
+### Rolling windows
+
+Rolling window measures calculate metrics over a moving window of time, such
+as cumulative counts or moving averages. Use the
+[`rolling_window`][ref-rolling-window] parameter:
+
+```yaml
+measures:
+  - name: cumulative_count
+    type: count
+    rolling_window:
+      trailing: unbounded
+
+  - name: trailing_month_count
+    sql: id
+    type: count
+    rolling_window:
+      trailing: 1 month
+```
+
+### Period-to-date
+
+Period-to-date measures analyze data from the start of a period to the current
+date — year-to-date (YTD), quarter-to-date (QTD), or month-to-date (MTD):
+
+```yaml
+measures:
+  - name: revenue_ytd
+    sql: revenue
+    type: sum
+    rolling_window:
+      type: to_date
+      granularity: year
+
+  - name: revenue_qtd
+    sql: revenue
+    type: sum
+    rolling_window:
+      type: to_date
+      granularity: quarter
+```
+
+### Time shift
+
+Time-shift measures calculate the value of another measure at a different
+point in time, typically for period-over-period comparisons like
+year-over-year growth. Use the [`time_shift`][ref-time-shift] parameter:
+
+```yaml
+measures:
+  - name: revenue
+    sql: revenue
+    type: sum
+
+  - name: revenue_prior_year
+    multi_stage: true
+    sql: "{revenue}"
+    type: number
+    time_shift:
+      - interval: 1 year
+        type: prior
+```
+
+You can combine time shift with period-to-date for comparisons like
+"this year's YTD vs. last year's YTD":
+
+```yaml
+measures:
+  - name: revenue_ytd
+    sql: revenue
+    type: sum
+    rolling_window:
+      type: to_date
+      granularity: year
+
+  - name: revenue_prior_year_ytd
+    multi_stage: true
+    sql: "{revenue_ytd}"
+    type: number
+    time_shift:
+      - time_dimension: time
+        interval: 1 year
+        type: prior
+```
+
+Time-shift measures can also be used with [calendar cubes][ref-calendar-cubes]
+to customize how time-shifting works, e.g., to shift by retail calendar
+periods.
+
+### Percent of total (fixed dimension)
+
+Use the [`group_by`][ref-group-by] parameter to fix the inner aggregation to
+specific dimensions, enabling percent-of-total calculations:
+
+```yaml
+measures:
+  - name: revenue
+    sql: revenue
+    type: sum
+
+  - name: country_revenue
+    multi_stage: true
+    sql: "{revenue}"
+    type: sum
+    group_by:
+      - country
+
+  - name: country_revenue_percentage
+    multi_stage: true
+    sql: "{revenue} / NULLIF({country_revenue}, 0)"
+    type: number
+```
+
+### Nested aggregates
+
+Use the [`add_group_by`][ref-add-group-by] parameter to compute an aggregate
+of an aggregate, e.g., the average of per-customer averages:
+
+```yaml
+measures:
+  - name: avg_order_value
+    sql: amount
+    type: avg
+
+  - name: avg_customer_order_value
+    multi_stage: true
+    sql: "{avg_order_value}"
+    type: avg
+    add_group_by:
+      - customer_id
+```
+
+### Ranking
+
+Use the [`reduce_by`][ref-reduce-by] parameter to rank items within groups:
+
+```yaml
+measures:
+  - name: revenue
+    sql: revenue
+    type: sum
+
+  - name: product_rank
+    multi_stage: true
+    order_by:
+      - sql: "{revenue}"
+        dir: asc
+    reduce_by:
+      - product
+    type: rank
+```
+
+### Conditional measures
+
+Conditional measures depend on the value of a dimension, using the
+[`case`][ref-case] parameter with [`switch` dimensions][ref-switch-dim]:
+
+```yaml
+measures:
+  - name: amount_in_currency
+    multi_stage: true
+    case:
+      switch: "{CUBE.currency}"
+      when:
+        - value: EUR
+          sql: "{CUBE.amount_eur}"
+        - value: GBP
+          sql: "{CUBE.amount_gbp}"
+      else:
+        sql: "{CUBE.amount_usd}"
+    type: number
+```
+
+## Formatting
+
+Use the [`format`][ref-format] parameter to control how measures are displayed:
+
+```yaml
+measures:
+  - name: total_revenue
+    sql: revenue
+    type: sum
+    format: currency
+
+  - name: conversion_rate
+    sql: "1.0 * {completed_count} / NULLIF({count}, 0)"
+    type: number
+    format: percent
+```
+
+## Next steps
+
+- See the [measures reference][ref-measures-ref] for all parameters
+- Learn about [dimensions][ref-dimensions-page] for grouping and filtering
+- Explore [pre-aggregations][ref-pre-aggs] to accelerate measure queries
+- See the [period-over-period recipe][ref-pop-recipe] for advanced time
+  comparisons
+
+[ref-measures-ref]: /reference/data-modeling/measures
+[ref-dimensions-page]: /docs/data-modeling/dimensions
+[ref-joins]: /docs/data-modeling/joins
+[ref-pre-aggs]: /reference/data-modeling/pre-aggregations
+[ref-type]: /reference/data-modeling/measures#type
+[ref-filters]: /reference/data-modeling/measures#filters
+[ref-format]: /reference/data-modeling/measures#format
+[ref-rolling-window]: /reference/data-modeling/measures#rolling_window
+[ref-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-group-by]: /reference/data-modeling/measures#group_by
+[ref-reduce-by]: /reference/data-modeling/measures#reduce_by
+[ref-add-group-by]: /reference/data-modeling/measures#add_group_by
+[ref-case]: /reference/data-modeling/measures#case
+[ref-switch-dim]: /reference/data-modeling/dimensions#type
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
+[ref-pop-recipe]: /recipes/data-modeling/period-over-period
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine

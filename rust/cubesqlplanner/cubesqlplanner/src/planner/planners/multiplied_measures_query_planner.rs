@@ -53,7 +53,7 @@ impl MultipliedMeasuresQueryPlanner {
                 .compute_join_multi_fact_groups_with_measures(
                     &full_key_aggregate_measures.regular_measures,
                 )?;
-            for (join, measures) in join_multi_fact_groups.iter() {
+            for (join, measures) in join_multi_fact_groups.groups() {
                 let regular_subquery_logical_plan =
                     self.regular_measures_subquery(measures, join.clone())?;
                 regular_measure_subqueries.push(regular_subquery_logical_plan);
@@ -73,19 +73,11 @@ impl MultipliedMeasuresQueryPlanner {
             let join_multi_fact_groups = self
                 .query_properties
                 .compute_join_multi_fact_groups_with_measures(&measures)?;
-            if join_multi_fact_groups.len() != 1 {
-                return Err(CubeError::internal(
-                    format!(
-                        "Expected just one multi-fact join group for aggregate measures but got multiple: {}",
-                        join_multi_fact_groups.into_iter().map(|(_, measures)| format!("({})", measures.iter().map(|m| m.full_name()).join(", "))).join(", ")
-                    )
-                ));
-            }
-            let aggregate_subquery_logical_plan = self.aggregate_subquery_plan(
-                &cube_name,
-                &measures,
-                join_multi_fact_groups.into_iter().next().unwrap().0,
-            )?;
+            let join = join_multi_fact_groups.single_join()?.ok_or_else(|| {
+                CubeError::internal("No join groups returned for aggregate measures".to_string())
+            })?;
+            let aggregate_subquery_logical_plan =
+                self.aggregate_subquery_plan(&cube_name, &measures, join)?;
             aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
         }
         if regular_measure_subqueries.is_empty() && aggregate_multiplied_subqueries.is_empty() {
@@ -187,8 +179,9 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
+            let owned_measure = measure.with_stripped_join_prefix();
             let member_expression_over_dimensions_cubes =
-                if let Ok(member_expression) = measure.as_member_expression() {
+                if let Ok(member_expression) = owned_measure.as_member_expression() {
                     member_expression.cube_names_if_dimension_only_expression()?
                 } else {
                     None
@@ -196,18 +189,21 @@ impl MultipliedMeasuresQueryPlanner {
             let cubes = if let Some(cubes) = member_expression_over_dimensions_cubes {
                 cubes
             } else {
-                collect_cube_names(&measure)?
+                collect_cube_names(&owned_measure)?
             };
-            let join_hints = collect_join_hints(&measure)?;
+            let join_hints = collect_join_hints(&owned_measure)?;
             if cubes.iter().any(|cube| cube != key_cube_name) {
-                let measures_join = self.query_tools.join_graph().build_join(join_hints)?;
+                let measures_join = self
+                    .query_tools
+                    .join_graph()
+                    .build_join(join_hints.into_items())?;
                 if *measures_join
                     .static_data()
                     .multiplication_factor
                     .get(key_cube_name)
                     .unwrap_or(&false)
                 {
-                    return Err(CubeError::user(format!("{}' references cubes that lead to row multiplication. Please rewrite it using sub query.", measure.full_name())));
+                    return Err(CubeError::user(format!("{}' references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.join(", "))));
                 }
                 return Ok(true);
             }
@@ -230,10 +226,11 @@ impl MultipliedMeasuresQueryPlanner {
         )?;
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
-        let join_hints = collect_join_hints_for_measures(&measures)?;
-        let source = self
-            .join_planner
-            .make_join_logical_plan_with_join_hints(join_hints, subquery_dimension_queries)?;
+        let measure_join_hints = collect_join_hints_for_measures(&measures)?;
+        let source = self.join_planner.make_join_logical_plan_with_join_hints(
+            measure_join_hints,
+            subquery_dimension_queries,
+        )?;
 
         let schema = LogicalSchema::default()
             .set_dimensions(primary_keys_dimensions.clone())

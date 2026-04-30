@@ -161,7 +161,14 @@ export type Sql4SqlCommon = {
     pushdown: boolean;
   }
 };
+
 export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
+
+export type QueryConvertResponse = {
+  status: string;
+  query: any;
+  error?: string;
+};
 
 let loadedNative: any = null;
 
@@ -438,10 +445,10 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string): Promise<void> => {
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId);
 };
 
 // TODO parse result from native code
@@ -449,6 +456,12 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   const native = loadNative();
 
   return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const rest4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> => {
+  const native = loadNative();
+
+  return native.rest4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): any[] => {

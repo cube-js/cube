@@ -253,6 +253,7 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
+    this.maskedMembers = new Set(this.options.maskedMembers || []);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -284,6 +285,7 @@ export class BaseQuery {
       multiStageTimeDimensions: this.options.multiStageTimeDimensions,
       subqueryJoins: this.options.subqueryJoins,
       joinHints: this.options.joinHints,
+      maskedMembers: this.options.maskedMembers,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -771,7 +773,7 @@ export class BaseQuery {
     }
     const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
 
-    if (this.options.cacheMode !== 'no-cache' && !this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
+    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -844,10 +846,6 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (this.options.cacheMode === 'no-cache') {
-      return false;
-    }
-
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery?.preAggregation.external) {
@@ -953,6 +951,9 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
+      convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
+      maskedMembers: this.options.maskedMembers,
+      memberToAlias: this.options.memberToAlias,
     };
 
     try {
@@ -1000,6 +1001,7 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
@@ -2844,14 +2846,19 @@ export class BaseQuery {
     return R.pipe(
       R.map(f => f.getMembers()),
       R.flatten,
-      R.map(s => (
-        (cache || this.compilerCache).cache(
+      R.map(s => {
+        const memberPath = s.path() ? s.path().join('.') : null;
+        const hasSqlMask = memberPath &&
+          this.maskedMembers && this.maskedMembers.size > 0 &&
+          this.maskedMembers.has(memberPath) &&
+          s.definition()?.mask && typeof s.definition().mask === 'object' && s.definition().mask.sql;
+        return (cache || (hasSqlMask ? this.queryCache : this.compilerCache)).cache(
           ['collectFrom'].concat(methodCacheKey).concat(
-            s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
+            memberPath ? [memberPath] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
-        )
-      )),
+        );
+      }),
       R.unnest,
       R.uniq,
       R.filter(R.identity)
@@ -3281,6 +3288,17 @@ export class BaseQuery {
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
+      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType) {
+        // In ungrouped queries, only apply static masks to measures.
+        // SQL masks (mask.sql) reference columns that don't apply per-row.
+        const isMeasure = type === 'measure';
+        const isUngrouped = this.options.ungrouped;
+        const hasSqlMask = symbol.mask && typeof symbol.mask === 'object' && symbol.mask.sql;
+        if (!isMeasure || !isUngrouped || !hasSqlMask) {
+          return this.memberMaskSql(cubeName, name, symbol);
+        }
+      }
+
       if (type === 'measure') {
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
@@ -3307,13 +3325,28 @@ export class BaseQuery {
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
         const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
         let sql;
+        let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
-          sql = symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+          const evaluateSql = () => symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
             primaryKeys.length && (
               primaryKeys.length > 1 ?
                 this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
                 : this.primaryKeySql(primaryKeys[0], cubeName)
             ) || '*';
+          // For patched view measures (aggType is set), the view's sql resolves to
+          // already-aggregated SQL (e.g. SUM(col)). Filters must be applied inside
+          // that aggregation, not outside. We pre-evaluate the filter SQL at the
+          // view level, push it down via context, and skip filters at this level.
+          const isPatchedViewMeasure = symbol.aggType && symbol.patchedFrom && symbol.filters?.length;
+          if (isPatchedViewMeasure) {
+            const pushDownFilterSql = this.evaluateFiltersArray(symbol.filters, cubeName);
+            sql = this.evaluateSymbolSqlWithContext(evaluateSql, {
+              patchMeasurePushDownFilterSql: pushDownFilterSql,
+            });
+            patchedSymbol = { ...symbol, filters: [] };
+          } else {
+            sql = evaluateSql();
+          }
         }
         const result = this.renderSqlMeasure(
           name,
@@ -3323,7 +3356,7 @@ export class BaseQuery {
               sql,
               isMemberExpr,
             ),
-            symbol,
+            patchedSymbol,
             cubeName
           ),
           symbol,
@@ -3420,6 +3453,50 @@ export class BaseQuery {
     } finally {
       this.safeEvaluateSymbolContext().currentMember = parentMember;
     }
+  }
+
+  memberMaskSql(cubeName, name, symbol) {
+    const { mask } = symbol;
+    if (mask !== undefined && mask !== null) {
+      if (typeof mask === 'object' && mask.sql) {
+        const sqlCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        return this.autoPrefixAndEvaluateSql(sqlCubeName, mask.sql);
+      }
+      if (typeof mask === 'number') {
+        return `${mask}`;
+      }
+      if (typeof mask === 'boolean') {
+        return mask ? 'TRUE' : 'FALSE';
+      }
+      if (typeof mask === 'string') {
+        return this.paramAllocator.allocateParam(mask);
+      }
+    }
+    return this.defaultMaskSql(symbol.type);
+  }
+
+  defaultMaskSql(memberType) {
+    const envMasks = {
+      string: getEnv('accessPolicyMaskString'),
+      time: getEnv('accessPolicyMaskTime'),
+      boolean: getEnv('accessPolicyMaskBoolean'),
+      number: getEnv('accessPolicyMaskNumber'),
+    };
+    const envMask = envMasks[memberType];
+    if (envMask !== undefined && envMask !== null) {
+      if (memberType === 'number') {
+        return `${envMask}`;
+      }
+      if (memberType === 'boolean') {
+        return envMask.toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+      }
+      return this.paramAllocator.allocateParam(envMask);
+    }
+    return 'NULL';
+  }
+
+  escapeStringLiteral(str) {
+    return `'${str.replace(/'/g, "''")}'`;
   }
 
   autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {
@@ -3780,11 +3857,21 @@ export class BaseQuery {
   }
 
   applyMeasureFilters(evaluateSql, symbol, cubeName) {
-    if (!symbol.filters || !symbol.filters.length) {
+    const pushDownFilterSql = this.safeEvaluateSymbolContext().patchMeasurePushDownFilterSql;
+    const hasOwnFilters = symbol.filters && symbol.filters.length;
+
+    if (!hasOwnFilters && !pushDownFilterSql) {
       return evaluateSql;
     }
 
-    const where = this.evaluateMeasureFilters(symbol, cubeName);
+    const parts = [];
+    if (hasOwnFilters) {
+      parts.push(this.evaluateMeasureFilters(symbol, cubeName));
+    }
+    if (pushDownFilterSql) {
+      parts.push(pushDownFilterSql);
+    }
+    const where = parts.join(' AND ');
 
     return `CASE WHEN ${where} THEN ${evaluateSql === '*' ? '1' : evaluateSql} END`;
   }

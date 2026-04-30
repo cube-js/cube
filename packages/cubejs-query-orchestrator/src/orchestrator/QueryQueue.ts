@@ -193,6 +193,11 @@ export class QueryQueue {
       ...executeOptions,
     };
 
+    if (options.requestId) {
+      const idx = options.requestId.lastIndexOf('-span-');
+      options.externalId = idx !== -1 ? options.requestId.substring(0, idx) : options.requestId;
+    }
+
     if (this.skipQueue) {
       const queryDef = {
         queryHandler,
@@ -233,7 +238,7 @@ export class QueryQueue {
       // Result here won't be fetched for a forced build query and a jobbed build
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
-      let result = !query.forceBuild && await queueConnection.getResult(queryKey);
+      let result = !query.forceBuild && await queueConnection.getResult(queryKey, options.externalId);
       if (result && !result.streamResult) {
         return this.parseResult(result);
       }
@@ -543,7 +548,16 @@ export class QueryQueue {
         }
       }));
 
-      const [_active, toProcess] = await queueConnection.getActiveAndToProcess();
+      const [active, toProcess] = await queueConnection.getActiveAndToProcess();
+
+      /**
+       * Important notice: Concurrency configuration works per a specific queue, not per node.
+       *
+       * In production clusters where it contains N nodes, it shares the same concurrency. It leads to a point
+       * where every node tries to pick up jobs as much as concurrency is defined for the whole cluster. To minimize
+       * the effect of competition between nodes, it's important to reduce the number of tries to process by active jobs.
+       */
+      const toProcessLimit = active.length >= this.concurrency ? 1 : this.concurrency - active.length;
 
       const tasks = toProcess
         .filter(([queryKey, _queueId]) => {
@@ -559,7 +573,7 @@ export class QueryQueue {
             return false;
           }
         })
-        .slice(0, this.concurrency)
+        .slice(0, toProcessLimit)
         .map(([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId));
 
       await Promise.all(tasks);

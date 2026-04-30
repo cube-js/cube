@@ -305,7 +305,7 @@ impl CacheStoreSqlService {
 
     pub async fn exec_queue_command_with_context(
         &self,
-        _context: SqlQueryContext,
+        context: SqlQueryContext,
         command: QueueCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
         let command_tag = command.as_tag_command();
@@ -323,10 +323,18 @@ impl CacheStoreSqlService {
         let (result, additional_traffic, track_time) = match command {
             QueueCommand::Add {
                 key,
+                exclusive,
                 priority,
                 orphaned,
                 value,
+                external_id,
             } => {
+                if exclusive && context.process_id.is_none() {
+                    return Err(CubeError::user(
+                        "QUEUE ADD EXCLUSIVE requires a process_id in the connection context (x-process-id header)".to_string(),
+                    ));
+                }
+
                 let value_size = key.value.deep_size_of() + value.deep_size_of();
                 let response = self
                     .cachestore
@@ -335,6 +343,9 @@ impl CacheStoreSqlService {
                         value,
                         priority,
                         orphaned,
+                        process_id: context.process_id.clone(),
+                        exclusive,
+                        external_id,
                     })
                     .await?;
 
@@ -458,7 +469,13 @@ impl CacheStoreSqlService {
             } => {
                 let rows = self
                     .cachestore
-                    .queue_list(prefix.value, status_filter, sort_by_priority, with_payload)
+                    .queue_list(
+                        prefix.value,
+                        status_filter,
+                        sort_by_priority,
+                        with_payload,
+                        context.process_id.clone(),
+                    )
                     .await?;
 
                 let mut columns = vec![
@@ -491,7 +508,7 @@ impl CacheStoreSqlService {
             } => {
                 let result = self
                     .cachestore
-                    .queue_retrieve_by_path(key.value, concurrency)
+                    .queue_retrieve_by_path(key.value, concurrency, context.process_id.clone())
                     .await?;
 
                 (
@@ -509,8 +526,9 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Result { key } => {
-                let ack_result = self.cachestore.queue_result_by_path(key.value).await?;
+            QueueCommand::Result { key, external_id } => {
+                let ack_result = self.cachestore.queue_result(key, external_id).await?;
+
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
                 } else {
@@ -522,6 +540,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -543,6 +563,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -591,11 +613,11 @@ impl SqlService for CacheStoreSqlService {
 
     async fn exec_query_with_context(
         &self,
-        ctx: SqlQueryContext,
+        mut ctx: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
         let stmt = {
-            let mut parser = CubeStoreParser::new(query)?;
+            let mut parser = CubeStoreParser::new(query, ctx.parameters.take())?;
             parser.parse_statement()?
         };
 

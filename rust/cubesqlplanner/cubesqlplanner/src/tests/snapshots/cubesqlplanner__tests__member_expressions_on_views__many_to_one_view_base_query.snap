@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/member_expressions_on_views.rs
+expression: result
+---
+many_to_one_view__root_dim | many_to_one_view__child_dim | many_to_one_view__root_val_avg | many_to_one_view__child_val_avg
+---------------------------+-----------------------------+--------------------------------+--------------------------------
+root_e                     | child_b                     | 50.0000000000000000            | 200.0000000000000000           
+root_d                     | child_b                     | 40.0000000000000000            | 200.0000000000000000           
+root_c                     | child_a                     | 30.0000000000000000            | 100.0000000000000000           
+root_b                     | child_a                     | 20.0000000000000000            | 100.0000000000000000           
+root_a                     | child_a                     | 10.0000000000000000            | 100.0000000000000000

@@ -1,8 +1,10 @@
 pub mod base_query_options;
 pub mod case;
 pub mod dimension;
+pub mod mask;
 pub mod measure;
 pub mod pre_aggregation;
+pub mod pre_aggregation_time_dimension;
 pub mod schema;
 pub mod segment;
 pub mod timeshift;

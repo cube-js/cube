@@ -1,0 +1,122 @@
+# SCIM provisioning with Okta
+
+With SCIM (System for Cross-domain Identity Management) enabled, you can
+automate user provisioning in Cube Cloud and keep user groups synchronized
+with Okta.
+
+<InfoBox>
+
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</InfoBox>
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- Okta SAML authentication already configured. If not, complete
+  the [SAML setup][ref-saml] first.
+- Admin permissions in Cube Cloud.
+- Admin permissions in Okta to manage application integrations.
+
+## Enable SCIM provisioning in Cube Cloud
+
+Before configuring SCIM in Okta, you need to enable SCIM
+provisioning in Cube Cloud:
+
+1. In Cube, navigate to <Btn>Admin → Settings</Btn>.
+2. In the <Btn>SAML</Btn> section, enable <Btn>SCIM Provisioning</Btn>.
+
+## Generate an API key in Cube Cloud
+
+To allow Okta to communicate with Cube Cloud via SCIM, you'll need to
+create a dedicated API key:
+
+1. In Cube Cloud, navigate to <Btn>Settings → API Keys</Btn>.
+2. Create a new API key. Give it a descriptive name such as **Okta SCIM**.
+3. Copy the generated key and store it securely — you'll need it in the
+   next step.
+
+## Enable SCIM provisioning in Okta
+
+This section assumes you already have a Cube Cloud SAML app integration
+in Okta. If you haven't created one yet, follow the
+[SAML setup guide][ref-saml] first.
+
+1. In the Okta Admin Console, go to <Btn>Applications → Applications</Btn>
+   and open your Cube Cloud application.
+2. On the <Btn>General</Btn> tab, click <Btn>Edit</Btn> in the
+   <Btn>App Settings</Btn> section.
+3. Set the <Btn>Provisioning</Btn> field to **SCIM** and click
+   <Btn>Save</Btn>.
+
+## Configure SCIM connection in Okta
+
+1. Navigate to the <Btn>Provisioning</Btn> tab of your Cube Cloud application.
+2. In the <Btn>Settings → Integration</Btn> section, click <Btn>Edit</Btn>.
+3. Fill in the following fields:
+   - **SCIM connector base URL** — Your Cube Cloud deployment URL with
+     `/api/scim/v2` appended. For example:
+     `https://your-deployment.cubecloud.dev/api/scim/v2`
+   - **Unique identifier field for users** — `userName`
+   - **Supported provisioning actions** — Select **Push New Users**,
+     **Push Profile Updates**, and **Push Groups**.
+   - **Authentication Mode** — Select **HTTP Header**.
+4. In the <Btn>HTTP Header</Btn> section, paste the API key you generated
+   earlier into the <Btn>Authorization</Btn> field.
+5. Click <Btn>Test Connector Configuration</Btn> to verify that Okta can
+   reach Cube Cloud. Proceed once the test is successful.
+6. Click <Btn>Save</Btn>.
+
+## Configure provisioning actions
+
+After saving the SCIM connection, configure which provisioning actions
+are enabled for your application:
+
+1. On the <Btn>Provisioning</Btn> tab, go to <Btn>Settings → To App</Btn>.
+2. Click <Btn>Edit</Btn> and enable the actions you want:
+   - **Create Users** — Automatically create users in Cube Cloud when
+     they are assigned in Okta.
+   - **Update User Attributes** — Synchronize profile changes from Okta
+     to Cube Cloud.
+   - **Deactivate Users** — Deactivate users in Cube Cloud when they are
+     unassigned or deactivated in Okta.
+3. Click <Btn>Save</Btn>.
+
+## Assign users and groups
+
+For users and groups to be provisioned in Cube Cloud, you need to assign
+them to your Cube Cloud application in Okta. This is also required for
+group memberships to be correctly synchronized — pushing a group alone
+does not assign its members to the application.
+
+1. In your Cube Cloud application, navigate to the <Btn>Assignments</Btn> tab.
+2. Click <Btn>Assign</Btn> and choose <Btn>Assign to Groups</Btn> (or
+   <Btn>Assign to People</Btn> for individual users).
+3. Select the groups or users you want to provision and click <Btn>Assign</Btn>,
+   then click <Btn>Done</Btn>.
+
+<WarningBox>
+
+If users were assigned to the application before SCIM provisioning was enabled,
+Okta will show the following message in the <Btn>Assignments</Btn> tab:
+*"User was assigned this application before Provisioning was enabled and not
+provisioned in the downstream application. Click Provision User."*
+
+To resolve this, click <Btn>Provision User</Btn> next to each affected user.
+This will trigger SCIM provisioning for them without needing to remove and
+re-add their assignment.
+
+</WarningBox>
+
+## Push groups to Cube Cloud
+
+To synchronize groups from Okta to Cube Cloud, you need to select which
+groups to push:
+
+1. In your Cube Cloud application, navigate to the <Btn>Push Groups</Btn> tab.
+2. Click <Btn>Push Groups</Btn> and choose how to find your groups — you can
+   search by name or rule.
+3. Select the groups you want to push to Cube Cloud and click <Btn>Save</Btn>.
+
+[ref-saml]: /product/administration/sso/okta/saml

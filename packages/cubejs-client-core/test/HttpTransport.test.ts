@@ -1,12 +1,12 @@
 /* eslint-disable import/first */
-/* globals describe,test,expect,jest,afterEach,beforeAll,beforeEach */
+import { vi, MockedFunction } from 'vitest';
 import fetch from 'cross-fetch';
 
-jest.mock('cross-fetch');
+vi.mock('cross-fetch');
 
 import HttpTransport from '../src/HttpTransport';
 
-const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
+const mockedFetch = fetch as MockedFunction<typeof fetch>;
 
 describe('HttpTransport', () => {
   const apiUrl = 'http://localhost:3000/cubejs-api/v1';
@@ -217,7 +217,7 @@ describe('HttpTransport', () => {
       // Mock AbortSignal.timeout
       const originalTimeout = AbortSignal.timeout;
       const mockTimeoutSignal = {};
-      AbortSignal.timeout = jest.fn().mockReturnValue(mockTimeoutSignal);
+      AbortSignal.timeout = vi.fn().mockReturnValue(mockTimeoutSignal);
 
       const transport = new HttpTransport({
         authorization: 'token',

@@ -15,11 +15,11 @@ import type { ApiGateway } from '../gateway';
 import type { LocalSubscriptionStore } from './local-subscription-store';
 
 const methodParams: Record<string, string[]> = Object.freeze({
-  load: ['query', 'queryType'],
+  load: ['query', 'queryType', 'cache'],
   sql: ['query'],
   'dry-run': ['query'],
   meta: [],
-  subscribe: ['query', 'queryType'],
+  subscribe: ['query', 'queryType', 'cache'],
   unsubscribe: [],
 });
 
@@ -38,7 +38,7 @@ export class SubscriptionServer {
   ) {
   }
 
-  protected resultFn(connectionId: string, messageId: string | number | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
+  protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
       if (logNetworkUsage) {
         this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
@@ -158,7 +158,7 @@ export class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
-      const subscriptionId = String(message.messageId);
+      const subscriptionId = message.messageId;
       const baseRequestId = message.requestId || `${connectionId}-${subscriptionId}`;
       const requestId = `${baseRequestId}-span-${uuidv4()}`;
 
@@ -181,6 +181,11 @@ export class SubscriptionServer {
         for (const k of methodParams[message.method]) {
           collectedParams[k] = message.params[k];
         }
+      }
+
+      if (collectedParams.cache !== undefined) {
+        collectedParams.cacheMode = collectedParams.cache;
+        delete collectedParams.cache;
       }
 
       const method = message.method.replace(/[^a-z]+(.)/g, (_m, chr) => chr.toUpperCase());

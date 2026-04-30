@@ -12,9 +12,9 @@ use typed_builder::TypedBuilder;
 pub struct MockGranularityDefinition {
     #[builder(setter(into))]
     interval: String,
-    #[builder(default, setter(strip_option, into))]
+    #[builder(default, setter(strip_option(fallback = origin_opt), into))]
     origin: Option<String>,
-    #[builder(default, setter(strip_option, into))]
+    #[builder(default, setter(strip_option(fallback = offset_opt), into))]
     offset: Option<String>,
     #[builder(default, setter(strip_option))]
     sql: Option<Rc<dyn MemberSql>>,

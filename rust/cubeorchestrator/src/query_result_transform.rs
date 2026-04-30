@@ -164,6 +164,65 @@ pub fn get_blending_response_key(
     ))
 }
 
+fn member_name(m: &MemberOrMemberExpression) -> Option<&str> {
+    match m {
+        MemberOrMemberExpression::Member(s) => Some(s.as_str()),
+        MemberOrMemberExpression::ParsedMemberExpression(e) => Some(e.name.as_str()),
+        MemberOrMemberExpression::MemberExpression(e) => Some(e.name.as_str()),
+    }
+}
+
+fn ensure_member_in_annotation(
+    member: &str,
+    annotation: &HashMap<String, ConfigItem>,
+) -> Result<()> {
+    if !annotation.contains_key(member) {
+        bail!(
+            concat!(
+                "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
+                "Please note primaryKey fields are `public: false` by default: ",
+                "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
+            ),
+            member
+        );
+    }
+    Ok(())
+}
+
+/// When the query result is empty (no columns/rows), we still need to verify
+/// that all requested members are present in the annotation.
+/// This catches RBAC-denied members that would otherwise silently return empty data.
+/// Note: segments are excluded because the annotation map only contains
+/// measures, dimensions, and time dimensions.
+fn validate_query_members_in_annotation(
+    query: &NormalizedQuery,
+    annotation: &HashMap<String, ConfigItem>,
+) -> Result<()> {
+    for m in query
+        .measures
+        .iter()
+        .flat_map(|v| v.iter())
+        .chain(query.dimensions.iter().flat_map(|v| v.iter()))
+        .filter_map(member_name)
+    {
+        ensure_member_in_annotation(m, annotation)?;
+    }
+
+    // Only validate time dimensions that have a granularity set.
+    // Time dimensions without granularity are used purely for date-range filtering
+    // and don't produce result columns, so they are not present in the annotation map.
+    for td in query
+        .time_dimensions
+        .iter()
+        .flat_map(|v| v.iter())
+        .filter(|td| td.granularity.is_some())
+    {
+        ensure_member_in_annotation(td.dimension.as_str(), annotation)?;
+    }
+
+    Ok(())
+}
+
 /// Parse member names from request/response.
 pub fn get_members(
     query_type: &QueryType,
@@ -185,6 +244,7 @@ pub fn get_members(
     let mut members_arr: Vec<String> = vec![];
 
     if db_data.columns.is_empty() {
+        validate_query_members_in_annotation(query, annotation)?;
         return Ok((members_map, members_arr));
     }
 
@@ -197,16 +257,7 @@ pub fn get_members(
             .get(column)
             .context(format!("Member name not found for alias: '{}'", column))?;
 
-        if !annotation.contains_key(member_name) {
-            bail!(
-                concat!(
-                    "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
-                    "Please note primaryKey fields are `public: false` by default: ",
-                    "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
-                ),
-                column
-            );
-        }
+        ensure_member_in_annotation(member_name, annotation)?;
 
         members_map.insert(member_name.clone(), column.clone());
         members_arr.push(member_name.clone());
@@ -345,19 +396,8 @@ pub fn get_vanilla_row(
                 }
             };
 
-            let annotation_for_member = match annotation.get(member_name) {
-                Some(am) => am,
-                None => {
-                    bail!(
-                    concat!(
-                        "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
-                        "Please note primaryKey fields are `public: false` by default: ",
-                        "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
-                    ),
-                    alias
-                )
-                }
-            };
+            ensure_member_in_annotation(member_name, annotation)?;
+            let annotation_for_member = annotation.get(member_name).unwrap();
 
             let transformed_value = transform_value(
                 value.clone(),
@@ -2193,6 +2233,99 @@ mod tests {
         )?;
         assert_eq!(members_to_alias_map.len(), 0);
         assert_eq!(members.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_members_empty_dataset_with_hidden_member() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"regular_profit_by_postal_code".to_string())
+            .unwrap()
+            .clone();
+
+        // Remove a measure from annotation to simulate RBAC-hidden member
+        let hidden_member = test_data
+            .request
+            .query
+            .measures
+            .as_ref()
+            .and_then(|m| m.first())
+            .and_then(|m| match m {
+                MemberOrMemberExpression::Member(s) => Some(s.clone()),
+                _ => None,
+            })
+            .expect("Test data should have at least one measure");
+        test_data.request.annotation.remove(&hidden_member);
+
+        let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
+        let annotation = &test_data.request.annotation;
+        let query = &test_data.request.query;
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
+
+        match get_members(
+            query_type,
+            query,
+            &QueryResult {
+                columns: vec![],
+                rows: vec![],
+                columns_pos: IndexMap::new(),
+            },
+            alias_to_member_name_map,
+            annotation,
+        ) {
+            Ok(_) => Err(TestError(
+                "get_members() should fail for hidden member with empty dataset".to_string(),
+            )
+            .into()),
+            Err(err) => {
+                assert!(err.to_string().contains("You requested hidden member"));
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_members_empty_dataset_with_filter_only_time_dimension() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"regular_profit_by_postal_code".to_string())
+            .unwrap()
+            .clone();
+
+        // Add a filter-only time dimension (no granularity) to the query.
+        // This simulates a dateRange filter like:
+        //   timeDimensions: [{ dimension: "Orders.created_at", dateRange: [...] }]
+        // These dimensions are NOT in the annotation because they don't produce
+        // result columns — they're only used for filtering.
+        test_data.request.query.time_dimensions = Some(vec![QueryTimeDimension {
+            dimension: "ECommerceRecordsUs2021.order_date".to_string(),
+            date_range: Some(vec!["2025-01-01".to_string(), "2025-12-31".to_string()]),
+            compare_date_range: None,
+            granularity: None,
+        }]);
+
+        let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
+        let annotation = &test_data.request.annotation;
+        let query = &test_data.request.query;
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
+
+        // Should succeed — filter-only time dimensions must not be checked
+        // against the annotation map.
+        let result = get_members(
+            query_type,
+            query,
+            &QueryResult {
+                columns: vec![],
+                rows: vec![],
+                columns_pos: IndexMap::new(),
+            },
+            alias_to_member_name_map,
+            annotation,
+        );
+        assert!(
+            result.is_ok(),
+            "Filter-only time dimension (no granularity) should not trigger hidden member error, got: {:?}",
+            result.err()
+        );
         Ok(())
     }
 

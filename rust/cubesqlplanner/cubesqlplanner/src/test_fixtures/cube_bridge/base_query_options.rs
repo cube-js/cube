@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use cubenativeutils::CubeError;
@@ -65,6 +66,14 @@ pub struct MockBaseQueryOptions {
     cubestore_support_multistage: Option<bool>,
     #[builder(default = false)]
     disable_external_pre_aggregations: bool,
+    #[builder(default)]
+    pre_aggregation_id: Option<String>,
+    #[builder(default)]
+    convert_tz_for_raw_time_dimension: Option<bool>,
+    #[builder(default)]
+    masked_members: Option<Vec<String>>,
+    #[builder(default)]
+    member_to_alias: Option<HashMap<String, String>>,
 }
 
 impl_static_data!(
@@ -82,7 +91,11 @@ impl_static_data!(
     pre_aggregation_query,
     total_query,
     cubestore_support_multistage,
-    disable_external_pre_aggregations
+    disable_external_pre_aggregations,
+    pre_aggregation_id,
+    convert_tz_for_raw_time_dimension,
+    masked_members,
+    member_to_alias
 );
 
 pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {

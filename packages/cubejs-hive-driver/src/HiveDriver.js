@@ -11,7 +11,7 @@ const {
 } = require('@cubejs-backend/shared');
 const jshs2 = require('jshs2');
 const SqlString = require('sqlstring');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { BaseDriver, createPoolName } = require('@cubejs-backend/base-driver');
 const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
 
@@ -61,28 +61,30 @@ class HiveDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
       auth: 'PLAIN',
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      dbName: getEnv('dbName', { dataSource }) || 'default',
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      dbName: getEnv('dbName', { dataSource, preAggregations }) || 'default',
       timeout: 10000,
-      username: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      hiveType: getEnv('hiveType', { dataSource }) === 'CDH'
+      username: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      hiveType: getEnv('hiveType', { dataSource, preAggregations }) === 'CDH'
         ? HS2Util.HIVE_TYPE.CDH
         : HS2Util.HIVE_TYPE.HIVE,
-      hiveVer: getEnv('hiveVer', { dataSource }) || '2.1.1',
-      thriftVer: getEnv('hiveThriftVer', { dataSource }) || '0.9.3',
-      cdhVer: getEnv('hiveCdhVer', { dataSource }),
+      hiveVer: getEnv('hiveVer', { dataSource, preAggregations }) || '2.1.1',
+      thriftVer: getEnv('hiveThriftVer', { dataSource, preAggregations }) || '0.9.3',
+      cdhVer: getEnv('hiveCdhVer', { dataSource, preAggregations }),
       authZid: 'cube.js',
       ...config
     };
 
     const configuration = new Configuration(this.config);
-    
-    this.pool = new Pool('hive', {
+
+    const poolName = createPoolName('hive', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         const idl = new IDLContainer();
         await idl.initialize(configuration);
@@ -124,7 +126,7 @@ class HiveDriver extends BaseDriver {
       min: 0,
       max:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,

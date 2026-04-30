@@ -189,8 +189,6 @@ Array [
 ]
 `;
 
-exports[`Cube RBAC Engine RBAC via REST API orders_view and cube with default policy: orders_view_rest 1`] = `Array []`;
-
 exports[`Cube RBAC Engine RBAC via SQL API SELECT * from line_items: line_items 1`] = `
 Array [
   Object {

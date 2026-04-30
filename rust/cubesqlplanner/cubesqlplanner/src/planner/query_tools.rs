@@ -1,108 +1,25 @@
-use super::sql_evaluator::{Compiler, MemberSymbol};
+use super::sql_evaluator::Compiler;
 use super::ParamsAllocator;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
-use crate::plan::FilterItem;
-use crate::planner::sql_evaluator::collectors::collect_join_hints;
+use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-pub struct QueryToolsCachedData {
-    join_hints: HashMap<String, Rc<Vec<JoinHintItem>>>,
-    join_hints_to_join_key: HashMap<Vec<Rc<Vec<JoinHintItem>>>, Rc<JoinKey>>,
-    join_key_to_join: HashMap<Rc<JoinKey>, Rc<dyn JoinDefinition>>,
-}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct JoinKey {
     root: String,
     joins: Vec<JoinItemStatic>,
-}
-
-impl QueryToolsCachedData {
-    pub fn new() -> Self {
-        Self {
-            join_hints: HashMap::new(),
-            join_hints_to_join_key: HashMap::new(),
-            join_key_to_join: HashMap::new(),
-        }
-    }
-
-    pub fn join_hints_for_member(
-        &mut self,
-        node: &Rc<MemberSymbol>,
-    ) -> Result<Rc<Vec<JoinHintItem>>, CubeError> {
-        let full_name = node.full_name();
-        if let Some(val) = self.join_hints.get(&full_name) {
-            Ok(val.clone())
-        } else {
-            let join_hints = Rc::new(collect_join_hints(node)?);
-            self.join_hints.insert(full_name, join_hints.clone());
-            Ok(join_hints)
-        }
-    }
-
-    pub fn join_hints_for_member_symbol_vec(
-        &mut self,
-        vec: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
-        vec.iter()
-            .map(|b| self.join_hints_for_member(b))
-            .collect::<Result<Vec<_>, _>>()
-    }
-
-    pub fn join_hints_for_filter_item_vec(
-        &mut self,
-        vec: &Vec<FilterItem>,
-    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
-        let mut member_symbols = Vec::new();
-        for i in vec.iter() {
-            i.find_all_member_evaluators(&mut member_symbols);
-        }
-        member_symbols
-            .iter()
-            .map(|b| self.join_hints_for_member(b))
-            .collect::<Result<Vec<_>, _>>()
-    }
-
-    pub fn join_by_hints(
-        &mut self,
-        hints: Vec<Rc<Vec<JoinHintItem>>>,
-        join_fn: impl FnOnce(Vec<JoinHintItem>) -> Result<Rc<dyn JoinDefinition>, CubeError>,
-    ) -> Result<(Rc<JoinKey>, Rc<dyn JoinDefinition>), CubeError> {
-        if let Some(key) = self.join_hints_to_join_key.get(&hints) {
-            Ok((key.clone(), self.join_key_to_join.get(key).unwrap().clone()))
-        } else {
-            let join = join_fn(
-                hints
-                    .iter()
-                    .flat_map(|h| h.as_ref().iter().cloned())
-                    .collect(),
-            )?;
-            let join_key = Rc::new(JoinKey {
-                root: join.static_data().root.to_string(),
-                joins: join
-                    .joins()?
-                    .iter()
-                    .map(|i| i.static_data().clone())
-                    .collect(),
-            });
-            self.join_hints_to_join_key.insert(hints, join_key.clone());
-            self.join_key_to_join.insert(join_key.clone(), join.clone());
-            Ok((join_key, join))
-        }
-    }
 }
 
 pub struct QueryTools {
@@ -112,8 +29,9 @@ pub struct QueryTools {
     templates_render: Rc<dyn SqlTemplatesRender>,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     evaluator_compiler: Rc<RefCell<Compiler>>,
-    cached_data: RefCell<QueryToolsCachedData>,
     timezone: Tz,
+    convert_tz_for_raw_time_dimension: bool,
+    masked_members: HashSet<String>,
 }
 
 impl QueryTools {
@@ -124,6 +42,9 @@ impl QueryTools {
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
         export_annotated_sql: bool,
+        convert_tz_for_raw_time_dimension: bool,
+        masked_members: Option<Vec<String>>,
+        member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -138,6 +59,7 @@ impl QueryTools {
             base_tools.clone(),
             security_context.clone(),
             timezone.clone(),
+            member_to_alias,
         )));
         Ok(Rc::new(Self {
             cube_evaluator,
@@ -146,9 +68,14 @@ impl QueryTools {
             templates_render,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
             evaluator_compiler,
-            cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,
+            convert_tz_for_raw_time_dimension,
+            masked_members: masked_members.unwrap_or_default().into_iter().collect(),
         }))
+    }
+
+    pub fn is_member_masked(&self, member_path: &str) -> bool {
+        self.masked_members.contains(member_path)
     }
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
@@ -172,12 +99,26 @@ impl QueryTools {
         self.timezone
     }
 
-    pub fn cached_data(&self) -> Ref<'_, QueryToolsCachedData> {
-        self.cached_data.borrow()
+    pub fn convert_tz_for_raw_time_dimension(&self) -> bool {
+        self.convert_tz_for_raw_time_dimension
     }
 
-    pub fn cached_data_mut(&self) -> RefMut<'_, QueryToolsCachedData> {
-        self.cached_data.borrow_mut()
+    pub fn join_for_hints(
+        &self,
+        hints: &JoinHints,
+    ) -> Result<(JoinKey, Rc<dyn JoinDefinition>), CubeError> {
+        let join = self
+            .base_tools
+            .join_tree_for_hints(hints.items().to_vec())?;
+        let join_key = JoinKey {
+            root: join.static_data().root.to_string(),
+            joins: join
+                .joins()?
+                .iter()
+                .map(|i| i.static_data().clone())
+                .collect(),
+        };
+        Ok((join_key, join))
     }
 
     pub fn evaluator_compiler(&self) -> &Rc<RefCell<Compiler>> {

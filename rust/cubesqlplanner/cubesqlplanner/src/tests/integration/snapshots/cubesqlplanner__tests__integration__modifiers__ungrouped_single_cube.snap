@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/modifiers.rs
+expression: result
+---
+orders__status | orders__amount | orders__count
+---------------+----------------+--------------
+completed      | 100.00         | 1            
+completed      | 200.00         | 1            
+pending        | 50.00          | 1            
+completed      | 300.00         | 1            
+cancelled      | 25.00          | 1            
+completed      | 150.00         | 1            
+pending        | 75.00          | 1            
+completed      | 500.00         | 1            
+pending        | 40.00          | 1

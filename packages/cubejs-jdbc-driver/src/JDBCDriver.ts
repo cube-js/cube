@@ -12,6 +12,7 @@ import {
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
+  createPoolName,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   StreamOptions,
@@ -87,6 +88,11 @@ export class JDBCDriver extends BaseDriver {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -105,20 +111,21 @@ export class JDBCDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const { poolOptions, ...dbOptions } = config;
 
     const dbTypeDescription = JDBCDriver.dbTypeDescription(
-      <string>(config.dbType || getEnv('dbType', { dataSource })),
+      <string>(config.dbType || getEnv('dbType', { dataSource, preAggregations })),
     );
 
     this.config = {
-      dbType: getEnv('dbType', { dataSource }),
+      dbType: getEnv('dbType', { dataSource, preAggregations }),
       url:
-        getEnv('jdbcUrl', { dataSource }) ||
+        getEnv('jdbcUrl', { dataSource, preAggregations }) ||
         dbTypeDescription && dbTypeDescription.jdbcUrl(),
       drivername:
-        getEnv('jdbcDriver', { dataSource }) ||
+        getEnv('jdbcDriver', { dataSource, preAggregations }) ||
         dbTypeDescription && dbTypeDescription.driverClass,
       properties: dbTypeDescription && dbTypeDescription.properties,
       ...dbOptions
@@ -132,7 +139,8 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    this.pool = new Pool('jdbc', {
+    const poolName = createPoolName('jdbc', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         await initMvn(await this.getCustomClassPath());
 
@@ -171,7 +179,7 @@ export class JDBCDriver extends BaseDriver {
       )
     }, {
       min: 0,
-      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource }) || 8,
+      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource, preAggregations }) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

@@ -1,0 +1,30 @@
+cubes:
+    - name: masking_cube
+      sql: "SELECT 1"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: secret_number
+            type: number
+            sql: price
+            mask: -1
+          - name: public_dim
+            type: string
+            sql: "{CUBE}.status"
+          - name: secret_with_sql_mask
+            type: string
+            sql: "{CUBE}.secret_col"
+            mask:
+              sql: "CONCAT('***', RIGHT(CAST({CUBE}.secret_col AS TEXT), 2))"
+      measures:
+          - name: count
+            type: count
+            mask: 12345
+          - name: sum_revenue
+            type: sum
+            sql: revenue
+            mask: -1
+          - name: real_count
+            type: count

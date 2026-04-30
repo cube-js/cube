@@ -24,12 +24,12 @@ use datafusion::physical_plan::{
     PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::scalar::ScalarValue;
-use flatbuffers::bitflags::_core::cmp::Ordering;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::any::Any;
+use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fmt::{self, Debug};

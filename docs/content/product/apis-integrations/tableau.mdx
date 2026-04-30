@@ -1,0 +1,140 @@
+---
+---
+
+# Tableau
+
+You can connect [Tableau](https://www.tableau.com) to Cube using
+[Semantic Layer Sync][ref-sls]. It will programmatically create and
+update Tableau data sources that are connected to Cube via the
+[SQL API][ref-sql-api].
+
+<InfoBox>
+
+Semantic Layer Sync with Tableau is available on
+[Enterprise and above plans](https://cube.dev/pricing).
+
+</InfoBox>
+
+Semantic Layer Sync works with Tableau Cloud, Tableau Desktop, and Tableau Server.
+
+## Setting up Semantic Layer Sync
+
+You can create a new sync by navigating to <Btn>IDE → Integrations</Btn>
+in Cube.
+
+To create a new sync, choose either <Btn>Tableau Cloud</Btn>, <Btn>Tableau Desktop</Btn>,
+or <Btn>Tableau Server</Btn>.
+
+For Tableau Cloud and Tableau Server,
+the data model is synchronized via the [Tableau API][tableau-api] which uses [personal
+access tokens][tableau-pat] for authentication. You can create a new [personal access
+token][tableau-api-authentication] on the&nbsp;<Btn>My Account Settings</Btn> page.
+
+<InfoBox>
+
+Personal access tokens might be disabled in your Tableau site configuration.
+To enable them, navigate to the&nbsp;<Btn>Settings</Btn> page of your Tableau site
+and click&nbsp;<Btn>Enable personal access tokens</Btn>.
+
+By default, personal access tokens are configured with an expiry period of 180 days.
+Please check your Tableau site configuration for details. To customize the expiry
+period, navigate to the&nbsp;<Btn>Settings</Btn> page of your Tableau site. Please
+also make sure to renew your personal access token in time. 
+
+</InfoBox>
+
+<WarningBox>
+
+Personal access tokens expire if they are not used after 15 consecutive days.
+If they are used more frequently than every 15 days, they expire after one year.
+
+</WarningBox>
+
+You will also need to specify a `region` and a Tableau `site` name. Consider the
+following URL of a Tableau site: `https://10ax.online.tableau.com/#/site/cubedev/home`.
+In this case, the region would be `10ax` and the site name would be `cubedev`.
+
+Example configuration for Tableau:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'tableau',
+      'name': 'Tableau Sync',
+      'config': {
+        'region': '10ax',
+        'site': 'mytableausite',
+        'personalAccessToken': 'cube-cloud',
+        'personalAccessTokenSecret': 'HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4',
+        'database': 'Cube Cloud: production-deployment',
+      },
+    },
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "tableau",
+        name: "Tableau Sync",
+        config: {
+          region: "10ax",
+          site: "mytableausite",
+          personalAccessToken: "cube-cloud",
+          personalAccessTokenSecret: "HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4",
+          database: "Cube Cloud: production-deployment"
+        }
+      }
+    ]
+  }
+}
+```
+
+</CodeTabs>
+
+When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
+to enter the user name and password for Cube Cloud. You can find them at the&nbsp;<Btn>SQL
+API Connection</Btn> tab on the&nbsp;<Btn>IDE → Integrations</Btn> page in Cube Cloud.
+
+### Tableau Desktop
+
+You can download a Tableau [data source][tds] file by clicking <Btn>Download .tds</Btn>.
+In the modal window, select one or more cubes or views and click <Btn>Download
+all selected</Btn> to download a ZIP archive with Tableau data source files, one
+per cube or view. You can open these files in Tableau to create data sources.
+
+## Authenticating users
+
+Semantic Layer Sync handles authentication automatically. When a user
+authenticates from Tableau to Cube, they are matched to a Cube user by
+their email address.
+
+For this to work, the same users that access Tableau must also exist in
+Cube. If you use an identity provider such as [Microsoft Entra ID][ref-entra]
+or [Okta][ref-okta], we recommend using [SCIM][ref-scim] for automated
+user provisioning.
+
+You can use [user attributes][ref-user-attributes] and
+[user groups][ref-user-groups] in combination with
+[data access policies][ref-dap] to control which data each user can access.
+
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
+[ref-scim]: /product/administration/sso/microsoft-entra-id/scim
+[ref-entra]: /product/administration/sso/microsoft-entra-id
+[ref-okta]: /product/administration/sso/okta
+[ref-user-attributes]: /product/administration/users-and-permissions/user-attributes
+[ref-user-groups]: /product/administration/users-and-permissions/user-groups
+[ref-dap]: /product/auth/data-access-policies
+[ref-sql-api]: /product/apis-integrations/sql-api
+[tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
+[tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
+[tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
+[tableau-pat]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm

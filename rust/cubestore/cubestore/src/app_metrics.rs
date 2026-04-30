@@ -73,9 +73,9 @@ pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.que
 pub static STREAMING_ROWS_READ: Counter = metrics::counter("cs.streaming.rows");
 pub static STREAMING_CHUNKS_READ: Counter = metrics::counter("cs.streaming.chunks");
 pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset");
-pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_chunks)");
-pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows)");
-pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory)");
+pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_chunks");
+pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows");
+pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory");
 pub static STREAMING_IMPORT_TIME: Histogram = metrics::histogram("cs.streaming.import_time.ms");
 pub static STREAMING_PARTITION_TIME: Histogram =
     metrics::histogram("cs.streaming.partition_time.ms");

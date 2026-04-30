@@ -91,6 +91,11 @@ export interface ClickHouseDriverOptions {
    * request before determining it as not valid. Default - 10000 ms.
    */
   testConnectionTimeout?: number,
+
+  /**
+   * Whether this driver is used for pre-aggregations.
+   */
+  preAggregations?: boolean,
 }
 
 interface ClickhouseDriverExportRequiredAWS {
@@ -145,20 +150,21 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     });
 
     const dataSource = config.dataSource ?? assertDataSource('default');
-    const host = config.host ?? getEnv('dbHost', { dataSource });
-    const port = config.port ?? getEnv('dbPort', { dataSource }) ?? 8123;
-    const protocol = config.protocol ?? (getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:');
+    const preAggregations = config.preAggregations || false;
+    const host = config.host ?? getEnv('dbHost', { dataSource, preAggregations });
+    const port = config.port ?? getEnv('dbPort', { dataSource, preAggregations }) ?? 8123;
+    const protocol = config.protocol ?? (getEnv('dbSsl', { dataSource, preAggregations }) ? 'https:' : 'http:');
     const url = `${protocol}//${host}:${port}`;
 
-    const username = config.username ?? getEnv('dbUser', { dataSource });
-    const password = config.password ?? getEnv('dbPass', { dataSource });
-    const database = config.database ?? (getEnv('dbName', { dataSource }) as string) ?? 'default';
+    const username = config.username ?? getEnv('dbUser', { dataSource, preAggregations });
+    const password = config.password ?? getEnv('dbPass', { dataSource, preAggregations });
+    const database = config.database ?? (getEnv('dbName', { dataSource, preAggregations }) as string) ?? 'default';
 
     // TODO this is a bit inconsistent with readOnly
-    this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource });
+    this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource, preAggregations });
 
     // Expect that getEnv('dbQueryTimeout') will always return a value
-    const requestTimeoutEnv: number = getEnv('dbQueryTimeout', { dataSource }) * 1000;
+    const requestTimeoutEnv: number = getEnv('dbQueryTimeout', { dataSource, preAggregations }) * 1000;
     const requestTimeout = config.requestTimeout ?? requestTimeoutEnv;
 
     this.config = {
@@ -166,13 +172,13 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       username,
       password,
       database,
-      exportBucket: this.getExportBucket(dataSource),
+      exportBucket: this.getExportBucket(dataSource, preAggregations),
       readOnly: !!config.readOnly,
       requestTimeout,
       compression: {
         // Response compression can't be enabled for a user with readonly=1, as ClickHouse will not allow settings modifications for such user.
-        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource }),
-        request: getEnv('clickhouseCompression', { dataSource }),
+        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource, preAggregations }),
+        request: getEnv('clickhouseCompression', { dataSource, preAggregations }),
       },
       clickhouseSettings: {
         /// Default Node.js client has a limit for the max size of HTTP headers. In practise, such headers can be extremely large
@@ -185,7 +191,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       },
     };
 
-    const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource }) ?? 8;
+    const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ?? 8;
 
     this.client = this.createClient(maxPoolSize);
   }
@@ -504,20 +510,22 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   protected getExportBucket(
     dataSource: string,
+    preAggregations?: boolean,
   ): ClickhouseDriverExportAWS | null {
     const requiredExportBucket: ClickhouseDriverExportRequiredAWS = {
       bucketType: getEnv('dbExportBucketType', {
         supported: SUPPORTED_BUCKET_TYPES,
         dataSource,
+        preAggregations,
       }),
-      bucketName: getEnv('dbExportBucket', { dataSource }),
-      region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+      bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
+      region: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
     };
 
     const exportBucket: ClickhouseDriverExportAWS = {
       ...requiredExportBucket,
-      keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
-      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+      keyId: getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
+      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
     };
 
     if (exportBucket.bucketType) {

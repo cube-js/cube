@@ -48,8 +48,7 @@
     "@rollup/plugin-node-resolve": "^11.2.0",
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "@types/fs-extra": "^9.0.1",
-    "@types/jest": "^27",
-    "flush-promises": "^1.0.2",
+    "@types/jest": "^29",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",
     "less": "^3.13.1",
@@ -57,7 +56,7 @@
     "postcss": "^8.2.8",
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
-    "rollup": "2.53.1",
+    "rollup": "2.80.0",
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-tsconfig-paths": "^1.5.2",
     "typescript": "~5.2.2"

@@ -49,7 +49,6 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
-use flatbuffers::bitflags::_core::pin::Pin;
 use futures::future::join_all;
 use futures::future::BoxFuture;
 use futures::task::{Context, Poll};
@@ -69,6 +68,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::pin::Pin;
 use std::sync::Weak;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -867,6 +867,10 @@ pub struct JobResultListener {
 }
 
 impl JobResultListener {
+    pub fn into_receiver(self) -> Receiver<MetaStoreEvent> {
+        self.receiver
+    }
+
     pub async fn wait_for_job_result(
         self,
         row_key: RowKey,

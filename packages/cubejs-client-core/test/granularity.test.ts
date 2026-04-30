@@ -1,6 +1,3 @@
-/* globals describe,test,expect */
-
-import 'jest';
 import dayjs from 'dayjs';
 import ko from 'dayjs/locale/ko';
 import ResultSet from '../src/ResultSet';

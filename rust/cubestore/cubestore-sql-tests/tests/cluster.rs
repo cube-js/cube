@@ -82,7 +82,8 @@ impl MultiProcTest for ClusterSqlTest {
                     prefix: "cluster",
                     service: services.sql_service,
                 }))
-                .await;
+                .await
+                .unwrap();
             })
             .await;
     }

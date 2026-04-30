@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/filters_segments.rs
+expression: result
+---
+customers__city | orders__count
+----------------+--------------
+Boston          | 1            
+New York        | 3            
+San Francisco   | 1

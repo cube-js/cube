@@ -1,0 +1,53 @@
+cubes:
+    - name: cube_d
+      sql: "SELECT * FROM t_d"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: label
+            type: string
+            sql: label
+
+    - name: cube_c
+      sql: "SELECT * FROM t_c"
+      joins:
+          - name: cube_d
+            relationship: many_to_one
+            sql: "{cube_c}.d_id = {cube_d.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+    - name: cube_b
+      sql: "SELECT * FROM t_b"
+      joins:
+          - name: cube_c
+            relationship: many_to_one
+            sql: "{cube_b}.c_id = {cube_c.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+    - name: cube_a
+      sql: "SELECT * FROM t_a"
+      joins:
+          - name: cube_b
+            relationship: many_to_one
+            sql: "{cube_a}.b_id = {cube_b.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: total_value
+            type: sum
+            sql: value
+          - name: count
+            type: count

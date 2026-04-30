@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/with_joins.rs
+expression: result
+---
+customers__name | orders__rolling_sum_trailing
+----------------+-----------------------------
+Alice Johnson   | 440.00                      
+Bob Smith       | 75.00                       
+Charlie Brown   | 425.00

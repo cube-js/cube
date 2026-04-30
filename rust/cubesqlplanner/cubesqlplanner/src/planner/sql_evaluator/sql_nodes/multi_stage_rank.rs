@@ -1,5 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::symbols::MeasureKind;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -40,14 +41,15 @@ impl SqlNode for MultiStageRankNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if m.is_multi_stage() && m.measure_type() == "rank" {
+                if m.is_multi_stage() && matches!(m.kind(), MeasureKind::Rank) {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let order_by = if !m.measure_order_by().is_empty() {
                         let sql = m
                             .measure_order_by()
                             .iter()
                             .map(|item| -> Result<String, CubeError> {
                                 let sql = item.sql_call().eval(
-                                    visitor,
+                                    &inner_visitor,
                                     node_processor.clone(),
                                     query_tools.clone(),
                                     templates,

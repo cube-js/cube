@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::MemberSymbol;
-use super::{evaluate_with_context, VisitorContext};
+use super::sql_evaluator::{CubeRef, CubeTableSymbol};
+use super::VisitorContext;
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -10,7 +10,7 @@ use std::rc::Rc;
 pub struct BaseCube {
     cube_name: String,
     members: HashSet<String>,
-    member_evaluator: Rc<MemberSymbol>,
+    cube_table_symbol: Rc<CubeTableSymbol>,
     definition: Rc<dyn CubeDefinition>,
     query_tools: Rc<QueryTools>,
 }
@@ -18,7 +18,7 @@ impl BaseCube {
     pub fn try_new(
         cube_name: String,
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<MemberSymbol>,
+        cube_table_symbol: Rc<CubeTableSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
         let definition = query_tools
             .cube_evaluator()
@@ -32,7 +32,7 @@ impl BaseCube {
         Ok(Rc::new(Self {
             cube_name,
             members,
-            member_evaluator,
+            cube_table_symbol,
             definition,
             query_tools,
         }))
@@ -43,8 +43,10 @@ impl BaseCube {
         context: Rc<VisitorContext>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let cube_sql = evaluate_with_context(&self.member_evaluator, context, templates)?;
-        Ok(cube_sql)
+        let cube_ref = CubeRef::Table(self.cube_table_symbol.clone());
+        let visitor = context.make_visitor(context.query_tools());
+        let node_processor = context.node_processor();
+        visitor.evaluate_cube_ref(&cube_ref, node_processor, templates)
     }
 
     pub fn name(&self) -> &String {

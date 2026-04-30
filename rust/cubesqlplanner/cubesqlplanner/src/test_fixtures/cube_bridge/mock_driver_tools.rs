@@ -1,6 +1,8 @@
 use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+use chrono::NaiveDateTime;
+use chrono::TimeZone;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -15,6 +17,7 @@ pub struct MockDriverTools {
     timezone: String,
     timestamp_precision: u32,
     sql_templates: Rc<MockSqlTemplatesRender>,
+    visible_in_db_time_zone: bool,
 }
 
 impl MockDriverTools {
@@ -23,6 +26,7 @@ impl MockDriverTools {
             timezone: "UTC".to_string(),
             timestamp_precision: 3,
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
+            visible_in_db_time_zone: false,
         }
     }
 
@@ -32,6 +36,7 @@ impl MockDriverTools {
             timezone,
             timestamp_precision: 3,
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
+            visible_in_db_time_zone: false,
         }
     }
 
@@ -41,7 +46,14 @@ impl MockDriverTools {
             timezone: "UTC".to_string(),
             timestamp_precision: 3,
             sql_templates: Rc::new(sql_templates),
+            visible_in_db_time_zone: false,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_visible_in_db_time_zone(mut self) -> Self {
+        self.visible_in_db_time_zone = true;
+        self
     }
 }
 
@@ -106,7 +118,36 @@ impl DriverTools for MockDriverTools {
     }
 
     fn in_db_time_zone(&self, date: String) -> Result<String, CubeError> {
-        Ok(date)
+        if self.timezone == "UTC" {
+            return Ok(date);
+        }
+        let tz: chrono_tz::Tz = self
+            .timezone
+            .parse()
+            .map_err(|e| CubeError::user(format!("Unknown timezone {}: {}", self.timezone, e)))?;
+
+        let precision = self.timestamp_precision;
+        let fmt = if precision == 3 {
+            "%Y-%m-%dT%H:%M:%S%.3f"
+        } else {
+            "%Y-%m-%dT%H:%M:%S%.6f"
+        };
+
+        let naive = NaiveDateTime::parse_from_str(&date, fmt)
+            .map_err(|e| CubeError::user(format!("Cannot parse timestamp '{}': {}", date, e)))?;
+
+        let local_dt = tz
+            .from_local_datetime(&naive)
+            .single()
+            .ok_or_else(|| CubeError::user(format!("Ambiguous local time: {}", date)))?;
+
+        let utc_dt = local_dt.with_timezone(&chrono::Utc);
+        let result = if precision == 3 {
+            utc_dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string()
+        } else {
+            utc_dt.format("%Y-%m-%dT%H:%M:%S%.6f").to_string()
+        };
+        Ok(result)
     }
 
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {

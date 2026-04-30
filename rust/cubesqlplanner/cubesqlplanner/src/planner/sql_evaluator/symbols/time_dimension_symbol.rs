@@ -1,5 +1,7 @@
+use super::common::CompiledMemberPath;
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::CubeRef;
 use crate::planner::time_dimension::Granularity;
 use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
@@ -10,8 +12,7 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
-    full_name: String,
-    alias: String,
+    compiled_path: CompiledMemberPath,
     granularity: Option<String>,
     granularity_obj: Option<Granularity>,
     date_range: Option<(String, String)>,
@@ -32,12 +33,18 @@ impl TimeDimensionSymbol {
         };
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
         let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
+        let compiled_path = CompiledMemberPath::new(
+            base_symbol.compiled_path().cube().clone(),
+            full_name,
+            base_symbol.name().clone(),
+            alias,
+            base_symbol.path().clone(),
+        );
         Rc::new(Self {
             base_symbol,
-            alias,
+            compiled_path,
             granularity,
             granularity_obj,
-            full_name,
             date_range,
             alias_suffix: name_suffix,
         })
@@ -93,8 +100,16 @@ impl TimeDimensionSymbol {
         Ok(result)
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
+    pub fn strip_join_prefix(&mut self) {
+        self.compiled_path = self.compiled_path.strip_join_prefix();
+    }
+
     pub fn full_name(&self) -> String {
-        self.full_name.clone()
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias_suffix(&self) -> String {
@@ -102,7 +117,7 @@ impl TimeDimensionSymbol {
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn owned_by_cube(&self) -> bool {
@@ -118,7 +133,7 @@ impl TimeDimensionSymbol {
             .into_iter()
             .map(|s| match s.as_ref() {
                 MemberSymbol::Dimension(dimension_symbol) => {
-                    if dimension_symbol.dimension_type() == "time" {
+                    if dimension_symbol.is_time() {
                         let result = Self::new(
                             s.clone(),
                             self.granularity.clone(),
@@ -159,27 +174,27 @@ impl TimeDimensionSymbol {
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        let mut refs = vec![];
         if let Some(granularity_obj) = &self.granularity_obj {
             if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                calendar_sql.extract_symbol_deps_with_path(&mut deps);
+                calendar_sql.extract_cube_refs(&mut refs);
             }
         }
-
-        deps.append(&mut self.base_symbol.get_dependencies_with_path());
-        deps
+        refs.append(&mut self.base_symbol.get_cube_refs());
+        refs
     }
 
     pub fn cube_name(&self) -> String {
-        self.base_symbol.cube_name()
+        self.compiled_path.cube_name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        match self.base_symbol.as_ref() {
-            MemberSymbol::Dimension(d) => d.join_map(),
-            _ => &None,
-        }
+        self.compiled_path.join_map()
     }
 
     pub fn is_multi_stage(&self) -> bool {
@@ -211,7 +226,7 @@ impl TimeDimensionSymbol {
     }
 
     pub fn name(&self) -> String {
-        self.base_symbol.name()
+        self.compiled_path.name().clone()
     }
 
     pub fn date_range_granularity(

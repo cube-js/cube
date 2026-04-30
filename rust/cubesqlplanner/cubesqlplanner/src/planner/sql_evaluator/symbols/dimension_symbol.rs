@@ -1,12 +1,18 @@
 use super::common::Case;
+use super::common::CompiledMemberPath;
+use super::dimension_kinds::{
+    CaseDimension, DimensionKind, GeoDimension, RegularDimension, SwitchDimension,
+};
 use super::SymbolPath;
-use super::{MemberSymbol, SymbolFactory};
+use super::{DimensionType, MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_evaluator::{CubeTableSymbol, TimeDimensionSymbol};
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::sql_evaluator::{
+    sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
+};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
@@ -22,72 +28,48 @@ pub struct CalendarDimensionTimeShift {
 
 #[derive(Clone)]
 pub struct DimensionSymbol {
-    cube: Rc<CubeTableSymbol>,
-    name: String,
-    dimension_type: String,
-    alias: String,
-    member_sql: Option<Rc<SqlCall>>,
-    latitude: Option<Rc<SqlCall>>,
-    longitude: Option<Rc<SqlCall>>,
-    values: Vec<String>,
-    case: Option<Case>,
-    definition: Rc<dyn DimensionDefinition>,
+    compiled_path: CompiledMemberPath,
+    kind: DimensionKind,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
     time_shift: Vec<CalendarDimensionTimeShift>,
     time_shift_pk_full_name: Option<String>,
     is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
-    owned_by_cube: bool,
     is_multi_stage: bool,
     is_sub_query: bool,
     propagate_filters_to_sub_query: bool,
+    mask_sql: Option<Rc<SqlCall>>,
 }
 
 impl DimensionSymbol {
     pub fn new(
-        cube: Rc<CubeTableSymbol>,
-        name: String,
-        dimension_type: String,
-        alias: String,
-        member_sql: Option<Rc<SqlCall>>,
+        compiled_path: CompiledMemberPath,
+        kind: DimensionKind,
         is_reference: bool,
         is_view: bool,
-        latitude: Option<Rc<SqlCall>>,
-        longitude: Option<Rc<SqlCall>>,
-        values: Vec<String>,
-        case: Option<Case>,
-        definition: Rc<dyn DimensionDefinition>,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
         is_self_time_shift_pk: bool,
-        owned_by_cube: bool,
         is_multi_stage: bool,
         is_sub_query: bool,
         propagate_filters_to_sub_query: bool,
+        mask_sql: Option<Rc<SqlCall>>,
     ) -> Rc<Self> {
         Rc::new(Self {
-            cube,
-            name,
-            dimension_type,
-            alias,
-            member_sql,
+            compiled_path,
+            kind,
             is_reference,
-            latitude,
-            longitude,
-            values,
-            definition,
-            add_group_by,
-            case,
             is_view,
+            add_group_by,
             time_shift,
             time_shift_pk_full_name,
             is_self_time_shift_pk,
-            owned_by_cube,
             is_multi_stage,
             is_sub_query,
             propagate_filters_to_sub_query,
+            mask_sql,
         })
     }
 
@@ -98,53 +80,53 @@ impl DimensionSymbol {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if self.member_sql.is_none() && self.dimension_type == "switch" {
-            Ok(templates.quote_identifier(&self.name)?) //We don't return cube_name -
-                                                        //it should be added in
-                                                        //autoprefix processing
-        } else if let Some(member_sql) = &self.member_sql {
-            let sql = member_sql.eval(visitor, node_processor, query_tools, templates)?;
-            Ok(sql)
-        } else {
-            Err(CubeError::internal(format!(
-                "Dimension {} hasn't sql evaluator",
-                self.full_name()
-            )))
-        }
+        self.kind.evaluate_sql(
+            self.compiled_path.name(),
+            self.compiled_path.full_name(),
+            visitor,
+            node_processor,
+            query_tools,
+            templates,
+        )
     }
 
     pub fn is_calc_group(&self) -> bool {
-        self.member_sql.is_none() && self.dimension_type == "switch"
+        self.kind.is_calc_group()
     }
 
-    pub fn values(&self) -> &Vec<String> {
-        &self.values
+    pub fn values(&self) -> &[String] {
+        match &self.kind {
+            DimensionKind::Switch(s) => s.values(),
+            _ => &[],
+        }
     }
 
     pub(super) fn replace_case(&self, new_case: Case) -> Rc<DimensionSymbol> {
         let mut new = self.clone();
         if new_case.is_single_value() {
-            //FIXME - Hack: we don’t treat a single-element case as a multi-stage dimension
+            //FIXME - Hack: we don't treat a single-element case as a multi-stage dimension
             new.is_multi_stage = false;
         }
-        new.case = Some(new_case);
+        if let DimensionKind::Case(ref c) = new.kind {
+            new.kind = DimensionKind::Case(c.replace_case(new_case));
+        }
         Rc::new(new)
     }
 
-    pub fn latitude(&self) -> Option<Rc<SqlCall>> {
-        self.latitude.clone()
-    }
-
-    pub fn longitude(&self) -> Option<Rc<SqlCall>> {
-        self.longitude.clone()
-    }
-
     pub fn case(&self) -> Option<&Case> {
-        self.case.as_ref()
+        match &self.kind {
+            DimensionKind::Case(c) => Some(c.case()),
+            _ => None,
+        }
     }
 
-    pub fn member_sql(&self) -> &Option<Rc<SqlCall>> {
-        &self.member_sql
+    pub fn member_sql(&self) -> Option<&Rc<SqlCall>> {
+        match &self.kind {
+            DimensionKind::Regular(r) => Some(r.member_sql()),
+            DimensionKind::Switch(s) => s.member_sql(),
+            DimensionKind::Case(c) => c.member_sql(),
+            DimensionKind::Geo(_) => None,
+        }
     }
 
     pub fn time_shift(&self) -> &Vec<CalendarDimensionTimeShift> {
@@ -155,16 +137,24 @@ impl DimensionSymbol {
         self.time_shift_pk_full_name.clone()
     }
 
+    pub fn compiled_path(&self) -> &CompiledMemberPath {
+        &self.compiled_path
+    }
+
+    pub fn strip_join_prefix(&mut self) {
+        self.compiled_path = self.compiled_path.strip_join_prefix();
+    }
+
     pub fn full_name(&self) -> String {
-        format!("{}.{}", self.cube.cube_name(), self.name)
+        self.compiled_path.full_name().clone()
     }
 
     pub fn alias(&self) -> String {
-        self.alias.clone()
+        self.compiled_path.alias().clone()
     }
 
     pub fn owned_by_cube(&self) -> bool {
-        self.owned_by_cube
+        !self.is_multi_stage && !self.kind.is_switch() && self.kind.is_owned_by_cube()
     }
 
     pub fn is_multi_stage(&self) -> bool {
@@ -175,12 +165,36 @@ impl DimensionSymbol {
         self.is_sub_query
     }
 
+    pub fn mask_sql(&self) -> &Option<Rc<SqlCall>> {
+        &self.mask_sql
+    }
+
     pub fn add_group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
         &self.add_group_by
     }
 
-    pub fn dimension_type(&self) -> &String {
-        &self.dimension_type
+    pub fn dimension_type(&self) -> &str {
+        self.kind.dimension_type_str()
+    }
+
+    pub fn kind(&self) -> &DimensionKind {
+        &self.kind
+    }
+
+    pub fn is_time(&self) -> bool {
+        self.kind.is_time()
+    }
+
+    pub fn is_geo(&self) -> bool {
+        self.kind.is_geo()
+    }
+
+    pub fn is_switch(&self) -> bool {
+        self.kind.is_switch()
+    }
+
+    pub fn is_case(&self) -> bool {
+        self.kind.is_case()
     }
 
     pub fn propagate_filters_to_sub_query(&self) -> bool {
@@ -211,81 +225,53 @@ impl DimensionSymbol {
         f: &F,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let mut result = self.clone();
-        if let Some(member_sql) = &self.member_sql {
-            result.member_sql = Some(member_sql.apply_recursive(f)?);
+        result.kind = self.kind.apply_to_deps(f)?;
+        if let Some(mask) = &self.mask_sql {
+            result.mask_sql = Some(mask.apply_recursive(f)?);
         }
-        if let Some(latitude) = &self.latitude {
-            result.latitude = Some(latitude.apply_recursive(f)?);
-        }
-        if let Some(longitude) = &self.longitude {
-            result.longitude = Some(longitude.apply_recursive(f)?);
-        }
-
-        if let Some(case) = &self.case {
-            result.case = Some(case.apply_to_deps(f)?)
-        }
-
         Ok(MemberSymbol::new_dimension(Rc::new(result)))
     }
 
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
-        let result = self
-            .member_sql
-            .iter()
-            .chain(self.latitude.iter())
-            .chain(self.longitude.iter())
-            .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
-        Box::new(result)
+        // mask_sql is intentionally excluded here: it's compiled in the
+        // context of the cube that owns the dimension (via aliasMember when
+        // the dimension is exposed through a view), which may legitimately
+        // differ from the current cube_name of the symbol. Including it in
+        // the generic validate_regular_member_cube_refs would produce false
+        // foreign-cube errors for view members.
+        self.kind.iter_sql_calls()
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_symbol_deps(&mut deps);
-        }
-        if let Some(member_sql) = &self.latitude {
-            member_sql.extract_symbol_deps(&mut deps);
-        }
-        if let Some(member_sql) = &self.longitude {
-            member_sql.extract_symbol_deps(&mut deps);
-        }
-        if let Some(case) = &self.case {
-            case.extract_symbol_deps(&mut deps);
+        let mut deps = self.kind.get_dependencies();
+        if let Some(mask) = &self.mask_sql {
+            mask.extract_symbol_deps(&mut deps);
         }
         deps
     }
 
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_symbol_deps_with_path(&mut deps);
+    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
+        let mut refs = self.kind.get_cube_refs();
+        if let Some(mask) = &self.mask_sql {
+            mask.extract_cube_refs(&mut refs);
         }
-        if let Some(member_sql) = &self.latitude {
-            member_sql.extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(member_sql) = &self.longitude {
-            member_sql.extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(case) = &self.case {
-            case.extract_symbol_deps_with_path(&mut deps);
-        }
-        deps
+        refs
     }
 
-    pub fn cube_name(&self) -> &String {
-        &self.cube.cube_name()
-    }
-
-    pub fn definition(&self) -> &Rc<dyn DimensionDefinition> {
-        &self.definition
+    pub fn cube_name(&self) -> String {
+        self.compiled_path.cube_name().clone()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
-        self.cube.join_map()
+        self.compiled_path.join_map()
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.compiled_path.name().clone()
+    }
+
+    pub fn path(&self) -> &Vec<String> {
+        self.compiled_path.path()
     }
 
     pub fn calendar_time_shift_for_interval(
@@ -330,6 +316,7 @@ impl DimensionSymbol {
 pub struct DimensionSymbolFactory {
     path: SymbolPath,
     sql: Option<Rc<dyn MemberSql>>,
+    mask_sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn DimensionDefinition>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
 }
@@ -341,9 +328,11 @@ impl DimensionSymbolFactory {
     ) -> Result<Self, CubeError> {
         let definition = cube_evaluator.dimension_by_path(path.full_name().clone())?;
         let sql = definition.sql()?;
+        let mask_sql = definition.mask_sql()?;
         Ok(Self {
             path,
             sql,
+            mask_sql,
             definition,
             cube_evaluator,
         })
@@ -355,6 +344,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let Self {
             path,
             sql,
+            mask_sql,
             definition,
             cube_evaluator,
         } = self;
@@ -367,28 +357,25 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let is_sql_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference()
-        } else {
-            false
-        };
+        let is_sql_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
 
-        let (latitude, longitude) = if dimension_type == "geo" {
-            if let (Some(latitude_item), Some(longitude_item)) =
-                (definition.latitude()?, definition.longitude()?)
-            {
-                let latitude = compiler.compile_sql_call(path.cube_name(), latitude_item.sql()?)?;
-                let longitude =
-                    compiler.compile_sql_call(path.cube_name(), longitude_item.sql()?)?;
-                (Some(latitude), Some(longitude))
-            } else {
-                return Err(CubeError::user(format!(
-                    "Geo dimension '{}'must have latitude and longitude",
-                    path.full_name()
-                )));
-            }
+        // mask.sql references are written in the context of the cube that
+        // owns the dimension. When a dimension is exposed through a view,
+        // the dimension's sql is a direct reference to the underlying cube
+        // member; compile mask.sql against that referenced member's cube so
+        // CUBE / cross-cube references inside the mask resolve the same way
+        // as on the owning cube — and as they do on the legacy BaseQuery
+        // path, which routes mask compilation through aliasMember for the
+        // same reason.
+        let mask_sql_cube_name = sql
+            .as_ref()
+            .and_then(|s| s.resolve_direct_reference())
+            .map(|dep| dep.cube_name())
+            .unwrap_or_else(|| path.cube_name().clone());
+        let mask_sql = if let Some(mask_sql) = mask_sql {
+            Some(compiler.compile_sql_call(&mask_sql_cube_name, mask_sql)?)
         } else {
-            (None, None)
+            None
         };
 
         let case = if let Some(native_case) = definition.case()? {
@@ -430,11 +417,15 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
-        let alias = PlanSqlTemplates::member_alias_name(
-            cube.static_data().resolved_alias(),
-            path.symbol_name(),
-            &None,
-        );
+        let alias = compiler
+            .alias_for_member(path.full_name())
+            .unwrap_or_else(|| {
+                PlanSqlTemplates::member_alias_name(
+                    cube.static_data().resolved_alias(),
+                    path.symbol_name(),
+                    &None,
+                )
+            });
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
@@ -467,12 +458,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let values = if definition.static_data().dimension_type == "switch" {
-            definition.static_data().values.clone().unwrap_or_default()
-        } else {
-            vec![]
-        };
-
         let add_group_by =
             if let Some(add_group_by) = &definition.static_data().add_group_by_references {
                 let symbols = add_group_by
@@ -487,31 +472,49 @@ impl SymbolFactory for DimensionSymbolFactory {
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
-        let owned_by_cube = if is_multi_stage || dimension_type == "switch" {
+        let kind = if let Some(case_val) = case {
+            let dim_type = DimensionType::from_str(&dimension_type)?;
+            DimensionKind::Case(CaseDimension::new(dim_type, case_val, sql))
+        } else if dimension_type == "geo" {
+            if let (Some(lat_item), Some(lon_item)) =
+                (definition.latitude()?, definition.longitude()?)
+            {
+                let latitude = compiler.compile_sql_call(path.cube_name(), lat_item.sql()?)?;
+                let longitude = compiler.compile_sql_call(path.cube_name(), lon_item.sql()?)?;
+                DimensionKind::Geo(GeoDimension::new(latitude, longitude))
+            } else {
+                return Err(CubeError::user(format!(
+                    "Geo dimension '{}' must have latitude and longitude",
+                    path.full_name()
+                )));
+            }
+        } else if dimension_type == "switch" {
+            let values = definition.static_data().values.clone().unwrap_or_default();
+            DimensionKind::Switch(SwitchDimension::new(values, sql))
+        } else {
+            let dim_type = DimensionType::from_str(&dimension_type)?;
+            match sql {
+                Some(sql) => DimensionKind::Regular(RegularDimension::new(dim_type, sql)),
+                None => {
+                    return Err(CubeError::internal(format!(
+                        "Dimension '{}' must have sql",
+                        path.full_name()
+                    )));
+                }
+            }
+        };
+
+        let owned_by_cube = if is_multi_stage || kind.is_switch() {
             false
         } else {
-            let mut owned = false;
-            if let Some(sql) = &sql {
-                owned |= sql.is_owned_by_cube();
-            }
-            if let Some(sql) = &latitude {
-                owned |= sql.is_owned_by_cube();
-            }
-            if let Some(sql) = &longitude {
-                owned |= sql.is_owned_by_cube();
-            }
-            if let Some(case) = &case {
-                owned |= case.is_owned_by_cube();
-            }
-            owned
+            kind.is_owned_by_cube()
         };
         let is_reference = (is_view && is_sql_direct_ref)
             || (!owned_by_cube
                 && !is_sub_query
                 && is_sql_direct_ref
-                && case.is_none()
-                && latitude.is_none()
-                && longitude.is_none()
+                && !kind.is_case()
+                && !kind.is_geo()
                 && !is_multi_stage);
 
         let propagate_filters_to_sub_query = definition
@@ -519,31 +522,29 @@ impl SymbolFactory for DimensionSymbolFactory {
             .propagate_filters_to_sub_query
             .unwrap_or(false);
 
-        let cube_symbol = compiler
-            .add_cube_table_evaluator(path.cube_name().clone())?
-            .as_cube_table()?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+
+        let compiled_path = CompiledMemberPath::new(
+            cube_symbol,
+            path.full_name().clone(),
+            path.symbol_name().clone(),
+            alias,
+            path.path().clone(),
+        );
 
         let symbol = MemberSymbol::new_dimension(DimensionSymbol::new(
-            cube_symbol,
-            path.symbol_name().clone(),
-            dimension_type,
-            alias,
-            sql,
+            compiled_path,
+            kind,
             is_reference,
             is_view,
-            latitude,
-            longitude,
-            values,
-            case,
-            definition,
             add_group_by,
             time_shift,
             time_shift_pk,
             is_self_time_shift_pk,
-            owned_by_cube,
             is_multi_stage,
             is_sub_query,
             propagate_filters_to_sub_query,
+            mask_sql,
         ));
 
         if let Some(granularity) = path.granularity() {
@@ -576,33 +577,23 @@ impl SymbolFactory for DimensionSymbolFactory {
 
 impl crate::utils::debug::DebugSql for DimensionSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
-        if let Some(case) = &self.case {
-            return case.debug_sql(expand_deps);
+        match &self.kind {
+            DimensionKind::Case(c) => c.case().debug_sql(expand_deps),
+            DimensionKind::Geo(g) => {
+                let lat = g.latitude().debug_sql(expand_deps);
+                let lon = g.longitude().debug_sql(expand_deps);
+                format!("GEO({}, {})", lat, lon)
+            }
+            DimensionKind::Switch(s) if s.is_calc_group() => {
+                format!("SWITCH({})", self.full_name())
+            }
+            _ => {
+                if let Some(sql) = self.member_sql() {
+                    sql.debug_sql(expand_deps)
+                } else {
+                    "".to_string()
+                }
+            }
         }
-
-        if self.dimension_type == "geo" {
-            let lat = self
-                .latitude
-                .as_ref()
-                .map(|sql| sql.debug_sql(expand_deps))
-                .unwrap_or_else(|| "{missing_latitude}".to_string());
-            let lon = self
-                .longitude
-                .as_ref()
-                .map(|sql| sql.debug_sql(expand_deps))
-                .unwrap_or_else(|| "{missing_longitude}".to_string());
-            return format!("GEO({}, {})", lat, lon);
-        }
-
-        if self.dimension_type == "switch" && self.member_sql.is_none() {
-            return format!("SWITCH({})", self.full_name());
-        }
-
-        let res = if let Some(sql) = &self.member_sql {
-            sql.debug_sql(expand_deps)
-        } else {
-            "".to_string()
-        };
-        res
     }
 }

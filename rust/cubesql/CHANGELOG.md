@@ -3,6 +3,130 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.38](https://github.com/cube-js/cube/compare/v1.6.37...v1.6.38) (2026-04-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.37](https://github.com/cube-js/cube/compare/v1.6.36...v1.6.37) (2026-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.36](https://github.com/cube-js/cube/compare/v1.6.35...v1.6.36) (2026-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.35](https://github.com/cube-js/cube/compare/v1.6.34...v1.6.35) (2026-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.34](https://github.com/cube-js/cube/compare/v1.6.33...v1.6.34) (2026-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **backend-native:** Fix `Continue wait` SQL API over HTTP event reporting ([#10649](https://github.com/cube-js/cube/issues/10649)) ([18d1e65](https://github.com/cube-js/cube/commit/18d1e65e7b7195de634dc74b17e2bc824ae0e3cf))
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+### Features
+
+- **cubesql:** Support PatchMeasure for view measures ([#10571](https://github.com/cube-js/cube/issues/10571)) ([3bfe812](https://github.com/cube-js/cube/commit/3bfe8121be684fb08e22e27efb59877734276dba))
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+### Features
+
+- **cubesql:** Expose format in /v1/cubesql schema response ([#10555](https://github.com/cube-js/cube/issues/10555)) ([f8d79a2](https://github.com/cube-js/cube/commit/f8d79a2e8c0e1fb291d7d55a21cb329c387605a4))
+- Expose alias for named numeric format ([#10568](https://github.com/cube-js/cube/issues/10568)) ([662bc58](https://github.com/cube-js/cube/commit/662bc581c38c87eddb40505dd1847f1f2c79bac9))
+- **schema-compiler:** Support currency for numeric measures and dimensions ([#10561](https://github.com/cube-js/cube/issues/10561)) ([5fc721f](https://github.com/cube-js/cube/commit/5fc721f98429cc46395673b03283c501a59c5cdd))
+
+## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.27](https://github.com/cube-js/cube/compare/v1.6.26...v1.6.27) (2026-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.26](https://github.com/cube-js/cube/compare/v1.6.25...v1.6.26) (2026-03-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.25](https://github.com/cube-js/cube/compare/v1.6.24...v1.6.25) (2026-03-20)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.24](https://github.com/cube-js/cube/compare/v1.6.23...v1.6.24) (2026-03-18)
+
+### Bug Fixes
+
+- **cubesql:** Push `Distinct` down CubeScan with time dimensions ([#10518](https://github.com/cube-js/cube/issues/10518)) ([028eadc](https://github.com/cube-js/cube/commit/028eadcec1ce7aa294f29395cfb272448e9b08a1))
+
+## [1.6.23](https://github.com/cube-js/cube/compare/v1.6.22...v1.6.23) (2026-03-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.22](https://github.com/cube-js/cube/compare/v1.6.21...v1.6.22) (2026-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.21](https://github.com/cube-js/cube/compare/v1.6.20...v1.6.21) (2026-03-10)
+
+### Bug Fixes
+
+- **cubesql:** Support per-column format codes (Tableau Desktop compatibility) ([#10484](https://github.com/cube-js/cube/issues/10484)) ([d6ad885](https://github.com/cube-js/cube/commit/d6ad885f384d675f25ca8405dad4ee5a559e98c3)), closes [#10418](https://github.com/cube-js/cube/issues/10418)
+
+### Features
+
+- **cubesql:** Introduce `cube_cache` session variable ([#10483](https://github.com/cube-js/cube/issues/10483)) ([541aa34](https://github.com/cube-js/cube/commit/541aa3465f25cb55328249b95fa9c258c95f5e07))
+
+## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
+
+### Bug Fixes
+
+- **cubesql:** Do not panic when executing `MEASURE` function ([#10472](https://github.com/cube-js/cube/issues/10472)) ([3202d51](https://github.com/cube-js/cube/commit/3202d517dce747831ff2549f30f4888b11bb005b))
+
+### Features
+
+- **backend-native:** Add `throwContinueWait` parameter to `/cubesql` API endpoint ([#10385](https://github.com/cube-js/cube/issues/10385)) ([3687c5f](https://github.com/cube-js/cube/commit/3687c5f422d6b265409a3e539fc77f37df207eb1))
+
+## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.18](https://github.com/cube-js/cube/compare/v1.6.17...v1.6.18) (2026-03-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Features
+
+- **cubesql:** Improve Talend compatibility ([#10430](https://github.com/cube-js/cube/issues/10430)) ([e4f39e5](https://github.com/cube-js/cube/commit/e4f39e5cc016b5c0a15a5ca74fdac197bd0d4290))
+
+## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
 ## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
 
 ### Bug Fixes

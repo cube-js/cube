@@ -1,0 +1,395 @@
+---
+title: Cubes
+description: Cubes represent the tables in your database. Each cube maps to a table or query in your data source and contains measures, dimensions, joins, and pre-aggregations.
+---
+
+Cubes represent the tables in your database. Each cube maps to a single
+table in your [data source][ref-data-sources] and contains the business
+logic — [measures][ref-measures], [dimensions][ref-dimensions],
+[joins][ref-joins], and [pre-aggregations][ref-pre-aggs] — that defines
+how that data can be queried.
+
+<Note>
+
+See the [cube reference][ref-cube-reference] for the full list of
+parameters and configuration options.
+
+</Note>
+
+## Defining a cube
+
+A cube points to a table in your data source using `sql_table`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`
+})
+```
+
+</CodeGroup>
+
+You can also use the `sql` property for more complex queries:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql: |
+      SELECT *
+      FROM orders, line_items
+      WHERE orders.id = line_items.order_id
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql: `
+    SELECT *
+    FROM orders, line_items
+    WHERE orders.id = line_items.order_id
+  `
+})
+```
+
+</CodeGroup>
+
+<Tip>
+
+If you're using dbt, see [this recipe][ref-cube-with-dbt] to streamline
+defining cubes on top of dbt models.
+
+</Tip>
+
+## Cube members
+
+Each cube contains definitions for its members: dimensions, measures,
+and segments.
+
+### Dimensions
+
+[Dimensions][ref-dimensions] represent the properties of a single data
+point — the attributes you group by and filter on, such as `status`,
+`city`, or `created_at`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Time dimensions enable grouping by granularity (year, quarter, month,
+week, day, hour, minute, second) and are essential for
+[partitioned pre-aggregations][ref-partition-preaggs].
+
+### Measures
+
+[Measures][ref-measures] represent aggregated values over a set of data
+points — counts, sums, averages, and custom calculations:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+      - name: average_amount
+        sql: amount
+        type: avg
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    total_amount: {
+      sql: `amount`,
+      type: `sum`
+    },
+
+    average_amount: {
+      sql: `amount`,
+      type: `avg`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Measures can reference other measures to create
+[calculated measures][ref-calculated-measures], and you can apply
+[filters][ref-measure-filters] to create filtered aggregations like
+"count of completed orders."
+
+### Segments
+
+[Segments][ref-segments] are predefined filters on a cube. They allow
+you to define commonly used filter logic once and reuse it across
+queries:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    segments:
+      - name: completed
+        sql: "{CUBE}.status = 'completed'"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  segments: {
+    completed: {
+      sql: `${CUBE}.status = 'completed'`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+## Joins
+
+[Joins][ref-joins] define relationships between cubes, forming the data
+graph that Cube uses to generate multi-table SQL queries:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: users
+        relationship: many_to_one
+        sql: "{CUBE}.user_id = {users.id}"
+
+      - name: line_items
+        relationship: one_to_many
+        sql: "{CUBE}.id = {line_items.order_id}"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  joins: {
+    users: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.user_id = ${users.id}`
+    },
+
+    line_items: {
+      relationship: `one_to_many`,
+      sql: `${CUBE}.id = ${line_items.order_id}`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Cube supports `one_to_one`, `many_to_one`, and `one_to_many` relationship
+types. See [working with joins][ref-working-with-joins] for advanced
+patterns like cross-database joins and join direction control.
+
+## Pre-aggregations
+
+[Pre-aggregations][ref-pre-aggs] are materialized summaries of cube data
+that dramatically speed up query execution. Cube automatically matches
+incoming queries to the best available pre-aggregation:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: day
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      measures: [count, total_amount],
+      dimensions: [status],
+      time_dimension: created_at,
+      granularity: `day`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Pre-aggregations support [partitioning][ref-partition-preaggs] by time
+and [incremental refreshes][ref-incremental-preaggs] to keep materialized
+data up-to-date efficiently.
+
+## Designing effective cubes
+
+### One cube per entity
+
+Map each cube to a single business entity — `orders`, `users`,
+`products`, `line_items`. Use [joins](#joins) to connect them rather than
+creating wide cubes with data from multiple tables.
+
+### Keep naming consistent
+
+Use clear, consistent naming for members. Dimensions should describe
+attributes (`status`, `city`, `created_at`), and measures should describe
+aggregations (`count`, `total_revenue`, `average_order_value`). Add
+[`description`][ref-cube-description] and [`title`][ref-cube-title] for
+user-friendly display.
+
+### Control visibility
+
+Use [`public`][ref-cube-public] to hide cubes that should not be
+directly queried by end-users. In most data models, cubes are internal
+building blocks and [views][ref-views] are the public interface:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: base_orders
+    public: false
+    sql_table: orders
+
+    # ...
+```
+
+```javascript title="JavaScript"
+cube(`base_orders`, {
+  public: false,
+  sql_table: `orders`,
+
+  // ...
+})
+```
+
+</CodeGroup>
+
+### Scale with extension and polymorphism
+
+When cubes share common members, use [`extends`][ref-extending-cubes] to
+avoid duplication. For data models with many similar entities,
+[polymorphic cubes][ref-polymorphic-cubes] let you define a base cube
+and specialize it per entity.
+
+## Next steps
+
+- See the [cube reference][ref-cube-reference] for the full list of
+  parameters
+- Learn about [views][ref-views] to expose cubes to end-users
+- Explore [calculated measures][ref-calculated-measures] for derived metrics
+- Use the [Semantic Model IDE][ref-ide] to develop cubes interactively
+
+[wiki-view-sql]: https://en.wikipedia.org/wiki/View_(SQL)
+[ref-data-sources]: /admin/connect-to-data
+[ref-cube-reference]: /reference/data-modeling/cube
+[ref-cube-description]: /reference/data-modeling/cube#description
+[ref-cube-title]: /reference/data-modeling/cube#title
+[ref-cube-public]: /reference/data-modeling/cube#public
+[ref-measures]: /reference/data-modeling/measures
+[ref-dimensions]: /reference/data-modeling/dimensions
+[ref-segments]: /reference/data-modeling/segments
+[ref-joins]: /reference/data-modeling/joins
+[ref-pre-aggs]: /reference/data-modeling/pre-aggregations
+[ref-views]: /docs/data-modeling/views
+[ref-extending-cubes]: /docs/data-modeling/extending-cubes
+[ref-polymorphic-cubes]: /recipes/data-modeling/polymorphic-cubes
+[ref-dynamic-models]: /docs/data-modeling/dynamic
+[ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
+[ref-measure-filters]: /reference/data-modeling/measures#filters
+[ref-working-with-joins]: /docs/data-modeling/joins
+[ref-partition-preaggs]: /docs/pre-aggregations/matching-pre-aggregations#partitioning
+[ref-incremental-preaggs]: /reference/data-modeling/pre-aggregations#incremental
+[ref-cube-with-dbt]: /reference/data-modeling/cube-dbt
+[ref-explore]: /analytics/explore
+[ref-workbooks]: /analytics/workbooks
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-ide]: /docs/data-modeling/data-model-ide

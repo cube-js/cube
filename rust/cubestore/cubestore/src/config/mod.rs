@@ -473,6 +473,10 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
 
+    fn cachestore_cache_lfu_log_factor(&self) -> u8;
+
+    fn cachestore_cache_lfu_decay_time(&self) -> u32;
+
     fn cachestore_queue_results_expire(&self) -> u64;
 
     fn cachestore_metrics_interval(&self) -> u64;
@@ -553,6 +557,12 @@ pub trait ConfigObj: DIService {
     fn remote_files_cleanup_batch_size(&self) -> u64;
 
     fn create_table_max_retries(&self) -> u64;
+
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
+
+    fn max_joined_partitions(&self) -> usize;
+
+    fn max_joined_partitions_message(&self) -> &str;
 }
 
 #[derive(Debug, Clone)]
@@ -618,6 +628,8 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
     pub cachestore_cache_ttl_notify_channel: usize,
     pub cachestore_cache_ttl_buffer_max_size: usize,
+    pub cachestore_cache_lfu_log_factor: u8,
+    pub cachestore_cache_lfu_decay_time: u32,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -656,6 +668,9 @@ pub struct ConfigObjImpl {
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
     pub create_table_max_retries: u64,
+    pub compaction_readiness_chunks_threshold: Option<u64>,
+    pub max_joined_partitions: usize,
+    pub max_joined_partitions_message: String,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -874,6 +889,14 @@ impl ConfigObj for ConfigObjImpl {
         self.cachestore_cache_ttl_buffer_max_size
     }
 
+    fn cachestore_cache_lfu_log_factor(&self) -> u8 {
+        self.cachestore_cache_lfu_log_factor
+    }
+
+    fn cachestore_cache_lfu_decay_time(&self) -> u32 {
+        self.cachestore_cache_lfu_decay_time
+    }
+
     fn cachestore_queue_results_expire(&self) -> u64 {
         self.cachestore_queue_results_expire
     }
@@ -1033,6 +1056,18 @@ impl ConfigObj for ConfigObjImpl {
 
     fn create_table_max_retries(&self) -> u64 {
         self.create_table_max_retries
+    }
+
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64> {
+        self.compaction_readiness_chunks_threshold
+    }
+
+    fn max_joined_partitions(&self) -> usize {
+        self.max_joined_partitions
+    }
+
+    fn max_joined_partitions_message(&self) -> &str {
+        &self.max_joined_partitions_message
     }
 
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
@@ -1236,7 +1271,7 @@ impl Config {
             Some(256 << 20),
         ) as u64;
 
-        Config {
+        let result = Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::var("CUBESTORE_DATA_DIR")
@@ -1459,6 +1494,8 @@ impl Config {
                     "CUBESTORE_CACHE_TTL_BUFFER_MAX_SIZE",
                     16_384,
                 ),
+                cachestore_cache_lfu_log_factor: env_parse("CUBESTORE_CACHE_LFU_LOG_FACTOR", 10),
+                cachestore_cache_lfu_decay_time: env_parse("CUBESTORE_CACHE_LFU_DECAY_TIME", 60),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -1579,8 +1616,15 @@ impl Config {
                     50000,
                 ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
+                compaction_readiness_chunks_threshold: env_optparse(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
+                ),
+                max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
+                max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }),
-        }
+        };
+        result.validate_config();
+        result
     }
 
     pub fn test(name: &str) -> Config {
@@ -1681,6 +1725,8 @@ impl Config {
                 cachestore_cache_eviction_proactive_ttl_threshold: 5,
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
+                cachestore_cache_lfu_log_factor: 10,
+                cachestore_cache_lfu_decay_time: 60,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
@@ -1724,6 +1770,9 @@ impl Config {
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
                 create_table_max_retries: 3,
+                compaction_readiness_chunks_threshold: None,
+                max_joined_partitions: 5,
+                max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }
         }
     }
@@ -1733,9 +1782,25 @@ impl Config {
         update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
     ) -> Config {
         let new_config = self.config_obj.as_ref().clone();
-        Self {
+        let config = Self {
             injector: self.injector.clone(),
             config_obj: Arc::new(update_config(new_config)),
+        };
+        config.validate_config();
+        config
+    }
+
+    fn validate_config(&self) {
+        if let Some(readiness) = self.config_obj.compaction_readiness_chunks_threshold {
+            let compaction = self.config_obj.compaction_chunks_count_threshold;
+            if readiness < compaction {
+                panic!(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD ({}) must not be lower than \
+                     CUBESTORE_CHUNKS_COUNT_THRESHOLD ({}), otherwise compaction will never \
+                     reduce chunks below the readiness threshold",
+                    readiness, compaction,
+                );
+            }
         }
     }
 

@@ -25,12 +25,21 @@ Please track [this issue](https://github.com/cube-js/cube/issues/8487).
 
 Common uses of multi-stage calculations:
 
-- [Rolling window](#rolling-window) calculations.
-- [Time-shift](#time-shift) calculations, e.g., year-over-year sales growth.
-- [Period-to-date](#period-to-date) calculations, e.g., year-to-date (YTD) analysis.
-- [Fixed dimension](#fixed-dimension) calculations, e.g., comparing individual items to a broader dataset or calculating percent of total.
-- [Conditional measure](#conditional-measure) calculations, e.g., based on a dimension value.
-- [Ranking](#ranking) calculations.
+- [Rolling window](#rolling-window), e.g., cumulative counts or moving averages.
+- [Time-shift](#time-shift), e.g., year-over-year sales growth.
+- [Period-to-date](#period-to-date), e.g., year-to-date (YTD) analysis.
+- [Conditional measure](#conditional-measure), e.g., amount in a selected currency.
+
+**Some calculations use inner and outer aggregation stages.** The _inner_ stage computes
+a base measure at a specific granularity, and the _outer_ stage aggregates those results
+according to the query's dimensions:
+
+- [Fixed dimension](#fixed-dimension), e.g., percent of total — use the [`group_by`][ref-group-by]
+parameter to group by only the listed dimensions.
+- [Nested aggregate](#nested-aggregate), e.g., average of per-customer averages — use the
+[`add_group_by`][ref-add-group-by] parameter to group by query dimensions plus listed.
+- [Ranking](#ranking), e.g., ranking products by revenue — use the [`reduce_by`][ref-reduce-by]
+parameter to group by query dimensions minus listed.
 
 ## Rolling window
 
@@ -301,10 +310,138 @@ Query and result:
 
 <Screenshot src="https://ucarecdn.com/3c8bbb38-b582-410d-8a1c-fa7c0dc38d14/" />
 
+## Conditional measure
+
+Conditional measure calculations can be used to create measures that depend on the value
+of a dimension. Such measures are defined using the [`case` parameter][ref-case-measures]
+and used together with [`switch` dimensions][ref-switch-dimensions].
+
+```yaml
+- name: amount_in_currency
+  multi_stage: true
+  case:
+    switch: "{CUBE.currency}"
+    when:
+      - value: EUR
+        sql: "{CUBE.amount_eur}"
+      - value: GBP
+        sql: "{CUBE.amount_gbp}"
+    else:
+      sql: "{CUBE.amount_usd}"
+  type: number
+```
+
+### Example
+
+Data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: |
+      SELECT 1 AS id, 100 AS amount_usd UNION ALL
+      SELECT 2 AS id, 200 AS amount_usd UNION ALL
+      SELECT 3 AS id, 300 AS amount_usd UNION ALL
+      SELECT 4 AS id, 400 AS amount_usd UNION ALL
+      SELECT 5 AS id, 500 AS amount_usd
+
+    dimensions:
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+
+    measures:
+      - name: amount_usd
+        sql: amount_usd
+        type: sum
+
+      - name: amount_eur
+        sql: "{amount_usd} * 0.9"
+        type: number
+
+      - name: amount_gbp
+        sql: "{amount_usd} * 0.8"
+        type: number
+
+      - name: amount_in_currency
+        multi_stage: true
+        case:
+          switch: "{currency}"
+          when:
+            - value: EUR
+              sql: "{amount_eur}"
+            - value: GBP
+              sql: "{amount_gbp}"
+          else:
+            sql: "{amount_usd}"
+        type: number
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, 100 AS amount_usd UNION ALL
+    SELECT 2 AS id, 200 AS amount_usd UNION ALL
+    SELECT 3 AS id, 300 AS amount_usd UNION ALL
+    SELECT 4 AS id, 400 AS amount_usd UNION ALL
+    SELECT 5 AS id, 500 AS amount_usd
+  `,
+
+  dimensions: {
+    currency: {
+      type: `switch`,
+      values: [`USD`, `EUR`, `GBP`]
+    }
+  },
+
+  measures: {
+    amount_usd: {
+      sql: `amount_usd`,
+      type: `sum`
+    },
+
+    amount_eur: {
+      sql: `${amount_usd} * 0.9`,
+      type: `number`
+    },
+
+    amount_gbp: {
+      sql: `${amount_usd} * 0.8`,
+      type: `number`
+    },
+
+    amount_in_currency: {
+      multi_stage: true,
+      case: {
+        switch: `${currency}`,
+        when: [
+          { value: `EUR`, sql: `${amount_eur}` },
+          { value: `GBP`, sql: `${amount_gbp}` }
+        ],
+        else: { sql: `${amount_usd}` }
+      },
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+Query and result:
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/43df5a7c-7537-448a-999c-abeed5347519/" />
+
 ## Fixed dimension
 
 Fixed dimension calculations can be used to perform fixed comparisons, e.g., to compare
-individual items to a broader dataset.
+individual items to a broader dataset. Use the [`group_by` parameter][ref-group-by]
+of a multi-stage measure to specify dimensions for the inner aggregation stage.
 
 For example, comparing revenue sales to the overall average:
 
@@ -401,137 +538,92 @@ Query and result:
 
 <Screenshot src="https://ucarecdn.com/0d0b318c-0743-4698-bb05-b9bf6dfeb292/" />
 
-## Conditional measure
+## Nested aggregate
 
-Conditional measure calculations can be used to create measures that depend on the value
-of a dimension. Such measures are defined using the [`case` parameter][ref-case-measures]
-and used together with [`switch` dimensions][ref-switch-dimensions].
+Nested aggregate calculations are used to compute an aggregate of an aggregate, e.g.,
+to calculate the average of per-customer averages or to count how many customers exceed
+a threshold. Use the [`add_group_by` parameter][ref-add-group-by] of a multi-stage
+measure to specify dimensions for the inner aggregation stage.
+
+For example, calculating the average order value per customer, then averaging across
+customers:
 
 ```yaml
-- name: amount_in_currency
+- name: avg_order_value
+  sql: amount
+  type: avg
+
+- name: avg_customer_order_value
   multi_stage: true
-  case:
-    switch: "{CUBE.currency}"
-    when:
-      - value: EUR
-        sql: "{CUBE.amount_eur}"
-      - value: GBP
-        sql: "{CUBE.amount_gbp}"
-    else:
-      sql: "{CUBE.amount_usd}"
-  type: number
+  sql: "{avg_order_value}"
+  type: avg
+  add_group_by:
+    - customer_id
+```
+
+Counting customers with total spending above a threshold:
+
+```yaml
+- name: total_amount
+  sql: amount
+  type: sum
+
+- name: high_value_customer_count
+  multi_stage: true
+  sql: "CASE WHEN {total_amount} > 1000 THEN 1 END"
+  type: count
+  add_group_by:
+    - customer_id
 ```
 
 ### Example
 
 Data model:
 
-<CodeTabs>
-
 ```yaml
 cubes:
   - name: orders
     sql: |
-      SELECT 1 AS id, 100 AS amount_usd UNION ALL
-      SELECT 2 AS id, 200 AS amount_usd UNION ALL
-      SELECT 3 AS id, 300 AS amount_usd UNION ALL
-      SELECT 4 AS id, 400 AS amount_usd UNION ALL
-      SELECT 5 AS id, 500 AS amount_usd
-      
+      SELECT 1 AS id, 100 AS amount, 1 AS customer_id, 'USA' AS country UNION ALL
+      SELECT 2 AS id, 150 AS amount, 1 AS customer_id, 'USA' AS country UNION ALL
+      SELECT 3 AS id, 200 AS amount, 2 AS customer_id, 'USA' AS country UNION ALL
+      SELECT 4 AS id, 300 AS amount, 2 AS customer_id, 'USA' AS country UNION ALL
+      SELECT 5 AS id, 400 AS amount, 2 AS customer_id, 'USA' AS country UNION ALL
+      SELECT 6 AS id, 500 AS amount, 3 AS customer_id, 'Germany' AS country UNION ALL
+      SELECT 7 AS id, 600 AS amount, 3 AS customer_id, 'Germany' AS country UNION ALL
+      SELECT 8 AS id, 250 AS amount, 4 AS customer_id, 'Germany' AS country
+
     dimensions:
-      - name: currency
-        type: switch
-        values:
-          - USD
-          - EUR
-          - GBP
-    
+      - name: customer_id
+        sql: customer_id
+        type: number
+
+      - name: country
+        sql: country
+        type: string
+
     measures:
-      - name: amount_usd
-        sql: amount_usd
-        type: sum
+      - name: avg_order_value
+        sql: amount
+        type: avg
 
-      - name: amount_eur
-        sql: "{amount_usd} * 0.9"
-        type: number
- 
-      - name: amount_gbp
-        sql: "{amount_usd} * 0.8"
-        type: number
-
-      - name: amount_in_currency
+      - name: avg_customer_order_value
         multi_stage: true
-        case:
-          switch: "{currency}"
-          when:
-            - value: EUR
-              sql: "{amount_eur}"
-            - value: GBP
-              sql: "{amount_gbp}"
-          else:
-            sql: "{amount_usd}"
-        type: number
+        sql: "{avg_order_value}"
+        type: avg
+        add_group_by:
+          - customer_id
 ```
 
-```javascript
-cube(`orders`, {
-  sql: `
-    SELECT 1 AS id, 100 AS amount_usd UNION ALL
-    SELECT 2 AS id, 200 AS amount_usd UNION ALL
-    SELECT 3 AS id, 300 AS amount_usd UNION ALL
-    SELECT 4 AS id, 400 AS amount_usd UNION ALL
-    SELECT 5 AS id, 500 AS amount_usd
-  `,
-
-  dimensions: {
-    currency: {
-      type: `switch`,
-      values: [`USD`, `EUR`, `GBP`]
-    }
-  },
-
-  measures: {
-    amount_usd: {
-      sql: `amount_usd`,
-      type: `sum`
-    },
-
-    amount_eur: {
-      sql: `${amount_usd} * 0.9`,
-      type: `number`
-    },
-
-    amount_gbp: {
-      sql: `${amount_usd} * 0.8`,
-      type: `number`
-    },
-
-    amount_in_currency: {
-      multi_stage: true,
-      case: {
-        switch: `${currency}`,
-        when: [
-          { value: `EUR`, sql: `${amount_eur}` },
-          { value: `GBP`, sql: `${amount_gbp}` }
-        ],
-        else: { sql: `${amount_usd}` }
-      },
-      type: `number`
-    }
-  }
-})
-```
-
-</CodeTabs>
-
-Query and result:
-
-<Screenshot src="https://lgo0ecceic.ucarecd.net/43df5a7c-7537-448a-999c-abeed5347519/" />
+When querying `avg_customer_order_value` grouped by `country`, Cube computes the average
+order value per customer first (inner stage), then averages those values per country
+(outer stage). This gives equal weight to each customer regardless of order count.
 
 ## Ranking
 
 Ranking calculations can be used to get valuable insights, especially when analyzing
-data across various dimensions.
+data across various dimensions. Use the [`reduce_by` parameter][ref-reduce-by] of a
+multi-stage measure to specify dimensions to exclude from the inner aggregation stage.
 
 ```yaml
 - name: product_rank
@@ -600,3 +692,6 @@ Query and result:
 [ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
 [ref-case-measures]: /product/data-modeling/reference/measures#case
 [ref-switch-dimensions]: /product/data-modeling/reference/types-and-formats#switch
+[ref-group-by]: /product/data-modeling/reference/measures#group_by
+[ref-reduce-by]: /product/data-modeling/reference/measures#reduce_by
+[ref-add-group-by]: /product/data-modeling/reference/measures#add_group_by

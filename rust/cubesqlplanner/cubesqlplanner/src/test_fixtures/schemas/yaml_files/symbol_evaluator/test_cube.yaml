@@ -41,3 +41,6 @@ cubes:
           - name: count_distinct_approx_id
             type: countDistinctApprox
             sql: id
+      segments:
+          - name: is_active
+            sql: "{CUBE}.status = 'active'"

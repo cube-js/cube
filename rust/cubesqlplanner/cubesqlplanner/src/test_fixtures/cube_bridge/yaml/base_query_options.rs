@@ -1,6 +1,7 @@
 use crate::cube_bridge::base_query_options::{FilterItem, OrderByItem, TimeDimension};
 use serde::de;
 use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct YamlBaseQueryOptions {
@@ -16,9 +17,7 @@ pub struct YamlBaseQueryOptions {
     pub order: Option<Vec<YamlOrderByItem>>,
     #[serde(default)]
     pub filters: Option<Vec<YamlFilterItem>>,
-    #[serde(default)]
-    pub limit: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "limit")]
     pub row_limit: Option<String>,
     #[serde(default)]
     pub offset: Option<String>,
@@ -34,6 +33,18 @@ pub struct YamlBaseQueryOptions {
     pub cubestore_support_multistage: Option<bool>,
     #[serde(default)]
     pub disable_external_pre_aggregations: Option<bool>,
+    #[serde(default)]
+    pub pre_aggregation_id: Option<String>,
+    #[serde(default)]
+    pub convert_tz_for_raw_time_dimension: Option<bool>,
+    #[serde(default, rename = "joinHints")]
+    pub join_hints: Option<Vec<Vec<String>>>,
+    #[serde(default, rename = "memberToAlias")]
+    pub member_to_alias: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub timezone: Option<String>,
+    #[serde(default, rename = "maskedMembers")]
+    pub masked_members: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]

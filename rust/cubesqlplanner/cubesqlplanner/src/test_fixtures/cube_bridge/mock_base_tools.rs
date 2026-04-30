@@ -66,10 +66,10 @@ impl BaseTools for MockBaseTools {
 
     fn generate_time_series(
         &self,
-        _granularity: String,
-        _date_range: Vec<String>,
+        granularity: String,
+        date_range: Vec<String>,
     ) -> Result<Vec<Vec<String>>, CubeError> {
-        todo!("generate_time_series not implemented in mock")
+        super::time_series::generate_time_series(&granularity, &date_range)
     }
 
     fn generate_custom_time_series(

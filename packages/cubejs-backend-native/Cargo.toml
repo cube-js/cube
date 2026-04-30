@@ -57,3 +57,6 @@ neon-debug = []
 neon-entrypoint = []
 python = ["pyo3", "pyo3-asyncio"]
 async-log = ["log_nonblock"]
+
+[lints.clippy]
+too_many_arguments = "allow"

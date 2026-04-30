@@ -2179,7 +2179,14 @@ pub fn create_measure_udaf() -> AggregateUDF {
         }
     });
 
-    let accumulator: AccumulatorFunctionImplementation = Arc::new(|_| todo!("Not implemented"));
+    let accumulator: AccumulatorFunctionImplementation = Arc::new(|_| {
+        Err(DataFusionError::Execution(
+            "This query is required to be pushed down due to use of MEASURE() function \
+            but planner wasn't able to. Please check that you're using MEASURE() function \
+            on a measure column, and that no filters prevent the pushdown"
+                .to_string(),
+        ))
+    });
 
     let state_type = Arc::new(vec![DataType::Float64]);
     let state_type: StateTypeFunction = Arc::new(move |_, _| Ok(state_type.clone()));

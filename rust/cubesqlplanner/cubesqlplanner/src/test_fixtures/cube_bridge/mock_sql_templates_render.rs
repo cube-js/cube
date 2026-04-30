@@ -372,11 +372,11 @@ impl MockSqlTemplatesRender {
         );
         templates.insert(
             "tesseract/bool_param_cast".to_string(),
-            "{{ expr }}".to_string(),
+            "{{ expr }}::boolean".to_string(),
         );
         templates.insert(
             "tesseract/number_param_cast".to_string(),
-            "{{ expr }}".to_string(),
+            "{{ expr }}::numeric".to_string(),
         );
 
         // Filters - based on BaseQuery.js:4398-4414
@@ -445,7 +445,10 @@ impl MockSqlTemplatesRender {
         templates.insert("quotes/escape".to_string(), "\"\"".to_string());
 
         // Params - based on BaseQuery.js:4421-4423
-        templates.insert("params/param".to_string(), "?".to_string());
+        templates.insert(
+            "params/param".to_string(),
+            "${{ param_index + 1 }}".to_string(),
+        );
 
         // Join types - based on BaseQuery.js:4424-4427
         templates.insert("join_types/inner".to_string(), "INNER".to_string());
@@ -519,6 +522,45 @@ impl MockSqlTemplatesRender {
         );
 
         Self::try_new(templates).expect("Default templates should always parse successfully")
+    }
+
+    pub fn default_templates_with_generated_time_series() -> Self {
+        let mut render = Self::default_templates();
+        render.templates.insert(
+            "statements/generated_time_series_select".to_string(),
+            concat!(
+                "SELECT gs::timestamp AS \"date_from\",\n",
+                "(gs + interval '{{ granularity }}'",
+                "{% if granularity_offset %} - interval '{{ granularity_offset }}'{% endif %}",
+                " - interval '{{ minimal_time_unit }}')::timestamp AS \"date_to\"\n",
+                "FROM generate_series(\n",
+                "  '{{ start }}'::timestamp,\n",
+                "  '{{ end }}'::timestamp,\n",
+                "  interval '{{ granularity }}'\n",
+                ") AS gs"
+            )
+            .to_string(),
+        );
+        render.templates.insert(
+            "statements/generated_time_series_with_cte_range_source".to_string(),
+            concat!(
+                "SELECT gs::timestamp AS \"date_from\",\n",
+                "(gs + interval '{{ granularity }}' - interval '{{ minimal_time_unit }}')::timestamp AS \"date_to\"\n",
+                "FROM generate_series(\n",
+                "  (SELECT {{ min_name }} FROM {{ range_source }}),\n",
+                "  (SELECT {{ max_name }} FROM {{ range_source }}),\n",
+                "  interval '{{ granularity }}'\n",
+                ") AS gs"
+            ).to_string(),
+        );
+        let mut jinja = Environment::new();
+        for (name, template) in render.templates.iter() {
+            jinja
+                .add_template_owned(name.to_string(), template.to_string())
+                .expect("Generated time series templates should parse");
+        }
+        render.jinja = jinja;
+        render
     }
 }
 
@@ -857,8 +899,10 @@ mod tests {
         let render = MockSqlTemplatesRender::default_templates();
 
         assert_eq!(
-            render.render_template("params/param", context! {}).unwrap(),
-            "?"
+            render
+                .render_template("params/param", context! { param_index => 0 })
+                .unwrap(),
+            "$1"
         );
     }
 

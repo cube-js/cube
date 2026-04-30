@@ -275,10 +275,15 @@ impl TransportService for NodeBridgeTransport {
             .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let req_id_spanned = if request_id.contains("-span-") {
+            request_id.clone()
+        } else {
+            format!("{}-span-1", request_id)
+        };
 
         let extra = serde_json::to_string(&LoadRequest {
             request: TransportRequest {
-                id: format!("{}-span-{}", request_id, 1),
+                id: req_id_spanned,
                 meta: Some(meta.clone()),
             },
             query: query.clone(),
@@ -345,6 +350,7 @@ impl TransportService for NodeBridgeTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
@@ -362,9 +368,14 @@ impl TransportService for NodeBridgeTransport {
 
         loop {
             req_seq_id += 1;
+            let req_id_spanned = if request_id.contains("-span-") {
+                request_id.clone()
+            } else {
+                format!("{}-span-{}", request_id, req_seq_id)
+            };
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, req_seq_id),
+                    id: req_id_spanned,
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -378,7 +389,7 @@ impl TransportService for NodeBridgeTransport {
                 member_to_alias: None,
                 expression_params: None,
                 streaming: false,
-                cache_mode: cache_mode.clone(),
+                cache_mode,
             })?;
 
             let result = call_raw_js_with_channel_as_callback(
@@ -451,6 +462,9 @@ impl TransportService for NodeBridgeTransport {
 
             if let Err(e) = &result {
                 if e.message.to_lowercase().contains("continue wait") {
+                    if throw_continue_wait {
+                        return Err(CubeError::internal("Continue wait".to_string()));
+                    }
                     continue;
                 }
             }
@@ -471,15 +485,24 @@ impl TransportService for NodeBridgeTransport {
                         match error_value {
                             serde_json::Value::String(error) => {
                                 if error.to_lowercase() == *"continue wait" {
-                                    debug!(
-                                "[transport] load - retrying request (continue wait) requestId: {}",
-                                request_id
-                            );
+                                    if throw_continue_wait {
+                                        debug!(
+                                            "[transport] load - throwing continue wait, requestId: {}",
+                                            request_id
+                                        );
+                                        return Err(CubeError::internal(
+                                            "Continue wait".to_string(),
+                                        ));
+                                    }
 
+                                    debug!(
+                                        "[transport] load - retrying request (continue wait) requestId: {}",
+                                        request_id
+                                    );
                                     continue;
-                                } else {
-                                    return Err(CubeError::user(error.clone()));
                                 }
+
+                                return Err(CubeError::user(error.clone()));
                             }
                             other => {
                                 error!(
@@ -538,6 +561,7 @@ impl TransportService for NodeBridgeTransport {
         meta: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        throw_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError> {
         trace!("[transport] Request ->");
 
@@ -550,6 +574,11 @@ impl TransportService for NodeBridgeTransport {
 
         loop {
             req_seq_id += 1;
+            let req_id_spanned = if request_id.contains("-span-") {
+                request_id.clone()
+            } else {
+                format!("{}-span-{}", request_id, req_seq_id)
+            };
             let native_auth = ctx
                 .as_any()
                 .downcast_ref::<NativeSQLAuthContext>()
@@ -557,7 +586,7 @@ impl TransportService for NodeBridgeTransport {
 
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, req_seq_id),
+                    id: req_id_spanned,
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -585,6 +614,9 @@ impl TransportService for NodeBridgeTransport {
 
             if let Err(e) = &res {
                 if e.message.to_lowercase().contains("continue wait") {
+                    if throw_continue_wait {
+                        return Err(CubeError::internal("Continue wait".to_string()));
+                    }
                     continue;
                 }
             }
@@ -642,15 +674,18 @@ impl TransportService for NodeBridgeTransport {
             .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
-        let request_id = span_id
+        let mut request_id = span_id
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+        if !request_id.contains("-span-") {
+            request_id = format!("{}-span-1", request_id);
+        }
         call_raw_js_with_channel_as_callback(
             self.channel.clone(),
             self.log_load_event.clone(),
             LogEvent {
                 request: TransportRequest {
-                    id: format!("{}-span-1", request_id),
+                    id: request_id,
                     meta: Some(meta_fields.clone()),
                 },
                 session: SessionContext {

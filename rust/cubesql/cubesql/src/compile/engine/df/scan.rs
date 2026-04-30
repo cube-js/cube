@@ -49,7 +49,7 @@ use std::str::FromStr;
 use std::{
     any::Any,
     borrow::Cow,
-    fmt,
+    fmt::{self, Display},
     sync::Arc,
     task::{Context, Poll},
 };
@@ -80,7 +80,7 @@ impl MemberField {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum CacheMode {
     #[serde(rename = "stale-if-slow")]
     StaleIfSlow,
@@ -106,11 +106,23 @@ impl FromStr for CacheMode {
     }
 }
 
+impl Display for CacheMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CacheMode::StaleIfSlow => write!(f, "stale-if-slow"),
+            CacheMode::StaleWhileRevalidate => write!(f, "stale-while-revalidate"),
+            CacheMode::MustRevalidate => write!(f, "must-revalidate"),
+            CacheMode::NoCache => write!(f, "no-cache"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CubeScanOptions {
     pub change_user: Option<String>,
     pub max_records: Option<usize>,
     pub cache_mode: Option<CacheMode>,
+    pub throw_continue_wait: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -481,6 +493,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                     meta,
                     self.schema.clone(),
                     self.member_fields.clone(),
+                    self.options.throw_continue_wait,
                 )
                 .await;
             let stream = result.map_err(|err| DataFusionError::External(Box::new(err)))?;
@@ -608,7 +621,9 @@ impl CubeScanMemoryStream {
                 } else {
                     err.message
                 };
-                err.message = format!("Database Execution Error: {}", err.message);
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    err.message = format!("Database Execution Error: {}", err.message);
+                }
                 Some(Err(ArrowError::ExternalError(Box::new(err))))
             }
             Some(None) => None,
@@ -721,6 +736,7 @@ async fn load_data(
                 schema,
                 member_fields,
                 options.cache_mode,
+                options.throw_continue_wait,
             )
             .await
             .map_err(|mut err| {
@@ -730,7 +746,9 @@ async fn load_data(
                 } else {
                     err.message
                 };
-                err.message = format!("Database Execution Error: {}", err.message);
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    err.message = format!("Database Execution Error: {}", err.message);
+                }
                 ArrowError::ExternalError(Box::new(err))
             })?;
         let response = result.first();
@@ -1260,6 +1278,7 @@ mod tests {
                 schema: SchemaRef,
                 member_fields: Vec<MemberField>,
                 _cache_mode: Option<CacheMode>,
+                _throw_continue_wait: bool,
             ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
                 {
@@ -1295,6 +1314,7 @@ mod tests {
                 _meta_fields: LoadRequestMeta,
                 _schema: SchemaRef,
                 _member_fields: Vec<MemberField>,
+                _throw_continue_wait: bool,
             ) -> Result<CubeStreamReceiver, CubeError> {
                 panic!("It's a fake transport");
             }
@@ -1386,6 +1406,7 @@ mod tests {
                 change_user: None,
                 max_records: None,
                 cache_mode: None,
+                throw_continue_wait: false,
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),

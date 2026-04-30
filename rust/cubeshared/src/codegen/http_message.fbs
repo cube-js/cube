@@ -10,10 +10,23 @@ table HttpMessage {
     connection_id: string;
 }
 
+table Int64Value { v: int64; }
+table BoolValue { v: bool; }
+table StringValue { v: string (required); }
+table BinaryValue { v: [ubyte] (required); }
+table Float64Value { v: float64; }
+table NullValue { }
+union HttpParameterValue { Int64Value, BoolValue, StringValue, BinaryValue, Float64Value, NullValue }
+
+table HttpParameter {
+    value: HttpParameterValue (required);
+}
+
 table HttpQuery {
     query: string;
     trace_obj: string;
     inline_tables: [HttpTable];
+    parameters: [HttpParameter];
 }
 
 table HttpTable {
@@ -40,6 +53,5 @@ table HttpRow {
 table HttpColumnValue {
     string_value: string;
 }
-
 
 root_type HttpMessage;

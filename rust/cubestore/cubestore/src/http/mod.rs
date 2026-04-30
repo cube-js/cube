@@ -6,7 +6,9 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
-use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
+use crate::sql::{
+    InlineTable, InlineTables, QueryParameter, QueryParameters, SqlQueryContext, SqlService,
+};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
@@ -14,11 +16,11 @@ use crate::{app_metrics, CubeError};
 use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
-    HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs,
+    HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpResultSet,
+    HttpResultSetArgs, HttpRow, HttpRowArgs,
 };
+use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
-use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use futures_timer::Delay;
 use hex::ToHex;
@@ -109,20 +111,32 @@ impl HttpServer {
 
         let auth_filter = warp::any()
             .and(warp::header::optional("authorization"))
-            .and_then(move |auth_header: Option<String>| {
-                let auth_service = auth_service.clone();
-                async move {
-                    let res = HttpServer::authorize(auth_service, auth_header).await;
-                    match res {
-                        Ok(user) => Ok(SqlQueryContext {
-                            user,
-                            inline_tables: InlineTables::new(),
-                            trace_obj: None,
-                        }),
-                        Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
+            .and(warp::header::optional("x-process-id"))
+            .and_then(
+                move |auth_header: Option<String>, process_id: Option<String>| {
+                    let auth_service = auth_service.clone();
+                    async move {
+                        if let Some(ref id) = process_id {
+                            if id.len() > 64 {
+                                return Err(warp::reject::custom(CubeRejection::Internal(
+                                    "x-process-id header exceeds 64 characters".to_string(),
+                                )));
+                            }
+                        }
+                        let res = HttpServer::authorize(auth_service, auth_header).await;
+                        match res {
+                            Ok(user) => Ok(SqlQueryContext {
+                                user,
+                                inline_tables: InlineTables::new(),
+                                parameters: None,
+                                trace_obj: None,
+                                process_id,
+                            }),
+                            Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
+                        }
                     }
-                }
-            });
+                },
+            );
 
         let context_filter = tx_to_move_filter.and(auth_filter.clone());
 
@@ -136,12 +150,14 @@ impl HttpServer {
             .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                let reply = ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                    let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
+                    trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
                             Some(res) = response_rx.recv() => {
-                                trace!("Sending web socket response");
+                                trace!("Sending web socket response (process_id: {})", process_id);
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
@@ -159,12 +175,32 @@ impl HttpServer {
                                     }
                                     Ok(msg) => {
                                         if msg.is_binary() {
-                                            match HttpMessage::read(msg.into_bytes()).await {
-                                                Err(e) => error!("Websocket message read error: {:?}", e),
+                                            let message_buffer = msg.into_bytes();
+                                            let http_message = match root_as_http_message(&message_buffer) {
+                                                Err(e) => {
+                                                    error!("Websocket message deserialization error: {:?}", e);
+                                                    continue;
+                                                },
+                                                Ok(http_message) => http_message,
+                                            };
+
+                                            let message_id = http_message.message_id();
+                                            let connection_id = http_message.connection_id().map(|s| s.to_string());
+
+                                            match HttpMessage::read(http_message).await {
+                                                Err(e) => {
+                                                    error!("Websocket message read error: {:?}", e);
+
+                                                    let send_res = web_socket.send(
+                                                        Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
+                                                    ).await;
+                                                    if let Err(e) = send_res {
+                                                        error!("Websocket message send error: {:?}", e)
+                                                    }
+                                                    break;
+                                                },
                                                 Ok(msg) => {
-                                                    trace!("Received web socket message");
-                                                    let message_id = msg.message_id;
-                                                    let connection_id = msg.connection_id.clone();
+                                                    trace!("Received web socket message (process_id: {})", process_id);
                                                     // TODO use timeout instead of try send for burst control however try_send is safer for now
                                                     if let Err(e) = tx_to_move.try_send((response_tx.clone(), sql_query_context.clone(), msg)) {
                                                         error!("Websocket channel error: {:?}", e);
@@ -194,7 +230,8 @@ impl HttpServer {
                             }
                         };
                     };
-                }))
+                });
+                Result::<_, Rejection>::Ok(warp::reply::with_header(reply, "X-CubeStore-Version", env!("CARGO_PKG_VERSION")))
             });
 
         let auth_filter_to_move = auth_filter.clone();
@@ -542,12 +579,14 @@ impl HttpServer {
                 query,
                 inline_tables,
                 trace_obj,
+                parameters,
             } => Ok(HttpCommand::ResultSet {
                 data_frame: sql_service
                     .exec_query_with_context(
                         sql_query_context
                             .with_trace_obj(trace_obj)
-                            .with_inline_tables(&inline_tables),
+                            .with_inline_tables(&inline_tables)
+                            .with_parameters(&parameters),
                         &query,
                     )
                     .await?,
@@ -600,6 +639,7 @@ pub enum HttpCommand {
         query: String,
         inline_tables: InlineTables,
         trace_obj: Option<String>,
+        parameters: Option<QueryParameters>,
     },
     ResultSet {
         data_frame: Arc<DataFrame>,
@@ -630,12 +670,19 @@ impl HttpMessage {
                     query,
                     inline_tables,
                     trace_obj,
+                    parameters,
                 } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
+
                     if !inline_tables.is_empty() {
-                        panic!("Not implemented")
+                        panic!("serializing inline_tables is not implemented")
                     }
+
+                    if parameters.is_some() {
+                        panic!("serializing parameters is not implemented")
+                    }
+
                     Some(
                         HttpQuery::create(
                             &mut builder,
@@ -643,6 +690,7 @@ impl HttpMessage {
                                 query: Some(query_offset),
                                 inline_tables: None,
                                 trace_obj: trace_obj_offset,
+                                parameters: None,
                             },
                         )
                         .as_union_value(),
@@ -782,14 +830,16 @@ impl HttpMessage {
         rows
     }
 
-    pub async fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
-        let http_message = root_as_http_message(buffer.as_slice())?;
+    pub async fn read<'a>(
+        http_message: cubeshared::codegen::HttpMessage<'a>,
+    ) -> Result<Self, CubeError> {
         Ok(HttpMessage {
             message_id: http_message.message_id(),
             connection_id: http_message.connection_id().map(|s| s.to_string()),
             command: match http_message.command_type() {
                 cubeshared::codegen::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
+
                     let mut inline_tables = Vec::new();
                     if let Some(query_inline_tables) = query.inline_tables() {
                         for inline_table in query_inline_tables.iter() {
@@ -829,10 +879,54 @@ impl HttpMessage {
                             ));
                         }
                     };
+
+                    let parameters = if let Some(http_params) = query.parameters() {
+                        let mut res = Vec::new();
+
+                        for http_param in http_params.iter() {
+                            let value = match http_param.value_type() {
+                                HttpParameterValue::NullValue => QueryParameter::Null,
+                                HttpParameterValue::Int64Value => QueryParameter::Int64Value(
+                                    http_param.value_as_int_64_value().unwrap().v(),
+                                ),
+                                HttpParameterValue::BoolValue => QueryParameter::BoolValue(
+                                    http_param.value_as_bool_value().unwrap().v(),
+                                ),
+                                HttpParameterValue::StringValue => QueryParameter::StringValue(
+                                    http_param.value_as_string_value().unwrap().v().to_string(),
+                                ),
+                                HttpParameterValue::BinaryValue => QueryParameter::BinaryValue(
+                                    http_param
+                                        .value_as_binary_value()
+                                        .unwrap()
+                                        .v()
+                                        .iter()
+                                        .collect::<Vec<u8>>(),
+                                ),
+                                HttpParameterValue::Float64Value => QueryParameter::Float64Value(
+                                    http_param.value_as_float_64_value().unwrap().v(),
+                                ),
+                                value_type => {
+                                    return Err(CubeError::internal(format!(
+                                        "Unsupported parameter type: {:?}",
+                                        value_type
+                                    )))
+                                }
+                            };
+
+                            res.push(value);
+                        }
+
+                        Some(res)
+                    } else {
+                        None
+                    };
+
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
-                        inline_tables,
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
+                        inline_tables,
+                        parameters,
                     }
                 }
                 cubeshared::codegen::HttpCommand::HttpResultSet => {
@@ -883,6 +977,7 @@ impl HttpMessage {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
@@ -895,8 +990,8 @@ mod tests {
     use cubeshared::codegen::{
         HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
     };
+    use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use datafusion::cube_ext;
-    use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
     use log::trace;
@@ -929,11 +1024,14 @@ mod tests {
                 query: "test query".to_string(),
                 inline_tables: vec![],
                 trace_obj: Some("test trace".to_string()),
+                parameters: None,
             },
             connection_id: Some("foo".to_string()),
         };
         let bytes = message.bytes();
-        let output_message = HttpMessage::read(bytes).await.unwrap();
+        let output_message = HttpMessage::read(root_as_http_message(&bytes).unwrap())
+            .await
+            .unwrap();
         assert_eq!(message, output_message);
     }
 
@@ -972,7 +1070,7 @@ mod tests {
             3,,2020-01-03T00:00:00.000Z
             4,four,
         "};
-        let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
+        let mut builder = cubeshared::flatbuffers::FlatBufferBuilder::with_capacity(1024);
         let query_offset = builder.create_string("query");
         let mut inline_tables_offsets = Vec::with_capacity(1);
         let name_offset = builder.create_string("table");
@@ -997,6 +1095,7 @@ mod tests {
                 query: Some(query_offset),
                 inline_tables: Some(inline_tables_offset),
                 trace_obj: None,
+                parameters: None,
             },
         );
         let args = HttpMessageArgs {
@@ -1008,7 +1107,9 @@ mod tests {
         let message = cubeshared::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         let bytes = builder.finished_data().to_vec();
-        let message = HttpMessage::read(bytes).await.unwrap();
+        let message = HttpMessage::read(root_as_http_message(&bytes).unwrap())
+            .await
+            .unwrap();
         assert_eq!(
             message,
             HttpMessage {
@@ -1020,7 +1121,8 @@ mod tests {
                         "table".to_string(),
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],
-                    trace_obj: None
+                    trace_obj: None,
+                    parameters: None
                 },
                 connection_id: Some("foo".to_string()),
             }
@@ -1134,6 +1236,7 @@ mod tests {
                             query: query.to_string(),
                             inline_tables: vec![],
                             trace_obj: None,
+                            parameters: None,
                         },
                         connection_id,
                     }
@@ -1165,7 +1268,9 @@ mod tests {
             counter: &str,
         ) {
             let msg = socket.next().await.unwrap().unwrap();
-            let message = HttpMessage::read(msg.into_data()).await.unwrap();
+            let message = HttpMessage::read(root_as_http_message(&msg.into_data()).unwrap())
+                .await
+                .unwrap();
             if let HttpCommand::ResultSet { data_frame } = message.command {
                 if let TableValue::String(v) = data_frame
                     .get_rows()

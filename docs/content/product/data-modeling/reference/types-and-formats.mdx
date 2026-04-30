@@ -147,7 +147,7 @@ cube(`orders`, {
 
   measures: {
     purchases_ratio: {
-      sql: `${purchases} / ${count} * 100.0`,
+      sql: `1.0 * ${purchases} / ${count}`,
       type: `number`,
       format: `percent`
     }
@@ -162,7 +162,7 @@ cubes:
 
     measures:
       - name: purchases_ratio
-        sql: "{purchases} / {count} * 100.0"
+        sql: "1.0 * {purchases} / {count}"
         type: number
         format: percent
 ```
@@ -551,7 +551,7 @@ cube(`orders`, {
 
   measures: {
     purchase_conversion: {
-      sql: `${purchase} / ${checkout} * 100.0`,
+      sql: `1.0 * ${purchase} / ${checkout}`,
       type: `number`,
       format: `percent`
     }
@@ -566,12 +566,29 @@ cubes:
 
     measures:
       - name: purchase_conversion
-        sql: "{purchase} / {checkout} * 100.0"
+        sql: "1.0 * {purchase} / {checkout}"
         type: number
         format: percent
 ```
 
 </CodeTabs>
+
+<WarningBox>
+
+When using the `percent` format, do not multiply by 100 in your SQL expression.
+Presentation tools like [Explore][ref-explore], [Workbooks][ref-workbooks], and
+[Dashboards][ref-dashboards] apply this multiplication implicitly when displaying
+percent-formatted values, e.g., a value of `0.5` will be displayed as `50%`.
+
+</WarningBox>
+
+<InfoBox>
+
+Use `1.0 * numerator / denominator` to ensure decimal division, as integer
+division would truncate the result, e.g., `5 / 10` may return `0`, not `0.5`,
+depending on your data source and column types.
+
+</InfoBox>
 
 ### `currency`
 
@@ -606,6 +623,100 @@ cubes:
 ```
 
 </CodeTabs>
+
+### Custom numeric formats
+
+Measures with numeric types support custom formatting
+using [d3-format][link-d3-format] specifier strings.
+
+<InfoBox>
+
+Custom numeric formatting is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+
+</InfoBox>
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    total_amount: {
+      sql: `amount`,
+      type: `sum`,
+      format: `$,.2f`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+        format: "$,.2f"
+```
+
+</CodeTabs>
+
+#### Common format examples
+
+| Format string | Description | Example output |
+|---------------|-------------|----------------|
+| `.2f` | Fixed-point, 2 decimal places | 1234.57 |
+| `,.0f` | Grouped thousands, no decimals | 1,235 |
+| `$,.2f` | Currency with grouped thousands | $1,234.57 |
+| `.0%` | Percentage, no decimals | 12% |
+| `.2s` | SI prefix, 2 significant digits | 1.2k |
+| `+.2f` | Explicit sign, 2 decimal places | +1234.57 |
+| `.2~f` | Trimmed trailing zeros, 2 decimals | 1234.5 |
+
+#### Format specifier syntax
+
+The full syntax for a d3-format specifier is:
+
+```
+[[fill]align][sign][symbol][0][width][,][.precision][~][type]
+```
+
+| Component | Description |
+|-----------|-------------|
+| `fill` | Character to use for padding |
+| `align` | `>` (right), `<` (left), `^` (center), `=` (pad after sign) |
+| `sign` | `-` (negative only, default), `+` (positive and negative), `(` (parentheses for negative) |
+| `symbol` | `$` (currency prefix), `#` (alternate form for binary/octal/hex) |
+| `0` | Enable zero-padding (shorthand for `fill=0` with `align==`) |
+| `width` | Minimum field width |
+| `,` | Enable comma grouping separator |
+| `.precision` | Number of digits after the decimal point (for `f`, `%`) or significant digits (for other types) |
+| `~` | Trim trailing zeros |
+| `type` | Output format type (see table below) |
+
+#### Supported type characters
+
+| Type | Description |
+|------|-------------|
+| `f` | Fixed-point notation |
+| `e` | Exponent notation |
+| `g` | Either decimal or exponent notation, rounded to significant digits |
+| `r` | Decimal notation, rounded to significant digits |
+| `s` | Decimal notation with an SI prefix, rounded to significant digits |
+| `%` | Multiply by 100 and format with `f`, followed by percent sign |
+| `p` | Multiply by 100, round to significant digits, followed by percent sign |
+| `d` | Integer; ignores non-integer values |
+| `b` | Binary |
+| `o` | Octal |
+| `x` | Hexadecimal (lowercase) |
+| `X` | Hexadecimal (uppercase) |
+| `c` | Character data (converts integer to Unicode) |
+| (none) | Similar to `g`, but trims trailing zeros |
 
 ## Dimension Types
 
@@ -815,7 +926,7 @@ cubes:
 <InfoBox>
 
 When `switch` dimensions are queried or introspected using the [`/v1/meta` REST API
-endpoint][ref-meta-api], they are represented as dimensions of type `string`. 
+endpoint][ref-meta-api], they are represented as dimensions of type `string`.
 
 </InfoBox>
 
@@ -1033,7 +1144,7 @@ cube(`orders`, {
 
   dimensions: {
     open_rate: {
-      sql: `COALESCE(100.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
+      sql: `COALESCE(1.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
       type: `number`,
       format: `percent`
     }
@@ -1049,12 +1160,58 @@ cubes:
     dimensions:
       - name: open_rate
         sql:
-          "COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
+          "COALESCE(1.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
         type: number
         format: percent
 ```
 
 </CodeTabs>
+
+### Custom numeric formats
+
+Dimensions with the `number` type support custom formatting using
+[d3-format][link-d3-format] specifier strings.
+
+<InfoBox>
+
+Custom numeric formatting is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+
+</InfoBox>
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    amount: {
+      sql: `amount`,
+      type: `number`,
+      format: `$,.2f`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: amount
+        sql: amount
+        type: number
+        format: "$,.2f"
+```
+
+</CodeTabs>
+
+See the [Custom numeric formats](#custom-numeric-formats) section under [Measure
+Formats](#measure-formats) for the full format specifier syntax and supported
+type characters.
 
 ### Custom time formats
 
@@ -1160,3 +1317,7 @@ cubes:
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-case-measures]: /product/data-modeling/reference/measures#case
 [ref-meta-api]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-explore]: /product/exploration/explore
+[ref-workbooks]: /product/exploration/workbooks
+[ref-dashboards]: /product/presentation/dashboards
+[link-d3-format]: https://d3js.org/d3-format

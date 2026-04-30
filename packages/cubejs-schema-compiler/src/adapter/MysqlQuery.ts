@@ -45,6 +45,7 @@ export class MysqlQuery extends BaseQuery {
     if (this.useNamedTimezones) {
       return `CONVERT_TZ(${field}, @@session.time_zone, '${this.timezone}')`;
     }
+
     return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
   }
 

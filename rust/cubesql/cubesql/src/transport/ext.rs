@@ -93,7 +93,9 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
             | "max"
             | "count"
             | "count_distinct"
-            | "count_distinct_approx" => true,
+            | "countDistinct"
+            | "count_distinct_approx"
+            | "countDistinctApprox" => true,
             _ => false,
         }
     }

@@ -20,7 +20,12 @@ pub struct YamlSchema {
 #[derive(Debug, Deserialize)]
 struct YamlCube {
     name: String,
-    sql: String,
+    #[serde(default)]
+    sql: Option<String>,
+    #[serde(default)]
+    sql_table: Option<String>,
+    #[serde(default)]
+    calendar: Option<bool>,
     #[serde(default)]
     joins: Vec<YamlJoin>,
     #[serde(default)]
@@ -86,6 +91,8 @@ struct YamlViewCube {
     join_path: String,
     #[serde(default)]
     includes: Option<YamlIncludes>,
+    #[serde(default)]
+    prefix: Option<bool>,
 }
 
 impl YamlSchema {
@@ -104,22 +111,28 @@ impl YamlSchema {
 
             let cube_def = MockCubeDefinition::builder()
                 .name(cube.name.clone())
-                .sql(cube.sql.clone())
+                .sql_opt(cube.sql.clone())
+                .sql_table_opt(cube.sql_table.clone())
+                .is_calendar(cube.calendar)
                 .joins(joins)
                 .build();
 
             let mut cube_builder = builder.add_cube(cube.name).cube_def(cube_def);
 
             for dim_entry in cube.dimensions {
-                let dim_rc = dim_entry.definition.build();
-                let dim_def = Rc::try_unwrap(dim_rc)
-                    .ok()
-                    .expect("Rc should have single owner");
-                cube_builder = cube_builder.add_dimension(dim_entry.name, dim_def);
+                let result = dim_entry.definition.build();
+                cube_builder =
+                    cube_builder.add_dimension(dim_entry.name.clone(), result.definition);
+                for (gran_name, gran_def) in result.granularities {
+                    cube_builder =
+                        cube_builder.add_granularity(&dim_entry.name, &gran_name, gran_def);
+                }
             }
 
             for meas_entry in cube.measures {
-                let meas_rc = meas_entry.definition.build();
+                let meas_rc = meas_entry
+                    .definition
+                    .build_with_cube_name(Some(&cube_builder.cube_name()));
                 let meas_def = Rc::try_unwrap(meas_rc)
                     .ok()
                     .expect("Rc should have single owner");
@@ -154,7 +167,9 @@ impl YamlSchema {
                     Some(YamlIncludes::List(list)) => list,
                     _ => vec![],
                 };
-                view_builder = view_builder.include_cube(view_cube.join_path, includes);
+                let prefix = view_cube.prefix.unwrap_or(false);
+                view_builder =
+                    view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
             }
 
             builder = view_builder.finish_view();

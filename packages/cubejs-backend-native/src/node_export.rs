@@ -1,8 +1,8 @@
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
-use cubesql::sql::dataframe::{arrow_to_column_type, Column};
-use cubesql::sql::ColumnFlags;
+use cubesql::sql::dataframe::arrow_to_column_type;
+use cubesql::sql::ColumnType;
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -16,6 +16,7 @@ use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCube
 use crate::cross::CLRepr;
 use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
+use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
 use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
@@ -33,6 +34,8 @@ use cubesql::{telemetry::ReportingLogger, CubeError};
 #[cfg(feature = "async-log")]
 use log_nonblock::NonBlockingLoggerBuilder;
 use neon::prelude::*;
+use serde::Serialize;
+
 use neon::result::Throw;
 #[cfg(not(feature = "async-log"))]
 use simple_logger::SimpleLogger;
@@ -42,6 +45,16 @@ pub(crate) struct SQLInterface {
 }
 
 impl Finalize for SQLInterface {}
+
+#[derive(Serialize)]
+pub(crate) struct SchemaColumn {
+    name: String,
+    column_type: ColumnType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    format: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,
+}
 
 impl SQLInterface {
     pub fn new(services: Arc<NodeCubeServices>) -> Self {
@@ -227,9 +240,11 @@ async fn handle_sql_query(
     sql_query: &str,
     cache_mode: &str,
     timezone: Option<String>,
+    throw_continue_wait: bool,
+    request_id: Option<String>,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
-        Uuid::new_v4().to_string(),
+        request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
         serde_json::json!({ "sql": sql_query }),
     )));
 
@@ -276,6 +291,15 @@ async fn handle_sql_query(
             *cm = Some(cache_enum);
         }
 
+        {
+            let mut cm = session
+                .state
+                .throw_continue_wait
+                .write()
+                .expect("failed to unlock session throw_continue_wait for change");
+            *cm = throw_continue_wait;
+        }
+
         let session_clone = Arc::clone(&session);
         let span_id_clone = span_id.clone();
 
@@ -292,7 +316,7 @@ async fn handle_sql_query(
                 parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
             let query_plan = convert_statement_to_cube_query(
                 stmt,
-                meta_context,
+                meta_context.clone(),
                 session,
                 &mut None,
                 span_id_clone,
@@ -311,23 +335,44 @@ async fn handle_sql_query(
 
             drain_handler.handle(stream_methods.on.clone()).await?;
 
-            // Get schema from stream and convert to DataFrame columns format
-            let stream_schema = stream.schema();
-            let mut columns = Vec::with_capacity(stream_schema.fields().len());
-            for field in stream_schema.fields().iter() {
-                columns.push(Column::new(
-                    field.name().clone(),
-                    arrow_to_column_type(field.data_type().clone())?,
-                    ColumnFlags::empty(),
-                ));
+            // Get schema from stream and convert to schema columns with format
+            let mut columns = Vec::with_capacity(stream.schema().fields().len());
+
+            for field in stream.schema().fields().iter() {
+                let (format, currency) = field
+                    .metadata()
+                    .and_then(|m| m.get("member_name"))
+                    .and_then(|member_name| {
+                        meta_context
+                            .find_measure_with_name(member_name)
+                            .map(|m| (m.format.as_ref(), m.currency.as_ref()))
+                            .or_else(|| {
+                                meta_context
+                                    .find_dimension_with_name(member_name)
+                                    .map(|d| (d.format.as_ref(), d.currency.as_ref()))
+                            })
+                    })
+                    .map(|(fmt, cur)| {
+                        (
+                            fmt.and_then(|f| serde_json::to_value(f.as_ref()).ok()),
+                            cur.cloned(),
+                        )
+                    })
+                    .unwrap_or((None, None));
+
+                columns.push(SchemaColumn {
+                    name: field.name().clone(),
+                    column_type: arrow_to_column_type(field.data_type().clone())?,
+                    format,
+                    currency,
+                });
             }
 
             // Send schema first
-            let columns_json = serde_json::to_value(&columns)?;
             let mut schema_response = Map::new();
-            schema_response.insert("schema".into(), columns_json);
+            schema_response.insert("schema".into(), serde_json::to_value(&columns)?);
 
-            if let Some(last_refresh_time) = stream_schema.metadata().get("lastRefreshTime") {
+            if let Some(last_refresh_time) = stream.schema().metadata().get("lastRefreshTime") {
                 schema_response.insert(
                     "lastRefreshTime".into(),
                     serde_json::Value::String(last_refresh_time.clone()),
@@ -407,25 +452,27 @@ async fn handle_sql_query(
                     .await?;
             }
             Err(err) => {
-                session_clone
-                    .session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        span_id.clone(),
-                        session_clone.state.auth_context().unwrap(),
-                        session_clone.state.get_load_request_meta("sql"),
-                        "Cube SQL Error".to_string(),
-                        serde_json::json!({
-                            "query": {
-                                "sql": sql_query
-                            },
-                            "apiType": "sql",
-                            "duration": span_id.as_ref().unwrap().duration(),
-                            "error": err.message,
-                        }),
-                    )
-                    .await?;
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    session_clone
+                        .session_manager
+                        .server
+                        .transport
+                        .log_load_state(
+                            span_id.clone(),
+                            session_clone.state.auth_context().unwrap(),
+                            session_clone.state.get_load_request_meta("sql"),
+                            "Cube SQL Error".to_string(),
+                            serde_json::json!({
+                                "query": {
+                                    "sql": sql_query
+                                },
+                                "apiType": "sql",
+                                "duration": span_id.as_ref().unwrap().duration(),
+                                "error": err.message,
+                            }),
+                        )
+                        .await?;
+                }
             }
         }
 
@@ -458,6 +505,34 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let cache_mode = cx.argument::<JsString>(4)?.value(&mut cx);
 
     let timezone: Option<String> = match cx.argument::<JsValue>(5) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                None
+            } else {
+                match val.downcast::<JsString, _>(&mut cx) {
+                    Ok(v) => Some(v.value(&mut cx)),
+                    Err(_) => None,
+                }
+            }
+        }
+        Err(_) => None,
+    };
+
+    let throw_continue_wait: bool = match cx.argument::<JsValue>(6) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                false
+            } else {
+                match val.downcast::<JsBoolean, _>(&mut cx) {
+                    Ok(v) => v.value(&mut cx),
+                    Err(_) => false,
+                }
+            }
+        }
+        Err(_) => false,
+    };
+
+    let request_id: Option<String> = match cx.argument::<JsValue>(7) {
         Ok(val) => {
             if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
                 None
@@ -512,6 +587,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             write: js_stream_write_fn,
         };
 
+        let request_id_for_error = request_id.clone();
+
         let result = handle_sql_query(
             services,
             native_auth_ctx,
@@ -520,6 +597,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             &sql_query,
             &cache_mode,
             timezone,
+            throw_continue_wait,
+            request_id,
         )
         .await;
 
@@ -538,6 +617,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                 Err(err) => {
                     let mut error_response = Map::new();
                     error_response.insert("error".into(), err.to_string().into());
+                    if let Some(req_id) = &request_id_for_error {
+                        error_response.insert("requestId".into(), req_id.clone().into());
+                    }
                     let error_message = format!(
                         "{}{}",
                         serde_json::to_string(&serde_json::Value::Object(error_response))
@@ -707,6 +789,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("sql4sql", sql4sql)?;
+    cx.export_function("rest4sql", rest4sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 

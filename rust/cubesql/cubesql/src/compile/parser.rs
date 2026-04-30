@@ -179,6 +179,12 @@ pub fn parse_sql_to_statements(
     // DataGrip CTID workaround
     let query = query.replace("SELECT t.*, CTID\nFROM ", "SELECT t.*, NULL AS ctid\nFROM ");
 
+    // Talend pg_encoding_to_char workaround
+    let query = query.replace(
+        "SELECT pg_encoding_to_char(encoding) FROM pg_database",
+        "SELECT pg_encoding_to_char(encoding) AS pg_encoding_to_char FROM pg_database",
+    );
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }

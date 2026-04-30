@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/basic_types.rs
+expression: result
+---
+orders__rolling_sum_both
+------------------------
+2755.00

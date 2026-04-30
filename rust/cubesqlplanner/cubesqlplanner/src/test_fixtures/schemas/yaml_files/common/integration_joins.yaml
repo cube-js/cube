@@ -1,0 +1,100 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+
+    - name: products
+      sql: "SELECT * FROM products"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: category
+            type: string
+            sql: category
+      measures:
+          - name: count
+            type: count
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: amount
+            type: number
+            sql: amount
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+
+    - name: order_items
+      sql: "SELECT * FROM order_items"
+      joins:
+          - name: orders
+            relationship: many_to_one
+            sql: "{order_items}.order_id = {orders.id}"
+          - name: products
+            relationship: many_to_one
+            sql: "{order_items}.product_id = {products.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: quantity
+            type: number
+            sql: quantity
+          - name: price
+            type: number
+            sql: price
+          - name: order_id
+            type: number
+            sql: order_id
+          - name: product_id
+            type: number
+            sql: product_id
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+          - name: total_quantity
+            type: sum
+            sql: quantity

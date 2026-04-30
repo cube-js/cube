@@ -1,4 +1,5 @@
 import { prepareYamlCompiler } from './PrepareCompiler';
+import { PostgresQuery } from '../../src';
 
 describe('Yaml Schema Testing', () => {
   describe('Duplicate member detection', () => {
@@ -239,6 +240,78 @@ cubes:
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate dimension.granularity 'fiscal_year' in time dimension 'created_at' in cube 'orders'");
+      }
+    });
+
+    it('detects duplicate folder names in views', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: category
+        sql: category
+        type: string
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+    folders:
+      - name: Details
+        includes:
+          - id
+          - status
+      - name: Details
+        includes:
+          - category
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain(
+          "Folder names must be unique within a view. Found duplicate folder 'Details' in view 'orders_view'."
+        );
+      }
+    });
+
+    it('detects duplicate dimension time shifts', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: fiscal_calendar
+    sql: "SELECT 1"
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+      - name: date
+        sql: calendar_date
+        type: time
+        time_shift:
+          - name: prior_year
+            type: prior
+            interval: 1 year
+          - name: prior_year
+            sql: "{CUBE}.prior_year_date"
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain(
+          "Time shift names must be unique within a dimension. Found duplicate time shift 'prior_year' in dimension 'date' in cube 'fiscal_calendar'."
+        );
       }
     });
   });
@@ -872,5 +945,479 @@ cubes:
     );
 
     await compiler.compile();
+  });
+
+  describe('Currency property', () => {
+    it('measure with currency in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: currency
+          currency: usd
+      `);
+
+      await compiler.compile();
+
+      const { measures } = metaTransformer.cubes[0].config;
+      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
+      expect(totalAmount).toBeDefined();
+      expect(totalAmount!.currency).toBe('USD');
+      expect(totalAmount!.format).toBe('currency');
+    });
+
+    it('number dimension with currency in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          currency: eur
+      `);
+
+      await compiler.compile();
+
+      const { dimensions } = metaTransformer.cubes[0].config;
+      const price = dimensions.find((d) => d.name === 'Orders.price');
+      expect(price).toBeDefined();
+      expect(price!.currency).toBe('EUR');
+    });
+
+    it('non-number dimension with currency in YAML - error', async () => {
+      const { compiler } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: status
+          sql: status
+          type: string
+          currency: usd
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('"currency" property can only be used with dimensions of type "number"');
+      }
+    });
+  });
+
+  describe('Named numeric formats', () => {
+    it('measure with named format in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: accounting_2
+        - name: bytes
+          sql: bytes
+          type: sum
+          format: abbr_3
+      `);
+
+      await compiler.compile();
+
+      const { measures } = metaTransformer.cubes[0].config;
+      const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
+      expect(totalAmount).toBeDefined();
+      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2f', alias: 'accounting_2' });
+
+      const bytes = measures.find((m) => m.name === 'Orders.bytes');
+      expect(bytes).toBeDefined();
+      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3s', alias: 'abbr_3' });
+    });
+
+    it('number dimension with named format in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          format: currency_1
+        - name: population
+          sql: population
+          type: number
+          format: abbr
+      `);
+
+      await compiler.compile();
+
+      const { dimensions } = metaTransformer.cubes[0].config;
+      const price = dimensions.find((d) => d.name === 'Orders.price');
+      expect(price).toBeDefined();
+      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1f', alias: 'currency_1' });
+
+      const population = dimensions.find((d) => d.name === 'Orders.population');
+      expect(population).toBeDefined();
+      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2s', alias: 'abbr' });
+    });
+
+    it('formatDescription for all format variants', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        - name: price
+          sql: price
+          type: number
+          format: currency_1
+        - name: status
+          sql: status
+          type: string
+        - name: created_at
+          sql: created_at
+          type: time
+        measures:
+        - name: count
+          sql: id
+          type: count
+        - name: revenue
+          sql: amount
+          type: sum
+          format: currency
+          currency: eur
+        - name: rate
+          sql: rate
+          type: number
+          format: percent
+        - name: total
+          sql: amount
+          type: sum
+          format: number
+        - name: bytes
+          sql: bytes
+          type: sum
+          format: abbr_3
+        - name: balance
+          sql: balance
+          type: sum
+          format: accounting_2
+        - name: order_id
+          sql: id
+          type: number
+          format: id
+        - name: custom_amount
+          sql: amount
+          type: sum
+          format: "$,.0f"
+      `);
+
+      await compiler.compile();
+
+      const { measures, dimensions } = metaTransformer.cubes[0].config;
+
+      const pick = (list: any[], name: string) => {
+        const m = list.find((x) => x.name === name);
+        return { format: m?.format, formatDescription: m?.formatDescription, currency: m?.currency };
+      };
+
+      expect({
+        measures: {
+          count_no_format: pick(measures, 'Orders.count'),
+          revenue_currency: pick(measures, 'Orders.revenue'),
+          rate_percent: pick(measures, 'Orders.rate'),
+          total_number: pick(measures, 'Orders.total'),
+          bytes_abbr_3: pick(measures, 'Orders.bytes'),
+          balance_accounting_2: pick(measures, 'Orders.balance'),
+          order_id_id: pick(measures, 'Orders.order_id'),
+          custom_amount_d3: pick(measures, 'Orders.custom_amount'),
+        },
+        dimensions: {
+          id_number_no_format: pick(dimensions, 'Orders.id'),
+          price_currency_1: pick(dimensions, 'Orders.price'),
+          status_string: pick(dimensions, 'Orders.status'),
+          created_at_time: pick(dimensions, 'Orders.created_at'),
+        },
+      }).toMatchSnapshot();
+    });
+
+    it('invalid named format in YAML - error', async () => {
+      const { compiler } = prepareYamlCompiler(`
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          sql: id
+          type: number
+          primary_key: true
+        measures:
+        - name: total_amount
+          sql: amount
+          type: sum
+          format: unknown_format
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('format');
+      }
+    });
+  });
+
+  describe('Mask SQL with shorthand', () => {
+    it('userAttributes shorthand in mask sql should compile and resolve', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+        mask:
+          sql: "CASE WHEN { userAttributes.hasStatusAccess } THEN {CUBE}.status ELSE '***' END"
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      `);
+
+      await compilers.compiler.compile();
+
+      const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.status;
+      const maskSql = (dim as any).mask.sql.toString();
+      expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.userAttributes.hasStatusAccess');
+      expect(maskSql).toContain('CUBE');
+      expect(maskSql).not.toMatch(/[^.}]userAttributes\.hasStatusAccess/);
+
+      const query = new PostgresQuery(
+        compilers,
+        {
+          measures: ['orders.count'],
+          dimensions: ['orders.status'],
+          maskedMembers: ['orders.status'],
+          contextSymbols: {
+            securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
+          }
+        }
+      );
+      const sql = query.buildSqlAndParams();
+      expect(sql[0]).toContain('"orders".status');
+      expect(sql[0]).toContain('CASE WHEN');
+    });
+
+    it('user_attributes shorthand in mask sql should compile and resolve', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+        mask:
+          sql: "CASE WHEN { user_attributes.hasStatusAccess } THEN {CUBE}.status ELSE '***' END"
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      `);
+
+      await compilers.compiler.compile();
+
+      const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.status;
+      const maskSql = (dim as any).mask.sql.toString();
+      expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.userAttributes.hasStatusAccess');
+    });
+
+    it('groups shorthand in mask sql should compile and resolve', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: secret
+        sql: price
+        type: number
+        mask:
+          sql: "CASE WHEN {CUBE}.product_id IN ({groups}) THEN {CUBE}.price ELSE -1 END"
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      `);
+
+      await compilers.compiler.compile();
+
+      const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.secret;
+      const maskSql = (dim as any).mask.sql.toString();
+      expect(maskSql).toContain('SECURITY_CONTEXT.cubeCloud.groups');
+    });
+
+    // Regression tests for mask.sql authored with different cube reference
+    // styles on a cube member that is re-exposed through a prefixed view.
+    // The mask must compile against the owning cube, not the view, so:
+    //   * {cube.member}, {CUBE.member}, {CUBE}.column and {cube}.column
+    //     all resolve to the underlying cube's alias.
+    //   * The view's prefixed member ("users_city") does not collide with
+    //     mask-sql references authored as "city" on the underlying cube.
+    //   * Empty groups arrays in {groups.filter(...)} do not emit invalid
+    //     `IN ()` SQL.
+    describe('Mask SQL through prefixed view (cross-cube references)', () => {
+      const buildMaskViewCompilers = (maskThen: string) => prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    public: false
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: city_sensitive_masked
+        sql: city
+        mask:
+          sql: |
+            CASE
+              WHEN {groups.filter("'sensitive_data_access'")}
+              THEN ${maskThen}
+              ELSE '***MASKED***'
+            END
+        type: string
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: users_secure_view
+    public: true
+    cubes:
+      - join_path: users
+        prefix: true
+        includes:
+          - id
+          - city
+          - city_sensitive_masked
+          - count
+    access_policy:
+      - group: "*"
+        member_level:
+          includes:
+            - users_id
+            - users_count
+        member_masking:
+          includes: '*'
+      `);
+
+      const runBaseQuery = async (maskThen: string, groups: string[], useNativeSqlPlanner: boolean) => {
+        const compilers = buildMaskViewCompilers(maskThen);
+        await compilers.compiler.compile();
+        const query = new PostgresQuery(compilers, {
+          measures: ['users_secure_view.users_count'],
+          dimensions: ['users_secure_view.users_city_sensitive_masked'],
+          maskedMembers: ['users_secure_view.users_city_sensitive_masked'],
+          contextSymbols: {
+            securityContext: { cubeCloud: { groups } }
+          },
+          ...(useNativeSqlPlanner ? { useNativeSqlPlanner: true } : {})
+        });
+        return query.buildSqlAndParams();
+      };
+
+      const maskReferenceStyles = [
+        ['{users.city}', 'cube.member'],
+        ['{CUBE.city}', 'CUBE.member'],
+        ['{CUBE}.city', 'CUBE.column'],
+        ['{users}.city', 'cube.column'],
+      ] as const;
+
+      for (const [maskBody, label] of maskReferenceStyles) {
+        it(`legacy BaseQuery: ${label} (${maskBody}) resolves through view`, async () => {
+          const [sql] = await runBaseQuery(maskBody, ['sensitive_data_access'], false);
+          expect(sql).toContain('"users".city');
+        });
+
+        it(`tesseract: ${label} (${maskBody}) resolves through view`, async () => {
+          const [sql] = await runBaseQuery(maskBody, ['sensitive_data_access'], true);
+          expect(sql).toContain('"users".city');
+        });
+      }
+
+      it('legacy BaseQuery: empty groups array does not produce IN ()', async () => {
+        const [sql] = await runBaseQuery('{users.city}', [], false);
+        expect(sql).not.toMatch(/IN\s*\(\s*\)/);
+      });
+
+      it('tesseract: empty groups array does not produce IN ()', async () => {
+        const [sql] = await runBaseQuery('{users.city}', [], true);
+        expect(sql).not.toMatch(/IN\s*\(\s*\)/);
+      });
+    });
   });
 });

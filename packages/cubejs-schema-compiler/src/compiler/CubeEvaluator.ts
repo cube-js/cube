@@ -60,6 +60,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string;
+  aggType?: string,
   sql(): string;
   ownedByCube: boolean;
   rollingWindow?: any
@@ -267,6 +268,22 @@ export class CubeEvaluator extends CubeSymbols {
           policy.memberLevel.excludes || []
         ).map(memberMapper('an excludes member'));
       }
+
+      if (policy.memberMasking) {
+        if (!policy.memberLevel) {
+          errorReporter.error(
+            `accessPolicy for ${cube.name} defines memberMasking without memberLevel. memberLevel is required when memberMasking is used`
+          );
+        }
+        policy.memberMasking.includesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.includes || '*'
+        ).map(memberMapper('a masking includes member'));
+        policy.memberMasking.excludesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.excludes || []
+        ).map(memberMapper('a masking excludes member'));
+      }
     }
   }
 
@@ -317,6 +334,20 @@ export class CubeEvaluator extends CubeSymbols {
   private prepareFolders(cube: CubeDefinitionExtended, errorReporter: ErrorReporter): void {
     const folders = cube.rawFolders();
     if (!folders.length) return;
+
+    const seen = new Set<string>();
+
+    for (const folder of folders) {
+      if (folder.name && seen.has(folder.name)) {
+        errorReporter.error(
+          `Folder names must be unique within a view. Found duplicate folder '${folder.name}' in view '${cube.name}'.`
+        );
+      }
+
+      if (folder.name) {
+        seen.add(folder.name);
+      }
+    }
 
     const checkMember = (memberName: string, folderName: string): ViewIncludedMember | null => {
       if (memberName.includes('.')) {
@@ -636,6 +667,34 @@ export class CubeEvaluator extends CubeSymbols {
       members[memberName] = { ...members[memberName], ownedByCube };
       if (aliasMember) {
         members[memberName].aliasMember = aliasMember;
+      }
+
+      // Expose maskSql getter for the Tesseract bridge. It normalizes both
+      // SQL masks (mask.sql) and static masks into a callable function.
+      // Non-enumerable so it doesn't pollute serialization.
+      const memberMask = members[memberName].mask;
+      if (memberMask !== undefined && memberMask !== null) {
+        if (typeof memberMask === 'object' && memberMask.sql) {
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => memberMask.sql,
+            enumerable: false,
+          });
+        } else {
+          let maskLiteral: string;
+          if (typeof memberMask === 'number') {
+            maskLiteral = `(${memberMask})`;
+          } else if (typeof memberMask === 'boolean') {
+            maskLiteral = memberMask ? '(TRUE)' : '(FALSE)';
+          } else {
+            maskLiteral = `'${String(memberMask).replace(/'/g, "''")}'`;
+          }
+          // eslint-disable-next-line no-new-func
+          const maskFn = new Function(`return \`${maskLiteral}\`;`);
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => maskFn,
+            enumerable: false,
+          });
+        }
       }
     }
   }

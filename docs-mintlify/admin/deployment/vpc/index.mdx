@@ -1,0 +1,35 @@
+---
+title: Dedicated Infrastructure (VPC)
+description: Connect Cube Cloud to your private cloud network on AWS, GCP, or Azure for secure access to internal data sources.
+---
+
+ Connecting with a VPC in Cube Cloud
+
+For improved stability and security, Cube Cloud supports connecting to one or
+more VPCs (virtual private clouds) in your Azure, AWS, or GCP accounts.
+
+<Info>
+
+Requires [dedicated infrastructure][ref-dedicated-infra].
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</Info>
+
+VPC connection improves stability through dedicated infrastructure for a
+deployment and improves security by preventing your database traffic from being
+routed through the public internet.
+
+<CardGroup cols={3}>
+  <Card title="Amazon Web Services" icon="brand-aws" href="vpc/aws">
+    Connect via VPC on AWS.
+  </Card>
+  <Card title="Google Cloud Platform" icon="google" href="vpc/gcp">
+    Connect via VPC on GCP.
+  </Card>
+  <Card title="Microsoft Azure" icon="microsoft" href="vpc/azure">
+    Connect via VPC on Azure.
+  </Card>
+</CardGroup>
+
+
+[ref-dedicated-infra]: /docs/deployment/cloud/infrastructure#dedicated-infrastructure

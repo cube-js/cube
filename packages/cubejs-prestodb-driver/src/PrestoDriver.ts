@@ -52,6 +52,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
+  preAggregations?: boolean;
 };
 
 const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
@@ -83,37 +84,38 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    const dbUser = getEnv('dbUser', { dataSource });
-    const dbPassword = getEnv('dbPass', { dataSource });
-    const authToken = getEnv('prestoAuthToken', { dataSource });
+    const dbUser = getEnv('dbUser', { dataSource, preAggregations });
+    const dbPassword = getEnv('dbPass', { dataSource, preAggregations });
+    const authToken = getEnv('prestoAuthToken', { dataSource, preAggregations });
 
     if (authToken && dbPassword) {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
-    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource });
+    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
       catalog:
-        getEnv('prestoCatalog', { dataSource }) ||
-        getEnv('dbCatalog', { dataSource }),
+        getEnv('prestoCatalog', { dataSource, preAggregations }) ||
+        getEnv('dbCatalog', { dataSource, preAggregations }),
       schema:
-        getEnv('dbName', { dataSource }) ||
-        getEnv('dbSchema', { dataSource }),
+        getEnv('dbName', { dataSource, preAggregations }) ||
+        getEnv('dbSchema', { dataSource, preAggregations }),
       user: dbUser,
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
       ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
-      ssl: this.getSslOptions(dataSource),
-      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
-      exportBucket: getEnv('dbExportBucket', { dataSource }),
-      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource }),
-      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
-      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource }),
-      credentials: getEnv('dbExportGCSCredentials', { dataSource }),
-      queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
+      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource, preAggregations }),
+      exportBucket: getEnv('dbExportBucket', { dataSource, preAggregations }),
+      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
+      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
+      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
+      credentials: getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
+      queryTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
       ...config
     };
     this.catalog = this.config.catalog;

@@ -664,6 +664,14 @@ The maximum number of concurrent database connections to pool.
 | --------------- | ------------------------------------------- | ------------------------------------------- |
 | A valid number  | [See database-specific page][ref-config-db] | [See database-specific page][ref-config-db] |
 
+## `CUBEJS_DB_MIN_POOL`
+
+The minimum number of database connections to pool.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `0`                    | `0`                   |
+
 ## `CUBEJS_DB_NAME`
 
 The name of the database to connect to.
@@ -1895,7 +1903,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-folders]: /product/data-modeling/reference/view#folders
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
-[ref-environments]: /product/workspace/environments
+[ref-environments]: /product/administration/deployment/environments
 [ref-databricks-m2m-oauth]: https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-mdx-api-locale]: /product/apis-integrations/mdx-api#measure-format

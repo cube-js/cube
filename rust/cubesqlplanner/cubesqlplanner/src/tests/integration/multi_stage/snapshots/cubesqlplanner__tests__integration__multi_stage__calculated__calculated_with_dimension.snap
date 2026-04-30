@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/calculated.rs
+expression: result
+---
+orders__status | orders__created_at_month | orders__total_amount | orders__mom_growth    
+---------------+--------------------------+----------------------+-----------------------
+cancelled      | 2024-01-01 00:00:00      | 50.00                | NULL                  
+cancelled      | 2024-02-01 00:00:00      | 50.00                | 0.00000000000000000000
+cancelled      | 2024-03-01 00:00:00      | 100.00               | 1.00000000000000000000
+completed      | 2024-01-01 00:00:00      | 300.00               | NULL                  
+completed      | 2024-02-01 00:00:00      | 500.00               | 0.66666666666666666667
+completed      | 2024-03-01 00:00:00      | 600.00               | 0.20000000000000000000
+pending        | 2024-01-01 00:00:00      | 150.00               | NULL                  
+pending        | 2024-02-01 00:00:00      | 200.00               | 0.33333333333333333333
+pending        | 2024-03-01 00:00:00      | 300.00               | 0.50000000000000000000

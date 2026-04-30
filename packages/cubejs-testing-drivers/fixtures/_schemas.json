@@ -441,7 +441,7 @@
         {
           "name": "percentageOfTotalForStatus",
           "type": "number",
-          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
+          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0), 0)",
           "multi_stage": true
         },
         {

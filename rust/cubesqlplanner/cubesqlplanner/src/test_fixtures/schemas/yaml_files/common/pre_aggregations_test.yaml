@@ -19,7 +19,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
       - name: checkins_total
         type: sum
         sql: "{visitor_checkins.count}"
@@ -76,7 +75,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
     pre_aggregations:
       # Rollup with join - aggregates checkins with visitor source via many_to_one join
       # Not multiplied: many_to_one relationship doesn't cause multiplication
@@ -145,7 +143,6 @@ cubes:
     measures:
       - name: count
         type: count
-        sql: "COUNT(*)"
     pre_aggregations:
       # Base rollup for rollupLambda - same structure as visitor_checkins.for_lambda
       - name: for_lambda

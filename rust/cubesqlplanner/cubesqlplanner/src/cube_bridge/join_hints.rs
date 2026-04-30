@@ -4,7 +4,7 @@ use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use serde::Serialize;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Ord, PartialOrd)]
 pub enum JoinHintItem {
     Single(String),
     Vector(Vec<String>),

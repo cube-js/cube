@@ -2,6 +2,7 @@ use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
 use crate::planner::sql_evaluator::sql_nodes::RenderReferencesType;
+use crate::planner::sql_evaluator::symbols::AggregateWrap;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -48,14 +49,14 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                                 table_ref,
                                 templates.quote_identifier(&column_name.name())?
                             );
-                            if ev.measure_type() == "count" || ev.measure_type() == "sum" {
-                                format!("sum({})", pre_aggregation_measure)
-                            } else if ev.measure_type() == "countDistinctApprox" {
-                                templates.count_distinct_approx(pre_aggregation_measure)?
-                            } else if ev.measure_type() == "min" || ev.measure_type() == "max" {
-                                format!("{}({})", ev.measure_type(), pre_aggregation_measure)
-                            } else {
-                                format!("sum({})", pre_aggregation_measure)
+                            match ev.kind().pre_aggregate_wrap() {
+                                AggregateWrap::CountDistinctApprox => {
+                                    templates.count_distinct_approx(pre_aggregation_measure)?
+                                }
+                                AggregateWrap::Function(name) => {
+                                    format!("{}({})", name, pre_aggregation_measure)
+                                }
+                                _ => format!("sum({})", pre_aggregation_measure),
                             }
                         }
                         RenderReferencesType::LiteralValue(value) => {

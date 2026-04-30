@@ -364,6 +364,25 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         Ok(SqlCallArg::security_value(index))
     }
 
+    /// Invokes a user-provided `column` callback (e.g.
+    /// `col => \`col IN (${groups.join(', ')})\``) passed to
+    /// `SECURITY_CONTEXT.…filter()`, passing the prepared `arg` value and
+    /// returning the resulting SQL string.
+    ///
+    /// Returns an empty string if the callback result cannot be converted to
+    /// a string, matching the pre-existing behavior.
+    fn invoke_filter_column_callback<CIT: InnerTypes>(
+        column: &<CIT as InnerTypes>::Function,
+        arg: NativeObjectHandle<CIT>,
+    ) -> Result<String, CubeError> {
+        let result = column.call(vec![arg])?;
+        if let Ok(result) = result.to_string() {
+            Ok(result.value()?)
+        } else {
+            Ok("".to_string())
+        }
+    }
+
     fn security_context_filter_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         property_value: NativeObjectHandle<CIT>,
@@ -379,6 +398,14 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             ParamValue::StringVec(prop_vec)
         } else if let Ok(prop) = String::from_native(property_value.clone()) {
             ParamValue::String(prop)
+        } else if let Ok(prop) = f64::from_native(property_value.clone()) {
+            if prop.fract() == 0.0 && prop.is_finite() {
+                ParamValue::String(format!("{}", prop as i64))
+            } else {
+                ParamValue::String(prop.to_string())
+            }
+        } else if let Ok(prop) = bool::from_native(property_value.clone()) {
+            ParamValue::String(prop.to_string())
         } else if property_value.is_undefined()? || property_value.is_null()? {
             ParamValue::None
         } else {
@@ -399,12 +426,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                         let value = Self::process_secutity_context_value(&proxy_state, value)?;
                         if let Ok(column) = column.to_function() {
                             let native_value = value.to_native(context.clone())?;
-                            let result = column.call(vec![native_value])?;
-                            if let Ok(result) = result.to_string() {
-                                result.value()?
-                            } else {
-                                "".to_string()
-                            }
+                            Self::invoke_filter_column_callback(&column, native_value)?
                         } else if let Ok(column) = column.to_string() {
                             let column_value = column.value()?;
                             format!("{} = {}", column_value, value)
@@ -413,22 +435,35 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                         }
                     }
                     ParamValue::StringVec(items) => {
-                        let values = items
-                            .iter()
-                            .map(|v| Self::process_secutity_context_value(&proxy_state, &v))
-                            .collect::<Result<Vec<_>, _>>()?;
+                        // An empty array means the user passed a filter value
+                        // but nothing matches (e.g. `groups: []`). Emitting
+                        // `col IN ()` produces invalid SQL in Postgres and
+                        // other dialects, so fall back to `1 = 0` (or the
+                        // function callback variant) to make the filter
+                        // match nothing explicitly.
+                        if items.is_empty() {
+                            if let Ok(column) = column.to_function() {
+                                let empty: Vec<String> = vec![];
+                                let native_values = empty.to_native(context)?;
+                                Self::invoke_filter_column_callback(&column, native_values)?
+                            } else {
+                                "1 = 0".to_string()
+                            }
+                        } else {
+                            let values = items
+                                .iter()
+                                .map(|v| Self::process_secutity_context_value(&proxy_state, &v))
+                                .collect::<Result<Vec<_>, _>>()?;
 
-                        let values = values.to_native(context)?;
-
-                        if let Ok(column) = column.to_function() {
-                            let result = column.call(vec![values])?;
-                            if let Ok(result) = result.to_string() {
-                                result.value()?
+                            if let Ok(column) = column.to_function() {
+                                let native_values = values.to_native(context)?;
+                                Self::invoke_filter_column_callback(&column, native_values)?
+                            } else if let Ok(column) = column.to_string() {
+                                let column_value = column.value()?;
+                                format!("{} IN ({})", column_value, values.join(", "))
                             } else {
                                 "".to_string()
                             }
-                        } else {
-                            "".to_string()
                         }
                     }
                     ParamValue::None => {
@@ -460,6 +495,38 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         Ok(NativeObjectHandle::new(result.into_object()))
     }
 
+    fn security_context_to_string_fn<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        property_value: NativeObjectHandle<CIT>,
+        proxy_state: ProxyStateWeak,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        let str_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
+            Some(prop_vec)
+        } else if let Ok(prop) = String::from_native(property_value.clone()) {
+            Some(vec![prop])
+        } else if let Ok(prop) = f64::from_native(property_value.clone()) {
+            if prop.fract() == 0.0 && prop.is_finite() {
+                Some(vec![format!("{}", prop as i64)])
+            } else {
+                Some(vec![prop.to_string()])
+            }
+        } else if let Ok(prop) = bool::from_native(property_value.clone()) {
+            Some(vec![prop.to_string()])
+        } else {
+            None
+        };
+        let allocated = match str_value {
+            Some(values) => values
+                .iter()
+                .map(|v| Self::process_secutity_context_value(&proxy_state, v))
+                .collect::<Result<Vec<_>, _>>()?
+                .join(", "),
+            None => String::new(),
+        };
+        let result = context_holder.to_string_fn(allocated)?;
+        Ok(NativeObjectHandle::new(result.into_object()))
+    }
+
     fn security_context_proxy<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         proxy_state: ProxyStateWeak,
@@ -484,8 +551,15 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             }
             if &prop == "unsafeValue" {
                 return Ok(Some(Self::security_context_unsafe_value_fn(
-                    inner_context,
+                    inner_context.clone(),
                     target.clone(),
+                )?));
+            }
+            if &prop == "toString" || &prop == "valueOf" {
+                return Ok(Some(Self::security_context_to_string_fn(
+                    inner_context.clone(),
+                    target.clone(),
+                    proxy_state.clone(),
                 )?));
             }
             let target_obj = target.to_struct()?;
@@ -497,32 +571,67 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                     property_value,
                 )?));
             }
+            Ok(Some(Self::security_context_leaf_proxy(
+                inner_context,
+                proxy_state.clone(),
+                property_value,
+            )?))
+        })
+    }
 
-            let result = inner_context.empty_struct()?;
-            result.set_field(
-                "filter",
-                Self::security_context_filter_fn(
-                    inner_context.clone(),
-                    property_value.clone(),
-                    false,
-                    proxy_state.clone(),
-                )?,
-            )?;
-            result.set_field(
-                "requiredFilter",
-                Self::security_context_filter_fn(
-                    inner_context.clone(),
-                    property_value.clone(),
-                    true,
-                    proxy_state.clone(),
-                )?,
-            )?;
-            result.set_field(
-                "unsafeValue",
-                Self::security_context_unsafe_value_fn(inner_context, target.clone())?,
-            )?;
-            let result = NativeObjectHandle::new(result.into_object());
-            Ok(Some(result))
+    /// Creates a chainable proxy for leaf (non-object) security context values.
+    /// The proxy target is a struct with method properties (filter, unsafeValue,
+    /// etc.). Unknown property access returns another chainable proxy, enabling
+    /// deeply nested paths like `SECURITY_CONTEXT.cubeCloud.tenantId.filter(...)`.
+    fn security_context_leaf_proxy<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        proxy_state: ProxyStateWeak,
+        property_value: NativeObjectHandle<CIT>,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        let result = context_holder.empty_struct()?;
+        result.set_field(
+            "filter",
+            Self::security_context_filter_fn(
+                context_holder.clone(),
+                property_value.clone(),
+                false,
+                proxy_state.clone(),
+            )?,
+        )?;
+        result.set_field(
+            "requiredFilter",
+            Self::security_context_filter_fn(
+                context_holder.clone(),
+                property_value.clone(),
+                true,
+                proxy_state.clone(),
+            )?,
+        )?;
+        result.set_field(
+            "unsafeValue",
+            Self::security_context_unsafe_value_fn(context_holder.clone(), property_value.clone())?,
+        )?;
+        result.set_field(
+            "toString",
+            Self::security_context_to_string_fn(
+                context_holder.clone(),
+                property_value.clone(),
+                proxy_state.clone(),
+            )?,
+        )?;
+        let methods_handle = NativeObjectHandle::new(result.into_object());
+        context_holder.make_proxy(Some(methods_handle), move |inner_context, target, prop| {
+            if let Ok(target_obj) = target.to_struct() {
+                if let Ok(true) = target_obj.has_field(&prop) {
+                    return Ok(Some(target_obj.get_field(&prop)?));
+                }
+            }
+            let undef = inner_context.undefined()?;
+            Ok(Some(Self::security_context_leaf_proxy(
+                inner_context,
+                proxy_state.clone(),
+                undef,
+            )?))
         })
     }
 

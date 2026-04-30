@@ -1,5 +1,8 @@
 use crate::cube_bridge::member_sql::MemberSql;
-use crate::test_fixtures::cube_bridge::{MockMemberSql, MockPreAggregationDescription};
+use crate::test_fixtures::cube_bridge::yaml::pre_aggregation_time_dimension::YamlPreAggregationTimeDimension;
+use crate::test_fixtures::cube_bridge::{
+    MockMemberSql, MockPreAggregationDescription, MockPreAggregationTimeDimension,
+};
 use cubenativeutils::CubeError;
 use serde::Deserialize;
 use std::rc::Rc;
@@ -23,7 +26,8 @@ pub struct YamlPreAggregationDefinition {
     #[serde(default)]
     time_dimension: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
+    time_dimensions: Option<Vec<YamlPreAggregationTimeDimension>>,
+    #[serde(default)]
     segments: Option<Vec<String>>,
     #[serde(default)]
     #[allow(dead_code)]
@@ -98,6 +102,16 @@ impl YamlPreAggregationDefinition {
             .transpose()
             .expect("Failed to build time dimension reference");
 
+        let time_dimension_references: Option<Vec<Rc<MockPreAggregationTimeDimension>>> = self
+            .time_dimensions
+            .map(|tds| tds.into_iter().map(|td| td.build()).collect());
+
+        let segment_references = self
+            .segments
+            .map(|s| build_array_references(s))
+            .transpose()
+            .expect("Failed to build segment references");
+
         let rollup_references = self
             .rollups
             .map(|r| build_array_references(r))
@@ -115,7 +129,9 @@ impl YamlPreAggregationDefinition {
                 .measure_references_opt(measure_references)
                 .dimension_references_opt(dimension_references)
                 .time_dimension_reference_opt(time_dimension_reference)
+                .segment_references_opt(segment_references)
                 .rollup_references_opt(rollup_references)
+                .time_dimension_references(time_dimension_references)
                 .build(),
         )
     }

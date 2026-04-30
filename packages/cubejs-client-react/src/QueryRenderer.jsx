@@ -14,7 +14,8 @@ export default class QueryRenderer extends React.Component {
     queries: null,
     loadSql: null,
     updateOnlyOnStateChange: false,
-    resetResultSetOnChange: true
+    resetResultSetOnChange: true,
+    cache: null,
   };
 
   // @deprecated use `isQueryPresent` from `@cubejs-client/core`
@@ -71,7 +72,7 @@ export default class QueryRenderer extends React.Component {
   }
 
   load(query) {
-    const { resetResultSetOnChange } = this.props;
+    const { resetResultSetOnChange, cache } = this.props;
     this.setState({
       isLoading: true,
       error: null,
@@ -80,6 +81,12 @@ export default class QueryRenderer extends React.Component {
     });
     const { loadSql } = this.props;
     const cubeApi = this.cubeApi();
+
+    const loadOptions = {
+      mutexObj: this.mutexObj,
+      mutexKey: 'query',
+      ...(cache ? { cache } : {}),
+    };
 
     if (query && isQueryPresent(query)) {
       if (loadSql === 'only') {
@@ -93,7 +100,7 @@ export default class QueryRenderer extends React.Component {
       } else if (loadSql) {
         Promise.all([
           cubeApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
-          cubeApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+          cubeApi.load(query, loadOptions)
         ]).then(([sqlQuery, resultSet]) => this.setState({
           sqlQuery, resultSet, error: null, isLoading: false
         }))
@@ -103,7 +110,7 @@ export default class QueryRenderer extends React.Component {
             isLoading: false
           }));
       } else {
-        cubeApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+        cubeApi.load(query, loadOptions)
           .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
           .catch(error => this.setState({
             ...(resetResultSetOnChange ? { resultSet: null } : {}),
@@ -116,7 +123,7 @@ export default class QueryRenderer extends React.Component {
 
   loadQueries(queries) {
     const cubeApi = this.cubeApi();
-    const { resetResultSetOnChange } = this.props;
+    const { resetResultSetOnChange, cache } = this.props;
     this.setState({
       isLoading: true,
       ...(resetResultSetOnChange ? { resultSet: null } : {}),
@@ -124,7 +131,11 @@ export default class QueryRenderer extends React.Component {
     });
 
     const resultPromises = Promise.all(toPairs(queries).map(
-      ([name, query]) => cubeApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
+      ([name, query]) => cubeApi.load(query, {
+        mutexObj: this.mutexObj,
+        mutexKey: name,
+        ...(cache ? { cache } : {}),
+      }).then(r => [name, r])
     ));
 
     resultPromises

@@ -134,11 +134,49 @@ impl InlineTable {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub enum QueryParameter {
+    Null,
+    StringValue(String),
+    BoolValue(bool),
+    BinaryValue(Vec<u8>),
+    Int64Value(i64),
+    Float64Value(f64),
+}
+
+impl QueryParameter {
+    pub fn get_type(&self) -> &'static str {
+        match self {
+            QueryParameter::Null => "null",
+            QueryParameter::StringValue(_) => "string",
+            QueryParameter::BoolValue(_) => "bool",
+            QueryParameter::BinaryValue(_) => "binary",
+            QueryParameter::Int64Value(_) => "int64",
+            QueryParameter::Float64Value(_) => "float64",
+        }
+    }
+
+    pub fn try_as_u64(&self) -> Result<u64, String> {
+        match self {
+            QueryParameter::Int64Value(v) => u64::try_from(*v)
+                .map_err(|err| format!("value must be a valid unsigned integer, error: {}", err)),
+            other => Err(format!(
+                "Wrong parameters type, actual: {}, expected: integer parameter",
+                other.get_type()
+            )),
+        }
+    }
+}
+
+pub type QueryParameters = Vec<QueryParameter>;
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
     pub inline_tables: InlineTables,
     pub trace_obj: Option<String>,
+    pub process_id: Option<String>,
+    pub parameters: Option<QueryParameters>,
 }
 
 impl SqlQueryContext {
@@ -157,6 +195,18 @@ impl SqlQueryContext {
     pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
         let mut res = self.clone();
         res.trace_obj = trace_obj;
+        res
+    }
+
+    pub fn with_process_id(&self, process_id: Option<String>) -> Self {
+        let mut res = self.clone();
+        res.process_id = process_id;
+        res
+    }
+
+    pub fn with_parameters(&self, parameters: &Option<QueryParameters>) -> Self {
+        let mut res = self.clone();
+        res.parameters = parameters.clone();
         res
     }
 }
@@ -597,18 +647,20 @@ impl SqlService for SqlServiceImpl {
     #[instrument(level = "trace", skip(self))]
     async fn exec_query_with_context(
         &self,
-        context: SqlQueryContext,
+        mut context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
             trace!("Query: '{}'", query);
         }
+
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
             return Ok(Arc::new(data_frame));
         }
+
         let ast = {
-            let mut parser = CubeStoreParser::new(query)?;
+            let mut parser = CubeStoreParser::new(query, context.parameters.take())?;
             parser.parse_statement()?
         };
         // trace!("AST is: {:?}", ast);
@@ -1235,7 +1287,7 @@ impl SqlService for SqlServiceImpl {
     ) -> Result<QueryPlans, CubeError> {
         let ast = {
             let replaced_quote = q.replace("\\'", "''");
-            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            let mut parser = CubeStoreParser::new(&replaced_quote, context.parameters)?;
             parser.parse_statement()?
         };
         match ast {
@@ -3083,6 +3135,7 @@ mod tests {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 50;
+            c.max_joined_partitions = 10;
             c
         }).start_test(async move |services| {
             let service = services.sql_service;
@@ -5362,6 +5415,209 @@ mod tests {
             .await;
 
         //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+    }
+
+    #[test]
+    fn compaction_readiness_threshold() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
+                Config::test("compaction_readiness_threshold")
+                    .update_config(|mut config| {
+                        config.partition_split_threshold = 10;
+                        config.compaction_chunks_count_threshold = 0;
+                        config.compaction_readiness_chunks_threshold = Some(1);
+                        config
+                    })
+                    .start_test(async move |services| {
+                        let service = services.sql_service;
+
+                        let total_rows = 200;
+                        let files_count = 20;
+                        let rows_per_file = total_rows / files_count;
+
+                        let paths = {
+                            let dir = env::temp_dir();
+                            let mut paths = Vec::new();
+                            for f in 0..files_count {
+                                let path = dir.clone().join(format!("compaction-ready-{}.csv", f));
+                                let mut file = File::create(path.clone()).unwrap();
+                                file.write_all("id,value\n".as_bytes()).unwrap();
+                                let start = f * rows_per_file;
+                                for i in start..start + rows_per_file {
+                                    file.write_all(format!("{},{}\n", i, i * 10).as_bytes())
+                                        .unwrap();
+                                }
+                                paths.push(path);
+                            }
+                            paths
+                        };
+
+                        service
+                            .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+                            .await
+                            .unwrap();
+                        service
+                            .exec_query(&format!(
+                                "CREATE TABLE test.compaction_ready (`id` int, `value` int) \
+                                 WITH (input_format = 'csv') LOCATION {}",
+                                paths
+                                    .iter()
+                                    .map(|p| format!("'{}'", p.to_string_lossy()))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ))
+                            .await
+                            .unwrap();
+
+                        let result = service
+                            .exec_query("SELECT count(*) FROM test.compaction_ready")
+                            .await
+                            .unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(total_rows as i64)])
+                        );
+
+                        let indexes = services
+                            .meta_store
+                            .get_table_indexes(
+                                services
+                                    .meta_store
+                                    .get_table("test".to_string(), "compaction_ready".to_string())
+                                    .await
+                                    .unwrap()
+                                    .get_id(),
+                            )
+                            .await
+                            .unwrap();
+                        let partitions = services
+                            .meta_store
+                            .get_active_partitions_and_chunks_by_index_id_for_select(
+                                indexes.iter().map(|i| i.get_id()).collect(),
+                            )
+                            .await
+                            .unwrap();
+                        for index_partitions in &partitions {
+                            for (_partition, chunks) in index_partitions {
+                                let active = chunks.iter().filter(|c| c.get_row().active()).count();
+                                assert!(
+                                    active <= 1,
+                                    "Expected at most 1 active chunk per partition after \
+                                     compaction readiness, but found {}",
+                                    active,
+                                );
+                            }
+                        }
+                    })
+                    .await;
+            });
+    }
+
+    #[test]
+    fn compaction_readiness_without_threshold() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
+                Config::test("compaction_readiness_no_threshold")
+                    .update_config(|mut config| {
+                        config.partition_split_threshold = 10;
+                        config.compaction_chunks_count_threshold = 100;
+                        config.compaction_chunks_total_size_threshold = 100_000_000;
+                        config
+                    })
+                    .start_test(async move |services| {
+                        let service = services.sql_service;
+
+                        let total_rows = 200;
+                        let files_count = 20;
+                        let rows_per_file = total_rows / files_count;
+
+                        let paths = {
+                            let dir = env::temp_dir();
+                            let mut paths = Vec::new();
+                            for f in 0..files_count {
+                                let path = dir.clone().join(format!("no-threshold-{}.csv", f));
+                                let mut file = File::create(path.clone()).unwrap();
+                                file.write_all("id,value\n".as_bytes()).unwrap();
+                                let start = f * rows_per_file;
+                                for i in start..start + rows_per_file {
+                                    file.write_all(format!("{},{}\n", i, i * 10).as_bytes())
+                                        .unwrap();
+                                }
+                                paths.push(path);
+                            }
+                            paths
+                        };
+
+                        service
+                            .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+                            .await
+                            .unwrap();
+                        service
+                            .exec_query(&format!(
+                                "CREATE TABLE test.no_threshold (`id` int, `value` int) \
+                                 WITH (input_format = 'csv') LOCATION {}",
+                                paths
+                                    .iter()
+                                    .map(|p| format!("'{}'", p.to_string_lossy()))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ))
+                            .await
+                            .unwrap();
+
+                        let result = service
+                            .exec_query("SELECT count(*) FROM test.no_threshold")
+                            .await
+                            .unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(total_rows as i64)])
+                        );
+
+                        let indexes = services
+                            .meta_store
+                            .get_table_indexes(
+                                services
+                                    .meta_store
+                                    .get_table("test".to_string(), "no_threshold".to_string())
+                                    .await
+                                    .unwrap()
+                                    .get_id(),
+                            )
+                            .await
+                            .unwrap();
+                        let partitions = services
+                            .meta_store
+                            .get_active_partitions_and_chunks_by_index_id_for_select(
+                                indexes.iter().map(|i| i.get_id()).collect(),
+                            )
+                            .await
+                            .unwrap();
+                        let max_chunks = partitions
+                            .iter()
+                            .flat_map(|index_partitions| index_partitions.iter())
+                            .map(|(_partition, chunks)| {
+                                chunks.iter().filter(|c| c.get_row().active()).count()
+                            })
+                            .max()
+                            .unwrap_or(0);
+                        assert!(
+                            max_chunks > 1,
+                            "Without threshold, table should be ready with uncompacted chunks, \
+                             but max active chunks per partition was {}",
+                            max_chunks,
+                        );
+                    })
+                    .await;
+            });
     }
 }
 

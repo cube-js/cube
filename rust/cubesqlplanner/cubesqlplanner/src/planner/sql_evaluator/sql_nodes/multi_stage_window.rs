@@ -50,8 +50,9 @@ impl SqlNode for MultiStageWindowNode {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
                 if m.is_multi_stage() && !m.is_calculated() {
+                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let input_sql = self.input.to_sql(
-                        visitor,
+                        &inner_visitor,
                         node,
                         query_tools.clone(),
                         node_processor.clone(),

@@ -11,6 +11,7 @@ use cubenativeutils::wrappers::{NativeArray, NativeContextHolder, NativeObjectHa
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -71,6 +72,14 @@ pub struct BaseQueryOptionsStatic {
     pub cubestore_support_multistage: Option<bool>,
     #[serde(rename = "disableExternalPreAggregations")]
     pub disable_external_pre_aggregations: bool,
+    #[serde(rename = "preAggregationId")]
+    pub pre_aggregation_id: Option<String>,
+    #[serde(rename = "convertTzForRawTimeDimension")]
+    pub convert_tz_for_raw_time_dimension: Option<bool>,
+    #[serde(rename = "maskedMembers")]
+    pub masked_members: Option<Vec<String>>,
+    #[serde(rename = "memberToAlias", default)]
+    pub member_to_alias: Option<HashMap<String, String>>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

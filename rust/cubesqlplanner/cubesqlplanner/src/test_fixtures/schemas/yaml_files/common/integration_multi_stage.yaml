@@ -1,0 +1,260 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM ms_customers"
+      joins:
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+
+    - name: orders
+      sql: "SELECT * FROM ms_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: status
+            type: string
+            sql: status
+          - name: category
+            type: string
+            sql: category
+          - name: amount
+            type: number
+            sql: amount
+          - name: created_at
+            type: time
+            sql: created_at
+
+          - name: customer_name
+            type: string
+            sql: "{customers.name}"
+            multi_stage: true
+            add_group_by:
+                - customers.id
+          - name: customer_city
+            type: string
+            sql: "{customers.city}"
+            multi_stage: true
+            add_group_by:
+                - customers.id
+
+      measures:
+          - name: count
+            type: count
+
+          - name: total_amount
+            type: sum
+            sql: amount
+
+          - name: avg_amount
+            type: avg
+            sql: amount
+
+          - name: amount_by_id
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.id
+
+          - name: amount_by_category
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.category
+
+          - name: amount_by_status_category
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.status
+                - orders.category
+
+          - name: amount_reduce_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: amount_reduce_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+
+          - name: amount_reduce_all
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+                - orders.category
+
+          - name: amount_group_by_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            group_by:
+                - orders.status
+
+          - name: amount_group_by_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            group_by:
+                - orders.category
+
+          - name: amount_group_by_both
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            group_by:
+                - orders.status
+                - orders.category
+
+          - name: amount_group_by_status_time
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            group_by:
+                - orders.status
+                - orders.created_at.month
+
+          - name: amount_prev_month
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: orders.created_at
+
+          - name: amount_next_month
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: next
+                  timeDimension: orders.created_at
+
+          - name: count_prev_month
+            type: number
+            sql: "{CUBE.count}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: orders.created_at
+
+          - name: amount_mom_diff
+            type: number
+            sql: "{CUBE.total_amount} - {CUBE.amount_prev_month}"
+            multi_stage: true
+
+          - name: mom_growth
+            type: number
+            sql: "({CUBE.total_amount} - {CUBE.amount_prev_month}) / NULLIF({CUBE.amount_prev_month}, 0)"
+            multi_stage: true
+
+          - name: category_share
+            type: number
+            sql: "{CUBE.total_amount} / NULLIF({CUBE.amount_reduce_category}, 0)"
+            multi_stage: true
+
+          - name: amount_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
+          - name: amount_rank_by_status
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.status
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
+          - name: status_weighted_amount
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.status}"
+                when:
+                    - value: "completed"
+                      sql: "{CUBE.total_amount}"
+                    - value: "pending"
+                      sql: "{CUBE.total_amount} * 0.5"
+                else:
+                    sql: "{CUBE.total_amount} * 0"
+
+          - name: rolling_sum_7d
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+                offset: start
+
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"
+
+    - name: returns
+      sql: "SELECT * FROM ms_returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
+
+views:
+    - name: orders_ms_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - created_at
+                - total_amount
+                - amount_prev_month
+                - mom_growth

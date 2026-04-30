@@ -3,6 +3,157 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
+
+### Bug Fixes
+
+- **tesseract:** mask.sql with cross-cube refs through prefixed views ([#10727](https://github.com/cube-js/cube/issues/10727)) ([e52f201](https://github.com/cube-js/cube/commit/e52f201e20bdd1ab3a7556049099d286397e29b9))
+
+## [1.6.38](https://github.com/cube-js/cube/compare/v1.6.37...v1.6.38) (2026-04-23)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.37](https://github.com/cube-js/cube/compare/v1.6.36...v1.6.37) (2026-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.36](https://github.com/cube-js/cube/compare/v1.6.35...v1.6.36) (2026-04-16)
+
+### Bug Fixes
+
+- **docs:** remove multiplication by 100 in percentage measure examples ([#10607](https://github.com/cube-js/cube/issues/10607)) ([bca52d9](https://github.com/cube-js/cube/commit/bca52d91dfdfbc252dd53d364b5958239161c56a))
+
+## [1.6.35](https://github.com/cube-js/cube/compare/v1.6.34...v1.6.35) (2026-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.34](https://github.com/cube-js/cube/compare/v1.6.33...v1.6.34) (2026-04-14)
+
+### Features
+
+- add format description handling ([#10688](https://github.com/cube-js/cube/issues/10688)) ([365bd74](https://github.com/cube-js/cube/commit/365bd74cdf420505ab073624462cd49127a4ca6a))
+
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **bigquery:** Align time series output type to TIMESTAMP for tesseract planner, thanks [@tlangton3](https://github.com/tlangton3) ([#10645](https://github.com/cube-js/cube/issues/10645)) ([05ab975](https://github.com/cube-js/cube/commit/05ab9752a03cd9ca2095cf96133e3c896d5ed455)), closes [cube-js/cube#10642](https://github.com/cube-js/cube/issues/10642)
+- **tesseract:** Issue with filters over multi-fact measure ([#10650](https://github.com/cube-js/cube/issues/10650)) ([7169d39](https://github.com/cube-js/cube/commit/7169d39b440e7cabe181cfecebd589880aee51ec))
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+### Bug Fixes
+
+- SECURITY_CONTEXT renders empty strings on filter with enabled Tesseract ([#10576](https://github.com/cube-js/cube/issues/10576)) ([6d9afac](https://github.com/cube-js/cube/commit/6d9afac3e16a5c8a948887270f0304f78a736c5f))
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+### Features
+
+- **tesseract:** Support multiple time dimensions in pre-aggregations ([#10599](https://github.com/cube-js/cube/issues/10599)) ([c773953](https://github.com/cube-js/cube/commit/c77395389038f384a686a8f2cee3cc39249d51af))
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+### Bug Fixes
+
+- **cube:** Quarter intervals in postgres ([#10580](https://github.com/cube-js/cube/issues/10580)) ([defc186](https://github.com/cube-js/cube/commit/defc186c39d447a24914e7b1d924095c8761dabf))
+- **tesseract:** Filter by multi-stage measure ([#10579](https://github.com/cube-js/cube/issues/10579)) ([4a4b67f](https://github.com/cube-js/cube/commit/4a4b67f50fcf6ced8ddb493ec90b3dc9f4c93b1e))
+- **tesseract:** Tesseract should respect convertTzForRawTimeDimension ([#10585](https://github.com/cube-js/cube/issues/10585)) ([515eeae](https://github.com/cube-js/cube/commit/515eeaef4abf554a3291b8a4d2603240281915a3))
+
+### Features
+
+- **cubesql:** Support PatchMeasure for view measures ([#10571](https://github.com/cube-js/cube/issues/10571)) ([3bfe812](https://github.com/cube-js/cube/commit/3bfe8121be684fb08e22e27efb59877734276dba))
+- **mssql-driver:** Support use named timezones ([#10582](https://github.com/cube-js/cube/issues/10582)) ([ee788f4](https://github.com/cube-js/cube/commit/ee788f4f843073eb26bf07e101f83084e653270f))
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+### Features
+
+- Expose alias for named numeric format ([#10568](https://github.com/cube-js/cube/issues/10568)) ([662bc58](https://github.com/cube-js/cube/commit/662bc581c38c87eddb40505dd1847f1f2c79bac9))
+- **schema-compiler:** Support currency for numeric measures and dimensions ([#10561](https://github.com/cube-js/cube/issues/10561)) ([5fc721f](https://github.com/cube-js/cube/commit/5fc721f98429cc46395673b03283c501a59c5cdd))
+- **schema-compiler:** Support predefined named numeric formats ([#10563](https://github.com/cube-js/cube/issues/10563)) ([f060f5c](https://github.com/cube-js/cube/commit/f060f5c6a8a8c5cfe1b06be79f4c189520d3453b))
+
+## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.27](https://github.com/cube-js/cube/compare/v1.6.26...v1.6.27) (2026-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.26](https://github.com/cube-js/cube/compare/v1.6.25...v1.6.26) (2026-03-23)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.25](https://github.com/cube-js/cube/compare/v1.6.24...v1.6.25) (2026-03-20)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.24](https://github.com/cube-js/cube/compare/v1.6.23...v1.6.24) (2026-03-18)
+
+### Bug Fixes
+
+- **schema-compiler:** Use isNotDistinctFrom() for ClickHouse Tesseract multi-fact joins ([#10494](https://github.com/cube-js/cube/issues/10494)) ([43429eb](https://github.com/cube-js/cube/commit/43429eb59f941036f6e4a7fa22ca670544bb2193)), closes [#10493](https://github.com/cube-js/cube/issues/10493)
+- **tesseract:** Incorrect ubounded rolling window without granularity ([#10508](https://github.com/cube-js/cube/issues/10508)) ([33a68a0](https://github.com/cube-js/cube/commit/33a68a02574c815c748dd5383c421621e220d68d))
+- **tesseract:** Measure with string type ends up with SUM aggregation ([#10516](https://github.com/cube-js/cube/issues/10516)) ([589d20f](https://github.com/cube-js/cube/commit/589d20fc5fb6b93c861e54b1df2901742146a75a))
+- **tesseract:** Subquery dimension in filter ([#10506](https://github.com/cube-js/cube/issues/10506)) ([58c0687](https://github.com/cube-js/cube/commit/58c06879b93110336740fc7792144ca1165239df))
+- **tesseract:** Tesseract should respect sql api aliases ([#10505](https://github.com/cube-js/cube/issues/10505)) ([d5f6351](https://github.com/cube-js/cube/commit/d5f635105de2e4e881f5ec8b6a073cb62b031295))
+
+### Features
+
+- **tesseract:** ClickHouse support ([#10515](https://github.com/cube-js/cube/issues/10515)) ([cbdc6e8](https://github.com/cube-js/cube/commit/cbdc6e80108f15320a11b8cb6340251ea704c1db))
+
+## [1.6.23](https://github.com/cube-js/cube/compare/v1.6.22...v1.6.23) (2026-03-13)
+
+### Features
+
+- Data access policy masking ([#10463](https://github.com/cube-js/cube/issues/10463)) ([4b0d1bf](https://github.com/cube-js/cube/commit/4b0d1bfe49d8dbd72a9df03718793179e20ed167))
+
+## [1.6.22](https://github.com/cube-js/cube/compare/v1.6.21...v1.6.22) (2026-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.21](https://github.com/cube-js/cube/compare/v1.6.20...v1.6.21) (2026-03-10)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
+
+### Bug Fixes
+
+- **cube:** Issue with rollup pre-aggragations matching for views ([#10474](https://github.com/cube-js/cube/issues/10474)) ([7160283](https://github.com/cube-js/cube/commit/7160283c7dac5d5696cf683b8e59418e58453821))
+
+## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.6.18](https://github.com/cube-js/cube/compare/v1.6.17...v1.6.18) (2026-03-02)
+
+### Features
+
+- **schema-compiler:** Add duplicate folder name and time shift validation ([#10423](https://github.com/cube-js/cube/issues/10423)) ([2000373](https://github.com/cube-js/cube/commit/200037317fc1f90edf169ce02d7967fa331a09f4))
+
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+### Bug Fixes
+
+- **cube:** Issue with calculated measures in pre-aggragations ([#10429](https://github.com/cube-js/cube/issues/10429)) ([58bfe5e](https://github.com/cube-js/cube/commit/58bfe5e567e5999aba2e75e32a662fbba652bd02))
+- **schema-compiler:** Allow no-cache queries to use pre-aggregations ([#10440](https://github.com/cube-js/cube/issues/10440)) ([22286f5](https://github.com/cube-js/cube/commit/22286f50beeddadc93bcfba0b7055b114d06a824))
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Bug Fixes
+
+- **tesseract:** Issue with custom granularities for pre-aggregations ([#10424](https://github.com/cube-js/cube/issues/10424)) ([e79d10a](https://github.com/cube-js/cube/commit/e79d10a9569297798e44a61a31311fdf5ebd7cbb))
+- **tesseract:** Segment support in pre-aggregations ([#10422](https://github.com/cube-js/cube/issues/10422)) ([1756cdb](https://github.com/cube-js/cube/commit/1756cdbace8429cd0558353686eaf9b2a29cd13c))
+
+## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
+
+### Bug Fixes
+
+- **mssql-driver:** Use UTC timestamps in responses ([#10411](https://github.com/cube-js/cube/issues/10411)) ([4cb9f78](https://github.com/cube-js/cube/commit/4cb9f782e0ec40f055f80d48c6049b9dcc500dc6)), closes [#9488](https://github.com/cube-js/cube/issues/9488)
+- **tesseract:** Incorrect matching of calculated measures in pre-aggregations ([#10417](https://github.com/cube-js/cube/issues/10417)) ([8959b0d](https://github.com/cube-js/cube/commit/8959b0d9df6a8423ad75950f5611d2a4dfed781f))
+
 ## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
 
 ### Features

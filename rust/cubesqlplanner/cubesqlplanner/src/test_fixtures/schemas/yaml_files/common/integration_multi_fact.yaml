@@ -1,0 +1,133 @@
+cubes:
+    - name: regions
+      sql: "SELECT * FROM regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders.customer_id}"
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+          - name: reviews
+            relationship: one_to_many
+            sql: "{customers}.id = {reviews.customer_id}"
+          - name: regions
+            relationship: many_to_one
+            sql: "{customers}.region_id = {regions.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+          - name: total_lifetime_value_for_east
+            type: sum
+            sql: lifetime_value
+            filters:
+              - sql: "{regions.name} = 'East'"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+          - name: avg_amount_per_return
+            type: number
+            sql: "{orders.total_amount} / NULLIF({returns.count}, 0)"
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: reason
+            type: string
+            sql: reason
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+
+    - name: reviews
+      sql: "SELECT * FROM reviews"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: rating
+            type: number
+            sql: rating
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: avg_rating
+            type: avg
+            sql: rating

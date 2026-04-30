@@ -35,18 +35,19 @@ class ElasticSearchDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const auth = {
-      username: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
+      username: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
     };
     if (
-      getEnv('elasticApiId', { dataSource }) ||
-      getEnv('elasticApiKey', { dataSource })
+      getEnv('elasticApiId', { dataSource, preAggregations }) ||
+      getEnv('elasticApiKey', { dataSource, preAggregations })
     ) {
       auth.apiKey = {
-        id: getEnv('elasticApiId', { dataSource }),
-        api_key: getEnv('elasticApiKey', { dataSource }),
+        id: getEnv('elasticApiId', { dataSource, preAggregations }),
+        api_key: getEnv('elasticApiKey', { dataSource, preAggregations }),
       };
     }
 
@@ -55,14 +56,14 @@ class ElasticSearchDriver extends BaseDriver {
     // their respective documentation.
     this.config = {
       auth,
-      url: getEnv('dbUrl', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
+      url: getEnv('dbUrl', { dataSource, preAggregations }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
       openDistro:
-        (getEnv('elasticOpenDistro', { dataSource }) || 'false')
+        (getEnv('elasticOpenDistro', { dataSource, preAggregations }) || 'false')
           .toLowerCase() === 'true' ||
-        getEnv('dbType', { dataSource }) === 'odelasticsearch',
+        getEnv('dbType', { dataSource, preAggregations }) === 'odelasticsearch',
       queryFormat:
-        getEnv('elasticQueryFormat', { dataSource }) || 'jdbc',
+        getEnv('elasticQueryFormat', { dataSource, preAggregations }) || 'jdbc',
       ...config,
     };
 

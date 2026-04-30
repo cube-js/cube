@@ -90,6 +90,18 @@ impl ResultWrapper {
         let query_result =
             if let Ok(js_box) = raw_data_js.downcast::<JsBox<Arc<QueryResult>>, _>(cx) {
                 Arc::clone(&js_box)
+            } else if let Ok(js_buffer) = raw_data_js.downcast::<JsBuffer, _>(cx) {
+                let bytes = js_buffer.as_slice(cx);
+                let js_raw_data: JsRawData = serde_json::from_slice(bytes).map_err(|e| {
+                    CubeError::internal(format!(
+                        "Can't parse raw data JSON from JS ResultWrapper: {}",
+                        e
+                    ))
+                })?;
+
+                QueryResult::from_js_raw_data(js_raw_data)
+                    .map(Arc::new)
+                    .map_cube_err("Can't build results data from JS rawData")?
             } else if let Ok(js_array) = raw_data_js.downcast::<JsArray, _>(cx) {
                 let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
                 let js_raw_data: JsRawData = match Deserialize::deserialize(deserializer) {
@@ -222,6 +234,13 @@ fn extract_query_result(
 ) -> Result<Arc<QueryResult>, anyhow::Error> {
     if let Ok(js_box) = data_arg.downcast::<JsBox<Arc<QueryResult>>, _>(cx) {
         Ok(Arc::clone(&js_box))
+    } else if let Ok(js_buffer) = data_arg.downcast::<JsBuffer, _>(cx) {
+        let bytes = js_buffer.as_slice(cx);
+        let js_raw_data: JsRawData = serde_json::from_slice(bytes)?;
+
+        QueryResult::from_js_raw_data(js_raw_data)
+            .map(Arc::new)
+            .map_err(anyhow::Error::from)
     } else if let Ok(js_array) = data_arg.downcast::<JsArray, _>(cx) {
         let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
         let js_raw_data: JsRawData = Deserialize::deserialize(deserializer)?;

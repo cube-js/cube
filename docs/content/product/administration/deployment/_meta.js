@@ -3,6 +3,7 @@ export default {
   "infrastructure": "Infrastructure options",
   "vpc": "VPC",
   "byoc": "BYOC",
+  "environments": "Environments",
   "deployments": "Deployments",
   "deployment-types": "Deployment types",
   "continuous-deployment": "Continuous deployment",
@@ -10,7 +11,8 @@ export default {
   "warm-up": "Deployment warm-up",
   "auto-suspension": "Auto-suspension",
   "scalability": "Scalability",
-  "pricing": "Pricing",
+  "monitoring": "Monitoring Integrations",
+  "encryption-keys": "Encryption keys",
   "support": "Support",
   "limits": "Limits",
   "core": "Cube Core"

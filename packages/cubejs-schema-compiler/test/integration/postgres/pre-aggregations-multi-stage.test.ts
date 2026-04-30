@@ -170,6 +170,85 @@ describe('PreAggregationsMultiStage', () => {
 
   })
 
+  cube('coach', {
+    sql: \`
+      SELECT 101 AS id, '2025-01-01'::TIMESTAMP AS time UNION ALL
+      SELECT 102 AS id, '2025-02-01'::TIMESTAMP AS time UNION ALL
+      SELECT 103 AS id, '2025-02-02'::TIMESTAMP AS time UNION ALL
+      SELECT 104 AS id, '2025-03-01'::TIMESTAMP AS time UNION ALL
+      SELECT 105 AS id, '2025-03-02'::TIMESTAMP AS time UNION ALL
+      SELECT 106 AS id, '2025-03-03'::TIMESTAMP AS time UNION ALL
+      SELECT 107 AS id, '2025-04-01'::TIMESTAMP AS time UNION ALL
+      SELECT 108 AS id, '2025-04-02'::TIMESTAMP AS time UNION ALL
+      SELECT 109 AS id, '2025-04-03'::TIMESTAMP AS time UNION ALL
+      SELECT 110 AS id, '2025-04-04'::TIMESTAMP AS time UNION ALL
+      SELECT 111 AS id, '2025-05-01'::TIMESTAMP AS time UNION ALL
+      SELECT 112 AS id, '2025-05-02'::TIMESTAMP AS time UNION ALL
+      SELECT 113 AS id, '2025-05-03'::TIMESTAMP AS time UNION ALL
+      SELECT 114 AS id, '2025-05-04'::TIMESTAMP AS time UNION ALL
+      SELECT 115 AS id, '2025-05-05'::TIMESTAMP AS time UNION ALL
+      SELECT 116 AS id, '2025-06-01'::TIMESTAMP AS time UNION ALL
+      SELECT 117 AS id, '2025-06-02'::TIMESTAMP AS time UNION ALL
+      SELECT 118 AS id, '2025-06-03'::TIMESTAMP AS time UNION ALL
+      SELECT 119 AS id, '2025-06-04'::TIMESTAMP AS time UNION ALL
+      SELECT 120 AS id, '2025-06-05'::TIMESTAMP AS time UNION ALL
+      SELECT 121 AS id, '2025-06-06'::TIMESTAMP AS time UNION ALL
+      SELECT 122 AS id, '2025-07-01'::TIMESTAMP AS time UNION ALL
+      SELECT 123 AS id, '2025-07-02'::TIMESTAMP AS time UNION ALL
+      SELECT 124 AS id, '2025-07-03'::TIMESTAMP AS time UNION ALL
+      SELECT 125 AS id, '2025-07-04'::TIMESTAMP AS time UNION ALL
+      SELECT 126 AS id, '2025-07-05'::TIMESTAMP AS time UNION ALL
+      SELECT 127 AS id, '2025-07-06'::TIMESTAMP AS time UNION ALL
+      SELECT 128 AS id, '2025-07-07'::TIMESTAMP AS time
+    \`,
+
+    dimensions: {
+      time: {
+        sql: 'time',
+        type: 'time',
+        public: false,
+      },
+    },
+
+    measures: {
+      count_distinct: {
+        sql: 'id',
+        type: 'countDistinct',
+        public: false,
+      },
+      count_distinct__sum_by_quarter_aux: {
+        multi_stage: true,
+        sql: \`\${count_distinct}\`,
+        type: 'sum',
+        add_group_by: [time.month],
+        group_by: [time.quarter],
+        public: false,
+      },
+      count_distinct__sum_by_quarter: {
+        multi_stage: true,
+        sql: \`\${count_distinct__sum_by_quarter_aux}\`,
+        type: 'sum',
+        add_group_by: [time.quarter],
+      },
+    },
+
+    preAggregations: {
+      main: {
+        type: 'rollup',
+        measures: [count_distinct],
+        timeDimensions: [
+          {
+            dimension: time,
+            granularity: 'month'
+          },
+          {
+            dimension: time,
+            granularity: 'quarter'
+          }
+        ]
+      },
+    },
+  })
 
    `);
 
@@ -282,6 +361,30 @@ describe('PreAggregationsMultiStage', () => {
             { vis__source: null, vis__count: '3', vis__revenue_and_time: '50' }
           ]
 
+        );
+      });
+    }));
+
+    it('multi stage count_distinct sum by quarter with pre-aggregation', () => compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'coach.count_distinct__sum_by_quarter'
+        ],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      const sqlAndParams = query.buildSqlAndParams();
+      expect(preAggregationsDescription[0].tableName).toEqual('coach_main');
+      expect(sqlAndParams[0]).toContain('coach_main');
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            { coach__count_distinct__sum_by_quarter: '28' },
+          ]
         );
       });
     }));

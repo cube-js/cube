@@ -325,7 +325,7 @@ describe('DataSchemaCompiler', () => {
 
     await compiler.compile();
 
-    const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
+    const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_or_on_date'].map((operator, index) => {
       const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
       return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [],

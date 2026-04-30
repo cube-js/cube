@@ -16,6 +16,7 @@ use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::Case;
 use crate::planner::sql_evaluator::CaseSwitchDefinition;
 use crate::planner::sql_evaluator::CaseSwitchItem;
+use crate::planner::sql_evaluator::MeasureKind;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
@@ -48,7 +49,7 @@ impl MultiStageQueryPlanner {
     > {
         let multi_stage_members = self
             .query_properties
-            .all_members(false)
+            .all_used_symbols()?
             .into_iter()
             .filter_map(|memb| -> Option<Result<_, CubeError>> {
                 match has_multi_stage_members(&memb, false) {
@@ -114,12 +115,10 @@ impl MultiStageQueryPlanner {
         resolved_multi_stage_dimensions: &mut HashSet<String>,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
         let inode = if let Ok(measure) = base_member.as_measure() {
-            let member_type = if measure.measure_type() == "rank" {
-                MultiStageInodeMemberType::Rank
-            } else if !measure.is_calculated() {
-                MultiStageInodeMemberType::Aggregate
-            } else {
-                MultiStageInodeMemberType::Calculate
+            let member_type = match measure.kind() {
+                MeasureKind::Rank => MultiStageInodeMemberType::Rank,
+                MeasureKind::Calculated(_) => MultiStageInodeMemberType::Calculate,
+                _ => MultiStageInodeMemberType::Aggregate,
             };
 
             let time_shift = measure.time_shift().clone();
@@ -474,13 +473,21 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
+                let base_member = MemberSymbol::new_measure(measure.new_unrolling());
+
                 if time_dimensions.is_empty() {
-                    let rolling_base = self.add_rolling_window_base(
-                        member.clone(),
-                        state.clone(),
-                        ungrouped,
-                        descriptions,
-                    )?;
+                    let base_state =
+                        self.replace_date_range_for_rolling_window(&rolling_window, state.clone())?;
+                    let rolling_base = if !measure.is_multi_stage() {
+                        self.add_rolling_window_base(base_member, base_state, false, descriptions)?
+                    } else {
+                        self.make_queries_descriptions(
+                            base_member,
+                            base_state,
+                            descriptions,
+                            resolved_multi_stage_dimensions,
+                        )?
+                    };
                     return Ok(Some(rolling_base));
                 }
                 let uniq_time_dimensions = time_dimensions
@@ -503,7 +510,6 @@ impl MultiStageQueryPlanner {
                     &rolling_window,
                     state.clone(),
                 )?;
-                let base_member = MemberSymbol::new_measure(measure.new_unrolling());
 
                 let time_series =
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?;
@@ -699,6 +705,29 @@ impl MultiStageQueryPlanner {
         }
     }
 
+    /// Adjust date range filters for rolling window when there's no granularity.
+    /// Without granularity there's no time_series CTE, so we replace InDateRange
+    /// with BeforeOrOnDate/AfterOrOnDate that use parameters directly.
+    fn replace_date_range_for_rolling_window(
+        &self,
+        rolling_window: &RollingWindow,
+        state: Rc<MultiStageAppliedState>,
+    ) -> Result<Rc<MultiStageAppliedState>, CubeError> {
+        let mut new_state = state.clone_state();
+        for filter_item in state.time_dimensions_filters() {
+            if let FilterItem::Item(filter) = filter_item {
+                if matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+                    new_state.replace_date_range_for_rolling_window_without_granularity(
+                        &filter.member_name(),
+                        &rolling_window.trailing,
+                        &rolling_window.leading,
+                    )?;
+                }
+            }
+        }
+        Ok(Rc::new(new_state))
+    }
+
     fn make_rolling_base_state(
         &self,
         time_dimension: Rc<MemberSymbol>,
@@ -739,13 +768,13 @@ impl MultiStageQueryPlanner {
         new_state.set_dimensions(dimensions);
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity);
+            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity)?;
         } else {
             new_state.replace_regular_date_range_filter(
                 &time_dimension_base_name,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
-            );
+            )?;
         }
 
         Ok((Rc::new(new_state), new_time_dimension))

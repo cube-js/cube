@@ -36,13 +36,6 @@ impl SqlNode for CalendarTimeShiftSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let input = self.input.to_sql(
-            visitor,
-            node,
-            query_tools.clone(),
-            node_processor.clone(),
-            templates,
-        )?;
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() {
@@ -55,20 +48,52 @@ impl SqlNode for CalendarTimeShiftSqlNode {
                                 templates,
                             )?
                         } else if let Some(interval) = &shift.interval {
+                            let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                            let input = self.input.to_sql(
+                                &inner_visitor,
+                                node,
+                                query_tools.clone(),
+                                node_processor.clone(),
+                                templates,
+                            )?;
                             let res = templates
                                 .add_timestamp_interval(input, interval.inverse().to_sql())?;
                             format!("({})", res)
                         } else {
-                            input
+                            self.input.to_sql(
+                                visitor,
+                                node,
+                                query_tools.clone(),
+                                node_processor.clone(),
+                                templates,
+                            )?
                         }
                     } else {
-                        input
+                        self.input.to_sql(
+                            visitor,
+                            node,
+                            query_tools.clone(),
+                            node_processor.clone(),
+                            templates,
+                        )?
                     }
                 } else {
-                    input
+                    self.input.to_sql(
+                        visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )?
                 }
             }
-            _ => input,
+            _ => self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?,
         };
         Ok(res)
     }

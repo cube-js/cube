@@ -26,23 +26,6 @@ Relevant environment variables: <EnvVar>CUBEJS_API_SECRET</EnvVar>, <EnvVar>CUBE
 Cube allows you to provide your own JWT verification logic. You can use the
 [`check_auth`][ref-config-check-auth] configuration option to verify a JWT and set the security context.
 
-For example, if you needed to retrieve user information from an LDAP server,
-you might do the following:
-
-```javascript
-module.exports = {
-  checkAuth: async (req, auth) => {
-    try {
-      const userInfo = await getUserFromLDAP(req.get("X-LDAP-User-ID"))
-      return { security_context: userInfo }
-    }
-    catch {
-      throw new Error("Could not authenticate user from LDAP")
-    }
-  }
-}
-```
-
 A typical use case would be:
 
 1.  A web server serves a page which needs to communicate with the Cube API.

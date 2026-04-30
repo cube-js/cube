@@ -1,0 +1,89 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+          - name: full_location
+            type: string
+            sql: "CONCAT({CUBE}.name, ' from ', {CUBE}.city)"
+      measures:
+          - name: count
+            type: count
+      segments:
+          - name: sf_customers
+            sql: "{CUBE}.city = 'San Francisco'"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: amount
+            type: number
+            sql: amount
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: updated_at
+            type: time
+            sql: updated_at
+          - name: amount_tier
+            type: string
+            sql: "CASE WHEN {CUBE}.amount >= 200 THEN 'high' WHEN {CUBE}.amount >= 75 THEN 'medium' ELSE 'low' END"
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: avg_amount
+            type: avg
+            sql: amount
+          - name: min_amount
+            type: min
+            sql: amount
+          - name: max_amount
+            type: max
+            sql: amount
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+          - name: unique_statuses
+            type: count_distinct
+            sql: status
+          - name: approx_unique_customers
+            type: countDistinctApprox
+            sql: customer_id
+          - name: avg_order_value
+            type: number
+            sql: "{orders.total_amount} / {orders.count}"
+          - name: min_created_at
+            type: min
+            sql: created_at
+          - name: status_summary
+            type: string
+            sql: "CASE WHEN {orders.count} > 3 THEN 'high' ELSE 'low' END"
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"

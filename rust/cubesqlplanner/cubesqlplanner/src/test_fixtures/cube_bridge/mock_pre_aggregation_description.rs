@@ -2,7 +2,9 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::{
     PreAggregationDescription, PreAggregationDescriptionStatic,
 };
+use crate::cube_bridge::pre_aggregation_time_dimension::PreAggregationTimeDimension;
 use crate::impl_static_data;
+use crate::test_fixtures::cube_bridge::mock_pre_aggregation_time_dimension::MockPreAggregationTimeDimension;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -28,8 +30,12 @@ pub struct MockPreAggregationDescription {
     dimension_references: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = time_dimension_reference_opt)))]
     time_dimension_reference: Option<Rc<dyn MemberSql>>,
+    #[builder(default, setter(strip_option(fallback = segment_references_opt)))]
+    segment_references: Option<Rc<dyn MemberSql>>,
     #[builder(default, setter(strip_option(fallback = rollup_references_opt)))]
     rollup_references: Option<Rc<dyn MemberSql>>,
+    #[builder(default)]
+    time_dimension_references: Option<Vec<Rc<MockPreAggregationTimeDimension>>>,
 }
 
 impl_static_data!(
@@ -70,12 +76,37 @@ impl PreAggregationDescription for MockPreAggregationDescription {
         Ok(self.time_dimension_reference.clone())
     }
 
+    fn has_segment_references(&self) -> Result<bool, CubeError> {
+        Ok(self.segment_references.is_some())
+    }
+
+    fn segment_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+        Ok(self.segment_references.clone())
+    }
+
     fn has_rollup_references(&self) -> Result<bool, CubeError> {
         Ok(self.rollup_references.is_some())
     }
 
     fn rollup_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
         Ok(self.rollup_references.clone())
+    }
+
+    fn has_time_dimension_references(&self) -> Result<bool, CubeError> {
+        Ok(self.time_dimension_references.is_some())
+    }
+
+    fn time_dimension_references(
+        &self,
+    ) -> Result<Option<Vec<Rc<dyn PreAggregationTimeDimension>>>, CubeError> {
+        match &self.time_dimension_references {
+            Some(refs) => Ok(Some(
+                refs.iter()
+                    .map(|r| r.clone() as Rc<dyn PreAggregationTimeDimension>)
+                    .collect(),
+            )),
+            None => Ok(None),
+        }
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
