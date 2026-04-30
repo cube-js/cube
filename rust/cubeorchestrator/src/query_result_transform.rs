@@ -393,73 +393,112 @@ pub fn get_compact_row(
     Ok(row)
 }
 
+/// Per-column information that is constant across all rows for a given request.
+/// Built once and walked per row to avoid redoing hash lookups, annotation checks,
+/// and member-name parsing for every cell.
+pub struct VanillaColumnPlan<'a> {
+    column_index: usize,
+    member_name: &'a str,
+    member_type: &'a str,
+    granularity_track: Option<VanillaGranularityTrack<'a>>,
+}
+
+pub struct VanillaGranularityTrack<'a> {
+    /// Slice of `member_name` containing only the `{cube}.{dim}` prefix.
+    base_member: &'a str,
+    level: u8,
+}
+
+pub fn build_vanilla_column_plan<'a>(
+    columns_pos: &'a IndexMap<String, usize>,
+    alias_to_member_name_map: &'a HashMap<String, String>,
+    annotation: &'a HashMap<String, ConfigItem>,
+    query: &NormalizedQuery,
+) -> Result<Vec<VanillaColumnPlan<'a>>> {
+    let mut plans = Vec::with_capacity(columns_pos.len());
+    for (alias, &index) in columns_pos {
+        let member_name = match alias_to_member_name_map.get(alias) {
+            Some(m) => m.as_str(),
+            None => bail!("Missing member name for alias: {}", alias),
+        };
+        ensure_member_in_annotation(member_name, annotation)?;
+        let annotation_for_member = annotation.get(member_name).unwrap();
+        let member_type = annotation_for_member.member_type.as_deref().unwrap_or("");
+
+        // Handle deprecated time dimensions without granularity.
+        // Try to collect minimal granularity value for time dimensions without granularity
+        // as there might be more than one granularity column for the same dimension.
+        let granularity_track = compute_vanilla_granularity_track(member_name, query);
+
+        plans.push(VanillaColumnPlan {
+            column_index: index,
+            member_name,
+            member_type,
+            granularity_track,
+        });
+    }
+    Ok(plans)
+}
+
+// FIXME: For now custom granularities are not supported, only common ones.
+// There is no granularity type/class implementation in rust yet.
+fn compute_vanilla_granularity_track<'a>(
+    member_name: &'a str,
+    query: &NormalizedQuery,
+) -> Option<VanillaGranularityTrack<'a>> {
+    // Require exactly two `.` separators — i.e. the `{cube}.{dim}.{granularity}` form.
+    let mut indices = member_name.match_indices(MEMBER_SEPARATOR);
+    indices.next()?;
+
+    let second = indices.next()?.0;
+    if indices.next().is_some() {
+        return None;
+    }
+
+    let base_member = &member_name[..second];
+    let granularity = &member_name[second + MEMBER_SEPARATOR.len()..];
+
+    // Check that a member without granularity is absent in the query
+    let already_requested = query.dimensions.as_ref().is_some_and(|dims| {
+        dims.iter()
+            .any(|dim| matches!(dim, MemberOrMemberExpression::Member(s) if s == base_member))
+    });
+    if already_requested {
+        return None;
+    }
+
+    let level = GRANULARITY_LEVELS
+        .get(granularity)
+        .cloned()
+        .unwrap_or(DEFAULT_LEVEL_FOR_UNKNOWN);
+    Some(VanillaGranularityTrack { base_member, level })
+}
+
 /// Convert DB response object to the vanilla output format.
 pub fn get_vanilla_row(
-    alias_to_member_name_map: &HashMap<String, String>,
-    annotation: &HashMap<String, ConfigItem>,
+    plan: &[VanillaColumnPlan<'_>],
     query_type: &QueryType,
     query: &NormalizedQuery,
     db_row: &[DBResponseValue],
-    columns_pos: &IndexMap<String, usize>,
 ) -> Result<IndexMap<String, DBResponsePrimitive>> {
-    let mut row = IndexMap::new();
+    // +1 to cover the optional tail entry (compareDateRange / blending key).
+    let mut row = IndexMap::with_capacity(plan.len() + 1);
 
     // FIXME: For now custom granularities are not supported, only common ones.
     // There is no granularity type/class implementation in rust yet.
-    let mut minimal_granularities: HashMap<String, (u8, DBResponsePrimitive)> = HashMap::new();
+    let mut minimal_granularities: HashMap<&str, (u8, DBResponsePrimitive)> = HashMap::new();
 
-    for (alias, &index) in columns_pos {
-        if let Some(value) = db_row.get(index) {
-            let member_name = match alias_to_member_name_map.get(alias) {
-                Some(m) => m,
-                None => {
-                    bail!("Missing member name for alias: {}", alias);
-                }
-            };
+    for column in plan {
+        if let Some(value) = db_row.get(column.column_index) {
+            let transformed_value = transform_value(value.clone(), column.member_type);
+            row.insert(column.member_name.to_string(), transformed_value.clone());
 
-            ensure_member_in_annotation(member_name, annotation)?;
-            let annotation_for_member = annotation.get(member_name).unwrap();
-
-            let transformed_value = transform_value(
-                value.clone(),
-                annotation_for_member
-                    .member_type
-                    .as_ref()
-                    .unwrap_or(&"".to_string()),
-            );
-
-            row.insert(member_name.clone(), transformed_value.clone());
-
-            // Handle deprecated time dimensions without granularity
-            // Try to collect minimal granularity value for time dimensions without granularity
-            // as there might be more than one granularity column for the same dimension
-            let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
-            if path.len() == 3 {
-                let granularity = path[2];
-                let member_name_without_granularity =
-                    format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
-
-                // Check that a member without granularity is absent in the query
-                if query.dimensions.as_ref().map_or(true, |dims| {
-                    !dims.iter().any(|dim| {
-                        *dim == MemberOrMemberExpression::Member(
-                            member_name_without_granularity.clone(),
-                        )
-                    })
-                }) {
-                    let level = GRANULARITY_LEVELS
-                        .get(granularity)
-                        .cloned()
-                        .unwrap_or(DEFAULT_LEVEL_FOR_UNKNOWN);
-
-                    match minimal_granularities.get(&member_name_without_granularity) {
-                        Some((existing_level, _)) if *existing_level < level => {}
-                        _ => {
-                            minimal_granularities.insert(
-                                member_name_without_granularity,
-                                (level, transformed_value),
-                            );
-                        }
+            if let Some(track) = &column.granularity_track {
+                match minimal_granularities.get(track.base_member) {
+                    Some((existing_level, _)) if *existing_level < track.level => {}
+                    _ => {
+                        minimal_granularities
+                            .insert(track.base_member, (track.level, transformed_value));
                     }
                 }
             }
@@ -467,8 +506,8 @@ pub fn get_vanilla_row(
     }
 
     // Handle deprecated time dimensions without granularity
-    for (member, (_, value)) in minimal_granularities {
-        row.insert(member, value);
+    for (base_member, (_, value)) in minimal_granularities {
+        row.insert(base_member.to_string(), value);
     }
 
     match query_type {
@@ -660,19 +699,16 @@ impl TransformedData {
                 Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
+                let plan = build_vanilla_column_plan(
+                    &cube_store_result.columns_pos,
+                    alias_to_member_name_map,
+                    annotation,
+                    query,
+                )?;
                 let dataset: Vec<_> = cube_store_result
                     .rows
                     .iter()
-                    .map(|row| {
-                        get_vanilla_row(
-                            alias_to_member_name_map,
-                            annotation,
-                            query_type,
-                            query,
-                            row,
-                            &cube_store_result.columns_pos,
-                        )
-                    })
+                    .map(|row| get_vanilla_row(&plan, query_type, query, row))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(TransformedData::Vanilla(dataset))
             }
@@ -2874,14 +2910,13 @@ mod tests {
         let query = test_data.request.query.clone();
         let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
-        let res = get_vanilla_row(
-            &alias_to_member_name_map,
-            &annotation,
-            &query_type,
-            &query,
-            &raw_data.rows[0],
+        let plan = build_vanilla_column_plan(
             &raw_data.columns_pos,
+            alias_to_member_name_map,
+            annotation,
+            &query,
         )?;
+        let res = get_vanilla_row(&plan, query_type, &query, &raw_data.rows[0])?;
         let expected = IndexMap::from([
             (
                 "ECommerceRecordsUs2021.city".to_string(),
@@ -2910,17 +2945,14 @@ mod tests {
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
-        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
-        match get_vanilla_row(
-            &alias_to_member_name_map,
-            &annotation,
-            &query_type,
-            &query,
-            &raw_data.rows[0],
+        match build_vanilla_column_plan(
             &raw_data.columns_pos,
+            alias_to_member_name_map,
+            annotation,
+            &query,
         ) {
-            Ok(_) => Err(TestError("get_vanilla_row() should fail ".to_string()).into()),
+            Ok(_) => Err(TestError("build_vanilla_column_plan() should fail ".to_string()).into()),
             Err(err) => {
                 assert!(err.to_string().contains("Missing member name for alias"));
                 Ok(())
@@ -2942,17 +2974,14 @@ mod tests {
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
-        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
-        match get_vanilla_row(
-            &alias_to_member_name_map,
-            &annotation,
-            &query_type,
-            &query,
-            &raw_data.rows[0],
+        match build_vanilla_column_plan(
             &raw_data.columns_pos,
+            alias_to_member_name_map,
+            annotation,
+            &query,
         ) {
-            Ok(_) => Err(TestError("get_vanilla_row() should fail ".to_string()).into()),
+            Ok(_) => Err(TestError("build_vanilla_column_plan() should fail ".to_string()).into()),
             Err(err) => {
                 assert!(err.to_string().contains("You requested hidden member"));
                 Ok(())
@@ -3069,5 +3098,90 @@ mod tests {
         let columns = transpose_to_columns(&members, dataset);
         assert_eq!(columns.len(), 3);
         assert_eq!(columns[2], vec![DBResponsePrimitive::Null]);
+    }
+
+    fn make_query_with_dims(dimensions: Option<Vec<MemberOrMemberExpression>>) -> NormalizedQuery {
+        NormalizedQuery {
+            measures: None,
+            dimensions,
+            time_dimensions: None,
+            segments: None,
+            limit: None,
+            offset: None,
+            total: None,
+            total_query: None,
+            timezone: None,
+            renew_query: None,
+            ungrouped: None,
+            response_format: None,
+            filters: None,
+            row_limit: None,
+            order: None,
+            query_type: None,
+        }
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_none() {
+        let q = make_query_with_dims(None);
+        assert!(compute_vanilla_granularity_track("nodots", &q).is_none());
+
+        let q = make_query_with_dims(None);
+        assert!(compute_vanilla_granularity_track("Cube.dim", &q).is_none());
+
+        let q = make_query_with_dims(None);
+        assert!(compute_vanilla_granularity_track("Cube.dim.day.extra", &q).is_none());
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_known_granularity() {
+        let q = make_query_with_dims(None);
+        let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
+            .expect("should produce a track");
+        assert_eq!(track.base_member, "Cube.orderDate");
+        assert_eq!(track.level, 4);
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_levels_for_all_known_granularities() {
+        let q = make_query_with_dims(None);
+        let cases: &[(&str, u8)] = &[
+            ("Cube.t.second", 1),
+            ("Cube.t.minute", 2),
+            ("Cube.t.hour", 3),
+            ("Cube.t.day", 4),
+            ("Cube.t.week", 5),
+            ("Cube.t.month", 6),
+            ("Cube.t.quarter", 7),
+            ("Cube.t.year", 8),
+        ];
+        for (member, expected_level) in cases {
+            let track = compute_vanilla_granularity_track(member, &q)
+                .unwrap_or_else(|| panic!("expected Some for {}", member));
+            assert_eq!(
+                track.level, *expected_level,
+                "level mismatch for {}",
+                member
+            );
+            assert_eq!(track.base_member, "Cube.t");
+        }
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_skips_when_base_in_dimensions() {
+        let q = make_query_with_dims(Some(vec![MemberOrMemberExpression::Member(
+            "Cube.orderDate".to_string(),
+        )]));
+        assert!(compute_vanilla_granularity_track("Cube.orderDate.day", &q).is_none());
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_proceeds_when_other_dims_present() {
+        let q = make_query_with_dims(Some(vec![MemberOrMemberExpression::Member(
+            "Cube.other".to_string(),
+        )]));
+        let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
+            .expect("should produce a track");
+        assert_eq!(track.base_member, "Cube.orderDate");
     }
 }
