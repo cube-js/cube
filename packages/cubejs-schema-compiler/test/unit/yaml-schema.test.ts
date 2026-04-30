@@ -1200,6 +1200,313 @@ cubes:
     });
   });
 
+  describe('View groups', () => {
+    it('standalone view_groups definition', async () => {
+      const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Sales related views
+    views:
+      - revenue
+      `);
+
+      await compiler.compile();
+
+      expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        title: 'Sales',
+        description: 'Sales related views',
+        views: ['revenue'],
+      }]);
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroup).toBe('sales');
+    });
+
+    it('view_group property on individual views', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: orders
+        includes: '*'
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        views: ['revenue'],
+      }]);
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroup).toBe('sales');
+    });
+
+    it('merges standalone view_groups with view-level view_group', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: customers
+    sql_table: customers
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+  - name: customers_view
+    cubes:
+      - join_path: customers
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Sales related views
+    views:
+      - customers_view
+      `);
+
+      await compiler.compile();
+
+      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      expect(salesGroup).toBeDefined();
+      expect(salesGroup?.title).toBe('Sales');
+      expect(salesGroup?.description).toBe('Sales related views');
+      expect(salesGroup?.views).toContain('customers_view');
+      expect(salesGroup?.views).toContain('revenue');
+    });
+
+    it('multiple view_groups', async () => {
+      const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: users
+    sql_table: users
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+  - name: users_view
+    cubes:
+      - join_path: users
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    views:
+      - revenue
+  - name: people
+    title: People
+    description: People related views
+    views:
+      - users_view
+      `);
+
+      await compiler.compile();
+
+      expect(viewGroupEvaluator.viewGroupList).toEqual(['sales', 'people']);
+      expect(metaTransformer.viewGroups).toHaveLength(2);
+
+      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      expect(salesGroup?.title).toBe('Sales');
+      expect(salesGroup?.views).toEqual(['revenue']);
+
+      const peopleGroup = metaTransformer.viewGroups.find(g => g.name === 'people');
+      expect(peopleGroup?.title).toBe('People');
+      expect(peopleGroup?.description).toBe('People related views');
+      expect(peopleGroup?.views).toEqual(['users_view']);
+    });
+
+    it('detects duplicate view group names', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+view_groups:
+  - name: sales
+    views:
+      - some_view
+  - name: sales
+    views:
+      - other_view
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate view group name 'sales'");
+      }
+    });
+
+    it('empty view_groups section', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+view_groups:
+      `);
+
+      await compiler.compile();
+      expect(metaTransformer.viewGroups).toEqual([]);
+    });
+
+    it('view_group without title or description', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    views:
+      - revenue
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        views: ['revenue'],
+      }]);
+    });
+
+    it('cubes are not assigned to view groups', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    views:
+      - revenue
+      `);
+
+      await compiler.compile();
+
+      const ordersCube = metaTransformer.cubes.find(c => c.config.name === 'orders');
+      expect(ordersCube?.config.viewGroup).toBeUndefined();
+    });
+  });
+
   describe('Mask SQL with shorthand', () => {
     it('userAttributes shorthand in mask sql should compile and resolve', async () => {
       const compilers = prepareYamlCompiler(`
