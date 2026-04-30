@@ -1,7 +1,7 @@
 ---
 title: Connecting to your VPC using AWS PrivateLink
 sidebarTitle: AWS PrivateLink
-description: How to expose an AWS endpoint service and coordinate PrivateLink so Cube dedicated infrastructure reaches your VPC privately.
+description: How to expose an AWS endpoint service and coordinate PrivateLink so Cube single-tenant infrastructure reaches your VPC privately.
 ---
 
 [AWS PrivateLink][aws-docs-private-link] provides private connectivity between virtual private clouds (VPCs), supported services and resources, and your on-premises networks, without exposing your traffic to the public internet.
@@ -36,8 +36,8 @@ To request establishing a PrivateLink connection, please share the following inf
 - **Ports**: a list of ports that will be accessed through this connection
 - **DNS Name** (optional): an internal DNS name of the upstream service in case SSL needs to be supported
 - **Dedicated Infrastructure Region:** VPC Peering requires Cube to be hosted in
-    [dedicated infrastructure][dedicated-infra]. Please specify what region the Cube Cloud
-    dedicated infrastructure should be hosted in.
+    [single-tenant infrastructure][dedicated-infra]. Please specify what region the Cube Cloud
+    single-tenant infrastructure should be hosted in.
 
 
 If a DNS name is provided, an internal DNS record will be created pointing at the established PrivateLink
