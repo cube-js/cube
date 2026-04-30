@@ -86,6 +86,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
         {
           config: {
             name: 'Foo',
+            type: 'cube',
             description: 'cube from compilerApi mock',
             measures: [
               {
@@ -126,8 +127,36 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             ],
           },
         },
+        {
+          config: {
+            name: 'FooView',
+            type: 'view',
+            description: 'view from compilerApi mock',
+            viewGroup: 'analytics',
+            measures: [
+              {
+                name: 'FooView.bar',
+                isVisible: true,
+              },
+            ],
+            dimensions: [
+              {
+                name: 'FooView.id',
+                isVisible: true,
+              },
+            ],
+            segments: [],
+          },
+        },
       ],
-      viewGroups: [],
+      viewGroups: [
+        {
+          name: 'analytics',
+          title: 'Analytics',
+          description: 'Analytics related views',
+          views: ['FooView'],
+        },
+      ],
     };
   },
 
