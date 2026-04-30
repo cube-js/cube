@@ -30,6 +30,26 @@ When describing plan availability:
   Enterprise. Use "Enterprise plan" (singular) instead.
 - For Enterprise-only features that require an additional purchase, use
   "Available as an add-on on the [Enterprise plan]".
+- For features that depend on another add-on, name the dependency:
+  "Available on the [Enterprise plan] with the [Single-tenant infrastructure]
+  add-on."
+
+## Plan availability callouts
+
+Use Mintlify's `<Note>` (gray) component — **not** `<Info>` (blue) — for
+plan-availability messages. `<Info>` is the catch-all blue callout used
+heavily throughout the docs for general "by the way" notes; using a different
+color for plan gating makes it visually distinct and scannable.
+
+```mdx
+<Note>
+
+Available on the [Enterprise plan](https://cube.dev/pricing).
+
+</Note>
+```
+
+Place the callout immediately after the section heading it applies to.
 
 # Infrastructure Naming
 
