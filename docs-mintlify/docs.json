@@ -304,8 +304,8 @@
             "pages": [
               "admin/deployment/index",
               "admin/deployment/deployment-types",
-              "admin/deployment/infrastructure",
               "admin/deployment/environments",
+              "admin/deployment/infrastructure",
               "admin/deployment/continuous-deployment",
               "admin/deployment/custom-domains",
               "admin/deployment/warm-up",
