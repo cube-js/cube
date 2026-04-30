@@ -971,6 +971,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       // eslint-disable-next-line no-new-func
       const sql = new Function(path[0], `return \`\${${memberRef.member}}\`;`);
       let memberDefinition;
+      const propagatedCurrency = memberRef.override?.currency || resolvedMember.currency;
       if (type === 'measures') {
         memberDefinition = {
           sql,
@@ -980,7 +981,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           title: memberRef.override?.title || resolvedMember.title,
           description: memberRef.override?.description || resolvedMember.description,
           format: memberRef.override?.format || resolvedMember.format,
-          currency: memberRef.override?.currency || resolvedMember.currency,
+          ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
@@ -996,7 +997,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           title: memberRef.override?.title || resolvedMember.title,
           description: memberRef.override?.description || resolvedMember.description,
           format: memberRef.override?.format || resolvedMember.format,
-          currency: memberRef.override?.currency || resolvedMember.currency,
+          ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
