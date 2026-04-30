@@ -409,9 +409,6 @@ pub(crate) struct VanillaGranularityTrack<'a> {
     level: u8,
 }
 
-/// Plan for the entire vanilla transform: per-column entries plus a flag
-/// telling `get_vanilla_row` whether any column requires the
-/// minimal-granularity bookkeeping path.
 pub struct VanillaPlan<'a> {
     columns: Vec<VanillaColumnPlan<'a>>,
     has_granularity_tracking: bool,
@@ -425,6 +422,7 @@ pub fn build_vanilla_plan<'a>(
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
     let mut has_granularity_tracking = false;
+
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
             Some(m) => m.as_str(),
@@ -449,6 +447,7 @@ pub fn build_vanilla_plan<'a>(
             granularity_track,
         });
     }
+
     Ok(VanillaPlan {
         columns,
         has_granularity_tracking,
