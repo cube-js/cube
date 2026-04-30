@@ -83,11 +83,11 @@ Object {
       "format": Object {
         "alias": "id",
         "type": "custom-numeric",
-        "value": ".0~f",
+        "value": ".0f",
       },
       "formatDescription": Object {
         "name": "id",
-        "specifier": ".0~f",
+        "specifier": ".0f",
       },
     },
     "rate_percent": Object {

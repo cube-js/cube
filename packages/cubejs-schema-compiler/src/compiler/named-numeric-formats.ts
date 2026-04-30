@@ -8,7 +8,7 @@
 // zeros — the precision is an upper bound, not a fixed digit count.
 export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   // number: grouped fixed-point
-  number_0: ',.0~f',
+  number_0: ',.0f',
   number_1: ',.1~f',
   number_2: ',.2~f',
   number_3: ',.3~f',
@@ -17,7 +17,7 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   number_6: ',.6~f',
 
   // percent: .X%
-  percent_0: '.0~%',
+  percent_0: '.0%',
   percent_1: '.1~%',
   percent_2: '.2~%',
   percent_3: '.3~%',
@@ -26,7 +26,7 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   percent_6: '.6~%',
 
   // currency: $,.Xf
-  currency_0: '$,.0~f',
+  currency_0: '$,.0f',
   currency_1: '$,.1~f',
   currency_2: '$,.2~f',
   currency_3: '$,.3~f',
@@ -37,7 +37,7 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   // decimal (Looker compat, same as number): ,.Xf
   // Alias to decimal_2
   decimal: ',.2~f',
-  decimal_0: ',.0~f',
+  decimal_0: ',.0f',
   decimal_1: ',.1~f',
   decimal_2: ',.2~f',
   decimal_3: ',.3~f',
@@ -57,12 +57,12 @@ export const NAMED_NUMERIC_FORMATS: Record<string, string> = {
   abbr_6: '.6~s',
 
   // id: grouped integer (no decimals)
-  id: '.0~f',
+  id: '.0f',
 
   // accounting (negative in parens): (,.Xf
   // Alias to accounting_2
   accounting: '(,.2~f',
-  accounting_0: '(,.0~f',
+  accounting_0: '(,.0f',
   accounting_1: '(,.1~f',
   accounting_2: '(,.2~f',
   accounting_3: '(,.3~f',
@@ -87,7 +87,7 @@ export const STANDARD_FORMAT_SPECIFIERS: Record<string, { name: string; specifie
   number: { name: 'number', specifier: ',.2~f' },
   abbr: { name: 'abbr', specifier: '.2~s' },
   accounting: { name: 'accounting', specifier: '(,.2~f' },
-  id: { name: 'id', specifier: '.0~f' },
+  id: { name: 'id', specifier: '.0f' },
 };
 
 export const DEFAULT_FORMAT_SPECIFIER: { name: string; specifier: string } = {

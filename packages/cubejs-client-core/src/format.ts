@@ -12,7 +12,7 @@ const DEFAULT_NUMBER_FORMAT = ',.2~f';
 const DEFAULT_CURRENCY_FORMAT = '$,.2~f';
 const DEFAULT_PERCENT_FORMAT = '.2~%';
 
-const DEFAULT_ID_FORMAT = '.0~f';
+const DEFAULT_ID_FORMAT = '.0f';
 
 function detectLocale() {
   try {
