@@ -5,6 +5,12 @@ title: Overview
 
 Every Cube deployment ships with an agent that powers AI features such as [Analytics Chat](/docs/explore-analyze/analytics-chat). You can customize the agent's behavior with rules, certified queries, accessible views, model selection, and memory configuration.
 
+<Warning>
+  Configuring the agent in the UI is **deprecated** in favor of code-first configuration. Cube version 1.6.5 or above is required.
+
+  Deployments created after **April 30, 2026** have code-first agent configuration enabled by default. Existing deployments need to opt in by setting `CUBE_CLOUD_AGENTS_CONFIG_ENABLED=true`. The directory path defaults to `agents` and can be overridden with `CUBE_CLOUD_AGENTS_CONFIG_PATH`.
+</Warning>
+
 ## Agent configuration
 
 Agent configuration lives in your **Cube data model repository**, alongside your cubes and views. Configuration is defined as YAML and Markdown files under an `agents/` directory in your project:
@@ -24,10 +30,6 @@ your-cube-project/
 ```
 
 Storing configuration as code in your repository enables version control, code review, and consistent behavior across environments.
-
-<Info>
-  Cube version 1.6.5 or above is required. Agent configuration is enabled by setting `CUBE_CLOUD_AGENTS_CONFIG_ENABLED=true`. The directory path defaults to `agents` and can be overridden with `CUBE_CLOUD_AGENTS_CONFIG_PATH`.
-</Info>
 
 ## Configure the agent
 
