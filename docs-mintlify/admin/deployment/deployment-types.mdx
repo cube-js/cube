@@ -27,6 +27,15 @@ Shared deployments run on compute shared with other deployments within the
 selected region, which keeps the cost low but means resources aren't reserved
 for you exclusively.
 
+<Note>
+
+If your account uses [dedicated infrastructure][ref-dedicated-infra], Shared
+deployments are only shared with your other deployments on that infrastructure
+— never with other customers. Your environment remains fully isolated at the
+infrastructure level.
+
+</Note>
+
 Shared deployments are designed for development use cases only. This makes
 it easy to get started with Cube quickly, and also allows you to build and
 query pre-aggregations on-demand.
@@ -154,3 +163,4 @@ and select from the available options.
 [ref-multitenancy]: /embedding/multitenancy
 [ref-auto-sus]: /docs/deployment/cloud/auto-suspension
 [ref-refresh-worker]: /cube-core/architecture#refresh-worker
+[ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
