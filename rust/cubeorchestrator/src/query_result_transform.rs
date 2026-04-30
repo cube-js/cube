@@ -403,7 +403,7 @@ pub struct VanillaColumnPlan<'a> {
     granularity_track: Option<VanillaGranularityTrack<'a>>,
 }
 
-pub struct VanillaGranularityTrack<'a> {
+pub(crate) struct VanillaGranularityTrack<'a> {
     /// Slice of `member_name` containing only the `{cube}.{dim}` prefix.
     base_member: &'a str,
     level: u8,
