@@ -266,7 +266,7 @@ pub fn get_members(
         let calc_member = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
 
         if path.len() == 3
-            && query.dimensions.as_ref().map_or(true, |dims| {
+            && query.dimensions.as_ref().is_none_or(|dims| {
                 !dims
                     .iter()
                     .any(|dim| *dim == MemberOrMemberExpression::Member(calc_member.clone()))
@@ -2198,7 +2198,7 @@ mod tests {
         test_data
             .request
             .alias_to_member_name_map
-            .remove(&"e_commerce_records_us2021__avg_discount".to_string());
+            .remove("e_commerce_records_us2021__avg_discount");
         test_data.request.res_type = Some(ResultType::Compact);
         let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         match TransformedData::transform(&test_data.request, &raw_data) {
@@ -2250,7 +2250,7 @@ mod tests {
         test_data
             .request
             .alias_to_member_name_map
-            .remove(&"e_commerce_records_us2021__avg_discount".to_string());
+            .remove("e_commerce_records_us2021__avg_discount");
         test_data.request.res_type = Some(ResultType::Default);
         let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         match TransformedData::transform(&test_data.request, &raw_data) {
@@ -2693,8 +2693,8 @@ mod tests {
         )?;
         let res = get_compact_row(
             &members_to_alias_map,
-            &annotation,
-            &query_type,
+            annotation,
+            query_type,
             &members,
             Some(time_dimensions),
             &raw_data.rows[0],
@@ -2742,8 +2742,8 @@ mod tests {
         )?;
         let res = get_compact_row(
             &members_to_alias_map,
-            &annotation,
-            &query_type,
+            annotation,
+            query_type,
             &members,
             Some(time_dimensions),
             &raw_data.rows[0],
@@ -2791,8 +2791,8 @@ mod tests {
         )?;
         let res = get_compact_row(
             &members_to_alias_map,
-            &annotation,
-            &query_type,
+            annotation,
+            query_type,
             &members,
             Some(time_dimensions),
             &raw_data.rows[0],
@@ -2827,8 +2827,8 @@ mod tests {
 
         let res = get_compact_row(
             &members_to_alias_map,
-            &annotation,
-            &query_type,
+            annotation,
+            query_type,
             &members,
             Some(time_dimensions),
             &raw_data.rows[1],
@@ -2889,8 +2889,8 @@ mod tests {
         )?;
         let res = get_compact_row(
             &members_to_alias_map,
-            &annotation,
-            &query_type,
+            annotation,
+            query_type,
             &members,
             Some(time_dimensions),
             &raw_data.rows[0],
@@ -2965,7 +2965,7 @@ mod tests {
         test_data
             .request
             .alias_to_member_name_map
-            .remove(&"e_commerce_records_us2021__avg_discount".to_string());
+            .remove("e_commerce_records_us2021__avg_discount");
         let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
@@ -2994,7 +2994,7 @@ mod tests {
         test_data
             .request
             .annotation
-            .remove(&"ECommerceRecordsUs2021.avg_discount".to_string());
+            .remove("ECommerceRecordsUs2021.avg_discount");
         let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;

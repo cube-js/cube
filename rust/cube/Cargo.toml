@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+    "cubenativeutils",
+    "cubeshared",
+    "cubeorchestrator",
+    "cubesqlplanner/cubesqlplanner",
+    "cubesqlplanner/nativebridge",
+]
