@@ -1,3 +1,5 @@
+import { pad2, pad3, pad4 } from '@cubejs-backend/shared';
+
 /** OID 1082 — Postgres emits `YYYY-MM-DD`. */
 export const dateTypeParser = (val: string): string => `${val}T00:00:00.000`;
 
@@ -10,28 +12,6 @@ export const timestampTypeParser = (val: string): string => {
   // val[19] is '.'; pad / truncate fractional digits to exactly 3.
   const ms = `${val.slice(20, 23)}00`.slice(0, 3);
   return `${val.slice(0, 10)}T${val.slice(11, 19)}.${ms}`;
-};
-
-// Hand-rolled zero-padders for the TIMESTAMPTZ hot path. `String(n).padStart`
-// allocates an extra intermediate string per call; with six pad calls per value
-// that measured ~15–20% slower in our microbenchmark than these range-checked
-// template literals, so we keep the explicit versions.
-const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
-const pad3 = (n: number): string => {
-  if (n < 10) return `00${n}`;
-  if (n < 100) return `0${n}`;
-
-  return `${n}`;
-};
-const pad4 = (n: number): string => {
-  if (n < 1000) {
-    if (n < 10) return `000${n}`;
-    if (n < 100) return `00${n}`;
-
-    return `0${n}`;
-  }
-
-  return `${n}`;
 };
 
 /**

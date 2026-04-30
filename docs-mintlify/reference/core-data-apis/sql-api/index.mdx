@@ -21,7 +21,7 @@ The SQL API supports the following transports:
 | Transport | Description | When to use |
 | --- | --- | --- |
 | Postgres | Same protocol that is used by the `psql` utility and other Postgres clients | Use by default |
-| HTTP | JSON-based protocol that is also used by the [REST API][ref-rest-api] | Use when you need to run a SQL API query from an embedded analytics application and REST API is not an option |
+| HTTP | JSON-based protocol that is also used by the [REST (JSON) API][ref-rest-api] | Use when you need to run a SQL API query from an embedded analytics application and REST (JSON) API is not an option |
 
 ### Postgres protocol
 
@@ -225,7 +225,7 @@ limit.
 
 You can use the `cube_cache` session variable with the [`SET` command][ref-set-command]
 to control [in-memory cache][ref-caching] behavior.
-It works the same way as [cache control in the REST API][ref-rest-cache-control].
+It works the same way as [cache control in the REST (JSON) API][ref-rest-cache-control].
 
 Example:
 

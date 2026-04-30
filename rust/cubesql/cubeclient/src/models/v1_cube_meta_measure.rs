@@ -31,6 +31,7 @@ pub struct V1CubeMetaMeasure {
     pub format: Option<Box<models::V1CubeMetaFormat>>,
     #[serde(rename = "formatDescription", skip_serializing_if = "Option::is_none")]
     pub format_description: Option<Box<models::V1CubeMetaFormatDescription>>,
+    /// ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)
     #[serde(rename = "currency", skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
     /// When measure is defined in View, it keeps the original path: Cube.measure

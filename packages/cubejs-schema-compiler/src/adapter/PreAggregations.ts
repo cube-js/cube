@@ -94,6 +94,17 @@ export type FullPreAggregationDescription = any;
  */
 export type TransformedQuery = any;
 
+export type UsageDateRangeInfo = {
+  dateRange?: [string, string];
+};
+
+export type PreAggregationUsageInfo = {
+  cubeName: string;
+  preAggregationName: string;
+  external: boolean;
+  usages: Record<string, UsageDateRangeInfo>;
+};
+
 export class PreAggregations {
   private readonly query: BaseQuery;
 
@@ -106,6 +117,8 @@ export class PreAggregations {
   private hasCumulativeMeasuresValue: boolean = false;
 
   public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
+
+  public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
@@ -137,6 +150,10 @@ export class PreAggregations {
     const isInPreAggregationQuery = this.query.options.preAggregationQuery;
     if (!isInPreAggregationQuery) {
       const preAggregationForQuery = this.findPreAggregationForQuery();
+      // Check usageInfos after findPreAggregationForQuery (which may populate them)
+      if (this.preAggregationUsageInfos && this.preAggregationUsageInfos.length > 0) {
+        return this.preAggregationDescriptionsForUsageInfos(this.preAggregationUsageInfos);
+      }
       if (preAggregationForQuery) {
         return this.preAggregationDescriptionsFor(preAggregationForQuery);
       }
@@ -163,6 +180,48 @@ export class PreAggregations {
       return [];
     }
     return join.joins.map(j => j.originalTo).concat([join.root]);
+  }
+
+  private preAggregationDescriptionsForUsageInfos(usageInfos: PreAggregationUsageInfo[]): FullPreAggregationDescription[] {
+    return usageInfos.flatMap(usageInfo => {
+      const preAggObj = this.getRollupPreAggregationByName(usageInfo.cubeName, usageInfo.preAggregationName);
+      if (!preAggObj || !('preAggregationName' in preAggObj)) {
+        return [];
+      }
+      const foundPreAgg = preAggObj as PreAggregationForQuery;
+
+      // One description per physical pre-aggregation, with usageMapping attached
+      const descriptions = this.preAggregationDescriptionsFor(foundPreAgg);
+
+      // Compute the union of all usage date ranges so that partitions cover
+      // every usage (e.g. time_shift may require earlier partitions).
+      const mergedDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
+
+      return descriptions.map(desc => ({
+        ...desc,
+        usageMapping: usageInfo.usages,
+        ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
+      }));
+    });
+  }
+
+  private static mergeUsageDateRanges(usages: Record<string, UsageDateRangeInfo>): [string, string] | null {
+    let minDate: string | null = null;
+    let maxDate: string | null = null;
+
+    for (const usage of Object.values(usages)) {
+      if (usage.dateRange) {
+        const [from, to] = usage.dateRange;
+        if (!minDate || from < minDate) {
+          minDate = from;
+        }
+        if (!maxDate || to > maxDate) {
+          maxDate = to;
+        }
+      }
+    }
+
+    return minDate && maxDate ? [minDate, maxDate] : null;
   }
 
   private preAggregationDescriptionsFor(foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {

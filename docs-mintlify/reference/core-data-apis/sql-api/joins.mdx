@@ -85,7 +85,7 @@ in a data model while using provided cubes as [join hints][ref-join-hints].
 
 For example, the following query joins the `orders` and `products` tables under
 the hood on `orders.product_id = products.id`, exactly the same way as the
-REST API query does:
+REST (JSON) API query does:
 
 ```sql
 cube=> SELECT p.name, SUM(o.count) FROM orders o LEFT JOIN products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
@@ -114,7 +114,7 @@ cube=> SELECT p.name, sum(o.count) FROM orders o CROSS JOIN products p GROUP BY 
 ```
 
 In the resulting query plan, you won't see any joins as you can't see those for
-REST API queries either:
+REST (JSON) API queries either:
 
 ```sql
 cube=> EXPLAIN SELECT p.name, sum(o.count) FROM orders o LEFT JOIN products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;

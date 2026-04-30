@@ -56,17 +56,17 @@ compilation](#data-model-compilation).
 Also, you can use this chart to **fine-tune the
 [auto-suspension][ref-auto-sus] configuration**, e.g., by turning
 auto-suspension off or increasing the auto-suspension threshold.
-For example, the following chart shows a [Development
-Instance][ref-dev-instance] deployment that is only accessed a few times
+For example, the following chart shows a [Shared
+deployment][ref-dev-instance] that is only accessed a few times
 a day and automatically suspends after a short period of inactivity:
 
 <Frame>
   <img src="https://ucarecdn.com/9bf6760b-805c-413c-85fb-9402b48718cb/" />
 </Frame>
 
-The next chart shows a misconfigured [Production Cluster][ref-prod-cluster]
-deployment that serves the requests throughout the whole day but was
-configured to auto-suspend with a tiny threshold:
+The next chart shows a misconfigured [Dedicated
+deployment][ref-prod-cluster] that serves the requests throughout the whole
+day but was configured to auto-suspend with a tiny threshold:
 
 <Frame>
   <img src="https://ucarecdn.com/2938ff51-0699-4f60-bba6-03a0132774f0/" />
@@ -126,9 +126,9 @@ configuration** (e.g., turn it off or increase the threshold so that API
 instances suspend less frequently), **identify [multitenancy][ref-multitenancy]
 misconfiguration** (e.g., suboptimal bucketing via
 [`context_to_app_id`][ref-context-to-app-id]), or
-**consider using a [multi-cluster deployment][ref-multi-cluster]** to
-distribute requests to different tenants over a number of Production
-Cluster deployments.
+**consider using a [Multi-cluster deployment][ref-multi-cluster]** to
+distribute requests to different tenants over a number of Dedicated
+deployments.
 
 ### Cube Store
 
@@ -176,9 +176,9 @@ for queries and jobs.
 [ref-scalability-api]: /docs/deployment/cloud/scalability#auto-scaling-of-api-instances
 [ref-scalability-cube-store]: /docs/deployment/cloud/scalability#sizing-cube-store-workers
 [ref-auto-sus]: /docs/deployment/cloud/auto-suspension
-[ref-dev-instance]: /docs/deployment/cloud/deployment-types#development-instance
-[ref-prod-cluster]: /docs/deployment/cloud/deployment-types#production-cluster
-[ref-multi-cluster]: /docs/deployment/cloud/deployment-types#production-multi-cluster
+[ref-dev-instance]: /docs/deployment/cloud/deployment-types#shared
+[ref-prod-cluster]: /docs/deployment/cloud/deployment-types#dedicated
+[ref-multi-cluster]: /docs/deployment/cloud/deployment-types#multi-cluster
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-multitenancy]: /embedding/multitenancy
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id

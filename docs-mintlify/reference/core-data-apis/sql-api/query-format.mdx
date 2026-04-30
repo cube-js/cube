@@ -110,7 +110,7 @@ GROUP BY 1
 ```
 
 For this query, the SQL API would transform `SELECT` query fragments into a [regular
-query][ref-regular-queries]. It can be represented as follows in the REST API query
+query][ref-regular-queries]. It can be represented as follows in the REST (JSON) API query
 format:
 
 ```json
@@ -327,7 +327,7 @@ Automatic use of `GROUP BY` is disabled by default.
 </Warning>
 
 Whenever query pushdown is enabled, such query would run as ungrouped query.
-As with REST API such queries do not use `GROUP BY` and render measures as if those would be grouped by primary key of a cube.
+As with REST (JSON) API such queries do not use `GROUP BY` and render measures as if those would be grouped by primary key of a cube.
 
 <Warning>
 

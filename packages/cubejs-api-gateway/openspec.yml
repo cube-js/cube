@@ -390,8 +390,53 @@ components:
           type: "object"
         timeDimensions:
           type: "object"
-    V1LoadResultData:
+    V1LoadResultDataRow:
+      type: "array"
+      description: "Row-oriented (default) data format - an array of rows, each row is an object keyed by member name."
+      items:
+        type: "object"
+    V1LoadResultDataCompact:
       type: "object"
+      description: "Compact data format - a single object with the members list and a dataset of primitive arrays. Returned when `responseFormat=compact` is requested."
+      required:
+        - members
+        - dataset
+      properties:
+        members:
+          type: "array"
+          description: "Ordered list of member names that correspond to each cell position in `dataset` rows."
+          items:
+            type: "string"
+        dataset:
+          type: "array"
+          description: "Array of rows, where each row is an array of primitive values (null, boolean, number, string) aligned with `members`."
+          items:
+            type: "array"
+            items: {}
+    V1LoadResultDataColumnar:
+      type: "object"
+      description: "Columnar data format - members list paired with one primitive array per column. Returned when `responseFormat=columnar` is requested."
+      required:
+        - members
+        - columns
+      properties:
+        members:
+          type: "array"
+          description: "Ordered list of member names. Element `i` of `columns` holds the values for `members[i]` across all rows."
+          items:
+            type: "string"
+        columns:
+          type: "array"
+          description: "One array per member, in the same order as `members`. Each inner array contains the primitive value of that member for every row (null, boolean, number, string)."
+          items:
+            type: "array"
+            items: {}
+    V1LoadResultData:
+      description: "Result `data` payload. Either an array of objects keyed by member name (default); a compact `{ members, dataset }` object when `responseFormat=compact`; or a columnar `{ members, columns }` object when `responseFormat=columnar`."
+      oneOf:
+        - $ref: "#/components/schemas/V1LoadResultDataRow"
+        - $ref: "#/components/schemas/V1LoadResultDataCompact"
+        - $ref: "#/components/schemas/V1LoadResultDataColumnar"
     V1LoadResult:
       type: "object"
       required:
@@ -403,9 +448,7 @@ components:
         annotation:
           $ref: "#/components/schemas/V1LoadResultAnnotation"
         data:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/V1LoadResultData"
+          $ref: "#/components/schemas/V1LoadResultData"
         refreshKeyValues:
           type: "array"
           items:
@@ -552,6 +595,13 @@ components:
             $ref: "#/components/schemas/V1LoadRequestJoinHint"
         timezone:
           type: "string"
+        responseFormat:
+          type: "string"
+          description: "Output format of the result `data` payload. `default` returns row-oriented data (`V1LoadResultDataRow`); `compact` returns a `{ members, dataset }` object with rows of primitive arrays (`V1LoadResultDataCompact`); `columnar` returns a `{ members, columns }` object with one primitive array per member (`V1LoadResultDataColumnar`)."
+          enum:
+            - default
+            - compact
+            - columnar
     V1LoadRequest:
       type: "object"
       properties:

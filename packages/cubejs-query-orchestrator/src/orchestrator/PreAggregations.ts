@@ -149,6 +149,7 @@ export type LoadPreAggregationResult = {
   rollupLambdaId?: string;
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
+  usageTargetTableNames?: Record<string, string>;
 };
 
 export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
@@ -192,6 +193,7 @@ export type PreAggregationDescription = {
   sealAt?: string;
   rollupLambdaId?: string;
   lastRollupLambda?: boolean;
+  usageMapping?: Record<string, { dateRange?: QueryDateRange }>;
 };
 
 export const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -570,10 +572,22 @@ export class PreAggregations {
             );
           }
 
-          return [p.tableName, usedPreAggregation];
+          return [p.tableName, usedPreAggregation] as PreAggregationTableToTempTable;
         };
 
-        return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
+        return preAggregationPromise().then(([tableName, result]) => {
+          const { usageTargetTableNames } = result;
+          if (usageTargetTableNames && Object.keys(usageTargetTableNames).length > 0) {
+            const entries: PreAggregationTableToTempTable[] = Object.entries(usageTargetTableNames).map(
+              ([suffix, usageTarget]) => [
+                `${tableName}${suffix}`,
+                { ...result, targetTableName: usageTarget, usageTargetTableNames: undefined },
+              ]
+            );
+            return preAggregationsTablesToTempTables.concat(entries);
+          }
+          return preAggregationsTablesToTempTables.concat([[tableName, result]]);
+        });
       }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
 
     return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => ({

@@ -1,6 +1,6 @@
 ---
 title: Querying data APIs
-description: Cross-cutting query behavior in Cube—default ordering and limits, query kinds, and how REST, GraphQL, and SQL APIs interpret them.
+description: Cross-cutting query behavior in Cube—default ordering and limits, query kinds, and how REST (JSON), GraphQL, and SQL APIs interpret them.
 ---
 
 After creating a [data model][ref-data-model], you would like to *ask questions
@@ -16,7 +16,7 @@ The following defaults apply to all queries run by Cube.
 
 ### Order
 
-By default, for [REST API][ref-rest-api] and [GraphQL API][ref-graphql-api]
+By default, for [REST (JSON) API][ref-rest-api] and [GraphQL API][ref-graphql-api]
 queries, Cube will apply ordering to [any query](#query-types) that does not
 set it explicitly. The default heuristics are to sort the result set by a time
 dimension, if any; otherwise, sort it by the first measure, if any; otherwise,
@@ -55,7 +55,7 @@ filters) are in the [UTC time zone][wiki-utc-time-zone]. Similarly, it will use
 the same time zone for time dimension values in result sets. You can use the
 [`CUBEJS_DEFAULT_TIMEZONE`](/reference/configuration/environment-variables#cubejs_default_timezone) environment variable to override it.
 
-You can also use the `timezone` option with [REST API][ref-rest-api-query-format-options]
+You can also use the `timezone` option with [REST (JSON) API][ref-rest-api-query-format-options]
 or [GraphQL API][ref-ref-graphql-api-args] to specify the time zone for a query.
 Also, you can use the [`SQL_UTILS` context variable][ref-sql-utils] to apply the
 time zone conversion to dimensions that are not used as time dimensions in a query.
@@ -70,12 +70,12 @@ and the sections below for details on each query type.
 
 | Query type | Supported by [APIs][ref-apis] | Supported in [Playground][ref-playground] |
 | --- | --- | --- |
-| [Regular query](#regular-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api], [GraphQL API][ref-graphql-api] | ✅ Yes |
+| [Regular query](#regular-query) | [SQL API][ref-sql-api], [REST (JSON) API][ref-rest-api], [GraphQL API][ref-graphql-api] | ✅ Yes |
 | [Query with post-processing](#query-with-post-processing) | [SQL API][ref-sql-api] only | ❌ No |
 | [Query with pushdown](#query-with-pushdown) | [SQL API][ref-sql-api] only | ❌ No |
-| [Compare date range query](#compare-date-range-query) | [REST API][ref-rest-api] only | ❌ No |
-| [Total query](#total-query) | [REST API][ref-rest-api] only | ❌ No |
-| [Ungrouped query](#ungrouped-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api], [GraphQL API][ref-graphql-api] | ❌ No |
+| [Compare date range query](#compare-date-range-query) | [REST (JSON) API][ref-rest-api] only | ❌ No |
+| [Total query](#total-query) | [REST (JSON) API][ref-rest-api] only | ❌ No |
+| [Ungrouped query](#ungrouped-query) | [SQL API][ref-sql-api], [REST (JSON) API][ref-rest-api], [GraphQL API][ref-graphql-api] | ❌ No |
 
 ### Regular query
 
@@ -112,7 +112,7 @@ GROUP BY 1, 2, 3
 LIMIT 10;
 ```
 
-The same query using the REST API syntax looks as follows:
+The same query using the REST (JSON) API syntax looks as follows:
 
 ```json
 {
@@ -304,7 +304,7 @@ However, unlike regular queries, they provide a convenient way to retrieve
 measure values for *more than one date range* for a time dimension.
 
 You can make a compare date range query by using the `compareDateRange`
-option with the [REST API][ref-rest-api-query-format-options-tdf]. Note that
+option with the [REST (JSON) API][ref-rest-api-query-format-options-tdf]. Note that
 you also need to set the `queryType` parameter of the [`/v1/load`
 endpoint][ref-rest-api-load] to `multi`.
 
@@ -365,7 +365,7 @@ grouping. Measures will be rendered as their `sql` without any aggregation.
 Time dimensions will be truncated by granularity as usual, however, not grouped by.
 
 You can make a regular query ungrouped by using the `ungrouped` option with
-[REST API][ref-rest-api-query-format-options] or [GraphQL API][ref-ref-graphql-api-args].
+[REST (JSON) API][ref-rest-api-query-format-options] or [GraphQL API][ref-ref-graphql-api-args].
 For the [SQL API][ref-sql-api], you can omit the `GROUP BY` statement from the
 SQL API query.
 

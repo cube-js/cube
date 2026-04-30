@@ -1059,6 +1059,77 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  /**
+   * Group-based conditional row filtering test.
+   *
+   * A view (region_test_view) wraps the region_test cube (backed by
+   * line_items). A single access policy for "user_group" uses conditions
+   * to check security_context.auth.groups for "region_group" membership:
+   *   - If groups.includes('region_group') is true, the first policy
+   *     matches and filters rows by product_id using allowedProductIds.
+   *   - If !groups.includes('region_group'), the second policy matches
+   *     and grants allowAll.
+   *
+   * The conditions are mutually exclusive (includes vs !includes) so
+   * only one policy matches per user, avoiding the union-overlap
+   * problem. A user with both user_group and region_group is correctly
+   * filtered because the condition on the first policy evaluates to
+   * true, and the condition on the second evaluates to false.
+   *
+   * Two users:
+   *   - region_user: groups = ['user_group', 'region_group'],
+   *     allowedProductIds = [1, 2]
+   *     → sees only rows with product_id in [1, 2]
+   *   - region_user_no_filter: groups = ['user_group']
+   *     → sees all rows
+   */
+  describe('RBAC via SQL API region group conditional row filter', () => {
+    let regionConn: PgClient;
+    let noFilterConn: PgClient;
+
+    beforeAll(async () => {
+      regionConn = await createPostgresClient('region_user', 'region_user_password');
+      noFilterConn = await createPostgresClient('region_user_no_filter', 'region_user_no_filter_password');
+    });
+
+    afterAll(async () => {
+      await regionConn.end();
+      await noFilterConn.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('user with region_group sees only rows matching their allowed product IDs', async () => {
+      const res = await regionConn.query(
+        'SELECT * FROM region_test_view ORDER BY id LIMIT 50'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect([1, 2]).toContain(row.product_id);
+      }
+    });
+
+    test('user without region_group sees all rows (no row filter)', async () => {
+      const res = await noFilterConn.query(
+        'SELECT * FROM region_test_view ORDER BY id LIMIT 50'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      const productIds = new Set(res.rows.map((r: any) => r.product_id));
+      expect(productIds.size).toBeGreaterThan(2);
+    });
+
+    test('filtered user count is less than unfiltered user count', async () => {
+      const filteredRes = await regionConn.query(
+        'SELECT MEASURE(count) as cnt FROM region_test_view'
+      );
+      const unfilteredRes = await noFilterConn.query(
+        'SELECT MEASURE(count) as cnt FROM region_test_view'
+      );
+      const filteredCount = Number(filteredRes.rows[0].cnt);
+      const unfilteredCount = Number(unfilteredRes.rows[0].cnt);
+      expect(filteredCount).toBeGreaterThan(0);
+      expect(unfilteredCount).toBeGreaterThan(filteredCount);
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;

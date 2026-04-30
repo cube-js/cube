@@ -1,12 +1,12 @@
 ---
 title: Core Data APIs
 sidebarTitle: Overview
-description: "Query the Cube semantic layer using SQL, DAX, REST, or GraphQL protocols depending on your application needs."
+description: "Query the Cube semantic layer using SQL, DAX, REST (JSON), or GraphQL protocols depending on your application needs."
 ---
 
  Core Data APIs
 
-Core Data APIs enable you to query and retrieve data from your Cube semantic layer using various protocols and formats, including SQL, DAX, REST, and GraphQL.
+Core Data APIs enable you to query and retrieve data from your Cube semantic layer using various protocols and formats, including SQL, DAX, REST (JSON), and GraphQL.
 
 ## Choosing the Right API
 
@@ -20,7 +20,7 @@ Core Data APIs enable you to query and retrieve data from your Cube semantic lay
 
 * For internal or self-serve [business intelligence][cube-issbi], use [Semantic Layer Sync][ref-sls] if it supports your BI tools. Otherwise, connect via the [SQL API][ref-sql-api] directly
 
-* For [embedded analytics][cube-ea] and [real-time analytics][cube-rta], use [REST API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST API, the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code
+* For [embedded analytics][cube-ea] and [real-time analytics][cube-rta], use [REST (JSON) API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST (JSON) API, the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code
 
 All Core Data APIs share common [querying concepts][ref-queries] and support authentication, security contexts, and access policies defined in your semantic layer.
 
@@ -65,7 +65,7 @@ tools][ref-viz-tools]:
 | [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
 | [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
-| [JSON Web Token][ref-auth-jwt] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
+| [JSON Web Token][ref-auth-jwt] | [REST (JSON) API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
 
 [cube-issbi]: https://cube.dev/use-cases/semantic-layer
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics

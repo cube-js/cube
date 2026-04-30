@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/case_switch.rs
+expression: result
+---
+orders__status | orders__status_weighted_amount
+---------------+-------------------------------
+cancelled      | 0.00                          
+completed      | 1400.00                       
+pending        | 325.000

@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Bug Fixes
+
+- **backend-native:** Respect `isDataQuery` flag in `cubesql` endpoint ([#10774](https://github.com/cube-js/cube/issues/10774)) ([6f3c031](https://github.com/cube-js/cube/commit/6f3c031993a292acca7d7031b18e2e31c8523d1a))
+- **cubesql:** Do not throw error on empty peer based evaluation in window aggregates ([#10776](https://github.com/cube-js/cube/issues/10776)) ([d6ca598](https://github.com/cube-js/cube/commit/d6ca598d9080ffc960a63ac5ca4e7a02486385d6))
+- **cubesql:** Preserve errors when panicking ([#10771](https://github.com/cube-js/cube/issues/10771)) ([5d571d4](https://github.com/cube-js/cube/commit/5d571d4229a5419ddf5340739c6af64b87769b2e))
+- **schema-compiler:** remove AthenaQuery.convertTz override that produces wrong timestamps on engine v3 ([#10779](https://github.com/cube-js/cube/issues/10779)) ([f395432](https://github.com/cube-js/cube/commit/f395432ea7db963da345db32d3ede7bbd38d9c68))
+- Support not in access policy conditions ([#10767](https://github.com/cube-js/cube/issues/10767)) ([1f755a1](https://github.com/cube-js/cube/commit/1f755a10bd8140d52e9fa6c145185fd3b5835434))
+- **tesseract:** CASE handling fixes in multi-stage measures ([#10764](https://github.com/cube-js/cube/issues/10764)) ([cb66e8e](https://github.com/cube-js/cube/commit/cb66e8e755824319007f5ff90e1663c9d6f51137))
+
+### Features
+
+- **snowflake-driver:** Upgrade snowflake-sdk to 2.4.0 ([#10765](https://github.com/cube-js/cube/issues/10765)) ([d9fa353](https://github.com/cube-js/cube/commit/d9fa353e1189d8594b74e8652b94413767088222))
+- Support columnar format in REST-API /v1/load ([#10775](https://github.com/cube-js/cube/issues/10775)) ([1f749cf](https://github.com/cube-js/cube/commit/1f749cf5c37d5f8dbe70fb6d785f66da02408507))
+- **tesseract:** Support separate pre-aggregations for different multi-fact subqueries ([#10718](https://github.com/cube-js/cube/issues/10718)) ([187ee17](https://github.com/cube-js/cube/commit/187ee17da2242bc2387545bbc0559620d537a443))
+- **tesseract:** Support separate pre-aggregations for different multi-stage subqueries ([#10684](https://github.com/cube-js/cube/issues/10684)) ([46b7106](https://github.com/cube-js/cube/commit/46b71064576beb17992ef5cdc500da7f17d9baf5))
+- update default number formats to trim insignificant trailing zeros ([#10782](https://github.com/cube-js/cube/issues/10782)) ([22694eb](https://github.com/cube-js/cube/commit/22694ebb25038c5089768f35d942cfa15aefb765))
+
+### Performance Improvements
+
+- **cubeorchestrator:** Improve columnar transform (−77%, 4.4x) ([#10786](https://github.com/cube-js/cube/issues/10786)) ([9e8a6ad](https://github.com/cube-js/cube/commit/9e8a6add84689781c7b02debf3137430cf2ea57a))
+- **cubeorchestrator:** Improve performance of get_vanilla_row (−66.8%, 3x) ([#10783](https://github.com/cube-js/cube/issues/10783)) ([0c2cb89](https://github.com/cube-js/cube/commit/0c2cb89eb7b32fbce69dbe09b166a82ef6a1edf4))
+- **cubesql:** Avoid cloning row payload in convert_transport_response ([#10772](https://github.com/cube-js/cube/issues/10772)) ([388607c](https://github.com/cube-js/cube/commit/388607cf9737e5ddb5712e484fd8af4ac30cc4b4))
+- **cubestore-driver:** Enable sendable parameters by default ([#10763](https://github.com/cube-js/cube/issues/10763)) ([af206b4](https://github.com/cube-js/cube/commit/af206b4426e7cc6c57d7b325a6b9f0d82ac09cb3))
+- **snowflake-driver:** replace formatToTimeZone with UTC formatter (~12x) ([#10759](https://github.com/cube-js/cube/issues/10759)) ([af08537](https://github.com/cube-js/cube/commit/af08537f6f9774ed3152e9977cc97955cb60eee1))
+
 ## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
 
 ### Bug Fixes

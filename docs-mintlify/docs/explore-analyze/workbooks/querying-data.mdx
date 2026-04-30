@@ -45,6 +45,35 @@ change the sort order for any member. Drag and drop members within the sorting c
 
 When a [pivot](#pivoting) is applied, an additional section with pivot dimensions appears.
 
+## Inspecting queries
+
+Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the top-right toolbar to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/inspect-query-tabs-v2.png" />
+</Frame>
+
+The panel exposes two top-level tabs:
+
+- **Semantic SQL** — the query expressed against the Semantic Model (semantic views, measures, dimensions, and `MEASURE()` calls). This is the source of truth for the query and what the workbook stores.
+- **Generated SQL** — the SQL that Cube compiles from the Semantic SQL and sends to your data warehouse. Use it to understand exactly what runs against your database, debug performance, or share with a database administrator.
+
+The **Semantic SQL** tab also has a dropdown for viewing the same query in the formats accepted by Cube's [Core Data APIs][ref-core-data-apis]:
+
+- **Semantic JSON** — the [REST (JSON) API][ref-rest-api] query format
+- **Semantic GraphQL** — the [GraphQL API][ref-graphql-api] query format
+
+These views are convenient when you want to take a query you've built interactively in a workbook and reuse it directly through one of the Core Data APIs from your own application.
+
+## Editing Semantic SQL by hand
+
+You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/edit-semantic-sql-v2.png" />
+</Frame>
+
+When you save a hand-edited query, the workbook keeps the Semantic SQL as the source of truth, and the visual controls (members panel, sort, pivot) stay in sync with what's expressible in the UI. Anything that goes beyond the interactive controls — see [Advanced semantic queries](#advanced-semantic-queries) below — disables the affected UI controls but keeps the rest of the workbook fully functional.
 
 ## Advanced semantic queries
 
@@ -59,4 +88,8 @@ Advanced semantic queries typically can contain CTEs (Common Table Expressions) 
 Currently, advanced semantic queries can be placed on dashboards, but dashboard filters cannot be applied to advanced semantic queries.
 
 </Info>
+
+[ref-core-data-apis]: /reference/core-data-apis
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
 

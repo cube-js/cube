@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Performance Improvements
+
+- **snowflake-driver:** replace formatToTimeZone with UTC formatter (~12x) ([#10759](https://github.com/cube-js/cube/issues/10759)) ([af08537](https://github.com/cube-js/cube/commit/af08537f6f9774ed3152e9977cc97955cb60eee1))
+
 ## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
 
 ### Performance Improvements

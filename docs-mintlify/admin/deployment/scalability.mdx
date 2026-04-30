@@ -5,17 +5,17 @@ description: Tune Cube Cloud throughput and pre-aggregation capacity by scaling 
 
 Cube Cloud also allows adding additional infrastructure to your deployment to
 increase scalability and performance beyond what is available with each
-Production Deployment.
+Dedicated deployment.
 
 ## Auto-scaling of API instances
 
-With a Production Cluster, 2 Cube API Instances are included. That said, it
+With a Dedicated deployment, 2 Cube API Instances are included. That said, it
 is very common to use more, and [additional API instances][ref-limits] can be
 added to your deployment to increase the throughput of your queries. A rough
 estimate is that 1 Cube API Instance is needed for every 5-10
 requests-per-second served. Cube API Instances can also auto-scale as needed.
 
-To change how many Cube API instances are available in the Production Cluster,
+To change how many Cube API instances are available in the Dedicated deployment,
 go to the deployment’s **Settings** screen, and open
 the **Configuration** tab. From this screen, you can set the minimum and
 maximum number of Cube API instances for a deployment:

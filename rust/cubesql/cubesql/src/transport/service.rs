@@ -312,7 +312,7 @@ impl TransportService for HttpTransport {
 
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
-            query: Some(query),
+            query: Some(Box::new(query)),
             query_type: Some("multi".to_string()),
             cache: cache_mode,
         };

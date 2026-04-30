@@ -890,7 +890,7 @@ environment variable, this option is enabled as well for the best user experienc
 
 ### `base_path`
 
-The base path for the [REST API](/reference/rest-api/reference).
+The base path for the [REST (JSON) API](/reference/rest-api/reference).
 
 <CodeGroup>
 
@@ -912,7 +912,7 @@ The default value is `/cubejs-api`.
 
 ### `http.cors`
 
-CORS settings for the Cube REST API can be configured by providing an object
+CORS settings for the Cube REST (JSON) API can be configured by providing an object
 with options [from here][link-express-cors-opts]:
 
 <CodeGroup>
@@ -995,7 +995,7 @@ module.exports = {
 ### `context_to_api_scopes`
 
 This function is used to select accessible [API scopes][ref-rest-scopes]
-and effectively allow or disallow access to REST API endpoints, based on
+and effectively allow or disallow access to REST (JSON) API endpoints, based on
 the [security context][ref-sec-ctx].
 
 Security context is provided as the first argument. An array of scopes that
@@ -1121,7 +1121,7 @@ environment documentation][ref-exec-environment-globals].
 
 ### `check_auth`
 
-Used in the [REST API][ref-rest-api]. Default implementation parses the [JSON
+Used in the [REST (JSON) API][ref-rest-api]. Default implementation parses the [JSON
 Web Token][link-jwt] in the `Authorization` header, verifies it, and sets its
 payload to the `securityContext`. [Read more][ref-sec-ctx] about JWT generation.
 

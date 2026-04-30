@@ -250,6 +250,86 @@ describe('PreAggregationsMultiStage', () => {
     },
   })
 
+  cube('monthly_data', {
+    sql: \`
+      SELECT 1 AS id, 10 AS amount, 'a' AS category, '2017-01-10'::TIMESTAMP AS created_at UNION ALL
+      SELECT 2 AS id, 20 AS amount, 'b' AS category, '2017-01-20'::TIMESTAMP AS created_at UNION ALL
+      SELECT 4 AS id, 100 AS amount, 'a' AS category, '2017-02-10'::TIMESTAMP AS created_at UNION ALL
+      SELECT 5 AS id, 100 AS amount, 'b' AS category, '2017-02-20'::TIMESTAMP AS created_at UNION ALL
+      SELECT 10 AS id, 200 AS amount, 'a' AS category, '2017-03-10'::TIMESTAMP AS created_at UNION ALL
+      SELECT 20 AS id, 200 AS amount, 'b' AS category, '2017-03-20'::TIMESTAMP AS created_at
+    \`,
+
+    sqlAlias: 'md',
+
+    dimensions: {
+      id: {
+        type: 'number',
+        sql: 'id',
+        primaryKey: true
+      },
+      category: {
+        type: 'string',
+        sql: 'category'
+      },
+      created_at: {
+        type: 'time',
+        sql: 'created_at'
+      },
+    },
+
+    measures: {
+      revenue: {
+        sql: 'amount',
+        type: 'sum'
+      },
+      count: {
+        type: 'count'
+      },
+      revenue_per_id: {
+        multi_stage: true,
+        sql: \`\${revenue} / \${id}\`,
+        type: 'sum',
+        add_group_by: [monthly_data.id],
+      },
+      count_by_category: {
+        multi_stage: true,
+        sql: \`\${count}\`,
+        type: 'sum',
+        add_group_by: [monthly_data.category],
+      },
+      prev_month_revenue: {
+        multi_stage: true,
+        sql: \`\${revenue}\`,
+        type: 'number',
+        timeShift: [{
+          timeDimension: created_at,
+          interval: '1 month',
+          type: 'prior',
+        }],
+      },
+    },
+
+    preAggregations: {
+      revenueById: {
+        type: 'rollup',
+        measureReferences: [revenue],
+        dimensionReferences: [id],
+        timeDimensionReference: created_at,
+        granularity: 'day',
+        partitionGranularity: 'month',
+      },
+      countByCat: {
+        type: 'rollup',
+        measureReferences: [revenue, count],
+        dimensionReferences: [category],
+        timeDimensionReference: created_at,
+        granularity: 'day',
+        partitionGranularity: 'month',
+      },
+    },
+  })
+
    `);
 
   if (getEnv('nativeSqlPlanner')) {
@@ -384,6 +464,98 @@ describe('PreAggregationsMultiStage', () => {
         expect(res).toEqual(
           [
             { coach__count_distinct__sum_by_quarter: '28' },
+          ]
+        );
+      });
+    }));
+
+    it('two multi-stage measures with different pre-aggregations', () => compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'monthly_data.revenue_per_id',
+          'monthly_data.count_by_category'
+        ],
+        timeDimensions: [{
+          dimension: 'monthly_data.created_at',
+          granularity: 'month',
+          dateRange: ['2017-01-01', '2017-03-31']
+        }],
+        timezone: 'UTC',
+        order: [{
+          id: 'monthly_data.created_at'
+        }],
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      const sqlAndParams = query.buildSqlAndParams();
+      const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
+      expect(tableNames).toContain('md_revenue_by_id');
+      expect(tableNames).toContain('md_count_by_cat');
+      expect(sqlAndParams[0]).toContain('md_revenue_by_id');
+      expect(sqlAndParams[0]).toContain('md_count_by_cat');
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            {
+              md__created_at_month: '2017-01-01T00:00:00.000Z',
+              md__revenue_per_id: '20.0000000000000000',
+              md__count_by_category: '2'
+            },
+            {
+              md__created_at_month: '2017-02-01T00:00:00.000Z',
+              md__revenue_per_id: '45.0000000000000000',
+              md__count_by_category: '2'
+            },
+            {
+              md__created_at_month: '2017-03-01T00:00:00.000Z',
+              md__revenue_per_id: '30.0000000000000000',
+              md__count_by_category: '2'
+            }
+          ]
+        );
+      });
+    }));
+
+    it('multi-stage with time_shift loading different pre-aggregation partitions', () => compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'monthly_data.revenue_per_id',
+          'monthly_data.prev_month_revenue'
+        ],
+        timeDimensions: [{
+          dimension: 'monthly_data.created_at',
+          granularity: 'month',
+          dateRange: ['2017-02-01', '2017-03-31']
+        }],
+        timezone: 'UTC',
+        order: [{
+          id: 'monthly_data.created_at'
+        }],
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      const sqlAndParams = query.buildSqlAndParams();
+      expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+      expect(preAggregationsDescription.some((d: any) => d.tableName.startsWith('md_'))).toBe(true);
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            {
+              md__created_at_month: '2017-02-01T00:00:00.000Z',
+              md__revenue_per_id: '45.0000000000000000',
+              md__prev_month_revenue: '30'
+            },
+            {
+              md__created_at_month: '2017-03-01T00:00:00.000Z',
+              md__revenue_per_id: '30.0000000000000000',
+              md__prev_month_revenue: '200'
+            }
           ]
         );
       });

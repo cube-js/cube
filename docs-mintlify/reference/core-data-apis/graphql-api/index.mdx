@@ -13,14 +13,14 @@ Often, the GraphQL API is used to enable the [embedded analytics][cube-ea] use
 case.
 
 Under the hood, the GraphQL API is exposed via the `/graphql` endpoint of the
-[REST API][ref-rest-api].
+[REST (JSON) API][ref-rest-api].
 
 See [GraphQL API reference][ref-ref-graphql-api] for the list of supported
 requests and parameters.
 
 <Warning>
 
-Compared to the [REST API][ref-rest-api], GraphQL API currently has the
+Compared to the [REST (JSON) API][ref-rest-api], GraphQL API currently has the
 following limitations:
 
 - No support for the [WebSockets transport][ref-websockets].
@@ -110,7 +110,7 @@ like this:
 }
 ```
 
-The equivalent query to the REST API endpoint would look like this:
+The equivalent query to the REST (JSON) API endpoint would look like this:
 
 ```json
 {

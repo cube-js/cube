@@ -446,7 +446,7 @@ async fn handle_sql_query(
                             },
                             "apiType": "sql",
                             "duration": span_id.as_ref().unwrap().duration(),
-                            "isDataQuery": true
+                            "isDataQuery": span_id.as_ref().unwrap().is_data_query().await,
                         }),
                     )
                     .await?;

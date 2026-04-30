@@ -1,23 +1,23 @@
 ---
 title: Query from a React app
-description: Wire a React app to Cube Cloud REST or GraphQL endpoints using the JavaScript client libraries and deployment-scoped URLs.
+description: Wire a React app to Cube Cloud REST (JSON) or GraphQL endpoints using the JavaScript client libraries and deployment-scoped URLs.
 ---
 
-Cube offers both [REST](/reference/rest-api) and
+Cube offers both [REST (JSON)](/reference/rest-api) and
 [GraphQL](/reference/graphql-api) APIs, which can be used to
 query data from applications built in React or other frontend frameworks.
 
-You can find your REST API endpoint on the **Overview** page. In
+You can find your REST (JSON) API endpoint on the **Overview** page. In
 development mode, Cube creates an isolated endpoint for testing data model
-changes without affecting production. The structure of your REST API endpoint in
+changes without affecting production. The structure of your REST (JSON) API endpoint in
 development mode should follow the format below.
 
 ```yaml
 https://<deployment-id>.<region>.cubecloudapp.dev/dev-mode/<dev-branch-name>/cubejs-api/v1
 ```
 
-To test your REST API from your terminal, you can use [curl](https://curl.se/).
-Click on “How to connect your application” next to the REST API, and it will
+To test your REST (JSON) API from your terminal, you can use [curl](https://curl.se/).
+Click on “How to connect your application” next to the REST (JSON) API, and it will
 display a code snippet that you can run in your terminal to test the endpoint
 with curl.
 

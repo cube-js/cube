@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Performance Improvements
+
+- **cubestore-driver:** Enable sendable parameters by default ([#10763](https://github.com/cube-js/cube/issues/10763)) ([af206b4](https://github.com/cube-js/cube/commit/af206b4426e7cc6c57d7b325a6b9f0d82ac09cb3))
+- **snowflake-driver:** replace formatToTimeZone with UTC formatter (~12x) ([#10759](https://github.com/cube-js/cube/issues/10759)) ([af08537](https://github.com/cube-js/cube/commit/af08537f6f9774ed3152e9977cc97955cb60eee1))
+
 ## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
 
 **Note:** Version bump only for package @cubejs-backend/shared

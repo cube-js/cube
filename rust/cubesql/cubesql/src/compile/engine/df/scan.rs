@@ -11,7 +11,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
-use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse};
+use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse, V1LoadResult};
 pub use datafusion::{
     arrow::{
         array::{
@@ -1194,9 +1194,15 @@ pub fn convert_transport_response(
     response
         .results
         .into_iter()
-        .map(|r| {
-            let mut response = JsonValueObject::new(r.data.clone());
-            let updated_schema = if let Some(last_refresh_time) = r.last_refresh_time.clone() {
+        .map(|result| {
+            let V1LoadResult {
+                data,
+                last_refresh_time,
+                ..
+            } = result;
+
+            let mut response = JsonValueObject::new(data);
+            let updated_schema = if let Some(last_refresh_time) = last_refresh_time {
                 let mut metadata = schema.metadata().clone();
                 metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
                 Arc::new(Schema::new_with_metadata(

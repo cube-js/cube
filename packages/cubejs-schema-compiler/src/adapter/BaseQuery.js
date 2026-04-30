@@ -959,11 +959,9 @@ export class BaseQuery {
     try {
       const buildResult = nativeBuildSqlAndParams(queryParams);
 
-      const [query, params, preAggregation] = buildResult;
+      const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
-      if (preAggregation) {
-        this.preAggregations.preAggregationForQuery = preAggregation;
-      }
+      this.applyNativePreAggResult(preAggResult);
       return [query, paramsArray];
     } catch (e) {
       if (e.name === 'TesseractUserError') {
@@ -1009,8 +1007,21 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    const [, , preAggregation] = buildResult;
-    return preAggregation;
+    const [, , preAggResult] = buildResult;
+    this.applyNativePreAggResult(preAggResult);
+    return this.preAggregations.preAggregationForQuery;
+  }
+
+  applyNativePreAggResult(preAggResult) {
+    if (!preAggResult) return;
+    if (Array.isArray(preAggResult)) {
+      this.preAggregations.preAggregationUsageInfos = preAggResult;
+      const first = preAggResult[0];
+      this.preAggregations.preAggregationForQuery =
+        this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    } else {
+      this.preAggregations.preAggregationForQuery = preAggResult;
+    }
   }
 
   allCubeMembers(path) {
@@ -3496,7 +3507,7 @@ export class BaseQuery {
   }
 
   escapeStringLiteral(str) {
-    return `'${str.replace(/'/g, "''")}'`;
+    return `'${str.replace(/'/g, '\'\'')}'`;
   }
 
   autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {

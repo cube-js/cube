@@ -25,7 +25,7 @@ detailed instructions.
 
 ## Connect from Cube Core
 
-You can connect a Cube deployment to Retool using the [REST API](/reference/rest-api).
+You can connect a Cube deployment to Retool using the [REST (JSON) API](/reference/rest-api).
 
 ## Connecting from Retool
 
@@ -37,7 +37,7 @@ Create a new "REST API" resource in Retool.
   <img src="https://ucarecdn.com/8a07d9ac-f33b-4aa1-8089-515694e56a63/" />
 </Frame>
 
-Next, copy and paste Cube's REST API URL and the Authorization token.
+Next, copy and paste Cube's REST (JSON) API URL and the Authorization token.
 
 <Frame>
   <img src="https://ucarecdn.com/fdab9eaa-737b-4ef9-9e08-ad15aaa2fe29/" />
@@ -52,7 +52,7 @@ copy it from Cube’s Playground or compose manually.
 Create a POST request, paste the JSON query in the **Body**. Make sure to add a
 `query` parameter for your JSON query.
 
-Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget
+Because the Cube REST (JSON) API has the format of `HOST/cubejs-api/v1`, don't forget
 to add the `/load` endpoint to the end of the data source API.
 
 Next, hit Run.
@@ -67,8 +67,8 @@ Retool has an amazing feature where you can drag and drop UI components into the
 dashboard. You can use this to add a tables, bar charts, and much more.
 
 Because the name of the Retool query in the example is `OrdersByMonth`, using
-the data binding curly brackets will populate the charts with data from the REST
-API.
+the data binding curly brackets will populate the charts with data from the
+REST (JSON) API.
 
 ```handlebars
 {{OrdersByMonth.data.data}}

@@ -1158,6 +1158,24 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying ECommerce: count by month + order with non-UTC timezone (Asia/Kolkata)', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: {
+          'ECommerce.customOrderDateNoPreAgg': 'asc'
+        },
+        timezone: 'Asia/Kolkata',
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('filtering ECommerce: contains dimensions, first', async () => {
       const response = await client.load({
         dimensions: [

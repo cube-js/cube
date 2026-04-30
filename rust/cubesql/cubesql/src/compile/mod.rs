@@ -18697,4 +18697,19 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_window_aggr_empty() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "window_aggr_empty",
+            execute_query(
+                "SELECT oid, COUNT(*) OVER() AS c FROM pg_class WHERE oid < 0 GROUP BY 1"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

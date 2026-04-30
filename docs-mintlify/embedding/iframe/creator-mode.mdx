@@ -22,33 +22,32 @@ In Creator Mode, you embed the full Cube application instead of individual dashb
 - Access all workbook and dashboard functionality
 - Build custom analytics experiences
 
-To enable Creator Mode, pass `creatorMode: true`, `tenantId`, and `tenantName` to the [Generate Session API][ref-generate-session] when generating an embed session. The tenant ID is used to scope all content the user creates to a specific tenant; the tenant name is a human-readable label displayed in the user interface.
+To enable Creator Mode, pass `creatorMode: true` to the [Generate Session API][ref-generate-session] when generating an embed session. Optionally, pass `embedTenantName` to scope content to a specific embed tenant — by default, creator mode uses the current tenant's name.
 
-## Tenant ID and Name
+## Embed tenant name
 
-When using Creator Mode, you must provide both `tenantId` and `tenantName` parameters when generating a session:
+`embedTenantName` is an optional parameter on the Generate Session API used to scope all content (dashboards, workbooks, etc.) that users create within the embedded application to a specific embed tenant. This ensures proper data isolation in multi-tenant scenarios.
 
-- **`tenantId`** – Used to scope all content (dashboards, workbooks, etc.) that users create within the embedded application to a specific tenant. This ensures proper data isolation in multi-tenant scenarios.
-- **`tenantName`** – A human-readable friendly name for the tenant that will be displayed in the user interface.
+When `embedTenantName` is omitted in creator mode, the session defaults to the current tenant, so most setups don't need to set it.
+
+The value must be lowercase, start with a letter, end with a letter or number, and only contain letters, numbers, or hyphens (length 5–36).
 
 ## Using Creator Mode
 
 To use Creator Mode and embed the app:
 
 1. **Set the embed type to "App"** in the form
-2. **Fill in Deployment ID**, **Tenant ID**, **Tenant Name**, and either **External ID** or **Internal ID** (email)
+2. **Fill in Deployment ID** and either **External ID** or **Internal ID** (email). Optionally provide an **Embed Tenant Name** to scope content to a specific embed tenant
 3. **Click "Generate Session & Embed"** — the request automatically includes `creatorMode: true` for app embeddings
 4. The app is embedded at `/embed/d/{deploymentId}/app?session={sessionId}` and displayed in the iframe
 
-Creator Mode is enabled automatically when the embed type is "app"; no additional configuration is needed. The tenant ID is required to scope all dashboards and content created by the user to the specific tenant, and the tenant name will be displayed in the user interface.
+Creator mode is enabled automatically when the embed type is "app"; no additional configuration is needed.
 
 ### Example
 
 ```javascript
 const API_KEY = "YOUR_API_KEY";
 const DEPLOYMENT_ID = 32;
-const TENANT_ID = "tenant-123";
-const TENANT_NAME = "Acme Corporation";
 
 const session = await fetch(
   "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
@@ -62,8 +61,8 @@ const session = await fetch(
       deploymentId: DEPLOYMENT_ID,
       externalId: "user@example.com",
       creatorMode: true,
-      tenantId: TENANT_ID,
-      tenantName: TENANT_NAME,
+      // Optional — defaults to the current tenant when omitted:
+      embedTenantName: "acme-corp",
     }),
   },
 );
@@ -93,7 +92,7 @@ For a complete working example of embedding, including Creator Mode, check out t
 
 - A full working example of iframe embedding
 - Implementation of signed iframe embedding with session generation
-- Support for Creator Mode with tenant ID and tenant name
+- Support for creator mode with an optional embed tenant name
 - A React-based UI for testing embedding functionality
 - Backend server that securely handles API key authentication
 

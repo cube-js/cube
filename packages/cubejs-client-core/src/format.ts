@@ -5,10 +5,12 @@ import { getD3NumericLocale } from './format-d3-numeric-locale';
 import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
 
 // Default d3-format specifiers — aligned with the named _2 formats
-// (number_2, currency_2, percent_2) in named-numeric-formats.ts
-const DEFAULT_NUMBER_FORMAT = ',.2f';
-const DEFAULT_CURRENCY_FORMAT = '$,.2f';
-const DEFAULT_PERCENT_FORMAT = '.2%';
+// (number_2, currency_2, percent_2) in named-numeric-formats.ts.
+// The `~` modifier trims insignificant trailing zeros so values like 1234
+// render as "1,234" rather than "1,234.00".
+const DEFAULT_NUMBER_FORMAT = ',.2~f';
+const DEFAULT_CURRENCY_FORMAT = '$,.2~f';
+const DEFAULT_PERCENT_FORMAT = '.2~%';
 
 const DEFAULT_ID_FORMAT = '.0f';
 
