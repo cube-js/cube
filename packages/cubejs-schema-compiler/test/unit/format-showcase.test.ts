@@ -57,7 +57,6 @@ describe('Format showcase fixture', () => {
 
   describe('currency measures on view', () => {
     it('total_sales_usd (aliased) preserves full formatDescription with currency USD', () => {
-      console.log('>>>', '@', findMeasure('format_showcase_view', 'total_sales_usd'))
       expectCurrencyMeasure(findMeasure('format_showcase_view', 'total_sales_usd'), 'USD');
     });
 
