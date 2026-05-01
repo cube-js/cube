@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.41](https://github.com/cube-js/cube/compare/v1.6.40...v1.6.41) (2026-05-01)
+
+### Bug Fixes
+
+- **schema-compiler:** preserve currency value in views ([#10793](https://github.com/cube-js/cube/issues/10793)) ([613af8d](https://github.com/cube-js/cube/commit/613af8d52dc711021ec564645e0cb86e7a4f2be3))
+
 ## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
 
 ### Bug Fixes
