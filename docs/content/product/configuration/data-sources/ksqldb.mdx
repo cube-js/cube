@@ -195,6 +195,156 @@ that consumes from the backing Kafka topic directly. The lambda
 pre-aggregation in the batch cube merges both, serving historical data
 from the warehouse rollup and real-time data from the streaming rollup:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: order_events
+    data_source: default
+    sql: >
+      SELECT
+        order_id,
+        user_id,
+        status,
+        amount,
+        created_at
+      FROM ecommerce.order_events
+      WHERE {FILTER_PARAMS.order_events.created_at.filter(
+        (from, to) =>
+        `created_at >= ${from} AND created_at < ${to}`
+      )}
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+      - name: failed_count
+        sql: "CASE WHEN status = 'failed' THEN 1 ELSE 0 END"
+        type: sum
+
+    dimensions:
+      - name: order_id
+        sql: order_id
+        type: string
+        primary_key: true
+
+      - name: user_id
+        sql: user_id
+        type: string
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    pre_aggregations:
+      - name: lambda
+        type: rollup_lambda
+        rollups:
+          - order_events.batch
+          - order_events_stream.stream
+
+      - name: batch
+        type: rollup
+        measures:
+          - CUBE.count
+          - CUBE.total_amount
+          - CUBE.failed_count
+        dimensions:
+          - CUBE.order_id
+          - CUBE.user_id
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: second
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '90 days'
+        build_range_end:
+          sql: SELECT NOW()
+        refresh_key:
+          every: 8 hour
+          update_window: 1 day
+          incremental: true
+        indexes:
+          - name: user_status
+            columns:
+              - CUBE.user_id
+              - CUBE.status
+
+  - name: order_events_stream
+    data_source: ksql
+    sql: "SELECT * FROM ORDER_EVENTS_STREAM"
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: AMOUNT
+        type: sum
+
+      - name: failed_count
+        sql: "CASE WHEN STATUS = 'failed' THEN 1 ELSE 0 END"
+        type: sum
+
+    dimensions:
+      - name: order_id
+        sql: ORDER_ID
+        type: string
+        primary_key: true
+
+      - name: user_id
+        sql: USER_ID
+        type: string
+
+      - name: status
+        sql: STATUS
+        type: string
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
+
+    pre_aggregations:
+      - name: stream
+        type: rollup
+        read_only: true
+        measures:
+          - CUBE.count
+          - CUBE.total_amount
+          - CUBE.failed_count
+        dimensions:
+          - CUBE.order_id
+          - CUBE.user_id
+          - CUBE.status
+        unique_key_columns:
+          - order_id
+        time_dimension: CUBE.created_at
+        granularity: second
+        partition_granularity: day
+        build_range_start:
+          sql: "SELECT date_trunc('day', DATE_SUB(NOW(), INTERVAL '5 hour'))"
+        build_range_end:
+          sql: "SELECT DATE_ADD(NOW(), INTERVAL '15 minute')"
+        refresh_key:
+          every: 1 minute
+          update_window: 1 hour
+          incremental: true
+        indexes:
+          - name: user_status
+            columns:
+              - CUBE.user_id
+              - CUBE.status
+        stream_offset: latest
+```
+
 ```javascript
 cube("order_events", {
   data_source: "default",
@@ -362,6 +512,8 @@ cube("order_events_stream", {
   },
 });
 ```
+
+</CodeTabs>
 
 Key properties for the streaming pre-aggregation:
 
