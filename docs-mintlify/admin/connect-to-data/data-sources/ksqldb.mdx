@@ -448,6 +448,50 @@ This allows you to define a streaming cube that only ingests a subset of
 the data from the underlying Kafka topic without creating any
 server-side filter objects in ksqlDB.
 
+#### Supported SQL syntax
+
+The `SELECT` statement must follow a strict shape. Cube Store only
+accepts plans that resolve to **Projection > Filter > TableScan** (where
+the filter is optional). Any other query plan shape is rejected.
+
+**Supported:**
+
+- `SELECT` with column references (e.g., `SELECT col1, col2 FROM topic`)
+- `SELECT *` wildcard
+- Column aliases (`SELECT col1 AS my_alias`)
+- `WHERE` clause with comparison operators (`=`, `!=`, `<`, `>`, `<=`,
+  `>=`)
+- Boolean logic in `WHERE` (`AND`, `OR`, `NOT`)
+- `IS NULL` and `IS NOT NULL`
+- `IN` lists (`col IN (1, 2, 3)`)
+- `BETWEEN` expressions
+- `CASE ... WHEN ... THEN ... ELSE ... END` expressions
+- `CAST(expr AS type)` type conversions
+- `EXTRACT(field FROM expr)` for date/time parts
+- `SUBSTRING(expr FROM start FOR length)`
+- Scalar functions (e.g., `COALESCE`, `CONCAT`, arithmetic)
+- `CONVERT_TZ` for timezone conversion (internally rewritten for
+  compatibility)
+- Nested expressions with parentheses
+
+**Not supported:**
+
+- `JOIN` clauses — only a single `FROM` table is allowed
+- Subqueries in `SELECT` or `WHERE`
+- `GROUP BY`, `HAVING`, or aggregate functions (`SUM`, `COUNT`, `AVG`,
+  etc.)
+- `ORDER BY` (rows are consumed in stream order)
+- `LIMIT` and `OFFSET`
+- `UNION`, `INTERSECT`, `EXCEPT`
+- Window functions (`OVER`, `PARTITION BY`)
+- Multiple `FROM` or multiple `WHERE` clauses
+- Common Table Expressions (`WITH ... AS`)
+
+All column expressions in the `SELECT` list that are not simple column
+references must have explicit aliases. Unique key columns may reference
+the source column through a scalar function (e.g.,
+`CAST(id AS VARCHAR) AS id`), but not through arbitrary expressions.
+
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 [ref-powerbi]: /docs/integrations/power-bi
 [ref-dax-api]: /reference/core-data-apis/dax-api
