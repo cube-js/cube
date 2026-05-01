@@ -367,15 +367,80 @@ Key properties for the streaming pre-aggregation:
 
 - `read_only: true` — Cube will not create any objects in ksqlDB. The
   data is consumed directly from the backing Kafka topic.
-- `stream_offset: "latest"` — start consuming from the latest offset in
-  the Kafka topic. Use `"earliest"` to replay from the beginning.
+- `stream_offset` — controls where Cube Store starts consuming from in
+  the Kafka topic. Set to `"latest"` to only consume new messages
+  arriving after the pre-aggregation is created. Set to `"earliest"` to
+  replay the topic from the beginning. Defaults to `"latest"` if not
+  specified. On subsequent refreshes, Cube Store automatically resumes
+  from the last processed offset regardless of this setting.
 - `unique_key_columns` — columns that uniquely identify a record, used
-  for deduplication during ingestion into Cube Store.
+  for deduplication (see [below](#unique-key-columns-and-deduplication)).
 
 The `sql_table` or `sql` value should reference an existing ksqlDB stream
 or table. Cube discovers its schema automatically. With Kafka streams
 mode enabled, the streaming pre-aggregation reads the backing Kafka topic
 directly — no objects are created in ksqlDB.
+
+### Unique key columns and deduplication
+
+When `unique_key_columns` is set, Cube Store appends an internal
+sequence column (`__seq`) to the table, populated from the Kafka
+partition offset. The unique key columns together with `__seq` form the
+sort key for all indexes on this table.
+
+Deduplication is not applied at ingestion time — all incoming records are
+appended as they arrive. Instead, Cube Store deduplicates during
+**reads** and **compaction**: rows are sorted by the unique key columns
+and then by `__seq`, and only the **last row per unique key** (the one
+with the highest sequence number) is kept. This means that if the same
+key appears multiple times in the stream, the most recent version is
+always the one returned by queries.
+
+For Kafka messages, unique key column values can come from either the
+message **payload** (the JSON value) or the message **key**. If a column
+listed in `unique_key_columns` is missing from the payload, Cube Store
+falls back to the Kafka message key: for a single unique key column, the
+raw key value is used; for composite keys, the key is expected to be a
+JSON object with matching field names.
+
+### Stream format
+
+Cube Store expects Kafka messages to have a **JSON object** as their
+value payload, with field names matching the column names defined in the
+cube. For example, given the streaming cube above, each Kafka message
+value should look like:
+
+```json
+{
+  "ORDER_ID": "ord_12345",
+  "USER_ID": "usr_789",
+  "STATUS": "completed",
+  "AMOUNT": 49.99,
+  "CREATED_AT": "2025-01-15T10:30:00.000"
+}
+```
+
+Field names are case-sensitive and must match the column names used in
+the `sql` property of each dimension and measure definition. Missing
+fields default to `null`.
+
+The message key is optional. When present and the value starts with `{`,
+it is parsed as a JSON object and used as a fallback source for unique
+key column values (see [above](#unique-key-columns-and-deduplication)).
+
+### Filtering on the stream
+
+When the streaming cube defines a `sql` property with a `SELECT`
+statement (rather than `sql_table`), Cube Store applies the projection
+and any `WHERE` filters from that statement directly on each micro-batch
+of incoming Kafka messages. This filtering happens inside Cube Store
+using its query engine — it does not require ksqlDB to process the
+filter. Only rows that pass the filter are ingested into the
+pre-aggregation table.
+
+This allows you to define a streaming cube that only ingests a subset of
+the data from the underlying Kafka topic without creating any
+server-side filter objects in ksqlDB.
 
 [ref-powerbi]: /product/configuration/visualization-tools/powerbi
 [ref-dax-api]: /product/apis-integrations/dax-api
