@@ -217,6 +217,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private resolveViewGroups(): ViewGroupConfig[] {
     const viewGroupMap = new Map<string, ViewGroupConfig>();
+    const cubeDefByName = new Map(this.cubeSymbols.cubeList.map(c => [c.name, c]));
+    const transformedByName = new Map(this.cubes.map(c => [c.config.name, c]));
     const validViewNames = new Set(
       this.cubes.filter(c => c.config.type === 'view').map(c => c.config.name)
     );
@@ -232,7 +234,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     for (const cube of this.cubes) {
       if (cube.config.type === 'view') {
-        const extendedCube = this.cubeSymbols.cubeList.find(c => c.name === cube.config.name) as any;
+        const extendedCube = cubeDefByName.get(cube.config.name) as any;
 
         const groupNames: string[] = [];
         if (extendedCube?.viewGroup) {
@@ -268,7 +270,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     for (const group of viewGroupMap.values()) {
       for (const viewName of group.views) {
-        const cube = this.cubes.find(c => c.config.name === viewName);
+        const cube = transformedByName.get(viewName);
         if (cube) {
           if (!cube.config.viewGroup) {
             cube.config.viewGroup = group.name;
