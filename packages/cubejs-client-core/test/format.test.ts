@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatValue, formatDateByGranularity, getFormat } from '../src/format';
+import { formatValue, formatDateByGranularity, getFormat } from '../src/format.js';
 
 describe('formatValue', () => {
   it('format null', () => {

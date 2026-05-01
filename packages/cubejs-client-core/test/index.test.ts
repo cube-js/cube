@@ -5,8 +5,8 @@
  */
 
 import { vi, MockedClass } from 'vitest';
-import { CubeApi, LoadMethodOptions, LoadResponse } from '../src/index';
-import ResultSet from '../src/ResultSet';
+import { CubeApi, LoadMethodOptions, LoadResponse } from '../src/index.js';
+import ResultSet from '../src/ResultSet.js';
 
 vi.mock('../src/ResultSet');
 

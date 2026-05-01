@@ -7,16 +7,16 @@
 /* eslint-disable import/first */
 import { vi } from 'vitest';
 
-import { CubeApi as CubeApiOriginal, Query } from '../src';
-import HttpTransport from '../src/HttpTransport';
-import RequestError from '../src/RequestError';
+import { CubeApi as CubeApiOriginal, Query } from '../src/index.js';
+import HttpTransport from '../src/HttpTransport.js';
+import RequestError from '../src/RequestError.js';
 import {
   DescriptiveQueryRequest,
   DescriptiveQueryRequestCompact,
   DescriptiveQueryResponse,
   NumericCastedData
-} from './helpers';
-import ResultSet from '../src/ResultSet';
+} from './helpers.js';
+import ResultSet from '../src/ResultSet.js';
 
 class CubeApi extends CubeApiOriginal {
   public getTransport(): any {

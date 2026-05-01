@@ -1,8 +1,8 @@
 import { format as d3Format } from 'd3-format';
 import { timeFormat } from 'd3-time-format';
-import { getD3NumericLocale } from './format-d3-numeric-locale';
+import { getD3NumericLocale } from './format-d3-numeric-locale.js';
 
-import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types';
+import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types.js';
 
 // Default d3-format specifiers — aligned with the named _2 formats
 // (number_2, currency_2, percent_2) in named-numeric-formats.ts.

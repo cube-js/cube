@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { defaultHeuristics } from '../src/utils';
+import { defaultHeuristics } from '../src/utils.js';
 
 vi.mock('moment-range', async () => {
   const Moment = await vi.importActual('moment');

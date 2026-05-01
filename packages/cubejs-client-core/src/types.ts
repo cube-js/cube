@@ -1,5 +1,5 @@
-import Meta from './Meta';
-import { TimeDimensionGranularity } from './time';
+import Meta from './Meta.js';
+import { TimeDimensionGranularity } from './time.js';
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 

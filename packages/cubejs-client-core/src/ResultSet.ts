@@ -4,7 +4,7 @@ import {
   flatten,
 } from 'ramda';
 
-import { aliasSeries } from './utils';
+import { aliasSeries } from './utils.js';
 import {
   DateRegex,
   dayRange,
@@ -13,7 +13,7 @@ import {
   LocalDateRegex,
   TIME_SERIES,
   timeSeriesFromCustomInterval
-} from './time';
+} from './time.js';
 import {
   Annotation,
   ChartPivotRow, DateRange,
@@ -30,7 +30,7 @@ import {
   SeriesNamesColumn,
   TableColumn,
   TimeDimension
-} from './types';
+} from './types.js';
 
 const groupByToPairs = function groupByToPairsImpl<T, K>(keyFn: (item: T) => K): (data: T[]) => [K, T[]][] {
   const acc = new Map();
