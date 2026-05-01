@@ -511,6 +511,8 @@ export type Cube = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  viewGroup?: string;
+  viewGroups?: string[];
 };
 
 export type CubeMap = {
@@ -524,8 +526,16 @@ export type CubesMap = Record<
   CubeMap
 >;
 
+export type ViewGroup = {
+  name: string;
+  title?: string;
+  description?: string;
+  views: string[];
+};
+
 export type MetaResponse = {
   cubes: Cube[];
+  viewGroups?: ViewGroup[];
 };
 
 export type FilterOperator = {
