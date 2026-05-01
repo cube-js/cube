@@ -2696,7 +2696,7 @@ from
         FROM BigECommerce
         WHERE EXTRACT(DOW FROM BigECommerce.orderDate) = 3
       `);
-      expect(res.rows).toMatchSnapshot();
+      expect(res.rows).toEqual([{ qty: 35 }]);
     });
   });
 }
