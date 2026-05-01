@@ -217,13 +217,16 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private resolveViewGroups(): ViewGroupConfig[] {
     const viewGroupMap = new Map<string, ViewGroupConfig>();
+    const validViewNames = new Set(
+      this.cubes.filter(c => c.config.type === 'view').map(c => c.config.name)
+    );
 
     for (const compiled of this.viewGroupEvaluator.compiledViewGroups) {
       viewGroupMap.set(compiled.name, {
         name: compiled.name,
         title: compiled.title,
         description: compiled.description,
-        views: [...compiled.views],
+        views: compiled.views.filter(v => validViewNames.has(v)),
       });
     }
 

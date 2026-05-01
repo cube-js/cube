@@ -5,7 +5,7 @@ export interface ViewGroupInput {
   name: string;
   title?: string;
   description?: string;
-  views?: any;
+  views?: string[] | (() => string[]);
   fileName?: string;
 }
 
@@ -62,14 +62,5 @@ export class ViewGroupEvaluator implements CompilerInterface {
 
   public get compiledViewGroups(): CompiledViewGroup[] {
     return Array.from(this.viewGroupDefinitions.values());
-  }
-
-  public viewGroupForView(viewName: string): string | undefined {
-    for (const [, viewGroup] of this.viewGroupDefinitions) {
-      if (viewGroup.views.includes(viewName)) {
-        return viewGroup.name;
-      }
-    }
-    return undefined;
   }
 }

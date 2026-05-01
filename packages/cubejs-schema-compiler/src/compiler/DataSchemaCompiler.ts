@@ -859,7 +859,11 @@ export class DataSchemaCompiler {
     return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
       .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
       .then(() => this.compileObjects(compilers.viewGroupCompilers || [], viewGroups, errorsReport))
-      .then(() => this.metaTransformer?.compileViewGroups());
+      .then(() => {
+        if (compilers.viewGroupCompilers?.length) {
+          this.metaTransformer?.compileViewGroups();
+        }
+      });
   }
 
   public throwIfAnyErrors() {

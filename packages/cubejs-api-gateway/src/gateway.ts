@@ -662,7 +662,13 @@ class ApiGateway {
       }
       const cubesConfig = metaConfig.cubes;
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
-      const viewGroups = metaConfig.viewGroups || [];
+      const visibleCubeNames = new Set(cubes.map(c => c.name));
+      const viewGroups = (metaConfig.viewGroups || [])
+        .map(group => ({
+          ...group,
+          views: group.views.filter((v: string) => visibleCubeNames.has(v)),
+        }))
+        .filter(group => group.views.length > 0);
       const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
       if (viewGroups.length > 0) {
         response.viewGroups = viewGroups;
