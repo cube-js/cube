@@ -18,5 +18,24 @@ Dashboards enable you to:
 
 In the dashboard builder inside your [workbook][ref-workbooks], select the reports you want to include and arrange them on the canvas alongside other [widgets][ref-widgets] to tell your data story, then publish the dashboard. This gives stakeholders direct access to the insights that matter most, without the complexity of the underlying analysis.
 
+## Download as PNG or PDF
+
+Open a published dashboard, click the **More actions** (`⋯`) button in the
+header, and choose **Download as PNG** or **Download as PDF**. The file is
+named after the dashboard's title.
+
+The download is a server-rendered snapshot — Cube re-opens the dashboard,
+waits for every widget to finish rendering, and captures the result. This
+can take up to a couple of minutes for large dashboards. Filter or time
+grain selections you change in your browser before clicking **Download**
+are not applied; the snapshot uses the dashboard's saved state.
+
+Available to users with **Manage** permission on the workbook that owns
+the dashboard. The same screenshot mechanism powers PNG/PDF attachments on
+[notifications][ref-notifications] sent after a [scheduled
+refresh][ref-scheduled-refreshes].
+
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-notifications]: /docs/explore-analyze/notifications
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
