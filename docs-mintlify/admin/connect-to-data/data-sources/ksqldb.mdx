@@ -189,68 +189,146 @@ CUBEJS_DS_KSQL_DB_KAFKA_PASS=kafka_api_secret
 CUBEJS_DS_KSQL_DB_KAFKA_USE_SSL=true
 ```
 
-Then, create a cube that references an existing ksqlDB stream or table.
-Set `data_source` to the name you declared above so that Cube uses the
-ksqlDB connection for this cube:
+Then, create cubes that reference your data. A common pattern is to
+combine a **batch cube** (reading historical data from your warehouse)
+with a **streaming cube** (reading real-time data from ksqlDB via Kafka)
+using a [lambda pre-aggregation][ref-lambda-pre-aggs].
 
-<CodeGroup>
-
-```yaml title="YAML"
-cubes:
-  - name: events
-    data_source: ksql
-    sql_table: EVENTS-STREAM
-
-    measures:
-      - name: count
-        type: count
-
-    dimensions:
-      - name: id
-        sql: ID
-        type: number
-        primary_key: true
-
-      - name: name
-        sql: NAME
-        type: string
-
-      - name: created_at
-        sql: CREATED_AT
-        type: time
-
-    pre_aggregations:
-      - name: main
-        type: rollup
-        measures:
-          - CUBE.count
-        dimensions:
-          - CUBE.name
-        time_dimension: CUBE.created_at
-        granularity: day
-        partition_granularity: day
-```
+The batch cube queries the warehouse and builds daily partitions
+incrementally. The streaming cube points at an existing ksqlDB stream
+with `data_source: ksql` and uses a read-only streaming pre-aggregation
+that consumes from the backing Kafka topic directly. The lambda
+pre-aggregation in the batch cube merges both, serving historical data
+from the warehouse rollup and real-time data from the streaming rollup:
 
 ```javascript title="JavaScript"
-cube("events", {
-  data_source: "ksql",
-  sql_table: `EVENTS-STREAM`,
+cube("order_events", {
+  data_source: "default",
+
+  sql: `
+    SELECT
+      order_id,
+      user_id,
+      status,
+      amount,
+      created_at
+    FROM ecommerce.order_events
+    WHERE ${FILTER_PARAMS.order_events.created_at.filter(
+      (from, to) => `created_at >= ${from} AND created_at < ${to}`
+    )}
+  `,
 
   measures: {
     count: {
       type: `count`,
     },
+
+    total_amount: {
+      sql: `amount`,
+      type: `sum`,
+    },
+
+    failed_count: {
+      sql: `CASE WHEN status = 'failed' THEN 1 ELSE 0 END`,
+      type: `sum`,
+    },
   },
 
   dimensions: {
-    id: {
-      sql: `ID`,
-      type: `number`,
+    order_id: {
+      sql: `order_id`,
+      type: `string`,
       primary_key: true,
     },
 
-    name: {
-      sql: `NAME`,
+    user_id: {
+      sql: `user_id`,
+      type: `string`,
+    },
+
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+
+  pre_aggregations: {
+    lambda: {
+      type: `rollup_lambda`,
+      rollups: [
+        order_events.batch,
+        order_events_stream.stream,
+      ],
+    },
+
+    batch: {
+      external: true,
+      type: `rollup`,
+      measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
+      dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
+      time_dimension: CUBE.created_at,
+      granularity: `second`,
+      partition_granularity: `day`,
+      build_range_start: {
+        sql: `SELECT NOW() - INTERVAL '90 days'`,
+      },
+      build_range_end: {
+        sql: `SELECT NOW()`,
+      },
+      refresh_key: {
+        every: `8 hour`,
+        update_window: `1 day`,
+        incremental: true,
+      },
+      indexes: {
+        user_status: {
+          columns: [CUBE.user_id, CUBE.status],
+        },
+      },
+    },
+  },
+});
+
+cube("order_events_stream", {
+  data_source: "ksql",
+
+  sql: `SELECT * FROM ORDER_EVENTS_STREAM`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+
+    total_amount: {
+      sql: `AMOUNT`,
+      type: `sum`,
+    },
+
+    failed_count: {
+      sql: `CASE WHEN STATUS = 'failed' THEN 1 ELSE 0 END`,
+      type: `sum`,
+    },
+  },
+
+  dimensions: {
+    order_id: {
+      sql: `ORDER_ID`,
+      type: `string`,
+      primary_key: true,
+    },
+
+    user_id: {
+      sql: `USER_ID`,
+      type: `string`,
+    },
+
+    status: {
+      sql: `STATUS`,
       type: `string`,
     },
 
@@ -261,24 +339,51 @@ cube("events", {
   },
 
   pre_aggregations: {
-    main: {
+    stream: {
       type: `rollup`,
-      measures: [CUBE.count],
-      dimensions: [CUBE.name],
+      read_only: true,
+      external: true,
+      measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
+      dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
+      unique_key_columns: [`order_id`],
       time_dimension: CUBE.created_at,
-      granularity: `day`,
+      granularity: `second`,
       partition_granularity: `day`,
+      build_range_start: {
+        sql: `SELECT date_trunc('day', DATE_SUB(NOW(), INTERVAL '5 hour'))`,
+      },
+      build_range_end: {
+        sql: `SELECT DATE_ADD(NOW(), INTERVAL '15 minute')`,
+      },
+      refresh_key: {
+        every: `1 minute`,
+        update_window: `1 hour`,
+        incremental: true,
+      },
+      indexes: {
+        user_status: {
+          columns: [CUBE.user_id, CUBE.status],
+        },
+      },
+      stream_offset: `latest`,
     },
   },
 });
 ```
 
-</CodeGroup>
+Key properties for the streaming pre-aggregation:
 
-The `sql_table` value should match the name of an existing ksqlDB stream
-or table. Cube will discover its schema automatically. With Kafka streams
-mode enabled, the pre-aggregation is built by reading the backing Kafka
-topic directly — no objects are created in ksqlDB.
+- `read_only: true` — Cube will not create any objects in ksqlDB. The
+  data is consumed directly from the backing Kafka topic.
+- `stream_offset: "latest"` — start consuming from the latest offset in
+  the Kafka topic. Use `"earliest"` to replay from the beginning.
+- `unique_key_columns` — columns that uniquely identify a record, used
+  for deduplication during ingestion into Cube Store.
+
+The `sql_table` or `sql` value should reference an existing ksqlDB stream
+or table. Cube discovers its schema automatically. With Kafka streams
+mode enabled, the streaming pre-aggregation reads the backing Kafka topic
+directly — no objects are created in ksqlDB.
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 [ref-powerbi]: /docs/integrations/power-bi
@@ -286,3 +391,4 @@ topic directly — no objects are created in ksqlDB.
 [ref-streaming-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
 [ref-decorated-env-vars]: /admin/connect-to-data/multiple-data-sources#decorated-environment-variables
 [ref-cube-data-source]: /reference/data-modeling/cube#data_source
+[ref-lambda-pre-aggs]: /docs/pre-aggregations/lambda-pre-aggregations
