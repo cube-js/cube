@@ -434,6 +434,43 @@ The message key is optional. When present and the value starts with `{`,
 it is parsed as a JSON object and used as a fallback source for unique
 key column values (see [above](#unique-key-columns-and-deduplication)).
 
+#### Timestamp handling
+
+For dimensions with `type: time`, Cube Store accepts timestamp values in
+two formats:
+
+- **String** — parsed using ISO 8601 / RFC 3339 formats. Supported
+  patterns include:
+  - `2025-01-15T10:30:00.000Z`
+  - `2025-01-15T10:30:00Z`
+  - `2025-01-15 10:30:00.000 UTC`
+  - `2025-01-15T10:30:00`
+  - `2025-01-15 10:30:00`
+  - `2025-01-15`
+- **Number** — interpreted as **epoch milliseconds** (not seconds, not
+  microseconds). For example, `1736939400000` represents
+  `2025-01-15T10:30:00.000Z`.
+
+If your Kafka topic produces timestamps as strings in a non-standard
+format, you can use `PARSE_TIMESTAMP` in the cube's `sql` property to
+convert them. In that case, define the source column as `type: string`
+in a `source_table` and use the `select_statement` to transform it:
+
+```javascript
+sql: `SELECT PARSE_TIMESTAMP(TIMESTAMP_STR,
+  'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC') AS created_at,
+  ORDER_ID, USER_ID, STATUS, AMOUNT
+  FROM ORDER_EVENTS_STREAM`,
+```
+
+Time dimension truncation (controlled by the `granularity` property of
+the pre-aggregation) is handled automatically. Cube generates the
+appropriate `PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(...)))`
+expression chain to truncate timestamps to the configured granularity
+(e.g., `day`, `hour`, `minute`). Cube Store evaluates these expressions
+natively on each micro-batch during ingestion. Standard SQL functions
+like `date_trunc` are also available in the `select_statement`.
+
 ### Filtering on the stream
 
 When the streaming cube defines a `sql` property with a `SELECT`
@@ -476,14 +513,7 @@ the filter is optional). Any other query plan shape is rejected.
   formatting using ksql-style format strings (e.g.,
   `yyyy-MM-dd'T'HH:mm:ss.SSS`)
 - Nested expressions with parentheses
-
-Time dimension truncation (controlled by the `granularity` property of
-the pre-aggregation) is fully supported. Cube automatically generates
-the appropriate `PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(...)))`
-expression chain to truncate timestamps to the configured granularity.
-Cube Store evaluates these expressions natively on each micro-batch
-during ingestion — there is no dependency on ksqlDB for this
-processing.
+- `date_trunc` for timestamp truncation
 
 **Not supported:**
 
