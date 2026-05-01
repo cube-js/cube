@@ -387,15 +387,19 @@
               "admin/ai/bring-your-own-model"
             ]
           },
-         
           {
-            "group": "Account & Billing",
+            "group": "Account",
             "pages": [
+              {
+                "group": "Customization",
+                "pages": [
+                  "admin/customization/chart-palettes",
+                  "admin/customization/dashboard-themes"
+                ]
+              },
               "admin/account-billing/ai-tokens",
               "admin/account-billing/api-keys",
               "admin/account-billing/billing-faq",
-              "admin/account-billing/budgets",
-              "admin/account-billing/distribution",
               "admin/account-billing/support"
             ]
           }
