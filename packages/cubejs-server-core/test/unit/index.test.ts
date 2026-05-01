@@ -362,11 +362,19 @@ describe('index.test', () => {
 
     test('CompilerApi metaConfig', async () => {
       const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
+      expect((<any[]>metaConfig)?.length).toBeGreaterThan(0);
+      expect(metaConfig[0]).toHaveProperty('config');
+      expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfig with includeViewGroups', async () => {
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX', includeViewGroups: true });
       expect(metaConfig).toHaveProperty('cubes');
       expect(metaConfig).toHaveProperty('viewGroups');
       expect((<any[]>metaConfig.cubes)?.length).toBeGreaterThan(0);
       expect(metaConfig.cubes[0]).toHaveProperty('config');
-      expect(metaConfig.cubes[0].config.hasOwnProperty('sql')).toBe(false);
       expect(metaConfigSpy).toHaveBeenCalled();
       metaConfigSpy.mockClear();
     });
@@ -393,6 +401,13 @@ describe('index.test', () => {
 
     test('CompilerApi metaConfig', async () => {
       const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
+      expect(metaConfig).toEqual([]);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfig with includeViewGroups', async () => {
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX', includeViewGroups: true });
       expect(metaConfig).toHaveProperty('cubes');
       expect(metaConfig).toHaveProperty('viewGroups');
       expect(metaConfig.cubes).toEqual([]);

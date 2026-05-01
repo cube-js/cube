@@ -80,84 +80,94 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return { query, denied: false };
   },
 
-  async metaConfig() {
-    return {
-      cubes: [
-        {
-          config: {
-            name: 'Foo',
-            type: 'cube',
-            description: 'cube from compilerApi mock',
-            measures: [
-              {
-                name: 'Foo.bar',
-                description: 'measure from compilerApi mock',
-                isVisible: true,
-              },
-            ],
-            dimensions: [
-              {
-                name: 'Foo.id',
-                description: 'id dimension from compilerApi mock',
-                isVisible: true,
-              },
-              {
-                name: 'Foo.time',
-                isVisible: true,
-              },
-              {
-                name: 'Foo.timeGranularities',
-                isVisible: true,
-                granularities: [
-                  {
-                    name: 'half_year_by_1st_april',
-                    title: 'Half Year By1 St April',
-                    interval: '6 months',
-                    offset: '3 months'
-                  }
-                ]
-              },
-            ],
-            segments: [
-              {
-                name: 'Foo.quux',
-                description: 'segment from compilerApi mock',
-                isVisible: true,
-              },
-            ],
+  async metaConfig(_ctx, options: any = {}) {
+    const cubes = [
+      {
+        config: {
+          name: 'Foo',
+          type: 'cube',
+          description: 'cube from compilerApi mock',
+          measures: [
+            {
+              name: 'Foo.bar',
+              description: 'measure from compilerApi mock',
+              isVisible: true,
+            },
+          ],
+          dimensions: [
+            {
+              name: 'Foo.id',
+              description: 'id dimension from compilerApi mock',
+              isVisible: true,
+            },
+            {
+              name: 'Foo.time',
+              isVisible: true,
+            },
+            {
+              name: 'Foo.timeGranularities',
+              isVisible: true,
+              granularities: [
+                {
+                  name: 'half_year_by_1st_april',
+                  title: 'Half Year By1 St April',
+                  interval: '6 months',
+                  offset: '3 months'
+                }
+              ]
+            },
+          ],
+          segments: [
+            {
+              name: 'Foo.quux',
+              description: 'segment from compilerApi mock',
+              isVisible: true,
+            },
+          ],
+        },
+      },
+      {
+        config: {
+          name: 'FooView',
+          type: 'view',
+          description: 'view from compilerApi mock',
+          viewGroup: 'analytics',
+          measures: [
+            {
+              name: 'FooView.bar',
+              isVisible: true,
+            },
+          ],
+          dimensions: [
+            {
+              name: 'FooView.id',
+              isVisible: true,
+            },
+          ],
+          segments: [],
+        },
+      },
+    ];
+
+    if (options.includeCompilerId || options.includeViewGroups) {
+      const result: any = { cubes };
+      if (options.includeCompilerId) {
+        result.compilerId = 'mock-compiler-id';
+      }
+      if (options.includeViewGroups) {
+        result.viewGroups = [
+          {
+            name: 'analytics',
+            title: 'Analytics',
+            description: 'Analytics related views',
+            views: ['FooView'],
           },
-        },
-        {
-          config: {
-            name: 'FooView',
-            type: 'view',
-            description: 'view from compilerApi mock',
-            viewGroup: 'analytics',
-            measures: [
-              {
-                name: 'FooView.bar',
-                isVisible: true,
-              },
-            ],
-            dimensions: [
-              {
-                name: 'FooView.id',
-                isVisible: true,
-              },
-            ],
-            segments: [],
-          },
-        },
-      ],
-      viewGroups: [
-        {
-          name: 'analytics',
-          title: 'Analytics',
-          description: 'Analytics related views',
-          views: ['FooView'],
-        },
-      ],
-    };
+        ];
+      }
+      return result;
+    }
+
+    return cubes;
   },
 
   async metaConfigExtended() {
