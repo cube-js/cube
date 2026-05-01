@@ -707,12 +707,12 @@ describe('API Gateway', () => {
 
     const fooView = res.body.cubes.find(c => c.name === 'FooView');
     expect(fooView).toBeDefined();
-    expect(fooView.viewGroup).toBe('analytics');
+    expect(fooView.viewGroups).toEqual(['analytics']);
     expect(fooView.type).toBe('view');
 
     const fooCube = res.body.cubes.find(c => c.name === 'Foo');
     expect(fooCube).toBeDefined();
-    expect(fooCube.viewGroup).toBeUndefined();
+    expect(fooCube.viewGroups).toBeUndefined();
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {

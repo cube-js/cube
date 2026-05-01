@@ -511,7 +511,6 @@ export type Cube = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
-  viewGroup?: string;
   viewGroups?: string[];
 };
 

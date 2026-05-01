@@ -537,11 +537,9 @@ describe('DataSchemaCompiler', () => {
     }]);
 
     const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-    expect(revenueView?.config.viewGroup).toBe('sales');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
 
     const customersView = metaTransformer.cubes.find(c => c.config.name === 'customers_view');
-    expect(customersView?.config.viewGroup).toBe('sales');
     expect(customersView?.config.viewGroups).toEqual(['sales']);
   });
 
@@ -573,7 +571,6 @@ describe('DataSchemaCompiler', () => {
     }]);
 
     const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-    expect(revenueView?.config.viewGroup).toBe('sales');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
@@ -741,7 +738,7 @@ view_groups:
     }]);
 
     const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-    expect(revenueView?.config.viewGroup).toBe('sales');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view_group via view property in YAML', async () => {
@@ -773,6 +770,6 @@ views:
     }]);
 
     const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-    expect(revenueView?.config.viewGroup).toBe('sales');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 });

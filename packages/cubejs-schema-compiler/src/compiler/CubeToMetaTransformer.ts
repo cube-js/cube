@@ -147,7 +147,6 @@ export type CubeConfig = {
   isVisible: boolean;
   public: boolean;
   description?: string;
-  viewGroup?: string;
   viewGroups?: string[];
   connectedComponent: number;
   meta?: any;
@@ -259,9 +258,6 @@ export class CubeToMetaTransformer implements CompilerInterface {
           }
         }
 
-        if (groupNames.length === 1) {
-          [cube.config.viewGroup] = groupNames;
-        }
         if (groupNames.length > 0) {
           cube.config.viewGroups = groupNames;
         }
@@ -272,9 +268,6 @@ export class CubeToMetaTransformer implements CompilerInterface {
       for (const viewName of group.views) {
         const cube = transformedByName.get(viewName);
         if (cube) {
-          if (!cube.config.viewGroup) {
-            cube.config.viewGroup = group.name;
-          }
           if (!cube.config.viewGroups) {
             cube.config.viewGroups = [group.name];
           } else if (!cube.config.viewGroups.includes(group.name)) {

@@ -131,7 +131,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
           name: 'FooView',
           type: 'view',
           description: 'view from compilerApi mock',
-          viewGroup: 'analytics',
+          viewGroups: ['analytics'],
           measures: [
             {
               name: 'FooView.bar',

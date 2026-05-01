@@ -73,24 +73,23 @@ describe('view groups', () => {
     expect(inventoryGroup!.views).toContain('CatalogView');
   });
 
-  test('view cube config includes viewGroup reference', async () => {
+  test('view cube config includes viewGroups reference', async () => {
     const meta = await client.meta();
 
     const revenueView = meta.cubes.find((c) => c.name === 'RevenueView');
     expect(revenueView).toBeDefined();
-    expect(revenueView!.viewGroup).toBe('sales');
+    expect(revenueView!.viewGroups).toEqual(expect.arrayContaining(['sales']));
 
     const customersView = meta.cubes.find((c) => c.name === 'CustomersView');
     expect(customersView).toBeDefined();
-    expect(customersView!.viewGroup).toBe('sales');
+    expect(customersView!.viewGroups).toEqual(['sales']);
   });
 
-  test('cubes without view groups do not have viewGroup', async () => {
+  test('cubes without view groups do not have viewGroups', async () => {
     const meta = await client.meta();
 
     const ordersCube = meta.cubes.find((c) => c.name === 'Orders');
     expect(ordersCube).toBeDefined();
-    expect(ordersCube!.viewGroup).toBeUndefined();
     expect(ordersCube!.viewGroups).toBeUndefined();
   });
 

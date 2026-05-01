@@ -1240,7 +1240,7 @@ view_groups:
       }]);
 
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-      expect(revenueView?.config.viewGroup).toBe('sales');
+      expect(revenueView?.config.viewGroups).toEqual(['sales']);
     });
 
     it('view_group property on individual views', async () => {
@@ -1273,7 +1273,7 @@ views:
       }]);
 
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-      expect(revenueView?.config.viewGroup).toBe('sales');
+      expect(revenueView?.config.viewGroups).toEqual(['sales']);
     });
 
     it('merges standalone view_groups with view-level view_group', async () => {
@@ -1503,7 +1503,6 @@ view_groups:
       await compiler.compile();
 
       const ordersCube = metaTransformer.cubes.find(c => c.config.name === 'orders');
-      expect(ordersCube?.config.viewGroup).toBeUndefined();
       expect(ordersCube?.config.viewGroups).toBeUndefined();
     });
 
@@ -1576,7 +1575,6 @@ views:
       await compiler.compile();
 
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-      expect(revenueView?.config.viewGroup).toBe('sales');
       expect(revenueView?.config.viewGroups).toEqual(['sales']);
     });
 
