@@ -421,7 +421,9 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
-        return viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
+        viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
+        this.compileV8ContextCache![name] = name;
+        return name;
       },
       addExport: (obj) => {
         const file = ctxFileStorage.getStore();

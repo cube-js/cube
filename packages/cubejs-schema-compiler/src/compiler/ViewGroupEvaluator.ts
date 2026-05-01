@@ -93,10 +93,25 @@ export class ViewGroupEvaluator implements CompilerInterface {
 
       const groupNames: string[] = [];
       if (cube.viewGroup) {
-        groupNames.push(cube.viewGroup);
+        const resolved = typeof cube.viewGroup === 'function'
+          ? this.cubeEvaluator.evaluateReferences(null, cube.viewGroup)
+          : cube.viewGroup;
+        const names = Array.isArray(resolved) ? resolved : [resolved];
+        for (const n of names) {
+          if (!groupNames.includes(n)) {
+            groupNames.push(n);
+          }
+        }
       }
-      if (Array.isArray(cube.viewGroups)) {
-        for (const n of cube.viewGroups) {
+      if (cube.viewGroups) {
+        let resolved: string[];
+        if (typeof cube.viewGroups === 'function') {
+          const evaluated = this.cubeEvaluator.evaluateReferences(null, cube.viewGroups, { originalSorting: true });
+          resolved = Array.isArray(evaluated) ? evaluated : [evaluated];
+        } else {
+          resolved = cube.viewGroups;
+        }
+        for (const n of resolved) {
           if (!groupNames.includes(n)) {
             groupNames.push(n);
           }

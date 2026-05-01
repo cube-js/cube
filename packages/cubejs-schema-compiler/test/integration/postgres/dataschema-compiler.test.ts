@@ -688,6 +688,67 @@ describe('DataSchemaCompiler', () => {
     expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
+  it('view-level viewGroup as bare reference to view_group', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+      });
+
+      view('revenue', {
+        viewGroup: sales,
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view-level viewGroups as bare references to view_group', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view_group('sales', { title: 'Sales' });
+      view_group('finance', { title: 'Finance' });
+
+      view('revenue', {
+        viewGroups: [sales, finance],
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+    `);
+    await compiler.compile();
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
+  });
+
   it('view_group merges standalone and view-level definitions', async () => {
     const { compiler, metaTransformer } = prepareJsCompiler(`
       cube('Orders', {

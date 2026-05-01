@@ -27,6 +27,8 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(outputColumnTypes|output_column_types)\.\d+\.member$/,
   /^contextMembers$/,
   /^views$/,
+  /^(viewGroup|view_group)$/,
+  /^(viewGroups|view_groups)$/,
   /^includes$/,
   /^excludes$/,
   /^hierarchies\.[_a-zA-Z][_a-zA-Z0-9]*\.levels$/,
