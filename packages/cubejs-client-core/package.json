@@ -21,7 +21,8 @@
     },
     "./format": {
       "types": "./dist/src/format.d.ts",
-      "import": "./dist/src/format.js"
+      "import": "./dist/src/format.js",
+      "require": "./dist/format.cjs"
     }
   },
   "typesVersions": {
