@@ -89,14 +89,13 @@ export class ViewGroupEvaluator implements CompilerInterface {
       }
 
       const groupNames: string[] = [];
-      const cubeDef = cube as any;
-      if (cubeDef.viewGroup) {
-        groupNames.push(cubeDef.viewGroup);
+      if (cube.viewGroup) {
+        groupNames.push(cube.viewGroup);
       }
-      if (Array.isArray(cubeDef.viewGroups)) {
-        for (const name of cubeDef.viewGroups) {
-          if (!groupNames.includes(name)) {
-            groupNames.push(name);
+      if (Array.isArray(cube.viewGroups)) {
+        for (const n of cube.viewGroups) {
+          if (!groupNames.includes(n)) {
+            groupNames.push(n);
           }
         }
       }
