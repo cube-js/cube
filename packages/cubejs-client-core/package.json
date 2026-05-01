@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-client-core"
   },
   "description": "Cube client",
-  "main": "dist/cubejs-client-core.cjs.js",
+  "main": "dist/cubejs-client-core.cjs",
   "browser": "dist/cubejs-client-core.umd.js",
   "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
@@ -17,7 +17,7 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js",
-      "require": "./dist/cubejs-client-core.cjs.js"
+      "require": "./dist/cubejs-client-core.cjs"
     },
     "./format": {
       "types": "./dist/src/format.d.ts",
