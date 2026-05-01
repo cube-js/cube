@@ -516,7 +516,7 @@ describe('DataSchemaCompiler', () => {
       view_group('sales', {
         title: 'Sales',
         description: 'Sales related views',
-        views: ['revenue', 'customers_view']
+        views: [revenue, customers_view]
       });
     `);
     await compiler.compile();
@@ -541,6 +541,42 @@ describe('DataSchemaCompiler', () => {
 
     const customersView = metaTransformer.cubes.find(c => c.config.name === 'customers_view');
     expect(customersView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view_group with string references', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+        views: ['revenue']
+      });
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      views: ['revenue'],
+    }]);
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view_group defined via view property', async () => {

@@ -48,7 +48,8 @@ export class ViewGroupEvaluator implements CompilerInterface {
     let views: string[] = [];
     if (viewGroup.views) {
       if (typeof viewGroup.views === 'function') {
-        views = viewGroup.views();
+        const evaluated = this.cubeEvaluator.evaluateReferences(null, viewGroup.views, { originalSorting: true });
+        views = Array.isArray(evaluated) ? evaluated : [evaluated];
       } else if (Array.isArray(viewGroup.views)) {
         views = viewGroup.views;
       }

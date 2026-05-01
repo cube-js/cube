@@ -26,6 +26,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensions|time_dimensions)\.\d+\.dimension$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(outputColumnTypes|output_column_types)\.\d+\.member$/,
   /^contextMembers$/,
+  /^views$/,
   /^includes$/,
   /^excludes$/,
   /^hierarchies\.[_a-zA-Z][_a-zA-Z0-9]*\.levels$/,
@@ -68,7 +69,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
                 this.knownIdentifiersInjectVisitor('extends', name => this.cubeDictionary.resolveCube(name))
               );
             }
-          } else if (path.node.callee.name === 'context') {
+          } else if (path.node.callee.name === 'context' || path.node.callee.name === 'view_group') {
             args[args.length - 1].traverse(this.sqlAndReferencesFieldVisitor(null));
           }
         }
