@@ -24,10 +24,13 @@ export class ViewGroupEvaluator implements CompilerInterface {
 
   private resolvedViewGroups: CompiledViewGroup[];
 
+  private viewToGroups: Map<string, string[]>;
+
   public constructor(cubeEvaluator: CubeEvaluator) {
     this.cubeEvaluator = cubeEvaluator;
     this.viewGroupDefinitions = new Map<string, CompiledViewGroup>();
     this.resolvedViewGroups = [];
+    this.viewToGroups = new Map();
   }
 
   public compile(viewGroups: ViewGroupInput[], errorReporter?: ErrorReporter): void {
@@ -113,6 +116,18 @@ export class ViewGroupEvaluator implements CompilerInterface {
     }
 
     this.resolvedViewGroups = Array.from(viewGroupMap.values());
+
+    this.viewToGroups = new Map();
+    for (const group of this.resolvedViewGroups) {
+      for (const viewName of group.views) {
+        let groups = this.viewToGroups.get(viewName);
+        if (!groups) {
+          groups = [];
+          this.viewToGroups.set(viewName, groups);
+        }
+        groups.push(group.name);
+      }
+    }
   }
 
   public get viewGroupList(): string[] {
@@ -124,12 +139,6 @@ export class ViewGroupEvaluator implements CompilerInterface {
   }
 
   public viewGroupsForView(viewName: string): string[] {
-    const groups: string[] = [];
-    for (const group of this.resolvedViewGroups) {
-      if (group.views.includes(viewName)) {
-        groups.push(group.name);
-      }
-    }
-    return groups;
+    return this.viewToGroups.get(viewName) || [];
   }
 }

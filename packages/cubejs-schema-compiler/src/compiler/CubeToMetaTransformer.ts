@@ -170,8 +170,6 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   public cubes: TransformedCube[];
 
-  private viewGroupsPopulated: boolean = false;
-
   /**
    * @deprecated
    */
@@ -195,33 +193,15 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   public get viewGroups(): CompiledViewGroup[] {
-    this.ensureViewGroupsPopulated();
     return this.viewGroupEvaluator.compiledViewGroups;
   }
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
-    this.viewGroupsPopulated = false;
     this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
 
     this.queries = this.cubes;
-  }
-
-  private ensureViewGroupsPopulated(): void {
-    if (this.viewGroupsPopulated) {
-      return;
-    }
-    this.viewGroupsPopulated = true;
-
-    for (const cube of this.cubes) {
-      if (cube.config.type === 'view') {
-        const groups = this.viewGroupEvaluator.viewGroupsForView(cube.config.name);
-        if (groups.length > 0) {
-          cube.config.viewGroups = groups;
-        }
-      }
-    }
   }
 
   protected transform(cube: CubeDefinitionExtended, _errorReporter?: ErrorReporter): TransformedCube {
@@ -269,6 +249,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const nestedFolders: NestedFolder[] = (extendedCube.folders || []).map((f: Folder) => processFolder(f));
 
+    const viewGroupNames = extendedCube.isView
+      ? this.viewGroupEvaluator.viewGroupsForView(cubeName)
+      : [];
+
     return {
       config: {
         name: cubeName,
@@ -277,6 +261,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
         isVisible: isCubeVisible,
         public: isCubeVisible,
         description: extendedCube.description,
+        ...(viewGroupNames.length > 0 ? { viewGroups: viewGroupNames } : {}),
         connectedComponent: this.joinGraph.connectedComponents()[cubeName],
         meta: extendedCube.meta,
         measures: Object.entries(extendedCube.measures || {}).map((nameToMetric: [string, any]) => {
