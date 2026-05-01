@@ -12,8 +12,8 @@ import {
   FilterOperator,
   TCubeSegment,
   NotFoundMember,
+  DeeplyReadonly,
 } from './types.js';
-import { DeeplyReadonly } from './index.js';
 
 export interface CubeMemberWrapper<T> {
   cubeName: string;

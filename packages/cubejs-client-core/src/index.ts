@@ -7,6 +7,7 @@ import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './Ht
 import RequestError from './RequestError.js';
 import {
   CacheMode,
+  DeeplyReadonly,
   DimensionFormat,
   ExtractTimeMembers,
   LoadResponse,
@@ -61,10 +62,6 @@ export type LoadMethodOptions = {
    * Client provided request ID, if client wants to track request onb their own
    */
   baseRequestId?: string;
-};
-
-export type DeeplyReadonly<T> = {
-  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
 };
 
 export type ExtractMembers<T extends DeeplyReadonly<Query>> =

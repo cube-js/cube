@@ -1,7 +1,7 @@
 import { clone, equals, fromPairs, indexBy, prop, toPairs } from 'ramda';
-import { DeeplyReadonly } from './index.js';
 import { DEFAULT_GRANULARITY } from './time.js';
 import {
+  DeeplyReadonly,
   Filter,
   PivotConfig,
   Query,
