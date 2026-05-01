@@ -466,7 +466,18 @@ the filter is optional). Any other query plan shape is rejected.
 - Scalar functions (e.g., `COALESCE`, `CONCAT`, arithmetic)
 - `CONVERT_TZ` for timezone conversion (internally rewritten for
   compatibility)
+- `PARSE_TIMESTAMP` and `FORMAT_TIMESTAMP` for timestamp parsing and
+  formatting using ksql-style format strings (e.g.,
+  `yyyy-MM-dd'T'HH:mm:ss.SSS`)
 - Nested expressions with parentheses
+
+Time dimension truncation (controlled by the `granularity` property of
+the pre-aggregation) is fully supported. Cube automatically generates
+the appropriate `PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(...)))`
+expression chain to truncate timestamps to the configured granularity.
+Cube Store evaluates these expressions natively on each micro-batch
+during ingestion — there is no dependency on ksqlDB for this
+processing.
 
 **Not supported:**
 
