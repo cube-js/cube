@@ -41,7 +41,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
       }
     }
 
-    this.resolve();
+    this.resolve(errorReporter);
   }
 
   private compileViewGroup(viewGroup: ViewGroupInput): CompiledViewGroup {
@@ -63,7 +63,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
     };
   }
 
-  private resolve(): void {
+  private resolve(errorReporter?: ErrorReporter): void {
     const viewGroupMap = new Map<string, CompiledViewGroup>();
     const validViewNames = new Set<string>();
 
@@ -101,12 +101,12 @@ export class ViewGroupEvaluator implements CompilerInterface {
       }
 
       for (const groupName of groupNames) {
-        let group = viewGroupMap.get(groupName);
+        const group = viewGroupMap.get(groupName);
         if (!group) {
-          group = { name: groupName, views: [] };
-          viewGroupMap.set(groupName, group);
-        }
-        if (!group.views.includes(cube.name)) {
+          if (errorReporter) {
+            errorReporter.error(`View "${cube.name}" references view group "${groupName}" which is not defined. Define it using view_group('${groupName}', { ... }).`);
+          }
+        } else if (!group.views.includes(cube.name)) {
           group.views.push(cube.name);
         }
       }

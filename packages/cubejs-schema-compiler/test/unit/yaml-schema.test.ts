@@ -1263,6 +1263,9 @@ views:
     cubes:
       - join_path: orders
         includes: '*'
+
+view_groups:
+  - name: sales
       `);
 
       await compiler.compile();
@@ -1570,6 +1573,9 @@ views:
     cubes:
       - join_path: orders
         includes: '*'
+
+view_groups:
+  - name: sales
       `);
 
       await compiler.compile();
@@ -1602,6 +1608,10 @@ views:
     cubes:
       - join_path: orders
         includes: '*'
+
+view_groups:
+  - name: sales
+  - name: finance
       `);
 
       await compiler.compile();

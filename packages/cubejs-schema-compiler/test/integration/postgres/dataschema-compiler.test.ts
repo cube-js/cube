@@ -598,6 +598,8 @@ describe('DataSchemaCompiler', () => {
           includes: '*'
         }]
       })
+
+      view_group('sales', {});
     `);
     await compiler.compile();
 
@@ -672,6 +674,9 @@ describe('DataSchemaCompiler', () => {
           includes: '*'
         }]
       })
+
+      view_group('sales', {});
+      view_group('finance', {});
     `);
     await compiler.compile();
 
@@ -797,6 +802,9 @@ views:
     cubes:
       - join_path: Orders
         includes: '*'
+
+view_groups:
+  - name: sales
     `);
     await compiler.compile();
 
@@ -807,5 +815,34 @@ views:
 
     const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('fails when view references non-existent view group', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        viewGroup: 'nonexistent',
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View "revenue" references view group "nonexistent" which is not defined');
+    }
   });
 });
