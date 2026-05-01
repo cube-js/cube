@@ -376,6 +376,24 @@ Key properties for the streaming pre-aggregation:
 - `unique_key_columns` — columns that uniquely identify a record, used
   for deduplication (see [below](#unique-key-columns-and-deduplication)).
 
+#### Primary key and ungrouped queries
+
+For the streaming pre-aggregation to work in read-only mode, the
+generated SQL must not contain a `GROUP BY` clause — Cube Store's stream
+post-processing engine does not support aggregation.
+
+Cube automatically omits the `GROUP BY` clause when at least one of the
+dimensions included in the pre-aggregation has `primary_key: true`. In
+that case, the generated query becomes a simple
+`SELECT ... FROM ...` without grouping, and measures are passed through
+as raw expressions rather than aggregated. This is what makes the
+pre-aggregation eligible for the read-only streaming path.
+
+If none of the dimensions has `primary_key: true`, Cube generates a
+`GROUP BY` clause, which means the query cannot be used for streaming
+ingestion. You must include at least one primary key dimension in the
+streaming pre-aggregation to ensure it stays ungrouped.
+
 The `sql_table` or `sql` value should reference an existing ksqlDB stream
 or table. Cube discovers its schema automatically. With Kafka streams
 mode enabled, the streaming pre-aggregation reads the backing Kafka topic
