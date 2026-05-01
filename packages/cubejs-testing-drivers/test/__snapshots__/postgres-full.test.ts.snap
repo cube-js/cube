@@ -1813,14 +1813,6 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver SQL API: EXTRACT DOW from column reference in SQL push down 1`] = `
-Array [
-  Object {
-    "qty": 35,
-  },
-]
-`;
-
 exports[`Queries with the @cubejs-backend/postgres-driver SQL API: Extended nested Rollup over asterisk 1`] = `
 Array [
   Object {
