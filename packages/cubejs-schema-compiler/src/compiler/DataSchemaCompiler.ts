@@ -20,7 +20,6 @@ import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
-import type { CubeToMetaTransformer } from './CubeToMetaTransformer';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
@@ -76,7 +75,6 @@ export type DataSchemaCompilerOptions = {
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
   viewGroupCompilers?: CompilerInterface[];
-  metaTransformer?: CubeToMetaTransformer;
   transpilers?: TranspilerInterface[];
   viewCompilers?: CompilerInterface[];
   viewCompilationGate: ViewCompilationGate;
@@ -121,8 +119,6 @@ export class DataSchemaCompiler {
   private readonly contextCompilers: CompilerInterface[];
 
   private readonly viewGroupCompilers: CompilerInterface[];
-
-  private readonly metaTransformer?: CubeToMetaTransformer;
 
   private readonly transpilers: TranspilerInterface[];
 
@@ -190,7 +186,6 @@ export class DataSchemaCompiler {
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
     this.viewGroupCompilers = options.viewGroupCompilers || [];
-    this.metaTransformer = options.metaTransformer;
     this.transpilers = options.transpilers || [];
     this.viewCompilers = options.viewCompilers || [];
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
@@ -858,12 +853,7 @@ export class DataSchemaCompiler {
     await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
     return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
       .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
-      .then(() => this.compileObjects(compilers.viewGroupCompilers || [], viewGroups, errorsReport))
-      .then(() => {
-        if (compilers.viewGroupCompilers?.length) {
-          this.metaTransformer?.compileViewGroups();
-        }
-      });
+      .then(() => this.compileObjects(compilers.viewGroupCompilers || [], viewGroups, errorsReport));
   }
 
   public throwIfAnyErrors() {

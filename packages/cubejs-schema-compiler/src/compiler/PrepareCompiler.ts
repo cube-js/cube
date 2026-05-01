@@ -67,7 +67,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const cubeValidator = new CubeValidator(cubeSymbols);
   const cubeEvaluator = new CubeEvaluator(cubeValidator);
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
-  const viewGroupEvaluator = new ViewGroupEvaluator();
+  const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
@@ -103,7 +103,6 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],
     viewGroupCompilers: [viewGroupEvaluator],
-    metaTransformer,
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     cubeDictionary,

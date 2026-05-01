@@ -15,7 +15,7 @@ import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
-import type { ViewGroupEvaluator } from './ViewGroupEvaluator';
+import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
@@ -133,13 +133,6 @@ export type HierarchyConfig = {
   [key: string]: any;
 };
 
-export type ViewGroupConfig = {
-  name: string;
-  title?: string;
-  description?: string;
-  views: string[];
-};
-
 export type CubeConfig = {
   name: string;
   type: 'view' | 'cube';
@@ -175,9 +168,9 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly joinGraph: JoinGraph;
 
-  public cubes: TransformedCube[];
+  private _cubes: TransformedCube[];
 
-  public viewGroups: ViewGroupConfig[];
+  private viewGroupsPopulated: boolean = false;
 
   /**
    * @deprecated
@@ -197,87 +190,43 @@ export class CubeToMetaTransformer implements CompilerInterface {
     this.contextEvaluator = contextEvaluator;
     this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
-    this.cubes = [];
-    this.viewGroups = [];
+    this._cubes = [];
     this.queries = [];
   }
 
+  public get cubes(): TransformedCube[] {
+    this.ensureViewGroupsPopulated();
+    return this._cubes;
+  }
+
+  public get viewGroups(): CompiledViewGroup[] {
+    this.ensureViewGroupsPopulated();
+    return this.viewGroupEvaluator.compiledViewGroups;
+  }
+
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
-    this.cubes = this.cubeSymbols.cubeList
+    this.viewGroupsPopulated = false;
+    this._cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
 
-    this.queries = this.cubes;
+    this.queries = this._cubes;
   }
 
-  public compileViewGroups(): void {
-    this.viewGroups = this.resolveViewGroups();
-  }
-
-  private resolveViewGroups(): ViewGroupConfig[] {
-    const viewGroupMap = new Map<string, ViewGroupConfig>();
-    const cubeDefByName = new Map(this.cubeSymbols.cubeList.map(c => [c.name, c]));
-    const transformedByName = new Map(this.cubes.map(c => [c.config.name, c]));
-    const validViewNames = new Set(
-      this.cubes.filter(c => c.config.type === 'view').map(c => c.config.name)
-    );
-
-    for (const compiled of this.viewGroupEvaluator.compiledViewGroups) {
-      viewGroupMap.set(compiled.name, {
-        name: compiled.name,
-        title: compiled.title,
-        description: compiled.description,
-        views: compiled.views.filter(v => validViewNames.has(v)),
-      });
+  private ensureViewGroupsPopulated(): void {
+    if (this.viewGroupsPopulated) {
+      return;
     }
+    this.viewGroupsPopulated = true;
 
-    for (const cube of this.cubes) {
+    for (const cube of this._cubes) {
       if (cube.config.type === 'view') {
-        const extendedCube = cubeDefByName.get(cube.config.name) as any;
-
-        const groupNames: string[] = [];
-        if (extendedCube?.viewGroup) {
-          groupNames.push(extendedCube.viewGroup);
-        }
-        if (Array.isArray(extendedCube?.viewGroups)) {
-          for (const name of extendedCube.viewGroups) {
-            if (!groupNames.includes(name)) {
-              groupNames.push(name);
-            }
-          }
-        }
-
-        for (const viewGroupName of groupNames) {
-          let group = viewGroupMap.get(viewGroupName);
-          if (!group) {
-            group = { name: viewGroupName, views: [] };
-            viewGroupMap.set(viewGroupName, group);
-          }
-          if (!group.views.includes(cube.config.name)) {
-            group.views.push(cube.config.name);
-          }
-        }
-
-        if (groupNames.length > 0) {
-          cube.config.viewGroups = groupNames;
+        const groups = this.viewGroupEvaluator.viewGroupsForView(cube.config.name);
+        if (groups.length > 0) {
+          cube.config.viewGroups = groups;
         }
       }
     }
-
-    for (const group of viewGroupMap.values()) {
-      for (const viewName of group.views) {
-        const cube = transformedByName.get(viewName);
-        if (cube) {
-          if (!cube.config.viewGroups) {
-            cube.config.viewGroups = [group.name];
-          } else if (!cube.config.viewGroups.includes(group.name)) {
-            cube.config.viewGroups.push(group.name);
-          }
-        }
-      }
-    }
-
-    return Array.from(viewGroupMap.values());
   }
 
   protected transform(cube: CubeDefinitionExtended, _errorReporter?: ErrorReporter): TransformedCube {
