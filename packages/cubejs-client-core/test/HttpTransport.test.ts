@@ -4,7 +4,7 @@ import fetch from 'cross-fetch';
 
 vi.mock('cross-fetch');
 
-import HttpTransport from '../src/HttpTransport';
+import HttpTransport from '../src/HttpTransport.js';
 
 const mockedFetch = fetch as MockedFunction<typeof fetch>;
 

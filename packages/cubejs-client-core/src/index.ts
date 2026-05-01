@@ -1,12 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import ResultSet from './ResultSet';
-import SqlQuery from './SqlQuery';
-import Meta from './Meta';
-import ProgressResult from './ProgressResult';
-import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
-import RequestError from './RequestError';
+import ResultSet from './ResultSet.js';
+import SqlQuery from './SqlQuery.js';
+import Meta from './Meta.js';
+import ProgressResult from './ProgressResult.js';
+import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport.js';
+import RequestError from './RequestError.js';
 import {
   CacheMode,
+  DeeplyReadonly,
   DimensionFormat,
   ExtractTimeMembers,
   LoadResponse,
@@ -18,7 +19,7 @@ import {
   QueryOrder,
   QueryType,
   TransformedQuery
-} from './types';
+} from './types.js';
 
 export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
 
@@ -61,10 +62,6 @@ export type LoadMethodOptions = {
    * Client provided request ID, if client wants to track request onb their own
    */
   baseRequestId?: string;
-};
-
-export type DeeplyReadonly<T> = {
-  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
 };
 
 export type ExtractMembers<T extends DeeplyReadonly<Query>> =
@@ -916,14 +913,14 @@ class CubeApi {
 export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
 export { CubeApi };
-export { default as Meta } from './Meta';
-export { default as SqlQuery } from './SqlQuery';
-export { default as RequestError } from './RequestError';
-export { default as ProgressResult } from './ProgressResult';
-export { default as ResultSet } from './ResultSet';
-export * from './HttpTransport';
-export * from './utils';
-export * from './time';
-export * from './types';
+export { default as Meta } from './Meta.js';
+export { default as SqlQuery } from './SqlQuery.js';
+export { default as RequestError } from './RequestError.js';
+export { default as ProgressResult } from './ProgressResult.js';
+export { default as ResultSet } from './ResultSet.js';
+export * from './HttpTransport.js';
+export * from './utils.js';
+export * from './time.js';
+export * from './types.js';
 // We don't export it for now, because size of builds for cjs/umd users will be affected
-// export * from './format';
+// export * from './format.js';

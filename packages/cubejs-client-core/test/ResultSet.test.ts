@@ -4,9 +4,9 @@
  * @fileoverview ResultSet class unit tests.
  */
 
-import ResultSet from '../src/ResultSet';
-import { TimeDimension } from '../src';
-import { DescriptiveQueryResponse } from './helpers';
+import ResultSet from '../src/ResultSet.js';
+import { TimeDimension } from '../src/index.js';
+import { DescriptiveQueryResponse } from './helpers.js';
 
 describe('ResultSet', () => {
   describe('timeSeries', () => {

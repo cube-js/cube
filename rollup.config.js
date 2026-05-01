@@ -63,6 +63,10 @@ const bundle = (
   // Will be built with typescript
   const skipEsModule = name === 'cubejs-client-core';
 
+  // Packages with "type": "module" need a .cjs extension so Node treats the
+  // CJS bundle as CommonJS regardless of the package's module type.
+  const cjsExtension = name === 'cubejs-client-core' ? 'cjs' : 'cjs.js';
+
   const config = [
     // browser-friendly UMD build
     {
@@ -120,7 +124,7 @@ const bundle = (
       ],
       output: [
         {
-          file: `packages/${name}/dist/${name}.cjs.js`,
+          file: `packages/${name}/dist/${name}.${cjsExtension}`,
           format: 'cjs',
           sourcemap: true,
         },

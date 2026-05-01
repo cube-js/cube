@@ -1,5 +1,9 @@
-import Meta from './Meta';
-import { TimeDimensionGranularity } from './time';
+import Meta from './Meta.js';
+import { TimeDimensionGranularity } from './time.js';
+
+export type DeeplyReadonly<T> = {
+  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+};
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
