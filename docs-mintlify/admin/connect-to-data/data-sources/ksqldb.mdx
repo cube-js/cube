@@ -267,7 +267,6 @@ cube("order_events", {
     },
 
     batch: {
-      external: true,
       type: `rollup`,
       measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
       dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
@@ -342,7 +341,6 @@ cube("order_events_stream", {
     stream: {
       type: `rollup`,
       read_only: true,
-      external: true,
       measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
       dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
       unique_key_columns: [`order_id`],
