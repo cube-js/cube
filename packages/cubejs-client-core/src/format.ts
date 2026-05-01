@@ -254,7 +254,7 @@ export function getFormat(
       default: {
         const specifier = NAMED_NUMERIC_FORMATS[format];
         if (specifier) {
-          const localeFormatter = specifier.includes('$')
+          const localeFormatter = format.startsWith('currency')
             ? getD3NumericLocale(locale, currency).format(specifier)
             : getD3NumericLocale(locale).format(specifier);
           return {
