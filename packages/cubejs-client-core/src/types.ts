@@ -31,13 +31,25 @@ export type CustomNumericFormat = {
   alias?: string;
 };
 export type DimensionLinkFormat = { type: 'link'; label: string };
-export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
-  | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFormat;
 
 type FormatDescriptionBaseName = 'number' | 'percent' | 'currency' | 'abbr' | 'accounting';
 type FormatDescriptionPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 type FormatDescriptionName = 'custom' | 'id' | FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
+
+type NamedNumericPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type NamedNumericFormatName =
+  | `number_${NamedNumericPrecision}`
+  | `percent_${NamedNumericPrecision}`
+  | `currency_${NamedNumericPrecision}`
+  | `decimal_${NamedNumericPrecision}`
+  | `abbr_${NamedNumericPrecision}`
+  | `accounting_${NamedNumericPrecision}`
+  | 'decimal' | 'abbr' | 'accounting';
+
+export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
+  | NamedNumericFormatName
+  | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
+export type MeasureFormat = 'percent' | 'currency' | 'number' | NamedNumericFormatName | CustomNumericFormat;
 
 export type FormatDescription = {
   /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */
