@@ -161,32 +161,128 @@ With Kafka streams mode enabled:
 4. Pre-aggregation builds use the read-only refresh strategy. Cube does
    not issue any `CREATE TABLE` or `CREATE STREAM` statements to ksqlDB.
 
-### Configuration via `driverFactory`
+### Data modeling
 
-You can also configure Kafka streams mode programmatically in the
-`cube.js` configuration file:
+ksqlDB is typically used as an additional data source alongside a primary
+data warehouse. To use Kafka streams mode, configure ksqlDB as a named
+data source using [decorated environment variables][ref-decorated-env-vars]
+and point your cubes to it with the
+[`data_source`][ref-cube-data-source] property.
 
-```javascript
-const KsqlDriver = require("@cubejs-backend/ksql-driver");
+First, declare the data sources and configure the ksqlDB connection with
+Kafka credentials:
 
-module.exports = {
-  driverFactory: ({ dataSource }) => {
-    if (dataSource === "ksql") {
-      return new KsqlDriver({
-        url: process.env.CUBEJS_DB_URL,
-        username: process.env.CUBEJS_DB_USER,
-        password: process.env.CUBEJS_DB_PASS,
-        kafkaHost: process.env.CUBEJS_DB_KAFKA_HOST,
-        kafkaUser: process.env.CUBEJS_DB_KAFKA_USER,
-        kafkaPassword: process.env.CUBEJS_DB_KAFKA_PASS,
-        kafkaUseSsl: true,
-      });
-    }
-  },
-};
+```dotenv
+CUBEJS_DATASOURCES=default,ksql
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_HOST=my.postgres.host
+CUBEJS_DB_NAME=my_database
+CUBEJS_DB_USER=postgres_user
+CUBEJS_DB_PASS=postgres_password
+CUBEJS_DS_KSQL_DB_TYPE=ksql
+CUBEJS_DS_KSQL_DB_URL=https://xxxxxx-xxxxx.us-west4.gcp.confluent.cloud:443
+CUBEJS_DS_KSQL_DB_USER=ksql_api_key
+CUBEJS_DS_KSQL_DB_PASS=ksql_api_secret
+CUBEJS_DS_KSQL_DB_KAFKA_HOST=pkc-xxxxx.us-west4.gcp.confluent.cloud:9092
+CUBEJS_DS_KSQL_DB_KAFKA_USER=kafka_api_key
+CUBEJS_DS_KSQL_DB_KAFKA_PASS=kafka_api_secret
+CUBEJS_DS_KSQL_DB_KAFKA_USE_SSL=true
 ```
+
+Then, create a cube that references an existing ksqlDB stream or table.
+Set `data_source` to the name you declared above so that Cube uses the
+ksqlDB connection for this cube:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: events
+    data_source: ksql
+    sql_table: EVENTS-STREAM
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: NAME
+        type: string
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
+
+    pre_aggregations:
+      - name: main
+        type: rollup
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.name
+        time_dimension: CUBE.created_at
+        granularity: day
+        partition_granularity: day
+```
+
+```javascript title="JavaScript"
+cube("events", {
+  data_source: "ksql",
+  sql_table: `EVENTS-STREAM`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: `ID`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `NAME`,
+      type: `string`,
+    },
+
+    created_at: {
+      sql: `CREATED_AT`,
+      type: `time`,
+    },
+  },
+
+  pre_aggregations: {
+    main: {
+      type: `rollup`,
+      measures: [CUBE.count],
+      dimensions: [CUBE.name],
+      time_dimension: CUBE.created_at,
+      granularity: `day`,
+      partition_granularity: `day`,
+    },
+  },
+});
+```
+
+</CodeGroup>
+
+The `sql_table` value should match the name of an existing ksqlDB stream
+or table. Cube will discover its schema automatically. With Kafka streams
+mode enabled, the pre-aggregation is built by reading the backing Kafka
+topic directly — no objects are created in ksqlDB.
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 [ref-powerbi]: /docs/integrations/power-bi
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-streaming-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
+[ref-decorated-env-vars]: /admin/connect-to-data/multiple-data-sources#decorated-environment-variables
+[ref-cube-data-source]: /reference/data-modeling/cube#data_source
