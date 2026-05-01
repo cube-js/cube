@@ -119,4 +119,18 @@ groups to push:
    search by name or rule.
 3. Select the groups you want to push to Cube Cloud and click **Save**.
 
+## Default role for SCIM-provisioned users
+
+Users created through SCIM receive the same default role configured for
+SAML auto-provisioning — there is no separate SCIM control. By default
+this is the **Viewer** role; to choose a different default role (including
+[custom roles][ref-custom-roles]), see
+[Default role for new users][ref-saml-default-role] on the SAML setup page.
+
+The default role only applies to users created by SCIM (`POST
+/api/scim/v2/Users`). Existing users are not modified by subsequent SCIM
+profile or group updates.
+
 [ref-saml]: /admin/sso/okta/saml
+[ref-saml-default-role]: /admin/sso/okta/saml#default-role-for-new-users
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
