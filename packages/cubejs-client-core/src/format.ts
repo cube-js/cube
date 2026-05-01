@@ -5,7 +5,7 @@ import { getD3NumericLocale } from './format-d3-numeric-locale.js';
 import type { DimensionFormat, MeasureFormat, TCubeMemberType } from './types.js';
 
 // Default d3-format specifiers — aligned with the named _2 formats
-// (number_2, currency_2, percent_2) in named-numeric-formats.ts.
+// (number_2, currency_2, percent_2) in NAMED_NUMERIC_FORMATS below.
 // The `~` modifier trims insignificant trailing zeros so values like 1234
 // render as "1,234" rather than "1,234.00".
 const DEFAULT_NUMBER_FORMAT = ',.2~f';
@@ -13,6 +13,64 @@ const DEFAULT_CURRENCY_FORMAT = '$,.2~f';
 const DEFAULT_PERCENT_FORMAT = '.2~%';
 
 const DEFAULT_ID_FORMAT = '.0f';
+
+// Predefined named numeric formats and their d3-format specifiers.
+// Mirrors NAMED_NUMERIC_FORMATS in @cubejs-backend/schema-compiler — keep in sync.
+// Bare names ('number', 'percent', 'currency') keep their existing API contract
+// and are routed through the explicit cases below; only the _N suffixed variants
+// (and bare 'abbr', 'accounting', 'decimal') are resolved through this map.
+const NAMED_NUMERIC_FORMATS: Record<string, string> = {
+  number_0: ',.0f',
+  number_1: ',.1~f',
+  number_2: ',.2~f',
+  number_3: ',.3~f',
+  number_4: ',.4~f',
+  number_5: ',.5~f',
+  number_6: ',.6~f',
+
+  percent_0: '.0%',
+  percent_1: '.1~%',
+  percent_2: '.2~%',
+  percent_3: '.3~%',
+  percent_4: '.4~%',
+  percent_5: '.5~%',
+  percent_6: '.6~%',
+
+  currency_0: '$,.0f',
+  currency_1: '$,.1~f',
+  currency_2: '$,.2~f',
+  currency_3: '$,.3~f',
+  currency_4: '$,.4~f',
+  currency_5: '$,.5~f',
+  currency_6: '$,.6~f',
+
+  decimal: ',.2~f',
+  decimal_0: ',.0f',
+  decimal_1: ',.1~f',
+  decimal_2: ',.2~f',
+  decimal_3: ',.3~f',
+  decimal_4: ',.4~f',
+  decimal_5: ',.5~f',
+  decimal_6: ',.6~f',
+
+  abbr: '.2~s',
+  abbr_0: '.0~s',
+  abbr_1: '.1~s',
+  abbr_2: '.2~s',
+  abbr_3: '.3~s',
+  abbr_4: '.4~s',
+  abbr_5: '.5~s',
+  abbr_6: '.6~s',
+
+  accounting: '(,.2~f',
+  accounting_0: '(,.0f',
+  accounting_1: '(,.1~f',
+  accounting_2: '(,.2~f',
+  accounting_3: '(,.3~f',
+  accounting_4: '(,.4~f',
+  accounting_5: '(,.5~f',
+  accounting_6: '(,.6~f',
+};
 
 function detectLocale() {
   try {
@@ -192,8 +250,20 @@ export function getFormat(
         };
       case 'imageUrl':
       case 'link':
-      default:
         return { formatString: null, formatFunc: (value) => String(value) };
+      default: {
+        const specifier = NAMED_NUMERIC_FORMATS[format];
+        if (specifier) {
+          const localeFormatter = specifier.includes('$')
+            ? getD3NumericLocale(locale, currency).format(specifier)
+            : getD3NumericLocale(locale).format(specifier);
+          return {
+            formatString: specifier,
+            formatFunc: (value) => localeFormatter(parseNumber(value)),
+          };
+        }
+        return { formatString: null, formatFunc: (value) => String(value) };
+      }
     }
   }
 

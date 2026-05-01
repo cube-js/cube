@@ -21,6 +21,31 @@ describe('formatValue', () => {
     expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'USD' })).toBe('$1,234.56');
   });
 
+  it('format: currency_N with precision', () => {
+    expect(formatValue(1234.56, { type: 'number', format: 'currency_0', currency: 'JPY' })).toBe('¥1,235');
+    expect(formatValue(1234.56, { type: 'number', format: 'currency_1', currency: 'EUR' })).toBe('€1,234.6');
+    expect(formatValue(1234.56, { type: 'number', format: 'currency_2', currency: 'GBP' })).toBe('£1,234.56');
+    expect(formatValue(1234, { type: 'number', format: 'currency_2', currency: 'USD' })).toBe('$1,234');
+  });
+
+  it('format: number_N / percent_N with precision', () => {
+    expect(formatValue(1234.56, { type: 'number', format: 'number_0' })).toBe('1,235');
+    expect(formatValue(1234.56, { type: 'number', format: 'number_3' })).toBe('1,234.56');
+    expect(formatValue(0.1234, { type: 'number', format: 'percent_1' })).toBe('12.3%');
+    expect(formatValue(0.1234, { type: 'number', format: 'percent_3' })).toBe('12.34%');
+  });
+
+  it('format: abbr / accounting / decimal', () => {
+    expect(formatValue(1500, { type: 'number', format: 'abbr' })).toBe('1.5k');
+    expect(formatValue(123456, { type: 'number', format: 'abbr_1' })).toBe('100k');
+    expect(formatValue(123456, { type: 'number', format: 'abbr_2' })).toBe('120k');
+    expect(formatValue(123456, { type: 'number', format: 'abbr_3' })).toBe('123k');
+    expect(formatValue(-1234.56, { type: 'number', format: 'accounting' })).toBe('(1,234.56)');
+    expect(formatValue(-1234.56, { type: 'number', format: 'accounting_0' })).toBe('(1,235)');
+    expect(formatValue(1234.56, { type: 'number', format: 'decimal' })).toBe('1,234.56');
+    expect(formatValue(1234.56, { type: 'number', format: 'decimal_0' })).toBe('1,235');
+  });
+
   it('format: percent', () => {
     expect(formatValue(0.1234, { type: 'number', format: 'percent' })).toBe('12.34%');
     expect(formatValue(0, { type: 'number', format: 'percent' })).toBe('0%');
@@ -156,7 +181,7 @@ describe('getFormat', () => {
     expect(getFormat({ type: 'time', granularity: 'hour' }).formatString).toBe('%Y-%m-%d %H:%M:%S');
     expect(getFormat({ type: 'time' }).formatString).toBe('%Y-%m-%d %H:%M:%S');
   });
-  
+
   it('time dimension: formatFunc delegates to formatDateByGranularity', () => {
     const { formatFunc } = getFormat({ type: 'time', granularity: 'month' });
     expect(formatFunc('2024-03-01T00:00:00.000')).toBe('2024 Mar');
