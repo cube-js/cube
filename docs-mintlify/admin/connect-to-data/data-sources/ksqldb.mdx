@@ -72,16 +72,121 @@ CUBEJS_DB_PASS=password
 | Environment Variable | Description                                                                   | Possible Values           | Required |
 | -------------------- | ----------------------------------------------------------------------------- | ------------------------- | :------: |
 | [`CUBEJS_DB_URL`](/reference/configuration/environment-variables#cubejs_db_url)      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
-| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
-| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid database username |    ✅    |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database password |    ✅    |
+| [`CUBEJS_DB_KAFKA_HOST`](/reference/configuration/environment-variables#cubejs_db_kafka_host) | Kafka broker host(s) for [Kafka streams mode](#kafka-streams-mode). Multiple brokers can be comma-separated. | A valid Kafka broker URL  |    ❌    |
+| [`CUBEJS_DB_KAFKA_USER`](/reference/configuration/environment-variables#cubejs_db_kafka_user) | Username for Kafka broker authentication (SASL PLAIN)                         | A valid Kafka username    |    ❌    |
+| [`CUBEJS_DB_KAFKA_PASS`](/reference/configuration/environment-variables#cubejs_db_kafka_pass) | Password for Kafka broker authentication (SASL PLAIN)                         | A valid Kafka password    |    ❌    |
+| [`CUBEJS_DB_KAFKA_USE_SSL`](/reference/configuration/environment-variables#cubejs_db_kafka_use_ssl) | If `true`, enables SASL_SSL for the Kafka connection                         | `true`, `false`           |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
-[ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 ## Pre-Aggregations Support
 
 ksqlDB supports only
-[streaming pre-aggregations](/docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations).
+[streaming pre-aggregations][ref-streaming-pre-aggs].
 
+## Kafka streams mode
 
-[ref-powerbi]: /admin/connect-to-data/visualization-tools/powerbi
-[ref-dax-api]: /reference/dax-api
+By default, Cube connects to ksqlDB via its REST API. ksqlDB uses its REST
+API both for metadata (discovering tables and streams) and for streaming
+data into Cube Store during pre-aggregation builds.
+
+In this default mode, Cube may create tables and streams in ksqlDB as part
+of the pre-aggregation build process (e.g., `CREATE TABLE ... AS SELECT`
+statements for non-read-only pre-aggregations).
+
+When **Kafka streams mode** is enabled, Cube reads data directly from the
+underlying Kafka topics instead of going through the ksqlDB REST API for
+data streaming. ksqlDB is still used for metadata operations such as
+discovering tables, streams, and their schemas, but Cube Store subscribes
+to the backing Kafka topic directly.
+
+In this mode, Cube does not create any tables or streams in ksqlDB. All
+pre-aggregations use the read-only refresh path: Cube discovers the
+existing ksqlDB objects and their backing Kafka topics, then streams data
+directly from Kafka into Cube Store.
+
+### When to use Kafka streams mode
+
+Kafka streams mode is useful when:
+
+- You want to prevent Cube from creating any objects in ksqlDB
+- You need higher throughput for data ingestion by reading Kafka directly
+- Your ksqlDB environment has restricted permissions that don't allow
+  creating tables or streams
+- You prefer Cube Store to consume from Kafka topics without an
+  intermediary
+
+### Enabling Kafka streams mode
+
+Set the `CUBEJS_DB_KAFKA_HOST` environment variable to the address of your
+Kafka broker(s). This activates Kafka streams mode automatically:
+
+```dotenv
+CUBEJS_DB_TYPE=ksql
+CUBEJS_DB_URL=https://xxxxxx-xxxxx.us-west4.gcp.confluent.cloud:443
+CUBEJS_DB_USER=ksql_username
+CUBEJS_DB_PASS=ksql_password
+CUBEJS_DB_KAFKA_HOST=pkc-xxxxx.us-west4.gcp.confluent.cloud:9092
+CUBEJS_DB_KAFKA_USER=kafka_api_key
+CUBEJS_DB_KAFKA_PASS=kafka_api_secret
+CUBEJS_DB_KAFKA_USE_SSL=true
+```
+
+Multiple Kafka brokers can be specified as a comma-separated list:
+
+```dotenv
+CUBEJS_DB_KAFKA_HOST=broker1:9092,broker2:9092,broker3:9092
+```
+
+<Info>
+
+When using [Confluent Cloud](https://www.confluent.io/confluent-cloud/),
+the Kafka credentials are separate from the ksqlDB credentials. Generate
+an API key for the Kafka cluster (not the ksqlDB cluster) and use it as
+`CUBEJS_DB_KAFKA_USER` and `CUBEJS_DB_KAFKA_PASS`.
+
+</Info>
+
+### How it works
+
+With Kafka streams mode enabled:
+
+1. Cube uses the ksqlDB REST API to discover available tables and streams
+   and to retrieve their schemas via `DESCRIBE`.
+2. For each table or stream, Cube resolves the backing Kafka topic name
+   from the ksqlDB metadata.
+3. Instead of streaming data through ksqlDB, Cube Store connects directly
+   to the Kafka broker(s) and consumes from the resolved topic.
+4. Pre-aggregation builds use the read-only refresh strategy. Cube does
+   not issue any `CREATE TABLE` or `CREATE STREAM` statements to ksqlDB.
+
+### Configuration via `driverFactory`
+
+You can also configure Kafka streams mode programmatically in the
+`cube.js` configuration file:
+
+```javascript
+const KsqlDriver = require("@cubejs-backend/ksql-driver");
+
+module.exports = {
+  driverFactory: ({ dataSource }) => {
+    if (dataSource === "ksql") {
+      return new KsqlDriver({
+        url: process.env.CUBEJS_DB_URL,
+        username: process.env.CUBEJS_DB_USER,
+        password: process.env.CUBEJS_DB_PASS,
+        kafkaHost: process.env.CUBEJS_DB_KAFKA_HOST,
+        kafkaUser: process.env.CUBEJS_DB_KAFKA_USER,
+        kafkaPassword: process.env.CUBEJS_DB_KAFKA_PASS,
+        kafkaUseSsl: true,
+      });
+    }
+  },
+};
+```
+
+[ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+[ref-powerbi]: /docs/integrations/power-bi
+[ref-dax-api]: /reference/core-data-apis/dax-api
+[ref-streaming-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
