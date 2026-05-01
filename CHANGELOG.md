@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.42](https://github.com/cube-js/cube/compare/v1.6.41...v1.6.42) (2026-05-01)
+
+### Bug Fixes
+
+- **client-core:** make CJS consumers work for main entry and /format subpath ([#10796](https://github.com/cube-js/cube/issues/10796)) ([1b40ddc](https://github.com/cube-js/cube/commit/1b40ddcbc84f67c0c2d35d130dd715a19a5e72d8)), closes [#5917](https://github.com/cube-js/cube/issues/5917) [#9562](https://github.com/cube-js/cube/issues/9562)
+
+### Features
+
+- **client-core:** extend numeric formatting options with precision a… ([#10800](https://github.com/cube-js/cube/issues/10800)) ([dd50d32](https://github.com/cube-js/cube/commit/dd50d32af37fc8d4610618e50f449f080a2c4a11))
+
 ## [1.6.41](https://github.com/cube-js/cube/compare/v1.6.40...v1.6.41) (2026-05-01)
 
 ### Bug Fixes
