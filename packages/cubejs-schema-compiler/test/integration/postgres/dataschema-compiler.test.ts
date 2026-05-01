@@ -640,9 +640,6 @@ describe('DataSchemaCompiler', () => {
     `);
     await compiler.compile();
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
-
     const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
     expect(salesGroup?.views).toContain('revenue');
     expect(salesGroup?.title).toBe('Sales');
@@ -650,6 +647,9 @@ describe('DataSchemaCompiler', () => {
     const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
     expect(financeGroup?.views).toContain('revenue');
     expect(financeGroup?.title).toBe('Finance');
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
   it('singular viewGroup and plural viewGroups are merged', async () => {
@@ -675,12 +675,12 @@ describe('DataSchemaCompiler', () => {
     `);
     await compiler.compile();
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
-
     expect(metaTransformer.viewGroups).toHaveLength(2);
     expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
     expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
   it('view_group merges standalone and view-level definitions', async () => {

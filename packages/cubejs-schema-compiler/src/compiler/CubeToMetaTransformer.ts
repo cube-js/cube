@@ -168,7 +168,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly joinGraph: JoinGraph;
 
-  private _cubes: TransformedCube[];
+  public cubes: TransformedCube[];
 
   private viewGroupsPopulated: boolean = false;
 
@@ -190,13 +190,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
     this.contextEvaluator = contextEvaluator;
     this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
-    this._cubes = [];
+    this.cubes = [];
     this.queries = [];
-  }
-
-  public get cubes(): TransformedCube[] {
-    this.ensureViewGroupsPopulated();
-    return this._cubes;
   }
 
   public get viewGroups(): CompiledViewGroup[] {
@@ -206,11 +201,11 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
     this.viewGroupsPopulated = false;
-    this._cubes = this.cubeSymbols.cubeList
+    this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
 
-    this.queries = this._cubes;
+    this.queries = this.cubes;
   }
 
   private ensureViewGroupsPopulated(): void {
@@ -219,7 +214,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     }
     this.viewGroupsPopulated = true;
 
-    for (const cube of this._cubes) {
+    for (const cube of this.cubes) {
       if (cube.config.type === 'view') {
         const groups = this.viewGroupEvaluator.viewGroupsForView(cube.config.name);
         if (groups.length > 0) {

@@ -1538,9 +1538,6 @@ view_groups:
 
       await compiler.compile();
 
-      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
-      expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
-
       const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
       expect(salesGroup?.title).toBe('Sales');
       expect(salesGroup?.views).toContain('revenue');
@@ -1548,9 +1545,12 @@ view_groups:
       const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
       expect(financeGroup?.title).toBe('Finance');
       expect(financeGroup?.views).toContain('revenue');
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
     });
 
-    it('singular view_group sets both viewGroup and viewGroups', async () => {
+    it('singular view_group sets viewGroups', async () => {
       const { compiler, metaTransformer } = prepareYamlCompiler(`
 cubes:
   - name: orders
@@ -1573,6 +1573,8 @@ views:
       `);
 
       await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toHaveLength(1);
 
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales']);
@@ -1604,10 +1606,10 @@ views:
 
       await compiler.compile();
 
+      expect(metaTransformer.viewGroups).toHaveLength(2);
+
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
-
-      expect(metaTransformer.viewGroups).toHaveLength(2);
       expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
       expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
     });
