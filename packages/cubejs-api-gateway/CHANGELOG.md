@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.43](https://github.com/cube-js/cube/compare/v1.6.42...v1.6.43) (2026-05-02)
+
+### Features
+
+- add view_group support to data model ([#10768](https://github.com/cube-js/cube/issues/10768)) ([6ebae55](https://github.com/cube-js/cube/commit/6ebae5570f92e56c802c6dd3b22ca8ed339b48c8))
+
 ## [1.6.42](https://github.com/cube-js/cube/compare/v1.6.41...v1.6.42) (2026-05-01)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
