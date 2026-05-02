@@ -15,6 +15,7 @@ import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
+import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
@@ -139,6 +140,7 @@ export type CubeConfig = {
   isVisible: boolean;
   public: boolean;
   description?: string;
+  viewGroups?: string[];
   connectedComponent: number;
   meta?: any;
   measures: MeasureConfig[];
@@ -162,6 +164,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly contextEvaluator: ContextEvaluator;
 
+  private readonly viewGroupEvaluator: ViewGroupEvaluator;
+
   private readonly joinGraph: JoinGraph;
 
   public cubes: TransformedCube[];
@@ -175,15 +179,21 @@ export class CubeToMetaTransformer implements CompilerInterface {
     cubeValidator: CubeValidator,
     cubeEvaluator: CubeEvaluator,
     contextEvaluator: ContextEvaluator,
+    viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
+    this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
     this.cubes = [];
     this.queries = [];
+  }
+
+  public get viewGroups(): CompiledViewGroup[] {
+    return this.viewGroupEvaluator.compiledViewGroups;
   }
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
@@ -239,6 +249,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const nestedFolders: NestedFolder[] = (extendedCube.folders || []).map((f: Folder) => processFolder(f));
 
+    const viewGroupNames = extendedCube.isView
+      ? this.viewGroupEvaluator.viewGroupsForView(cubeName)
+      : [];
+
     return {
       config: {
         name: cubeName,
@@ -247,6 +261,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
         isVisible: isCubeVisible,
         public: isCubeVisible,
         description: extendedCube.description,
+        ...(viewGroupNames.length > 0 ? { viewGroups: viewGroupNames } : {}),
         connectedComponent: this.joinGraph.connectedComponents()[cubeName],
         meta: extendedCube.meta,
         measures: Object.entries(extendedCube.measures || {}).map((nameToMetric: [string, any]) => {

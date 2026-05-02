@@ -959,15 +959,19 @@ export class CompilerApi {
 
   public async metaConfig(
     requestContext: Context,
-    options: { includeCompilerId?: boolean; skipVisibilityPatch?: boolean; requestId?: string } = {}
+    options: { includeCompilerId?: boolean; includeViewGroups?: boolean; skipVisibilityPatch?: boolean; requestId?: string } = {}
   ): Promise<any> {
-    const { includeCompilerId, skipVisibilityPatch, ...restOptions } = options;
+    const { includeCompilerId, includeViewGroups, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     const { cubes } = compilers.metaTransformer;
 
     if (skipVisibilityPatch) {
-      if (includeCompilerId) {
-        return { cubes, compilerId: compilers.compilerId };
+      if (includeCompilerId || includeViewGroups) {
+        const result: any = { cubes, compilerId: compilers.compilerId };
+        if (includeViewGroups) {
+          result.viewGroups = compilers.metaTransformer.viewGroups;
+        }
+        return result;
       }
       return cubes;
     }
@@ -977,15 +981,15 @@ export class CompilerApi {
       requestContext,
       cubes
     );
-    if (includeCompilerId) {
-      return {
+    if (includeCompilerId || includeViewGroups) {
+      const result: any = {
         cubes: patchedCubes,
-        // This compilerId is primarily used by the cubejs-backend-native or caching purposes.
-        // By default, it doesn't account for member visibility changes introduced above by DAP.
-        // Here we're modifying the original compilerId in a way that it's distinct for
-        // distinct schema versions while still being a valid UUID.
         compilerId: visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId,
       };
+      if (includeViewGroups) {
+        result.viewGroups = compilers.metaTransformer.viewGroups;
+      }
+      return result;
     }
     return patchedCubes;
   }

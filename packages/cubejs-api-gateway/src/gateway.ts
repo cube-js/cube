@@ -649,19 +649,30 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const metaConfig = await compilerApi.metaConfig(context, {
         requestId: context.requestId,
-        includeCompilerId: includeCompilerId || onlyCompilerId
+        includeCompilerId: includeCompilerId || onlyCompilerId,
+        includeViewGroups: true,
       });
       if (onlyCompilerId) {
-        const response: { cubes: any[], compilerId?: string } = {
+        const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = {
           cubes: [],
           compilerId: metaConfig.compilerId
         };
         res(response);
         return;
       }
-      const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
+      const cubesConfig = metaConfig.cubes;
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
-      const response: { cubes: any[], compilerId?: string } = { cubes };
+      const visibleCubeNames = new Set(cubes.map(c => c.name));
+      const viewGroups = (metaConfig.viewGroups || [])
+        .map(group => ({
+          ...group,
+          views: group.views.filter((v: string) => visibleCubeNames.has(v)),
+        }))
+        .filter(group => group.views.length > 0);
+      const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
+      if (viewGroups.length > 0) {
+        response.viewGroups = viewGroups;
+      }
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;
       }

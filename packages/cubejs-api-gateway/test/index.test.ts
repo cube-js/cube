@@ -686,6 +686,35 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
+  test('meta endpoint returns view groups', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body).toHaveProperty('viewGroups');
+
+    expect(res.body.viewGroups).toHaveLength(1);
+    expect(res.body.viewGroups[0]).toEqual({
+      name: 'analytics',
+      title: 'Analytics',
+      description: 'Analytics related views',
+      views: ['FooView'],
+    });
+
+    const fooView = res.body.cubes.find(c => c.name === 'FooView');
+    expect(fooView).toBeDefined();
+    expect(fooView.viewGroups).toEqual(['analytics']);
+    expect(fooView.type).toBe('view');
+
+    const fooCube = res.body.cubes.find(c => c.name === 'Foo');
+    expect(fooCube).toBeDefined();
+    expect(fooCube.viewGroups).toBeUndefined();
+  });
+
   test('meta endpoint extended to get schema information with additional data', async () => {
     const { app } = await createApiGateway();
 

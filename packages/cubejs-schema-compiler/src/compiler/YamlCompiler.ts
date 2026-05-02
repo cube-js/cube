@@ -109,8 +109,15 @@ export class YamlCompiler {
           const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
           transpiledFilesContent.push(transpiledView);
         });
+      } else if (key === 'view_groups') {
+        this.checkDuplicateNames(yamlObj.view_groups || [], errorsReport, (name) => `Found duplicate view group name '${name}'.`);
+
+        (yamlObj.view_groups || []).forEach(({ name, ...viewGroup }) => {
+          const transpiledViewGroup = this.transpileViewGroup({ name, ...viewGroup });
+          transpiledFilesContent.push(transpiledViewGroup);
+        });
       } else {
-        errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);
+        errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes', 'views', and 'view_groups' are allowed here.`);
       }
     }
 
@@ -119,6 +126,32 @@ export class YamlCompiler {
       fileName: file.fileName,
       content: transpiledFilesContent.join('\n\n'),
     } as FileContent;
+  }
+
+  private transpileViewGroup(viewGroupObj): string {
+    const properties: t.ObjectProperty[] = [];
+
+    if (viewGroupObj.title) {
+      properties.push(t.objectProperty(t.stringLiteral('title'), t.stringLiteral(viewGroupObj.title)));
+    }
+    if (viewGroupObj.description) {
+      properties.push(t.objectProperty(t.stringLiteral('description'), t.stringLiteral(viewGroupObj.description)));
+    }
+    if (viewGroupObj.views && Array.isArray(viewGroupObj.views)) {
+      properties.push(
+        t.objectProperty(
+          t.stringLiteral('views'),
+          t.arrayExpression(viewGroupObj.views.map((v: string) => t.stringLiteral(v)))
+        )
+      );
+    }
+
+    const viewGroupCall = t.callExpression(
+      t.identifier('view_group'),
+      [t.stringLiteral(viewGroupObj.name), t.objectExpression(properties)]
+    );
+
+    return babelGenerator(viewGroupCall, {}, '').code;
   }
 
   private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): string {

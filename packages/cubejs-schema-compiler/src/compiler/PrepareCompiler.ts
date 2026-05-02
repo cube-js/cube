@@ -19,6 +19,7 @@ import { CubeSymbols } from './CubeSymbols';
 import { CubeDictionary } from './CubeDictionary';
 import { CubeEvaluator } from './CubeEvaluator';
 import { ContextEvaluator } from './ContextEvaluator';
+import { ViewGroupEvaluator } from './ViewGroupEvaluator';
 import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
@@ -50,6 +51,7 @@ export type Compiler = {
     metaTransformer: CubeToMetaTransformer;
     cubeEvaluator: CubeEvaluator;
     contextEvaluator: ContextEvaluator;
+    viewGroupEvaluator: ViewGroupEvaluator;
     joinGraph: JoinGraph;
     compilerCache: CompilerCache;
     headCommitId?: string;
@@ -65,8 +67,9 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const cubeValidator = new CubeValidator(cubeSymbols);
   const cubeEvaluator = new CubeEvaluator(cubeValidator);
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
+  const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
@@ -97,8 +100,10 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     compiledYamlCache,
     compiledJinjaCache,
     viewCompilers: [viewCompiler],
-    cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
+    cubeCompilers: [cubeEvaluator, joinGraph],
     contextCompilers: [contextEvaluator],
+    viewGroupCompilers: [viewGroupEvaluator],
+    metaCompilers: [metaTransformer],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     cubeDictionary,
@@ -122,6 +127,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     metaTransformer,
     cubeEvaluator,
     contextEvaluator,
+    viewGroupEvaluator,
     joinGraph,
     compilerCache,
     headCommitId: options.headCommitId,

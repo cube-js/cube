@@ -74,6 +74,8 @@ export type DataSchemaCompilerOptions = {
   cubeAndViewSymbols: CubeSymbols;
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
+  viewGroupCompilers?: CompilerInterface[];
+  metaCompilers?: CompilerInterface[];
   transpilers?: TranspilerInterface[];
   viewCompilers?: CompilerInterface[];
   viewCompilationGate: ViewCompilationGate;
@@ -105,6 +107,8 @@ export type CompileStage = 0 | 1 | 2 | 3;
 type CompileCubeFilesCompilers = {
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
+  viewGroupCompilers?: CompilerInterface[];
+  metaCompilers?: CompilerInterface[];
 };
 
 export type CompileContext = any;
@@ -115,6 +119,10 @@ export class DataSchemaCompiler {
   private readonly cubeCompilers: CompilerInterface[];
 
   private readonly contextCompilers: CompilerInterface[];
+
+  private readonly viewGroupCompilers: CompilerInterface[];
+
+  private readonly metaCompilers: CompilerInterface[];
 
   private readonly transpilers: TranspilerInterface[];
 
@@ -181,6 +189,8 @@ export class DataSchemaCompiler {
     this.repository = repository;
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
+    this.viewGroupCompilers = options.viewGroupCompilers || [];
+    this.metaCompilers = options.metaCompilers || [];
     this.transpilers = options.transpilers || [];
     this.viewCompilers = options.viewCompilers || [];
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
@@ -366,6 +376,7 @@ export class DataSchemaCompiler {
     let cubes: CubeDefinition[] = [];
     let exports: Record<string, Record<string, any>> = {};
     let contexts: Record<string, any>[] = [];
+    let viewGroups: Record<string, any>[] = [];
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
     let transpiledFiles: FileContent[] = [];
@@ -374,6 +385,7 @@ export class DataSchemaCompiler {
       cubes = [];
       exports = {};
       contexts = [];
+      viewGroups = [];
       compiledFiles = {};
       asyncModules = [];
     };
@@ -403,6 +415,15 @@ export class DataSchemaCompiler {
           throw new Error('No file stored in context');
         }
         return contexts.push({ ...context, name, fileName: file.fileName });
+      },
+      view_group: (name: string, viewGroup) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+        viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
+        this.compileV8ContextCache![name] = name;
+        return name;
       },
       addExport: (obj) => {
         const file = ctxFileStorage.getStore();
@@ -473,7 +494,7 @@ export class DataSchemaCompiler {
       const convertedToJsFiles = transpiledFiles.filter(f => !f.fileName.endsWith('.js'));
       toCompile = [...originalJsFiles, ...convertedToJsFiles];
 
-      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
+      return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
@@ -481,7 +502,7 @@ export class DataSchemaCompiler {
       cleanup();
       transpiledFiles = await transpilePhase(stage);
 
-      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
+      return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     return compilePhaseFirst({ cubeCompilers: this.cubeNameCompilers }, 0)
@@ -492,6 +513,8 @@ export class DataSchemaCompiler {
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,
+        viewGroupCompilers: this.viewGroupCompilers,
+        metaCompilers: this.metaCompilers,
       }, 3))
       .then(() => {
         // Free unneeded resources
@@ -820,6 +843,7 @@ export class DataSchemaCompiler {
   private async compileCubeFiles(
     cubes: CubeDefinition[],
     contexts: Record<string, any>[],
+    viewGroups: Record<string, any>[],
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
     compilers: CompileCubeFilesCompilers,
@@ -836,7 +860,9 @@ export class DataSchemaCompiler {
       });
     await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
     return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
-      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
+      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
+      .then(() => this.compileObjects(compilers.viewGroupCompilers || [], viewGroups, errorsReport))
+      .then(() => this.compileObjects(compilers.metaCompilers || [], cubes, errorsReport));
   }
 
   public throwIfAnyErrors() {
