@@ -15,6 +15,32 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum MaskedMemberItem {
+    Simple(String),
+    WithFilter {
+        member: String,
+        filter: FilterItem,
+    },
+}
+
+impl MaskedMemberItem {
+    pub fn member_name(&self) -> &str {
+        match self {
+            MaskedMemberItem::Simple(s) => s.as_str(),
+            MaskedMemberItem::WithFilter { member, .. } => member.as_str(),
+        }
+    }
+
+    pub fn filter(&self) -> Option<&FilterItem> {
+        match self {
+            MaskedMemberItem::Simple(_) => None,
+            MaskedMemberItem::WithFilter { filter, .. } => Some(filter),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeDimension {
     pub dimension: String,
     pub granularity: Option<String>,
@@ -77,7 +103,7 @@ pub struct BaseQueryOptionsStatic {
     #[serde(rename = "convertTzForRawTimeDimension")]
     pub convert_tz_for_raw_time_dimension: Option<bool>,
     #[serde(rename = "maskedMembers")]
-    pub masked_members: Option<Vec<String>>,
+    pub masked_members: Option<Vec<MaskedMemberItem>>,
     #[serde(rename = "memberToAlias", default)]
     pub member_to_alias: Option<HashMap<String, String>>,
 }

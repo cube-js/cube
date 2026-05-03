@@ -1873,14 +1873,11 @@ cubes:
       const query = new PostgresQuery(compilers, {
         measures: ['users.count'],
         dimensions: ['users.city'],
-        maskedMembers: ['users.city'],
-        memberMaskFilters: {
-          'users.city': {
-            member: 'users.data_region',
-            operator: 'equals',
-            values: ['RESEARCH', 'DEMO'],
-          }
-        },
+        maskedMembers: [{ member: 'users.city', filter: {
+          member: 'users.data_region',
+          operator: 'equals',
+          values: ['RESEARCH', 'DEMO'],
+        }}],
       });
       const [sql] = query.buildSqlAndParams();
       expect(sql).toContain('CASE WHEN');
@@ -1916,23 +1913,20 @@ cubes:
       const query = new PostgresQuery(compilers, {
         measures: ['users.count'],
         dimensions: ['users.city'],
-        maskedMembers: ['users.city'],
-        memberMaskFilters: {
-          'users.city': {
-            and: [
-              {
-                member: 'users.data_region',
-                operator: 'equals',
-                values: ['RESEARCH'],
-              },
-              {
-                member: 'users.region_lock',
-                operator: 'equals',
-                values: ['0'],
-              }
-            ]
-          }
-        },
+        maskedMembers: [{ member: 'users.city', filter: {
+          and: [
+            {
+              member: 'users.data_region',
+              operator: 'equals',
+              values: ['RESEARCH'],
+            },
+            {
+              member: 'users.region_lock',
+              operator: 'equals',
+              values: ['0'],
+            }
+          ]
+        }}],
       });
       const [sql] = query.buildSqlAndParams();
       expect(sql).toContain('CASE WHEN');
@@ -1967,14 +1961,11 @@ cubes:
       const query = new PostgresQuery(compilers, {
         measures: ['users.count'],
         dimensions: ['users.city'],
-        maskedMembers: ['users.city'],
-        memberMaskFilters: {
-          'users.city': {
-            member: 'users.data_region',
-            operator: 'equals',
-            values: ['RESEARCH'],
-          }
-        },
+        maskedMembers: [{ member: 'users.city', filter: {
+          member: 'users.data_region',
+          operator: 'equals',
+          values: ['RESEARCH'],
+        }}],
       });
       const [sql] = query.buildSqlAndParams();
       expect(sql).toContain('CASE WHEN');

@@ -779,10 +779,13 @@ export class CompilerApi {
       query.filters.push(rlsFilter);
     }
     if (maskedMembersSet.size > 0) {
-      query.maskedMembers = Array.from(maskedMembersSet);
-    }
-    if (Object.keys(memberMaskFiltersMap).length > 0) {
-      query.memberMaskFilters = memberMaskFiltersMap;
+      query.maskedMembers = Array.from(maskedMembersSet).map(member => {
+        const filter = memberMaskFiltersMap[member];
+        if (filter) {
+          return { member, filter };
+        }
+        return member;
+      });
     }
     return { query, denied: false };
   }

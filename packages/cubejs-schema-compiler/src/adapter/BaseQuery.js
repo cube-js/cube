@@ -253,8 +253,19 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
-    this.maskedMembers = new Set(this.options.maskedMembers || []);
-    this.memberMaskFilters = this.options.memberMaskFilters || {};
+    const maskedMembersInput = this.options.maskedMembers || [];
+    this.maskedMembers = new Set();
+    this.memberMaskFilters = {};
+    for (const item of maskedMembersInput) {
+      if (typeof item === 'string') {
+        this.maskedMembers.add(item);
+      } else if (item && typeof item === 'object' && item.member) {
+        this.maskedMembers.add(item.member);
+        if (item.filter) {
+          this.memberMaskFilters[item.member] = item.filter;
+        }
+      }
+    }
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -287,7 +298,6 @@ export class BaseQuery {
       subqueryJoins: this.options.subqueryJoins,
       joinHints: this.options.joinHints,
       maskedMembers: this.options.maskedMembers,
-      memberMaskFilters: this.options.memberMaskFilters,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -955,7 +965,6 @@ export class BaseQuery {
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
       maskedMembers: this.options.maskedMembers,
-      memberMaskFilters: this.options.memberMaskFilters,
       memberToAlias: this.options.memberToAlias,
     };
 

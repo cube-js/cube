@@ -1,5 +1,6 @@
 use super::sql_evaluator::Compiler;
 use super::ParamsAllocator;
+use crate::cube_bridge::base_query_options::{FilterItem, MaskedMemberItem};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
@@ -32,6 +33,7 @@ pub struct QueryTools {
     timezone: Tz,
     convert_tz_for_raw_time_dimension: bool,
     masked_members: HashSet<String>,
+    member_mask_filters: HashMap<String, FilterItem>,
 }
 
 impl QueryTools {
@@ -43,7 +45,7 @@ impl QueryTools {
         timezone_name: Option<String>,
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,
-        masked_members: Option<Vec<String>>,
+        masked_members: Option<Vec<MaskedMemberItem>>,
         member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
@@ -61,6 +63,17 @@ impl QueryTools {
             timezone.clone(),
             member_to_alias,
         )));
+        let mut masked_set = HashSet::new();
+        let mut mask_filters = HashMap::new();
+        if let Some(items) = masked_members {
+            for item in items {
+                let name = item.member_name().to_string();
+                masked_set.insert(name.clone());
+                if let Some(filter) = item.filter() {
+                    mask_filters.insert(name, filter.clone());
+                }
+            }
+        }
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
@@ -70,12 +83,17 @@ impl QueryTools {
             evaluator_compiler,
             timezone,
             convert_tz_for_raw_time_dimension,
-            masked_members: masked_members.unwrap_or_default().into_iter().collect(),
+            masked_members: masked_set,
+            member_mask_filters: mask_filters,
         }))
     }
 
     pub fn is_member_masked(&self, member_path: &str) -> bool {
         self.masked_members.contains(member_path)
+    }
+
+    pub fn member_mask_filter(&self, member_path: &str) -> Option<&FilterItem> {
+        self.member_mask_filters.get(member_path)
     }
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
