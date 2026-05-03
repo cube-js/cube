@@ -702,43 +702,37 @@ export class CompilerApi {
             return inIncludes && (!policy.rowLevel || policy.rowLevel.allowAll);
           });
 
-          if (hasUnconditionalFullAccess) {
-            continue;
-          }
-
-          const hasMaskingPolicy = policiesWithMemberAccess.some(
-            (policy) => policy.memberMasking &&
-              policy.memberMasking.includesMembers.includes(memberName) &&
-              !policy.memberMasking.excludesMembers.includes(memberName)
-          );
-
-          if (!hasMaskingPolicy) {
-            continue;
-          }
-
-          const conditionalFullAccessPolicies = policiesWithMemberAccess.filter(policy => {
-            const hasFullMemberAccess = !policy.memberLevel ||
-              (policy.memberLevel.includesMembers.includes(memberName) &&
-               !policy.memberLevel.excludesMembers.includes(memberName));
-            return hasFullMemberAccess &&
-              policy.rowLevel && !policy.rowLevel.allowAll &&
-              policy.rowLevel.filters?.length > 0;
-          });
-
-          if (conditionalFullAccessPolicies.length > 0) {
-            maskedMembersSet.add(memberName);
-            const evaluatedFilters = conditionalFullAccessPolicies.flatMap(
-              policy => (policy.rowLevel.filters || []).map(
-                (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
-              )
+          if (!hasUnconditionalFullAccess) {
+            const hasMaskingPolicy = policiesWithMemberAccess.some(
+              (policy) => policy.memberMasking &&
+                policy.memberMasking.includesMembers.includes(memberName) &&
+                !policy.memberMasking.excludesMembers.includes(memberName)
             );
-            if (evaluatedFilters.length > 0) {
-              memberMaskFiltersMap[memberName] = evaluatedFilters.length === 1
-                ? evaluatedFilters[0]
-                : { and: evaluatedFilters };
+
+            if (hasMaskingPolicy) {
+              const conditionalFullAccessPolicies = policiesWithMemberAccess.filter(policy => {
+                const hasFullMemberAccess = !policy.memberLevel ||
+                  (policy.memberLevel.includesMembers.includes(memberName) &&
+                   !policy.memberLevel.excludesMembers.includes(memberName));
+                return hasFullMemberAccess &&
+                  policy.rowLevel && !policy.rowLevel.allowAll &&
+                  policy.rowLevel.filters?.length > 0;
+              });
+
+              maskedMembersSet.add(memberName);
+              if (conditionalFullAccessPolicies.length > 0) {
+                const evaluatedFilters = conditionalFullAccessPolicies.flatMap(
+                  policy => (policy.rowLevel.filters || []).map(
+                    (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
+                  )
+                );
+                if (evaluatedFilters.length > 0) {
+                  memberMaskFiltersMap[memberName] = evaluatedFilters.length === 1
+                    ? evaluatedFilters[0]
+                    : { and: evaluatedFilters };
+                }
+              }
             }
-          } else {
-            maskedMembersSet.add(memberName);
           }
         }
 

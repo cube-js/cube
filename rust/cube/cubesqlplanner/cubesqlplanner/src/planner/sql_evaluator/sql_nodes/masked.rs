@@ -1,5 +1,4 @@
 use super::SqlNode;
-use super::SqlNodesFactory;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::plan::filter::FilterItem;
 use crate::planner::filter::compiler::FilterCompiler;
@@ -94,26 +93,26 @@ impl MaskedSqlNode {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<Option<String>, CubeError> {
-        let mut compiler = query_tools.evaluator_compiler().borrow_mut();
-        let mut filter_compiler = FilterCompiler::new(&mut compiler, query_tools.clone());
-        filter_compiler.add_item(native_filter)?;
-        let (dimension_filters, _, _) = filter_compiler.extract_result();
-        if dimension_filters.is_empty() {
-            return Ok(None);
-        }
-        let filter_item = if dimension_filters.len() == 1 {
-            dimension_filters.into_iter().next().unwrap()
-        } else {
-            FilterItem::Group(Rc::new(crate::plan::filter::FilterGroup::new(
-                crate::plan::filter::FilterGroupOperator::And,
-                dimension_filters,
-            )))
+        let filter_item = {
+            let mut compiler = query_tools.evaluator_compiler().borrow_mut();
+            let mut filter_compiler = FilterCompiler::new(&mut compiler, query_tools.clone());
+            filter_compiler.add_item(native_filter)?;
+            let (dimension_filters, _, _) = filter_compiler.extract_result();
+            if dimension_filters.is_empty() {
+                return Ok(None);
+            }
+            if dimension_filters.len() == 1 {
+                dimension_filters.into_iter().next().unwrap()
+            } else {
+                FilterItem::Group(Rc::new(crate::plan::filter::FilterGroup::new(
+                    crate::plan::filter::FilterGroupOperator::And,
+                    dimension_filters,
+                )))
+            }
         };
-        let nodes_factory = SqlNodesFactory::new();
-        let context = Rc::new(VisitorContext::new(
+        let context = Rc::new(VisitorContext::new_with_node_processor(
             query_tools.clone(),
-            &nodes_factory,
-            None,
+            self.input.clone(),
         ));
         let sql = filter_item.to_sql(templates, context)?;
         if sql.is_empty() {
