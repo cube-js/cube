@@ -3519,24 +3519,11 @@ export class BaseQuery {
 
   maskFilterToSql(filter) {
     if (!filter) return null;
-    if (filter.and) {
-      const parts = filter.and.map(f => this.maskFilterToSql(f)).filter(Boolean);
-      return parts.length ? parts.map(p => `(${p})`).join(' AND ') : null;
-    }
-    if (filter.or) {
-      const parts = filter.or.map(f => this.maskFilterToSql(f)).filter(Boolean);
-      return parts.length ? parts.map(p => `(${p})`).join(' OR ') : null;
-    }
-    if (filter.member && filter.operator) {
-      const filterObj = this.initFilter({
-        dimension: filter.member,
-        operator: filter.operator,
-        values: filter.values,
-        measure: null,
-      });
-      return filterObj.filterToWhere();
-    }
-    return null;
+    const filterItems = this.extractFiltersAsTree([filter]);
+    if (!filterItems.length) return null;
+    const initialized = filterItems.map(this.initFilter.bind(this));
+    const clauses = initialized.map(f => f.filterToWhere()).filter(Boolean);
+    return clauses.length ? clauses.map(c => `(${c})`).join(' AND ') : null;
   }
 
   defaultMaskSql(memberType) {

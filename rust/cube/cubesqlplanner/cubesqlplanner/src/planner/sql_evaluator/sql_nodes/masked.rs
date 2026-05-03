@@ -1,9 +1,13 @@
 use super::SqlNode;
+use super::SqlNodesFactory;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
+use crate::plan::filter::FilterItem;
+use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -66,16 +70,11 @@ impl MaskedSqlNode {
                 visitor,
                 node,
                 query_tools.clone(),
-                node_processor.clone(),
-                templates,
-            )?;
-            let filter_sql = self.compile_filter_to_sql(
-                &filter_item,
-                visitor,
                 node_processor,
-                query_tools.clone(),
                 templates,
             )?;
+            let filter_sql =
+                self.compile_filter_to_sql(&filter_item, query_tools.clone(), templates)?;
             if let Some(filter_sql) = filter_sql {
                 Ok(Some(format!(
                     "CASE WHEN {} THEN {} ELSE {} END",
@@ -91,157 +90,36 @@ impl MaskedSqlNode {
 
     fn compile_filter_to_sql(
         &self,
-        filter_item: &NativeFilterItem,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        native_filter: &NativeFilterItem,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<Option<String>, CubeError> {
-        self.render_native_filter(filter_item, visitor, node_processor, query_tools, templates)
-    }
-
-    fn render_native_filter(
-        &self,
-        item: &NativeFilterItem,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<Option<String>, CubeError> {
-        if let Some(items) = &item.or {
-            let parts: Vec<String> = items
-                .iter()
-                .filter_map(|i| {
-                    self.render_native_filter(
-                        i,
-                        visitor,
-                        node_processor.clone(),
-                        query_tools.clone(),
-                        templates,
-                    )
-                    .transpose()
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            if parts.is_empty() {
-                return Ok(None);
-            }
-            Ok(Some(
-                parts
-                    .iter()
-                    .map(|p| format!("({})", p))
-                    .collect::<Vec<_>>()
-                    .join(" OR "),
-            ))
-        } else if let Some(items) = &item.and {
-            let parts: Vec<String> = items
-                .iter()
-                .filter_map(|i| {
-                    self.render_native_filter(
-                        i,
-                        visitor,
-                        node_processor.clone(),
-                        query_tools.clone(),
-                        templates,
-                    )
-                    .transpose()
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            if parts.is_empty() {
-                return Ok(None);
-            }
-            Ok(Some(
-                parts
-                    .iter()
-                    .map(|p| format!("({})", p))
-                    .collect::<Vec<_>>()
-                    .join(" AND "),
-            ))
-        } else if let (Some(member), Some(operator)) = (item.member(), &item.operator) {
-            let member_symbol = query_tools
-                .evaluator_compiler()
-                .borrow_mut()
-                .add_dimension_evaluator(member.clone())?;
-            let column_sql = self.input.to_sql(
-                visitor,
-                &member_symbol,
-                query_tools.clone(),
-                node_processor,
-                templates,
-            )?;
-            let filter_sql =
-                self.render_filter_condition(&column_sql, operator, &item.values, &query_tools)?;
-            Ok(Some(filter_sql))
-        } else {
-            Ok(None)
+        let mut compiler = query_tools.evaluator_compiler().borrow_mut();
+        let mut filter_compiler = FilterCompiler::new(&mut compiler, query_tools.clone());
+        filter_compiler.add_item(native_filter)?;
+        let (dimension_filters, _, _) = filter_compiler.extract_result();
+        if dimension_filters.is_empty() {
+            return Ok(None);
         }
-    }
-
-    fn render_filter_condition(
-        &self,
-        column_sql: &str,
-        operator: &str,
-        values: &Option<Vec<Option<String>>>,
-        query_tools: &Rc<QueryTools>,
-    ) -> Result<String, CubeError> {
-        let vals: Vec<String> = values
-            .as_ref()
-            .map(|v| v.iter().filter_map(|x| x.clone()).collect())
-            .unwrap_or_default();
-
-        match operator {
-            "equals" => {
-                if vals.len() == 1 {
-                    Ok(format!(
-                        "{} = {}",
-                        column_sql,
-                        query_tools.allocate_param(&vals[0])
-                    ))
-                } else if vals.len() > 1 {
-                    let params: Vec<String> =
-                        vals.iter().map(|v| query_tools.allocate_param(v)).collect();
-                    Ok(format!("{} IN ({})", column_sql, params.join(", ")))
-                } else {
-                    Ok(format!("{} IS NULL", column_sql))
-                }
-            }
-            "notEquals" => {
-                if vals.len() == 1 {
-                    Ok(format!(
-                        "{} <> {}",
-                        column_sql,
-                        query_tools.allocate_param(&vals[0])
-                    ))
-                } else if vals.len() > 1 {
-                    let params: Vec<String> =
-                        vals.iter().map(|v| query_tools.allocate_param(v)).collect();
-                    Ok(format!("{} NOT IN ({})", column_sql, params.join(", ")))
-                } else {
-                    Ok(format!("{} IS NOT NULL", column_sql))
-                }
-            }
-            "set" => Ok(format!("{} IS NOT NULL", column_sql)),
-            "notSet" => Ok(format!("{} IS NULL", column_sql)),
-            "gt" => Ok(format!(
-                "{} > {}",
-                column_sql,
-                query_tools.allocate_param(&vals[0])
-            )),
-            "gte" => Ok(format!(
-                "{} >= {}",
-                column_sql,
-                query_tools.allocate_param(&vals[0])
-            )),
-            "lt" => Ok(format!(
-                "{} < {}",
-                column_sql,
-                query_tools.allocate_param(&vals[0])
-            )),
-            "lte" => Ok(format!(
-                "{} <= {}",
-                column_sql,
-                query_tools.allocate_param(&vals[0])
-            )),
-            _ => Ok("1 = 1".to_string()),
+        let filter_item = if dimension_filters.len() == 1 {
+            dimension_filters.into_iter().next().unwrap()
+        } else {
+            FilterItem::Group(Rc::new(crate::plan::filter::FilterGroup::new(
+                crate::plan::filter::FilterGroupOperator::And,
+                dimension_filters,
+            )))
+        };
+        let nodes_factory = SqlNodesFactory::new();
+        let context = Rc::new(VisitorContext::new(
+            query_tools.clone(),
+            &nodes_factory,
+            None,
+        ));
+        let sql = filter_item.to_sql(templates, context)?;
+        if sql.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(sql))
         }
     }
 }
