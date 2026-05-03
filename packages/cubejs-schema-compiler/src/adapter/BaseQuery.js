@@ -3311,7 +3311,8 @@ export class BaseQuery {
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
-      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType) {
+      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
+          this.safeEvaluateSymbolContext().skipMaskFor !== memberPath) {
         // In ungrouped queries, only apply static masks to measures.
         // SQL masks (mask.sql) reference columns that don't apply per-row.
         const isMeasure = type === 'measure';
@@ -3508,7 +3509,11 @@ export class BaseQuery {
     if (!filterSql) {
       return maskedSql;
     }
-    const originalSql = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+    const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
+    const originalSql = this.evaluateSymbolSqlWithContext(
+      () => this.autoPrefixAndEvaluateSql(cubeName, symbol.sql),
+      { skipMaskFor: memberPath }
+    );
     return `CASE WHEN ${filterSql} THEN ${originalSql} ELSE ${maskedSql} END`;
   }
 

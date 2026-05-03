@@ -706,16 +706,26 @@ export class CompilerApi {
             continue;
           }
 
+          const hasMaskingPolicy = policiesWithMemberAccess.some(
+            (policy) => policy.memberMasking &&
+              policy.memberMasking.includesMembers.includes(memberName) &&
+              !policy.memberMasking.excludesMembers.includes(memberName)
+          );
+
+          if (!hasMaskingPolicy) {
+            continue;
+          }
+
           const conditionalFullAccessPolicies = policiesWithMemberAccess.filter(policy => {
-            if (!policy.memberLevel) {
-              return policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0;
-            }
-            const inIncludes = policy.memberLevel.includesMembers.includes(memberName) &&
-                   !policy.memberLevel.excludesMembers.includes(memberName);
-            return inIncludes && policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0;
+            const hasFullMemberAccess = !policy.memberLevel ||
+              (policy.memberLevel.includesMembers.includes(memberName) &&
+               !policy.memberLevel.excludesMembers.includes(memberName));
+            return hasFullMemberAccess &&
+              policy.rowLevel && !policy.rowLevel.allowAll &&
+              policy.rowLevel.filters?.length > 0;
           });
 
-          if (conditionalFullAccessPolicies.length > 0 && policiesWithMemberAccess.length > 0) {
+          if (conditionalFullAccessPolicies.length > 0) {
             maskedMembersSet.add(memberName);
             const evaluatedFilters = conditionalFullAccessPolicies.flatMap(
               policy => (policy.rowLevel.filters || []).map(
@@ -727,13 +737,8 @@ export class CompilerApi {
                 ? evaluatedFilters[0]
                 : { and: evaluatedFilters };
             }
-          } else if (policiesWithMemberAccess.length > 0) {
-            const isMaskedByAnyPolicy = policiesWithMemberAccess.some(
-              (policy) => policy.memberMasking && policy.memberMasking.includesMembers.includes(memberName) && !policy.memberMasking.excludesMembers.includes(memberName)
-            );
-            if (isMaskedByAnyPolicy) {
-              maskedMembersSet.add(memberName);
-            }
+          } else {
+            maskedMembersSet.add(memberName);
           }
         }
 

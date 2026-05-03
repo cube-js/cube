@@ -8,7 +8,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     cube_bridge::{
         base_query_options::{
-            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, MaskedMemberItem, OrderByItem, TimeDimension,
+            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, MaskedMemberItem, OrderByItem,
+            TimeDimension,
         },
         base_tools::BaseTools,
         evaluator::CubeEvaluator,

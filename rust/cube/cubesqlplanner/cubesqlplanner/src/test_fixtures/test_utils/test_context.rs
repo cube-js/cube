@@ -78,7 +78,10 @@ impl TestContext {
         schema: MockSchema,
         masked_members: Vec<String>,
     ) -> Result<Self, CubeError> {
-        let items: Vec<MaskedMemberItem> = masked_members.into_iter().map(MaskedMemberItem::Simple).collect();
+        let items: Vec<MaskedMemberItem> = masked_members
+            .into_iter()
+            .map(MaskedMemberItem::Simple)
+            .collect();
         Self::new_with_options(schema, Tz::UTC, Some(items), None, false, false)
     }
 

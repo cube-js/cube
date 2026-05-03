@@ -18,10 +18,7 @@ use std::rc::Rc;
 #[serde(untagged)]
 pub enum MaskedMemberItem {
     Simple(String),
-    WithFilter {
-        member: String,
-        filter: FilterItem,
-    },
+    WithFilter { member: String, filter: FilterItem },
 }
 
 impl MaskedMemberItem {
