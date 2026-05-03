@@ -2010,5 +2010,49 @@ cubes:
       expect(sql).not.toContain('CASE WHEN');
       expect(sql).toContain('NULL');
     });
+
+    it('does not recurse when filter member is also masked', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: items
+    sql_table: public.items
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: number
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['items.count'],
+        dimensions: ['items.product_id', 'items.price'],
+        maskedMembers: [
+          {
+            member: 'items.product_id',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+          {
+            member: 'items.price',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+        ],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('CASE WHEN');
+      expect(sql).toMatch(/product_id/);
+      expect(sql).not.toMatch(/Maximum call stack/);
+    });
   });
 });

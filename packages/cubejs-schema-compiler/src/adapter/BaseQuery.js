@@ -3312,7 +3312,7 @@ export class BaseQuery {
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
       if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
-          this.safeEvaluateSymbolContext().skipMaskFor !== memberPath) {
+          !this.safeEvaluateSymbolContext().skipMasking) {
         // In ungrouped queries, only apply static masks to measures.
         // SQL masks (mask.sql) reference columns that don't apply per-row.
         const isMeasure = type === 'measure';
@@ -3505,16 +3505,18 @@ export class BaseQuery {
 
   conditionalMemberMaskSql(cubeName, name, symbol, memberPathArray, maskFilter) {
     const maskedSql = this.memberMaskSql(cubeName, name, symbol);
-    const filterSql = this.maskFilterToSql(maskFilter);
-    if (!filterSql) {
-      return maskedSql;
-    }
-    const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
-    const originalSql = this.evaluateSymbolSqlWithContext(
-      () => this.autoPrefixAndEvaluateSql(cubeName, symbol.sql),
-      { skipMaskFor: memberPath }
+    const result = this.evaluateSymbolSqlWithContext(
+      () => {
+        const filterSql = this.maskFilterToSql(maskFilter);
+        if (!filterSql) {
+          return maskedSql;
+        }
+        const originalSql = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+        return `CASE WHEN ${filterSql} THEN ${originalSql} ELSE ${maskedSql} END`;
+      },
+      { skipMasking: true, currentMember: null }
     );
-    return `CASE WHEN ${filterSql} THEN ${originalSql} ELSE ${maskedSql} END`;
+    return result;
   }
 
   maskFilterToSql(filter) {
