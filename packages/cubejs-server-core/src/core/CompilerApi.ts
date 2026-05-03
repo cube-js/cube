@@ -548,6 +548,7 @@ export class CompilerApi {
     const viewFiltersPerCubePerRole: Record<string, Record<string, any[]>> = {};
     const hasAllowAllForCube: Record<string, boolean> = {};
     const maskedMembersSet = new Set<string>();
+    const memberMaskFiltersMap: Record<string, any> = {};
 
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
@@ -680,21 +681,53 @@ export class CompilerApi {
         });
 
         // Determine which members need masking: a member is masked if no covering
-        // policy grants it full access via memberLevel AND at least one covering
-        // policy defines memberMasking that includes the member.
-        // Masking follows the same pattern as row-level security: it is applied
-        // at both cube and view levels. When a cube is accessed through a view,
-        // both the cube's and the view's masking policies are evaluated.
+        // policy grants it unconditional full access via memberLevel AND at least
+        // one covering policy defines memberMasking that includes the member.
+        //
+        // When a policy grants full memberLevel access but also has row_level filters,
+        // the full access is conditional on the row filter. In that case, we track
+        // the row filters so that the generated SQL uses:
+        //   CASE WHEN {rowFilter} THEN {originalValue} ELSE {maskedValue} END
+        // This ensures that rows outside the filter range see masked values.
         const cubeMembersInQuery = Array.from(queryMemberNames).filter(
           memberName => memberName.startsWith(`${cubeName}.`)
         );
         for (const memberName of cubeMembersInQuery) {
-          const hasFullAccessInAnyPolicy = policiesWithMemberAccess.some(policy => {
-            if (!policy.memberLevel) return true;
-            return policy.memberLevel.includesMembers.includes(memberName) &&
+          const hasUnconditionalFullAccess = policiesWithMemberAccess.some(policy => {
+            if (!policy.memberLevel) {
+              return !policy.rowLevel || policy.rowLevel.allowAll;
+            }
+            const inIncludes = policy.memberLevel.includesMembers.includes(memberName) &&
                    !policy.memberLevel.excludesMembers.includes(memberName);
+            return inIncludes && (!policy.rowLevel || policy.rowLevel.allowAll);
           });
-          if (!hasFullAccessInAnyPolicy && policiesWithMemberAccess.length > 0) {
+
+          if (hasUnconditionalFullAccess) {
+            continue;
+          }
+
+          const conditionalFullAccessPolicies = policiesWithMemberAccess.filter(policy => {
+            if (!policy.memberLevel) {
+              return policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0;
+            }
+            const inIncludes = policy.memberLevel.includesMembers.includes(memberName) &&
+                   !policy.memberLevel.excludesMembers.includes(memberName);
+            return inIncludes && policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0;
+          });
+
+          if (conditionalFullAccessPolicies.length > 0 && policiesWithMemberAccess.length > 0) {
+            maskedMembersSet.add(memberName);
+            const evaluatedFilters = conditionalFullAccessPolicies.flatMap(
+              policy => (policy.rowLevel.filters || []).map(
+                (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
+              )
+            );
+            if (evaluatedFilters.length > 0) {
+              memberMaskFiltersMap[memberName] = evaluatedFilters.length === 1
+                ? evaluatedFilters[0]
+                : { and: evaluatedFilters };
+            }
+          } else if (policiesWithMemberAccess.length > 0) {
             const isMaskedByAnyPolicy = policiesWithMemberAccess.some(
               (policy) => policy.memberMasking && policy.memberMasking.includesMembers.includes(memberName) && !policy.memberMasking.excludesMembers.includes(memberName)
             );
@@ -747,6 +780,9 @@ export class CompilerApi {
     }
     if (maskedMembersSet.size > 0) {
       query.maskedMembers = Array.from(maskedMembersSet);
+    }
+    if (Object.keys(memberMaskFiltersMap).length > 0) {
+      query.memberMaskFilters = memberMaskFiltersMap;
     }
     return { query, denied: false };
   }

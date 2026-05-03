@@ -254,6 +254,7 @@ export class BaseQuery {
       ...this.options.contextSymbols,
     };
     this.maskedMembers = new Set(this.options.maskedMembers || []);
+    this.memberMaskFilters = this.options.memberMaskFilters || {};
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -286,6 +287,7 @@ export class BaseQuery {
       subqueryJoins: this.options.subqueryJoins,
       joinHints: this.options.joinHints,
       maskedMembers: this.options.maskedMembers,
+      memberMaskFilters: this.options.memberMaskFilters,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -953,6 +955,7 @@ export class BaseQuery {
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
       maskedMembers: this.options.maskedMembers,
+      memberMaskFilters: this.options.memberMaskFilters,
       memberToAlias: this.options.memberToAlias,
     };
 
@@ -3306,6 +3309,10 @@ export class BaseQuery {
         const isUngrouped = this.options.ungrouped;
         const hasSqlMask = symbol.mask && typeof symbol.mask === 'object' && symbol.mask.sql;
         if (!isMeasure || !isUngrouped || !hasSqlMask) {
+          const maskFilter = this.memberMaskFilters && this.memberMaskFilters[memberPath];
+          if (maskFilter) {
+            return this.conditionalMemberMaskSql(cubeName, name, symbol, memberPathArray, maskFilter);
+          }
           return this.memberMaskSql(cubeName, name, symbol);
         }
       }
@@ -3484,6 +3491,38 @@ export class BaseQuery {
       }
     }
     return this.defaultMaskSql(symbol.type);
+  }
+
+  conditionalMemberMaskSql(cubeName, name, symbol, memberPathArray, maskFilter) {
+    const maskedSql = this.memberMaskSql(cubeName, name, symbol);
+    const filterSql = this.maskFilterToSql(maskFilter);
+    if (!filterSql) {
+      return maskedSql;
+    }
+    const originalSql = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+    return `CASE WHEN ${filterSql} THEN ${originalSql} ELSE ${maskedSql} END`;
+  }
+
+  maskFilterToSql(filter) {
+    if (!filter) return null;
+    if (filter.and) {
+      const parts = filter.and.map(f => this.maskFilterToSql(f)).filter(Boolean);
+      return parts.length ? parts.map(p => `(${p})`).join(' AND ') : null;
+    }
+    if (filter.or) {
+      const parts = filter.or.map(f => this.maskFilterToSql(f)).filter(Boolean);
+      return parts.length ? parts.map(p => `(${p})`).join(' OR ') : null;
+    }
+    if (filter.member && filter.operator) {
+      const filterObj = this.initFilter({
+        dimension: filter.member,
+        operator: filter.operator,
+        values: filter.values,
+        measure: null,
+      });
+      return filterObj.filterToWhere();
+    }
+    return null;
   }
 
   defaultMaskSql(memberType) {

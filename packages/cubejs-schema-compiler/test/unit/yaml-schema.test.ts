@@ -1845,4 +1845,170 @@ views:
       });
     });
   });
+
+  describe('Conditional masking with row-level filters (memberMaskFilters)', () => {
+    it('generates CASE WHEN with row filter for masked members that have conditional full access', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: data_region
+        sql: data_region
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: ['users.city'],
+        memberMaskFilters: {
+          'users.city': {
+            member: 'users.data_region',
+            operator: 'equals',
+            values: ['RESEARCH', 'DEMO'],
+          }
+        },
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('CASE WHEN');
+      expect(sql).toMatch(/CASE WHEN.*data_region.*THEN.*city.*ELSE.*NULL.*END/s);
+    });
+
+    it('generates CASE WHEN with AND row filter for multiple filter conditions', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: data_region
+        sql: data_region
+        type: string
+      - name: region_lock
+        sql: region_lock
+        type: number
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: ['users.city'],
+        memberMaskFilters: {
+          'users.city': {
+            and: [
+              {
+                member: 'users.data_region',
+                operator: 'equals',
+                values: ['RESEARCH'],
+              },
+              {
+                member: 'users.region_lock',
+                operator: 'equals',
+                values: ['0'],
+              }
+            ]
+          }
+        },
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('CASE WHEN');
+      expect(sql).toMatch(/CASE WHEN.*AND.*THEN.*city.*ELSE.*NULL.*END/s);
+    });
+
+    it('uses mask.sql as the ELSE branch when dimension has a custom mask', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+        mask:
+          sql: "'***MASKED***'"
+      - name: data_region
+        sql: data_region
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: ['users.city'],
+        memberMaskFilters: {
+          'users.city': {
+            member: 'users.data_region',
+            operator: 'equals',
+            values: ['RESEARCH'],
+          }
+        },
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('CASE WHEN');
+      expect(sql).toMatch(/CASE WHEN.*data_region.*THEN.*city.*ELSE.*MASKED.*END/s);
+    });
+
+    it('applies regular masking (no CASE WHEN) when no memberMaskFilters', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: ['users.city'],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toContain('CASE WHEN');
+      expect(sql).toContain('NULL');
+    });
+  });
 });
