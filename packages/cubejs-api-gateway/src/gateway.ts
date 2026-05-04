@@ -1343,7 +1343,9 @@ class ApiGateway {
         currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
       }
 
-      delete (currentQuery as any).maskedMembers;
+      if ((currentQuery as any).maskedMembers) {
+        throw new UserError('maskedMembers cannot be provided in the query');
+      }
 
       return {
         normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
