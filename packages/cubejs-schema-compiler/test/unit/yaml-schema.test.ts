@@ -1883,8 +1883,8 @@ cubes:
         }],
       });
       const [sql] = query.buildSqlAndParams();
-      expect(sql).toContain('CASE WHEN');
-      expect(sql).toMatch(/CASE WHEN.*data_region.*THEN.*city.*ELSE.*NULL.*END/s);
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*data_region.*THEN.*city.*ELSE.*NULL.*END/s);
     });
 
     it('generates CASE WHEN with AND row filter for multiple filter conditions', async () => {
@@ -1935,8 +1935,8 @@ cubes:
         }],
       });
       const [sql] = query.buildSqlAndParams();
-      expect(sql).toContain('CASE WHEN');
-      expect(sql).toMatch(/CASE WHEN.*AND.*THEN.*city.*ELSE.*NULL.*END/s);
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*AND.*THEN.*city.*ELSE.*NULL.*END/s);
     });
 
     it('uses mask.sql as the ELSE branch when dimension has a custom mask', async () => {
@@ -1977,8 +1977,8 @@ cubes:
         }],
       });
       const [sql] = query.buildSqlAndParams();
-      expect(sql).toContain('CASE WHEN');
-      expect(sql).toMatch(/CASE WHEN.*data_region.*THEN.*city.*ELSE.*MASKED.*END/s);
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*data_region.*THEN.*city.*ELSE.*MASKED.*END/s);
     });
 
     it('applies regular masking (no CASE WHEN) when no memberMaskFilters', async () => {
@@ -2007,7 +2007,7 @@ cubes:
         maskedMembers: [{ member: 'users.city' }],
       });
       const [sql] = query.buildSqlAndParams();
-      expect(sql).not.toContain('CASE WHEN');
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
       expect(sql).toContain('NULL');
     });
 
@@ -2050,7 +2050,7 @@ cubes:
         ],
       });
       const [sql] = query.buildSqlAndParams();
-      expect(sql).toContain('CASE WHEN');
+      expect(sql).toMatch(/CASE\s+WHEN/);
       expect(sql).toMatch(/product_id/);
       expect(sql).not.toMatch(/Maximum call stack/);
     });

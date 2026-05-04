@@ -75,10 +75,11 @@ impl MaskedSqlNode {
             let filter_sql =
                 self.compile_filter_to_sql(&filter_item, query_tools.clone(), templates)?;
             if let Some(filter_sql) = filter_sql {
-                Ok(Some(format!(
-                    "CASE WHEN {} THEN {} ELSE {} END",
-                    filter_sql, original_sql, masked_sql
-                )))
+                Ok(Some(templates.case(
+                    None,
+                    vec![(filter_sql, original_sql)],
+                    Some(masked_sql),
+                )?))
             } else {
                 Ok(Some(masked_sql))
             }

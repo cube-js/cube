@@ -3507,7 +3507,7 @@ export class BaseQuery {
           return maskedSql;
         }
         const originalSql = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
-        return `CASE WHEN ${filterSql} THEN ${originalSql} ELSE ${maskedSql} END`;
+        return this.caseWhenStatement([{ sql: filterSql, label: originalSql }], maskedSql);
       },
       { skipMasking: true, currentMember: null }
     );
