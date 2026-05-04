@@ -67,10 +67,9 @@ impl QueryTools {
         let mut mask_filters = HashMap::new();
         if let Some(items) = masked_members {
             for item in items {
-                let name = item.member_name().to_string();
-                masked_set.insert(name.clone());
-                if let Some(filter) = item.filter() {
-                    mask_filters.insert(name, filter.clone());
+                masked_set.insert(item.member.clone());
+                if let Some(filter) = item.filter {
+                    mask_filters.insert(item.member, filter);
                 }
             }
         }

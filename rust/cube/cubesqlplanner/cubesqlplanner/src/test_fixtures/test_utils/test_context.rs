@@ -80,7 +80,10 @@ impl TestContext {
     ) -> Result<Self, CubeError> {
         let items: Vec<MaskedMemberItem> = masked_members
             .into_iter()
-            .map(MaskedMemberItem::Simple)
+            .map(|member| MaskedMemberItem {
+                member,
+                filter: None,
+            })
             .collect();
         Self::new_with_options(schema, Tz::UTC, Some(items), None, false, false)
     }

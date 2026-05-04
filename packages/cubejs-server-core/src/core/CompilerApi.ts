@@ -778,13 +778,10 @@ export class CompilerApi {
       query.filters.push(rlsFilter);
     }
     if (maskedMembersSet.size > 0) {
-      query.maskedMembers = Array.from(maskedMembersSet).map(member => {
-        const filter = memberMaskFiltersMap[member];
-        if (filter) {
-          return { member, filter };
-        }
-        return member;
-      });
+      query.maskedMembers = Array.from(maskedMembersSet).map(member => ({
+        member,
+        filter: memberMaskFiltersMap[member],
+      }));
     }
     return { query, denied: false };
   }

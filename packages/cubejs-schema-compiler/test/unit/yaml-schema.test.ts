@@ -1665,7 +1665,7 @@ cubes:
         {
           measures: ['orders.count'],
           dimensions: ['orders.status'],
-          maskedMembers: ['orders.status'],
+          maskedMembers: [{ member: 'orders.status' }],
           contextSymbols: {
             securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
           }
@@ -1806,7 +1806,7 @@ views:
         const query = new PostgresQuery(compilers, {
           measures: ['users_secure_view.users_count'],
           dimensions: ['users_secure_view.users_city_sensitive_masked'],
-          maskedMembers: ['users_secure_view.users_city_sensitive_masked'],
+          maskedMembers: [{ member: 'users_secure_view.users_city_sensitive_masked' }],
           contextSymbols: {
             securityContext: { cubeCloud: { groups } }
           },
@@ -2004,7 +2004,7 @@ cubes:
       const query = new PostgresQuery(compilers, {
         measures: ['users.count'],
         dimensions: ['users.city'],
-        maskedMembers: ['users.city'],
+        maskedMembers: [{ member: 'users.city' }],
       });
       const [sql] = query.buildSqlAndParams();
       expect(sql).not.toContain('CASE WHEN');
