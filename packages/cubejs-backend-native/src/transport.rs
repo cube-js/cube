@@ -16,11 +16,12 @@ use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
 use cubesql::compile::arrow::datatypes::Schema;
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, transform_response, CacheMode, MemberField, RecordBatch, SchemaRef,
+    convert_transport_response_columnar, transform_columnar_response, CacheMode, MemberField,
+    RecordBatch, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
-    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
+    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponseColumnar,
     TransportMetaResponse,
 };
 use cubesql::{
@@ -469,17 +470,17 @@ impl TransportService for NodeBridgeTransport {
                 }
             }
 
+            #[cfg(debug_assertions)]
+            trace!("[transport] Request <- {:?}", result);
+            #[cfg(not(debug_assertions))]
+            trace!("[transport] Request <- <hidden>");
+
             match result? {
                 ValueFromJs::String(result) => {
                     let response: serde_json::Value = match serde_json::from_str(&result) {
                         Ok(json) => json,
                         Err(err) => return Err(CubeError::internal(err.to_string())),
                     };
-
-                    #[cfg(debug_assertions)]
-                    trace!("[transport] Request <- {:?}", response);
-                    #[cfg(not(debug_assertions))]
-                    trace!("[transport] Request <- <hidden>");
 
                     if let Some(error_value) = response.get("error") {
                         match error_value {
@@ -517,15 +518,20 @@ impl TransportService for NodeBridgeTransport {
                         }
                     };
 
-                    let response = match serde_json::from_value::<TransportLoadResponse>(response) {
-                        Ok(v) => v,
-                        Err(err) => {
-                            return Err(CubeError::user(err.to_string()));
-                        }
-                    };
+                    let response =
+                        match serde_json::from_value::<TransportLoadResponseColumnar>(response) {
+                            Ok(v) => v,
+                            Err(err) => {
+                                return Err(CubeError::user(err.to_string()));
+                            }
+                        };
 
-                    break convert_transport_response(response, schema.clone(), member_fields)
-                        .map_err(|err| CubeError::user(err.to_string()));
+                    break convert_transport_response_columnar(
+                        response,
+                        schema.clone(),
+                        member_fields,
+                    )
+                    .map_err(|err| CubeError::user(err.to_string()));
                 }
                 ValueFromJs::ResultWrapper(result_wrappers) => {
                     break result_wrappers
@@ -544,7 +550,11 @@ impl TransportService for NodeBridgeTransport {
                                 schema.clone()
                             };
 
-                            transform_response(&mut wrapper, updated_schema, &member_fields)
+                            transform_columnar_response(
+                                &mut wrapper,
+                                updated_schema,
+                                &member_fields,
+                            )
                         })
                         .collect::<Result<Vec<_>, _>>();
                 }
