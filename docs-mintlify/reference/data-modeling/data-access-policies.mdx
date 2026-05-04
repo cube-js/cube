@@ -473,6 +473,69 @@ Note that access policies also respect [row-level security][ref-rls] restriction
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
 learn more about policy evaluation.
 
+#### `allow_all`
+
+Within `row_level`, you can use `allow_all: true` instead of `filters` to grant
+unrestricted row-level access when a policy matches. `allow_all` and `filters`
+are mutually exclusive — exactly one of them must be specified.
+
+This is useful when layering multiple policies, for example, to grant one group
+unrestricted access while another group receives a row filter:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: admin
+        row_level:
+          allow_all: true
+
+      - group: manager
+        row_level:
+          filters:
+            - member: state
+              operator: equals
+              values: [ "{ securityContext.state }" ]
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `admin`,
+      row_level: {
+        allowAll: true
+      }
+    },
+    {
+      group: `manager`,
+      row_level: {
+        filters: [
+          {
+            member: `state`,
+            operator: `equals`,
+            values: [ securityContext.state ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+When multiple matching policies apply to a query, an `allow_all` policy on a
+cube grants unrestricted access for that cube, overriding row filters from
+other matching policies. See [row-level access][ref-dap-rls] for details on
+how policies are combined.
+
 ## Using securityContext
 
 The [`userAttributes`][ref-sec-ctx] object is only available in Cube Cloud platform. If you are using Cube Core or authenticating against [Core Data APIs][ref-core-data-apis] directly, you won't have access to `userAttributes`. Instead, you need to use `securityContext` directly when referencing user attributes in access policies (e.g., in `row_level` filters or `conditions`). For example, use `securityContext.userId` instead of `userAttributes.userId`.
