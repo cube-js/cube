@@ -1343,6 +1343,8 @@ class ApiGateway {
         currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
       }
 
+      delete (currentQuery as any).maskedMembers;
+
       return {
         normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
         hasExpressionsInQuery
@@ -1371,6 +1373,8 @@ class ApiGateway {
             queryWithRlsFilters,
             context
           ) : queryWithRlsFilters;
+
+          rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
           // if that's the case, we should run an extra pass of parsing here to make sure
