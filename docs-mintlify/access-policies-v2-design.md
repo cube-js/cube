@@ -530,6 +530,59 @@ Per-deal visibility:
 | Umbrella Holdings | Qualified | APAC | — | ✓ | ✓ |
 | Stark Industries | Proposal | EMEA | — | ✓ | ✓ |
 
+#### Field-level access: `region` is regional-manager-only
+
+Layering [member-level access](#member-access) on top of the same
+example: `region` is a regional-manager-only field. Pavel still sees
+the same 4 deals as before — but can no longer reference `region` in
+any query. Alex is unchanged.
+
+```yaml
+# cubes/sales_deals.yml
+cubes:
+  - name: sales_deals
+    sql_table: CRM.DEALS
+
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+
+      - name: amount
+        sql: amount
+        type: number
+
+      - name: stage
+        sql: stage
+        type: string
+
+      # Hard deny for anyone who isn't a regional manager:
+      # the field is hidden from metadata and queries that reference
+      # it fail.
+      - name: region
+        sql: region
+        type: string
+        required_access_policies: [sales_regional_manager]
+```
+
+Per-user field visibility:
+
+| Field | Artyom | Pavel | Alex |
+|---|:-:|:-:|:-:|
+| `name` | — | ✓ | ✓ |
+| `amount` | — | ✓ | ✓ |
+| `stage` | — | ✓ | ✓ |
+| `region` | — | — | ✓ |
+
+> Artyom shows `—` across the board because he fails the view-level
+> `required_access_policies: [sales]` — the member-level rules never
+> get a chance to apply to him.
+
+The `region`-scoped access filter for Alex still works: the filter is
+evaluated by the engine using the user's attribute, and Alex's policy
+(`sales_regional_manager`) grants him read access to the `region`
+member the filter references.
+
 ### Region-scoped access on a folder of views
 
 Pattern: a folder of related views (here, a `SUPPLY_CHAIN` folder
