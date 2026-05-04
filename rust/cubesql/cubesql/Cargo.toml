@@ -87,6 +87,10 @@ harness = false
 name = "large_model"
 harness = false
 
+[[bench]]
+name = "transform_response"
+harness = false
+
 # Code in cubesql workspace is not ready for full-blown clippy
 # So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
 # Feel free to remove any rule from here and fix all warnings with it
