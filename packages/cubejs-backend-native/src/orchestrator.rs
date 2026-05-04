@@ -191,20 +191,16 @@ impl ValueObject for ResultWrapper {
                 };
 
                 let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    return Err(CubeError::user(format!(
-                        "Field name '{}' not found in members",
-                        field_name
-                    )));
+                    // Missing field → NULL, matching `Vanilla` semantics below.
+                    return Ok(FieldValue::Null);
                 };
 
                 row.get(member_index).unwrap_or(&DBResponsePrimitive::Null)
             }
             TransformedData::Columnar { members, columns } => {
                 let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    return Err(CubeError::user(format!(
-                        "Field name '{}' not found in members",
-                        field_name
-                    )));
+                    // Missing field → NULL, matching `Vanilla` semantics below.
+                    return Ok(FieldValue::Null);
                 };
 
                 let Some(column) = columns.get(member_index) else {
@@ -272,10 +268,9 @@ impl ColumnarValueObject for ResultWrapper {
         };
 
         let Some(member_index) = members.iter().position(|m| m == field_name) else {
-            return Err(CubeError::user(format!(
-                "Field name '{}' not found in members",
-                field_name
-            )));
+            // Missing field → column of NULLs. See JsonColumnarValueObject::column.
+            let len = columns.first().map(|c| c.len()).unwrap_or(0);
+            return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
         };
 
         let Some(column) = columns.get(member_index) else {

@@ -410,17 +410,19 @@ impl ColumnarValueObject for JsonColumnarValueObject {
         CubeError,
     > {
         let Some(idx) = self.members.iter().position(|m| m == field_name) else {
-            return Err(CubeError::user(format!(
-                "Field name '{}' not found in members",
-                field_name
-            )));
+            // Match the row-mode `JsonValueObject::get` semantics: a missing field
+            // is treated as a column of NULLs.
+            let len = self.columns.first().map(|c| c.len()).unwrap_or(0);
+            return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
         };
+
         let Some(column) = self.columns.get(idx) else {
             return Err(CubeError::user(format!(
                 "Unexpected response from Cube, missing column for '{}'",
                 field_name
             )));
         };
+
         Ok(Box::new(column.iter().map(json_value_to_field_value)))
     }
 }
