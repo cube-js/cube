@@ -48,6 +48,20 @@ Alternatively, you can push Cube views into Snowflake as native semantic views. 
 
 This enables you to use Cube-authored views directly in Snowflake, maintaining consistency across both platforms.
 
+### Cubes defined with `sql`
+
+During a push, cubes that use the `sql` property instead of `sql_table` are
+handled automatically:
+
+- **Plain SQL string** (e.g., `sql: "SELECT id, status FROM raw.orders"`): Cube
+  creates a helper Snowflake view named `CUBE_SV_SRC_<CUBENAME>` in a configurable
+  schema (defaults to `PUBLIC`) and uses that view as the source for the semantic
+  view.
+- **Simple table reference** (e.g., `sql: MY_SCHEMA.MY_TABLE`): treated the same
+  as `sql_table`.
+- **Templated SQL** (e.g., Jinja or dbt expressions): not supported — the push
+  will fail with a validation error.
+
 ### Prerequisites
 
 The push integration uses the SQL Runner to execute DDL statements in Snowflake. To
@@ -60,6 +74,8 @@ successfully create semantic views, ensure the following:
 - The Snowflake role configured for your Cube data source (via [`CUBEJS_DB_SNOWFLAKE_ROLE`](/reference/configuration/environment-variables#cubejs_db_snowflake_role))
   has privileges to create semantic views in the target database and schema
   (`CREATE SEMANTIC VIEW` on the schema, plus `USAGE` on the parent database and schema).
+  If any cube uses a plain SQL string in its `sql` property, the role also needs
+  `CREATE VIEW` on the schema where helper views are created (defaults to `PUBLIC`).
 - The role has `USAGE` on the warehouse specified by [`CUBEJS_DB_SNOWFLAKE_WAREHOUSE`](/reference/configuration/environment-variables#cubejs_db_snowflake_warehouse)
   and `SELECT` on the underlying tables referenced by the view.
 - [`CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE`](/reference/configuration/environment-variables#cubejs_db_snowflake_quoted_identifiers_ignore_case)
@@ -81,9 +97,10 @@ Cube only.
 
 When pushing a Cube view to Snowflake, the following are currently not supported:
 
-- **Cubes without a `sql_table`.** Each cube referenced by the view must be
-  backed by a physical table. Cubes defined with an arbitrary `sql` block
-  (subqueries, CTEs, or other inline SQL) can't be pushed.
+- **Cubes with templated `sql`.** If a cube's `sql` property uses template
+  expressions (e.g., Jinja or dbt `{{ source(...) }}` syntax), it can't be
+  pushed. Cubes that use `sql_table` or a plain SQL string are supported — see
+  [Cubes defined with `sql`](#cubes-defined-with-sql) for details.
 - **Cubes without a single-column primary key.** Every cube needs a
   `primary_key` dimension that resolves to a single physical column. Composite
   primary keys and primary keys defined as SQL expressions aren't supported.
