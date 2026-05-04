@@ -195,6 +195,7 @@ const querySchema = Joi.object().keys({
   responseFormat: Joi.valid('default', 'compact', 'columnar'),
   subqueryJoins: Joi.array().items(subqueryJoin),
   joinHints: Joi.array().items(joinHint),
+  maskedMembers: Joi.array().items(Joi.object()),
 });
 
 const normalizeQueryOrder = order => {
