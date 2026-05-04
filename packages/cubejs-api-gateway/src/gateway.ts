@@ -129,6 +129,40 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
+function rowsToColumnar(rawData: any): { members: string[]; columns: any[][] } {
+  let rows: any[];
+
+  if (Array.isArray(rawData)) {
+    rows = rawData;
+  } else if (rawData) {
+    rows = Array.from(rawData as Iterable<any>);
+  } else {
+    rows = [];
+  }
+
+  const rowCount = rows.length;
+  if (rowCount === 0) {
+    return { members: [], columns: [] };
+  }
+
+  const members = Object.keys(rows[0]);
+  const memberCount = members.length;
+  const columns: any[][] = new Array(memberCount);
+
+  for (let j = 0; j < memberCount; j++) {
+    const member = members[j];
+    const col = new Array(rowCount);
+
+    for (let i = 0; i < rowCount; i++) {
+      col[i] = rows[i][member];
+    }
+
+    columns[j] = col;
+  }
+
+  return { members, columns };
+}
+
 // Prepared CheckAuthFn, default or from config: always async
 type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
   securityContext: any;
@@ -2125,7 +2159,16 @@ class ApiGateway {
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           results = [{
-            data: response.data,
+            /**
+             * I am still working on improving cpu/memory performance of moving results from ResultWrapper
+             * into RecordBatch on a rust side. Right now, it's slower then doing transpose and JSON serialize on JS side +
+             * deserializing on Rust.
+             *
+             * Right now, it's a temporary solution, which means it will probably outlive us all.
+             *
+             * TODO(ovr): You must finish it, move to ResultWrapper after optimizing it.
+             */
+            data: rowsToColumnar(response.data),
             annotation
           }];
         }
