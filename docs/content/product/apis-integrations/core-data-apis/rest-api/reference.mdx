@@ -318,6 +318,11 @@ It provides additional information such as data lineage.
 
 Get meta-information for cubes and views defined in the data model. Information about cubes and views with `public: false` will not be returned.
 
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `onlyViews` | If present, the response will include only views (entries with `type: "view"`) and any associated `viewGroups`. Useful for clients that consume views exclusively to avoid loading duplicated cube metadata. | ❌ No |
+| `extended` | If present, returns extended schema information including SQL definitions for cubes and views. | ❌ No |
+
 Response
 
 - `cubes` - Array of cubes and views
@@ -340,6 +345,15 @@ curl \
   -H "Authorization: TOKEN" \
   -G \
   http://localhost:4000/cubejs-api/v1/meta
+```
+
+Example request to load only views:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  http://localhost:4000/cubejs-api/v1/meta?onlyViews
 ```
 
 Example response:

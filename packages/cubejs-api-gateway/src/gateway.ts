@@ -439,11 +439,13 @@ class ApiGateway {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
+            onlyViews: 'onlyViews' in req.query,
           });
         } else {
           await this.meta({
             context: req.context,
             res: this.resToResultFn(res),
+            onlyViews: 'onlyViews' in req.query,
           });
         }
       })
@@ -636,11 +638,12 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res, includeCompilerId, onlyCompilerId }: {
+  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
     context: RequestContext,
     res: MetaResponseResultFn,
     includeCompilerId?: boolean,
-    onlyCompilerId?: boolean
+    onlyCompilerId?: boolean,
+    onlyViews?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -660,7 +663,9 @@ class ApiGateway {
         res(response);
         return;
       }
-      const cubesConfig = metaConfig.cubes;
+      const cubesConfig = onlyViews
+        ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
+        : metaConfig.cubes;
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
@@ -688,7 +693,11 @@ class ApiGateway {
     }
   }
 
-  public async metaExtended({ context, res }: { context: ExtendedRequestContext, res: ResponseResultFn }) {
+  public async metaExtended({ context, res, onlyViews }: {
+    context: ExtendedRequestContext,
+    res: ResponseResultFn,
+    onlyViews?: boolean,
+  }) {
     const requestStarted = new Date();
 
     try {
@@ -699,7 +708,10 @@ class ApiGateway {
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
 
-      const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
+      const filteredMetaConfig = onlyViews
+        ? metaConfig.filter((c: any) => c.config?.type === 'view')
+        : metaConfig;
+      const cubes = this.filterVisibleItemsInMeta(context, filteredMetaConfig)
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),

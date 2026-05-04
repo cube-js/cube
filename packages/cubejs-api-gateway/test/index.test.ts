@@ -732,6 +732,41 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
+  test('meta endpoint with onlyViews returns only views and their groups', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?onlyViews')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes).toHaveLength(1);
+    expect(res.body.cubes[0].name).toBe('FooView');
+    expect(res.body.cubes[0].type).toBe('view');
+    expect(res.body.viewGroups).toEqual([
+      {
+        name: 'analytics',
+        title: 'Analytics',
+        description: 'Analytics related views',
+        views: ['FooView'],
+      },
+    ]);
+  });
+
+  test('meta endpoint extended with onlyViews returns only views', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?extended&onlyViews')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes).toHaveLength(1);
+    expect(res.body.cubes[0].name).toBe('FooView');
+  });
+
   describe('multi query support', () => {
     const searchParams = new URLSearchParams({
       query: JSON.stringify({
