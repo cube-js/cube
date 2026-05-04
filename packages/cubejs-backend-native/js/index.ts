@@ -110,7 +110,6 @@ export type SQLInterfaceOptions = {
   contextToApiScopes: (payload: ContextToApiScopesPayload) => ContextToApiScopesResponse | Promise<ContextToApiScopesResponse>,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
-  load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
   stream: (payload: LoadPayload) => unknown | Promise<unknown>,
@@ -396,10 +395,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.checkSqlAuth must be a function');
   }
 
-  if (typeof options.load !== 'function') {
-    throw new Error('options.load must be a function');
-  }
-
   if (typeof options.meta !== 'function') {
     throw new Error('options.meta must be a function');
   }
@@ -426,7 +421,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     contextToApiScopes: wrapNativeFunctionWithChannelCallback(options.contextToApiScopes),
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
     checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
-    load: wrapNativeFunctionWithChannelCallback(options.load),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
     stream: wrapNativeFunctionWithStream(options.stream),
