@@ -123,6 +123,7 @@ type BaseRequest = {
 type RequestQuery = Record<string, any> | Record<string, any>[] & {
   renewQuery?: boolean;
   cacheMode?: CacheMode;
+  responseFormat?: string;
 };
 
 /**
@@ -131,7 +132,6 @@ type RequestQuery = Record<string, any> | Record<string, any>[] & {
 type QueryRequest = BaseRequest & {
   query: RequestQuery;
   queryType?: RequestType;
-  responseFormat?: string;
   apiType?: ApiType;
   resType?: ResultType
   memberToAlias?: Record<string, string>;
