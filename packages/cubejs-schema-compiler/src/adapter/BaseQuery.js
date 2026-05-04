@@ -3519,8 +3519,14 @@ export class BaseQuery {
     const filterItems = this.extractFiltersAsTree([filter]);
     if (!filterItems.length) return null;
     const initialized = filterItems.map(this.initFilter.bind(this));
-    const clauses = initialized.map(f => f.filterToWhere()).filter(Boolean);
-    return clauses.length ? clauses.map(c => `(${c})`).join(' AND ') : null;
+    if (initialized.length === 1) {
+      return initialized[0].filterToWhere();
+    }
+    const groupFilter = this.newGroupFilter({
+      operator: 'and',
+      values: initialized,
+    });
+    return groupFilter.filterToWhere();
   }
 
   defaultMaskSql(memberType) {
