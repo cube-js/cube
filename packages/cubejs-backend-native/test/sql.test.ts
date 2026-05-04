@@ -25,26 +25,8 @@ const _logger = jest.fn(({ event }) => {
 
 function interfaceMethods() {
   return {
-    load: jest.fn(async ({ request, session, query }) => {
-      console.log('[js] load', {
-        request,
-        session,
-        query,
-      });
-
-      expect(session).toEqual({
-        user: expect.toBeTypeOrNull(String),
-        superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' },
-      });
-
-      // It's just an emulation that ApiGateway returns error
-      return {
-        error: 'This error should be passed back to PostgreSQL client',
-      };
-    }),
     sqlApiLoad: jest.fn(async ({ request, session, query, streaming }) => {
-      console.log('[js] load', {
+      console.log('[js] sqlApiLoad', {
         request,
         session,
         query,
@@ -282,7 +264,6 @@ describe('SQLInterface', () => {
       });
 
       try {
-        // limit is used to router query to load method instead of stream
         await connection.query(
           'select * from KibanaSampleDataEcommerce LIMIT 1000'
         );
