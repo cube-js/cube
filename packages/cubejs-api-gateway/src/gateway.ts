@@ -2061,11 +2061,6 @@ class ApiGateway {
       await this.assertApiScope('data', context.securityContext);
 
       query = this.parseQueryParam(request.query);
-      let resType: ResultType = ResultType.DEFAULT;
-
-      if (!Array.isArray(query) && query.responseFormat) {
-        resType = query.responseFormat;
-      }
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions, cacheMode);
@@ -2163,7 +2158,7 @@ class ApiGateway {
               sqlQueries[index],
               annotation,
               response,
-              resType,
+              ResultType.COLUMNAR,
             );
           })
         );
