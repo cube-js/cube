@@ -423,10 +423,117 @@ Check [APIs & Integrations][ref-apis-support] for details on folder
 support. For tools that don't support nested folders, the structure is
 automatically flattened.
 
+## Grouping views with view groups
+
+When a data model contains many views, [view groups][ref-view-groups] help
+organize them into named collections by domain or purpose — for example,
+`sales`, `finance`, or `people`. View groups are exposed through the
+[`/v1/meta`][ref-meta-endpoint] API, making it easier for downstream tools,
+AI agents, and embedded analytics to present a navigable catalog.
+
+You define view groups as standalone entities and then associate views with
+them — either by listing views on the group or by setting
+[`view_group`][ref-view-view-group] / [`view_groups`][ref-view-view-groups]
+on individual views. Both approaches can be combined.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: order_items
+        includes:
+          - count
+          - total_sale_price
+          - status
+
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: order_items
+        includes:
+          - total_sale_price
+          - created_at
+
+  - name: customers_view
+    cubes:
+      - join_path: users
+        includes: "*"
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Revenue and order views for the sales team
+    views:
+      - orders_overview
+
+  - name: people
+    title: People
+    views:
+      - customers_view
+```
+
+```javascript title="JavaScript"
+view(`orders_overview`, {
+  cubes: [
+    {
+      join_path: order_items,
+      includes: [`count`, `total_sale_price`, `status`]
+    }
+  ]
+})
+
+view(`revenue`, {
+  viewGroup: sales,
+  cubes: [
+    {
+      join_path: order_items,
+      includes: [`total_sale_price`, `created_at`]
+    }
+  ]
+})
+
+view(`customers_view`, {
+  cubes: [
+    {
+      join_path: users,
+      includes: `*`
+    }
+  ]
+})
+
+view_group(`sales`, {
+  title: `Sales`,
+  description: `Revenue and order views for the sales team`,
+  views: [`orders_overview`]
+})
+
+view_group(`people`, {
+  title: `People`,
+  views: [`customers_view`]
+})
+```
+
+</CodeGroup>
+
+In this example, the `sales` group contains both `orders_overview`
+(listed on the group) and `revenue` (which references the group via
+`view_group`). The `people` group contains `customers_view`.
+
+<Note>
+
+See the [view group reference][ref-view-groups] for the full list of
+parameters and configuration options.
+
+</Note>
+
 ## Next steps
 
 - See the [view reference][ref-view-reference] for the full list of
   parameters
+- Learn about [view groups][ref-view-groups] to organize views into
+  named collections
 - Learn about [access policies][ref-access-policies] to govern view access
 - Explore [AI context][ref-ai-context] to improve AI query accuracy
 - Use the [Semantic Model IDE][ref-ide] to develop views interactively
@@ -446,4 +553,8 @@ automatically flattened.
 [ref-ide]: /docs/data-modeling/data-model-ide
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-apis-support]: /reference#data-modeling
+[ref-view-groups]: /reference/data-modeling/view-group
+[ref-view-view-group]: /reference/data-modeling/view#view_group
+[ref-view-view-groups]: /reference/data-modeling/view#view_groups
+[ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference
 [wiki-dry]: https://en.wikipedia.org/wiki/Don%27t_repeat_yourself

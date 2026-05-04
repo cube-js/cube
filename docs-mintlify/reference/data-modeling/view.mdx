@@ -230,6 +230,72 @@ view(`active_users`, {
 
 </CodeGroup>
 
+### `view_group`
+
+Assigns this view to a single [view group][ref-ref-view-group]. The referenced
+view group must be defined with `view_group()` elsewhere in the data model.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: order_items
+        includes: "*"
+```
+
+```javascript title="JavaScript"
+view(`revenue`, {
+  viewGroup: sales,
+  cubes: [
+    {
+      join_path: order_items,
+      includes: `*`
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### `view_groups`
+
+Assigns this view to multiple [view groups][ref-ref-view-group] at once.
+Each referenced view group must be defined with `view_group()` elsewhere
+in the data model.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: revenue
+    view_groups:
+      - sales
+      - finance
+    cubes:
+      - join_path: order_items
+        includes: "*"
+```
+
+```javascript title="JavaScript"
+view(`revenue`, {
+  viewGroups: [`sales`, `finance`],
+  cubes: [
+    {
+      join_path: order_items,
+      includes: `*`
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+You can use both `view_group` and `view_groups` on the same view. Cube
+merges them and removes duplicates.
+
 ### `cubes`
 
 Use `cubes` parameter in view to include exposed cubes in bulk. You can build
@@ -666,3 +732,4 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-dim-description]: /reference/data-modeling/dimensions#description
 [ref-dim-format]: /reference/data-modeling/dimensions#format
 [ref-dim-meta]: /reference/data-modeling/dimensions#meta
+[ref-ref-view-group]: /reference/data-modeling/view-group
