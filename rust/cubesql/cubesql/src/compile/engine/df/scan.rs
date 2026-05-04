@@ -388,6 +388,11 @@ pub struct JsonColumnarValueObject {
 
 impl JsonColumnarValueObject {
     pub fn new(members: Vec<String>, columns: Vec<Vec<Value>>) -> Self {
+        debug_assert!(
+            columns.windows(2).all(|w| w[0].len() == w[1].len()),
+            "columnar response has ragged columns"
+        );
+
         Self { members, columns }
     }
 }
