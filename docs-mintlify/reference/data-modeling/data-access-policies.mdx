@@ -105,6 +105,23 @@ that should all be `true` in order for a policy to take effect. Each condition i
 configured with an `if` parameter that is expected to reference the [security
 context][ref-sec-ctx] or user attributes.
 
+In YAML data models, `if` expressions support the Python boolean operators
+`not`, `and`, and `or`. This allows expressing more complex conditions, for
+example checking group membership with null safety:
+
+```yaml
+access_policy:
+  - group: user_group
+    conditions:
+      - if: "{ security_context.auth.groups and security_context.auth.groups.includes('region_group') }"
+    # ...
+
+  - group: user_group
+    conditions:
+      - if: "{ not (security_context.auth.groups and security_context.auth.groups.includes('region_group')) }"
+    # ...
+```
+
 In the following example, a permissive policy for all groups will only apply to
 EMEA-based users, as determined by the `is_EMEA_based` user attribute:
 
