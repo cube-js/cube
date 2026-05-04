@@ -751,8 +751,8 @@ async fn load_data(
                 }
                 ArrowError::ExternalError(Box::new(err))
             })?;
-        let response = result.first();
-        if let Some(data) = response.cloned() {
+
+        if let Some(data) = result.into_iter().next() {
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ExternalError(Box::new(CubeError::user(
