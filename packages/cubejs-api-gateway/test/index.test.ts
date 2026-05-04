@@ -732,11 +732,11 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
-  test('meta endpoint with onlyViews returns only views and their groups', async () => {
+  test('meta endpoint with onlyViews=true returns only views and their groups', async () => {
     const { app } = await createApiGateway();
 
     const res = await request(app)
-      .get('/cubejs-api/v1/meta?onlyViews')
+      .get('/cubejs-api/v1/meta?onlyViews=true')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
 
@@ -754,11 +754,22 @@ describe('API Gateway', () => {
     ]);
   });
 
-  test('meta endpoint extended with onlyViews returns only views', async () => {
+  test('meta endpoint with onlyViews=false returns all cubes and views', async () => {
     const { app } = await createApiGateway();
 
     const res = await request(app)
-      .get('/cubejs-api/v1/meta?extended&onlyViews')
+      .get('/cubejs-api/v1/meta?onlyViews=false')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body.cubes.map(c => c.name).sort()).toEqual(['Foo', 'FooView']);
+  });
+
+  test('meta endpoint extended with onlyViews=true returns only views', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?extended&onlyViews=true')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
 

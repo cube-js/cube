@@ -14,13 +14,14 @@ paths:
       #     required: false
       #     schema:
       #       type: boolean
-      #     description: You will receive extended response if this parameter is present
+      #     description: You will receive extended response if this parameter is present (presence-only, value is ignored)
       #   - in: query
       #     name: onlyViews
       #     required: false
       #     schema:
       #       type: boolean
-      #     description: If present, only views (entries with type="view") and their viewGroups are returned, excluding cubes
+      #       default: false
+      #     description: When set to "true", only views (entries with type="view") and their viewGroups are returned, excluding cubes
       description: ""
       operationId: "metaV1"
       responses:

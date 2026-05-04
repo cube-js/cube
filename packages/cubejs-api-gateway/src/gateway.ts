@@ -435,17 +435,18 @@ class ApiGateway {
       `${this.basePath}/v1/meta`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        const onlyViews = req.query.onlyViews === 'true';
         if ('extended' in req.query) {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
-            onlyViews: 'onlyViews' in req.query,
+            onlyViews,
           });
         } else {
           await this.meta({
             context: req.context,
             res: this.resToResultFn(res),
-            onlyViews: 'onlyViews' in req.query,
+            onlyViews,
           });
         }
       })

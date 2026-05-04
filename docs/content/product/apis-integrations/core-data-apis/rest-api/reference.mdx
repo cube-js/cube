@@ -320,7 +320,7 @@ Get meta-information for cubes and views defined in the data model. Information 
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `onlyViews` | If present, the response will include only views (entries with `type: "view"`) and any associated `viewGroups`. Useful for clients that consume views exclusively to avoid loading duplicated cube metadata. | ❌ No |
+| `onlyViews` | When set to `true`, the response will include only views (entries with `type: "view"`) and any associated `viewGroups`. Useful for clients that consume views exclusively to avoid loading duplicated cube metadata. Defaults to `false`. | ❌ No |
 | `extended` | If present, returns extended schema information including SQL definitions for cubes and views. | ❌ No |
 
 Response
@@ -353,7 +353,7 @@ Example request to load only views:
 curl \
   -H "Authorization: TOKEN" \
   -G \
-  http://localhost:4000/cubejs-api/v1/meta?onlyViews
+  http://localhost:4000/cubejs-api/v1/meta?onlyViews=true
 ```
 
 Example response:
