@@ -87,8 +87,6 @@ fn build_member_fields(kinds: &[ColKind]) -> Vec<MemberField> {
         .collect()
 }
 
-/// Build one primitive cell value, in the encoding that real Cube responses use:
-/// timestamps and ints arrive as JSON strings, floats as JSON numbers, strings as quoted.
 fn cell_value(row: usize, col: usize, kind: ColKind) -> serde_json::Value {
     match kind {
         ColKind::TimeDim => {
@@ -96,12 +94,11 @@ fn cell_value(row: usize, col: usize, kind: ColKind) -> serde_json::Value {
             let n = row % (12 * 28);
             let month = (n / 28) + 1;
             let day = (n % 28) + 1;
+
             // ISO-8601 with no offset, parseable by `parse_date_str`.
             json!(format!("2024-{:02}-{:02}T00:00:00.000", month, day))
         }
-        // Integer-valued floats are common in Cube responses.
         ColKind::Float => json!(row as f64 + (col as f64) / 100.0),
-        // Cube returns numeric measures as JSON strings.
         ColKind::Int => json!(row.wrapping_mul(31).wrapping_add(col).to_string()),
         ColKind::Str => json!(format!("row-{}-c{}", row, col)),
     }
