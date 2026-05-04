@@ -1086,14 +1086,12 @@ macro_rules! transform_response_body {
                             (FieldValue::String(s), builder) => {
                                 let timestamp = parse_date_str(s.as_ref())?;
                                 // TODO switch parsing to microseconds
-                                if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
-                                    builder.append_null()?;
-                                } else if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
+                                if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
                                     builder.append_value(nanos)?;
                                 } else {
                                     log::error!(
                                         "Unable to cast timestamp value to nanoseconds: {}",
-                                        timestamp.to_string()
+                                        timestamp
                                     );
                                     builder.append_null()?;
                                 }
@@ -1114,12 +1112,7 @@ macro_rules! transform_response_body {
                         {
                             (FieldValue::String(s), builder) => {
                                 let timestamp = parse_date_str(s.as_ref())?;
-                                // TODO switch parsing to microseconds
-                                if timestamp.and_utc().timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
-                                    builder.append_null()?;
-                                } else {
-                                    builder.append_value(timestamp.and_utc().timestamp_millis())?;
-                                }
+                                builder.append_value(timestamp.and_utc().timestamp_millis())?;
                             },
                         },
                         {
@@ -1136,28 +1129,18 @@ macro_rules! transform_response_body {
                         field_name,
                         {
                             (FieldValue::String(s), builder) => {
-                                let date = NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d")
-                                    // FIXME: temporary solution for cases when expected type is Date32
-                                    // but underlying data is a Timestamp
-                                    .or_else(|_| NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%dT00:00:00.000"))
-                                    .map_err(|e| {
-                                        DataFusionError::Execution(format!(
-                                            "Can't parse date: '{}': {}",
-                                            s, e
-                                        ))
-                                    });
-                                match date {
-                                    Ok(date) => {
+                                match parse_date_str(s.as_ref()) {
+                                    Ok(timestamp) => {
                                         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-                                        let days_since_epoch = date.num_days_from_ce()  - epoch.num_days_from_ce();
+                                        let days_since_epoch = timestamp.date().num_days_from_ce()
+                                            - epoch.num_days_from_ce();
                                         builder.append_value(days_since_epoch)?;
                                     }
                                     Err(error) => {
                                         log::error!(
                                             "Unable to parse value as Date32: {}",
-                                            error.to_string()
+                                            error
                                         );
-
                                         builder.append_null()?
                                     }
                                 }
