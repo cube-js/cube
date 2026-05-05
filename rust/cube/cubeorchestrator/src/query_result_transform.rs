@@ -1,5 +1,6 @@
 use crate::{
     query_message_parser::QueryResult,
+    structured_object::{StructuredObject, StructuredObjectShape, StructuredObjectShapeRef},
     transport::{
         AnnotatedConfigItem, ConfigItem, MemberOrMemberExpression, MembersMap, NormalizedQuery,
         QueryTimeDimension, QueryType, ResultType, TransformDataRequest,
@@ -377,20 +378,32 @@ pub fn get_compact_row(
 /// and member-name parsing for every cell.
 pub struct VanillaColumnPlan<'a> {
     column_index: usize,
-    member_name: &'a str,
+    /// Position of `member_name` inside `VanillaPlan::shape`.
+    output_index: usize,
     member_type: &'a str,
-    granularity_track: Option<VanillaGranularityTrack<'a>>,
+    granularity_track: Option<VanillaGranularityTrack>,
 }
 
-pub(crate) struct VanillaGranularityTrack<'a> {
-    /// Slice of `member_name` containing only the `{cube}.{dim}` prefix.
-    base_member: &'a str,
+pub(crate) struct VanillaGranularityTrack {
+    /// Position of the granularity's base member (`{cube}.{dim}`) inside
+    /// `VanillaPlan::shape`.
+    base_output_index: usize,
     level: u8,
 }
 
 pub struct VanillaPlan<'a> {
     columns: Vec<VanillaColumnPlan<'a>>,
     has_granularity_tracking: bool,
+    /// Shared key list for every row in the result set. Wrapped in `Arc` so each
+    /// `StructuredObject` row only bumps a refcount instead of cloning keys.
+    shape: StructuredObjectShapeRef,
+    /// Pre-resolved output positions for query-type-specific tail keys, so
+    /// `get_vanilla_row` doesn't need to do per-row hash lookups.
+    compare_date_range_index: Option<usize>,
+    blending_key_index: Option<usize>,
+    /// Position of the response_key column to copy into `blending_key_index`.
+    /// `None` if the response key isn't part of the shape (no matching column).
+    blending_response_index: Option<usize>,
 }
 
 pub fn build_vanilla_plan<'a>(
@@ -398,10 +411,14 @@ pub fn build_vanilla_plan<'a>(
     alias_to_member_name_map: &'a HashMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
     query: &NormalizedQuery,
+    query_type: &QueryType,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
     let mut has_granularity_tracking = false;
+    let mut shape_builder = StructuredObjectShape::builder();
 
+    // Pass 1: regular columns + their output positions.
+    let mut pre_columns: Vec<(usize, &'a str, &'a str)> = Vec::with_capacity(columns_pos.len());
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
             Some(m) => m.as_str(),
@@ -410,18 +427,55 @@ pub fn build_vanilla_plan<'a>(
         ensure_member_in_annotation(member_name, annotation)?;
         let annotation_for_member = annotation.get(member_name).unwrap();
         let member_type = annotation_for_member.member_type.as_deref().unwrap_or("");
+        shape_builder.insert(member_name);
+        pre_columns.push((index, member_name, member_type));
+    }
 
-        // Handle deprecated time dimensions without granularity.
-        // Try to collect minimal granularity value for time dimensions without granularity
-        // as there might be more than one granularity column for the same dimension.
-        let granularity_track = compute_vanilla_granularity_track(member_name, query);
+    // Pass 2: granularity base members. These usually collide with an existing
+    // column key — the builder collapses duplicates and reuses the position.
+    for (_, member_name, _) in &pre_columns {
+        if let Some((base_member, _)) = compute_vanilla_granularity_track(member_name, query) {
+            shape_builder.insert(base_member);
+        }
+    }
+
+    // Pass 3: query-type-specific tail keys.
+    let compare_date_range_index = match query_type {
+        QueryType::CompareDateRangeQuery => Some(shape_builder.insert(COMPARE_DATE_RANGE_FIELD)),
+        _ => None,
+    };
+    let (blending_key_index, blending_response_index) = match query_type {
+        QueryType::BlendingQuery => {
+            let blending_key = get_blending_query_key(query.time_dimensions.as_ref())?;
+            let response_key = get_blending_response_key(query.time_dimensions.as_ref())?;
+            // The response_key may or may not appear as a regular column — only
+            // record its position if it's already in the shape.
+            let response_idx = shape_builder.position(&response_key);
+            let key_idx = shape_builder.insert(blending_key);
+            (Some(key_idx), response_idx)
+        }
+        _ => (None, None),
+    };
+
+    // Pass 4: assemble the column plans now that the shape is finalized.
+    for (column_index, member_name, member_type) in pre_columns {
+        let output_index = shape_builder.position(member_name).expect("inserted above");
+        let granularity_track =
+            compute_vanilla_granularity_track(member_name, query).map(|(base_member, level)| {
+                let base_output_index = shape_builder
+                    .position(base_member)
+                    .expect("base_member inserted above");
+                VanillaGranularityTrack {
+                    base_output_index,
+                    level,
+                }
+            });
         if granularity_track.is_some() {
             has_granularity_tracking = true;
         }
-
         columns.push(VanillaColumnPlan {
-            column_index: index,
-            member_name,
+            column_index,
+            output_index,
             member_type,
             granularity_track,
         });
@@ -430,6 +484,10 @@ pub fn build_vanilla_plan<'a>(
     Ok(VanillaPlan {
         columns,
         has_granularity_tracking,
+        shape: Arc::new(shape_builder.build()),
+        compare_date_range_index,
+        blending_key_index,
+        blending_response_index,
     })
 }
 
@@ -438,7 +496,7 @@ pub fn build_vanilla_plan<'a>(
 fn compute_vanilla_granularity_track<'a>(
     member_name: &'a str,
     query: &NormalizedQuery,
-) -> Option<VanillaGranularityTrack<'a>> {
+) -> Option<(&'a str, u8)> {
     // Require exactly two `.` separators — i.e. the `{cube}.{dim}.{granularity}` form.
     let mut indices = member_name.match_indices(MEMBER_SEPARATOR);
     indices.next()?;
@@ -464,7 +522,7 @@ fn compute_vanilla_granularity_track<'a>(
         .get(granularity)
         .cloned()
         .unwrap_or(DEFAULT_LEVEL_FOR_UNKNOWN);
-    Some(VanillaGranularityTrack { base_member, level })
+    Some((base_member, level))
 }
 
 /// Source for one output column when materializing the [`TransformedData::Columnar`] result.
@@ -598,43 +656,44 @@ pub fn get_vanilla_row(
     query_type: &QueryType,
     query: &NormalizedQuery,
     db_row: &[DBResponseValue],
-) -> Result<IndexMap<String, DBResponsePrimitive>> {
-    // +1 to cover the optional tail entry (compareDateRange / blending key).
-    let mut row = IndexMap::with_capacity(plan.columns.len() + 1);
+) -> Result<StructuredObject> {
+    let mut row: StructuredObject = StructuredObject::with_shape_default(plan.shape.clone());
 
     if plan.has_granularity_tracking {
         // FIXME: For now custom granularities are not supported, only common ones.
         // There is no granularity type/class implementation in rust yet.
-        let mut minimal_granularities: HashMap<&str, (u8, DBResponsePrimitive)> = HashMap::new();
+        let mut minimal_granularities: HashMap<usize, (u8, DBResponsePrimitive)> = HashMap::new();
 
         for column in &plan.columns {
             if let Some(value) = db_row.get(column.column_index) {
                 let transformed_value = transform_value(value.clone(), column.member_type);
-                row.insert(column.member_name.to_string(), transformed_value.clone());
 
                 if let Some(track) = &column.granularity_track {
-                    match minimal_granularities.get(track.base_member) {
+                    match minimal_granularities.get(&track.base_output_index) {
                         Some((existing_level, _)) if *existing_level < track.level => {}
                         _ => {
-                            minimal_granularities
-                                .insert(track.base_member, (track.level, transformed_value));
+                            minimal_granularities.insert(
+                                track.base_output_index,
+                                (track.level, transformed_value.clone()),
+                            );
                         }
                     }
                 }
+
+                row.set_by_position(column.output_index, transformed_value);
             }
         }
 
         // Handle deprecated time dimensions without granularity
-        for (base_member, (_, value)) in minimal_granularities {
-            row.insert(base_member.to_string(), value);
+        for (base_output_index, (_, value)) in minimal_granularities {
+            row.set_by_position(base_output_index, value);
         }
     } else {
-        // Fast path: no column needs granularity bookkeeping. Skip the HashMap
-        // entirely and move the transformed value straight into the row.
+        // Fast path: no column needs granularity bookkeeping.
         for column in &plan.columns {
             if let Some(value) = db_row.get(column.column_index) {
                 let transformed_value = transform_value(value.clone(), column.member_type);
-                row.insert(column.member_name.to_string(), transformed_value);
+                row.set_by_position(column.output_index, transformed_value);
             }
         }
     }
@@ -642,14 +701,16 @@ pub fn get_vanilla_row(
     match query_type {
         QueryType::CompareDateRangeQuery => {
             let date_range_value = get_date_range_value(query.time_dimensions.as_ref())?;
-            row.insert("compareDateRange".to_string(), date_range_value);
+            if let Some(idx) = plan.compare_date_range_index {
+                row.set_by_position(idx, date_range_value);
+            }
         }
         QueryType::BlendingQuery => {
-            let blending_key = get_blending_query_key(query.time_dimensions.as_ref())?;
-            let response_key = get_blending_response_key(query.time_dimensions.as_ref())?;
-
-            if let Some(value) = row.get(&response_key) {
-                row.insert(blending_key, value.clone());
+            if let (Some(key_idx), Some(response_idx)) =
+                (plan.blending_key_index, plan.blending_response_index)
+            {
+                let value = row.values()[response_idx].clone();
+                row.set_by_position(key_idx, value);
             }
         }
         _ => {}
@@ -766,7 +827,7 @@ pub enum TransformedData {
         members: Vec<String>,
         columns: Vec<Vec<DBResponsePrimitive>>,
     },
-    Vanilla(Vec<IndexMap<String, DBResponsePrimitive>>),
+    Vanilla(Vec<StructuredObject>),
 }
 
 impl TransformedData {
@@ -826,6 +887,7 @@ impl TransformedData {
                     alias_to_member_name_map,
                     annotation,
                     query,
+                    query_type,
                 )?;
                 let dataset: Vec<_> = cube_store_result
                     .rows
@@ -933,6 +995,12 @@ pub enum DBResponsePrimitive {
     Number(f64),
     String(String),
     Uncommon(Value),
+}
+
+impl Default for DBResponsePrimitive {
+    fn default() -> Self {
+        DBResponsePrimitive::Null
+    }
 }
 
 impl Display for DBResponsePrimitive {
@@ -1860,7 +1928,7 @@ mod tests {
                         )));
                     }
 
-                    for (key, left_value) in left_record {
+                    for (key, left_value) in left_record.iter() {
                         if let Some(right_value) = right_record.get(key) {
                             if left_value != right_value {
                                 return Err(TestError(format!(
@@ -3037,18 +3105,20 @@ mod tests {
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         )?;
         let res = get_vanilla_row(&plan, query_type, &query, &raw_data.rows[0])?;
-        let expected = IndexMap::from([
-            (
-                "ECommerceRecordsUs2021.city".to_string(),
-                DBResponsePrimitive::String("Missouri City".to_string()),
-            ),
-            (
-                "ECommerceRecordsUs2021.avg_discount".to_string(),
-                DBResponsePrimitive::String("0.80000000000000000000".to_string()),
-            ),
-        ]);
+
+        let mut shape_builder = StructuredObjectShape::builder();
+        shape_builder.insert("ECommerceRecordsUs2021.city");
+        shape_builder.insert("ECommerceRecordsUs2021.avg_discount");
+        let shape = Arc::new(shape_builder.build());
+        let mut expected: StructuredObject = StructuredObject::with_shape_default(shape);
+        expected.set_by_position(0, DBResponsePrimitive::String("Missouri City".to_string()));
+        expected.set_by_position(
+            1,
+            DBResponsePrimitive::String("0.80000000000000000000".to_string()),
+        );
         assert_eq!(res, expected);
         Ok(())
     }
@@ -3073,6 +3143,7 @@ mod tests {
             alias_to_member_name_map,
             annotation,
             &query,
+            &QueryType::default(),
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3102,6 +3173,7 @@ mod tests {
             alias_to_member_name_map,
             annotation,
             &query,
+            &QueryType::default(),
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3215,10 +3287,10 @@ mod tests {
     #[test]
     fn test_compute_vanilla_granularity_track_known_granularity() {
         let q = make_query_with_dims(None);
-        let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
+        let (base_member, level) = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
             .expect("should produce a track");
-        assert_eq!(track.base_member, "Cube.orderDate");
-        assert_eq!(track.level, 4);
+        assert_eq!(base_member, "Cube.orderDate");
+        assert_eq!(level, 4);
     }
 
     #[test]
@@ -3235,14 +3307,10 @@ mod tests {
             ("Cube.t.year", 8),
         ];
         for (member, expected_level) in cases {
-            let track = compute_vanilla_granularity_track(member, &q)
+            let (base_member, level) = compute_vanilla_granularity_track(member, &q)
                 .unwrap_or_else(|| panic!("expected Some for {}", member));
-            assert_eq!(
-                track.level, *expected_level,
-                "level mismatch for {}",
-                member
-            );
-            assert_eq!(track.base_member, "Cube.t");
+            assert_eq!(level, *expected_level, "level mismatch for {}", member);
+            assert_eq!(base_member, "Cube.t");
         }
     }
 
@@ -3259,8 +3327,8 @@ mod tests {
         let q = make_query_with_dims(Some(vec![MemberOrMemberExpression::Member(
             "Cube.other".to_string(),
         )]));
-        let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
+        let (base_member, _) = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
             .expect("should produce a track");
-        assert_eq!(track.base_member, "Cube.orderDate");
+        assert_eq!(base_member, "Cube.orderDate");
     }
 }
