@@ -7,7 +7,7 @@ use crate::sql::parser::{
     CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
     Statement as CubeStoreStatement, SystemCommand,
 };
-use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
+use crate::sql::{QueryPlans, QueryResult, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::metrics;
@@ -606,7 +606,7 @@ impl CacheStoreSqlService {
 
 #[async_trait]
 impl SqlService for CacheStoreSqlService {
-    async fn exec_query(&self, q: &str) -> Result<Arc<DataFrame>, CubeError> {
+    async fn exec_query(&self, q: &str) -> Result<QueryResult, CubeError> {
         self.exec_query_with_context(SqlQueryContext::default(), q)
             .await
     }
@@ -615,7 +615,7 @@ impl SqlService for CacheStoreSqlService {
         &self,
         mut ctx: SqlQueryContext,
         query: &str,
-    ) -> Result<Arc<DataFrame>, CubeError> {
+    ) -> Result<QueryResult, CubeError> {
         let stmt = {
             let mut parser = CubeStoreParser::new(query, ctx.parameters.take())?;
             parser.parse_statement()?
@@ -635,25 +635,25 @@ impl SqlService for CacheStoreSqlService {
                 match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
                         app_metrics::META_QUERIES.increment();
-                        Ok(Arc::new(
+                        Ok(QueryResult::Frame(Arc::new(
                             self.query_planner.execute_meta_plan(logical_plan).await?,
-                        ))
+                        )))
                     }
                     _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
                 }
             }
             CubeStoreStatement::System(command) => match command {
-                SystemCommand::CacheStore(command) => {
-                    self.exec_system_command_with_context(ctx, command).await
-                }
+                SystemCommand::CacheStore(command) => Ok(QueryResult::Frame(
+                    self.exec_system_command_with_context(ctx, command).await?,
+                )),
                 _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
             },
-            CubeStoreStatement::Queue(command) => {
-                self.exec_queue_command_with_context(ctx, command).await
-            }
-            CubeStoreStatement::Cache(command) => {
-                self.exec_cache_command_with_context(ctx, command).await
-            }
+            CubeStoreStatement::Queue(command) => Ok(QueryResult::Frame(
+                self.exec_queue_command_with_context(ctx, command).await?,
+            )),
+            CubeStoreStatement::Cache(command) => Ok(QueryResult::Frame(
+                self.exec_cache_command_with_context(ctx, command).await?,
+            )),
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }

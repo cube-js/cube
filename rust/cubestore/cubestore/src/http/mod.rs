@@ -589,6 +589,8 @@ impl HttpServer {
                             .with_parameters(&parameters),
                         &query,
                     )
+                    .await?
+                    .collect()
                     .await?,
             }),
             x => Err(CubeError::user(format!("Unexpected command: {:?}", x))),
@@ -982,7 +984,9 @@ mod tests {
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
     use crate::mysql::MockSqlAuthService;
-    use crate::sql::{timestamp_from_string, InlineTable, QueryPlans, SqlQueryContext, SqlService};
+    use crate::sql::{
+        timestamp_from_string, InlineTable, QueryPlans, QueryResult, SqlQueryContext, SqlService,
+    };
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;
@@ -1137,7 +1141,7 @@ mod tests {
 
     #[async_trait]
     impl SqlService for SqlServiceMock {
-        async fn exec_query(&self, _query: &str) -> Result<Arc<DataFrame>, CubeError> {
+        async fn exec_query(&self, _query: &str) -> Result<QueryResult, CubeError> {
             todo!()
         }
 
@@ -1145,7 +1149,7 @@ mod tests {
             &self,
             _context: SqlQueryContext,
             query: &str,
-        ) -> Result<Arc<DataFrame>, CubeError> {
+        ) -> Result<QueryResult, CubeError> {
             tokio::time::sleep(Duration::from_secs(2)).await;
             let counter = self.message_counter.fetch_add(1, Ordering::Relaxed);
             if query == "close_connection" {
@@ -1153,10 +1157,10 @@ mod tests {
             } else if query == "error" {
                 Err(CubeError::internal("error".to_string()))
             } else {
-                Ok(Arc::new(DataFrame::new(
+                Ok(QueryResult::Frame(Arc::new(DataFrame::new(
                     vec![Column::new("foo".to_string(), ColumnType::String, 0)],
                     vec![Row::new(vec![TableValue::String(format!("{}", counter))])],
-                )))
+                ))))
             }
         }
 
