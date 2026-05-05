@@ -1,0 +1,178 @@
+---
+title: Conditional row-level access by group membership
+description: Switch row-level access for the same group based on additional security context properties using boolean logic in access policy conditions.
+---
+
+## Use case
+
+You want users in the same group to see different rows depending on additional
+properties in their [security context][ref-sec-ctx] — for example, whether
+they also belong to another group, hold a particular user attribute, or have
+completed a workflow. The same group identity should sometimes be restricted
+by a row-level filter and sometimes have unrestricted access to all rows.
+
+This recipe demonstrates two equivalent patterns for switching row-level
+access conditionally:
+
+- In **YAML**, by defining multiple policies for the same group and gating each
+  one with a boolean expression in [`conditions`][ref-ref-dap-conditions].
+- In **JavaScript**, by setting [`row_level`][ref-ref-dap-row-level] to an
+  expression that returns a different configuration based on the security
+  context.
+
+## Configuration
+
+Suppose you have a `region_test_view` and a `user_group`. Users in `user_group`
+who are _also_ in `region_group` should be limited to rows matching their
+`allowedProductIds` user attribute. All other users in `user_group` should see
+every row.
+
+In YAML, this is expressed as two policies for `user_group`, each one gated by
+a different `if` expression. The first policy uses a positive condition, the
+second negates it with `not (...)` so that exactly one of them applies for any
+given request:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: region_test_view
+    # ...
+
+    access_policy:
+      # Restricted: user is in `region_group` — apply row-level filter
+      - group: user_group
+        conditions:
+          - if: "{ security_context.auth.groups and security_context.auth.groups.includes('region_group') }"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: equals
+              values: security_context.auth.userAttributes.allowedProductIds
+
+      # Unrestricted: user is not in `region_group` — allow all rows
+      - group: user_group
+        conditions:
+          - if: "{ not (security_context.auth.groups and security_context.auth.groups.includes('region_group')) }"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+```
+
+```javascript title="JavaScript"
+view(`region_test_view`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `user_group`,
+      member_level: {
+        includes: `*`
+      },
+      // In JavaScript, switch the entire `row_level` structure based on the
+      // security context. No `conditions` needed.
+      row_level: security_context.auth?.groups?.includes(`region_group`)
+        ? {
+            filters: [
+              {
+                member: `product_id`,
+                operator: `equals`,
+                values: security_context.auth?.userAttributes?.allowedProductIds
+              }
+            ]
+          }
+        : {
+            allow_all: true
+          }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+## Boolean logic in `conditions`
+
+The YAML pattern relies on boolean expressions inside `if`. Each expression is
+written between `{ ... }` and supports `and`, `or`, `not`, and parentheses for
+grouping, plus comparisons and method calls on the security context. This lets
+you express arbitrarily complex conditions without leaving YAML.
+
+Multiple entries in a single `conditions` list are combined with logical AND.
+To express OR between branches, define multiple policies for the same group,
+as shown above. The same approach generalizes to other dimensions of the
+security context — user attributes, claims, roles, and so on:
+
+<CodeGroup>
+
+```yaml title="YAML"
+access_policy:
+  # Full-time admins, OR any user with explicit override
+  - group: data_team
+    conditions:
+      - if: "{ (userAttributes.is_admin and userAttributes.is_full_time) or userAttributes.has_override }"
+    member_level:
+      includes: "*"
+    row_level:
+      allow_all: true
+
+  # Everyone else on the data team — restricted to their region
+  - group: data_team
+    conditions:
+      - if: "{ not ((userAttributes.is_admin and userAttributes.is_full_time) or userAttributes.has_override) }"
+    member_level:
+      includes: "*"
+    row_level:
+      filters:
+        - member: region
+          operator: equals
+          values: [ "{ userAttributes.region }" ]
+```
+
+```javascript title="JavaScript"
+const isPrivileged =
+  (userAttributes.is_admin && userAttributes.is_full_time) ||
+  userAttributes.has_override;
+
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `data_team`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: isPrivileged
+        ? { allow_all: true }
+        : {
+            filters: [
+              {
+                member: `region`,
+                operator: `equals`,
+                values: [ userAttributes.region ]
+              }
+            ]
+          }
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+## Result
+
+For a request whose security context places the user in `region_group`, the
+view returns only rows whose `product_id` matches `allowedProductIds`. For a
+request from any other user in `user_group`, the view returns all rows. The
+member-level access (`includes: "*"`) is identical across both branches, so
+the only thing that changes per request is the row-level configuration.
+
+
+[ref-sec-ctx]: /docs/data-modeling/access-control/context
+[ref-ref-dap-conditions]: /reference/data-modeling/data-access-policies#conditions
+[ref-ref-dap-row-level]: /reference/data-modeling/data-access-policies#row-level

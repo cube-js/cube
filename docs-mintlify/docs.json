@@ -622,6 +622,12 @@
                 ]
               },
               {
+                "group": "Access Control",
+                "pages": [
+                  "recipes/access-control/conditional-row-level-access"
+                ]
+              },
+              {
                 "group": "AI",
                 "pages": [
                   "recipes/ai/agent-to-agent"

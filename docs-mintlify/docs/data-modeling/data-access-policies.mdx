@@ -495,73 +495,11 @@ view(`orders_view`, {
 ### Switch row-level access by group membership
 
 You can switch row-level access for the same group based on additional
-properties of the security context, such as membership in another group.
-The simplest approach is to define multiple policies and gate them with
-[`conditions`][ref-ref-dap-conditions]. Use [`allow_all: true`][ref-ref-dap-row-level]
-to express “no row-level restriction” for the unconstrained branch:
-
-<CodeGroup>
-
-```yaml title="YAML"
-views:
-  - name: region_test_view
-    # ...
-
-    access_policy:
-      # Users in `user_group` who are also in `region_group` are
-      # restricted to rows matching their `allowedProductIds` attribute
-      - group: user_group
-        conditions:
-          - if: "{ security_context.auth.groups and security_context.auth.groups.includes('region_group') }"
-        member_level:
-          includes: "*"
-        row_level:
-          filters:
-            - member: product_id
-              operator: equals
-              values: security_context.auth.userAttributes.allowedProductIds
-
-      # All other users in `user_group` are allowed access to all rows
-      - group: user_group
-        conditions:
-          - if: "{ not (security_context.auth.groups and security_context.auth.groups.includes('region_group')) }"
-        member_level:
-          includes: "*"
-        row_level:
-          allow_all: true
-```
-
-```javascript title="JavaScript"
-view(`region_test_view`, {
-  // ...
-
-  access_policy: [
-    {
-      group: `user_group`,
-      member_level: {
-        includes: `*`
-      },
-      // In JavaScript, you can also switch the entire `row_level` structure
-      // based on the security context, without using `conditions`
-      row_level: security_context.auth?.groups?.includes(`region_group`)
-        ? {
-            filters: [
-              {
-                member: `product_id`,
-                operator: `equals`,
-                values: security_context.auth?.userAttributes?.allowedProductIds
-              }
-            ]
-          }
-        : {
-            allow_all: true
-          }
-    }
-  ]
-})
-```
-
-</CodeGroup>
+properties of the security context — such as membership in another group — by
+combining boolean expressions in [`conditions`][ref-ref-dap-conditions] with
+[`allow_all: true`][ref-ref-dap-row-level] for the unconstrained branch. See
+[Conditional row-level access by group membership][ref-recipe-cond-rls] for a
+worked example covering both YAML and JavaScript.
 
 ### Mandatory filters
 
@@ -695,3 +633,4 @@ cube(`orders`, {
 [ref-ref-dap-row-level]: /reference/data-modeling/data-access-policies#row-level
 [ref-ref-mask-dim]: /reference/data-modeling/dimensions#mask
 [ref-core-data-apis]: /reference/core-data-apis
+[ref-recipe-cond-rls]: /recipes/access-control/conditional-row-level-access

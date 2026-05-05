@@ -143,8 +143,31 @@ cube(`orders`, {
 
 </CodeGroup>
 
-You can use the `conditions` parameter to define multiple policies for the same
-group.
+#### Boolean logic in `if` expressions
+
+Each `if` expression is evaluated as a boolean. In YAML data models, expressions
+are written inside `{ ... }` and support standard boolean operators — `and`,
+`or`, and `not` — along with parentheses for grouping, comparisons (`==`, `!=`,
+`<`, `>`, `<=`, `>=`), and method calls on the [security
+context][ref-sec-ctx] (e.g., `.includes(...)`). In JavaScript data models, `if`
+takes a regular JavaScript expression.
+
+```yaml
+conditions:
+  # AND across operands within a single `if`
+  - if: "{ userAttributes.is_full_time_employee and userAttributes.tenure_years >= 2 }"
+
+  # OR
+  - if: "{ userAttributes.is_admin or userAttributes.is_owner }"
+
+  # NOT and grouping
+  - if: "{ not (security_context.groups and security_context.groups.includes('contractors')) }"
+```
+
+Multiple entries in the `conditions` list are combined with logical AND — the
+policy applies only when every `if` evaluates to `true`. To express OR between
+policies, define multiple policies for the same group with different
+`conditions`.
 
 In the following example, the first policy provides access to a _subset of members_
 to users in the manager group who are full-time employees while the other one provides access to
@@ -498,83 +521,17 @@ cube(`orders`, {
 
 </CodeGroup>
 
-#### Conditional `row_level`
+#### Switching `row_level` based on the security context
 
-In JavaScript data models, you can also set `row_level` to an expression that
+In JavaScript data models, `row_level` may be set to an expression that
 evaluates against the [security context][ref-sec-ctx] and returns a different
-`row_level` configuration depending on its value. This lets you switch the
-entire row-level configuration (e.g., between filtering by an attribute and
-allowing all rows) based on user properties such as group membership.
+`row_level` configuration depending on its value, including `{ allow_all: true }`.
+In YAML data models, `row_level` is a static structure — to achieve the same
+result, define multiple policies for the same group and gate them with
+[`conditions`](#conditions).
 
-In the following example, users in the `region_group` group are restricted to
-rows matching their `allowedProductIds` user attribute, while all other users
-in `user_group` are allowed access to all rows:
-
-<CodeGroup>
-
-```javascript title="JavaScript"
-view(`region_test_view`, {
-  // ...
-
-  access_policy: [
-    {
-      group: `user_group`,
-      member_level: {
-        includes: `*`
-      },
-      row_level: security_context.auth?.groups?.includes(`region_group`)
-        ? {
-            filters: [
-              {
-                member: `product_id`,
-                operator: `equals`,
-                values: security_context.auth?.userAttributes?.allowedProductIds
-              }
-            ]
-          }
-        : {
-            allow_all: true
-          }
-    }
-  ]
-})
-```
-
-```yaml title="YAML"
-views:
-  - name: region_test_view
-    # ...
-
-    access_policy:
-      - group: user_group
-        conditions:
-          - if: "{ security_context.auth.groups and security_context.auth.groups.includes('region_group') }"
-        member_level:
-          includes: "*"
-        row_level:
-          filters:
-            - member: product_id
-              operator: equals
-              values: security_context.auth.userAttributes.allowedProductIds
-
-      - group: user_group
-        conditions:
-          - if: "{ not (security_context.auth.groups and security_context.auth.groups.includes('region_group')) }"
-        member_level:
-          includes: "*"
-        row_level:
-          allow_all: true
-```
-
-</CodeGroup>
-
-<Info>
-
-In YAML data models, `row_level` is a static structure. To achieve the same
-behavior, define multiple policies for the same group and gate them with
-[`conditions`](#conditions), as shown in the YAML example above.
-
-</Info>
+See [Conditional row-level access by group membership][ref-recipe-cond-rls] for
+a worked example.
 
 Note that access policies also respect [row-level security][ref-rls] restrictions
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
@@ -638,3 +595,4 @@ cube(`orders`, {
 [ref-rest-query-filters]: /reference/rest-api/query-format#filters-format
 [ref-rest-query-ops]: /reference/rest-api/query-format#filters-operators
 [ref-rest-boolean-ops]: /reference/rest-api/query-format#boolean-logical-operators
+[ref-recipe-cond-rls]: /recipes/access-control/conditional-row-level-access
