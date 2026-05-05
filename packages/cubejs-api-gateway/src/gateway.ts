@@ -470,17 +470,20 @@ class ApiGateway {
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
         const onlyViews = req.query.onlyViews === 'true';
+        const includeSettings = 'includeSettings' in req.query;
         if ('extended' in req.query) {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
             onlyViews,
+            includeSettings,
           });
         } else {
           await this.meta({
             context: req.context,
             res: this.resToResultFn(res),
             onlyViews,
+            includeSettings,
           });
         }
       })
@@ -688,12 +691,13 @@ class ApiGateway {
     return { defaultLimit, maxLimit };
   }
 
-  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
+  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews, includeSettings }: {
     context: RequestContext,
     res: MetaResponseResultFn,
     includeCompilerId?: boolean,
     onlyCompilerId?: boolean,
     onlyViews?: boolean,
+    includeSettings?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -728,16 +732,16 @@ class ApiGateway {
         cubes: any[],
         viewGroups?: any[],
         compilerId?: string,
-        settings: { defaultLimit: number, maxLimit: number },
-      } = {
-        cubes,
-        settings: this.getMetaSettings(),
-      };
+        settings?: { defaultLimit: number, maxLimit: number },
+      } = { cubes };
       if (viewGroups.length > 0) {
         response.viewGroups = viewGroups;
       }
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;
+      }
+      if (includeSettings) {
+        response.settings = this.getMetaSettings();
       }
       res(response);
     } catch (e: any) {
@@ -751,10 +755,11 @@ class ApiGateway {
     }
   }
 
-  public async metaExtended({ context, res, onlyViews }: {
+  public async metaExtended({ context, res, onlyViews, includeSettings }: {
     context: ExtendedRequestContext,
     res: ResponseResultFn,
     onlyViews?: boolean,
+    includeSettings?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -786,7 +791,10 @@ class ApiGateway {
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
 
-      await res({ cubes, settings: this.getMetaSettings() });
+      await res({
+        cubes,
+        ...(includeSettings ? { settings: this.getMetaSettings() } : {}),
+      });
     } catch (e: any) {
       this.handleError({
         e,

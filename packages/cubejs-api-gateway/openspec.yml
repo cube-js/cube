@@ -22,6 +22,12 @@ paths:
       #       type: boolean
       #       default: false
       #     description: When set to "true", only views (entries with type="view") and their viewGroups are returned, excluding cubes
+      #   - in: query
+      #     name: includeSettings
+      #     required: false
+      #     schema:
+      #       type: boolean
+      #     description: When this parameter is present (presence-only, value is ignored), the response includes a `settings` object with server-wide query limits. Omitted by default to keep the response minimal.
       description: ""
       operationId: "metaV1"
       responses:
@@ -383,9 +389,10 @@ components:
           type: "string"
         settings:
           $ref: "#/components/schemas/V1MetaSettings"
+          description: "Only present when the request includes the `includeSettings` query parameter."
     V1MetaSettings:
       type: "object"
-      description: "Server-wide settings exposed alongside meta. Useful for clients that need to render UI defaults or validate queries before sending them."
+      description: "Server-wide settings returned alongside meta when `includeSettings` is set. Useful for clients that need to render UI defaults or validate queries before sending them."
       required:
         - defaultLimit
         - maxLimit
