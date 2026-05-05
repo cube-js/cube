@@ -10,7 +10,7 @@ use log::trace;
 use moka::future::{Cache, ConcurrentCacheExt, Iter};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::{watch, Mutex};
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
@@ -65,11 +65,19 @@ impl SqlQueueCacheKey {
     }
 }
 
+#[derive(Clone)]
+struct StaleEntry {
+    result: Arc<DataFrame>,
+    created_at: Instant,
+}
+
 pub struct SqlResultCache {
     queue_cache: Mutex<
         lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
     result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
+    stale_cache: Option<Cache<SqlQueueCacheKey, StaleEntry>>,
+    stale_while_revalidate_timeout: Option<Duration>,
     create_table_cache:
         Mutex<HashMap<(String, String), watch::Receiver<Option<Result<IdRow<Table>, CubeError>>>>>,
 }
@@ -85,6 +93,7 @@ impl SqlResultCache {
         capacity_bytes: u64,
         time_to_idle_secs: Option<u64>,
         queue_cache_max_capacity: u64,
+        stale_while_revalidate_secs: Option<u64>,
     ) -> Self {
         let cache_builder = if let Some(time_to_idle_secs) = time_to_idle_secs {
             Cache::builder().time_to_idle(Duration::from_secs(time_to_idle_secs))
@@ -92,12 +101,24 @@ impl SqlResultCache {
             Cache::builder()
         };
 
+        let stale_while_revalidate_timeout =
+            stale_while_revalidate_secs.map(|s| Duration::from_secs(s));
+
+        let stale_cache = stale_while_revalidate_timeout.map(|timeout| {
+            Cache::builder()
+                .time_to_idle(timeout * 2)
+                .max_capacity(capacity_bytes)
+                .build()
+        });
+
         Self {
             queue_cache: Mutex::new(lru::LruCache::new(queue_cache_max_capacity as usize)),
             result_cache: cache_builder
                 .max_capacity(capacity_bytes)
                 .weigher(sql_result_cache_sizeof)
                 .build(),
+            stale_cache,
+            stale_while_revalidate_timeout,
             create_table_cache: Mutex::new(HashMap::new()),
         }
     }
@@ -107,6 +128,11 @@ impl SqlResultCache {
         self.result_cache.invalidate_all();
         // it doesnt flush all, blocking, but it's ok because it's used in one command.
         self.result_cache.sync();
+
+        if let Some(stale_cache) = &self.stale_cache {
+            stale_cache.invalidate_all();
+            stale_cache.sync();
+        }
 
         app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
         app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(self.result_cache.weighted_size() as i64);
@@ -120,13 +146,38 @@ impl SqlResultCache {
         self.result_cache.iter()
     }
 
+    fn try_get_stale(&self, queue_key: &SqlQueueCacheKey) -> Option<Arc<DataFrame>> {
+        let stale_cache = self.stale_cache.as_ref()?;
+        let timeout = self.stale_while_revalidate_timeout?;
+        let entry = stale_cache.get(queue_key)?;
+        if entry.created_at.elapsed() <= timeout {
+            Some(entry.result)
+        } else {
+            None
+        }
+    }
+
+    async fn update_stale_cache(&self, queue_key: &SqlQueueCacheKey, result: &Arc<DataFrame>) {
+        if let Some(stale_cache) = &self.stale_cache {
+            stale_cache
+                .insert(
+                    queue_key.clone(),
+                    StaleEntry {
+                        result: result.clone(),
+                        created_at: Instant::now(),
+                    },
+                )
+                .await;
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
         &self,
         query: &str,
         context: SqlQueryContext,
         plan: SerializedPlan,
-        exec: impl FnOnce(SerializedPlan) -> F,
+        exec: impl FnOnce(SerializedPlan) -> F + Send + 'static,
     ) -> Result<Arc<DataFrame>, CubeError>
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
@@ -140,6 +191,47 @@ impl SqlResultCache {
         }
 
         let queue_key = SqlQueueCacheKey::from_query(query, &context.inline_tables);
+
+        if let Some(stale_result) = self.try_get_stale(&queue_key) {
+            app_metrics::DATA_QUERIES_CACHE_STALE_HIT.increment();
+            trace!(
+                "Using stale-while-revalidate cache for '{}', spawning background refresh",
+                query
+            );
+            let result_cache = self.result_cache.clone();
+            let stale_cache = self.stale_cache.clone();
+            let queue_key_bg = queue_key.clone();
+            let result_key_bg = result_key.clone();
+            tokio::spawn(async move {
+                match exec(plan).await {
+                    Ok(df) => {
+                        let arc_df = Arc::new(df);
+                        result_cache.insert(result_key_bg, arc_df.clone()).await;
+
+                        if let Some(sc) = &stale_cache {
+                            sc.insert(
+                                queue_key_bg,
+                                StaleEntry {
+                                    result: arc_df,
+                                    created_at: Instant::now(),
+                                },
+                            )
+                            .await;
+                        }
+
+                        app_metrics::DATA_QUERIES_CACHE_SIZE
+                            .report(result_cache.entry_count() as i64);
+                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                            .report(result_cache.weighted_size() as i64);
+                    }
+                    Err(e) => {
+                        log::error!("Background stale-while-revalidate refresh failed: {}", e);
+                    }
+                }
+            });
+            return Ok(stale_result);
+        }
+
         let (sender, receiver) = {
             let key = queue_key.clone();
             let mut cache = self.queue_cache.lock().await;
@@ -191,6 +283,7 @@ impl SqlResultCache {
                         app_metrics::DATA_QUERIES_CACHE_WEIGHT
                             .report(self.result_cache.weighted_size() as i64);
                     }
+                    self.update_stale_cache(&queue_key, r).await;
                 }
                 Err(_) => {
                     trace!("Removing error result from cache");
@@ -310,7 +403,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
-        let cache = SqlResultCache::new(1 << 20, Some(120), 1000);
+        let cache = SqlResultCache::new(1 << 20, Some(120), 1000, None);
         let schema = Arc::new(DFSchema::empty());
         let plan = SerializedPlan::try_new(
             LogicalPlan::EmptyRelation(EmptyRelation {
@@ -388,6 +481,101 @@ mod tests {
                 TableValue::Int(1),
             ]
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stale_while_revalidate() -> Result<(), CubeError> {
+        let cache = SqlResultCache::new(1 << 20, Some(120), 1000, Some(30));
+        let schema = Arc::new(DFSchema::empty());
+        let plan = SerializedPlan::try_new(
+            LogicalPlan::EmptyRelation(EmptyRelation {
+                produce_one_row: false,
+                schema,
+            }),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+            },
+            None,
+        )
+        .await?;
+
+        let counter = Arc::new(AtomicI64::new(1));
+        let counter_clone = counter.clone();
+        let exec = async move |_p| {
+            Delay::new(Duration::from_millis(100)).await;
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(
+                    counter_clone.fetch_add(1, Ordering::Relaxed),
+                )])],
+            ))
+        };
+
+        let result = cache
+            .get("SELECT 1", SqlQueryContext::default(), plan.clone(), exec)
+            .await?;
+        assert_eq!(
+            result.get_rows().get(0).unwrap().values().get(0).unwrap(),
+            &TableValue::Int(1)
+        );
+
+        let counter_clone2 = counter.clone();
+        let exec2 = async move |_p| {
+            Delay::new(Duration::from_millis(500)).await;
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(
+                    counter_clone2.fetch_add(1, Ordering::Relaxed),
+                )])],
+            ))
+        };
+
+        let stale_result = cache
+            .get("SELECT 1", SqlQueryContext::default(), plan.clone(), exec2)
+            .await?;
+        assert_eq!(
+            stale_result
+                .get_rows()
+                .get(0)
+                .unwrap()
+                .values()
+                .get(0)
+                .unwrap(),
+            &TableValue::Int(1),
+            "Should return stale result immediately"
+        );
+
+        Delay::new(Duration::from_millis(800)).await;
+
+        let counter_clone3 = counter.clone();
+        let exec3 = async move |_p| {
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(
+                    counter_clone3.fetch_add(1, Ordering::Relaxed),
+                )])],
+            ))
+        };
+        let fresh_result = cache
+            .get("SELECT 1", SqlQueryContext::default(), plan, exec3)
+            .await?;
+
+        let val = fresh_result
+            .get_rows()
+            .get(0)
+            .unwrap()
+            .values()
+            .get(0)
+            .unwrap()
+            .clone();
+        assert!(
+            val == TableValue::Int(2) || val == TableValue::Int(3),
+            "Should see the updated value from background refresh: got {:?}",
+            val
+        );
+
         Ok(())
     }
 }

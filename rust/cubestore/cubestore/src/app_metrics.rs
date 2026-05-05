@@ -13,6 +13,8 @@ pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors"
 /// Incoming SQL queries that do data reads.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
+pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
+    metrics::counter("cs.sql.query.data.cache.stale_hit");
 // Approximate number of entries in this cache.
 pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.cache.size");
 // Approximate total weighted size of entries in this cache.
