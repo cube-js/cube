@@ -681,6 +681,10 @@ class ApiGateway {
    * query limits so clients can render correct defaults and validation
    * without having to know about Cube env vars.
    *
+   * These are non-sensitive deployment settings — only operational knobs
+   * that affect query shape (limits, defaults), never credentials, secrets,
+   * or anything that would let a caller infer infrastructure details.
+   *
    * `defaultLimit` is clamped to `maxLimit` to mirror the behaviour in
    * `query.js#normalizeQuery`, where `dbQueryDefaultLimit` is reduced to
    * `dbQueryLimit` if it ever exceeds it.
