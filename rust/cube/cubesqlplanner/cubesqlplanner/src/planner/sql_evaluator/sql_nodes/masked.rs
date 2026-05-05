@@ -1,7 +1,4 @@
 use super::SqlNode;
-use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
-use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
-use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
@@ -44,7 +41,7 @@ impl MaskedSqlNode {
             return Ok(None);
         }
 
-        let mask_filter = query_tools.member_mask_filter(&full_name).cloned();
+        let mask_filter = query_tools.member_mask_filter(&full_name);
 
         let masked_sql = if let Some(mask_call) = node.mask_sql() {
             if self.ungrouped {
@@ -64,68 +61,31 @@ impl MaskedSqlNode {
             "(NULL)".to_string()
         };
 
-        if let Some(filter_item) = mask_filter {
-            let original_sql = self.input.to_sql(
-                visitor,
-                node,
-                query_tools.clone(),
-                node_processor,
-                templates,
-            )?;
-            let filter_sql =
-                self.compile_filter_to_sql(&filter_item, visitor, query_tools.clone(), templates)?;
-            if let Some(filter_sql) = filter_sql {
-                Ok(Some(templates.case(
-                    None,
-                    vec![(filter_sql, original_sql)],
-                    Some(masked_sql),
-                )?))
-            } else {
-                Ok(Some(masked_sql))
-            }
-        } else {
-            Ok(Some(masked_sql))
-        }
-    }
-
-    fn compile_filter_to_sql(
-        &self,
-        native_filter: &NativeFilterItem,
-        visitor: &SqlEvaluatorVisitor,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<Option<String>, CubeError> {
-        let filter_item = {
-            let mut compiler = query_tools.evaluator_compiler().borrow_mut();
-            let mut filter_compiler = FilterCompiler::new(&mut compiler, query_tools.clone());
-            filter_compiler.add_item(native_filter)?;
-            let (dimension_filters, _, _) = filter_compiler.extract_result();
-            if dimension_filters.is_empty() {
-                return Ok(None);
-            }
-            if dimension_filters.len() == 1 {
-                dimension_filters.into_iter().next().unwrap()
-            } else {
-                FilterItem::Group(Rc::new(FilterGroup::new(
-                    FilterGroupOperator::And,
-                    dimension_filters,
-                )))
-            }
+        let Some(filter_item) = mask_filter else {
+            return Ok(Some(masked_sql));
         };
+
+        let original_sql =
+            self.input
+                .to_sql(visitor, node, query_tools.clone(), node_processor, templates)?;
         // Use self.input as node_processor so member references inside the filter
         // resolve through the unmasked chain — prevents recursion through MaskedSqlNode
         // when the filter member is itself masked.
-        let sql = filter_item.to_sql(
+        let filter_sql = filter_item.to_sql(
             visitor,
             self.input.clone(),
             query_tools,
             templates,
             &FiltersContext::default(),
         )?;
-        if sql.is_empty() {
-            Ok(None)
+        if filter_sql.is_empty() {
+            Ok(Some(masked_sql))
         } else {
-            Ok(Some(sql))
+            Ok(Some(templates.case(
+                None,
+                vec![(filter_sql, original_sql)],
+                Some(masked_sql),
+            )?))
         }
     }
 }

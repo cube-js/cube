@@ -1,6 +1,6 @@
 use super::sql_evaluator::Compiler;
 use super::ParamsAllocator;
-use crate::cube_bridge::base_query_options::{FilterItem, MaskedMemberItem};
+use crate::cube_bridge::base_query_options::MaskedMemberItem;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
@@ -8,6 +8,8 @@ use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
+use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
@@ -33,7 +35,10 @@ pub struct QueryTools {
     timezone: Tz,
     convert_tz_for_raw_time_dimension: bool,
     masked_members: HashSet<String>,
-    member_mask_filters: HashMap<String, FilterItem>,
+    // Compiled mask filters keyed by member full path. Populated in try_new
+    // after the QueryTools Rc is constructed (FilterCompiler requires it),
+    // then never mutated again — RefCell only carries the construction phase.
+    member_mask_filters: RefCell<HashMap<String, FilterItem>>,
 }
 
 impl QueryTools {
@@ -63,17 +68,18 @@ impl QueryTools {
             timezone.clone(),
             member_to_alias,
         )));
+
+        // Phase 1: collect masked member names eagerly; mask filters are
+        // compiled in Phase 2 below (FilterCompiler requires Rc<QueryTools>,
+        // which doesn't exist yet at this point).
         let mut masked_set = HashSet::new();
-        let mut mask_filters = HashMap::new();
-        if let Some(items) = masked_members {
+        if let Some(items) = &masked_members {
             for item in items {
                 masked_set.insert(item.member.clone());
-                if let Some(filter) = item.filter {
-                    mask_filters.insert(item.member, filter);
-                }
             }
         }
-        Ok(Rc::new(Self {
+
+        let result = Rc::new(Self {
             cube_evaluator,
             base_tools,
             join_graph,
@@ -83,16 +89,55 @@ impl QueryTools {
             timezone,
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
-            member_mask_filters: mask_filters,
-        }))
+            member_mask_filters: RefCell::new(HashMap::new()),
+        });
+
+        // Phase 2: compile mask filters once now that Rc<QueryTools> exists.
+        // After this, member_mask_filters is treated as immutable for the
+        // lifetime of QueryTools.
+        if let Some(items) = masked_members {
+            Self::compile_mask_filters(&result, items)?;
+        }
+
+        Ok(result)
+    }
+
+    fn compile_mask_filters(
+        this: &Rc<Self>,
+        items: Vec<MaskedMemberItem>,
+    ) -> Result<(), CubeError> {
+        let mut compiled = HashMap::new();
+        for item in items {
+            let Some(native_filter) = item.filter else {
+                continue;
+            };
+            let mut compiler = this.evaluator_compiler.borrow_mut();
+            let mut filter_compiler = FilterCompiler::new(&mut compiler, this.clone());
+            filter_compiler.add_item(&native_filter)?;
+            let (dimension_filters, _, _) = filter_compiler.extract_result();
+            if dimension_filters.is_empty() {
+                continue;
+            }
+            let filter_item = if dimension_filters.len() == 1 {
+                dimension_filters.into_iter().next().unwrap()
+            } else {
+                FilterItem::Group(Rc::new(FilterGroup::new(
+                    FilterGroupOperator::And,
+                    dimension_filters,
+                )))
+            };
+            compiled.insert(item.member, filter_item);
+        }
+        *this.member_mask_filters.borrow_mut() = compiled;
+        Ok(())
     }
 
     pub fn is_member_masked(&self, member_path: &str) -> bool {
         self.masked_members.contains(member_path)
     }
 
-    pub fn member_mask_filter(&self, member_path: &str) -> Option<&FilterItem> {
-        self.member_mask_filters.get(member_path)
+    pub fn member_mask_filter(&self, member_path: &str) -> Option<FilterItem> {
+        self.member_mask_filters.borrow().get(member_path).cloned()
     }
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
