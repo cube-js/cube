@@ -686,6 +686,33 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
+  test('meta endpoint exposes query limit settings', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('settings');
+    expect(typeof res.body.settings.defaultLimit).toBe('number');
+    expect(typeof res.body.settings.maxLimit).toBe('number');
+    expect(res.body.settings.defaultLimit).toBeLessThanOrEqual(res.body.settings.maxLimit);
+  });
+
+  test('meta endpoint extended exposes query limit settings', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?extended')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('settings');
+    expect(typeof res.body.settings.defaultLimit).toBe('number');
+    expect(typeof res.body.settings.maxLimit).toBe('number');
+  });
+
   test('meta endpoint returns view groups', async () => {
     const { app } = await createApiGateway();
 

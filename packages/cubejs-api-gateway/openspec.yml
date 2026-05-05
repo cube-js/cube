@@ -381,6 +381,21 @@ components:
             $ref: "#/components/schemas/V1CubeMeta"
         compilerId:
           type: "string"
+        settings:
+          $ref: "#/components/schemas/V1MetaSettings"
+    V1MetaSettings:
+      type: "object"
+      description: "Server-wide settings exposed alongside meta. Useful for clients that need to render UI defaults or validate queries before sending them."
+      required:
+        - defaultLimit
+        - maxLimit
+      properties:
+        defaultLimit:
+          type: "integer"
+          description: "Default row limit applied to incoming queries when `limit` is not specified. Sourced from `CUBEJS_DB_QUERY_DEFAULT_LIMIT`, clamped to `maxLimit`."
+        maxLimit:
+          type: "integer"
+          description: "Maximum row limit allowed for an incoming query. Sourced from `CUBEJS_DB_QUERY_LIMIT`. Requests with `limit` above this value are rejected."
     V1LoadResultAnnotation:
       type: "object"
       required:

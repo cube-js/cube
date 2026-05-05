@@ -673,6 +673,21 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
+  /**
+   * Build the `settings` object returned by `/v1/meta`. Exposes server-wide
+   * query limits so clients can render correct defaults and validation
+   * without having to know about Cube env vars.
+   *
+   * `defaultLimit` is clamped to `maxLimit` to mirror the behaviour in
+   * `query.js#normalizeQuery`, where `dbQueryDefaultLimit` is reduced to
+   * `dbQueryLimit` if it ever exceeds it.
+   */
+  protected getMetaSettings(): { defaultLimit: number, maxLimit: number } {
+    const maxLimit = getEnv('dbQueryLimit');
+    const defaultLimit = Math.min(getEnv('dbQueryDefaultLimit'), maxLimit);
+    return { defaultLimit, maxLimit };
+  }
+
   public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
     context: RequestContext,
     res: MetaResponseResultFn,
@@ -709,7 +724,15 @@ class ApiGateway {
           views: group.views.filter((v: string) => visibleCubeNames.has(v)),
         }))
         .filter(group => group.views.length > 0);
-      const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
+      const response: {
+        cubes: any[],
+        viewGroups?: any[],
+        compilerId?: string,
+        settings: { defaultLimit: number, maxLimit: number },
+      } = {
+        cubes,
+        settings: this.getMetaSettings(),
+      };
       if (viewGroups.length > 0) {
         response.viewGroups = viewGroups;
       }
@@ -763,7 +786,7 @@ class ApiGateway {
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
 
-      await res({ cubes });
+      await res({ cubes, settings: this.getMetaSettings() });
     } catch (e: any) {
       this.handleError({
         e,
