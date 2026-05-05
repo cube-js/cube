@@ -393,6 +393,7 @@ mod tests {
     use datafusion::logical_expr::{EmptyRelation, LogicalPlan};
     use futures::future::join_all;
     use futures_timer::Delay;
+    use moka::future::ConcurrentCacheExt;
     use std::collections::HashMap;
     use std::sync::atomic::AtomicI64;
     use std::sync::atomic::Ordering;
@@ -519,6 +520,11 @@ mod tests {
             &TableValue::Int(1)
         );
 
+        // Simulate a partition change: clear the exact result cache so the next get()
+        // misses the exact key but still finds the stale entry (keyed by SQL only).
+        cache.result_cache.invalidate_all();
+        cache.result_cache.sync();
+
         let counter_clone2 = counter.clone();
         let exec2 = async move |_p| {
             Delay::new(Duration::from_millis(500)).await;
@@ -545,8 +551,12 @@ mod tests {
             "Should return stale result immediately"
         );
 
+        // Wait for the background refresh to complete.
         Delay::new(Duration::from_millis(800)).await;
 
+        // The background refresh should have populated the exact result cache.
+        // Verify by fetching again — this should hit the exact cache with the
+        // refreshed value, or at minimum the stale cache was updated.
         let counter_clone3 = counter.clone();
         let exec3 = async move |_p| {
             Ok(DataFrame::new(
