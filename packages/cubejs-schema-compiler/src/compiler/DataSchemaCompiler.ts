@@ -28,6 +28,7 @@ const NATIVE_IS_SUPPORTED = isNativeSupported();
 const moduleFileCache = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
+const JINJA_MACRO_DEFINITION = /{%[-+]?\s*macro\s/;
 
 const getThreadsCount = () => {
   const envThreads = getEnv('transpilationWorkerThreadsCount');
@@ -100,6 +101,7 @@ export type TranspileOptions = {
   compilerId?: string;
   stage?: 0 | 1 | 2 | 3;
   jinjaUsed?: boolean;
+  jinjaMacrosFingerprint?: string;
 };
 
 export type CompileStage = 0 | 1 | 2 | 3;
@@ -280,6 +282,8 @@ export class DataSchemaCompiler {
       this.loadJinjaTemplates(jinjaTemplatedFiles);
     }
 
+    const jinjaMacrosFingerprint = DataSchemaCompiler.computeJinjaMacrosFingerprint(jinjaTemplatedFiles);
+
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
 
@@ -328,11 +332,11 @@ export class DataSchemaCompiler {
         }
 
         const jinjaFilesTasks = jinjaTemplatedFiles
-          .map(f => this.transpileJinjaFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames }));
+          .map(f => this.transpileJinjaFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, jinjaMacrosFingerprint }));
 
         results = (await Promise.all([...jsFilesTasks, ...yamlFilesTasks, ...jinjaFilesTasks])).flat();
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, jinjaMacrosFingerprint })));
       }
 
       return results.filter(f => !!f) as FileContent[];
@@ -576,6 +580,33 @@ export class DataSchemaCompiler {
     });
   }
 
+  /**
+   * Macro files are hidden dependencies of any cube file that imports them —
+   * minijinja resolves `{% import %}` lazily against its template store, so
+   * the per-file Jinja render cache must be invalidated when *any* macro file
+   * changes. Hashing all macro files together rather than tracking per-cube
+   * imports keeps the implementation simple at the cost of over-invalidating
+   * when macro edits happen (which is rare). CUB-2357.
+   */
+  private static computeJinjaMacrosFingerprint(files: FileContent[]): string {
+    const macroFiles = files
+      .filter((f) => JINJA_MACRO_DEFINITION.test(f.content))
+      .sort((a, b) => a.fileName.localeCompare(b.fileName));
+
+    if (macroFiles.length === 0) {
+      return '';
+    }
+
+    const hash = crypto.createHash('md5');
+    for (const f of macroFiles) {
+      hash.update(f.fileName);
+      hash.update('\0');
+      hash.update(f.content);
+      hash.update('\0');
+    }
+    return hash.digest('hex');
+  }
+
   private prepareTranspileSymbols() {
     const cubeNames: string[] = this.cubeDictionary.cubeNames();
     // We need only cubes and all its member names for transpiling.
@@ -802,7 +833,11 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    const cacheKey = crypto.createHash('md5')
+      .update(file.content)
+      .update('|')
+      .update(options.jinjaMacrosFingerprint || '')
+      .digest('hex');
 
     let renderedFileContent: string;
 
