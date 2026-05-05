@@ -112,23 +112,13 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(
-                    visitor,
-                    node_processor,
-                    query_tools,
-                    templates,
-                    filters_ctx,
-                )?;
+                let sql =
+                    item.to_sql(visitor, node_processor, query_tools, templates, filters_ctx)?;
                 format!("({})", sql)
             }
             FilterItem::Segment(item) => {
-                let sql = item.to_sql(
-                    visitor,
-                    node_processor,
-                    query_tools,
-                    templates,
-                    filters_ctx,
-                )?;
+                let sql =
+                    item.to_sql(visitor, node_processor, query_tools, templates, filters_ctx)?;
                 format!("({})", sql)
             }
         };

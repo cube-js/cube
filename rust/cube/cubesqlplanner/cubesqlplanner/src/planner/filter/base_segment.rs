@@ -1,8 +1,8 @@
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNode;
 use crate::planner::sql_evaluator::{
-    CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
-    SqlCall, SqlEvaluatorVisitor,
+    CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
+    SqlEvaluatorVisitor,
 };
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;

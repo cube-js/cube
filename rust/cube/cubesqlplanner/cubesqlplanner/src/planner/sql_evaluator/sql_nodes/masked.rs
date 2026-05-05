@@ -65,9 +65,13 @@ impl MaskedSqlNode {
             return Ok(Some(masked_sql));
         };
 
-        let original_sql =
-            self.input
-                .to_sql(visitor, node, query_tools.clone(), node_processor, templates)?;
+        let original_sql = self.input.to_sql(
+            visitor,
+            node,
+            query_tools.clone(),
+            node_processor,
+            templates,
+        )?;
         // Use self.input as node_processor so member references inside the filter
         // resolve through the unmasked chain — prevents recursion through MaskedSqlNode
         // when the filter member is itself masked.
