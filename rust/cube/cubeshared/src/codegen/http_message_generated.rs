@@ -2669,6 +2669,7 @@ impl<'a> ::flatbuffers::Follow<'a> for HttpQueryResultArrow<'a> {
 
 impl<'a> HttpQueryResultArrow<'a> {
     pub const VT_DATA: ::flatbuffers::VOffsetT = 4;
+    pub const VT_IS_LAST: ::flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
@@ -2688,6 +2689,7 @@ impl<'a> HttpQueryResultArrow<'a> {
         if let Some(x) = args.data {
             builder.add_data(x);
         }
+        builder.add_is_last(args.is_last);
         builder.finish()
     }
 
@@ -2705,6 +2707,17 @@ impl<'a> HttpQueryResultArrow<'a> {
                 .unwrap()
         }
     }
+    #[inline]
+    pub fn is_last(&self) -> bool {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<bool>(HttpQueryResultArrow::VT_IS_LAST, Some(false))
+                .unwrap()
+        }
+    }
 }
 
 impl ::flatbuffers::Verifiable for HttpQueryResultArrow<'_> {
@@ -2719,18 +2732,21 @@ impl ::flatbuffers::Verifiable for HttpQueryResultArrow<'_> {
                 Self::VT_DATA,
                 true,
             )?
+            .visit_field::<bool>("is_last", Self::VT_IS_LAST, false)?
             .finish();
         Ok(())
     }
 }
 pub struct HttpQueryResultArrowArgs<'a> {
     pub data: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
+    pub is_last: bool,
 }
 impl<'a> Default for HttpQueryResultArrowArgs<'a> {
     #[inline]
     fn default() -> Self {
         HttpQueryResultArrowArgs {
             data: None, // required field
+            is_last: false,
         }
     }
 }
@@ -2744,6 +2760,11 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> HttpQueryResultArrowBuilder<'
     pub fn add_data(&mut self, data: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<_>>(HttpQueryResultArrow::VT_DATA, data);
+    }
+    #[inline]
+    pub fn add_is_last(&mut self, is_last: bool) {
+        self.fbb_
+            .push_slot::<bool>(HttpQueryResultArrow::VT_IS_LAST, is_last, false);
     }
     #[inline]
     pub fn new(
@@ -2767,6 +2788,7 @@ impl ::core::fmt::Debug for HttpQueryResultArrow<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("HttpQueryResultArrow");
         ds.field("data", &self.data());
+        ds.field("is_last", &self.is_last());
         ds.finish()
     }
 }

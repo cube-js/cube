@@ -63,8 +63,10 @@ table HttpColumnValue {
 }
 
 table HttpQueryResultArrow {
-    // Arrow IPC stream payload.
+    // Self-contained Arrow IPC stream payload for a single RecordBatch.
     data: [ubyte] (required);
+    // True on the final frame of a streamed result.
+    is_last: bool;
 }
 
 union HttpQueryResultData {

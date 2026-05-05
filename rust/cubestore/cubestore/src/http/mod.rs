@@ -662,8 +662,8 @@ pub enum HttpCommand {
     ResultSet {
         data_frame: Arc<DataFrame>,
     },
-    /// Pre-serialized Arrow IPC stream payload for `HttpQueryResultArrow`.
     QueryResultArrow {
+        /// Pre-serialized Arrow IPC stream payload.
         data: Vec<u8>,
     },
     CloseConnection {
@@ -729,6 +729,9 @@ impl HttpMessage {
                         &mut builder,
                         &HttpQueryResultArrowArgs {
                             data: Some(payload),
+                            // We don't support streaming for now, but clients should implement it
+                            // according to the protocol specification
+                            is_last: true,
                         },
                     );
                     Some(
