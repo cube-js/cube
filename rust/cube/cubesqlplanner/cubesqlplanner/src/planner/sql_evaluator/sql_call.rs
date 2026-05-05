@@ -394,12 +394,12 @@ impl SqlCall {
                             .insert(itm.filter_symbol_name.clone(), itm.column.clone());
                     }
 
-                    let context = Rc::new(VisitorContext::new_for_filter_params(
+                    let context = VisitorContext::new_for_filter_params(
                         query_tools.clone(),
                         &SqlNodesFactory::new(),
                         filter_params_columns,
-                    ));
-                    return subtree.to_sql(templates, context);
+                    );
+                    return context.render_filter_item(&subtree, templates);
                 }
             }
         }

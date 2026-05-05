@@ -1,9 +1,9 @@
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::sql_nodes::SqlNode;
+use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::visitor_context::evaluate_filter_with_context;
-use crate::planner::{FiltersContext, VisitorContext};
+use crate::planner::FiltersContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -101,27 +101,30 @@ impl TypedFilter {
 
     pub fn to_sql(
         &self,
-        context: Rc<VisitorContext>,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
+        filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
         if let FilterOp::MeasureFilter(op) = &self.op {
             return op.to_sql(
                 &self.member_evaluator,
-                &self.query_tools,
-                &context,
+                visitor,
+                node_processor,
+                query_tools,
                 plan_templates,
             );
         }
 
         let resolved = resolve_base_symbol(&self.member_evaluator);
-        let member_sql = evaluate_filter_with_context(&resolved, context.clone(), plan_templates)?;
+        let member_sql = visitor.apply_for_filter(&resolved, node_processor, plan_templates)?;
 
-        let filters_context = context.filters_context();
         let ctx = FilterSqlContext {
             member_sql: &member_sql,
             query_tools: &self.query_tools,
             plan_templates,
-            use_db_time_zone: !filters_context.use_local_tz,
+            use_db_time_zone: !filters_ctx.use_local_tz,
             use_raw_values: self.use_raw_values,
         };
 

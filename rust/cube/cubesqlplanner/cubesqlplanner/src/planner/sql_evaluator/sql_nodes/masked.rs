@@ -1,12 +1,12 @@
 use super::SqlNode;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
-use crate::plan::filter::FilterItem;
+use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
+use crate::planner::FiltersContext;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -73,7 +73,7 @@ impl MaskedSqlNode {
                 templates,
             )?;
             let filter_sql =
-                self.compile_filter_to_sql(&filter_item, query_tools.clone(), templates)?;
+                self.compile_filter_to_sql(&filter_item, visitor, query_tools.clone(), templates)?;
             if let Some(filter_sql) = filter_sql {
                 Ok(Some(templates.case(
                     None,
@@ -91,6 +91,7 @@ impl MaskedSqlNode {
     fn compile_filter_to_sql(
         &self,
         native_filter: &NativeFilterItem,
+        visitor: &SqlEvaluatorVisitor,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<Option<String>, CubeError> {
@@ -105,17 +106,22 @@ impl MaskedSqlNode {
             if dimension_filters.len() == 1 {
                 dimension_filters.into_iter().next().unwrap()
             } else {
-                FilterItem::Group(Rc::new(crate::plan::filter::FilterGroup::new(
-                    crate::plan::filter::FilterGroupOperator::And,
+                FilterItem::Group(Rc::new(FilterGroup::new(
+                    FilterGroupOperator::And,
                     dimension_filters,
                 )))
             }
         };
-        let context = Rc::new(VisitorContext::new_with_node_processor(
-            query_tools.clone(),
+        // Use self.input as node_processor so member references inside the filter
+        // resolve through the unmasked chain — prevents recursion through MaskedSqlNode
+        // when the filter member is itself masked.
+        let sql = filter_item.to_sql(
+            visitor,
             self.input.clone(),
-        ));
-        let sql = filter_item.to_sql(templates, context)?;
+            query_tools,
+            templates,
+            &FiltersContext::default(),
+        )?;
         if sql.is_empty() {
             Ok(None)
         } else {

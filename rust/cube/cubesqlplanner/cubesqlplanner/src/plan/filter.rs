@@ -1,7 +1,9 @@
 use crate::planner::filter::{BaseFilter, BaseSegment};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::sql_nodes::SqlNode;
+use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
+use crate::planner::FiltersContext;
 use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
@@ -77,8 +79,11 @@ impl Filter {
 impl FilterItem {
     pub fn to_sql(
         &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
-        context: Rc<VisitorContext>,
+        filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
         let res = match self {
             FilterItem::Group(group) => {
@@ -86,7 +91,15 @@ impl FilterItem {
                 let items_sql = group
                     .items
                     .iter()
-                    .map(|itm| itm.to_sql(templates, context.clone()))
+                    .map(|itm| {
+                        itm.to_sql(
+                            visitor,
+                            node_processor.clone(),
+                            query_tools.clone(),
+                            templates,
+                            filters_ctx,
+                        )
+                    })
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .filter(|itm| !itm.is_empty())
@@ -99,11 +112,23 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone(), templates)?;
+                let sql = item.to_sql(
+                    visitor,
+                    node_processor,
+                    query_tools,
+                    templates,
+                    filters_ctx,
+                )?;
                 format!("({})", sql)
             }
             FilterItem::Segment(item) => {
-                let sql = item.to_sql(context.clone(), templates)?;
+                let sql = item.to_sql(
+                    visitor,
+                    node_processor,
+                    query_tools,
+                    templates,
+                    filters_ctx,
+                )?;
                 format!("({})", sql)
             }
         };
@@ -319,13 +344,24 @@ impl FilterItem {
 impl Filter {
     pub fn to_sql(
         &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
-        context: Rc<VisitorContext>,
+        filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
         let res = self
             .items
             .iter()
-            .map(|itm| itm.to_sql(templates, context.clone()))
+            .map(|itm| {
+                itm.to_sql(
+                    visitor,
+                    node_processor.clone(),
+                    query_tools.clone(),
+                    templates,
+                    filters_ctx,
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?
             .join(" AND ");
         Ok(res)
