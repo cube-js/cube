@@ -88,6 +88,14 @@ pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> 
         .unwrap_or(u32::MAX)
 }
 
+fn stale_cache_sizeof(_key: &SqlQueueCacheKey, entry: &StaleEntry) -> u32 {
+    (std::mem::size_of::<SqlQueueCacheKey>()
+        + std::mem::size_of::<StaleEntry>()
+        + entry.result.deep_size_of())
+    .try_into()
+    .unwrap_or(u32::MAX)
+}
+
 impl SqlResultCache {
     pub fn new(
         capacity_bytes: u64,
@@ -101,13 +109,13 @@ impl SqlResultCache {
             Cache::builder()
         };
 
-        let stale_while_revalidate_timeout =
-            stale_while_revalidate_secs.map(|s| Duration::from_secs(s));
+        let stale_while_revalidate_timeout = stale_while_revalidate_secs.map(Duration::from_secs);
 
         let stale_cache = stale_while_revalidate_timeout.map(|timeout| {
             Cache::builder()
                 .time_to_idle(timeout * 2)
                 .max_capacity(capacity_bytes)
+                .weigher(stale_cache_sizeof)
                 .build()
         });
 
@@ -582,6 +590,137 @@ mod tests {
             val == TableValue::Int(2) || val == TableValue::Int(3),
             "Should see the updated value from background refresh: got {:?}",
             val
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stale_while_revalidate_background_failure() -> Result<(), CubeError> {
+        let cache = Arc::new(SqlResultCache::new(1 << 20, Some(120), 1000, Some(30)));
+        let schema = Arc::new(DFSchema::empty());
+        let plan = SerializedPlan::try_new(
+            LogicalPlan::EmptyRelation(EmptyRelation {
+                produce_one_row: false,
+                schema,
+            }),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+            },
+            None,
+        )
+        .await?;
+
+        let exec = async move |_p| {
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(42)])],
+            ))
+        };
+        cache
+            .get("SELECT 1", SqlQueryContext::default(), plan.clone(), exec)
+            .await?;
+
+        // Simulate partition change
+        cache.result_cache.invalidate_all();
+        cache.result_cache.sync();
+
+        let exec_fail = async move |_p| -> Result<DataFrame, CubeError> {
+            Err(CubeError::internal("background exec failed".to_string()))
+        };
+
+        let stale_result = cache
+            .get(
+                "SELECT 1",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec_fail,
+            )
+            .await?;
+        assert_eq!(
+            stale_result
+                .get_rows()
+                .get(0)
+                .unwrap()
+                .values()
+                .get(0)
+                .unwrap(),
+            &TableValue::Int(42),
+            "Should still return stale result when background refresh will fail"
+        );
+
+        Delay::new(Duration::from_millis(200)).await;
+
+        // Stale entry should still be intact after background failure
+        cache.result_cache.invalidate_all();
+        cache.result_cache.sync();
+
+        let exec_after = async move |_p| {
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(99)])],
+            ))
+        };
+        let result = cache
+            .get("SELECT 1", SqlQueryContext::default(), plan, exec_after)
+            .await?;
+        assert_eq!(
+            result.get_rows().get(0).unwrap().values().get(0).unwrap(),
+            &TableValue::Int(42),
+            "Stale entry should still be available after background failure"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stale_while_revalidate_timeout_expiry() -> Result<(), CubeError> {
+        let cache = Arc::new(SqlResultCache::new(1 << 20, Some(120), 1000, Some(1)));
+        let schema = Arc::new(DFSchema::empty());
+        let plan = SerializedPlan::try_new(
+            LogicalPlan::EmptyRelation(EmptyRelation {
+                produce_one_row: false,
+                schema,
+            }),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+            },
+            None,
+        )
+        .await?;
+
+        let exec = async move |_p| {
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(1)])],
+            ))
+        };
+        cache
+            .get("SELECT 1", SqlQueryContext::default(), plan.clone(), exec)
+            .await?;
+
+        // Simulate partition change
+        cache.result_cache.invalidate_all();
+        cache.result_cache.sync();
+
+        // Wait for the 1-second stale timeout to expire
+        Delay::new(Duration::from_millis(1200)).await;
+
+        let exec2 = async move |_p| {
+            Ok(DataFrame::new(
+                Vec::new(),
+                vec![Row::new(vec![TableValue::Int(99)])],
+            ))
+        };
+        let result = cache
+            .get("SELECT 1", SqlQueryContext::default(), plan, exec2)
+            .await?;
+        assert_eq!(
+            result.get_rows().get(0).unwrap().values().get(0).unwrap(),
+            &TableValue::Int(99),
+            "After stale timeout expires, should execute fresh query instead of serving stale"
         );
 
         Ok(())
