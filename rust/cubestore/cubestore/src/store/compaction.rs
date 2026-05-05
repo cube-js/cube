@@ -2246,6 +2246,7 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(partitions.len(), 3);
+                Ok::<(), CubeError>(())
             })
             .await;
     }
@@ -2301,6 +2302,7 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(partitions.len(), 3);
+                Ok::<(), CubeError>(())
             })
             .await;
     }
@@ -2381,6 +2383,7 @@ mod tests {
                 for p in partitions.iter() {
                     assert!(p.get_row().file_size().unwrap() <= 10000);
                 }
+                Ok::<(), CubeError>(())
             })
             .await;
     }

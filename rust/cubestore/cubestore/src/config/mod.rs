@@ -1804,7 +1804,7 @@ impl Config {
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options::<_, T, _, _>(
             true,
@@ -1822,7 +1822,7 @@ impl Config {
 
     pub async fn start_migration_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_migration_test_with_options::<_, T, _, _>(
             Option::<
@@ -1839,7 +1839,7 @@ impl Config {
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options::<_, T, _, _>(
             false,
@@ -1861,7 +1861,7 @@ impl Config {
         test_fn: impl FnOnce(CubeServices) -> T2,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options(true, Some(configure_injector), test_fn)
             .await
@@ -1874,7 +1874,7 @@ impl Config {
         test_fn: F,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
@@ -1900,8 +1900,10 @@ impl Config {
 
             // Should be long enough even for CI.
             let timeout = Duration::from_secs(600);
-            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
-                panic!("Test timed out after {} seconds", timeout.as_secs());
+            match timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                Err(_) => panic!("Test timed out after {} seconds", timeout.as_secs()),
+                Ok(Err(e)) => panic!("Test failed: {}", e.display_with_backtrace()),
+                Ok(Ok(())) => {}
             }
 
             services.stop_processing_loops().await.unwrap();
@@ -1924,7 +1926,7 @@ impl Config {
         test_fn: F,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
@@ -1943,8 +1945,10 @@ impl Config {
 
             // Should be long enough even for CI.
             let timeout = Duration::from_secs(600);
-            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
-                panic!("Test timed out after {} seconds", timeout.as_secs());
+            match timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                Err(_) => panic!("Test timed out after {} seconds", timeout.as_secs()),
+                Ok(Err(e)) => panic!("Test failed: {}", e.display_with_backtrace()),
+                Ok(Ok(())) => {}
             }
 
             services.stop_processing_loops().await.unwrap();
@@ -1962,14 +1966,14 @@ impl Config {
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         Self::test(name).start_test(test_fn).await;
     }
 
     pub async fn run_migration_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         Self::migration_test(name)
             .start_migration_test(test_fn)

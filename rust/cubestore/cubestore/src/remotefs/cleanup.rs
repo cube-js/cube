@@ -383,6 +383,7 @@ mod test {
                     .collect()
                     .await
                     .unwrap();
+                Ok::<(), CubeError>(())
             })
             .await;
     }

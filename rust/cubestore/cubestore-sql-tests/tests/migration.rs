@@ -63,6 +63,7 @@ fn main() {
                 test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service)))
                     .await
                     .unwrap();
+                Ok(())
             },
         ));
     });

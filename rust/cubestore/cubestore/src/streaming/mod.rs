@@ -1294,6 +1294,7 @@ mod tests {
                 .await
                 .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 0);
+            Ok::<(), CubeError>(())
         })
             .await;
     }
@@ -1433,6 +1434,7 @@ mod tests {
                 .await
                 .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 0);
+            Ok::<(), CubeError>(())
         })
             .await;
     }
@@ -1497,6 +1499,7 @@ mod tests {
                 .await
                 .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1399)])]);
+            Ok::<(), CubeError>(())
         })
             .await;
     }
@@ -1561,6 +1564,7 @@ mod tests {
                 assert_eq!(values[0], values[1], "i = {}", i);
             }
 
+            Ok::<(), CubeError>(())
         })
             .await;
     }
@@ -1629,6 +1633,7 @@ mod tests {
                 .await
                 .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
+            Ok::<(), CubeError>(())
         })
             .await;
     }
@@ -1793,6 +1798,7 @@ mod tests {
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`, `TIMESTAMP_SECOND`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP_SECOND`,`TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap().collect().await.unwrap();
+            Ok::<(), CubeError>(())
         })
             .await;
     }
@@ -1891,6 +1897,7 @@ mod tests {
                 .await
                 .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
+            Ok::<(), CubeError>(())
         })
             .await;
     }
