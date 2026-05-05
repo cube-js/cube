@@ -69,6 +69,13 @@ impl DataFrame {
         DataFrame { columns, data }
     }
 
+    pub fn empty() -> DataFrame {
+        DataFrame {
+            columns: vec![],
+            data: vec![],
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.data.len()
     }

@@ -727,7 +727,7 @@ impl SqlService for SqlServiceImpl {
         }
 
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
-            return Ok(QueryResult::Frame(Arc::new(data_frame)));
+            return Ok(data_frame.into());
         }
 
         let ast = {
@@ -744,33 +744,29 @@ impl SqlService for SqlServiceImpl {
                     )));
                 }
                 match variable[0].value.to_lowercase() {
-                    s if s == "schemas" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
-                        self.db.get_schemas().await?,
-                    )))),
-                    s if s == "tables" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
-                        self.db.get_tables().await?,
-                    )))),
-                    s if s == "chunks" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
-                        self.db.chunks_table().all_rows().await?,
-                    )))),
-                    s if s == "indexes" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
-                        self.db.index_table().all_rows().await?,
-                    )))),
-                    s if s == "partitions" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
-                        self.db.partition_table().all_rows().await?,
-                    )))),
+                    s if s == "schemas" => Ok(DataFrame::from(self.db.get_schemas().await?).into()),
+                    s if s == "tables" => Ok(DataFrame::from(self.db.get_tables().await?).into()),
+                    s if s == "chunks" => {
+                        Ok(DataFrame::from(self.db.chunks_table().all_rows().await?).into())
+                    }
+                    s if s == "indexes" => {
+                        Ok(DataFrame::from(self.db.index_table().all_rows().await?).into())
+                    }
+                    s if s == "partitions" => {
+                        Ok(DataFrame::from(self.db.partition_table().all_rows().await?).into())
+                    }
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
             CubeStoreStatement::System(command) => match command {
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
-                    Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                    Ok(DataFrame::empty().into())
                 }
                 SystemCommand::Repartition { partition_id } => {
                     let partition = self.db.get_partition(partition_id).await?;
                     self.cluster.schedule_repartition(&partition).await?;
-                    Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                    Ok(DataFrame::empty().into())
                 }
                 SystemCommand::PanicWorker => {
                     let cluster = self.cluster.clone();
@@ -812,36 +808,36 @@ impl SqlService for SqlServiceImpl {
                     DropCommand::DropQueryCache => {
                         self.cache.clear().await;
 
-                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                        Ok(DataFrame::empty().into())
                     }
                     DropCommand::DropAllCache => {
                         self.cache.clear().await;
 
-                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                        Ok(DataFrame::empty().into())
                     }
                 },
                 SystemCommand::MetaStore(command) => match command {
                     MetaStoreCommand::SetCurrent { id } => {
                         self.db.set_current_snapshot(id).await?;
-                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                        Ok(DataFrame::empty().into())
                     }
                     MetaStoreCommand::Compaction => {
                         self.db.compaction().await?;
-                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                        Ok(DataFrame::empty().into())
                     }
                     MetaStoreCommand::Healthcheck => {
                         self.db.healthcheck().await?;
-                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                        Ok(DataFrame::empty().into())
                     }
                 },
-                SystemCommand::CacheStore(command) => Ok(QueryResult::Frame(
-                    self.cachestore
-                        .exec_system_command_with_context(context, command)
-                        .await?,
-                )),
+                SystemCommand::CacheStore(command) => Ok(self
+                    .cachestore
+                    .exec_system_command_with_context(context, command)
+                    .await?
+                    .into()),
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
-                Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                Ok(DataFrame::empty().into())
             }
             CubeStoreStatement::CreateSchema {
                 schema_name,
@@ -854,7 +850,7 @@ impl SqlService for SqlServiceImpl {
 
                 let name = normalize_for_schema_table_or_index_name(&schema_name.0[0]);
                 let res = self.create_schema(name, if_not_exists).await?;
-                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
+                Ok(DataFrame::from(vec![res]).into())
             }
             CubeStoreStatement::CreateTable {
                 create_table:
@@ -1053,7 +1049,7 @@ impl SqlService for SqlServiceImpl {
                         &context.trace_obj,
                     )
                     .await?;
-                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
+                Ok(DataFrame::from(vec![res]).into())
             }
             CubeStoreStatement::Statement(Statement::CreateIndex(CreateIndex {
                 name,
@@ -1098,7 +1094,7 @@ impl SqlService for SqlServiceImpl {
                             .collect::<Result<Vec<_>, _>>()?,
                     )
                     .await?;
-                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
+                Ok(DataFrame::from(vec![res]).into())
             }
             CubeStoreStatement::CreateSource {
                 name,
@@ -1145,7 +1141,7 @@ impl SqlService for SqlServiceImpl {
                         .db
                         .create_or_update_source(normalize_for_source_name(&name), creds?)
                         .await?;
-                    Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![source]))))
+                    Ok(DataFrame::from(vec![source]).into())
                 } else {
                     Err(CubeError::user(
                         "CREATE SOURCE OR UPDATE should be used instead".to_string(),
@@ -1181,7 +1177,7 @@ impl SqlService for SqlServiceImpl {
                         if_not_exists,
                     )
                     .await?;
-                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
+                Ok(DataFrame::from(vec![res]).into())
             }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
@@ -1211,7 +1207,7 @@ impl SqlService for SqlServiceImpl {
                 app_metrics::DATA_QUERIES
                     .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
 
-                Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                Ok(DataFrame::empty().into())
             }
             CubeStoreStatement::Statement(Statement::Insert(Insert {
                 table,
@@ -1251,18 +1247,18 @@ impl SqlService for SqlServiceImpl {
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
-                Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
+                Ok(DataFrame::empty().into())
             }
-            CubeStoreStatement::Queue(command) => Ok(QueryResult::Frame(
-                self.cachestore
-                    .exec_queue_command_with_context(context, command)
-                    .await?,
-            )),
-            CubeStoreStatement::Cache(command) => Ok(QueryResult::Frame(
-                self.cachestore
-                    .exec_cache_command_with_context(context, command)
-                    .await?,
-            )),
+            CubeStoreStatement::Queue(command) => Ok(self
+                .cachestore
+                .exec_queue_command_with_context(context, command)
+                .await?
+                .into()),
+            CubeStoreStatement::Cache(command) => Ok(self
+                .cachestore
+                .exec_cache_command_with_context(context, command)
+                .await?
+                .into()),
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
@@ -1325,7 +1321,7 @@ impl SqlService for SqlServiceImpl {
                         .await??
                     }
                 };
-                Ok(QueryResult::Frame(res))
+                Ok(res.into())
             }
             CubeStoreStatement::Statement(Statement::Explain {
                 analyze,
@@ -1333,18 +1329,17 @@ impl SqlService for SqlServiceImpl {
                 statement,
                 ..
             }) => match *statement {
-                Statement::Query(q) => Ok(QueryResult::Frame(
-                    self.explain(Statement::Query(q.clone()), analyze).await?,
-                )),
+                Statement::Query(q) => Ok(self
+                    .explain(Statement::Query(q.clone()), analyze)
+                    .await?
+                    .into()),
                 _ => Err(CubeError::user(format!(
                     "Unsupported explain request: '{}'",
                     query
                 ))),
             },
 
-            CubeStoreStatement::Dump(q) => {
-                Ok(QueryResult::Frame(self.dump_select_inputs(query, q).await?))
-            }
+            CubeStoreStatement::Dump(q) => Ok(self.dump_select_inputs(query, q).await?.into()),
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
@@ -5898,13 +5893,13 @@ impl SqlServiceImpl {
             ));
         }
         if q.to_lowercase() == "set character set utf8" {
-            return Some(DataFrame::new(vec![], vec![]));
+            return Some(DataFrame::empty());
         }
         if q.to_lowercase() == "set names utf8" {
-            return Some(DataFrame::new(vec![], vec![]));
+            return Some(DataFrame::empty());
         }
         if q.to_lowercase() == "show character set where charset = 'utf8mb4'" {
-            return Some(DataFrame::new(vec![], vec![]));
+            return Some(DataFrame::empty());
         }
         None
     }
