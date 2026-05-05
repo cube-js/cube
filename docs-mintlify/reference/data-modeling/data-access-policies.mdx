@@ -208,6 +208,61 @@ cube(`orders`, {
 
 </CodeGroup>
 
+#### Boolean logic in `if` expressions
+
+`if` expressions support full boolean logic so you can compose checks against
+the [security context][ref-sec-ctx] and user attributes:
+
+- In YAML, expressions inside `{ ... }` use Jinja-style operators: `and`, `or`,
+`not`, and parentheses for grouping.
+- In JavaScript, expressions use native operators: `&&`, `||`, and `!`.
+- Multiple `conditions` entries on a single policy are combined with _AND_
+semantics — every entry must evaluate to `true` for the policy to take effect.
+- Multiple policies that match the same group are combined with _OR_ semantics —
+if any matching policy grants access, the user gets access.
+
+In the following example, a single policy combines three `conditions` entries
+that each use a different boolean operator:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: manager
+        conditions:
+          - if: "{ user_attributes.is_full_time_employee and user_attributes.tenure_years >= 2 }"
+          - if: "{ user_attributes.is_admin or user_attributes.is_owner }"
+          - if: "{ not (security_context.groups and 'contractors' in security_context.groups) }"
+        member_level:
+          includes: "*"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `manager`,
+      conditions: [
+        { if: userAttributes.is_full_time_employee && userAttributes.tenure_years >= 2 },
+        { if: userAttributes.is_admin || userAttributes.is_owner },
+        { if: !(securityContext.groups && securityContext.groups.includes(`contractors`)) }
+      ],
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
 ### `member_level`
 
 The optional `member_level` parameter, when present, configures [member-level
@@ -452,6 +507,68 @@ REST (JSON) API][ref-rest-query-filters] queries, allowing to use the same set o
 You can also use `and` and `or` parameters to combine multiple filters into
 [boolean logical operators][ref-rest-boolean-ops].
 
+#### `allow_all`
+
+Use the `allow_all` parameter to make the row-level intent of a policy explicit
+without listing any filters:
+
+- `allow_all: true` grants the policy access to all rows. It is equivalent to
+omitting `row_level` (or omitting `filters`) and is useful when you want the
+policy to clearly state that no row-level restriction applies.
+- `allow_all: false` denies the policy access to all rows. Other matching
+policies (if any) still apply on top — see [row-level access][ref-dap-rls].
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: admin
+        row_level:
+          allow_all: true
+
+      - group: guest
+        row_level:
+          allow_all: false
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `admin`,
+      row_level: {
+        allow_all: true
+      }
+    },
+    {
+      group: `guest`,
+      row_level: {
+        allow_all: false
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+#### Conditional `row_level`
+
+You can make `row_level` conditional so that different filters apply depending
+on the [security context][ref-sec-ctx] or user attributes. In YAML, attach
+[`conditions`](#conditions) to a policy so its `row_level` is skipped when the
+conditions don't match. In JavaScript, you can additionally make `row_level` a
+function of `securityContext` and return different filters at evaluation time.
+When a policy's `row_level` is skipped, other matching policies still apply;
+if no policy matches, access is denied by default. See the [conditional
+row-level access recipe][ref-recipe-conditional-row-level] for worked examples.
+
 Note that access policies also respect [row-level security][ref-rls] restrictions
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
 learn more about policy evaluation.
@@ -514,3 +631,4 @@ cube(`orders`, {
 [ref-rest-query-filters]: /reference/rest-api/query-format#filters-format
 [ref-rest-query-ops]: /reference/rest-api/query-format#filters-operators
 [ref-rest-boolean-ops]: /reference/rest-api/query-format#boolean-logical-operators
+[ref-recipe-conditional-row-level]: /recipes/access-control/conditional-row-level-access

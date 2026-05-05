@@ -649,6 +649,12 @@
                 ]
               },
               {
+                "group": "Access Control",
+                "pages": [
+                  "recipes/access-control/conditional-row-level-access"
+                ]
+              },
+              {
                 "group": "Core Data API",
                 "pages": [
                   "recipes/core-data-api/getting-unique-values-for-a-field",
