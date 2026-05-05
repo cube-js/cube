@@ -119,6 +119,36 @@ impl QueryResult {
             }
         }
     }
+
+    pub async fn to_arrow_ipc_stream(self) -> Result<Vec<u8>, CubeError> {
+        let (schema, batches) = match self {
+            QueryResult::Frame(df) => {
+                let schema = df.get_schema();
+                let arrays = crate::table::data::rows_to_columns(df.get_columns(), df.get_rows());
+                let batch = RecordBatch::try_new(schema.clone(), arrays)?;
+                (schema, vec![batch])
+            }
+            QueryResult::Stream { schema, batches } => {
+                let acc: Vec<RecordBatch> = batches.try_collect().await?;
+                (schema, acc)
+            }
+        };
+
+        cube_ext::spawn_blocking(move || -> Result<Vec<u8>, CubeError> {
+            use datafusion::arrow::ipc::writer::StreamWriter;
+            use std::io::Cursor;
+
+            let mut writer = StreamWriter::try_new(Cursor::new(Vec::new()), schema.as_ref())?;
+            for batch in &batches {
+                writer.write(batch)?;
+            }
+
+            writer.finish()?;
+
+            Ok(writer.into_inner()?.into_inner())
+        })
+        .await?
+    }
 }
 
 impl std::fmt::Debug for QueryResult {
