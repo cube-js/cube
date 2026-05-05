@@ -171,6 +171,36 @@ impl SqlResultCache {
         }
     }
 
+    /// Tries to register this query in the queue cache for background execution.
+    /// Returns `Some(sender)` if we became the leader (no one else is running this query),
+    /// or `None` if another execution is already in flight.
+    async fn try_register_background(
+        &self,
+        queue_key: &SqlQueueCacheKey,
+    ) -> Option<watch::Sender<Option<Result<Arc<DataFrame>, CubeError>>>> {
+        let mut cache = self.queue_cache.lock().await;
+
+        if cache.contains(queue_key) {
+            if let Some(receiver) = cache.get(queue_key) {
+                if receiver.has_changed().is_err() {
+                    cache.pop(queue_key);
+                } else {
+                    return None;
+                }
+            } else {
+                cache.pop(queue_key);
+            }
+        }
+
+        if !cache.contains(queue_key) {
+            let (tx, rx) = watch::channel(None);
+            cache.put(queue_key.clone(), rx);
+            Some(tx)
+        } else {
+            None
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
         &self,
@@ -198,37 +228,58 @@ impl SqlResultCache {
                 "Using stale-while-revalidate cache for '{}', spawning background refresh",
                 query
             );
-            let result_cache = self.result_cache.clone();
-            let stale_cache = self.stale_cache.clone();
-            let queue_key_bg = queue_key.clone();
-            let result_key_bg = result_key.clone();
-            tokio::spawn(async move {
-                match exec(plan).await {
-                    Ok(df) => {
-                        let arc_df = Arc::new(df);
-                        result_cache.insert(result_key_bg, arc_df.clone()).await;
 
-                        if let Some(sc) = &stale_cache {
-                            sc.insert(
-                                queue_key_bg,
-                                StaleEntry {
-                                    result: arc_df,
-                                    created_at: Instant::now(),
-                                },
-                            )
-                            .await;
+            // Try to register in queue cache. If another execution is already in flight
+            // (from a previous stale hit or a concurrent foreground request), we skip
+            // spawning — that execution will update the caches for us.
+            if let Some(sender) = self.try_register_background(&queue_key).await {
+                let result_cache = self.result_cache.clone();
+                let stale_cache = self.stale_cache.clone();
+                let queue_key_bg = queue_key.clone();
+                let query_owned = query.to_string();
+                tokio::spawn(async move {
+                    trace!("Background refresh starting for '{}'", query_owned);
+                    let result = exec(plan).await.map(|d| Arc::new(d));
+                    match &result {
+                        Ok(arc_df) => {
+                            result_cache.insert(result_key, arc_df.clone()).await;
+
+                            if let Some(sc) = &stale_cache {
+                                sc.insert(
+                                    queue_key_bg,
+                                    StaleEntry {
+                                        result: arc_df.clone(),
+                                        created_at: Instant::now(),
+                                    },
+                                )
+                                .await;
+                            }
+
+                            app_metrics::DATA_QUERIES_CACHE_SIZE
+                                .report(result_cache.entry_count() as i64);
+                            app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                                .report(result_cache.weighted_size() as i64);
                         }
+                        Err(e) => {
+                            log::error!(
+                                "Background stale-while-revalidate refresh failed for '{}': {}",
+                                query_owned,
+                                e
+                            );
+                        }
+                    }
+                    // Notify any waiters that joined via the queue cache.
+                    let _ = sender.send(Some(result));
+                    // sender is dropped here, closing the channel. The queue_cache entry
+                    // will be cleaned up lazily on the next get() for this key.
+                });
+            } else {
+                trace!(
+                    "Background refresh already in flight for '{}', skipping",
+                    query
+                );
+            }
 
-                        app_metrics::DATA_QUERIES_CACHE_SIZE
-                            .report(result_cache.entry_count() as i64);
-                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
-                            .report(result_cache.weighted_size() as i64);
-                    }
-                    Err(e) => {
-                        log::error!("Background stale-while-revalidate refresh failed: {}", e);
-                    }
-                }
-            });
             return Ok(stale_result);
         }
 
