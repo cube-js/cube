@@ -119,10 +119,6 @@ impl QueryResult {
             }
         }
     }
-
-    pub fn get_schema(&self) -> SchemaRef {
-        self.schema()
-    }
 }
 
 impl std::fmt::Debug for QueryResult {
