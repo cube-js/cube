@@ -354,7 +354,11 @@ cube(`orders`, {
 ### `row_level`
 
 The optional `row_level` parameter, when present, configures [row-level
-access][ref-dap-rls] for a policy by specifying `filters` that should apply to result set rows.
+access][ref-dap-rls] for a policy. It accepts the following sub-parameters:
+
+- `filters` — a list of filters that should apply to result set rows.
+- `allow_all` — when set to `true`, grants the policy access to all rows
+without applying any row-level filters.
 
 In the following example, users in the `manager` group are allowed to access only
 rows that have the `state` dimension matching the state from the [security context][ref-sec-ctx].
@@ -451,6 +455,126 @@ REST (JSON) API][ref-rest-query-filters] queries, allowing to use the same set o
 [filter operators][ref-rest-query-ops], e.g., `equals`, `contains`, `gte`, etc.
 You can also use `and` and `or` parameters to combine multiple filters into
 [boolean logical operators][ref-rest-boolean-ops].
+
+#### `allow_all`
+
+Use `allow_all: true` to grant a policy access to all rows without applying any
+row-level filters. This is useful when you want to express “no row-level
+restriction” explicitly, for example in combination with [`conditions`](#conditions)
+or with conditional `row_level` expressions (see below).
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: admin
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `admin`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        allow_all: true
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+#### Conditional `row_level`
+
+In JavaScript data models, you can also set `row_level` to an expression that
+evaluates against the [security context][ref-sec-ctx] and returns a different
+`row_level` configuration depending on its value. This lets you switch the
+entire row-level configuration (e.g., between filtering by an attribute and
+allowing all rows) based on user properties such as group membership.
+
+In the following example, users in the `region_group` group are restricted to
+rows matching their `allowedProductIds` user attribute, while all other users
+in `user_group` are allowed access to all rows:
+
+<CodeGroup>
+
+```javascript title="JavaScript"
+view(`region_test_view`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `user_group`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: security_context.auth?.groups?.includes(`region_group`)
+        ? {
+            filters: [
+              {
+                member: `product_id`,
+                operator: `equals`,
+                values: security_context.auth?.userAttributes?.allowedProductIds
+              }
+            ]
+          }
+        : {
+            allow_all: true
+          }
+    }
+  ]
+})
+```
+
+```yaml title="YAML"
+views:
+  - name: region_test_view
+    # ...
+
+    access_policy:
+      - group: user_group
+        conditions:
+          - if: "{ security_context.auth.groups and security_context.auth.groups.includes('region_group') }"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: equals
+              values: security_context.auth.userAttributes.allowedProductIds
+
+      - group: user_group
+        conditions:
+          - if: "{ not (security_context.auth.groups and security_context.auth.groups.includes('region_group')) }"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+```
+
+</CodeGroup>
+
+<Info>
+
+In YAML data models, `row_level` is a static structure. To achieve the same
+behavior, define multiple policies for the same group and gate them with
+[`conditions`](#conditions), as shown in the YAML example above.
+
+</Info>
 
 Note that access policies also respect [row-level security][ref-rls] restrictions
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
