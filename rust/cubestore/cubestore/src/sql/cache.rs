@@ -171,39 +171,9 @@ impl SqlResultCache {
         }
     }
 
-    /// Tries to register this query in the queue cache for background execution.
-    /// Returns `Some(sender)` if we became the leader (no one else is running this query),
-    /// or `None` if another execution is already in flight.
-    async fn try_register_background(
-        &self,
-        queue_key: &SqlQueueCacheKey,
-    ) -> Option<watch::Sender<Option<Result<Arc<DataFrame>, CubeError>>>> {
-        let mut cache = self.queue_cache.lock().await;
-
-        if cache.contains(queue_key) {
-            if let Some(receiver) = cache.get(queue_key) {
-                if receiver.has_changed().is_err() {
-                    cache.pop(queue_key);
-                } else {
-                    return None;
-                }
-            } else {
-                cache.pop(queue_key);
-            }
-        }
-
-        if !cache.contains(queue_key) {
-            let (tx, rx) = watch::channel(None);
-            cache.put(queue_key.clone(), rx);
-            Some(tx)
-        } else {
-            None
-        }
-    }
-
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
-        &self,
+        self: &Arc<Self>,
         query: &str,
         context: SqlQueryContext,
         plan: SerializedPlan,
@@ -212,145 +182,122 @@ impl SqlResultCache {
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
-        let result_key = SqlResultCacheKey::from_plan(query, &context.inline_tables, &plan);
+        Arc::clone(self)
+            .get_inner(query.to_string(), context, plan, exec, false)
+            .await
+    }
 
-        if let Some(result) = self.result_cache.get(&result_key) {
-            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
-            trace!("Using result cache for '{}'", query);
-            return Ok(result);
-        }
+    fn get_inner<F>(
+        self: Arc<Self>,
+        query: String,
+        context: SqlQueryContext,
+        plan: SerializedPlan,
+        exec: impl FnOnce(SerializedPlan) -> F + Send + 'static,
+        is_background_refresh: bool,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<Arc<DataFrame>, CubeError>> + Send>>
+    where
+        F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
+    {
+        Box::pin(async move {
+            let result_key = SqlResultCacheKey::from_plan(&query, &context.inline_tables, &plan);
 
-        let queue_key = SqlQueueCacheKey::from_query(query, &context.inline_tables);
-
-        if let Some(stale_result) = self.try_get_stale(&queue_key) {
-            app_metrics::DATA_QUERIES_CACHE_STALE_HIT.increment();
-            trace!(
-                "Using stale-while-revalidate cache for '{}', spawning background refresh",
-                query
-            );
-
-            // Try to register in queue cache. If another execution is already in flight
-            // (from a previous stale hit or a concurrent foreground request), we skip
-            // spawning — that execution will update the caches for us.
-            if let Some(sender) = self.try_register_background(&queue_key).await {
-                let result_cache = self.result_cache.clone();
-                let stale_cache = self.stale_cache.clone();
-                let queue_key_bg = queue_key.clone();
-                let query_owned = query.to_string();
-                tokio::spawn(async move {
-                    trace!("Background refresh starting for '{}'", query_owned);
-                    let result = exec(plan).await.map(|d| Arc::new(d));
-                    match &result {
-                        Ok(arc_df) => {
-                            result_cache.insert(result_key, arc_df.clone()).await;
-
-                            if let Some(sc) = &stale_cache {
-                                sc.insert(
-                                    queue_key_bg,
-                                    StaleEntry {
-                                        result: arc_df.clone(),
-                                        created_at: Instant::now(),
-                                    },
-                                )
-                                .await;
-                            }
-
-                            app_metrics::DATA_QUERIES_CACHE_SIZE
-                                .report(result_cache.entry_count() as i64);
-                            app_metrics::DATA_QUERIES_CACHE_WEIGHT
-                                .report(result_cache.weighted_size() as i64);
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "Background stale-while-revalidate refresh failed for '{}': {}",
-                                query_owned,
-                                e
-                            );
-                        }
-                    }
-                    // Notify any waiters that joined via the queue cache.
-                    let _ = sender.send(Some(result));
-                    // sender is dropped here, closing the channel. The queue_cache entry
-                    // will be cleaned up lazily on the next get() for this key.
-                });
-            } else {
-                trace!(
-                    "Background refresh already in flight for '{}', skipping",
-                    query
-                );
+            if let Some(result) = self.result_cache.get(&result_key) {
+                app_metrics::DATA_QUERIES_CACHE_HIT.increment();
+                trace!("Using result cache for '{}'", query);
+                return Ok(result);
             }
 
-            return Ok(stale_result);
-        }
+            let queue_key = SqlQueueCacheKey::from_query(&query, &context.inline_tables);
 
-        let (sender, receiver) = {
-            let key = queue_key.clone();
-            let mut cache = self.queue_cache.lock().await;
+            if !is_background_refresh {
+                if let Some(stale_result) = self.try_get_stale(&queue_key) {
+                    app_metrics::DATA_QUERIES_CACHE_STALE_HIT.increment();
+                    trace!(
+                        "Using stale-while-revalidate cache for '{}', spawning background refresh",
+                        query
+                    );
+                    let this = Arc::clone(&self);
+                    let query_clone = query.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = this.get_inner(query_clone, context, plan, exec, true).await
+                        {
+                            log::error!("Background stale-while-revalidate refresh failed: {}", e);
+                        }
+                    });
+                    return Ok(stale_result);
+                }
+            }
 
-            if cache.contains(&key) {
-                if let Some(receiver) = cache.get(&key) {
-                    if receiver.has_changed().is_err() {
-                        log::error!("Queue cache contains closed channel");
+            let (sender, receiver) = {
+                let key = queue_key.clone();
+                let mut cache = self.queue_cache.lock().await;
+
+                if cache.contains(&key) {
+                    if let Some(receiver) = cache.get(&key) {
+                        if receiver.has_changed().is_err() {
+                            log::error!("Queue cache contains closed channel");
+                            cache.pop(&key);
+                        }
+                    } else {
+                        log::error!("Queue cache doesn't contains channel");
                         cache.pop(&key);
                     }
+                }
+
+                if !cache.contains(&key) {
+                    let (tx, rx) = watch::channel(None);
+                    cache.put(key, rx);
+
+                    app_metrics::DATA_QUERIES_CACHE_SIZE
+                        .report(self.result_cache.entry_count() as i64);
+                    app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                        .report(self.result_cache.weighted_size() as i64);
+
+                    (Some(tx), None)
                 } else {
-                    log::error!("Queue cache doesn't contains channel");
-                    cache.pop(&key);
+                    (None, cache.get(&key).cloned())
                 }
-            }
+            };
 
-            if !cache.contains(&key) {
-                let (tx, rx) = watch::channel(None);
-                cache.put(key, rx);
+            if let Some(sender) = sender {
+                trace!("Missing cache for '{}'", query);
+                let result = exec(plan).await.map(|d| Arc::new(d));
+                if let Err(e) = sender.send(Some(result.clone())) {
+                    trace!(
+                        "Failed to set cached query result, possibly flushed from LRU cache: {}",
+                        e
+                    );
+                }
+                match &result {
+                    Ok(r) => {
+                        if !self.result_cache.contains_key(&result_key) {
+                            self.result_cache
+                                .insert(result_key.clone(), r.clone())
+                                .await;
 
-                app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
-                app_metrics::DATA_QUERIES_CACHE_WEIGHT
-                    .report(self.result_cache.weighted_size() as i64);
-
-                (Some(tx), None)
-            } else {
-                (None, cache.get(&key).cloned())
-            }
-        };
-
-        if let Some(sender) = sender {
-            trace!("Missing cache for '{}'", query);
-            let result = exec(plan).await.map(|d| Arc::new(d));
-            if let Err(e) = sender.send(Some(result.clone())) {
-                trace!(
-                    "Failed to set cached query result, possibly flushed from LRU cache: {}",
-                    e
-                );
-            }
-            match &result {
-                Ok(r) => {
-                    if !self.result_cache.contains_key(&result_key) {
-                        self.result_cache
-                            .insert(result_key.clone(), r.clone())
-                            .await;
-
-                        app_metrics::DATA_QUERIES_CACHE_SIZE
-                            .report(self.result_cache.entry_count() as i64);
-                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
-                            .report(self.result_cache.weighted_size() as i64);
+                            app_metrics::DATA_QUERIES_CACHE_SIZE
+                                .report(self.result_cache.entry_count() as i64);
+                            app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                                .report(self.result_cache.weighted_size() as i64);
+                        }
+                        self.update_stale_cache(&queue_key, r).await;
                     }
-                    self.update_stale_cache(&queue_key, r).await;
+                    Err(_) => {
+                        trace!("Removing error result from cache");
+                    }
                 }
-                Err(_) => {
-                    trace!("Removing error result from cache");
-                }
+
+                self.queue_cache.lock().await.pop(&queue_key);
+
+                return result;
             }
 
-            self.queue_cache.lock().await.pop(&queue_key);
+            std::mem::drop(plan);
+            std::mem::drop(result_key);
+            std::mem::drop(context);
 
-            return result;
-        }
-
-        std::mem::drop(plan);
-        std::mem::drop(result_key);
-        std::mem::drop(context);
-
-        self.wait_for_queue(receiver, query).await
+            self.wait_for_queue(receiver, &query).await
+        })
     }
 
     pub async fn create_table<F>(
@@ -454,7 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
-        let cache = SqlResultCache::new(1 << 20, Some(120), 1000, None);
+        let cache = Arc::new(SqlResultCache::new(1 << 20, Some(120), 1000, None));
         let schema = Arc::new(DFSchema::empty());
         let plan = SerializedPlan::try_new(
             LogicalPlan::EmptyRelation(EmptyRelation {
@@ -537,7 +484,7 @@ mod tests {
 
     #[tokio::test]
     async fn stale_while_revalidate() -> Result<(), CubeError> {
-        let cache = SqlResultCache::new(1 << 20, Some(120), 1000, Some(30));
+        let cache = Arc::new(SqlResultCache::new(1 << 20, Some(120), 1000, Some(30)));
         let schema = Arc::new(DFSchema::empty());
         let plan = SerializedPlan::try_new(
             LogicalPlan::EmptyRelation(EmptyRelation {
