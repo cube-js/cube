@@ -315,17 +315,32 @@ mod test {
                 let service = services.sql_service;
                 let meta_store = services.meta_store;
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA test")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 let _ = service
                     .exec_query("CREATE TABLE test.tst (a int, b int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 let _ = service
                     .exec_query("INSERT INTO test.tst (a, b) VALUES (10, 10), (20 , 20)")
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 let _ = service
                     .exec_query("INSERT INTO test.tst (a, b) VALUES (20, 20), (40 , 40)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 let files = remove_root_paritition(meta_store.get_all_filenames().await.unwrap());
@@ -361,7 +376,13 @@ mod test {
                 let path = remote_fs.local_file("metastore".to_string()).await.unwrap();
                 assert!(Path::new(&path).exists());
 
-                let _ = service.exec_query("SELECT * FROM test.tst").await.unwrap();
+                let _ = service
+                    .exec_query("SELECT * FROM test.tst")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
             })
             .await;
     }

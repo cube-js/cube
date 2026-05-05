@@ -1164,19 +1164,19 @@ mod tests {
             let service = services.sql_service;
             let meta_store = services.meta_store;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= ''2022-01-01'' AND time < ''2022-02-01''', stream_offset = 'earliest') unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://ksql/EVENTS_BY_TYPE/0', 'stream://ksql/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://ksql/EVENTS_BY_TYPE/0".to_string())),
@@ -1187,7 +1187,7 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let listener = services.cluster.job_result_listener();
@@ -1233,18 +1233,18 @@ mod tests {
             println!("chunks: {:#?}", service
                 .exec_query("SELECT * FROM system.chunks")
                 .await
-                .unwrap()
+                .unwrap().collect().await.unwrap()
             );
             println!("replay handles: {:#?}", service
                 .exec_query("SELECT * FROM system.replay_handles")
                 .await
-                .unwrap()
+                .unwrap().collect().await.unwrap()
             );
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000 - 1638)])]);
 
             let listener = services.cluster.job_result_listener();
@@ -1261,13 +1261,13 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             println!("replay handles pre merge: {:#?}", service
                 .exec_query("SELECT * FROM system.replay_handles")
                 .await
-                .unwrap()
+                .unwrap().collect().await.unwrap()
             );
 
             scheduler.merge_replay_handles().await.unwrap();
@@ -1275,24 +1275,24 @@ mod tests {
             let result = service
                 .exec_query("SELECT * FROM system.replay_handles WHERE has_failed_to_persist_chunks = true")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 0);
 
             println!("replay handles after merge: {:#?}", service
                 .exec_query("SELECT * FROM system.replay_handles")
                 .await
-                .unwrap()
+                .unwrap().collect().await.unwrap()
             );
 
             service
                 .exec_query("DROP TABLE test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let result = service
                 .exec_query("SELECT * FROM system.replay_handles")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 0);
         })
             .await;
@@ -1323,19 +1323,19 @@ mod tests {
             let service = services.sql_service;
             let meta_store = services.meta_store;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (stream_offset = 'earliest') unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
@@ -1346,7 +1346,7 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let listener = services.cluster.job_result_listener();
@@ -1393,7 +1393,7 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000 - 1638)])]);
 
             let listener = services.cluster.job_result_listener();
@@ -1410,7 +1410,7 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
 
@@ -1419,19 +1419,19 @@ mod tests {
             let result = service
                 .exec_query("SELECT * FROM system.replay_handles WHERE has_failed_to_persist_chunks = true")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 0);
 
 
             service
                 .exec_query("DROP TABLE test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let result = service
                 .exec_query("SELECT * FROM system.replay_handles")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 0);
         })
             .await;
@@ -1458,12 +1458,12 @@ mod tests {
             //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
@@ -1472,7 +1472,7 @@ mod tests {
                             WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM `EVENTS_BY_TYPE` WHERE `FILTER_ID` >= 1000 and `FILTER_ID` < 1400') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
@@ -1483,19 +1483,19 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(800)])]);
 
             let result = service
                 .exec_query("SELECT min(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1000)])]);
 
             let result = service
                 .exec_query("SELECT max(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1399)])]);
         })
             .await;
@@ -1522,12 +1522,12 @@ mod tests {
             //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
@@ -1536,7 +1536,7 @@ mod tests {
                             WITH (stream_offset = 'earliest', select_statement = 'SELECT `ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, concat(`ANONYMOUSID`, `MESSAGEID`) AS `CONCATID` FROM `EVENTS_BY_TYPE` WHERE `FILTER_ID` >= 1000 and `FILTER_ID` < 1400') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
@@ -1547,13 +1547,13 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(800)])]);
 
             let result = service
             .exec_query("SELECT concat(`ANONYMOUSID`, `MESSAGEID`), `CONCATID` FROM test.events_by_type_1 ")
             .await
-            .unwrap();
+            .unwrap().collect().await.unwrap();
             let rows = result.get_rows();
             assert_eq!(rows.len(), 800);
             for (i, row) in rows.iter().enumerate() {
@@ -1586,12 +1586,12 @@ mod tests {
             //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
@@ -1604,7 +1604,7 @@ mod tests {
                             ') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
@@ -1615,19 +1615,19 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
 
             let result = service
                 .exec_query("SELECT min(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
 
             let result = service
                 .exec_query("SELECT max(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
         })
             .await;
@@ -1654,12 +1654,12 @@ mod tests {
             //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
@@ -1676,7 +1676,7 @@ mod tests {
                             ) \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE TABLE test.events_by_type_2 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
@@ -1693,7 +1693,7 @@ mod tests {
                             ) \
                             unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE TABLE test.events_by_type_3 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
@@ -1742,7 +1742,7 @@ mod tests {
                             ) \
                             unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_5 (`an_id` text, `message_id` text, `filter_id` float, `minute_timestamp` timestamp) \
@@ -1792,7 +1792,7 @@ mod tests {
                             ) \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`, `TIMESTAMP_SECOND`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP_SECOND`,`TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         })
             .await;
     }
@@ -1817,12 +1817,12 @@ mod tests {
             //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
@@ -1856,7 +1856,7 @@ mod tests {
                             ) \
                             unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
@@ -1867,29 +1867,29 @@ mod tests {
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1 where minute_timestamp = to_timestamp('1970-01-01T01:06:00'))")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2 * 60)])]);
             let result = service
                 .exec_query("SELECT minute_timestamp, count(*) FROM test.events_by_type_1 group by 1")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows().len(), 10);
 
             let result = service
                 .exec_query("SELECT min(filter_id) FROM test.events_by_type_1 ")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
 
             let result = service
                 .exec_query("SELECT max(filter_id) FROM test.events_by_type_1 ")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
         })
             .await;

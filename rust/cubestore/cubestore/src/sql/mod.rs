@@ -13,10 +13,14 @@ use chrono::format::Parsed;
 use chrono::{ParseResult, TimeZone, Utc};
 use datafusion::arrow::array::*;
 use datafusion::arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
+use futures::stream::BoxStream;
+use futures::TryStreamExt;
 use hex::FromHex;
 use itertools::Itertools;
 use log::trace;
@@ -84,16 +88,87 @@ use mockall::automock;
 use table_creator::{convert_columns_type, TableCreator};
 pub use table_creator::{TableExtensionService, TableExtensionServiceImpl};
 
+pub enum QueryResult {
+    Frame(Arc<DataFrame>),
+    Stream {
+        schema: SchemaRef,
+        batches: BoxStream<'static, Result<RecordBatch, CubeError>>,
+    },
+}
+
+impl QueryResult {
+    pub fn schema(&self) -> SchemaRef {
+        match self {
+            QueryResult::Frame(df) => df.get_schema(),
+            QueryResult::Stream { schema, .. } => schema.clone(),
+        }
+    }
+
+    pub async fn collect(self) -> Result<Arc<DataFrame>, CubeError> {
+        match self {
+            QueryResult::Frame(df) => Ok(df),
+            QueryResult::Stream { batches, .. } => {
+                let acc: Vec<RecordBatch> = batches.try_collect().await?;
+
+                let df = cube_ext::spawn_blocking(move || -> Result<DataFrame, CubeError> {
+                    batches_to_dataframe(acc)
+                })
+                .await??;
+
+                Ok(Arc::new(df))
+            }
+        }
+    }
+
+    pub fn get_schema(&self) -> SchemaRef {
+        self.schema()
+    }
+}
+
+impl std::fmt::Debug for QueryResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryResult::Frame(df) => f.debug_tuple("Frame").field(df).finish(),
+            QueryResult::Stream { schema, .. } => f
+                .debug_struct("Stream")
+                .field("schema", schema)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
+impl PartialEq for QueryResult {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (QueryResult::Frame(a), QueryResult::Frame(b)) => a == b,
+            // Streaming results carry a live BoxStream and aren't comparable.
+            _ => false,
+        }
+    }
+}
+
+impl From<DataFrame> for QueryResult {
+    fn from(df: DataFrame) -> Self {
+        QueryResult::Frame(Arc::new(df))
+    }
+}
+
+impl From<Arc<DataFrame>> for QueryResult {
+    fn from(df: Arc<DataFrame>) -> Self {
+        QueryResult::Frame(df)
+    }
+}
+
 #[automock]
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
-    async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError>;
+    async fn exec_query(&self, query: &str) -> Result<QueryResult, CubeError>;
 
     async fn exec_query_with_context(
         &self,
         context: SqlQueryContext,
         query: &str,
-    ) -> Result<Arc<DataFrame>, CubeError>;
+    ) -> Result<QueryResult, CubeError>;
 
     /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
@@ -639,7 +714,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 
 #[async_trait]
 impl SqlService for SqlServiceImpl {
-    async fn exec_query(&self, q: &str) -> Result<Arc<DataFrame>, CubeError> {
+    async fn exec_query(&self, q: &str) -> Result<QueryResult, CubeError> {
         self.exec_query_with_context(SqlQueryContext::default(), q)
             .await
     }
@@ -649,14 +724,14 @@ impl SqlService for SqlServiceImpl {
         &self,
         mut context: SqlQueryContext,
         query: &str,
-    ) -> Result<Arc<DataFrame>, CubeError> {
+    ) -> Result<QueryResult, CubeError> {
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
             trace!("Query: '{}'", query);
         }
 
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
-            return Ok(Arc::new(data_frame));
+            return Ok(QueryResult::Frame(Arc::new(data_frame)));
         }
 
         let ast = {
@@ -673,33 +748,33 @@ impl SqlService for SqlServiceImpl {
                     )));
                 }
                 match variable[0].value.to_lowercase() {
-                    s if s == "schemas" => {
-                        Ok(Arc::new(DataFrame::from(self.db.get_schemas().await?)))
-                    }
-                    s if s == "tables" => {
-                        Ok(Arc::new(DataFrame::from(self.db.get_tables().await?)))
-                    }
-                    s if s == "chunks" => Ok(Arc::new(DataFrame::from(
+                    s if s == "schemas" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
+                        self.db.get_schemas().await?,
+                    )))),
+                    s if s == "tables" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
+                        self.db.get_tables().await?,
+                    )))),
+                    s if s == "chunks" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
                         self.db.chunks_table().all_rows().await?,
-                    ))),
-                    s if s == "indexes" => Ok(Arc::new(DataFrame::from(
+                    )))),
+                    s if s == "indexes" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
                         self.db.index_table().all_rows().await?,
-                    ))),
-                    s if s == "partitions" => Ok(Arc::new(DataFrame::from(
+                    )))),
+                    s if s == "partitions" => Ok(QueryResult::Frame(Arc::new(DataFrame::from(
                         self.db.partition_table().all_rows().await?,
-                    ))),
+                    )))),
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
             CubeStoreStatement::System(command) => match command {
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
-                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                 }
                 SystemCommand::Repartition { partition_id } => {
                     let partition = self.db.get_partition(partition_id).await?;
                     self.cluster.schedule_repartition(&partition).await?;
-                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                 }
                 SystemCommand::PanicWorker => {
                     let cluster = self.cluster.clone();
@@ -741,36 +816,36 @@ impl SqlService for SqlServiceImpl {
                     DropCommand::DropQueryCache => {
                         self.cache.clear().await;
 
-                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                     }
                     DropCommand::DropAllCache => {
                         self.cache.clear().await;
 
-                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                     }
                 },
                 SystemCommand::MetaStore(command) => match command {
                     MetaStoreCommand::SetCurrent { id } => {
                         self.db.set_current_snapshot(id).await?;
-                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                     }
                     MetaStoreCommand::Compaction => {
                         self.db.compaction().await?;
-                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                     }
                     MetaStoreCommand::Healthcheck => {
                         self.db.healthcheck().await?;
-                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                        Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
                     }
                 },
-                SystemCommand::CacheStore(command) => {
+                SystemCommand::CacheStore(command) => Ok(QueryResult::Frame(
                     self.cachestore
                         .exec_system_command_with_context(context, command)
-                        .await
-                }
+                        .await?,
+                )),
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
             }
             CubeStoreStatement::CreateSchema {
                 schema_name,
@@ -783,7 +858,7 @@ impl SqlService for SqlServiceImpl {
 
                 let name = normalize_for_schema_table_or_index_name(&schema_name.0[0]);
                 let res = self.create_schema(name, if_not_exists).await?;
-                Ok(Arc::new(DataFrame::from(vec![res])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
             }
             CubeStoreStatement::CreateTable {
                 create_table:
@@ -982,7 +1057,7 @@ impl SqlService for SqlServiceImpl {
                         &context.trace_obj,
                     )
                     .await?;
-                Ok(Arc::new(DataFrame::from(vec![res])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
             }
             CubeStoreStatement::Statement(Statement::CreateIndex(CreateIndex {
                 name,
@@ -1027,7 +1102,7 @@ impl SqlService for SqlServiceImpl {
                             .collect::<Result<Vec<_>, _>>()?,
                     )
                     .await?;
-                Ok(Arc::new(DataFrame::from(vec![res])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
             }
             CubeStoreStatement::CreateSource {
                 name,
@@ -1074,7 +1149,7 @@ impl SqlService for SqlServiceImpl {
                         .db
                         .create_or_update_source(normalize_for_source_name(&name), creds?)
                         .await?;
-                    Ok(Arc::new(DataFrame::from(vec![source])))
+                    Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![source]))))
                 } else {
                     Err(CubeError::user(
                         "CREATE SOURCE OR UPDATE should be used instead".to_string(),
@@ -1110,7 +1185,7 @@ impl SqlService for SqlServiceImpl {
                         if_not_exists,
                     )
                     .await?;
-                Ok(Arc::new(DataFrame::from(vec![res])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::from(vec![res]))))
             }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
@@ -1140,7 +1215,7 @@ impl SqlService for SqlServiceImpl {
                 app_metrics::DATA_QUERIES
                     .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
             }
             CubeStoreStatement::Statement(Statement::Insert(Insert {
                 table,
@@ -1180,18 +1255,18 @@ impl SqlService for SqlServiceImpl {
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                Ok(QueryResult::Frame(Arc::new(DataFrame::new(vec![], vec![]))))
             }
-            CubeStoreStatement::Queue(command) => {
+            CubeStoreStatement::Queue(command) => Ok(QueryResult::Frame(
                 self.cachestore
                     .exec_queue_command_with_context(context, command)
-                    .await
-            }
-            CubeStoreStatement::Cache(command) => {
+                    .await?,
+            )),
+            CubeStoreStatement::Cache(command) => Ok(QueryResult::Frame(
                 self.cachestore
                     .exec_cache_command_with_context(context, command)
-                    .await
-            }
+                    .await?,
+            )),
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
@@ -1207,7 +1282,7 @@ impl SqlService for SqlServiceImpl {
                     .report(logical_plan_time_start.elapsed()?.as_micros() as i64);
 
                 // TODO distribute and combine
-                let res = match logical_plan {
+                let res: Arc<DataFrame> = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
                         app_metrics::META_QUERIES.increment();
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
@@ -1254,7 +1329,7 @@ impl SqlService for SqlServiceImpl {
                         .await??
                     }
                 };
-                Ok(res)
+                Ok(QueryResult::Frame(res))
             }
             CubeStoreStatement::Statement(Statement::Explain {
                 analyze,
@@ -1262,14 +1337,18 @@ impl SqlService for SqlServiceImpl {
                 statement,
                 ..
             }) => match *statement {
-                Statement::Query(q) => self.explain(Statement::Query(q.clone()), analyze).await,
+                Statement::Query(q) => Ok(QueryResult::Frame(
+                    self.explain(Statement::Query(q.clone()), analyze).await?,
+                )),
                 _ => Err(CubeError::user(format!(
                     "Unsupported explain request: '{}'",
                     query
                 ))),
             },
 
-            CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
+            CubeStoreStatement::Dump(q) => {
+                Ok(QueryResult::Frame(self.dump_select_inputs(query, q).await?))
+            }
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
@@ -1891,7 +1970,13 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let i = service
+                .exec_query("CREATE SCHEMA foo")
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -1970,7 +2055,13 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA `Foo`").await.unwrap();
+            let i = service
+                .exec_query("CREATE SCHEMA `Foo`")
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -1985,7 +2076,13 @@ mod tests {
                                 `Address` varchar(255),
                                 `City` varchar(255)
                               );";
-            let i = service.exec_query(&query.to_string()).await.unwrap();
+            let i = service
+                .exec_query(&query.to_string())
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![
                 TableValue::Int(1),
                 TableValue::String("Persons".to_string()),
@@ -2080,7 +2177,13 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA `Foo`").await.unwrap();
+            let i = service
+                .exec_query("CREATE SCHEMA `Foo`")
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -2095,7 +2198,13 @@ mod tests {
                                 `Address` varchar(255),
                                 `City` varchar(255)
                               ) WITH (seal_at='2022-10-05T01:00:00.000Z', select_statement='SELECT * FROM test WHERE created_at > ''2022-05-01 00:00:00''');";
-            let i = service.exec_query(&query.to_string()).await.unwrap();
+            let i = service
+                .exec_query(&query.to_string())
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![
                 TableValue::Int(1),
                 TableValue::String("Persons".to_string()),
@@ -2206,11 +2315,11 @@ mod tests {
         }, async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
             let created_table = service
                 .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
-                .await.unwrap();
+                .await.unwrap().collect().await.unwrap();
             let res = service
                 .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
                 .await;
@@ -2218,7 +2327,7 @@ mod tests {
             let res = service
                 .exec_query("CREATE TABLE IF NOT EXISTS foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
                 .await;
-            assert_eq!(res.unwrap(), created_table);
+            assert_eq!(res.unwrap().collect().await.unwrap(), created_table);
 
 
         })
@@ -2236,12 +2345,12 @@ mod tests {
         }, async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let res = service
                 .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12), (5, NULL, NULL), (6, NULL, NULL), (7, NULL, NULL), (NULL, NULL, NULL)")
@@ -2266,36 +2375,36 @@ mod tests {
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12), (5, NULL, NULL), (6, NULL, NULL), (7, NULL, NULL), (NULL, NULL, NULL)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(761000)), TableValue::Decimal(Decimal::new(5992))]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values where dec_value > 10")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Decimal(Decimal::new(5892))]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value > 10")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             // For this test's purposes there is no a priori reason to expect (precision, scale) =
             // (32, 6) -- DF decided that on its own initiative.
@@ -2306,7 +2415,7 @@ mod tests {
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Decimal(Decimal::new(450 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
@@ -2314,7 +2423,7 @@ mod tests {
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < decimal '10'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Decimal(Decimal::new(450 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
@@ -2327,21 +2436,33 @@ mod tests {
         let service = services.sql_service;
 
         if perform_writes {
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service
+                .exec_query("CREATE SCHEMA foo")
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE foo.values (id int, value int96)")
+                .await
+                .unwrap()
+                .collect()
                 .await
                 .unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values (id, value) VALUES (1, 10000000000000000000000), (2, 20000000000000000000000), (3, 10000000000000220000000), (4, 12000000000000000000024), (5, 123)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         }
 
         let result = service
             .exec_query("SELECT * from foo.values")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2384,6 +2505,9 @@ mod tests {
         let result = service
             .exec_query("SELECT sum(value) from foo.values")
             .await
+            .unwrap()
+            .collect()
+            .await
             .unwrap();
 
         assert_eq!(
@@ -2395,6 +2519,9 @@ mod tests {
 
         let result = service
             .exec_query("SELECT max(value), min(value) from foo.values")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2409,7 +2536,7 @@ mod tests {
         let result = service
             .exec_query("SELECT value + 103, value + value, value = CAST('12000000000000000000024' AS DECIMAL(38, 0)) from foo.values where value = CAST('12000000000000000000024' AS DECIMAL(38, 0))")
             .await
-            .unwrap();
+            .unwrap().collect().await.unwrap();
 
         assert_eq!(
             result.get_rows()[0],
@@ -2424,6 +2551,9 @@ mod tests {
             .exec_query(
                 "SELECT value / 2, value * 2 from foo.values where value > 12000000000000000000024",
             )
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2449,6 +2579,9 @@ mod tests {
 
         let result = service
             .exec_query("SELECT * from foo.values order by value")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2492,16 +2625,22 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE foo.values2 (id int, value int96)")
                 .await
+                .unwrap()
+                .collect()
+                .await
                 .unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values2 (id, value) VALUES (1, 10000000000000000000000), (2, 20000000000000000000000), (3, 10000000000000000000000), (4, 20000000000000000000000), (5, 123)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         }
 
         let result = service
             .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2531,16 +2670,22 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE foo.values3 (id int, value int96)")
                 .await
+                .unwrap()
+                .collect()
+                .await
                 .unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values3 (id, value) VALUES (1, -10000000000000000000000), (2, -20000000000000000000000), (3, -10000000000000220000000), (4, -12000000000000000000024), (5, -123)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         }
 
         let result = service
             .exec_query("SELECT * from foo.values3")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2614,21 +2759,33 @@ mod tests {
         let service: Arc<dyn SqlService> = services.sql_service;
 
         if perform_writes {
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service
+                .exec_query("CREATE SCHEMA foo")
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE foo.values (id int, value decimal96)")
+                .await
+                .unwrap()
+                .collect()
                 .await
                 .unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values (id, value) VALUES (1, 100000000000000000000.10), (2, 200000000000000000000), (3, 100000000000002200000.01), (4, 120000000000000000.10024), (5, 1.23)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         }
 
         let result = service
             .exec_query("SELECT * from foo.values")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2676,6 +2833,9 @@ mod tests {
         let result = service
             .exec_query("SELECT sum(value) from foo.values")
             .await
+            .unwrap()
+            .collect()
+            .await
             .unwrap();
 
         assert_eq!(
@@ -2687,6 +2847,9 @@ mod tests {
 
         let result = service
             .exec_query("SELECT max(value), min(value) from foo.values")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2701,7 +2864,7 @@ mod tests {
         let result = service
             .exec_query("SELECT value + CAST('10.103' AS DECIMAL(27, 5)), value + value from foo.values where id = 4")
             .await
-            .unwrap();
+            .unwrap().collect().await.unwrap();
 
         // 27, 5 comes from Cube's convert_columns_type.  Precision = 28 here comes from DataFusion behavior.
         assert_eq!(
@@ -2725,6 +2888,9 @@ mod tests {
                 "SELECT value / 2, value * 2 from foo.values where value > 100000000000002200000",
             )
             .await
+            .unwrap()
+            .collect()
+            .await
             .unwrap();
 
         // 31, 9, and 38, 5 simply describes the DF behavior we see (starting from value being a
@@ -2747,6 +2913,9 @@ mod tests {
 
         let result = service
             .exec_query("SELECT * from foo.values order by value")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2790,16 +2959,22 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE foo.values2 (id int, value decimal(27, 2))")
                 .await
+                .unwrap()
+                .collect()
+                .await
                 .unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values2 (id, value) VALUES (1, 100000000000000000000.10), (2, 20000000000000000000000.1), (3, 100000000000000000000.10), (4, 20000000000000000000000.1), (5, 123)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         }
 
         let result = service
             .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2829,16 +3004,22 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE foo.values3 (id int, value decimal96)")
                 .await
+                .unwrap()
+                .collect()
+                .await
                 .unwrap();
 
             service
                 .exec_query("INSERT INTO foo.values3 (id, value) VALUES (1, -100000000000000000000.10), (2, -200000000000000000000), (3, -100000000000002200000.01), (4, -120000000000000000.10024), (5, -1.23)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
         }
 
         let result = service
             .exec_query("SELECT * from foo.values3")
+            .await
+            .unwrap()
+            .collect()
             .await
             .unwrap();
 
@@ -2917,9 +3098,9 @@ mod tests {
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-            let _ = service.exec_query("CREATE TABLE foo.bool_group (bool_value boolean)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.bool_group (bool_value boolean)").await.unwrap().collect().await.unwrap();
 
             for batch in 0..25 {
                 let mut bools = Vec::new();
@@ -2931,16 +3112,16 @@ mod tests {
                 let values = bools.into_iter().map(|b| format!("({})", b)).join(", ");
                 service.exec_query(
                     &format!("INSERT INTO foo.bool_group (bool_value) VALUES {}", values)
-                ).await.unwrap();
+                ).await.unwrap().collect().await.unwrap();
             }
 
-            let result = service.exec_query("SELECT count(*) from foo.bool_group").await.unwrap();
+            let result = service.exec_query("SELECT count(*) from foo.bool_group").await.unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(25000)]));
 
-            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
+            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3823)]));
 
-            let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+            let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(21177)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(3823)]));
@@ -2952,26 +3133,26 @@ mod tests {
         Config::test("flatten_union").start_test(async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-            let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await.unwrap();
-            let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await.unwrap().collect().await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await.unwrap().collect().await.unwrap();
 
-            let _ = service.exec_query("CREATE TABLE foo.a1 (a int, b int, c int)").await.unwrap();
-            let _ = service.exec_query("CREATE TABLE foo.b1 (a int, b int, c int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.a1 (a int, b int, c int)").await.unwrap().collect().await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.b1 (a int, b int, c int)").await.unwrap().collect().await.unwrap();
 
             service.exec_query(
                 "INSERT INTO foo.a (a, b, c) VALUES (1, 1, 1)"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
             service.exec_query(
                 "INSERT INTO foo.b (a, b, c) VALUES (2, 2, 1)"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
             service.exec_query(
                 "INSERT INTO foo.a1 (a, b, c) VALUES (1, 1, 2)"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
             service.exec_query(
                 "INSERT INTO foo.b1 (a, b, c) VALUES (2, 2, 2)"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
 
             let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
                          select * from ( \
@@ -2988,7 +3169,7 @@ mod tests {
                                         union all \
                                         select * from foo.b \
                                 ) \
-                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap().collect().await.unwrap();
             match &result.get_rows()[0].values()[0] {
                 TableValue::String(s) => {
                     assert_eq!(s,
@@ -3027,7 +3208,7 @@ mod tests {
                                 ) \
                             union all
                             select * from foo.b \
-                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap().collect().await.unwrap();
             match &result.get_rows()[0].values()[0] {
                 TableValue::String(s) => {
                     assert_eq!(s,
@@ -3065,7 +3246,7 @@ mod tests {
                                 ) \
                             union all
                             select * from foo.b \
-                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap().collect().await.unwrap();
             match &result.get_rows()[0].values()[0] {
                 TableValue::String(s) => {
                     assert_eq!(s,
@@ -3105,7 +3286,7 @@ mod tests {
                                 ) \
                             union all
                             select * from foo.b \
-                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap().collect().await.unwrap();
             match &result.get_rows()[0].values()[0] {
                 TableValue::String(s) => {
                     assert_eq!(s,
@@ -3140,15 +3321,15 @@ mod tests {
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.orders (amount int, email text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.orders (amount int, email text)").await.unwrap().collect().await.unwrap();
 
-            service.exec_query("CREATE INDEX orders_by_email ON foo.orders (email)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_email ON foo.orders (email)").await.unwrap().collect().await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.customers (email text, system text, uuid text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (email text, system text, uuid text)").await.unwrap().collect().await.unwrap();
 
-            service.exec_query("CREATE INDEX customers_by_email ON foo.customers (email)").await.unwrap();
+            service.exec_query("CREATE INDEX customers_by_email ON foo.customers (email)").await.unwrap().collect().await.unwrap();
 
             let mut join_results = Vec::new();
 
@@ -3186,18 +3367,18 @@ mod tests {
 
                 service.exec_query(
                     &format!("INSERT INTO foo.orders (amount, email) VALUES {}", values)
-                ).await.unwrap();
+                ).await.unwrap().collect().await.unwrap();
 
                 let values = customers.into_iter().map(|(email, uuid)| format!("('{}', 'system', '{}')", email, uuid)).join(", ");
 
                 service.exec_query(
                     &format!("INSERT INTO foo.customers (email, system, uuid) VALUES {}", values)
-                ).await.unwrap();
+                ).await.unwrap().collect().await.unwrap();
             }
 
             join_results.sort_by(|a, b| cmp_row_key_heap(1, &a.values(), &b.values()));
 
-            let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
+            let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_rows().len(), join_results.len());
             for i in 0..result.get_rows().len() {
@@ -3214,15 +3395,27 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 let _ = service
                     .exec_query("CREATE TABLE foo.ints (value int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
                 service
                     .exec_query("INSERT INTO foo.ints (value) VALUES (42)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -3252,13 +3445,13 @@ mod tests {
 
                 let result = service.exec_query("SELECT count(*) from foo.ints").await;
                 println!("Result: {:?}", result);
+                let err_message = result
+                    .as_ref()
+                    .err()
+                    .map(|e| e.to_string())
+                    .unwrap_or_default();
                 assert!(
-                    result
-                        .clone()
-                        .err()
-                        .unwrap()
-                        .to_string()
-                        .contains("not found"),
+                    err_message.contains("not found"),
                     "Expected table not found error but got {:?}",
                     result
                 );
@@ -3277,10 +3470,19 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -3288,17 +3490,26 @@ mod tests {
                     service
                         .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
                         .await
+                        .unwrap()
+                        .collect()
+                        .await
                         .unwrap();
                 }
 
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(300)]));
 
                 let result = service
                     .exec_query("SELECT sum(num) from foo.numbers")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
@@ -3317,18 +3528,18 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
                 service
                     .exec_query("CREATE TABLE foo.numbers (num decimal)")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
 
                 for i in 0..100 {
                     service
                         .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
                         .await
-                        .unwrap();
+                        .unwrap().collect().await.unwrap();
                 }
 
                 Delay::new(Duration::from_millis(10000)).await;
@@ -3336,13 +3547,13 @@ mod tests {
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
 
                 let result = service
                     .exec_query("SELECT sum(num) from foo.numbers where num = 50")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
                 assert_eq!(
                     result.get_rows()[0],
                     Row::new(vec![TableValue::Decimal(Decimal::new(5000000))])
@@ -3351,7 +3562,7 @@ mod tests {
                 let partitions = service
                     .exec_query("SELECT id, min_value, max_value FROM system.partitions")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
 
                 println!("All partitions: {:#?}", partitions);
 
@@ -3396,10 +3607,19 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE foo.numbers (num decimal)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -3407,6 +3627,9 @@ mod tests {
                     let t = (0..100).map(|i| format!("({i})")).join(", ");
                     service
                         .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES {}", t))
+                        .await
+                        .unwrap()
+                        .collect()
                         .await
                         .unwrap();
                 }
@@ -3453,16 +3676,28 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
                 for i in 0..100 {
                     service
                         .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap()
+                        .collect()
                         .await
                         .unwrap();
 
@@ -3535,6 +3770,9 @@ mod tests {
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
             })
@@ -3573,10 +3811,19 @@ mod tests {
                         c
                     })
                     .start_test_worker(async move |_| {
-                        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                        service
+                            .exec_query("CREATE SCHEMA foo")
+                            .await
+                            .unwrap()
+                            .collect()
+                            .await
+                            .unwrap();
 
                         service
                             .exec_query("CREATE TABLE foo.numbers (num int)")
+                            .await
+                            .unwrap()
+                            .collect()
                             .await
                             .unwrap();
 
@@ -3593,6 +3840,9 @@ mod tests {
                                     values
                                 ))
                                 .await
+                                .unwrap()
+                                .collect()
+                                .await
                                 .unwrap();
                         }
 
@@ -3602,13 +3852,13 @@ mod tests {
                         )
                         .await;
 
-                        let result = first_query.unwrap();
+                        let result = first_query.unwrap().collect().await.unwrap();
                         assert_eq!(
                             result.get_rows()[0],
                             Row::new(vec![TableValue::Int(300000)])
                         );
 
-                        let result = second_query.unwrap();
+                        let result = second_query.unwrap().collect().await.unwrap();
                         assert_eq!(
                             result.get_rows()[0],
                             Row::new(vec![TableValue::Int(300000 / 2 * 99999)])
@@ -3653,10 +3903,19 @@ mod tests {
                         c
                     })
                     .start_test_worker(async move |_| {
-                        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                        service
+                            .exec_query("CREATE SCHEMA foo")
+                            .await
+                            .unwrap()
+                            .collect()
+                            .await
+                            .unwrap();
 
                         service
                             .exec_query("CREATE TABLE foo.numbers (num int)")
+                            .await
+                            .unwrap()
+                            .collect()
                             .await
                             .unwrap();
 
@@ -3673,6 +3932,9 @@ mod tests {
                                     values
                                 ))
                                 .await
+                                .unwrap()
+                                .collect()
+                                .await
                                 .unwrap();
                         }
 
@@ -3682,13 +3944,13 @@ mod tests {
                         )
                         .await;
 
-                        let result = first_query.unwrap();
+                        let result = first_query.unwrap().collect().await.unwrap();
                         assert_eq!(
                             result.get_rows()[0],
                             Row::new(vec![TableValue::Int(300000)])
                         );
 
-                        let result = second_query.unwrap();
+                        let result = second_query.unwrap().collect().await.unwrap();
                         assert_eq!(
                             result.get_rows()[0],
                             Row::new(vec![TableValue::Int(300000 / 2 * 99999)])
@@ -3714,16 +3976,28 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
                 for i in 0..10_u64 {
                     service
                         .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap()
+                        .collect()
                         .await
                         .unwrap();
                 }
@@ -3748,6 +4022,9 @@ mod tests {
 
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(10)]));
@@ -3800,10 +4077,19 @@ mod tests {
                     .get_service_typed::<dyn CompactionService>()
                     .await;
 
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE foo.numbers (a int, num int) UNIQUE KEY (a)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -3813,6 +4099,9 @@ mod tests {
                             "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
                             i, i, i
                         ))
+                        .await
+                        .unwrap()
+                        .collect()
                         .await
                         .unwrap();
                 }
@@ -3847,6 +4136,9 @@ mod tests {
                             i + 1,
                             i + 1
                         ))
+                        .await
+                        .unwrap()
+                        .collect()
                         .await
                         .unwrap();
                 }
@@ -3901,38 +4193,38 @@ mod tests {
                     config.compaction_chunks_count_threshold = 0;
                     config
                 }).start_test_worker(async move |_| {
-                    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                    service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-                    service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-                    service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-                    service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap();
-                    service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap();
-                    service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
-                    service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+                    service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap().collect().await.unwrap();
+                    service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap().collect().await.unwrap();
+                    service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap().collect().await.unwrap();
+                    service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap().collect().await.unwrap();
+                    service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap().collect().await.unwrap();
+                    service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap().collect().await.unwrap();
 
                     service.exec_query(
                         "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     service.exec_query(
                         "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     service.exec_query(
                         "INSERT INTO foo.orders_2 (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     service.exec_query(
                         "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     service.exec_query(
                         "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     service.exec_query(
                         "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     let result = service.exec_query(
                         "SELECT city, name, sum(amount) FROM (SELECT * FROM foo.orders_1 UNION ALL SELECT * FROM foo.orders_2) o \
@@ -3940,7 +4232,7 @@ mod tests {
                 LEFT JOIN foo.products p ON orders_product_id = product_id \
                 WHERE customer_id = 'a' \
                 GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                     let expected = vec![
                         Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
@@ -3999,16 +4291,16 @@ mod tests {
                     service
                         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
                         .await
-                        .unwrap();
+                        .unwrap().collect().await.unwrap();
 
                     let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
 
-                    service.exec_query(&create_table_sql).await.unwrap();
+                    service.exec_query(&create_table_sql).await.unwrap().collect().await.unwrap();
 
                     let result = service
                         .exec_query("SELECT count(*) from foo.bikes")
                         .await
-                        .unwrap();
+                        .unwrap().collect().await.unwrap();
 
                     assert_eq!(
                         result.get_rows(),
@@ -4018,7 +4310,7 @@ mod tests {
                     let result = service
                         .exec_query("SELECT partition_split_threshold from system.tables")
                         .await
-                        .unwrap();
+                        .unwrap().collect().await.unwrap();
 
                     assert_eq!(
                         result.get_rows(),
@@ -4089,15 +4381,15 @@ mod tests {
                             vec![path_1, path_2]
                         };
 
-                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap().collect().await.unwrap();
                         let _ = service.exec_query(
                             &format!(
                                 "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
-                        ).await.unwrap();
+                        ).await.unwrap().collect().await.unwrap();
 
-                        let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
+                        let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap().collect().await.unwrap();
                         assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8)])]);
                     })
                     .await;
@@ -4160,13 +4452,13 @@ mod tests {
                             vec![path_1, path_2]
                         };
 
-                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap().collect().await.unwrap();
                         let _ = service.exec_query(
                             &format!(
                                 "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
-                        ).await.unwrap();
+                        ).await.unwrap().collect().await.unwrap();
 
                         let res = service.exec_query(
                             &format!(
@@ -4241,13 +4533,13 @@ mod tests {
                             vec![path_1, path_2]
                         };
 
-                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap().collect().await.unwrap();
                         let _ = service.exec_query(
                             &format!(
                                 "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
-                        ).await.unwrap();
+                        ).await.unwrap().collect().await.unwrap();
 
                         let res = service.exec_query(
                             &format!(
@@ -4337,7 +4629,7 @@ mod tests {
                 let _ = service
                     .exec_query("CREATE SCHEMA IF NOT EXISTS Test")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
                 let _ = service
                     .exec_query(&format!(
                         "CREATE TABLE Test.Orders (\
@@ -4352,12 +4644,12 @@ mod tests {
                         path.to_string_lossy()
                     ))
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
 
                 let result = service
                     .exec_query("SELECT id, product_name, order_date, discount, profit, quantity, total_amount FROM Test.Orders ORDER BY id")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
 
                 assert_eq!(result.get_rows().len(), 44);
 
@@ -4519,7 +4811,7 @@ mod tests {
                 let _ = service
                     .exec_query("CREATE SCHEMA IF NOT EXISTS Test")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
                 let _ = service
                     .exec_query(&format!(
                         "CREATE TABLE Test.Orders (\
@@ -4534,12 +4826,12 @@ mod tests {
                         path.to_string_lossy()
                     ))
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
 
                 let result = service
                     .exec_query("SELECT id, product_name, order_date, discount, profit, quantity, total_amount FROM Test.Orders ORDER BY id")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
 
                 assert_eq!(result.get_rows().len(), 44);
 
@@ -4641,15 +4933,15 @@ mod tests {
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.table (t int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.table (t int)").await.unwrap().collect().await.unwrap();
 
             let listener = services.cluster.job_result_listener();
 
             service.exec_query(
                 "INSERT INTO foo.table (t) VALUES (NULL), (1), (3), (5), (10), (20), (25), (25), (25), (25), (25), (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
@@ -4689,7 +4981,7 @@ mod tests {
             expected.sort_by(|(min_a, _, _, _), (min_b, _, _, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             assert_eq!(intervals_set, expected);
 
-            let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
+            let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap().collect().await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
         }).await;
@@ -4728,18 +5020,18 @@ mod tests {
                 vec!["temp://foo-3.csv.gz".to_string()]
             };
 
-            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap().collect().await.unwrap();
             let _ = service.exec_query(
                 &format!(
                     "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
                     paths.into_iter().map(|p| format!("'{}'", p)).join(",")
                 )
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
 
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
 
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap().collect().await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
         }).await;
 
@@ -4751,11 +5043,11 @@ mod tests {
     async fn explain_meta_logical_plan() {
         Config::run_test("explain_meta_logical_plan", async move |services| {
             let service = services.sql_service;
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
             let result = service.exec_query(
                 "EXPLAIN SELECT table_name FROM information_schema.tables WHERE table_schema = 'foo'"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
             assert_eq!(result.len(), 1);
             assert_eq!(result.get_columns().len(), 1);
 
@@ -4778,17 +5070,17 @@ mod tests {
     async fn explain_logical_plan() {
         Config::run_test("explain_logical_plan", async move |services| {
             let service = services.sql_service;
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap().collect().await.unwrap();
 
             service.exec_query(
                 "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'andorid', 17, 4), (3, 'ios', 20, 5)"
-                ).await.unwrap();
+                ).await.unwrap().collect().await.unwrap();
 
             let result = service.exec_query(
                 "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
-            ).await.unwrap();
+            ).await.unwrap().collect().await.unwrap();
             assert_eq!(result.len(), 1);
             assert_eq!(result.get_columns().len(), 1);
 
@@ -4818,6 +5110,9 @@ mod tests {
             {
                 let result = service
                     .exec_query("SELECT round(42.4), round(42.4382, 2), round(1234.56, -1)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -4859,17 +5154,17 @@ mod tests {
                 config.compaction_chunks_count_threshold = 0;
                 config
             }).start_test_worker(async move |_| {
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service.exec_query("CREATE SCHEMA foo").await.unwrap().collect().await.unwrap();
 
-                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap();
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap().collect().await.unwrap();
 
                 service.exec_query(
                     "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'andorid', 17, 4), (3, 'ios', 20, 5)"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                 let result = service.exec_query(
                     "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
-                    ).await.unwrap();
+                    ).await.unwrap().collect().await.unwrap();
 
                 assert_eq!(result.len(), 2);
 
@@ -4937,7 +5232,13 @@ mod tests {
             })
             .start_test(async move |services| {
                 let service = services.sql_service;
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 let paths = {
                     let dir = env::temp_dir();
@@ -5003,7 +5304,13 @@ mod tests {
                     LOCATION {}",
                     paths.into_iter().map(|p| format!("'{}'", p)).join(",")
                 );
-                service.exec_query(&query).await.unwrap();
+                service
+                    .exec_query(&query)
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 let indices = services.meta_store.get_table_indexes(1).await.unwrap();
 
@@ -5047,27 +5354,27 @@ mod tests {
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= ''2022-01-01'' AND time < ''2022-02-01''') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_3 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_fail_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
@@ -5090,12 +5397,12 @@ mod tests {
             let service = services.sql_service;
             let metastore = services.meta_store;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
                 .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
@@ -5103,7 +5410,7 @@ mod tests {
                 source_table = 'CREATE TABLE events1 (a int, b int, c int)'
                             ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
             let table = metastore.get_table("test".to_string(), "events_1".to_string()).await.unwrap();
             assert_eq!(
                 table.get_row().source_columns(),
@@ -5139,16 +5446,16 @@ mod tests {
             let service = services.sql_service;
             let meta_store = services.meta_store;
 
-            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
 
             service
-                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')").await.unwrap();
+                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')").await.unwrap().collect().await.unwrap();
             let context = SqlQueryContext::default().with_trace_obj(Some("{\"test\":\"context\"}".to_string()));
 
             let _ = service
                 .exec_query_with_context(context, "CREATE TABLE test.table_1 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let table = meta_store.get_table("test".to_string(), "table_1".to_string()).await.unwrap();
             let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
@@ -5158,7 +5465,7 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE test.table_2 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`)")
                 .await
-                .unwrap();
+                .unwrap().collect().await.unwrap();
 
             let table = meta_store.get_table("test".to_string(), "table_2".to_string()).await.unwrap();
             let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
@@ -5174,14 +5481,26 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA test")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE test.test (id int, created timestamp, value int)")
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 service
                     .exec_query("CREATE TABLE test.test1 (id int, created timestamp, value int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -5196,6 +5515,9 @@ mod tests {
                             ",
                     )
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 service
                     .exec_query(
@@ -5207,6 +5529,9 @@ mod tests {
                             (2, '2022-01-02T00:00:00Z', 1)\
                             ",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 let res = service
@@ -5221,6 +5546,9 @@ mod tests {
                                  order by 2
                                  ) tmp",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
@@ -5237,6 +5565,9 @@ mod tests {
                                  order by 2
                                  ) tmp",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
@@ -5258,6 +5589,9 @@ mod tests {
                         ) tmp",
                     )
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
 
@@ -5276,6 +5610,9 @@ mod tests {
                                  ) tmp",
                     )
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
             })
@@ -5290,12 +5627,21 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA test")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query(
                         "CREATE TABLE test.topk_test (id int, name varchar, total_sales int)",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -5344,11 +5690,17 @@ mod tests {
                         (160, 'Beatrix', 49800)",
                     )
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 let res = service
                     .exec_query(
                         "SELECT name, total_sales FROM test.topk_test  ORDER BY 1 ASC limit 3",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 assert_eq!(
@@ -5380,10 +5732,19 @@ mod tests {
             .start_test(async move |services| {
                 let service = services.sql_service;
 
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA test")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query("CREATE TABLE test.test (idd int, value int)")
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
 
@@ -5393,6 +5754,9 @@ mod tests {
                             (1, 10)\
                             ",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 let res = service
@@ -5404,6 +5768,9 @@ mod tests {
                                  from test.test
                                  ) tmp",
                     )
+                    .await
+                    .unwrap()
+                    .collect()
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
@@ -5455,6 +5822,9 @@ mod tests {
                         service
                             .exec_query("CREATE SCHEMA IF NOT EXISTS test")
                             .await
+                            .unwrap()
+                            .collect()
+                            .await
                             .unwrap();
                         service
                             .exec_query(&format!(
@@ -5467,10 +5837,16 @@ mod tests {
                                     .join(",")
                             ))
                             .await
+                            .unwrap()
+                            .collect()
+                            .await
                             .unwrap();
 
                         let result = service
                             .exec_query("SELECT count(*) FROM test.compaction_ready")
+                            .await
+                            .unwrap()
+                            .collect()
                             .await
                             .unwrap();
                         assert_eq!(
@@ -5555,6 +5931,9 @@ mod tests {
                         service
                             .exec_query("CREATE SCHEMA IF NOT EXISTS test")
                             .await
+                            .unwrap()
+                            .collect()
+                            .await
                             .unwrap();
                         service
                             .exec_query(&format!(
@@ -5567,10 +5946,16 @@ mod tests {
                                     .join(",")
                             ))
                             .await
+                            .unwrap()
+                            .collect()
+                            .await
                             .unwrap();
 
                         let result = service
                             .exec_query("SELECT count(*) FROM test.no_threshold")
+                            .await
+                            .unwrap()
+                            .collect()
                             .await
                             .unwrap();
                         assert_eq!(

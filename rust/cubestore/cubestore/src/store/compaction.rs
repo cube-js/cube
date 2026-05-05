@@ -2182,7 +2182,13 @@ mod tests {
             })
             .start_test(async move |services| {
                 let service = services.sql_service;
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA test")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 let compaction_service = services
                     .injector
                     .get_service_typed::<dyn CompactionService>()
@@ -2190,13 +2196,22 @@ mod tests {
                 service
                     .exec_query("create table test.a (a int, b int96)")
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 let values = (0..15)
                     .map(|i| format!("({}, {})", i, i))
                     .collect::<Vec<_>>()
                     .join(", ");
                 let query = format!("insert into test.a (a, b) values {}", values);
-                service.exec_query(&query).await.unwrap();
+                service
+                    .exec_query(&query)
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 compaction_service
                     .compact(1, DataLoadedSize::new())
                     .await
@@ -2214,7 +2229,13 @@ mod tests {
 
                 let query = format!("insert into test.a (a, b) values {}", values);
 
-                service.exec_query(&query).await.unwrap();
+                service
+                    .exec_query(&query)
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 compaction_service
                     .compact(partitions[0].get_id(), DataLoadedSize::new())
                     .await
@@ -2238,7 +2259,7 @@ mod tests {
             })
             .start_test(async move |services| {
                 let service = services.sql_service;
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap().collect().await.unwrap();
                 let compaction_service = services
                     .injector
                     .get_service_typed::<dyn CompactionService>()
@@ -2246,13 +2267,13 @@ mod tests {
                 service
                     .exec_query("create table test.a (a int, d0 decimal(20,0), d1 decimal(20, 1), d2 decimal(20, 2), d3 decimal(20, 3), d4 decimal(20, 4), d5 decimal(20, 5), d10 decimal(20, 10))")
                     .await
-                    .unwrap();
+                    .unwrap().collect().await.unwrap();
                 let values = (0..15)
                     .map(|i| format!("({}, {}, {}, {}, {}, {}, {}, {})", i, i, i, i, i, i, i, i))
                     .collect::<Vec<_>>()
                     .join(", ");
                 let query = format!("insert into test.a (a, d0, d1, d2, d3, d4, d5, d10) values {}", values);
-                service.exec_query(&query).await.unwrap();
+                service.exec_query(&query).await.unwrap().collect().await.unwrap();
                 compaction_service
                     .compact(1, DataLoadedSize::new())
                     .await
@@ -2269,7 +2290,7 @@ mod tests {
                     .join(", ");
                 let query = format!("insert into test.a (a, d0, d1, d2, d3, d4, d5, d10) values {}", values);
 
-                service.exec_query(&query).await.unwrap();
+                service.exec_query(&query).await.unwrap().collect().await.unwrap();
                 compaction_service
                     .compact(partitions[0].get_id(), DataLoadedSize::new())
                     .await
@@ -2294,7 +2315,13 @@ mod tests {
             })
             .start_test(async move |services| {
                 let service = services.sql_service;
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE SCHEMA test")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 let compaction_service = services
                     .injector
                     .get_service_typed::<dyn CompactionService>()
@@ -2302,13 +2329,22 @@ mod tests {
                 service
                     .exec_query("create table test.a (a varchar(255), b varchar(255))")
                     .await
+                    .unwrap()
+                    .collect()
+                    .await
                     .unwrap();
                 let values = (0..1000)
                     .map(|i| format!("('{}{}', '{}{}')", i, "a".repeat(10), i, "b".repeat(10)))
                     .collect::<Vec<_>>()
                     .join(", ");
                 let query = format!("insert into test.a (a, b) values {}", values);
-                service.exec_query(&query).await.unwrap();
+                service
+                    .exec_query(&query)
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 compaction_service
                     .compact(1, DataLoadedSize::new())
                     .await
@@ -2325,7 +2361,13 @@ mod tests {
                     .join(", ");
                 let query = format!("insert into test.a (a, b) values {}", values);
 
-                service.exec_query(&query).await.unwrap();
+                service
+                    .exec_query(&query)
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
                 compaction_service
                     .compact(partitions[0].get_id(), DataLoadedSize::new())
                     .await
