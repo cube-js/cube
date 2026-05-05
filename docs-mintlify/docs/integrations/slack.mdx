@@ -59,6 +59,21 @@ get AI-powered answers grounded in your semantic layer — without leaving Slack
 Follow-up questions can be asked by replying in the same Slack thread, keeping
 the conversation contextual.
 
+### Customizing responses with rules
+
+The agent is aware when it's responding in Slack, so you can use [rules][ref-rules]
+to tailor its behavior on this surface. For example, to suppress charts in Slack
+unless the user explicitly asks for one, add an `always` rule:
+
+```markdown
+<!-- agents/rules/slack-no-charts.md -->
+---
+type: always
+---
+When responding in Slack, do not include charts in the response unless the user
+has explicitly asked for them.
+```
+
 ### User matching
 
 Cube identifies Slack users by their email address. For the integration to work,
@@ -88,3 +103,4 @@ Slack Agent is in active development. The following limitations apply:
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /analytics/scheduled-refreshes
+[ref-rules]: /admin/ai/rules
