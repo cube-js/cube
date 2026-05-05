@@ -30,6 +30,44 @@ Filters can allow either a single value or multiple values. Configure this when 
 
 You can set a default value that's applied when the dashboard loads. Defaults are useful for scoping the dashboard to "this quarter" or "the user's region" without requiring viewers to interact with the filter first.
 
+There are two ways to set a default:
+
+- **Static default** — pick a value (or values) directly in the filter. Every viewer sees the same default.
+- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default.
+
+Static defaults are configured by interacting with the filter in the dashboard builder — the value you select is saved on the widget and applied to every viewer when the dashboard loads.
+
+#### User attribute default
+
+Use the **User attribute default** toggle in the filter's edit sidebar to pre-fill a filter from the viewer's [user attribute][ref-user-attributes]. When the dashboard loads, Cube looks up the attribute value for the current viewer and applies it as the filter's default.
+
+This is useful for scoping a dashboard to the viewer's own slice of the data — for example, defaulting a **Region** filter to the viewer's `region` attribute, or a **Sales rep** filter to their `email`.
+
+To configure it:
+
+<Steps>
+ <Step title="Open the filter's settings">
+   In the dashboard builder, click the filter widget's settings menu and choose **Edit Filter**.
+ </Step>
+ <Step title="Enable User attribute default">
+   Scroll to the **User attribute default** switch and turn it on.
+ </Step>
+ <Step title="Pick the attribute">
+   Select the [user attribute][ref-user-attributes] whose value should be used as the default. Only attributes defined in your account appear in the picker.
+ </Step>
+</Steps>
+
+How the attribute value is matched to the filter:
+
+| Attribute type | How it's applied |
+|---|---|
+| **String**, **Number** | Used as a single value. Works with single-value operators like `is` / `is not`, and is also accepted by multi-select filters as a one-item selection. |
+| **String array**, **Number array** | Used as a list of values, one per array entry. Empty values are dropped. |
+
+Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
+
+The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked in for that viewer. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
+
 ### Faceted filters
 
 When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
@@ -96,3 +134,4 @@ Mappings are also configurable by AI agents when they build or edit a dashboard,
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-granularities]: /docs/data-modeling/dimensions
+[ref-user-attributes]: /admin/users-and-permissions/user-attributes
