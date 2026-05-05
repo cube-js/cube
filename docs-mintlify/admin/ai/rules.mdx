@@ -124,20 +124,6 @@ type: agent_requested
 When analyzing churn, distinguish between voluntary and involuntary churn.
 ```
 
-**Response formatting:**
-
-Rules can also shape how the agent presents its responses on different surfaces. For example, to suppress charts in Slack unless the user explicitly asks for one:
-
-```markdown
-<!-- agents/rules/slack-no-charts.md -->
----
-type: always
----
-When responding in Slack, do not include charts in the response unless the user has explicitly asked for them.
-```
-
-The agent is aware of the surface it's responding on (for example, Slack DMs), so rules like this take effect only when the conversation originates from that surface.
-
 ## Resolving conflicts
 
 When multiple rules could apply, follow these guidelines:
