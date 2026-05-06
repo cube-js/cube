@@ -111,6 +111,8 @@ impl MaskedSqlNode {
                 )))
             }
         };
+        // TODO: support FILTER_PARAMS in mask filter SQL by passing
+        // proper FiltersContext with filter_params_columns
         let context = Rc::new(VisitorContext::new_with_node_processor(
             query_tools.clone(),
             self.input.clone(),
