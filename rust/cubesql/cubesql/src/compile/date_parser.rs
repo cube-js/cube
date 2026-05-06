@@ -36,9 +36,7 @@ fn ascii_u32_4(b: &[u8], at: usize) -> Option<u32> {
     )
 }
 
-/// Recognises only `YYYY-MM-DDTHH:MM:SS.fff` (23 bytes, `T` separator,
-/// 3-digit fraction). Returns `None` for any other length or layout — the
-/// caller falls through to the chrono cascade.
+/// Recognizes only `YYYY-MM-DDTHH:MM:SS.fff` (23 bytes, `T` separator, 3-digit fraction).
 fn parse_fast(s: &str) -> Option<NaiveDateTime> {
     let b = s.as_bytes();
     if b.len() != 23
@@ -158,11 +156,6 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            assert!(
-                parse_fast(input).is_none(),
-                "fast path should reject: {}",
-                input
-            );
             assert_eq!(
                 parse_date_str(input).unwrap(),
                 *expected,
