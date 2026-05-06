@@ -721,15 +721,16 @@ export class CompilerApi {
 
               maskedMembersSet.add(memberName);
               if (conditionalFullAccessPolicies.length > 0) {
-                const evaluatedFilters = conditionalFullAccessPolicies.flatMap(
-                  policy => (policy.rowLevel.filters || []).map(
+                const policyFilters = conditionalFullAccessPolicies.map(policy => {
+                  const filters = (policy.rowLevel.filters || []).map(
                     (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
-                  )
-                );
-                if (evaluatedFilters.length > 0) {
-                  memberMaskFiltersMap[memberName] = evaluatedFilters.length === 1
-                    ? evaluatedFilters[0]
-                    : { and: evaluatedFilters };
+                  );
+                  return filters.length === 1 ? filters[0] : { and: filters };
+                });
+                if (policyFilters.length > 0) {
+                  memberMaskFiltersMap[memberName] = policyFilters.length === 1
+                    ? policyFilters[0]
+                    : { or: policyFilters };
                 }
               }
             }
