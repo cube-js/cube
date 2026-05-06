@@ -1,7 +1,7 @@
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::sql_nodes::SqlNode;
+use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,8 +16,9 @@ impl MeasureFilterOp {
     pub fn to_sql(
         &self,
         member_evaluator: &Rc<MemberSymbol>,
-        query_tools: &Rc<QueryTools>,
-        context: &Rc<VisitorContext>,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         match member_evaluator.as_ref() {
@@ -27,9 +28,6 @@ impl MeasureFilterOp {
                 {
                     plan_templates.always_true()
                 } else {
-                    let visitor = context.make_visitor(query_tools.clone());
-                    let node_processor = context.node_processor();
-
                     let parts = measure_symbol
                         .measure_filters()
                         .iter()
@@ -38,7 +36,7 @@ impl MeasureFilterOp {
                             Ok(format!(
                                 "({})",
                                 filter.eval(
-                                    &visitor,
+                                    visitor,
                                     node_processor.clone(),
                                     query_tools.clone(),
                                     plan_templates,

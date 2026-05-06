@@ -69,7 +69,7 @@ impl Select {
         };
 
         let where_condition = if let Some(filter) = &self.filter {
-            Some(filter.to_sql(templates, self.context.clone())?)
+            Some(self.context.render_filter(filter, templates)?)
         } else {
             None
         };
@@ -85,7 +85,7 @@ impl Select {
             .collect::<Result<Vec<_>, _>>()?;
 
         let having = if let Some(having) = &self.having {
-            Some(having.to_sql(templates, self.context.clone())?)
+            Some(self.context.render_filter(having, templates)?)
         } else {
             None
         };

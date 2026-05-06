@@ -71,6 +71,18 @@ impl SqlEvaluatorVisitor {
         Ok(result)
     }
 
+    /// Evaluate a member symbol in filter-mode: timezone conversion is suppressed
+    /// because filter values are already normalized to the database timezone.
+    pub fn apply_for_filter(
+        &self,
+        node: &Rc<MemberSymbol>,
+        node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        self.with_ignore_tz_convert()
+            .apply(node, node_processor, templates)
+    }
+
     pub fn ignore_tz_convert(&self) -> bool {
         self.ignore_tz_convert
     }

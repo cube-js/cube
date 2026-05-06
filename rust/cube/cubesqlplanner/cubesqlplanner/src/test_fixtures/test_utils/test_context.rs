@@ -649,7 +649,7 @@ impl TestContext {
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
 
-        let sql = filter.to_sql(&templates, context)?;
+        let sql = context.render_filter(&filter, &templates)?;
         let params = self.query_tools.get_allocated_params();
         Ok((sql, params))
     }
@@ -668,7 +668,14 @@ impl TestContext {
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
 
-        let sql = base_filter.to_sql(context, &templates)?;
+        let visitor = context.make_visitor(self.query_tools.clone());
+        let sql = base_filter.to_sql(
+            &visitor,
+            context.node_processor(),
+            self.query_tools.clone(),
+            &templates,
+            context.filters_context(),
+        )?;
         let params = self.query_tools.get_allocated_params();
         Ok((sql, params))
     }
