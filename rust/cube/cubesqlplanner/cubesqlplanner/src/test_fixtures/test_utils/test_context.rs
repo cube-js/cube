@@ -4,8 +4,8 @@ use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
 use crate::plan::filter::ToSql;
-use crate::planner::filter::Filter;
 use crate::planner::filter::base_segment::BaseSegment;
+use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor, TimeDimensionSymbol};

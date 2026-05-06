@@ -91,9 +91,7 @@ impl TypedFilter {
                     _ => self
                         .values()
                         .iter()
-                        .filter_map(|v| {
-                            v.as_ref().map(|v| self.query_tools().allocate_param(v))
-                        })
+                        .filter_map(|v| v.as_ref().map(|v| self.query_tools().allocate_param(v)))
                         .collect::<Vec<_>>(),
                 };
                 callback.call(&args)
