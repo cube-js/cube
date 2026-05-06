@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.44](https://github.com/cube-js/cube/compare/v1.6.43...v1.6.44) (2026-05-06)
+
+### Features
+
+- **api-gateway:** add support for onlyViews parameter in meta endpoint ([#10809](https://github.com/cube-js/cube/issues/10809)) ([e38fc38](https://github.com/cube-js/cube/commit/e38fc38007a5b0d547131b5a31953681bcc7ec14))
+- conditional data masking with row-level filters in access policies ([#10803](https://github.com/cube-js/cube/issues/10803)) ([4d3bcbe](https://github.com/cube-js/cube/commit/4d3bcbe064139d0d809b3d421dcec05d9e634778))
+
+### Performance Improvements
+
+- **cubesql:** Migrate to columnar format in transport (~5x) ([#10805](https://github.com/cube-js/cube/issues/10805)) ([87f4dc1](https://github.com/cube-js/cube/commit/87f4dc1c2cc47b76c8b72cf96010e94d50a748bd))
+
 ## [1.6.43](https://github.com/cube-js/cube/compare/v1.6.42...v1.6.43) (2026-05-02)
 
 ### Features
