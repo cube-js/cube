@@ -1,9 +1,7 @@
 use cubenativeutils::CubeError;
 
-use crate::{
-    plan::{filter::FilterGroupOperator, Filter, FilterGroup, FilterItem},
-    planner::sql_evaluator::MemberSymbol,
-};
+use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 
 pub fn find_value_restriction(

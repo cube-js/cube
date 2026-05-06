@@ -399,7 +399,9 @@ impl SqlCall {
                         &SqlNodesFactory::new(),
                         filter_params_columns,
                     );
-                    return context.render_filter_item(&subtree, templates);
+                    return crate::plan::filter::render_filter_item(
+                        &context, &subtree, templates,
+                    );
                 }
             }
         }

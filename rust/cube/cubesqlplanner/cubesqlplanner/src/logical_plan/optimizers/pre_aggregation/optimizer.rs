@@ -2,7 +2,7 @@ use super::PreAggregationsCompiler;
 use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
-use crate::plan::FilterItem;
+use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};

@@ -1,6 +1,6 @@
-use crate::plan::filter::{FilterGroup, FilterGroupOperator};
-use crate::plan::FilterItem;
-use crate::planner::filter::{BaseFilter, FilterOperator};
+use crate::planner::filter::{
+    BaseFilter, FilterGroup, FilterGroupOperator, FilterItem, FilterOperator,
+};
 use crate::planner::sql_evaluator::DebugSql;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;

@@ -8,7 +8,7 @@ use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
-use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;

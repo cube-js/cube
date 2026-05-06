@@ -1,6 +1,7 @@
 use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
-use crate::plan::{FilterItem, QualifiedColumnName};
+use crate::plan::QualifiedColumnName;
+use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;

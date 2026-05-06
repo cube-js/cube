@@ -1,11 +1,6 @@
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNode;
 use crate::planner::sql_evaluator::{
     CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
-    SqlEvaluatorVisitor,
 };
-use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::FiltersContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -49,17 +44,6 @@ impl BaseSegment {
             name,
         }))
     }
-    pub fn to_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        _query_tools: Rc<QueryTools>,
-        plan_templates: &PlanSqlTemplates,
-        _filters_ctx: &FiltersContext,
-    ) -> Result<String, CubeError> {
-        visitor.apply(&self.member_evaluator, node_processor, plan_templates)
-    }
-
     pub fn full_name(&self) -> String {
         self.full_name.clone()
     }

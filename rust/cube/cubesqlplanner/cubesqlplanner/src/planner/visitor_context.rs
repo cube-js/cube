@@ -2,7 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use super::sql_evaluator::{CubeRefEvaluator, MemberSymbol, SqlCall};
 use crate::cube_bridge::member_sql::FilterParamsColumn;
-use crate::plan::filter::{Filter, FilterItem};
+use crate::planner::filter::Filter;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -78,40 +78,6 @@ impl VisitorContext {
 
     pub fn query_tools(&self) -> Rc<QueryTools> {
         self.query_tools.clone()
-    }
-
-    /// Render a top-level Filter (AND of all items) using this context.
-    /// Convenience wrapper that unpacks the context into the explicit args
-    /// expected by Filter::to_sql.
-    pub fn render_filter(
-        &self,
-        filter: &Filter,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        let visitor = self.make_visitor(self.query_tools());
-        filter.to_sql(
-            &visitor,
-            self.node_processor(),
-            self.query_tools(),
-            templates,
-            &self.filters_context,
-        )
-    }
-
-    /// Render a single FilterItem (or group) using this context.
-    pub fn render_filter_item(
-        &self,
-        item: &FilterItem,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        let visitor = self.make_visitor(self.query_tools());
-        item.to_sql(
-            &visitor,
-            self.node_processor(),
-            self.query_tools(),
-            templates,
-            &self.filters_context,
-        )
     }
 }
 

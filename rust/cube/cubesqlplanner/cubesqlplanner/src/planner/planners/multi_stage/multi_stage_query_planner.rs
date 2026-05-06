@@ -5,7 +5,7 @@ use super::{
 };
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
-use crate::plan::FilterItem;
+use crate::planner::filter::FilterItem;
 use crate::planner::filter::base_filter::FilterType;
 use crate::planner::filter::BaseFilter;
 use crate::planner::filter::FilterOperator;

@@ -3,7 +3,6 @@ pub mod calc_groups_join;
 pub mod cte;
 pub mod expression;
 pub mod filter;
-pub mod filter_debug;
 pub mod from;
 pub mod join;
 pub mod order;
@@ -17,7 +16,6 @@ pub use builder::{JoinBuilder, SelectBuilder};
 pub use calc_groups_join::*;
 pub use cte::Cte;
 pub use expression::{Expr, MemberExpression};
-pub use filter::{Filter, FilterGroup, FilterItem};
 pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
 pub use join::{
     Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition, RollingTotalJoinCondition,

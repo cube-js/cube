@@ -13,7 +13,7 @@ use super::sql_evaluator::MemberSymbol;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::options_member::OptionsMember;
-use crate::plan::{Filter, FilterItem};
+use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::sql_evaluator::collectors::{
     collect_multiplied_measures, has_multi_stage_members,

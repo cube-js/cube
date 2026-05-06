@@ -1,4 +1,4 @@
-use crate::plan::{FilterGroup, FilterItem};
+use crate::planner::filter::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::planners::multi_stage::time_shift_state::TimeShiftState;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;

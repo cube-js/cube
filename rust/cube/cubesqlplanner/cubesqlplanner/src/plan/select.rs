@@ -1,4 +1,5 @@
-use super::{Cte, Expr, Filter, From, OrderBy, Schema};
+use super::{Cte, Expr, From, OrderBy, Schema};
+use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::{
     TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn,
@@ -69,7 +70,11 @@ impl Select {
         };
 
         let where_condition = if let Some(filter) = &self.filter {
-            Some(self.context.render_filter(filter, templates)?)
+            Some(crate::plan::filter::render_filter(
+                &self.context,
+                filter,
+                templates,
+            )?)
         } else {
             None
         };
@@ -85,7 +90,11 @@ impl Select {
             .collect::<Result<Vec<_>, _>>()?;
 
         let having = if let Some(having) = &self.having {
-            Some(self.context.render_filter(having, templates)?)
+            Some(crate::plan::filter::render_filter(
+                &self.context,
+                having,
+                templates,
+            )?)
         } else {
             None
         };

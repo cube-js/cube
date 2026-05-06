@@ -1,7 +1,7 @@
 use super::sql_nodes::SqlNode;
 use super::CubeRefEvaluator;
 use super::MemberSymbol;
-use crate::plan::Filter;
+use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_call::CubeRef;
 use crate::planner::sql_templates::PlanSqlTemplates;
