@@ -1086,14 +1086,12 @@ macro_rules! transform_response_body {
                             (FieldValue::String(s), builder) => {
                                 let timestamp = parse_date_str(s.as_ref())?;
                                 // TODO switch parsing to microseconds
-                                if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
-                                    builder.append_null()?;
-                                } else if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
+                                if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
                                     builder.append_value(nanos)?;
                                 } else {
                                     log::error!(
                                         "Unable to cast timestamp value to nanoseconds: {}",
-                                        timestamp.to_string()
+                                        timestamp
                                     );
                                     builder.append_null()?;
                                 }
@@ -1114,12 +1112,7 @@ macro_rules! transform_response_body {
                         {
                             (FieldValue::String(s), builder) => {
                                 let timestamp = parse_date_str(s.as_ref())?;
-                                // TODO switch parsing to microseconds
-                                if timestamp.and_utc().timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
-                                    builder.append_null()?;
-                                } else {
-                                    builder.append_value(timestamp.and_utc().timestamp_millis())?;
-                                }
+                                builder.append_value(timestamp.and_utc().timestamp_millis())?;
                             },
                         },
                         {
@@ -1136,28 +1129,18 @@ macro_rules! transform_response_body {
                         field_name,
                         {
                             (FieldValue::String(s), builder) => {
-                                let date = NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d")
-                                    // FIXME: temporary solution for cases when expected type is Date32
-                                    // but underlying data is a Timestamp
-                                    .or_else(|_| NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%dT00:00:00.000"))
-                                    .map_err(|e| {
-                                        DataFusionError::Execution(format!(
-                                            "Can't parse date: '{}': {}",
-                                            s, e
-                                        ))
-                                    });
-                                match date {
-                                    Ok(date) => {
+                                match parse_date_str(s.as_ref()) {
+                                    Ok(timestamp) => {
                                         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-                                        let days_since_epoch = date.num_days_from_ce()  - epoch.num_days_from_ce();
+                                        let days_since_epoch = timestamp.date().num_days_from_ce()
+                                            - epoch.num_days_from_ce();
                                         builder.append_value(days_since_epoch)?;
                                     }
                                     Err(error) => {
                                         log::error!(
                                             "Unable to parse value as Date32: {}",
-                                            error.to_string()
+                                            error
                                         );
-
                                         builder.append_null()?
                                     }
                                 }
@@ -1375,7 +1358,9 @@ mod tests {
     use cubeclient::models::V1LoadResponse;
     use datafusion::{
         arrow::{
-            array::{BooleanArray, Float64Array, StringArray, TimestampNanosecondArray},
+            array::{
+                BooleanArray, Date32Array, Float64Array, StringArray, TimestampNanosecondArray,
+            },
             datatypes::{Field, Schema},
         },
         execution::{
@@ -1441,11 +1426,11 @@ mod tests {
                             "timeDimensions": []
                         },
                         "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 2"},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 3"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 4"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
+                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderTimestamp": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2022-01-01", "KibanaSampleDataEcommerce.city": "City 2"},
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderTimestamp": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2023-01-01", "KibanaSampleDataEcommerce.city": "City 3"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderTimestamp": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "9999-12-31", "KibanaSampleDataEcommerce.city": "City 4"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
                         ]
                     }]
                 }
@@ -1498,7 +1483,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_df_cube_scan_execute() {
+    async fn test_df_cube_scan_execute() -> Result<(), CubeError> {
         assert_eq!(std::mem::size_of::<FieldValue>(), 24);
 
         let schema = Arc::new(Schema::new(vec![
@@ -1510,7 +1495,7 @@ mod tests {
                 false,
             ),
             Field::new(
-                "KibanaSampleDataEcommerce.orderDate",
+                "KibanaSampleDataEcommerce.orderTimestamp",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
                 false,
             ),
@@ -1521,6 +1506,11 @@ mod tests {
                 false,
             ),
             Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, false),
+            Field::new(
+                "KibanaSampleDataEcommerce.orderDate",
+                DataType::Date32,
+                false,
+            ),
         ]));
 
         let scan_node = CubeScanExecutionPlan {
@@ -1543,6 +1533,7 @@ mod tests {
                 ]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.isBool".to_string(),
+                    "KibanaSampleDataEcommerce.orderTimestamp".to_string(),
                     "KibanaSampleDataEcommerce.orderDate".to_string(),
                     "KibanaSampleDataEcommerce.city".to_string(),
                 ]),
@@ -1565,9 +1556,7 @@ mod tests {
             config_obj: crate::config::Config::test().config_obj(),
         };
 
-        let runtime = Arc::new(
-            RuntimeEnv::new(RuntimeConfig::new()).expect("Unable to create RuntimeEnv for testing"),
-        );
+        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
         let task = Arc::new(TaskContext::new(
             "test".to_string(),
             "session".to_string(),
@@ -1576,8 +1565,8 @@ mod tests {
             HashMap::new(),
             runtime,
         ));
-        let stream = scan_node.execute(0, task).await.unwrap();
-        let batches = common::collect(stream).await.unwrap();
+        let stream = scan_node.execute(0, task).await?;
+        let batches = common::collect(stream).await?;
 
         assert_eq!(
             batches[0],
@@ -1627,9 +1616,17 @@ mod tests {
                         Some("City 4"),
                         None
                     ])) as ArrayRef,
+                    Arc::new(Date32Array::from(vec![
+                        None,
+                        Some(18993),
+                        Some(19358),
+                        Some(2_932_896),
+                        None,
+                    ])) as ArrayRef,
                 ],
-            )
-            .unwrap()
-        )
+            )?
+        );
+
+        Ok(())
     }
 }
