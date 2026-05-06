@@ -1,4 +1,6 @@
-use crate::cube_bridge::base_query_options::{FilterItem, OrderByItem, TimeDimension};
+use crate::cube_bridge::base_query_options::{
+    FilterItem, MaskedMemberItem, OrderByItem, TimeDimension,
+};
 use serde::de;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
@@ -44,7 +46,7 @@ pub struct YamlBaseQueryOptions {
     #[serde(default)]
     pub timezone: Option<String>,
     #[serde(default, rename = "maskedMembers")]
-    pub masked_members: Option<Vec<String>>,
+    pub masked_members: Option<Vec<MaskedMemberItem>>,
 }
 
 #[derive(Debug, Deserialize)]

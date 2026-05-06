@@ -245,6 +245,40 @@ module.exports = {
         },
       };
     }
+    if (user === 'conditional_mask_user') {
+      if (password && password !== 'conditional_mask_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'conditional_mask_user',
+            userAttributes: {},
+            roles: ['conditional_mask_role'],
+            groups: [],
+          },
+        },
+      };
+    }
+    if (user === 'conditional_mask_multi_user') {
+      if (password && password !== 'conditional_mask_multi_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'conditional_mask_multi_user',
+            userAttributes: {},
+            roles: ['conditional_mask_role', 'conditional_mask_role_extra'],
+            groups: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };

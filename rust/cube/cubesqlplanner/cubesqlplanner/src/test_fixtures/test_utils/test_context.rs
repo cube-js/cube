@@ -1,4 +1,4 @@
-use crate::cube_bridge::base_query_options::BaseQueryOptions;
+use crate::cube_bridge::base_query_options::{BaseQueryOptions, MaskedMemberItem};
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
@@ -78,7 +78,14 @@ impl TestContext {
         schema: MockSchema,
         masked_members: Vec<String>,
     ) -> Result<Self, CubeError> {
-        Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false, false)
+        let items: Vec<MaskedMemberItem> = masked_members
+            .into_iter()
+            .map(|member| MaskedMemberItem {
+                member,
+                filter: None,
+            })
+            .collect();
+        Self::new_with_options(schema, Tz::UTC, Some(items), None, false, false)
     }
 
     fn for_options(&self, options: &dyn BaseQueryOptions) -> Result<Self, CubeError> {
@@ -104,7 +111,7 @@ impl TestContext {
     fn new_with_options(
         schema: MockSchema,
         timezone: Tz,
-        masked_members: Option<Vec<String>>,
+        masked_members: Option<Vec<MaskedMemberItem>>,
         member_to_alias: Option<std::collections::HashMap<String, String>>,
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,

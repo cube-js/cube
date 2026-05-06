@@ -410,7 +410,7 @@ describe('Transpilers', () => {
       {
         measures: ['Test.count'],
         dimensions: ['Test.secret'],
-        maskedMembers: ['Test.secret'],
+        maskedMembers: [{ member: 'Test.secret' }],
       }
     );
     const sql = query.buildSqlAndParams();

@@ -1665,7 +1665,7 @@ cubes:
         {
           measures: ['orders.count'],
           dimensions: ['orders.status'],
-          maskedMembers: ['orders.status'],
+          maskedMembers: [{ member: 'orders.status' }],
           contextSymbols: {
             securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
           }
@@ -1806,7 +1806,7 @@ views:
         const query = new PostgresQuery(compilers, {
           measures: ['users_secure_view.users_count'],
           dimensions: ['users_secure_view.users_city_sensitive_masked'],
-          maskedMembers: ['users_secure_view.users_city_sensitive_masked'],
+          maskedMembers: [{ member: 'users_secure_view.users_city_sensitive_masked' }],
           contextSymbols: {
             securityContext: { cubeCloud: { groups } }
           },
@@ -1843,6 +1843,216 @@ views:
         const [sql] = await runBaseQuery('{users.city}', [], true);
         expect(sql).not.toMatch(/IN\s*\(\s*\)/);
       });
+    });
+  });
+
+  describe('Conditional masking with row-level filters (memberMaskFilters)', () => {
+    it('generates CASE WHEN with row filter for masked members that have conditional full access', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: data_region
+        sql: data_region
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{
+          member: 'users.city',
+          filter: {
+            member: 'users.data_region',
+            operator: 'equals',
+            values: ['RESEARCH', 'DEMO'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*data_region.*THEN.*city.*ELSE.*NULL.*END/s);
+    });
+
+    it('generates CASE WHEN with AND row filter for multiple filter conditions', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: data_region
+        sql: data_region
+        type: string
+      - name: region_lock
+        sql: region_lock
+        type: number
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{
+          member: 'users.city',
+          filter: {
+            and: [
+              {
+                member: 'users.data_region',
+                operator: 'equals',
+                values: ['RESEARCH'],
+              },
+              {
+                member: 'users.region_lock',
+                operator: 'equals',
+                values: ['0'],
+              }
+            ]
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*AND.*THEN.*city.*ELSE.*NULL.*END/s);
+    });
+
+    it('uses mask.sql as the ELSE branch when dimension has a custom mask', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+        mask:
+          sql: "'***MASKED***'"
+      - name: data_region
+        sql: data_region
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{
+          member: 'users.city',
+          filter: {
+            member: 'users.data_region',
+            operator: 'equals',
+            values: ['RESEARCH'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*data_region.*THEN.*city.*ELSE.*MASKED.*END/s);
+    });
+
+    it('applies regular masking (no CASE WHEN) when no memberMaskFilters', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{ member: 'users.city' }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).toContain('NULL');
+    });
+
+    it('does not recurse when filter member is also masked', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: items
+    sql_table: public.items
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: number
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['items.count'],
+        dimensions: ['items.product_id', 'items.price'],
+        maskedMembers: [
+          {
+            member: 'items.product_id',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+          {
+            member: 'items.price',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+        ],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/product_id/);
+      expect(sql).not.toMatch(/Maximum call stack/);
     });
   });
 });

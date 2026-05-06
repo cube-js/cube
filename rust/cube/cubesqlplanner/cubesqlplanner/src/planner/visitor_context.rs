@@ -60,6 +60,19 @@ impl VisitorContext {
         }
     }
 
+    pub fn new_with_node_processor(
+        query_tools: Rc<QueryTools>,
+        node_processor: Rc<dyn SqlNode>,
+    ) -> Self {
+        Self {
+            query_tools,
+            node_processor,
+            cube_ref_evaluator: Rc::new(CubeRefEvaluator::new(HashMap::new(), HashMap::new())),
+            all_filters: None,
+            filters_context: FiltersContext::default(),
+        }
+    }
+
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
         SqlEvaluatorVisitor::new(
             query_tools,

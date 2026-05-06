@@ -8,7 +8,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     cube_bridge::{
         base_query_options::{
-            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, OrderByItem, TimeDimension,
+            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, MaskedMemberItem, OrderByItem,
+            TimeDimension,
         },
         base_tools::BaseTools,
         evaluator::CubeEvaluator,
@@ -71,7 +72,7 @@ pub struct MockBaseQueryOptions {
     #[builder(default)]
     convert_tz_for_raw_time_dimension: Option<bool>,
     #[builder(default)]
-    masked_members: Option<Vec<String>>,
+    masked_members: Option<Vec<MaskedMemberItem>>,
     #[builder(default)]
     member_to_alias: Option<HashMap<String, String>>,
 }
