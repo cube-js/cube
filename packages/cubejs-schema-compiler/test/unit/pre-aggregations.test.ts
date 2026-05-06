@@ -795,7 +795,7 @@ describe('pre-aggregations', () => {
       await compiler.compile();
     });
 
-    it('generates loadSql for non-partitioned originalSql pre-aggregation', async () => {
+    it('generates sql and loadSql for non-partitioned originalSql pre-aggregation', async () => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['orders.count'],
         dimensions: ['orders.status'],
@@ -806,10 +806,14 @@ describe('pre-aggregations', () => {
       expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
       const originalSqlDesc = preAggregationsDescription.find((d: any) => d.type === 'originalSql');
       expect(originalSqlDesc).toBeDefined();
-      expect(originalSqlDesc.loadSql[0]).toMatch(/public\.orders/);
+
+      // preAggregationSql() must produce a valid SELECT from the sqlTable
+      expect(originalSqlDesc.sql[0]).toMatch(/SELECT \* FROM public\.orders/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/CREATE TABLE/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/SELECT \* FROM public\.orders/);
     });
 
-    it('generates loadSql for partitioned originalSql pre-aggregation', async () => {
+    it('generates sql and loadSql for partitioned originalSql pre-aggregation', async () => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['orders.count'],
         timeDimensions: [{
@@ -824,7 +828,11 @@ describe('pre-aggregations', () => {
       expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
       const originalSqlDesc = preAggregationsDescription.find((d: any) => d.type === 'originalSql');
       expect(originalSqlDesc).toBeDefined();
-      expect(originalSqlDesc.loadSql[0]).toMatch(/public\.orders/);
+
+      // preAggregationSql() must produce a valid SELECT from the sqlTable
+      expect(originalSqlDesc.sql[0]).toMatch(/SELECT \* FROM public\.orders/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/CREATE TABLE/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/SELECT \* FROM public\.orders/);
     });
   });
 });
