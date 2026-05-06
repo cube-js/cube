@@ -32,6 +32,28 @@ export type SegmentDefinition = {
   multiStage?: boolean;
 };
 
+export type MultiStageFilterIncludeMember = {
+  member: string;
+  operator: string;
+  values?: string[];
+};
+
+export type MultiStageFilterIncludeItem =
+  | MultiStageFilterIncludeMember
+  | { and: MultiStageFilterIncludeItem[] }
+  | { or: MultiStageFilterIncludeItem[] };
+
+export type MultiStageFilterDirective = {
+  mode?: 'relative' | 'fixed';
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: MultiStageFilterIncludeItem[];
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  // The native bridge reads these (not the function forms above).
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -60,28 +82,6 @@ export type TimeShiftDefinitionReference = {
   name?: string;
   interval?: string;
   type?: 'next' | 'prior';
-};
-
-export type MultiStageFilterIncludeMember = {
-  member: string;
-  operator: string;
-  values?: string[] | ((...args: Array<unknown>) => Array<ToString>);
-};
-
-export type MultiStageFilterIncludeItem =
-  | MultiStageFilterIncludeMember
-  | { and: MultiStageFilterIncludeItem[] }
-  | { or: MultiStageFilterIncludeItem[] };
-
-export type MultiStageFilterDirective = {
-  mode?: 'relative' | 'fixed';
-  exclude?: (...args: Array<unknown>) => Array<ToString>;
-  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
-  include?: MultiStageFilterIncludeItem[];
-  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
-  // The native bridge reads these (not the function forms above).
-  excludeReferences?: string[];
-  keepOnlyReferences?: string[];
 };
 
 export type MeasureDefinition = {

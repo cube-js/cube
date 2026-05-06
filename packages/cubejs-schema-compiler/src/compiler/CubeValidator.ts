@@ -812,12 +812,12 @@ const timeShiftItemOptional = Joi.object({
   .and('interval', 'type');
 
 // Top-level predicate inside `filter.include`: same shape as a query-time
-// filter. We can't share `PolicyFilterSchema` directly because it lives below
-// in the file — the schemas here mirror its operator set but allow `values`
-// as plain strings/arrays (cube schema authors typically write path strings
-// for include) on top of the existing function form. `member` is plain string
-// only: `CubePropContextTranspiler` does not transpile `filter.include[*].member`,
-// so a `CUBE.dim` reference cannot be turned into a function here.
+// filter. `member` and `values` are plain string/array only — neither
+// `filter.include[*].member` nor `filter.include[*].values` is covered by
+// `CubePropContextTranspiler.transpiledFieldsPatterns`, so a function form
+// here would never receive the `CUBE`/`SECURITY_CONTEXT` arguments and would
+// fail at runtime. Use the existing `accessPolicy.rowLevel.filters` if you
+// need dynamic predicates resolved against the security context.
 const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
   member: Joi.string().required(),
   operator: Joi.any().valid(
@@ -848,8 +848,8 @@ const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
   ).required(),
   values: Joi.when('operator', {
     is: Joi.valid('set', 'notSet'),
-    then: Joi.alternatives(Joi.array(), Joi.func()).optional(),
-    otherwise: Joi.alternatives(Joi.array(), Joi.func()).required()
+    then: Joi.array().optional(),
+    otherwise: Joi.array().required()
   })
 });
 

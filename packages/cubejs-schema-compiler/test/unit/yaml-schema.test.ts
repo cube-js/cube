@@ -1870,7 +1870,6 @@ cubes:
 
       await compilers.compiler.compile();
 
-
       const query = new PostgresQuery(compilers, {
         measures: ['users.count'],
         dimensions: ['users.city'],
