@@ -750,4 +750,81 @@ describe('pre-aggregations', () => {
       expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.pre_agg_with_multiplied_measures');
     });
   });
+
+  describe('originalSql pre-aggregation with sqlTable', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube(\`orders\`, {
+        sqlTable: \`public.orders\`,
+
+        measures: {
+          count: {
+            type: \`count\`,
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          status: {
+            sql: \`status\`,
+            type: \`string\`,
+          },
+          created_at: {
+            sql: \`created_at\`,
+            type: \`time\`,
+          },
+        },
+
+        preAggregations: {
+          main: {
+            type: \`originalSql\`,
+          },
+          partitioned: {
+            type: \`originalSql\`,
+            partitionGranularity: \`month\`,
+            timeDimension: CUBE.created_at,
+          },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('generates loadSql for non-partitioned originalSql pre-aggregation', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['orders.count'],
+        dimensions: ['orders.status'],
+        preAggregationsSchema: '',
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+      const originalSqlDesc = preAggregationsDescription.find((d: any) => d.type === 'originalSql');
+      expect(originalSqlDesc).toBeDefined();
+      expect(originalSqlDesc.loadSql[0]).toMatch(/public\.orders/);
+    });
+
+    it('generates loadSql for partitioned originalSql pre-aggregation', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['orders.count'],
+        timeDimensions: [{
+          dimension: 'orders.created_at',
+          granularity: 'month',
+          dateRange: ['2017-01-01', '2017-03-31'],
+        }],
+        preAggregationsSchema: '',
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+      const originalSqlDesc = preAggregationsDescription.find((d: any) => d.type === 'originalSql');
+      expect(originalSqlDesc).toBeDefined();
+      expect(originalSqlDesc.loadSql[0]).toMatch(/public\.orders/);
+    });
+  });
 });

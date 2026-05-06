@@ -4261,8 +4261,10 @@ export class BaseQuery {
             cube,
             preAggregation
           );
+          const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
+          const cubeSqlFn = cubeFromPath.sqlTable || cubeFromPath.sql;
           return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
-            () => originalSqlPreAggregationQuery.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
+            () => originalSqlPreAggregationQuery.evaluateSql(cube, cubeSqlFn),
             { preAggregationQuery: true, collectOriginalSqlPreAggregations }
           ));
         }
