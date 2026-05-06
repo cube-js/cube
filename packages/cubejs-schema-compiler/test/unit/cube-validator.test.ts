@@ -542,7 +542,6 @@ describe('Cube Validation', () => {
             filter: {
               mode: 'relative',
               exclude: () => [],
-              keepOnly: () => [],
               include: [
                 { member: 'cube.dim', operator: 'equals', values: ['x'] },
                 { or: [
@@ -679,6 +678,36 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
+    it('multi-stage filter — exclude and keepOnly are mutually exclusive', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          both_set: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: {
+              exclude: () => [],
+              keepOnly: () => [],
+            }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('exclude');
+          expect(message).toContain('keepOnly');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
     it('multi-stage filter — exclude must be a function', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
@@ -718,7 +747,6 @@ describe('Cube Validation', () => {
             sql: () => '',
             filter: {
               mode: 'fixed',
-              exclude: () => [],
               keepOnly: () => [],
               include: [{ member: 'cube.dim', operator: 'equals', values: ['x'] }],
             }

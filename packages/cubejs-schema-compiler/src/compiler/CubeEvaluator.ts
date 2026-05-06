@@ -62,7 +62,16 @@ export type TimeShiftDefinitionReference = {
   type?: 'next' | 'prior';
 };
 
-export type MultiStageFilterIncludeItem = any;
+export type MultiStageFilterIncludeMember = {
+  member: string;
+  operator: string;
+  values?: string[] | ((...args: Array<unknown>) => Array<ToString>);
+};
+
+export type MultiStageFilterIncludeItem =
+  | MultiStageFilterIncludeMember
+  | { and: MultiStageFilterIncludeItem[] }
+  | { or: MultiStageFilterIncludeItem[] };
 
 export type MultiStageFilterDirective = {
   mode?: 'relative' | 'fixed';

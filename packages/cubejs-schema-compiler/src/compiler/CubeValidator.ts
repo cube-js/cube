@@ -813,11 +813,13 @@ const timeShiftItemOptional = Joi.object({
 
 // Top-level predicate inside `filter.include`: same shape as a query-time
 // filter. We can't share `PolicyFilterSchema` directly because it lives below
-// in the file — the schemas here mirror its operator set but allow `member`
-// and `values` as plain strings/arrays (cube schema authors typically write
-// path strings for include) on top of the existing function form.
+// in the file — the schemas here mirror its operator set but allow `values`
+// as plain strings/arrays (cube schema authors typically write path strings
+// for include) on top of the existing function form. `member` is plain string
+// only: `CubePropContextTranspiler` does not transpile `filter.include[*].member`,
+// so a `CUBE.dim` reference cannot be turned into a function here.
 const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
-  member: Joi.alternatives(Joi.string(), Joi.func()).required(),
+  member: Joi.string().required(),
   operator: Joi.any().valid(
     'equals',
     'notEquals',
@@ -864,7 +866,7 @@ const MultiStageFilter = Joi.object().keys({
     MultiStageIncludeMemberFilterSchema,
     MultiStageIncludeConditionSchema
   ),
-});
+}).nand('exclude', 'keepOnly');
 
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
