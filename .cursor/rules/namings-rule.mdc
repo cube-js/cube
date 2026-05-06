@@ -51,6 +51,20 @@ Available on the [Enterprise plan](https://cube.dev/pricing).
 
 Place the callout immediately after the section heading it applies to.
 
+# Cube Cloud billing customer segments
+
+When describing how a Cube Cloud account is sold and billed (for example on
+billing settings, pricing, and support pages):
+
+- **On-demand customers** — subscribe on the on-demand payment plan
+  (recurring billing, typically by credit card). Legacy: "self-serve customers".
+- **Contract customers** — annual commit under a signed commercial agreement
+  (commit payment plan). Legacy: "order form customers".
+
+**Self-serve** remains the right term for analytics and product UX meaning
+(end users exploring data without filing tickets) — for example "self-serve
+analytics". That usage is unrelated to the billing segment above.
+
 # Infrastructure Naming
 
 Infrastructure options are a separate, orthogonal concept from deployment types.
