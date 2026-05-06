@@ -16,8 +16,9 @@ use crate::{app_metrics, CubeError};
 use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
-    HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpResultSet,
-    HttpResultSetArgs, HttpRow, HttpRowArgs,
+    HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpQueryResult,
+    HttpQueryResultArgs, HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultData,
+    HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs, QueryResultFormat,
 };
 use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
@@ -326,6 +327,7 @@ impl HttpServer {
                                     HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
                                     HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                                     HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
+                                    HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
                                 };
                                 log::error!(
                                     "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
@@ -406,6 +408,7 @@ impl HttpServer {
                             HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
                             HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                             HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
+                            HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
                         };
                         let res = HttpServer::process_command(
                             sql_service.clone(),
@@ -580,8 +583,9 @@ impl HttpServer {
                 inline_tables,
                 trace_obj,
                 parameters,
-            } => Ok(HttpCommand::ResultSet {
-                data_frame: sql_service
+                response_format,
+            } => {
+                let query_result = sql_service
                     .exec_query_with_context(
                         sql_query_context
                             .with_trace_obj(trace_obj)
@@ -589,10 +593,21 @@ impl HttpServer {
                             .with_parameters(&parameters),
                         &query,
                     )
-                    .await?
-                    .collect()
-                    .await?,
-            }),
+                    .await?;
+                match response_format {
+                    QueryResultFormat::Legacy => Ok(HttpCommand::ResultSet {
+                        data_frame: query_result.collect().await?,
+                    }),
+                    QueryResultFormat::Arrow => {
+                        let data = query_result.to_arrow_ipc_stream().await?;
+                        Ok(HttpCommand::QueryResultArrow { data })
+                    }
+                    other => Err(CubeError::user(format!(
+                        "Unsupported response_format: {:?}",
+                        other
+                    ))),
+                }
+            }
             x => Err(CubeError::user(format!("Unexpected command: {:?}", x))),
         }
     }
@@ -642,9 +657,16 @@ pub enum HttpCommand {
         inline_tables: InlineTables,
         trace_obj: Option<String>,
         parameters: Option<QueryParameters>,
+        response_format: QueryResultFormat,
     },
     ResultSet {
         data_frame: Arc<DataFrame>,
+    },
+    QueryResultArrow {
+        /// Pre-serialized Arrow IPC stream payload. May contain multiple
+        /// RecordBatch messages following the schema header; consumers must
+        /// decode it with a streaming IPC reader.
+        data: Vec<u8>,
     },
     CloseConnection {
         error: String,
@@ -663,6 +685,9 @@ impl HttpMessage {
             command_type: match self.command {
                 HttpCommand::Query { .. } => cubeshared::codegen::HttpCommand::HttpQuery,
                 HttpCommand::ResultSet { .. } => cubeshared::codegen::HttpCommand::HttpResultSet,
+                HttpCommand::QueryResultArrow { .. } => {
+                    cubeshared::codegen::HttpCommand::HttpQueryResult
+                }
                 HttpCommand::CloseConnection { .. } | HttpCommand::Error { .. } => {
                     cubeshared::codegen::HttpCommand::HttpError
                 }
@@ -673,6 +698,7 @@ impl HttpMessage {
                     inline_tables,
                     trace_obj,
                     parameters,
+                    response_format,
                 } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
@@ -693,6 +719,29 @@ impl HttpMessage {
                                 inline_tables: None,
                                 trace_obj: trace_obj_offset,
                                 parameters: None,
+                                response_format: *response_format,
+                            },
+                        )
+                        .as_union_value(),
+                    )
+                }
+                HttpCommand::QueryResultArrow { data } => {
+                    let payload = builder.create_vector(data);
+                    let arrow_table = HttpQueryResultArrow::create(
+                        &mut builder,
+                        &HttpQueryResultArrowArgs {
+                            data: Some(payload),
+                            // We don't support streaming for now, but clients should implement it
+                            // according to the protocol specification
+                            is_last: true,
+                        },
+                    );
+                    Some(
+                        HttpQueryResult::create(
+                            &mut builder,
+                            &HttpQueryResultArgs {
+                                data_type: HttpQueryResultData::HttpQueryResultArrow,
+                                data: Some(arrow_table.as_union_value()),
                             },
                         )
                         .as_union_value(),
@@ -929,6 +978,7 @@ impl HttpMessage {
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                         inline_tables,
                         parameters,
+                        response_format: query.response_format(),
                     }
                 }
                 cubeshared::codegen::HttpCommand::HttpResultSet => {
@@ -999,6 +1049,7 @@ mod tests {
     use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
     use log::trace;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1021,7 +1072,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn query_test() {
+    async fn query_test() -> Result<(), CubeError> {
         let message = HttpMessage {
             message_id: 1234,
             command: HttpCommand::Query {
@@ -1029,18 +1080,18 @@ mod tests {
                 inline_tables: vec![],
                 trace_obj: Some("test trace".to_string()),
                 parameters: None,
+                response_format: QueryResultFormat::Legacy,
             },
             connection_id: Some("foo".to_string()),
         };
         let bytes = message.bytes();
-        let output_message = HttpMessage::read(root_as_http_message(&bytes).unwrap())
-            .await
-            .unwrap();
+        let output_message = HttpMessage::read(root_as_http_message(&bytes)?).await?;
         assert_eq!(message, output_message);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn inline_tables_query_test() {
+    async fn inline_tables_query_test() -> Result<(), CubeError> {
         let columns = vec![
             Column::new("A".to_string(), ColumnType::Int, 0),
             Column::new("B".to_string(), ColumnType::String, 1),
@@ -1100,6 +1151,7 @@ mod tests {
                 inline_tables: Some(inline_tables_offset),
                 trace_obj: None,
                 parameters: None,
+                response_format: QueryResultFormat::Legacy,
             },
         );
         let args = HttpMessageArgs {
@@ -1111,9 +1163,7 @@ mod tests {
         let message = cubeshared::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         let bytes = builder.finished_data().to_vec();
-        let message = HttpMessage::read(root_as_http_message(&bytes).unwrap())
-            .await
-            .unwrap();
+        let message = HttpMessage::read(root_as_http_message(&bytes)?).await?;
         assert_eq!(
             message,
             HttpMessage {
@@ -1126,11 +1176,168 @@ mod tests {
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],
                     trace_obj: None,
-                    parameters: None
+                    parameters: None,
+                    response_format: QueryResultFormat::Legacy,
                 },
                 connection_id: Some("foo".to_string()),
             }
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn arrow_response_format_round_trip() -> Result<(), CubeError> {
+        use crate::queryplanner::query_executor::batches_to_dataframe;
+        use crate::sql::{timestamp_from_string, QueryResult};
+        use crate::util::decimal::{Decimal, Decimal96};
+        use crate::util::int96::Int96;
+        use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
+        use datafusion::arrow::ipc::reader::StreamReader;
+        use datafusion::arrow::record_batch::RecordBatch;
+
+        // 1. Build a DataFrame with every TableValue variant + nulls.
+        let columns = vec![
+            Column::new("c_string".to_string(), ColumnType::String, 0),
+            Column::new("c_int".to_string(), ColumnType::Int, 1),
+            Column::new("c_int96".to_string(), ColumnType::Int96, 2),
+            Column::new(
+                "c_decimal".to_string(),
+                ColumnType::Decimal {
+                    scale: 4,
+                    precision: 18,
+                },
+                3,
+            ),
+            Column::new(
+                "c_decimal96".to_string(),
+                ColumnType::Decimal96 {
+                    scale: 6,
+                    precision: 38,
+                },
+                4,
+            ),
+            Column::new("c_float".to_string(), ColumnType::Float, 5),
+            Column::new("c_bytes".to_string(), ColumnType::Bytes, 6),
+            Column::new("c_timestamp".to_string(), ColumnType::Timestamp, 7),
+            Column::new("c_bool".to_string(), ColumnType::Boolean, 8),
+        ];
+        let rows = vec![
+            Row::new(vec![
+                TableValue::String("hello".to_string()),
+                TableValue::Int(42),
+                TableValue::Int96(Int96::new(123_456_789_012_345_i128)),
+                TableValue::Decimal(Decimal::new(12345)),
+                TableValue::Decimal96(Decimal96::new(67890)),
+                TableValue::Float(3.5_f64.into()),
+                TableValue::Bytes(vec![0x01, 0x02, 0x03]),
+                TableValue::Timestamp(timestamp_from_string("2024-01-15T10:30:45.123Z")?),
+                TableValue::Boolean(true),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+            ]),
+        ];
+        let original_df = Arc::new(DataFrame::new(columns.clone(), rows));
+
+        // 2. Drive process_command with response_format = Arrow.
+        struct StubService(Arc<DataFrame>);
+        crate::di_service!(StubService, [SqlService]);
+        #[async_trait]
+        impl SqlService for StubService {
+            async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+                unimplemented!("Mock")
+            }
+            async fn exec_query_with_context(
+                &self,
+                _ctx: SqlQueryContext,
+                _q: &str,
+            ) -> Result<QueryResult, CubeError> {
+                Ok(QueryResult::Frame(self.0.clone()))
+            }
+            async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+                unimplemented!("Mock")
+            }
+            async fn plan_query_with_context(
+                &self,
+                _ctx: SqlQueryContext,
+                _q: &str,
+            ) -> Result<QueryPlans, CubeError> {
+                unimplemented!("Mock")
+            }
+            async fn upload_temp_file(
+                &self,
+                _ctx: SqlQueryContext,
+                _name: String,
+                _path: &Path,
+            ) -> Result<(), CubeError> {
+                unimplemented!("Mock")
+            }
+            async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+                unimplemented!("Mock")
+            }
+        }
+
+        let svc = Arc::new(StubService(original_df.clone()));
+        let resp = HttpServer::process_command(
+            svc,
+            SqlQueryContext::default(),
+            HttpCommand::Query {
+                query: "select 1".to_string(),
+                inline_tables: vec![],
+                trace_obj: None,
+                parameters: None,
+                response_format: QueryResultFormat::Arrow,
+            },
+        )
+        .await?;
+        let arrow_bytes = match resp {
+            HttpCommand::QueryResultArrow { data } => data,
+            other => panic!("expected QueryResultArrow, got: {:?}", other),
+        };
+
+        // 3. Round-trip through HttpMessage::bytes() and verify the wire shape.
+        let wire = HttpMessage {
+            message_id: 99,
+            command: HttpCommand::QueryResultArrow {
+                data: arrow_bytes.clone(),
+            },
+            connection_id: None,
+        }
+        .bytes();
+        let parsed = root_as_http_message(&wire)?;
+        assert_eq!(
+            parsed.command_type(),
+            cubeshared::codegen::HttpCommand::HttpQueryResult
+        );
+        let result = parsed.command_as_http_query_result().unwrap();
+        assert_eq!(
+            result.data_type(),
+            HttpQueryResultData::HttpQueryResultArrow
+        );
+        let arrow = result.data_as_http_query_result_arrow().unwrap();
+        let payload: Vec<u8> = arrow.data().iter().collect();
+        assert_eq!(payload, arrow_bytes);
+
+        // 4. Decode the Arrow IPC stream, round-trip back to a DataFrame
+        let reader = StreamReader::try_new(std::io::Cursor::new(payload), None).unwrap();
+        let batches: Vec<RecordBatch> = reader.collect::<Result<_, _>>().unwrap();
+
+        let decoded = batches_to_dataframe(batches)?;
+        // we don't compare directly both dataframes, because there is a difference with decimal96
+        assert_eq!(decoded.get_columns().len(), original_df.get_columns().len());
+        assert_eq!(decoded.get_rows().len(), original_df.get_rows().len());
+
+        insta::assert_snapshot!("arrow_response_format_round_trip", decoded.print());
+
+        Ok(())
     }
 
     pub struct SqlServiceMock {
@@ -1191,7 +1398,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ws_test() {
+    async fn ws_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
         let sql_service = SqlServiceMock {
@@ -1241,6 +1448,7 @@ mod tests {
                             inline_tables: vec![],
                             trace_obj: None,
                             parameters: None,
+                            response_format: QueryResultFormat::Legacy,
                         },
                         connection_id,
                     }
@@ -1370,5 +1578,6 @@ mod tests {
         assert_message(&mut socket2, "10").await;
 
         http_server.stop_processing().await;
+        Ok(())
     }
 }

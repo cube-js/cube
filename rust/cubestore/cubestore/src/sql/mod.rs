@@ -119,6 +119,52 @@ impl QueryResult {
             }
         }
     }
+
+    pub async fn to_arrow_ipc_stream(self) -> Result<Vec<u8>, CubeError> {
+        // It's used to handle conversion + write in single spawn_blocking
+        enum Pending {
+            // CPU-bound task should be converted on spawn_blocking
+            Frame(Arc<DataFrame>),
+            Batches {
+                schema: SchemaRef,
+                batches: Vec<RecordBatch>,
+            },
+        }
+        let pending = match self {
+            QueryResult::Frame(df) => Pending::Frame(df),
+            QueryResult::Stream { schema, batches } => Pending::Batches {
+                schema,
+                batches: batches.try_collect().await?,
+            },
+        };
+
+        cube_ext::spawn_blocking(move || -> Result<Vec<u8>, CubeError> {
+            use datafusion::arrow::ipc::writer::StreamWriter;
+            use std::io::Cursor;
+
+            let (schema, batches) = match pending {
+                Pending::Frame(df) => {
+                    let schema = df.get_schema();
+                    let arrays = data::rows_to_columns(df.get_columns(), df.get_rows());
+                    let batch = RecordBatch::try_new(schema.clone(), arrays)?;
+                    (schema, vec![batch])
+                }
+                Pending::Batches { schema, batches } => (schema, batches),
+            };
+
+            let mut writer = StreamWriter::try_new(Cursor::new(Vec::new()), schema.as_ref())?;
+
+            // Writes multiple batches, because it's Arrow IPC stream format, client should handle it
+            for batch in &batches {
+                writer.write(batch)?;
+            }
+
+            writer.finish()?;
+
+            Ok(writer.into_inner()?.into_inner())
+        })
+        .await?
+    }
 }
 
 impl std::fmt::Debug for QueryResult {

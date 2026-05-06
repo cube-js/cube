@@ -51,6 +51,9 @@
     "extends": "../../packages/cubejs-linter"
   },
   "jest": {
+    "roots": [
+      "<rootDir>/dist"
+    ],
     "testMatch": [
       "<rootDir>/dist/test/*.(test|spec).(js)"
     ],

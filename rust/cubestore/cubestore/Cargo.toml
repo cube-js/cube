@@ -108,6 +108,7 @@ anyhow = "1.0"
 arc-swap = "1.7.1"
 object_store = "0.11.1"
 prost = "0.13.1"
+comfy-table = "7.2.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
@@ -125,6 +126,7 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 pretty_assertions = "0.7.1"
 criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
 md5 = "0.8.0"
+insta = "1.34"
 
 [[bench]]
 name = "cachestore_queue"

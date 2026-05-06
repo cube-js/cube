@@ -1,7 +1,8 @@
 union HttpCommand {
     HttpQuery,
     HttpResultSet,
-    HttpError
+    HttpError,
+    HttpQueryResult
 }
 
 table HttpMessage {
@@ -22,11 +23,18 @@ table HttpParameter {
     value: HttpParameterValue (required);
 }
 
+enum QueryResultFormat: ubyte {
+    // HttpResultSet will be returned.
+    Legacy = 0,
+    Arrow = 1,
+}
+
 table HttpQuery {
     query: string;
     trace_obj: string;
     inline_tables: [HttpTable];
     parameters: [HttpParameter];
+    response_format: QueryResultFormat = Legacy;
 }
 
 table HttpTable {
@@ -52,6 +60,23 @@ table HttpRow {
 
 table HttpColumnValue {
     string_value: string;
+}
+
+table HttpQueryResultArrow {
+    // Self-contained Arrow IPC stream payload. Contains a schema header
+    // followed by one or more RecordBatch messages. Consumers must use a
+    // streaming IPC reader (not assume a single batch).
+    data: [ubyte] (required);
+    // True on the final frame of a streamed result.
+    is_last: bool;
+}
+
+union HttpQueryResultData {
+    HttpQueryResultArrow,
+}
+
+table HttpQueryResult {
+    data: HttpQueryResultData (required);
 }
 
 root_type HttpMessage;
