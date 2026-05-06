@@ -3316,7 +3316,7 @@ export class BaseQuery {
         if (!isMeasure || !isUngrouped || !hasSqlMask) {
           const maskFilter = this.memberMaskFilters && this.memberMaskFilters[memberPath];
           if (maskFilter) {
-            return this.conditionalMemberMaskSql(cubeName, name, symbol, memberPathArray, maskFilter);
+            return this.conditionalMemberMaskSql(cubeName, name, symbol, maskFilter);
           }
           return this.memberMaskSql(cubeName, name, symbol);
         }
@@ -3498,7 +3498,7 @@ export class BaseQuery {
     return this.defaultMaskSql(symbol.type);
   }
 
-  conditionalMemberMaskSql(cubeName, name, symbol, memberPathArray, maskFilter) {
+  conditionalMemberMaskSql(cubeName, name, symbol, maskFilter) {
     const maskedSql = this.memberMaskSql(cubeName, name, symbol);
     const result = this.evaluateSymbolSqlWithContext(
       () => {
