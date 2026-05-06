@@ -41,3 +41,13 @@ cubes:
               operator: lte
               values:
                 - "3"
+
+      - role: "conditional_mask_role_extra"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: equals
+              values:
+                - "5"

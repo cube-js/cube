@@ -532,6 +532,43 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
+   * Multiple conditional policies use OR across policies:
+   *   - role "conditional_mask_role": product_id <= 3
+   *   - role "conditional_mask_role_extra": product_id = 5
+   *
+   * For conditional_mask_multi_user (both roles):
+   *   Unmasked when product_id <= 3 OR product_id = 5, masked otherwise.
+   */
+  describe('RBAC conditional masking with multiple policies (OR across policies)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('conditional_mask_multi_user', 'conditional_mask_multi_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('unmasked when any policy filter matches (OR across policies)', async () => {
+      const res = await connection.query(
+        'SELECT product_id, price FROM conditional_masking_test ORDER BY product_id LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        const pid = Number(row.product_id);
+        if (pid <= 3 || pid === 5) {
+          // Matches either policy filter → unmasked
+          expect(Number(row.price)).not.toBe(-1);
+        } else {
+          // Matches neither policy filter → masked
+          expect(Number(row.price)).toBe(-1);
+        }
+      }
+    });
+  });
+
+  /**
    * View masking tests — masking follows the RLS pattern and is applied at
    * both cube and view levels. If a cube masks a member, it stays masked
    * even when accessed through a view that grants full access.
