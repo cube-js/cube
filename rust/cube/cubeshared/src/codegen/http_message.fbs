@@ -63,7 +63,9 @@ table HttpColumnValue {
 }
 
 table HttpQueryResultArrow {
-    // Self-contained Arrow IPC stream payload for a single RecordBatch.
+    // Self-contained Arrow IPC stream payload. Contains a schema header
+    // followed by one or more RecordBatch messages. Consumers must use a
+    // streaming IPC reader (not assume a single batch).
     data: [ubyte] (required);
     // True on the final frame of a streamed result.
     is_last: bool;

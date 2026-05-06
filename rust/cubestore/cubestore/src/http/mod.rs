@@ -663,7 +663,9 @@ pub enum HttpCommand {
         data_frame: Arc<DataFrame>,
     },
     QueryResultArrow {
-        /// Pre-serialized Arrow IPC stream payload.
+        /// Pre-serialized Arrow IPC stream payload. May contain multiple
+        /// RecordBatch messages following the schema header; consumers must
+        /// decode it with a streaming IPC reader.
         data: Vec<u8>,
     },
     CloseConnection {
@@ -1047,6 +1049,7 @@ mod tests {
     use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
     use log::trace;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1184,16 +1187,13 @@ mod tests {
 
     #[tokio::test]
     async fn arrow_response_format_round_trip() -> Result<(), CubeError> {
+        use crate::queryplanner::query_executor::batches_to_dataframe;
         use crate::sql::{timestamp_from_string, QueryResult};
         use crate::util::decimal::{Decimal, Decimal96};
         use crate::util::int96::Int96;
         use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
-        use datafusion::arrow::array::{
-            Array, BinaryArray, BooleanArray, Decimal128Array, Float64Array, Int64Array,
-            StringArray, TimestampMicrosecondArray,
-        };
-        use datafusion::arrow::datatypes::{DataType, TimeUnit};
         use datafusion::arrow::ipc::reader::StreamReader;
+        use datafusion::arrow::record_batch::RecordBatch;
 
         // 1. Build a DataFrame with every TableValue variant + nulls.
         let columns = vec![
@@ -1221,7 +1221,6 @@ mod tests {
             Column::new("c_timestamp".to_string(), ColumnType::Timestamp, 7),
             Column::new("c_bool".to_string(), ColumnType::Boolean, 8),
         ];
-        let ts = timestamp_from_string("2024-01-15T10:30:45.123Z").unwrap();
         let rows = vec![
             Row::new(vec![
                 TableValue::String("hello".to_string()),
@@ -1231,7 +1230,7 @@ mod tests {
                 TableValue::Decimal96(Decimal96::new(67890)),
                 TableValue::Float(3.5_f64.into()),
                 TableValue::Bytes(vec![0x01, 0x02, 0x03]),
-                TableValue::Timestamp(ts.clone()),
+                TableValue::Timestamp(timestamp_from_string("2024-01-15T10:30:45.123Z")?),
                 TableValue::Boolean(true),
             ]),
             Row::new(vec![
@@ -1246,7 +1245,7 @@ mod tests {
                 TableValue::Null,
             ]),
         ];
-        let data_frame = Arc::new(DataFrame::new(columns.clone(), rows));
+        let original_df = Arc::new(DataFrame::new(columns.clone(), rows));
 
         // 2. Drive process_command with response_format = Arrow.
         struct StubService(Arc<DataFrame>);
@@ -1254,7 +1253,7 @@ mod tests {
         #[async_trait]
         impl SqlService for StubService {
             async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
-                todo!()
+                unimplemented!("Mock")
             }
             async fn exec_query_with_context(
                 &self,
@@ -1264,14 +1263,14 @@ mod tests {
                 Ok(QueryResult::Frame(self.0.clone()))
             }
             async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
-                todo!()
+                unimplemented!("Mock")
             }
             async fn plan_query_with_context(
                 &self,
                 _ctx: SqlQueryContext,
                 _q: &str,
             ) -> Result<QueryPlans, CubeError> {
-                todo!()
+                unimplemented!("Mock")
             }
             async fn upload_temp_file(
                 &self,
@@ -1279,13 +1278,14 @@ mod tests {
                 _name: String,
                 _path: &Path,
             ) -> Result<(), CubeError> {
-                todo!()
+                unimplemented!("Mock")
             }
             async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
-                todo!()
+                unimplemented!("Mock")
             }
         }
-        let svc = Arc::new(StubService(data_frame.clone()));
+
+        let svc = Arc::new(StubService(original_df.clone()));
         let resp = HttpServer::process_command(
             svc,
             SqlQueryContext::default(),
@@ -1297,8 +1297,7 @@ mod tests {
                 response_format: QueryResultFormat::Arrow,
             },
         )
-        .await
-        .unwrap();
+        .await?;
         let arrow_bytes = match resp {
             HttpCommand::QueryResultArrow { data } => data,
             other => panic!("expected QueryResultArrow, got: {:?}", other),
@@ -1313,7 +1312,7 @@ mod tests {
             connection_id: None,
         }
         .bytes();
-        let parsed = root_as_http_message(&wire).unwrap();
+        let parsed = root_as_http_message(&wire)?;
         assert_eq!(
             parsed.command_type(),
             cubeshared::codegen::HttpCommand::HttpQueryResult
@@ -1327,100 +1326,17 @@ mod tests {
         let payload: Vec<u8> = arrow.data().iter().collect();
         assert_eq!(payload, arrow_bytes);
 
-        // 4. Decode the Arrow IPC stream and verify schema + values.
-        let mut reader = StreamReader::try_new(std::io::Cursor::new(payload), None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-        assert_eq!(batch.num_rows(), 2);
-        assert_eq!(batch.num_columns(), columns.len());
-        assert!(reader.next().is_none());
+        // 4. Decode the Arrow IPC stream, round-trip back to a DataFrame
+        let reader = StreamReader::try_new(std::io::Cursor::new(payload), None).unwrap();
+        let batches: Vec<RecordBatch> = reader.collect::<Result<_, _>>().unwrap();
 
-        let schema = batch.schema();
-        assert_eq!(schema.field(0).name(), "c_string");
-        assert_eq!(schema.field(0).data_type(), &DataType::Utf8);
-        assert_eq!(schema.field(1).data_type(), &DataType::Int64);
-        assert_eq!(schema.field(2).data_type(), &DataType::Decimal128(38, 0));
-        assert_eq!(schema.field(3).data_type(), &DataType::Decimal128(18, 4));
-        assert_eq!(schema.field(4).data_type(), &DataType::Decimal128(38, 6));
-        assert_eq!(schema.field(5).data_type(), &DataType::Float64);
-        assert_eq!(schema.field(6).data_type(), &DataType::Binary);
-        assert_eq!(
-            schema.field(7).data_type(),
-            &DataType::Timestamp(TimeUnit::Microsecond, None)
-        );
-        assert_eq!(schema.field(8).data_type(), &DataType::Boolean);
+        let decoded = batches_to_dataframe(batches)?;
+        // we don't compare directly both dataframes, because there is a difference with decimal96
+        assert_eq!(decoded.get_columns().len(), original_df.get_columns().len());
+        assert_eq!(decoded.get_rows().len(), original_df.get_rows().len());
 
-        let strings = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        assert_eq!(strings.value(0), "hello");
-        assert!(strings.is_null(1));
+        insta::assert_snapshot!("arrow_response_format_round_trip", decoded.print());
 
-        let ints = batch
-            .column(1)
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .unwrap();
-        assert_eq!(ints.value(0), 42);
-        assert!(ints.is_null(1));
-
-        let int96 = batch
-            .column(2)
-            .as_any()
-            .downcast_ref::<Decimal128Array>()
-            .unwrap();
-        assert_eq!(int96.value(0), 123_456_789_012_345_i128);
-        assert!(int96.is_null(1));
-
-        let dec = batch
-            .column(3)
-            .as_any()
-            .downcast_ref::<Decimal128Array>()
-            .unwrap();
-        assert_eq!(dec.value(0), 12345_i128);
-        assert!(dec.is_null(1));
-
-        let dec96 = batch
-            .column(4)
-            .as_any()
-            .downcast_ref::<Decimal128Array>()
-            .unwrap();
-        assert_eq!(dec96.value(0), 67890_i128);
-        assert!(dec96.is_null(1));
-
-        let floats = batch
-            .column(5)
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .unwrap();
-        assert_eq!(floats.value(0), 3.5);
-        assert!(floats.is_null(1));
-
-        let bytes_col = batch
-            .column(6)
-            .as_any()
-            .downcast_ref::<BinaryArray>()
-            .unwrap();
-        assert_eq!(bytes_col.value(0), &[0x01u8, 0x02, 0x03]);
-        assert!(bytes_col.is_null(1));
-
-        let timestamps = batch
-            .column(7)
-            .as_any()
-            .downcast_ref::<TimestampMicrosecondArray>()
-            .unwrap();
-        // append_value divides nanoseconds by 1000 to get microseconds.
-        assert_eq!(timestamps.value(0), ts.get_time_stamp() / 1000);
-        assert!(timestamps.is_null(1));
-
-        let bools = batch
-            .column(8)
-            .as_any()
-            .downcast_ref::<BooleanArray>()
-            .unwrap();
-        assert_eq!(bools.value(0), true);
-        assert!(bools.is_null(1));
         Ok(())
     }
 
