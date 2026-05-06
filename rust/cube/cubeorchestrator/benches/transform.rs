@@ -8,6 +8,11 @@ use cubeorchestrator::transport::{
     ConfigItem, JsRawColumnarData, MemberOrMemberExpression, NormalizedQuery, QueryType,
     ResultType, TransformDataRequest,
 };
+use cubeshared::codegen::{
+    HttpColumnValue, HttpColumnValueArgs, HttpCommand, HttpMessage, HttpMessageArgs, HttpResultSet,
+    HttpResultSetArgs, HttpRow, HttpRowArgs,
+};
+use cubeshared::flatbuffers::FlatBufferBuilder;
 
 const ROW_COUNTS: &[usize] = &[1_000, 10_000, 50_000, 100_000];
 const COLUMN_COUNTS: &[usize] = &[8, 16, 32, 64];
@@ -366,8 +371,90 @@ fn bench_from_js_raw_data(c: &mut Criterion) {
     group.finish();
 }
 
+/// Build a FlatBuffer `HttpMessage` payload mirroring CubeStore's wire format
+/// for `from_cubestore_fb` to parse. Cells are 16-character strings to give
+/// a realistic per-cell allocation cost.
+fn build_cubestore_fb_message(num_rows: usize, num_columns: usize) -> Vec<u8> {
+    let mut builder = FlatBufferBuilder::new();
+
+    let column_names: Vec<_> = (0..num_columns)
+        .map(|i| builder.create_string(&format!("column_{:02}", i)))
+        .collect();
+
+    let mut rows_vec = Vec::with_capacity(num_rows);
+    for row_idx in 0..num_rows {
+        let mut values_vec = Vec::with_capacity(num_columns);
+        for col_idx in 0..num_columns {
+            let value_str = builder.create_string(&format!("r{:08}_c{:04}", row_idx, col_idx));
+            let col_value = HttpColumnValue::create(
+                &mut builder,
+                &HttpColumnValueArgs {
+                    string_value: Some(value_str),
+                },
+            );
+            values_vec.push(col_value);
+        }
+        let values_vector = builder.create_vector(&values_vec);
+        let row = HttpRow::create(
+            &mut builder,
+            &HttpRowArgs {
+                values: Some(values_vector),
+            },
+        );
+        rows_vec.push(row);
+    }
+
+    let columns_vector = builder.create_vector(&column_names);
+    let rows_vector = builder.create_vector(&rows_vec);
+    let result_set = HttpResultSet::create(
+        &mut builder,
+        &HttpResultSetArgs {
+            columns: Some(columns_vector),
+            rows: Some(rows_vector),
+        },
+    );
+
+    let connection_id = builder.create_string("bench_connection");
+    let message = HttpMessage::create(
+        &mut builder,
+        &HttpMessageArgs {
+            message_id: 1,
+            command_type: HttpCommand::HttpResultSet,
+            command: Some(result_set.as_union_value()),
+            connection_id: Some(connection_id),
+        },
+    );
+
+    builder.finish(message, None);
+    builder.finished_data().to_vec()
+}
+
+/// Bench `QueryResult::from_cubestore_fb`: parse a FlatBuffer HttpResultSet
+/// into the in-memory `QueryResult`. Throughput in cells/sec.
+fn bench_from_cubestore_fb(c: &mut Criterion) {
+    let mut group = c.benchmark_group("QueryResult::from_cubestore_fb");
+
+    for &col_count in COLUMN_COUNTS {
+        for &row_count in ROW_COUNTS {
+            let msg = build_cubestore_fb_message(row_count, col_count);
+            let id = format!("c{:02}_r{}", col_count, row_count);
+            group.throughput(Throughput::Elements((row_count * col_count) as u64));
+            group.bench_with_input(BenchmarkId::from_parameter(id), &(), |b, _| {
+                b.iter(|| {
+                    let result =
+                        QueryResult::from_cubestore_fb(black_box(&msg)).expect("from_cubestore_fb");
+                    black_box(result);
+                });
+            });
+        }
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
+    bench_from_cubestore_fb,
     bench_transform,
     bench_transform_time_scenarios,
     bench_from_js_raw_data

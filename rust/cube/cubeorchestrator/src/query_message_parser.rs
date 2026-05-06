@@ -32,20 +32,39 @@ impl std::error::Error for ParseError {}
 #[derive(Debug, Clone)]
 pub struct QueryResult {
     pub members: Vec<String>,
-    pub rows: Vec<Vec<DBResponsePrimitive>>,
     pub columns_pos: IndexMap<String, usize>,
+    pub row_count: usize,
+    pub data: Vec<Vec<DBResponsePrimitive>>,
 }
 
 impl Finalize for QueryResult {}
 
 impl QueryResult {
-    pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
-        let mut result = QueryResult {
+    pub fn empty() -> Self {
+        QueryResult {
             members: vec![],
-            rows: vec![],
             columns_pos: IndexMap::new(),
-        };
+            row_count: 0,
+            data: vec![],
+        }
+    }
 
+    #[inline]
+    pub fn row_count(&self) -> usize {
+        self.row_count
+    }
+
+    #[inline]
+    pub fn column(&self, idx: usize) -> &[DBResponsePrimitive] {
+        &self.data[idx]
+    }
+
+    #[inline]
+    pub fn cell(&self, row: usize, col: usize) -> &DBResponsePrimitive {
+        &self.data[col][row]
+    }
+
+    pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
         let opts = VerifierOptions {
             max_tables: 10_000_000,     // Support up to 10M tables
             max_apparent_size: 1 << 31, // 2GB limit for large datasets
@@ -68,6 +87,8 @@ impl QueryResult {
                     .command_as_http_result_set()
                     .ok_or(ParseError::EmptyResultSet)?;
 
+                let mut result = QueryResult::empty();
+
                 if let Some(result_set_columns) = result_set.columns() {
                     if result_set_columns.iter().any(|c| c.is_empty()) {
                         return Err(ParseError::ColumnNameNotDefined);
@@ -85,21 +106,32 @@ impl QueryResult {
                     result.columns_pos = columns_pos;
                 }
 
+                let n_cols = result.members.len();
+
                 if let Some(result_set_rows) = result_set.rows() {
-                    result.rows = Vec::with_capacity(result_set_rows.len());
+                    let row_count = result_set_rows.len();
+                    result.row_count = row_count;
+                    result.data = (0..n_cols).map(|_| Vec::with_capacity(row_count)).collect();
 
                     for row in result_set_rows.iter() {
                         let values = row.values().ok_or(ParseError::NullRow)?;
-                        let row_obj: Vec<_> = values
-                            .iter()
-                            .map(|val| match val.string_value() {
+                        for (col_idx, val) in values.iter().enumerate() {
+                            if col_idx >= n_cols {
+                                break;
+                            }
+                            let cell = match val.string_value() {
                                 Some(s) => DBResponsePrimitive::String(s.to_owned()),
                                 None => DBResponsePrimitive::Null,
-                            })
-                            .collect();
-
-                        result.rows.push(row_obj);
+                            };
+                            result.data[col_idx].push(cell);
+                        }
+                        // Pad short rows with Null to keep all columns aligned.
+                        for col_idx in values.len()..n_cols {
+                            result.data[col_idx].push(DBResponsePrimitive::Null);
+                        }
                     }
+                } else {
+                    result.data = (0..n_cols).map(|_| Vec::new()).collect();
                 }
 
                 Ok(result)
@@ -112,11 +144,7 @@ impl QueryResult {
         let JsRawColumnarData { members, columns } = js_raw_data;
 
         if members.is_empty() {
-            return Ok(QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            });
+            return Ok(QueryResult::empty());
         }
 
         let columns_pos: IndexMap<String, usize> = members
@@ -126,25 +154,14 @@ impl QueryResult {
             .collect();
 
         let row_count = columns.first().map(|c| c.len()).unwrap_or(0);
-        // Transpose column-major input into the row-major shape `QueryResult`
-        // expects. Rows are pre-allocated, then we drain each column into the
-        // matching slot to avoid per-cell clones.
-        let mut rows: Vec<Vec<DBResponsePrimitive>> = (0..row_count)
-            .map(|_| Vec::with_capacity(members.len()))
-            .collect();
-
-        for column in columns.into_iter() {
-            for (row_idx, value) in column.into_iter().enumerate() {
-                if let Some(row) = rows.get_mut(row_idx) {
-                    row.push(value);
-                }
-            }
-        }
+        // JS already gives us column-major data; keep it that way directly.
+        let data: Vec<Vec<DBResponsePrimitive>> = columns;
 
         Ok(QueryResult {
             members,
-            rows,
             columns_pos,
+            row_count,
+            data,
         })
     }
 }
@@ -230,7 +247,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 5);
-        assert_eq!(query_result.rows.len(), 10);
+        assert_eq!(query_result.row_count, 10);
+        assert_eq!(query_result.data.len(), 5);
+        assert!(query_result.data.iter().all(|c| c.len() == 10));
     }
 
     #[test]
@@ -242,7 +261,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 20);
-        assert_eq!(query_result.rows.len(), 1000);
+        assert_eq!(query_result.row_count, 1000);
+        assert_eq!(query_result.data.len(), 20);
+        assert!(query_result.data.iter().all(|c| c.len() == 1000));
     }
 
     #[test]
@@ -255,7 +276,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 30);
-        assert_eq!(query_result.rows.len(), 10_000);
+        assert_eq!(query_result.row_count, 10_000);
+        assert_eq!(query_result.data.len(), 30);
+        assert!(query_result.data.iter().all(|c| c.len() == 10_000));
     }
 
     #[test]
@@ -267,7 +290,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 40);
-        assert_eq!(query_result.rows.len(), 33_000);
+        assert_eq!(query_result.row_count, 33_000);
+        assert_eq!(query_result.data.len(), 40);
+        assert!(query_result.data.iter().all(|c| c.len() == 33_000));
     }
 
     #[test]
@@ -279,7 +304,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 100);
-        assert_eq!(query_result.rows.len(), 50_000);
+        assert_eq!(query_result.row_count, 50_000);
+        assert_eq!(query_result.data.len(), 100);
+        assert!(query_result.data.iter().all(|c| c.len() == 50_000));
     }
 
     #[test]
