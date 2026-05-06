@@ -19,6 +19,10 @@ pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
 pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.cache.size");
 // Approximate total weighted size of entries in this cache.
 pub static DATA_QUERIES_CACHE_WEIGHT: Gauge = metrics::gauge("cs.sql.query.data.cache.weight");
+pub static DATA_QUERIES_STALE_CACHE_SIZE: Gauge =
+    metrics::gauge("cs.sql.query.data.cache.stale.size");
+pub static DATA_QUERIES_STALE_CACHE_WEIGHT: Gauge =
+    metrics::gauge("cs.sql.query.data.cache.stale.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");

@@ -131,6 +131,13 @@ impl SqlResultCache {
         }
     }
 
+    fn report_stale_cache_metrics(&self) {
+        if let Some(stale_cache) = &self.stale_cache {
+            app_metrics::DATA_QUERIES_STALE_CACHE_SIZE.report(stale_cache.entry_count() as i64);
+            app_metrics::DATA_QUERIES_STALE_CACHE_WEIGHT.report(stale_cache.weighted_size() as i64);
+        }
+    }
+
     pub async fn clear(&self) {
         // invalidation will be done in the background
         self.result_cache.invalidate_all();
@@ -144,6 +151,7 @@ impl SqlResultCache {
 
         app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
         app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(self.result_cache.weighted_size() as i64);
+        self.report_stale_cache_metrics();
     }
 
     pub fn entry_count(&self) -> u64 {
@@ -260,6 +268,7 @@ impl SqlResultCache {
                         .report(self.result_cache.entry_count() as i64);
                     app_metrics::DATA_QUERIES_CACHE_WEIGHT
                         .report(self.result_cache.weighted_size() as i64);
+                    self.report_stale_cache_metrics();
 
                     (Some(tx), None)
                 } else {
@@ -289,6 +298,7 @@ impl SqlResultCache {
                                 .report(self.result_cache.weighted_size() as i64);
                         }
                         self.update_stale_cache(&queue_key, r).await;
+                        self.report_stale_cache_metrics();
                     }
                     Err(_) => {
                         trace!("Removing error result from cache");
@@ -385,6 +395,8 @@ impl Drop for SqlResultCache {
     fn drop(&mut self) {
         app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
         app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(0);
+        app_metrics::DATA_QUERIES_STALE_CACHE_SIZE.report(0);
+        app_metrics::DATA_QUERIES_STALE_CACHE_WEIGHT.report(0);
     }
 }
 
