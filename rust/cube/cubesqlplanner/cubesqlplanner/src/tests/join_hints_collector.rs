@@ -1,7 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::planner::sql_evaluator::collectors::{
-    collect_join_hints, collect_join_hints_for_measures,
-};
+use crate::planner::collectors::{collect_join_hints, collect_join_hints_for_measures};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;

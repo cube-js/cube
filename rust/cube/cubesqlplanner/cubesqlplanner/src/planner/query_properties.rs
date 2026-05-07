@@ -3,21 +3,19 @@ use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::planner::join_hints::JoinHints;
-use crate::planner::sql_evaluator::{
+use crate::planner::GranularityHelper;
+use crate::planner::{
     apply_static_filter_to_filter_item, apply_static_filter_to_symbol, MemberExpressionExpression,
     MemberExpressionSymbol, TimeDimensionSymbol,
 };
-use crate::planner::GranularityHelper;
 
-use super::sql_evaluator::MemberSymbol;
+use super::MemberSymbol;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::options_member::OptionsMember;
+use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
-use crate::planner::sql_evaluator::collectors::{
-    collect_multiplied_measures, has_multi_stage_members,
-};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;

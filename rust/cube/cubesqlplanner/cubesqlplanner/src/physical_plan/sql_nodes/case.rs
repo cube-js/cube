@@ -1,11 +1,9 @@
 use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::symbols::{
-    Case, CaseDefinition, CaseLabel, CaseSwitchDefinition,
-};
-use crate::planner::sql_evaluator::{CaseSwitchItem, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::symbols::{Case, CaseDefinition, CaseLabel, CaseSwitchDefinition};
+use crate::planner::{CaseSwitchItem, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;

@@ -1,13 +1,13 @@
 use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::logical_plan::*;
-use crate::planner::planners::multi_stage::{CteState, TimeShiftState};
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::{
+use crate::planner::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
     collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::planners::multi_stage::{CteState, TimeShiftState};
+use crate::planner::query_tools::QueryTools;
+use crate::planner::MemberSymbol;
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;

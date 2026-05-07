@@ -8,7 +8,7 @@ use crate::physical_plan::expression::FunctionExpression;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::VisitorContext;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;

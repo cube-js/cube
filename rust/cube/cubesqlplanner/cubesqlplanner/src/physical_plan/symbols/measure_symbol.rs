@@ -1,5 +1,5 @@
 use super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::MeasureSymbol;
+use crate::planner::MeasureSymbol;
 use cubenativeutils::CubeError;
 
 impl ToSql for MeasureSymbol {

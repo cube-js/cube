@@ -1,5 +1,5 @@
 use super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::{MemberExpressionExpression, MemberExpressionSymbol};
+use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol};
 use cubenativeutils::CubeError;
 
 impl ToSql for MemberExpressionSymbol {

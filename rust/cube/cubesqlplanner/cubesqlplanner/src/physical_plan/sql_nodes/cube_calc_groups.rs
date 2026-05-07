@@ -1,6 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::structs::{TemplateCalcGroup, TemplateCalcSingleValue};
 use crate::planner::sql_templates::PlanSqlTemplates;

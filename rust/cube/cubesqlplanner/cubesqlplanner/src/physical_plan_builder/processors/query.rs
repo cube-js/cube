@@ -5,8 +5,8 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
-use crate::planner::sql_evaluator::get_filtered_values;
+use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::get_filtered_values;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;

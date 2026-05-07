@@ -1,5 +1,5 @@
 use super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::TimeDimensionSymbol;
 use cubenativeutils::CubeError;
 
 impl ToSql for TimeDimensionSymbol {

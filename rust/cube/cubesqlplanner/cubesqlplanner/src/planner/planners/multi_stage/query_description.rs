@@ -1,6 +1,6 @@
 use super::{MultiStageAppliedState, MultiStageMember};
 use crate::logical_plan::LogicalSchema;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::fmt::Debug;

@@ -1,5 +1,5 @@
 use super::super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::symbols::measure_kinds::{CountMeasure, CountSql};
+use crate::planner::symbols::measure_kinds::{CountMeasure, CountSql};
 use cubenativeutils::CubeError;
 
 impl ToSql for CountMeasure {

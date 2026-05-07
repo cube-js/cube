@@ -2,9 +2,9 @@ use super::sql_nodes::SqlNode;
 use super::CubeRefEvaluator;
 use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_call::CubeRef;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_call::CubeRef;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

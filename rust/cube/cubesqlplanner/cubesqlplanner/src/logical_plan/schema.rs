@@ -2,8 +2,8 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 
 use super::pretty_print::*;
-use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::MemberSymbol;
 use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
@@ -142,7 +142,7 @@ impl PrettyPrint for LogicalSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planner::sql_evaluator::symbols::TimeDimensionSymbol;
+    use crate::planner::symbols::TimeDimensionSymbol;
     use crate::test_fixtures::cube_bridge::MockSchema;
     use crate::test_fixtures::test_utils::TestContext;
 

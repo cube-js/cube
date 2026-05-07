@@ -1,6 +1,6 @@
 use super::filter_operator::FilterOperator;
 use super::typed_filter::{resolve_base_symbol, TypedFilter};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;

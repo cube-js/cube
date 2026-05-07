@@ -1,4 +1,4 @@
-use super::sql_evaluator::Compiler;
+use super::Compiler;
 use super::ParamsAllocator;
 use crate::cube_bridge::base_query_options::MaskedMemberItem;
 use crate::cube_bridge::base_tools::BaseTools;

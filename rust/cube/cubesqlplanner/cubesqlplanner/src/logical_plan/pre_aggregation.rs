@@ -1,5 +1,5 @@
 use super::*;
-use crate::{physical_plan::QualifiedColumnName, planner::sql_evaluator::MemberSymbol};
+use crate::{physical_plan::QualifiedColumnName, planner::MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::{collections::HashMap, rc::Rc};

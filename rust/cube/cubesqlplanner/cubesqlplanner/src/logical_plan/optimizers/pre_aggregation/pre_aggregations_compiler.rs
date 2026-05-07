@@ -12,9 +12,9 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
+use crate::planner::MemberSymbol;
+use crate::planner::TimeDimensionSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;

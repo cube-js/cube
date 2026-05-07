@@ -1,7 +1,7 @@
 use super::sql_nodes::SqlNode;
 use super::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_call::CubeRef;
+use crate::planner::sql_call::CubeRef;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;

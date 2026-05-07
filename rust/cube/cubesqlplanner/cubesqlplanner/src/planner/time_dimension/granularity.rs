@@ -1,6 +1,6 @@
 use super::{GranularityHelper, QueryDateTime, SqlInterval};
-use crate::planner::sql_evaluator::{MemberSymbol, SqlCall};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::{MemberSymbol, SqlCall};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

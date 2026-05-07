@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::rc::Rc;
 
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 
 #[derive(Debug, Clone)]
 pub struct QualifiedColumnName {

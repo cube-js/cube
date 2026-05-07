@@ -1,8 +1,8 @@
 use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::MemberSymbol;
 use crate::utils::sql_expression_scanner::is_top_level_compound;
 use cubenativeutils::CubeError;
 use std::any::Any;

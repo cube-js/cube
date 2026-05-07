@@ -1,5 +1,5 @@
 use super::CompiledPreAggregation;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;

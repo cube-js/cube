@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::logical_plan::*;
 use crate::planner::filter::FilterItem;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use std::rc::Rc;
 
 pub struct OptimizerHelper;

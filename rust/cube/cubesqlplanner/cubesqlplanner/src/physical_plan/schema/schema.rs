@@ -1,5 +1,5 @@
 use super::SchemaColumn;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use itertools::Itertools;
 use std::rc::Rc;
 

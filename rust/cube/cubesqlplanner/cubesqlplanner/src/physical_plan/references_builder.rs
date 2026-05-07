@@ -3,7 +3,7 @@ use crate::physical_plan::{
     CalcGroupsJoin, From, FromSource, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
 use crate::planner::filter::{Filter, FilterItem};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

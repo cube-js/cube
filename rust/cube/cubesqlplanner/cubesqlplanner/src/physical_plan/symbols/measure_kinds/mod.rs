@@ -3,7 +3,7 @@ pub mod calculated;
 pub mod count;
 
 use super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::MeasureKind;
+use crate::planner::MeasureKind;
 use cubenativeutils::CubeError;
 
 impl ToSql for MeasureKind {

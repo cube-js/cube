@@ -1,7 +1,6 @@
 use super::{Schema, SchemaColumn};
 use crate::planner::{
-    query_tools::QueryTools, sql_evaluator::MemberSymbol, sql_templates::PlanSqlTemplates,
-    Granularity,
+    query_tools::QueryTools, sql_templates::PlanSqlTemplates, Granularity, MemberSymbol,
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;

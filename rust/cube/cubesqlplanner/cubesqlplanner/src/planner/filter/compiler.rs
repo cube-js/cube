@@ -3,7 +3,7 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{Compiler, MemberSymbol};
+use crate::planner::{Compiler, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use std::str::FromStr;

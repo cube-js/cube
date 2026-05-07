@@ -3,7 +3,7 @@ pub mod regular;
 pub mod switch;
 
 use super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::DimensionKind;
+use crate::planner::DimensionKind;
 use cubenativeutils::CubeError;
 
 impl ToSql for DimensionKind {

@@ -1,10 +1,10 @@
 use super::CompiledPreAggregation;
 use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::DimensionSymbol;
-use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
+use crate::planner::MemberSymbol;
+use crate::planner::TimeDimensionSymbol;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;

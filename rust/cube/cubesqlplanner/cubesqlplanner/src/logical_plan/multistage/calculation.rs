@@ -1,6 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;

@@ -1,5 +1,5 @@
 use crate::planner::filter::FilterItem;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]

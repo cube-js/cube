@@ -1,5 +1,5 @@
 use super::super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::symbols::dimension_kinds::SwitchDimension;
+use crate::planner::symbols::dimension_kinds::SwitchDimension;
 use cubenativeutils::CubeError;
 
 impl ToSql for SwitchDimension {

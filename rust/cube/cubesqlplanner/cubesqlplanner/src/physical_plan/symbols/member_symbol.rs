@@ -1,5 +1,5 @@
 use super::{MemberSqlContext, ToSql};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 
 impl ToSql for MemberSymbol {

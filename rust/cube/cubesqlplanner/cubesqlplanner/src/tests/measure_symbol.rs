@@ -1,6 +1,6 @@
 //! Tests for MeasureSymbol: kind classification, new_patched, and helper methods
 
-use crate::planner::sql_evaluator::{AggregationType, CalculatedMeasureType, MeasureKind, SqlCall};
+use crate::planner::{AggregationType, CalculatedMeasureType, MeasureKind, SqlCall};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;

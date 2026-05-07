@@ -1,7 +1,7 @@
 use crate::planner::filter::{
     BaseFilter, FilterGroup, FilterGroupOperator, FilterItem, FilterOperator,
 };
-use crate::planner::sql_evaluator::DebugSql;
+use crate::planner::DebugSql;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 

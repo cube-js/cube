@@ -1,6 +1,6 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::sql_evaluator::Compiler;
-use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::Compiler;
+use crate::planner::TimeDimensionSymbol;
 use crate::planner::{Granularity, QueryDateTimeHelper};
 use chrono::prelude::*;
 use chrono_tz::Tz;

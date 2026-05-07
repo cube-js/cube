@@ -1,6 +1,6 @@
 use super::{evaluate_with_context, QualifiedColumnName, VisitorContext};
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
