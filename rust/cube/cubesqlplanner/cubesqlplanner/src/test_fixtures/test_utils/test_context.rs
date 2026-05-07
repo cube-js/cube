@@ -3,9 +3,9 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
-use crate::plan::filter::ToSql;
-use crate::plan::sql_nodes::SqlNodesFactory;
-use crate::plan::{SqlEvaluatorVisitor, VisitorContext};
+use crate::physical_plan::filter::ToSql;
+use crate::physical_plan::sql_nodes::SqlNodesFactory;
+use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
@@ -651,7 +651,7 @@ impl TestContext {
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
 
-        let sql = crate::plan::filter::render_filter(&context, &filter, &templates)?;
+        let sql = crate::physical_plan::filter::render_filter(&context, &filter, &templates)?;
         let params = self.query_tools.get_allocated_params();
         Ok((sql, params))
     }

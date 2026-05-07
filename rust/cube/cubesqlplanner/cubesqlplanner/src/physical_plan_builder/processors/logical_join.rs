@@ -1,7 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::LogicalJoin;
+use crate::physical_plan::{From, JoinBuilder, JoinCondition};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

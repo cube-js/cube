@@ -1,8 +1,8 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::MultiStageLeafMeasure;
+use crate::physical_plan::QueryPlan;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::QueryPlan;
 use cubenativeutils::CubeError;
 
 pub struct MultiStageLeafMeasureProcessor<'a> {

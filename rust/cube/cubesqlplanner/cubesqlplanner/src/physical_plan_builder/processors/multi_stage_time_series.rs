@@ -1,8 +1,8 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::MultiStageTimeSeries;
+use crate::physical_plan::{QueryPlan, TimeSeries, TimeSeriesDateRange};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{QueryPlan, TimeSeries, TimeSeriesDateRange};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

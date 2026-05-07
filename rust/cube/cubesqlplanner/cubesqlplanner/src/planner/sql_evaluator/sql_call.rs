@@ -1,7 +1,7 @@
 use super::symbols::MemberSymbol;
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
-use crate::plan::sql_nodes::{SqlNode, SqlNodesFactory};
-use crate::plan::{SqlEvaluatorVisitor, VisitorContext};
+use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
+use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{CubeNameSymbol, CubeTableSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -398,7 +398,9 @@ impl SqlCall {
                         &SqlNodesFactory::new(),
                         filter_params_columns,
                     );
-                    return crate::plan::filter::render_filter_item(&context, &subtree, templates);
+                    return crate::physical_plan::filter::render_filter_item(
+                        &context, &subtree, templates,
+                    );
                 }
             }
         }

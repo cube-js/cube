@@ -1,6 +1,6 @@
 use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
-use crate::plan::QualifiedColumnName;
+use crate::physical_plan::QualifiedColumnName;
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
