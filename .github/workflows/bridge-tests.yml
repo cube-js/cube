@@ -10,6 +10,9 @@ on:
       - 'packages/cubejs-backend-native/test/bridge/**'
       - 'packages/cubejs-backend-native/jest-bridge.config.js'
 
+permissions:
+  contents: read
+
 jobs:
   bridge-tests:
     runs-on: ubuntu-24.04
@@ -59,8 +62,7 @@ jobs:
       - name: Build native (debug, --features bridge-test-harness)
         working-directory: ./packages/cubejs-backend-native
         run: yarn run native:build-debug-bridge-tests
-      - name: TypeScript compile
-        working-directory: ./packages/cubejs-backend-native
+      - name: TypeScript compile (lerna, root)
         run: yarn tsc
       - name: Run bridge tests
         working-directory: ./packages/cubejs-backend-native
