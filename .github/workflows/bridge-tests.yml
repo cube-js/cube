@@ -1,0 +1,72 @@
+name: Bridge tests
+
+# Runs the Tesseract bridge regression suite (real V8 driving the production
+# bridge code). PR-only and only when the underlying Rust crates or the test
+# harness change — the bridge tests don't catch issues outside that scope and
+# we don't need the cycle time on master pushes.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/bridge-tests.yml'
+      - 'rust/cube/cubesqlplanner/**'
+      - 'rust/cube/cubenativeutils/**'
+      - 'packages/cubejs-backend-native/src/bridge_test_exports.rs'
+      - 'packages/cubejs-backend-native/test/bridge/**'
+      - 'packages/cubejs-backend-native/jest-bridge.config.js'
+
+jobs:
+  bridge-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    name: Bridge tests (debug, --features bridge-test-harness)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.90.0
+          rustflags: ""
+          cache: false
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./packages/cubejs-backend-native -> target
+          key: bridge-tests-${{ runner.OS }}-x86_64-unknown-linux-gnu
+          shared-key: bridge-tests-${{ runner.OS }}-x86_64-unknown-linux-gnu
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.22
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+      - name: Restore yarn cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Yarn install
+        uses: nick-fields/retry@v3
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Build native (debug, --features bridge-test-harness)
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug-bridge-tests
+      - name: TypeScript compile
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn tsc
+      - name: Run bridge tests
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn jest --config jest-bridge.config.js --forceExit
