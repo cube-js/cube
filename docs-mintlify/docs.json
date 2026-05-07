@@ -137,7 +137,8 @@
                 "group": "Views",
                 "root": "docs/data-modeling/views",
                 "pages": [
-                  "docs/data-modeling/multi-fact-views"
+                  "docs/data-modeling/multi-fact-views",
+                  "docs/data-modeling/view-groups"
                 ]
               },
               {
