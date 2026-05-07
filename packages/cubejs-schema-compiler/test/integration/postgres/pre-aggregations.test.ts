@@ -1234,6 +1234,43 @@ describe('PreAggregations', () => {
       }
     });
 
+    cube('sql_table_visitors', {
+      sqlTable: \`visitors\`,
+
+      measures: {
+        count: {
+          type: 'count'
+        },
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'number',
+          primaryKey: true
+        },
+        source: {
+          sql: 'source',
+          type: 'string'
+        },
+        createdAt: {
+          sql: 'created_at',
+          type: 'time'
+        },
+      },
+
+      preAggregations: {
+        main: {
+          type: 'originalSql',
+        },
+        partitioned: {
+          type: 'originalSql',
+          partitionGranularity: 'month',
+          timeDimensionReference: createdAt,
+        },
+      },
+    });
+
   `);
 
   it('simple pre-aggregation', async () => {
@@ -3642,4 +3679,62 @@ describe('PreAggregations', () => {
       expect(() => query.buildSqlAndParams()).toThrow('No rollups found that can be used for a rollup join');
     });
   }
+
+  it('originalSql pre-aggregation with sqlTable', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'sql_table_visitors.count'
+      ],
+      dimensions: [
+        'sql_table_visitors.source'
+      ],
+      timeDimensions: [{
+        dimension: 'sql_table_visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'sql_table_visitors.createdAt'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+    expect(preAggregationsDescription[0].type).toEqual('originalSql');
+    expect(preAggregationsDescription[0].loadSql[0]).toMatch(/CREATE TABLE/);
+    expect(preAggregationsDescription[0].loadSql[0]).toMatch(/SELECT \* FROM visitors/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            sql_table_visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            sql_table_visitors__source: 'some',
+            sql_table_visitors__count: '1'
+          },
+          {
+            sql_table_visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            sql_table_visitors__source: 'some',
+            sql_table_visitors__count: '1'
+          },
+          {
+            sql_table_visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            sql_table_visitors__source: 'google',
+            sql_table_visitors__count: '1'
+          },
+          {
+            sql_table_visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            sql_table_visitors__source: null,
+            sql_table_visitors__count: '2'
+          }
+        ]
+      );
+    });
+  });
 });
