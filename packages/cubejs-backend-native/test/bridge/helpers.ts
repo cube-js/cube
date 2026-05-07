@@ -45,3 +45,14 @@ export function compileMemberSql(
   }
   return native.__testBridgeCompileMemberSql(fn, securityContext);
 }
+
+export function parseArgsNames(fn: Function): string[] {
+  return native.__testBridgeParseArgsNames(fn);
+}
+
+export function invokeFilterParamsCallback(
+  fn: Function,
+  args: string[]
+): string {
+  return native.__testBridgeInvokeFilterParamsCallback(fn, args);
+}

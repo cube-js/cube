@@ -10,12 +10,15 @@
 //! module; they should fail loudly when an unsupported code path is exercised.
 
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
-use cubenativeutils::wrappers::object::{NativeArray, NativeStruct, NativeType};
+use cubenativeutils::wrappers::object::{NativeArray, NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
 use cubesqlplanner::cube_bridge::base_tools::BaseTools;
 use cubesqlplanner::cube_bridge::driver_tools::DriverTools;
+use cubesqlplanner::cube_bridge::filter_params_callback::{
+    FilterParamsCallback, NativeFilterParamsCallback,
+};
 use cubesqlplanner::cube_bridge::join_definition::JoinDefinition;
 use cubesqlplanner::cube_bridge::join_hints::JoinHintItem;
 use cubesqlplanner::cube_bridge::member_sql::{
@@ -205,7 +208,51 @@ fn compile_member_sql(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
+fn parse_args_names_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    js_fn: NativeObjectHandle<IT>,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let func = js_fn.to_function()?;
+    let names = func.args_names()?;
+    names.to_native(context_holder)
+}
+
+fn parse_args_names(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, js_fn: NativeObjectHandle<_>| {
+            parse_args_names_inner(context_holder, js_fn)
+        },
+    )
+}
+
+fn invoke_filter_params_callback_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    js_fn: NativeObjectHandle<IT>,
+    args: Vec<String>,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let callback = NativeFilterParamsCallback::new(js_fn);
+    let result = callback.call(&args)?;
+    result.to_native(context_holder)
+}
+
+fn invoke_filter_params_callback(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>,
+         js_fn: NativeObjectHandle<_>,
+         args: Vec<String>| {
+            invoke_filter_params_callback_inner(context_holder, js_fn, args)
+        },
+    )
+}
+
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeCompileMemberSql", compile_member_sql)?;
+    cx.export_function("__testBridgeParseArgsNames", parse_args_names)?;
+    cx.export_function(
+        "__testBridgeInvokeFilterParamsCallback",
+        invoke_filter_params_callback,
+    )?;
     Ok(())
 }
