@@ -243,7 +243,7 @@ pub fn get_members(
     // in sync with the order of members in members list.
     let mut members_arr: Vec<String> = vec![];
 
-    if db_data.columns.is_empty() {
+    if db_data.members.is_empty() {
         validate_query_members_in_annotation(query, annotation)?;
         return Ok((members_map, members_arr));
     }
@@ -252,7 +252,7 @@ pub fn get_members(
     // There is no granularity type/class implementation in rust yet.
     let mut minimal_granularities: HashMap<String, (u8, String)> = HashMap::new();
 
-    for column in db_data.columns.iter() {
+    for column in db_data.members.iter() {
         let member_name = alias_to_member_name_map
             .get(column)
             .context(format!("Member name not found for alias: '{}'", column))?;
@@ -2575,7 +2575,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2617,7 +2617,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2665,7 +2665,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2729,7 +2729,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2801,7 +2801,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },

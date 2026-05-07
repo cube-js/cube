@@ -34,7 +34,7 @@ impl std::error::Error for ParseError {}
 
 #[derive(Debug, Clone)]
 pub struct QueryResult {
-    pub columns: Vec<String>,
+    pub members: Vec<String>,
     pub rows: Vec<Vec<DBResponseValue>>,
     pub columns_pos: IndexMap<String, usize>,
 }
@@ -44,7 +44,7 @@ impl Finalize for QueryResult {}
 impl QueryResult {
     pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
         let mut result = QueryResult {
-            columns: vec![],
+            members: vec![],
             rows: vec![],
             columns_pos: IndexMap::new(),
         };
@@ -76,7 +76,7 @@ impl QueryResult {
                         return Err(ParseError::ColumnNameNotDefined);
                     }
 
-                    let (columns, columns_pos): (Vec<_>, IndexMap<_, _>) = result_set_columns
+                    let (members, columns_pos): (Vec<_>, IndexMap<_, _>) = result_set_columns
                         .iter()
                         .enumerate()
                         .map(|(index, column_name)| {
@@ -84,7 +84,7 @@ impl QueryResult {
                         })
                         .unzip();
 
-                    result.columns = columns;
+                    result.members = members;
                     result.columns_pos = columns_pos;
                 }
 
@@ -118,7 +118,7 @@ impl QueryResult {
 
         if members.is_empty() {
             return Ok(QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             });
@@ -147,7 +147,7 @@ impl QueryResult {
         }
 
         Ok(QueryResult {
-            columns: members,
+            members,
             rows,
             columns_pos,
         })
@@ -234,7 +234,7 @@ mod tests {
         assert!(result.is_ok());
 
         let query_result = result.unwrap();
-        assert_eq!(query_result.columns.len(), 5);
+        assert_eq!(query_result.members.len(), 5);
         assert_eq!(query_result.rows.len(), 10);
     }
 
@@ -246,7 +246,7 @@ mod tests {
         assert!(result.is_ok());
 
         let query_result = result.unwrap();
-        assert_eq!(query_result.columns.len(), 20);
+        assert_eq!(query_result.members.len(), 20);
         assert_eq!(query_result.rows.len(), 1000);
     }
 
@@ -259,7 +259,7 @@ mod tests {
         assert!(result.is_ok());
 
         let query_result = result.unwrap();
-        assert_eq!(query_result.columns.len(), 30);
+        assert_eq!(query_result.members.len(), 30);
         assert_eq!(query_result.rows.len(), 10_000);
     }
 
@@ -271,7 +271,7 @@ mod tests {
         assert!(result.is_ok());
 
         let query_result = result.unwrap();
-        assert_eq!(query_result.columns.len(), 40);
+        assert_eq!(query_result.members.len(), 40);
         assert_eq!(query_result.rows.len(), 33_000);
     }
 
@@ -283,7 +283,7 @@ mod tests {
         assert!(result.is_ok());
 
         let query_result = result.unwrap();
-        assert_eq!(query_result.columns.len(), 100);
+        assert_eq!(query_result.members.len(), 100);
         assert_eq!(query_result.rows.len(), 50_000);
     }
 
