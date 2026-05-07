@@ -11,10 +11,6 @@
   "icons": {
     "library": "tabler"
   },
-  "banner": {
-    "content": "🟣 Agentic Analytics Summit — April 29, 2026 — Online. Registration is open! [Join now →](https://cube.dev/events/agentic-analytics-summit)",
-    "dismissible": true
-  },
   "navigation": {
     "tabs": [
       {
