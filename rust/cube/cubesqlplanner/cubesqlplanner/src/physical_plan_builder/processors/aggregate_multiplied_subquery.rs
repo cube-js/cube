@@ -1,11 +1,11 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
-use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{
+use crate::physical_plan::ReferencesBuilder;
+use crate::physical_plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
     SelectBuilder,
 };
-use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

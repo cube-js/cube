@@ -1,6 +1,6 @@
 use super::pretty_print::*;
 use super::*;
-use crate::planner::sql_evaluator::SqlCall;
+use crate::planner::SqlCall;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;

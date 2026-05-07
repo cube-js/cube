@@ -1,10 +1,10 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::planner::collectors::{collect_join_hints, has_multi_stage_members};
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::{collect_join_hints, has_multi_stage_members};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;

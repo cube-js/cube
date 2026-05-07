@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{CubeRef, CubeTableSymbol};
-use super::VisitorContext;
+use super::{CubeRef, CubeTableSymbol};
 use crate::cube_bridge::cube_definition::CubeDefinition;
+use crate::physical_plan::VisitorContext;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;

@@ -3,15 +3,16 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
-use crate::plan::filter::ToSql;
+use crate::physical_plan::filter::ToSql;
+use crate::physical_plan::sql_nodes::SqlNodesFactory;
+use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor, TimeDimensionSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{GranularityHelper, QueryProperties, VisitorContext};
+use crate::planner::{GranularityHelper, QueryProperties};
+use crate::planner::{MemberSymbol, TimeDimensionSymbol};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
@@ -650,7 +651,7 @@ impl TestContext {
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
 
-        let sql = crate::plan::filter::render_filter(&context, &filter, &templates)?;
+        let sql = crate::physical_plan::filter::render_filter(&context, &filter, &templates)?;
         let params = self.query_tools.get_allocated_params();
         Ok((sql, params))
     }

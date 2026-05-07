@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::Compiler;
+use crate::planner::Compiler;
 use crate::test_fixtures::cube_bridge::{MockBaseTools, MockCubeEvaluator, MockSecurityContext};
 use chrono_tz::Tz;
 use std::rc::Rc;

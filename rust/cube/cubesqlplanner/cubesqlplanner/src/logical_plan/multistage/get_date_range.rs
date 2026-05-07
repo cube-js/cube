@@ -1,5 +1,5 @@
 use crate::logical_plan::*;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

@@ -1,5 +1,5 @@
 use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterGroupOperator, FilterItem};
-use crate::planner::sql_evaluator::DebugSql;
+use crate::planner::DebugSql;
 
 impl DebugSql for BaseFilter {
     fn debug_sql(&self, expand_deps: bool) -> String {

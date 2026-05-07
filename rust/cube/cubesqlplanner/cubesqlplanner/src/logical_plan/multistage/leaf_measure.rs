@@ -1,6 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

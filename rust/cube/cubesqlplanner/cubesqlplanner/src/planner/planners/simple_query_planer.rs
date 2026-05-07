@@ -1,7 +1,7 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner};
 use crate::logical_plan::*;
+use crate::planner::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

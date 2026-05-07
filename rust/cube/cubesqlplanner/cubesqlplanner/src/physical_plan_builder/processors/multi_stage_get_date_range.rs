@@ -1,9 +1,9 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::MultiStageGetDateRange;
+use crate::physical_plan::ReferencesBuilder;
+use crate::physical_plan::{QueryPlan, SelectBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{QueryPlan, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

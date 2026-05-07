@@ -4,8 +4,8 @@ use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_evaluator::SqlCall;
+use crate::planner::MemberSymbol;
+use crate::planner::SqlCall;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

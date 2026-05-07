@@ -1,0 +1,83 @@
+use super::SqlNode;
+use crate::physical_plan::SqlEvaluatorVisitor;
+use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::symbols::{AggregationType, MeasureKind};
+use crate::planner::MemberSymbol;
+use cubenativeutils::CubeError;
+use std::any::Any;
+use std::rc::Rc;
+
+pub struct UngroupedQueryFinalMeasureSqlNode {
+    input: Rc<dyn SqlNode>,
+}
+
+impl UngroupedQueryFinalMeasureSqlNode {
+    pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
+        Rc::new(Self { input })
+    }
+
+    pub fn input(&self) -> &Rc<dyn SqlNode> {
+        &self.input
+    }
+}
+
+impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
+    fn to_sql(
+        &self,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
+        query_tools: Rc<QueryTools>,
+        node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(ev) => {
+                let is_count_like = match ev.kind() {
+                    MeasureKind::Count(_) => true,
+                    MeasureKind::Aggregated(a) => matches!(
+                        a.agg_type(),
+                        AggregationType::CountDistinct | AggregationType::CountDistinctApprox
+                    ),
+                    _ => false,
+                };
+                // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
+                // (safe), other kinds pass through and must propagate the flag.
+                let child_visitor = if is_count_like {
+                    visitor.with_arg_needs_paren_safe(false)
+                } else {
+                    visitor.clone()
+                };
+                let input = self.input.to_sql(
+                    &child_visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                    templates,
+                )?;
+
+                if input == "*" {
+                    "1".to_string()
+                } else if is_count_like {
+                    format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
+                } else {
+                    input
+                }
+            }
+            _ => {
+                return Err(CubeError::internal(format!(
+                    "Measure filter node processor called for wrong node",
+                )));
+            }
+        };
+        Ok(res)
+    }
+
+    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+        self.clone()
+    }
+
+    fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
+        vec![self.input.clone()]
+    }
+}

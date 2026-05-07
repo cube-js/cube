@@ -1,14 +1,12 @@
 use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
-use crate::plan::QualifiedColumnName;
+use crate::physical_plan::QualifiedColumnName;
+use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;
-use crate::planner::sql_evaluator::{
-    MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
-};
 use crate::planner::QueryProperties;
+use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;

@@ -4,8 +4,8 @@ mod keys_aggregate_strategy;
 
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::FullKeyAggregate;
+use crate::physical_plan::From;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::From;
 use cubenativeutils::CubeError;
 use full_join_aggregate_strategy::FullJoinFullKeyAggregateStrategy;
 use inner_join_aggregate_strategy::InnerJoinFullKeyAggregateStrategy;

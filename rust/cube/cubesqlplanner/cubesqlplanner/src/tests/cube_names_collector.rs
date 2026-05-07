@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::collectors::collect_cube_names;
+use crate::planner::collectors::collect_cube_names;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 

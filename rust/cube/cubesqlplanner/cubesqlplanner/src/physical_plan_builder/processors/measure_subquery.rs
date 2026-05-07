@@ -1,8 +1,8 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::MeasureSubquery;
+use crate::physical_plan::ReferencesBuilder;
+use crate::physical_plan::{Select, SelectBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Select, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

@@ -1,5 +1,5 @@
-use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
-use crate::planner::sql_evaluator::DimensionTimeShift;
+use crate::planner::symbols::CalendarDimensionTimeShift;
+use crate::planner::DimensionTimeShift;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 

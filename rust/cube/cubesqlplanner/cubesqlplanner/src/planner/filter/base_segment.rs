@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::{
+use crate::planner::{
     CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
 };
 use cubenativeutils::CubeError;

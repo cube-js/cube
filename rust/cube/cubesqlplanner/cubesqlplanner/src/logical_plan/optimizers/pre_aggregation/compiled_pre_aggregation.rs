@@ -1,5 +1,5 @@
 use crate::planner::multi_fact_join_groups::MultiFactJoinGroups;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlCall};
+use crate::planner::{MemberSymbol, SqlCall};
 use std::fmt::Debug;
 use std::rc::Rc;
 

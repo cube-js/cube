@@ -1,8 +1,8 @@
+use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::FilterOperator;
 use crate::planner::filter::{FilterGroup, FilterItem};
 use crate::planner::planners::multi_stage::time_shift_state::TimeShiftState;
-use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
-use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
+use crate::planner::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;

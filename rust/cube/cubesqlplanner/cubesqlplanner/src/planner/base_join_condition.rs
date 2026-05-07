@@ -1,5 +1,5 @@
-use super::sql_evaluator::SqlCall;
-use super::{evaluate_sql_call_with_context, VisitorContext};
+use super::SqlCall;
+use crate::physical_plan::{evaluate_sql_call_with_context, VisitorContext};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

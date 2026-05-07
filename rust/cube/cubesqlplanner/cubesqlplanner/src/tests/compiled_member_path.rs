@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;

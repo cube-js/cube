@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 
 use super::*;
 use std::rc::Rc;

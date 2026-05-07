@@ -1,5 +1,5 @@
 use super::{BaseFilter, BaseSegment};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::MemberSymbol;
 use std::fmt;
 use std::rc::Rc;
 
