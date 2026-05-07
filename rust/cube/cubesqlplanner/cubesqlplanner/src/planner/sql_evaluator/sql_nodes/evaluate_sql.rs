@@ -25,15 +25,14 @@ impl SqlNode for EvaluateSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let name = node.name();
-        let full_name = node.full_name();
+        let path = node.compiled_path();
         let ctx = MemberSqlContext {
             visitor,
             node_processor: &node_processor,
             query_tools: &query_tools,
             templates,
-            name: &name,
-            full_name: &full_name,
+            name: path.name(),
+            full_name: path.full_name(),
         };
         node.as_ref().to_sql(&ctx)
     }
