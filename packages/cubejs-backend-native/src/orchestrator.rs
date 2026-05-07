@@ -87,26 +87,27 @@ impl ResultWrapper {
 
         let raw_data_js = raw_data_js_arr.first().unwrap();
 
-        let query_result =
-            if let Ok(js_box) = raw_data_js.downcast::<JsBox<Arc<QueryResult>>, _>(cx) {
-                Arc::clone(&js_box)
-            } else if let Ok(js_buffer) = raw_data_js.downcast::<JsBuffer, _>(cx) {
-                let bytes = js_buffer.as_slice(cx);
-                let js_raw_data: JsRawColumnarData = serde_json::from_slice(bytes).map_err(|e| {
-                    CubeError::internal(format!(
-                        "Can't parse raw data JSON from JS ResultWrapper: {}",
-                        e
-                    ))
-                })?;
+        let query_result = if let Ok(js_box) =
+            raw_data_js.downcast::<JsBox<Arc<QueryResult>>, _>(cx)
+        {
+            Arc::clone(&js_box)
+        } else if let Ok(js_buffer) = raw_data_js.downcast::<JsBuffer, _>(cx) {
+            let bytes = js_buffer.as_slice(cx);
+            let js_raw_data: JsRawColumnarData = serde_json::from_slice(bytes).map_err(|e| {
+                CubeError::internal(format!(
+                    "Can't parse raw data JSON from JS ResultWrapper: {}",
+                    e
+                ))
+            })?;
 
-                QueryResult::from_js_raw_data(js_raw_data)
-                    .map(Arc::new)
-                    .map_cube_err("Can't build results data from JS rawData")?
-            } else {
-                return Err(CubeError::internal(
-                    "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
-                ));
-            };
+            QueryResult::from_js_raw_data(js_raw_data)
+                .map(Arc::new)
+                .map_cube_err("Can't build results data from JS rawData")?
+        } else {
+            return Err(CubeError::internal(
+                "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
+            ));
+        };
 
         Ok(Self {
             transform_data: transform_request,
