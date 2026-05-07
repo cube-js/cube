@@ -1,10 +1,7 @@
 use super::common::CompiledMemberPath;
 use super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::{
-    sql_nodes::SqlNode, CubeRef, CubeTableSymbol, SqlCall, SqlEvaluatorVisitor,
-};
+use crate::planner::sql_evaluator::{CubeRef, CubeTableSymbol, SqlCall};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
@@ -52,32 +49,18 @@ impl MemberExpressionSymbol {
         }))
     }
 
-    pub fn evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        let sql = match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => {
-                sql_call.eval(visitor, node_processor, query_tools, templates)?
-            }
-            MemberExpressionExpression::PatchedSymbol(symbol) => {
-                visitor.apply(symbol, node_processor, templates)?
-            }
-        };
-        if self.parenthesized {
-            Ok(format!("({})", sql))
-        } else {
-            Ok(sql)
-        }
-    }
-
     pub fn with_parenthesized(self: &Rc<Self>) -> Rc<Self> {
         let mut result = self.as_ref().clone();
         result.parenthesized = true;
         Rc::new(result)
+    }
+
+    pub fn expression(&self) -> &MemberExpressionExpression {
+        &self.expression
+    }
+
+    pub fn is_parenthesized(&self) -> bool {
+        self.parenthesized
     }
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {

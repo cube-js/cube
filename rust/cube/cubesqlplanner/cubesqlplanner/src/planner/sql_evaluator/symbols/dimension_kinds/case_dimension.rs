@@ -1,8 +1,6 @@
 use super::super::common::{Case, DimensionType};
 use super::super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_evaluator::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -39,24 +37,6 @@ impl CaseDimension {
             dimension_type: self.dimension_type,
             case: new_case,
             member_sql: self.member_sql.clone(),
-        }
-    }
-
-    pub fn evaluate_sql(
-        &self,
-        full_name: &str,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.eval(visitor, node_processor, query_tools, templates)
-        } else {
-            Err(CubeError::internal(format!(
-                "Dimension {} hasn't sql evaluator",
-                full_name
-            )))
         }
     }
 

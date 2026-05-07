@@ -5,11 +5,8 @@ use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
-use crate::planner::sql_evaluator::{
-    sql_nodes::SqlNode, Compiler, CubeRef, SqlCall, SqlEvaluatorVisitor,
-};
+use crate::planner::sql_evaluator::{Compiler, CubeRef, SqlCall};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
@@ -264,22 +261,6 @@ impl MeasureSymbol {
         } else {
             self.kind.is_additive()
         }
-    }
-
-    pub fn evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        self.kind.evaluate_sql(
-            &self.full_name(),
-            visitor,
-            node_processor,
-            query_tools,
-            templates,
-        )
     }
 
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
