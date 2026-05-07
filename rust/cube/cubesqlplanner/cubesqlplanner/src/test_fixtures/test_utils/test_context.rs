@@ -4,14 +4,15 @@ use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
 use crate::plan::filter::ToSql;
+use crate::plan::sql_nodes::SqlNodesFactory;
+use crate::plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor, TimeDimensionSymbol};
+use crate::planner::sql_evaluator::{MemberSymbol, TimeDimensionSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{GranularityHelper, QueryProperties, VisitorContext};
+use crate::planner::{GranularityHelper, QueryProperties};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,

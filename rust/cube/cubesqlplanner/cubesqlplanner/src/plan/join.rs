@@ -1,7 +1,7 @@
-use super::{Expr, SingleAliasedSource};
+use super::{Expr, SingleAliasedSource, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseJoinCondition, Granularity, VisitorContext};
+use crate::planner::{BaseJoinCondition, Granularity};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 

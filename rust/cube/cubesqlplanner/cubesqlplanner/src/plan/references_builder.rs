@@ -1,12 +1,11 @@
+use crate::plan::sql_nodes::RenderReferences;
 use crate::plan::{
     CalcGroupsJoin, From, FromSource, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
 use crate::planner::filter::{Filter, FilterItem};
-use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
+use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
-
-use super::MemberSymbol;
 
 pub struct ReferencesBuilder {
     source: Rc<From>,

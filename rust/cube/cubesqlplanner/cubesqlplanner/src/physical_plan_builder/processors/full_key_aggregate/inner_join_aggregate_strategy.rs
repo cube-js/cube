@@ -2,11 +2,11 @@ use super::FullKeyAggregateStrategy;
 use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
+use crate::plan::sql_nodes::SqlNodesFactory;
 use crate::plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, SelectBuilder,
     SingleAliasedSource,
 };
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

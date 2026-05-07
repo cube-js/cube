@@ -5,11 +5,11 @@ use crate::logical_plan::{
     PreAggregationUnion,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::plan::sql_nodes::SqlNodesFactory;
 use crate::plan::{
     From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, QueryPlan, Schema,
     SelectBuilder, SingleAliasedSource, SingleSource, Union,
 };
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;

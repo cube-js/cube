@@ -1,10 +1,10 @@
 use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
+use crate::plan::sql_nodes::SqlNode;
+use crate::plan::SqlEvaluatorVisitor;
 use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedFilter};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNode;
-use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
 use cubenativeutils::CubeError;

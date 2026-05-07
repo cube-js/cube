@@ -1,21 +1,27 @@
 pub mod builder;
 pub mod calc_groups_join;
 pub mod cte;
+pub mod cube_ref_evaluator;
 pub mod expression;
 pub mod filter;
 pub mod from;
 pub mod join;
 pub mod order;
 pub mod query_plan;
+pub mod references_builder;
 pub mod schema;
 pub mod select;
+pub mod sql_nodes;
+pub mod sql_visitor;
 pub mod symbols;
 pub mod time_series;
 pub mod union;
+pub mod visitor_context;
 
 pub use builder::{JoinBuilder, SelectBuilder};
 pub use calc_groups_join::*;
 pub use cte::Cte;
+pub use cube_ref_evaluator::CubeRefEvaluator;
 pub use expression::{Expr, MemberExpression};
 pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
 pub use join::{
@@ -23,7 +29,10 @@ pub use join::{
 };
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
+pub use references_builder::ReferencesBuilder;
 pub use schema::{QualifiedColumnName, Schema, SchemaColumn};
 pub use select::{AliasedExpr, Select};
+pub use sql_visitor::SqlEvaluatorVisitor;
 pub use time_series::{TimeSeries, TimeSeriesDateRange};
 pub use union::Union;
+pub use visitor_context::{evaluate_sql_call_with_context, evaluate_with_context, VisitorContext};

@@ -1,6 +1,7 @@
+use crate::plan::sql_nodes::SqlNode;
+use crate::plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNode;
-use crate::planner::sql_evaluator::{SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::SqlCall;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

@@ -1,10 +1,10 @@
 use super::{Cte, Expr, From, OrderBy, Schema};
+use crate::plan::VisitorContext;
 use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::{
     TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn,
 };
-use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

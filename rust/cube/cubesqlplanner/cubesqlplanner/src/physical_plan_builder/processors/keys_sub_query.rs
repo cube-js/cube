@@ -1,9 +1,9 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{all_symbols, KeysSubQuery};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{CalcGroupItem, CalcGroupsJoin, From, Select, SelectBuilder};
+use crate::plan::{CalcGroupItem, CalcGroupsJoin, From, ReferencesBuilder, Select, SelectBuilder};
 use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
-use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
+use crate::planner::sql_evaluator::get_filtered_values;
 use cubenativeutils::CubeError;
 use itertools::Itertools as _;
 use std::rc::Rc;

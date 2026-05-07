@@ -2,8 +2,8 @@ use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::MultiStageDimensionCalculation;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::plan::ReferencesBuilder;
 use crate::plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

@@ -1,11 +1,10 @@
-use super::sql_nodes::SqlNode;
-use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
+use super::symbols::MemberSymbol;
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
+use crate::plan::sql_nodes::{SqlNode, SqlNodesFactory};
+use crate::plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{CubeNameSymbol, CubeTableSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
 use crate::utils::sql_expression_scanner::analyze_template_arg_contexts;
 use cubenativeutils::CubeError;
 use itertools::Itertools;

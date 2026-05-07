@@ -1,7 +1,7 @@
 use super::ToSql;
+use crate::plan::VisitorContext;
 use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 
 pub fn render_filter(

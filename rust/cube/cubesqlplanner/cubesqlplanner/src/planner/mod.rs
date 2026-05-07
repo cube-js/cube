@@ -24,6 +24,4 @@ pub use params_allocator::ParamsAllocator;
 pub use query_properties::{FullKeyAggregateMeasures, OrderByItem, QueryProperties};
 pub use time_dimension::*;
 pub use top_level_planner::TopLevelPlanner;
-pub use visitor_context::{
-    evaluate_sql_call_with_context, evaluate_with_context, FiltersContext, VisitorContext,
-};
+pub use visitor_context::FiltersContext;

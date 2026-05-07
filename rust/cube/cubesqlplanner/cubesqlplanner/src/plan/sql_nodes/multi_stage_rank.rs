@@ -1,32 +1,24 @@
 use super::SqlNode;
+use crate::plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::symbols::MeasureKind;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
-pub struct MultiStageWindowNode {
-    input: Rc<dyn SqlNode>,
+pub struct MultiStageRankNode {
     else_processor: Rc<dyn SqlNode>,
     partition: Vec<String>,
 }
 
-impl MultiStageWindowNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        else_processor: Rc<dyn SqlNode>,
-        partition: Vec<String>,
-    ) -> Rc<Self> {
+impl MultiStageRankNode {
+    pub fn new(else_processor: Rc<dyn SqlNode>, partition: Vec<String>) -> Rc<Self> {
         Rc::new(Self {
-            input,
             else_processor,
             partition,
         })
-    }
-
-    pub fn input(&self) -> &Rc<dyn SqlNode> {
-        &self.input
     }
 
     pub fn else_processor(&self) -> &Rc<dyn SqlNode> {
@@ -38,7 +30,7 @@ impl MultiStageWindowNode {
     }
 }
 
-impl SqlNode for MultiStageWindowNode {
+impl SqlNode for MultiStageRankNode {
     fn to_sql(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -49,23 +41,33 @@ impl SqlNode for MultiStageWindowNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if m.is_multi_stage() && !m.is_calculated() {
+                if m.is_multi_stage() && matches!(m.kind(), MeasureKind::Rank) {
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
-                    let input_sql = self.input.to_sql(
-                        &inner_visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?;
-
+                    let order_by = if !m.measure_order_by().is_empty() {
+                        let sql = m
+                            .measure_order_by()
+                            .iter()
+                            .map(|item| -> Result<String, CubeError> {
+                                let sql = item.sql_call().eval(
+                                    &inner_visitor,
+                                    node_processor.clone(),
+                                    query_tools.clone(),
+                                    templates,
+                                )?;
+                                Ok(format!("{} {}", sql, item.direction()))
+                            })
+                            .collect::<Result<Vec<_>, _>>()?
+                            .join(", ");
+                        format!("ORDER BY {sql}")
+                    } else {
+                        "".to_string()
+                    };
                     let partition_by = if self.partition.is_empty() {
                         "".to_string()
                     } else {
                         format!("PARTITION BY {} ", self.partition.join(", "))
                     };
-                    let measure_type = m.measure_type();
-                    format!("{measure_type}({measure_type}({input_sql})) OVER ({partition_by})")
+                    format!("rank() OVER ({partition_by}{order_by})")
                 } else {
                     self.else_processor.to_sql(
                         visitor,
@@ -78,7 +80,7 @@ impl SqlNode for MultiStageWindowNode {
             }
             _ => {
                 return Err(CubeError::internal(format!(
-                    "Unexpected evaluation node type for MultStageWindowNode"
+                    "Unexpected evaluation node type for MultStageRankNode"
                 )));
             }
         };
@@ -90,6 +92,6 @@ impl SqlNode for MultiStageWindowNode {
     }
 
     fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
-        vec![self.input.clone(), self.else_processor.clone()]
+        vec![self.else_processor.clone()]
     }
 }

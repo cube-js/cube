@@ -1,5 +1,6 @@
+use crate::plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 
 use cubenativeutils::CubeError;

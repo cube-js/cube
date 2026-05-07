@@ -1,7 +1,7 @@
 use super::SqlNode;
+use crate::plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::utils::sql_expression_scanner::is_top_level_compound;
 use cubenativeutils::CubeError;

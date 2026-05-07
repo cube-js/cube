@@ -1,7 +1,7 @@
-use super::{CalcGroupsJoin, Join, QueryPlan, Schema, Select};
+use super::{CalcGroupsJoin, Join, QueryPlan, Schema, Select, VisitorContext};
 use crate::plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseCube, VisitorContext};
+use crate::planner::BaseCube;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

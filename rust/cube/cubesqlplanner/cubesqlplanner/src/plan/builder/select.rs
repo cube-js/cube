@@ -5,10 +5,10 @@ use crate::plan::{
 use crate::planner::filter::Filter;
 
 use crate::plan::expression::FunctionExpression;
+use crate::plan::sql_nodes::SqlNodesFactory;
+use crate::plan::VisitorContext;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
