@@ -8,7 +8,7 @@ impl ToSql for CaseDimension {
             ctx.eval_sql_call(member_sql)
         } else {
             Err(CubeError::internal(format!(
-                "Dimension {} hasn't sql evaluator",
+                "Dimension {} has no sql evaluator",
                 ctx.full_name
             )))
         }
