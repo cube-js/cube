@@ -1,7 +1,7 @@
 use crate::plan::{
-    CalcGroupsJoin, Filter, FilterItem, From, FromSource, Join, QualifiedColumnName,
-    SingleAliasedSource, SingleSource,
+    CalcGroupsJoin, From, FromSource, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
+use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

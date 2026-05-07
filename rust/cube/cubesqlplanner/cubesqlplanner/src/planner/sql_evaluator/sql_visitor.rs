@@ -1,7 +1,7 @@
 use super::sql_nodes::SqlNode;
 use super::CubeRefEvaluator;
 use super::MemberSymbol;
-use crate::plan::Filter;
+use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_call::CubeRef;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -69,6 +69,18 @@ impl SqlEvaluatorVisitor {
             templates,
         )?;
         Ok(result)
+    }
+
+    /// Evaluate a member symbol in filter-mode: timezone conversion is suppressed
+    /// because filter values are already normalized to the database timezone.
+    pub fn apply_for_filter(
+        &self,
+        node: &Rc<MemberSymbol>,
+        node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        self.with_ignore_tz_convert()
+            .apply(node, node_processor, templates)
     }
 
     pub fn ignore_tz_convert(&self) -> bool {

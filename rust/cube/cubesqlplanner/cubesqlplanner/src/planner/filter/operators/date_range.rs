@@ -1,4 +1,3 @@
-use super::{FilterOperationSql, FilterSqlContext};
 use crate::planner::time_dimension::QueryDateTimeHelper;
 use cubenativeutils::CubeError;
 
@@ -10,9 +9,9 @@ pub enum DateRangeKind {
 
 #[derive(Clone, Debug)]
 pub struct DateRangeOp {
-    kind: DateRangeKind,
-    from: String,
-    to: String,
+    pub(crate) kind: DateRangeKind,
+    pub(crate) from: String,
+    pub(crate) to: String,
 }
 
 impl DateRangeOp {
@@ -24,24 +23,5 @@ impl DateRangeOp {
         let from = QueryDateTimeHelper::format_from_date(&self.from, precision)?;
         let to = QueryDateTimeHelper::format_to_date(&self.to, precision)?;
         Ok((from, to))
-    }
-}
-
-impl FilterOperationSql for DateRangeOp {
-    fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
-        let from_param = ctx.format_and_allocate_from_date(&self.from)?;
-        let to_param = ctx.format_and_allocate_to_date(&self.to)?;
-        match self.kind {
-            DateRangeKind::InRange => ctx.plan_templates.time_range_filter(
-                ctx.member_sql.to_string(),
-                from_param,
-                to_param,
-            ),
-            DateRangeKind::NotInRange => ctx.plan_templates.time_not_in_range_filter(
-                ctx.member_sql.to_string(),
-                from_param,
-                to_param,
-            ),
-        }
     }
 }

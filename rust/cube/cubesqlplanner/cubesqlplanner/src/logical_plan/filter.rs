@@ -1,5 +1,5 @@
 use super::pretty_print::*;
-use crate::plan::{Filter, FilterItem};
+use crate::planner::filter::{Filter, FilterItem};
 use itertools::Itertools;
 
 #[derive(Default)]

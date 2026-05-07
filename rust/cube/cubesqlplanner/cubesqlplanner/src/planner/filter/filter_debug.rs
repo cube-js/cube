@@ -1,5 +1,4 @@
-use super::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
-use crate::planner::filter::BaseFilter;
+use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::sql_evaluator::DebugSql;
 
 impl DebugSql for BaseFilter {

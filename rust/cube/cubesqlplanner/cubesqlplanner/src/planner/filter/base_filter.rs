@@ -1,8 +1,6 @@
 use super::filter_operator::FilterOperator;
 use super::typed_filter::{resolve_base_symbol, TypedFilter};
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -71,6 +69,10 @@ impl BaseFilter {
         self.typed_filter.member_evaluator().clone()
     }
 
+    pub fn raw_member_evaluator_ref(&self) -> &Rc<MemberSymbol> {
+        self.typed_filter.member_evaluator()
+    }
+
     pub fn with_member_evaluator(
         &self,
         member_evaluator: Rc<MemberSymbol>,
@@ -113,6 +115,10 @@ impl BaseFilter {
         self.typed_filter.use_raw_values()
     }
 
+    pub fn typed_filter(&self) -> &TypedFilter {
+        &self.typed_filter
+    }
+
     pub fn member_name(&self) -> String {
         self.member_evaluator().full_name()
     }
@@ -137,28 +143,5 @@ impl BaseFilter {
         } else {
             None
         }
-    }
-
-    pub fn to_sql(
-        &self,
-        context: Rc<VisitorContext>,
-        plan_templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        let filters_context = context.filters_context();
-        if !filters_context.filter_params_columns.is_empty() {
-            let symbol_to_match =
-                resolve_base_symbol(self.typed_filter.member_evaluator()).resolve_reference_chain();
-            if let Some(filter_params_column) = filters_context
-                .filter_params_columns
-                .get(&symbol_to_match.full_name())
-            {
-                return self.typed_filter.to_sql_for_filter_params(
-                    filter_params_column,
-                    plan_templates,
-                    filters_context,
-                );
-            }
-        }
-        self.typed_filter.to_sql(context, plan_templates)
     }
 }

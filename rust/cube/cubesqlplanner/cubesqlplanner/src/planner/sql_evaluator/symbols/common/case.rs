@@ -1,4 +1,4 @@
-use crate::plan::FilterItem;
+use crate::planner::filter::FilterItem;
 use crate::{
     cube_bridge::{
         case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,

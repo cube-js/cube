@@ -1,7 +1,8 @@
 use crate::plan::{
-    AliasedExpr, Cte, Expr, Filter, From, FromSource, MemberExpression, OrderBy,
-    QualifiedColumnName, Schema, SchemaColumn, Select, SingleAliasedSource, SingleSource,
+    AliasedExpr, Cte, Expr, From, FromSource, MemberExpression, OrderBy, QualifiedColumnName,
+    Schema, SchemaColumn, Select, SingleAliasedSource, SingleSource,
 };
+use crate::planner::filter::Filter;
 
 use crate::plan::expression::FunctionExpression;
 use crate::planner::query_tools::QueryTools;

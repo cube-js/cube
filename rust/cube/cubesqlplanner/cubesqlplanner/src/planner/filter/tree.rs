@@ -1,8 +1,5 @@
-use crate::planner::filter::{BaseFilter, BaseSegment};
+use super::{BaseFilter, BaseSegment};
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::VisitorContext;
-use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
 
@@ -75,41 +72,6 @@ impl Filter {
 }
 
 impl FilterItem {
-    pub fn to_sql(
-        &self,
-        templates: &PlanSqlTemplates,
-        context: Rc<VisitorContext>,
-    ) -> Result<String, CubeError> {
-        let res = match self {
-            FilterItem::Group(group) => {
-                let operator = format!(" {} ", group.operator.to_string());
-                let items_sql = group
-                    .items
-                    .iter()
-                    .map(|itm| itm.to_sql(templates, context.clone()))
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .filter(|itm| !itm.is_empty())
-                    .collect::<Vec<_>>();
-                if items_sql.is_empty() {
-                    "".to_string()
-                } else {
-                    let result = items_sql.join(&operator);
-                    format!("({})", result)
-                }
-            }
-            FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone(), templates)?;
-                format!("({})", sql)
-            }
-            FilterItem::Segment(item) => {
-                let sql = item.to_sql(context.clone(), templates)?;
-                format!("({})", sql)
-            }
-        };
-        Ok(res)
-    }
-
     pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
         let mut result = Vec::new();
         self.find_all_member_evaluators(&mut result);
@@ -313,21 +275,5 @@ impl FilterItem {
                 None
             }
         }
-    }
-}
-
-impl Filter {
-    pub fn to_sql(
-        &self,
-        templates: &PlanSqlTemplates,
-        context: Rc<VisitorContext>,
-    ) -> Result<String, CubeError> {
-        let res = self
-            .items
-            .iter()
-            .map(|itm| itm.to_sql(templates, context.clone()))
-            .collect::<Result<Vec<_>, _>>()?
-            .join(" AND ");
-        Ok(res)
     }
 }

@@ -2,7 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use super::sql_evaluator::{CubeRefEvaluator, MemberSymbol, SqlCall};
 use crate::cube_bridge::member_sql::FilterParamsColumn;
-use crate::plan::Filter;
+use crate::planner::filter::Filter;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -60,19 +60,6 @@ impl VisitorContext {
         }
     }
 
-    pub fn new_with_node_processor(
-        query_tools: Rc<QueryTools>,
-        node_processor: Rc<dyn SqlNode>,
-    ) -> Self {
-        Self {
-            query_tools,
-            node_processor,
-            cube_ref_evaluator: Rc::new(CubeRefEvaluator::new(HashMap::new(), HashMap::new())),
-            all_filters: None,
-            filters_context: FiltersContext::default(),
-        }
-    }
-
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
         SqlEvaluatorVisitor::new(
             query_tools,
@@ -100,19 +87,6 @@ pub fn evaluate_with_context(
     templates: &PlanSqlTemplates,
 ) -> Result<String, CubeError> {
     let visitor = context.make_visitor(context.query_tools());
-    let node_processor = context.node_processor();
-
-    visitor.apply(node, node_processor, templates)
-}
-
-pub fn evaluate_filter_with_context(
-    node: &Rc<MemberSymbol>,
-    context: Rc<VisitorContext>,
-    templates: &PlanSqlTemplates,
-) -> Result<String, CubeError> {
-    let visitor = context
-        .make_visitor(context.query_tools())
-        .with_ignore_tz_convert();
     let node_processor = context.node_processor();
 
     visitor.apply(node, node_processor, templates)

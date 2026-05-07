@@ -1,7 +1,7 @@
 use super::base_filter::{BaseFilter, FilterType};
 use super::FilterOperator;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
-use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{Compiler, MemberSymbol};
 use cubenativeutils::CubeError;

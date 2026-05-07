@@ -1,5 +1,5 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::plan::FilterItem;
+use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::query_tools::QueryTools;

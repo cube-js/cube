@@ -1,7 +1,5 @@
 use super::CompiledPreAggregation;
-use crate::plan::filter::FilterGroupOperator;
-use crate::plan::FilterItem;
-use crate::planner::filter::BaseFilter;
+use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::DimensionSymbol;
 use crate::planner::sql_evaluator::MemberSymbol;
