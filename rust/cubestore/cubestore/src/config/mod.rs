@@ -510,6 +510,8 @@ pub trait ConfigObj: DIService {
 
     fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
+    fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64>;
+
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
     fn metadata_cache_time_to_idle_secs(&self) -> u64;
@@ -643,6 +645,7 @@ pub struct ConfigObjImpl {
     pub query_cache_max_capacity_bytes: u64,
     pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
+    pub query_cache_stale_while_revalidate_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
@@ -956,6 +959,9 @@ impl ConfigObj for ConfigObjImpl {
     fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
         self.query_cache_time_to_idle_secs
     }
+    fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64> {
+        self.query_cache_stale_while_revalidate_secs
+    }
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
         self.metadata_cache_max_capacity_bytes
@@ -1233,6 +1239,8 @@ impl Config {
 
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let query_cache_stale_while_revalidate_secs: u64 =
+            env_parse("CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE", 0);
         let query_cache_time_to_idle_secs = env_parse(
             "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
             // 1 hour
@@ -1528,6 +1536,13 @@ impl Config {
                 } else {
                     Some(query_cache_time_to_idle_secs)
                 },
+                query_cache_stale_while_revalidate_secs: if query_cache_stale_while_revalidate_secs
+                    == 0
+                {
+                    None
+                } else {
+                    Some(query_cache_stale_while_revalidate_secs)
+                },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
                     0,
@@ -1740,6 +1755,7 @@ impl Config {
                 query_cache_max_capacity_bytes: 512 << 20,
                 query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
+                query_cache_stale_while_revalidate_secs: None,
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
@@ -2393,6 +2409,7 @@ impl Config {
             self.config_obj.query_cache_max_capacity_bytes(),
             self.config_obj.query_cache_time_to_idle_secs(),
             self.config_obj.query_queue_cache_max_capacity(),
+            self.config_obj.query_cache_stale_while_revalidate_secs(),
         ));
 
         let query_cache_to_move = query_cache.clone();

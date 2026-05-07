@@ -1063,7 +1063,7 @@ pub mod tests {
             Arc::new(test_utils::MetaStoreMock {}),
             Arc::new(test_utils::CacheStoreMock {}),
             &vec![],
-            Arc::new(SqlResultCache::new(1 << 20, None, 10000)),
+            Arc::new(SqlResultCache::new(1 << 20, None, 10000, None)),
             Arc::new(SessionContext::new().state()),
         )
     }

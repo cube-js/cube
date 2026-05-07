@@ -2004,6 +2004,7 @@ mod tests {
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
                     1000,
+                    None,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2088,6 +2089,7 @@ mod tests {
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
                     1000,
+                    None,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2207,6 +2209,7 @@ mod tests {
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
                     1000,
+                    None,
                 )),
                 BasicProcessRateLimiter::new(),
             );
