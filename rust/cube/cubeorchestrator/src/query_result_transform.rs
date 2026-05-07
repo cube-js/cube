@@ -1020,47 +1020,16 @@ mod tests {
     use crate::transport::JsRawColumnarData;
     use anyhow::Result;
     use chrono::{TimeZone, Timelike, Utc};
-    use indexmap::IndexMap;
     use serde_json::from_str;
     use std::{fmt, sync::LazyLock};
 
     type TestSuiteData = HashMap<String, TestData>;
 
-    /// Row-oriented mirror of `JsRawColumnarData`, kept only so the inline JSON test
-    /// fixtures can stay in their natural array-of-objects shape. Converted
-    /// to the columnar `JsRawColumnarData` via `to_js_raw_data()` before being fed to
-    /// `QueryResult::from_js_raw_data`.
-    type RowOrientedRawData = Vec<IndexMap<String, DBResponsePrimitive>>;
-
-    fn rows_to_js_raw_data(rows: &RowOrientedRawData) -> JsRawColumnarData {
-        if rows.is_empty() {
-            return JsRawColumnarData::default();
-        }
-
-        let members: Vec<String> = rows[0].keys().cloned().collect();
-        let mut columns: Vec<Vec<DBResponsePrimitive>> = members
-            .iter()
-            .map(|_| Vec::with_capacity(rows.len()))
-            .collect();
-
-        for row in rows {
-            for (idx, member) in members.iter().enumerate() {
-                columns[idx].push(
-                    row.get(member)
-                        .cloned()
-                        .unwrap_or(DBResponsePrimitive::Null),
-                );
-            }
-        }
-
-        JsRawColumnarData { members, columns }
-    }
-
     #[derive(Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct TestData {
         request: TransformDataRequest,
-        query_result: RowOrientedRawData,
+        query_result: JsRawColumnarData,
         final_result_default: Option<TransformedData>,
         final_result_compact: Option<TransformedData>,
     }
@@ -1106,16 +1075,22 @@ mod tests {
       },
       "queryType": "regularQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__city": "Missouri City",
-        "e_commerce_records_us2021__avg_discount": "0.80000000000000000000"
-      },
-      {
-        "e_commerce_records_us2021__city": "Abilene",
-        "e_commerce_records_us2021__avg_discount": "0.80000000000000000000"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__city",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "Missouri City",
+          "Abilene"
+        ],
+        [
+          "0.80000000000000000000",
+          "0.80000000000000000000"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.city": "Missouri City",
@@ -1182,16 +1157,22 @@ mod tests {
       },
       "queryType": "regularQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__postal_code": "95823",
-        "e_commerce_records_us2021__avg_profit": "646.1258666666666667"
-      },
-      {
-        "e_commerce_records_us2021__postal_code": "64055",
-        "e_commerce_records_us2021__avg_profit": "487.8315000000000000"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__postal_code",
+        "e_commerce_records_us2021__avg_profit"
+      ],
+      "columns": [
+        [
+          "95823",
+          "64055"
+        ],
+        [
+          "646.1258666666666667",
+          "487.8315000000000000"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.postalCode": "95823",
@@ -1286,16 +1267,22 @@ mod tests {
       },
       "queryType": "compareDateRangeQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_day": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__count": "10"
-      },
-      {
-        "e_commerce_records_us2021__order_date_day": null,
-        "e_commerce_records_us2021__count": null
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_day",
+        "e_commerce_records_us2021__count"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          null
+        ],
+        [
+          "10",
+          null
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.day": "2020-01-01T00:00:00.000",
@@ -1400,16 +1387,22 @@ mod tests {
       },
       "queryType": "compareDateRangeQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_day": "2020-03-02T00:00:00.000",
-        "e_commerce_records_us2021__count": "11"
-      },
-      {
-        "e_commerce_records_us2021__order_date_day": "2020-03-03T00:00:00.000",
-        "e_commerce_records_us2021__count": "7"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_day",
+        "e_commerce_records_us2021__count"
+      ],
+      "columns": [
+        [
+          "2020-03-02T00:00:00.000",
+          "2020-03-03T00:00:00.000"
+        ],
+        [
+          "11",
+          "7"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.day": "2020-03-02T00:00:00.000",
@@ -1506,16 +1499,22 @@ mod tests {
       },
       "queryType": "blendingQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.15638297872340425532"
-      },
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.17573529411764705882"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_month",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2020-02-01T00:00:00.000"
+        ],
+        [
+          "0.15638297872340425532",
+          "0.17573529411764705882"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
@@ -1612,16 +1611,22 @@ mod tests {
       },
       "queryType": "blendingQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.28571428571428571429"
-      },
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.21777777777777777778"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_month",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2020-02-01T00:00:00.000"
+        ],
+        [
+          "0.28571428571428571429",
+          "0.21777777777777777778"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
@@ -1732,18 +1737,27 @@ mod tests {
       },
       "queryType": "blendingQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__order_date_week": "2019-12-30T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.28571428571428571429"
-      },
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
-        "e_commerce_records_us2021__order_date_week": "2020-01-27T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.21777777777777777778"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_month",
+        "e_commerce_records_us2021__order_date_week",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2020-02-01T00:00:00.000"
+        ],
+        [
+          "2019-12-30T00:00:00.000",
+          "2020-01-27T00:00:00.000"
+        ],
+        [
+          "0.28571428571428571429",
+          "0.21777777777777777778"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
@@ -2317,7 +2331,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2330,7 +2344,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2343,7 +2357,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2356,7 +2370,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2373,7 +2387,7 @@ mod tests {
             .alias_to_member_name_map
             .remove("e_commerce_records_us2021__avg_discount");
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         match TransformedData::transform(&test_data.request, &raw_data) {
             Ok(_) => Err(TestError("regular_discount_by_city should fail ".to_string()).into()),
             Err(_) => Ok(()), // Should throw an error
@@ -2391,7 +2405,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2408,7 +2422,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2425,7 +2439,7 @@ mod tests {
             .alias_to_member_name_map
             .remove("e_commerce_records_us2021__avg_discount");
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         match TransformedData::transform(&test_data.request, &raw_data) {
             Ok(_) => Err(TestError("regular_discount_by_city should fail ".to_string()).into()),
             Err(_) => Ok(()), // Should throw an error
@@ -2439,7 +2453,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2452,7 +2466,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2469,7 +2483,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2486,7 +2500,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2499,7 +2513,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2512,7 +2526,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2524,7 +2538,7 @@ mod tests {
             .get(&"regular_profit_by_postal_code".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         test_data.request.alias_to_member_name_map = HashMap::new();
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
@@ -2672,7 +2686,7 @@ mod tests {
             .get(&"regular_profit_by_postal_code".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = &test_data.request.query;
@@ -2733,7 +2747,7 @@ mod tests {
             .get(&"compare_date_range_count_by_order_date".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = &test_data.request.query;
@@ -2808,7 +2822,7 @@ mod tests {
             )
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = &test_data.request.query;
@@ -2850,7 +2864,7 @@ mod tests {
             .get(&"regular_profit_by_postal_code".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -2899,7 +2913,7 @@ mod tests {
             .get(&"regular_discount_by_city".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -2948,7 +2962,7 @@ mod tests {
             .get(&"compare_date_range_count_by_order_date".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3038,7 +3052,7 @@ mod tests {
             )
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3094,7 +3108,7 @@ mod tests {
             .get(&"regular_discount_by_city".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3131,7 +3145,7 @@ mod tests {
             .request
             .alias_to_member_name_map
             .remove("e_commerce_records_us2021__avg_discount");
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3160,7 +3174,7 @@ mod tests {
             .request
             .annotation
             .remove("ECommerceRecordsUs2021.avg_discount");
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3184,7 +3198,7 @@ mod tests {
     /// compact dataset. This pins the contract: same data, different orientation.
     fn assert_columnar_matches_compact(fixture: &str) -> Result<()> {
         let mut test_data = TEST_SUITE_DATA.get(fixture).unwrap().clone();
-        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
 
         test_data.request.res_type = Some(ResultType::Compact);
         let compact = TransformedData::transform(&test_data.request, &raw_data)?;
