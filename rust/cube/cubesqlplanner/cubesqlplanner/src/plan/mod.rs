@@ -9,6 +9,7 @@ pub mod order;
 pub mod query_plan;
 pub mod schema;
 pub mod select;
+pub mod symbols;
 pub mod time_series;
 pub mod union;
 

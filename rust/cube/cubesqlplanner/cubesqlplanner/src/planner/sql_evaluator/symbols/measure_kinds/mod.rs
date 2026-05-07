@@ -8,9 +8,7 @@ pub use count::*;
 
 use super::common::AggregationType;
 use super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_evaluator::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -59,25 +57,6 @@ impl MeasureKind {
                 "Unknown measure type: '{}'",
                 measure_type
             )))
-        }
-    }
-
-    pub fn evaluate_sql(
-        &self,
-        full_name: &str,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        match self {
-            Self::Count(c) => c.evaluate_sql(visitor, node_processor, query_tools, templates),
-            Self::Aggregated(a) => a.evaluate_sql(visitor, node_processor, query_tools, templates),
-            Self::Calculated(c) => c.evaluate_sql(visitor, node_processor, query_tools, templates),
-            Self::Rank => Err(CubeError::internal(format!(
-                "Rank measure doesn't support direct evaluation for {}",
-                full_name
-            ))),
         }
     }
 

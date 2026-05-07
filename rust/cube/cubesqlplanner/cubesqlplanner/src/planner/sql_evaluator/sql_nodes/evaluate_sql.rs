@@ -1,4 +1,5 @@
 use super::SqlNode;
+use crate::plan::symbols::{MemberSqlContext, ToSql};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
@@ -24,38 +25,16 @@ impl SqlNode for EvaluateSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Dimension(ev) => {
-                let res = ev.evaluate_sql(
-                    visitor,
-                    node_processor.clone(),
-                    query_tools.clone(),
-                    templates,
-                )?;
-                Ok(res)
-            }
-            MemberSymbol::TimeDimension(ev) => {
-                let visitor = visitor.with_ignore_tz_convert();
-                let res = visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
-                Ok(res)
-            }
-            MemberSymbol::Measure(ev) => ev.evaluate_sql(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            ),
-            MemberSymbol::MemberExpression(e) => {
-                let res = e.evaluate_sql(
-                    visitor,
-                    node_processor.clone(),
-                    query_tools.clone(),
-                    templates,
-                )?;
-                Ok(res)
-            }
-        }?;
-        Ok(res)
+        let path = node.compiled_path();
+        let ctx = MemberSqlContext {
+            visitor,
+            node_processor: &node_processor,
+            query_tools: &query_tools,
+            templates,
+            name: path.name(),
+            full_name: path.full_name(),
+        };
+        node.as_ref().to_sql(&ctx)
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

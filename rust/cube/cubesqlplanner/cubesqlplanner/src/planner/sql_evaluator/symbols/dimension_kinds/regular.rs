@@ -1,8 +1,6 @@
 use super::super::common::DimensionType;
 use super::super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_evaluator::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -26,17 +24,6 @@ impl RegularDimension {
 
     pub fn member_sql(&self) -> &Rc<SqlCall> {
         &self.member_sql
-    }
-
-    pub fn evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        self.member_sql
-            .eval(visitor, node_processor, query_tools, templates)
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {

@@ -10,9 +10,7 @@ pub use switch::*;
 
 use super::common::DimensionType;
 use super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_evaluator::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -25,30 +23,6 @@ pub enum DimensionKind {
 }
 
 impl DimensionKind {
-    pub fn evaluate_sql(
-        &self,
-        name: &str,
-        full_name: &str,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        match self {
-            Self::Regular(r) => r.evaluate_sql(visitor, node_processor, query_tools, templates),
-            Self::Geo(_) => Err(CubeError::internal(format!(
-                "Geo dimension {} doesn't support evaluate_sql directly",
-                full_name
-            ))),
-            Self::Switch(s) => {
-                s.evaluate_sql(name, visitor, node_processor, query_tools, templates)
-            }
-            Self::Case(c) => {
-                c.evaluate_sql(full_name, visitor, node_processor, query_tools, templates)
-            }
-        }
-    }
-
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         match self {
             Self::Regular(r) => r.get_dependencies(),

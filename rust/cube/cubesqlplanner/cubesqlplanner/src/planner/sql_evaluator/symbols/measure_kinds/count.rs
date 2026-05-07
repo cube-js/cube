@@ -1,7 +1,5 @@
 use super::super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{sql_nodes::SqlNode, CubeRef, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_evaluator::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -23,40 +21,6 @@ impl CountMeasure {
 
     pub fn sql(&self) -> &CountSql {
         &self.sql
-    }
-
-    pub fn evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        match &self.sql {
-            CountSql::Explicit(sql) => sql.eval(visitor, node_processor, query_tools, templates),
-            CountSql::Auto(pk_sqls) => {
-                if pk_sqls.len() > 1 {
-                    let pk_strings = pk_sqls
-                        .iter()
-                        .map(|pk| -> Result<_, CubeError> {
-                            let res = pk.eval(
-                                visitor,
-                                node_processor.clone(),
-                                query_tools.clone(),
-                                templates,
-                            )?;
-                            templates.cast_to_string(&res)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    templates.concat_strings(&pk_strings)
-                } else if pk_sqls.len() == 1 {
-                    let pk_sql = pk_sqls.first().unwrap();
-                    pk_sql.eval(visitor, node_processor, query_tools, templates)
-                } else {
-                    Ok("*".to_string())
-                }
-            }
-        }
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
