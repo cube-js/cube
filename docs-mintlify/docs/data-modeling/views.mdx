@@ -423,10 +423,24 @@ Check [APIs & Integrations][ref-apis-support] for details on folder
 support. For tools that don't support nested folders, the structure is
 automatically flattened.
 
+## Grouping views with view groups
+
+When a data model contains many views, [view groups][ref-view-groups] help
+organize them into named collections by domain or purpose — for example,
+`sales`, `finance`, or `people`. They're exposed through the
+[`/v1/meta`][ref-meta-endpoint] API so downstream tools, AI agents, and
+embedded analytics can present a navigable catalog.
+
+See [View groups][ref-view-groups] for the full guide and the
+[view group reference][ref-view-group-ref] for the complete list of
+parameters.
+
 ## Next steps
 
 - See the [view reference][ref-view-reference] for the full list of
   parameters
+- Learn about [view groups][ref-view-groups] to organize views into
+  named collections
 - Learn about [access policies][ref-access-policies] to govern view access
 - Explore [AI context][ref-ai-context] to improve AI query accuracy
 - Use the [Semantic Model IDE][ref-ide] to develop views interactively
@@ -446,4 +460,7 @@ automatically flattened.
 [ref-ide]: /docs/data-modeling/data-model-ide
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-apis-support]: /reference#data-modeling
+[ref-view-groups]: /docs/data-modeling/view-groups
+[ref-view-group-ref]: /reference/data-modeling/view-group
+[ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference
 [wiki-dry]: https://en.wikipedia.org/wiki/Don%27t_repeat_yourself

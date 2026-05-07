@@ -17,7 +17,8 @@ option][ref-config-repository-factory] to dynamically define the folder name and
 data model file contents.
 
 It's recommended to place each cube or view in a separate file, in `model/cubes`
-and `model/views` folders, respectively. Example:
+and `model/views` folders, respectively. [View groups][ref-view-groups] can be
+defined alongside views or in their own files. Example:
 
 ```tree
 model
@@ -26,7 +27,8 @@ model
 │   ├── products.yml
 │   └── users.yml
 └── views
-    └── revenue.yml
+    ├── revenue.yml
+    └── view_groups.yml
 ```
 
 ## Model syntax
@@ -998,6 +1000,7 @@ string values in time dimensions.
 [ref-dax-api-date-hierarchies]: /reference/dax-api#date-hierarchies
 [ref-time-dimension]: /docs/data-modeling/dimensions#time-dimensions
 [ref-recipe-string-time-dimensions]: /recipes/data-modeling/string-time-dimensions
+[ref-view-groups]: /reference/data-modeling/view-group
 [ref-views]: /docs/data-modeling/views
 [ref-preaggs]: /reference/data-modeling/pre-aggregations
 [ref-join-paths]: /docs/data-modeling/joins#join-paths

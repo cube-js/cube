@@ -137,7 +137,8 @@
                 "group": "Views",
                 "root": "docs/data-modeling/views",
                 "pages": [
-                  "docs/data-modeling/multi-fact-views"
+                  "docs/data-modeling/multi-fact-views",
+                  "docs/data-modeling/view-groups"
                 ]
               },
               {
@@ -456,6 +457,7 @@
             "pages": [
               "reference/data-modeling/cube",
               "reference/data-modeling/view",
+              "reference/data-modeling/view-group",
               "reference/data-modeling/measures",
               "reference/data-modeling/dimensions",
               "reference/data-modeling/hierarchies",
