@@ -1,10 +1,5 @@
 name: Bridge tests
 
-# Runs the Tesseract bridge regression suite (real V8 driving the production
-# bridge code). PR-only and only when the underlying Rust crates or the test
-# harness change — the bridge tests don't catch issues outside that scope and
-# we don't need the cycle time on master pushes.
-
 on:
   pull_request:
     paths:
