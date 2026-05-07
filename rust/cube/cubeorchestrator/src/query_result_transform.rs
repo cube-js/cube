@@ -233,8 +233,8 @@ pub fn get_members(
 ) -> Result<(MembersMap, Vec<String>)> {
     let mut members_map: MembersMap = IndexMap::new();
     // IndexMap maintains insertion order, ensuring deterministic column ordering.
-    // The order comes from db_data.columns which now preserves the database result order
-    // (since JsRawData uses IndexMap instead of HashMap).
+    // `db_data.columns` preserves the original database result order — for JS
+    // input it's `JsRawColumnarData::members` (a `Vec` of column names in order).
     // Not sure if it solves the original comment below.
     // Original Comment:
     // Hashmaps don't guarantee the order of the elements while iterating
@@ -243,7 +243,7 @@ pub fn get_members(
     // in sync with the order of members in members list.
     let mut members_arr: Vec<String> = vec![];
 
-    if db_data.columns.is_empty() {
+    if db_data.members.is_empty() {
         validate_query_members_in_annotation(query, annotation)?;
         return Ok((members_map, members_arr));
     }
@@ -252,7 +252,7 @@ pub fn get_members(
     // There is no granularity type/class implementation in rust yet.
     let mut minimal_granularities: HashMap<String, (u8, String)> = HashMap::new();
 
-    for column in db_data.columns.iter() {
+    for column in db_data.members.iter() {
         let member_name = alias_to_member_name_map
             .get(column)
             .context(format!("Member name not found for alias: '{}'", column))?;
@@ -1017,7 +1017,7 @@ impl Display for DBResponseValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::JsRawData;
+    use crate::transport::JsRawColumnarData;
     use anyhow::Result;
     use chrono::{TimeZone, Timelike, Utc};
     use serde_json::from_str;
@@ -1029,7 +1029,7 @@ mod tests {
     #[serde(rename_all = "camelCase")]
     struct TestData {
         request: TransformDataRequest,
-        query_result: JsRawData,
+        query_result: JsRawColumnarData,
         final_result_default: Option<TransformedData>,
         final_result_compact: Option<TransformedData>,
     }
@@ -1075,16 +1075,22 @@ mod tests {
       },
       "queryType": "regularQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__city": "Missouri City",
-        "e_commerce_records_us2021__avg_discount": "0.80000000000000000000"
-      },
-      {
-        "e_commerce_records_us2021__city": "Abilene",
-        "e_commerce_records_us2021__avg_discount": "0.80000000000000000000"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__city",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "Missouri City",
+          "Abilene"
+        ],
+        [
+          "0.80000000000000000000",
+          "0.80000000000000000000"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.city": "Missouri City",
@@ -1151,16 +1157,22 @@ mod tests {
       },
       "queryType": "regularQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__postal_code": "95823",
-        "e_commerce_records_us2021__avg_profit": "646.1258666666666667"
-      },
-      {
-        "e_commerce_records_us2021__postal_code": "64055",
-        "e_commerce_records_us2021__avg_profit": "487.8315000000000000"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__postal_code",
+        "e_commerce_records_us2021__avg_profit"
+      ],
+      "columns": [
+        [
+          "95823",
+          "64055"
+        ],
+        [
+          "646.1258666666666667",
+          "487.8315000000000000"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.postalCode": "95823",
@@ -1255,16 +1267,22 @@ mod tests {
       },
       "queryType": "compareDateRangeQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_day": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__count": "10"
-      },
-      {
-        "e_commerce_records_us2021__order_date_day": null,
-        "e_commerce_records_us2021__count": null
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_day",
+        "e_commerce_records_us2021__count"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          null
+        ],
+        [
+          "10",
+          null
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.day": "2020-01-01T00:00:00.000",
@@ -1369,16 +1387,22 @@ mod tests {
       },
       "queryType": "compareDateRangeQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_day": "2020-03-02T00:00:00.000",
-        "e_commerce_records_us2021__count": "11"
-      },
-      {
-        "e_commerce_records_us2021__order_date_day": "2020-03-03T00:00:00.000",
-        "e_commerce_records_us2021__count": "7"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_day",
+        "e_commerce_records_us2021__count"
+      ],
+      "columns": [
+        [
+          "2020-03-02T00:00:00.000",
+          "2020-03-03T00:00:00.000"
+        ],
+        [
+          "11",
+          "7"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.day": "2020-03-02T00:00:00.000",
@@ -1475,16 +1499,22 @@ mod tests {
       },
       "queryType": "blendingQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.15638297872340425532"
-      },
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.17573529411764705882"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_month",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2020-02-01T00:00:00.000"
+        ],
+        [
+          "0.15638297872340425532",
+          "0.17573529411764705882"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
@@ -1581,16 +1611,22 @@ mod tests {
       },
       "queryType": "blendingQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.28571428571428571429"
-      },
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.21777777777777777778"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_month",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2020-02-01T00:00:00.000"
+        ],
+        [
+          "0.28571428571428571429",
+          "0.21777777777777777778"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
@@ -1701,18 +1737,27 @@ mod tests {
       },
       "queryType": "blendingQuery"
     },
-    "queryResult": [
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
-        "e_commerce_records_us2021__order_date_week": "2019-12-30T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.28571428571428571429"
-      },
-      {
-        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
-        "e_commerce_records_us2021__order_date_week": "2020-01-27T00:00:00.000",
-        "e_commerce_records_us2021__avg_discount": "0.21777777777777777778"
-      }
-    ],
+    "queryResult": {
+      "members": [
+        "e_commerce_records_us2021__order_date_month",
+        "e_commerce_records_us2021__order_date_week",
+        "e_commerce_records_us2021__avg_discount"
+      ],
+      "columns": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2020-02-01T00:00:00.000"
+        ],
+        [
+          "2019-12-30T00:00:00.000",
+          "2020-01-27T00:00:00.000"
+        ],
+        [
+          "0.28571428571428571429",
+          "0.21777777777777777778"
+        ]
+      ]
+    },
     "finalResultDefault": [
       {
         "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
@@ -2530,7 +2575,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2572,7 +2617,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2620,7 +2665,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2684,7 +2729,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },
@@ -2756,7 +2801,7 @@ mod tests {
             query_type,
             query,
             &QueryResult {
-                columns: vec![],
+                members: vec![],
                 rows: vec![],
                 columns_pos: IndexMap::new(),
             },

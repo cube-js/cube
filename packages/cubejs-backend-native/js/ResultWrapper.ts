@@ -15,6 +15,45 @@ export interface DataResult {
   getResults(): ResultWrapper[];
 }
 
+export interface JsRawColumnarData {
+  members: string[];
+  columns: any[][];
+}
+
+export function rowsToColumnar(rawData: any): JsRawColumnarData {
+  let rows: any[];
+
+  if (Array.isArray(rawData)) {
+    rows = rawData;
+  } else if (rawData) {
+    rows = Array.from(rawData as Iterable<any>);
+  } else {
+    rows = [];
+  }
+
+  const rowCount = rows.length;
+  if (rowCount === 0) {
+    return { members: [], columns: [] };
+  }
+
+  const members = Object.keys(rows[0]);
+  const memberCount = members.length;
+  const columns: any[][] = new Array(memberCount);
+
+  for (let j = 0; j < memberCount; j++) {
+    const member = members[j];
+    const col = new Array(rowCount);
+
+    for (let i = 0; i < rowCount; i++) {
+      col[i] = rows[i][member];
+    }
+
+    columns[j] = col;
+  }
+
+  return { members, columns };
+}
+
 class BaseWrapper {
   public readonly isWrapper: boolean = true;
 }
@@ -140,14 +179,19 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
       return [this.nativeReference];
     }
 
+    // Pivot to columnar before serializing: the row-oriented form repeats
+    // every column name on every row, which inflates JSON size and forces
+    // the Rust side to allocate a per-row map before transposing back to
+    // its native columnar `QueryResult` representation.
+    //
     // Serialize to a Buffer so the Rust side can decode via
-    // serde_json::from_slice instead of walking a JsArray through the
+    // serde_json::from_slice instead of walking a JsValue through the
     // Neon bridge with JsValueDeserializer. On 5 MB of AoO rows
-    // (~21k rows × 8 fields) the JsArray walk costs ~80 ms locally;
+    // (~21k rows × 8 fields) the JsValue walk costs ~80 ms locally;
     // Buffer + serde_json is ~7× faster (M3 MAX) and tracks V8's JSON.parse
     // (~11 ms on the same payload). On a real server it should be 3-6× slower,
-    // so avoiding the JsArray walk matters even more there.
-    return [Buffer.from(JSON.stringify(this.jsResult))];
+    // so avoiding the JsValue walk matters even more there.
+    return [Buffer.from(JSON.stringify(rowsToColumnar(this.jsResult)))];
   }
 
   public setTransformData(td: any) {

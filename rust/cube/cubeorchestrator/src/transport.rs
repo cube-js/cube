@@ -329,7 +329,13 @@ pub struct TransformDataRequest {
     pub res_type: Option<ResultType>,
 }
 
-pub type JsRawData = Vec<IndexMap<String, DBResponsePrimitive>>;
+/// Columnar representation of raw query results sent from JS to Rust.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsRawColumnarData {
+    pub members: Vec<String>,
+    pub columns: Vec<Vec<DBResponsePrimitive>>,
+}
 
 #[cfg(test)]
 mod tests {
