@@ -5,7 +5,7 @@ use cubeorchestrator::query_result_transform::{
     DBResponsePrimitive, DBResponseValue, RequestResultData, RequestResultDataMulti,
     TransformedData,
 };
-use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
+use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue, ValueObject};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
@@ -92,27 +92,12 @@ impl ResultWrapper {
                 Arc::clone(&js_box)
             } else if let Ok(js_buffer) = raw_data_js.downcast::<JsBuffer, _>(cx) {
                 let bytes = js_buffer.as_slice(cx);
-                let js_raw_data: JsRawData = serde_json::from_slice(bytes).map_err(|e| {
+                let js_raw_data: JsRawColumnarData = serde_json::from_slice(bytes).map_err(|e| {
                     CubeError::internal(format!(
                         "Can't parse raw data JSON from JS ResultWrapper: {}",
                         e
                     ))
                 })?;
-
-                QueryResult::from_js_raw_data(js_raw_data)
-                    .map(Arc::new)
-                    .map_cube_err("Can't build results data from JS rawData")?
-            } else if let Ok(js_array) = raw_data_js.downcast::<JsArray, _>(cx) {
-                let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
-                let js_raw_data: JsRawData = match Deserialize::deserialize(deserializer) {
-                    Ok(data) => data,
-                    Err(_) => {
-                        return Err(CubeError::internal(
-                            "Can't deserialize results raw data from JS ResultWrapper object"
-                                .to_string(),
-                        ));
-                    }
-                };
 
                 QueryResult::from_js_raw_data(js_raw_data)
                     .map(Arc::new)
@@ -315,21 +300,14 @@ fn extract_query_result(
         Ok(Arc::clone(&js_box))
     } else if let Ok(js_buffer) = data_arg.downcast::<JsBuffer, _>(cx) {
         let bytes = js_buffer.as_slice(cx);
-        let js_raw_data: JsRawData = serde_json::from_slice(bytes)?;
-
-        QueryResult::from_js_raw_data(js_raw_data)
-            .map(Arc::new)
-            .map_err(anyhow::Error::from)
-    } else if let Ok(js_array) = data_arg.downcast::<JsArray, _>(cx) {
-        let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
-        let js_raw_data: JsRawData = Deserialize::deserialize(deserializer)?;
+        let js_raw_data: JsRawColumnarData = serde_json::from_slice(bytes)?;
 
         QueryResult::from_js_raw_data(js_raw_data)
             .map(Arc::new)
             .map_err(anyhow::Error::from)
     } else {
         Err(anyhow::anyhow!(
-            "Second argument must be an Array of JsBox<Arc<QueryResult>> or JsArray"
+            "Second argument must be a JsBox<Arc<QueryResult>> or a JsBuffer with columnar JsRawColumnarData JSON"
         ))
     }
 }

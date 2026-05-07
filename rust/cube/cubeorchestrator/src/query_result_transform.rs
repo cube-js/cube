@@ -233,8 +233,8 @@ pub fn get_members(
 ) -> Result<(MembersMap, Vec<String>)> {
     let mut members_map: MembersMap = IndexMap::new();
     // IndexMap maintains insertion order, ensuring deterministic column ordering.
-    // The order comes from db_data.columns which now preserves the database result order
-    // (since JsRawData uses IndexMap instead of HashMap).
+    // `db_data.columns` preserves the original database result order — for JS
+    // input it's `JsRawColumnarData::members` (a `Vec` of column names in order).
     // Not sure if it solves the original comment below.
     // Original Comment:
     // Hashmaps don't guarantee the order of the elements while iterating
@@ -1017,19 +1017,50 @@ impl Display for DBResponseValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::JsRawData;
+    use crate::transport::JsRawColumnarData;
     use anyhow::Result;
     use chrono::{TimeZone, Timelike, Utc};
+    use indexmap::IndexMap;
     use serde_json::from_str;
     use std::{fmt, sync::LazyLock};
 
     type TestSuiteData = HashMap<String, TestData>;
 
+    /// Row-oriented mirror of `JsRawColumnarData`, kept only so the inline JSON test
+    /// fixtures can stay in their natural array-of-objects shape. Converted
+    /// to the columnar `JsRawColumnarData` via `to_js_raw_data()` before being fed to
+    /// `QueryResult::from_js_raw_data`.
+    type RowOrientedRawData = Vec<IndexMap<String, DBResponsePrimitive>>;
+
+    fn rows_to_js_raw_data(rows: &RowOrientedRawData) -> JsRawColumnarData {
+        if rows.is_empty() {
+            return JsRawColumnarData::default();
+        }
+
+        let members: Vec<String> = rows[0].keys().cloned().collect();
+        let mut columns: Vec<Vec<DBResponsePrimitive>> = members
+            .iter()
+            .map(|_| Vec::with_capacity(rows.len()))
+            .collect();
+
+        for row in rows {
+            for (idx, member) in members.iter().enumerate() {
+                columns[idx].push(
+                    row.get(member)
+                        .cloned()
+                        .unwrap_or(DBResponsePrimitive::Null),
+                );
+            }
+        }
+
+        JsRawColumnarData { members, columns }
+    }
+
     #[derive(Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct TestData {
         request: TransformDataRequest,
-        query_result: JsRawData,
+        query_result: RowOrientedRawData,
         final_result_default: Option<TransformedData>,
         final_result_compact: Option<TransformedData>,
     }
@@ -2286,7 +2317,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2299,7 +2330,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2312,7 +2343,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2325,7 +2356,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2342,7 +2373,7 @@ mod tests {
             .alias_to_member_name_map
             .remove("e_commerce_records_us2021__avg_discount");
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         match TransformedData::transform(&test_data.request, &raw_data) {
             Ok(_) => Err(TestError("regular_discount_by_city should fail ".to_string()).into()),
             Err(_) => Ok(()), // Should throw an error
@@ -2360,7 +2391,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2377,7 +2408,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2394,7 +2425,7 @@ mod tests {
             .alias_to_member_name_map
             .remove("e_commerce_records_us2021__avg_discount");
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         match TransformedData::transform(&test_data.request, &raw_data) {
             Ok(_) => Err(TestError("regular_discount_by_city should fail ".to_string()).into()),
             Err(_) => Ok(()), // Should throw an error
@@ -2408,7 +2439,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2421,7 +2452,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2438,7 +2469,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2455,7 +2486,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2468,7 +2499,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Default);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
         Ok(())
@@ -2481,7 +2512,7 @@ mod tests {
             .unwrap()
             .clone();
         test_data.request.res_type = Some(ResultType::Compact);
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
@@ -2493,7 +2524,7 @@ mod tests {
             .get(&"regular_profit_by_postal_code".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         test_data.request.alias_to_member_name_map = HashMap::new();
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
@@ -2641,7 +2672,7 @@ mod tests {
             .get(&"regular_profit_by_postal_code".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = &test_data.request.query;
@@ -2702,7 +2733,7 @@ mod tests {
             .get(&"compare_date_range_count_by_order_date".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = &test_data.request.query;
@@ -2777,7 +2808,7 @@ mod tests {
             )
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = &test_data.request.query;
@@ -2819,7 +2850,7 @@ mod tests {
             .get(&"regular_profit_by_postal_code".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -2868,7 +2899,7 @@ mod tests {
             .get(&"regular_discount_by_city".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -2917,7 +2948,7 @@ mod tests {
             .get(&"compare_date_range_count_by_order_date".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3007,7 +3038,7 @@ mod tests {
             )
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3063,7 +3094,7 @@ mod tests {
             .get(&"regular_discount_by_city".to_string())
             .unwrap()
             .clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3100,7 +3131,7 @@ mod tests {
             .request
             .alias_to_member_name_map
             .remove("e_commerce_records_us2021__avg_discount");
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3129,7 +3160,7 @@ mod tests {
             .request
             .annotation
             .remove("ECommerceRecordsUs2021.avg_discount");
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
@@ -3153,7 +3184,7 @@ mod tests {
     /// compact dataset. This pins the contract: same data, different orientation.
     fn assert_columnar_matches_compact(fixture: &str) -> Result<()> {
         let mut test_data = TEST_SUITE_DATA.get(fixture).unwrap().clone();
-        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let raw_data = QueryResult::from_js_raw_data(rows_to_js_raw_data(&test_data.query_result))?;
 
         test_data.request.res_type = Some(ResultType::Compact);
         let compact = TransformedData::transform(&test_data.request, &raw_data)?;

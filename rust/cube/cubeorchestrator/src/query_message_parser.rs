@@ -1,6 +1,6 @@
 use crate::{
     query_result_transform::{DBResponsePrimitive, DBResponseValue},
-    transport::JsRawData,
+    transport::JsRawColumnarData,
 };
 use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
 use cubeshared::flatbuffers::VerifierOptions;
@@ -113,8 +113,13 @@ impl QueryResult {
         }
     }
 
-    pub fn from_js_raw_data(js_raw_data: JsRawData) -> Result<Self, ParseError> {
-        if js_raw_data.is_empty() {
+    pub fn from_js_raw_data(js_raw_data: JsRawColumnarData) -> Result<Self, ParseError> {
+        let JsRawColumnarData {
+            members: columns,
+            columns: column_values,
+        } = js_raw_data;
+
+        if columns.is_empty() {
             return Ok(QueryResult {
                 columns: vec![],
                 rows: vec![],
@@ -122,28 +127,27 @@ impl QueryResult {
             });
         }
 
-        let first_row = &js_raw_data[0];
-        let columns: Vec<String> = first_row.keys().cloned().collect();
         let columns_pos: IndexMap<String, usize> = columns
             .iter()
             .enumerate()
             .map(|(index, column)| (column.clone(), index))
             .collect();
 
-        let rows: Vec<Vec<DBResponseValue>> = js_raw_data
-            .into_iter()
-            .map(|row_map| {
-                columns
-                    .iter()
-                    .map(|col| {
-                        row_map
-                            .get(col)
-                            .map(|val| DBResponseValue::Primitive(val.clone()))
-                            .unwrap_or(DBResponseValue::Primitive(DBResponsePrimitive::Null))
-                    })
-                    .collect()
-            })
+        let row_count = column_values.first().map(|c| c.len()).unwrap_or(0);
+        // Transpose column-major input into the row-major shape `QueryResult`
+        // expects. Rows are pre-allocated, then we drain each column into the
+        // matching slot to avoid per-cell clones.
+        let mut rows: Vec<Vec<DBResponseValue>> = (0..row_count)
+            .map(|_| Vec::with_capacity(columns.len()))
             .collect();
+
+        for column in column_values.into_iter() {
+            for (row_idx, value) in column.into_iter().enumerate() {
+                if let Some(row) = rows.get_mut(row_idx) {
+                    row.push(DBResponseValue::Primitive(value));
+                }
+            }
+        }
 
         Ok(QueryResult {
             columns,

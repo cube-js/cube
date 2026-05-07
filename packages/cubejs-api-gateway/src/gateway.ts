@@ -19,6 +19,7 @@ import {
   ResultArrayWrapper,
   ResultMultiWrapper,
   ResultWrapper,
+  rowsToColumnar,
 } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
@@ -127,40 +128,6 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
     handler(req as any, res).catch(next);
   };
-}
-
-function rowsToColumnar(rawData: any): { members: string[]; columns: any[][] } {
-  let rows: any[];
-
-  if (Array.isArray(rawData)) {
-    rows = rawData;
-  } else if (rawData) {
-    rows = Array.from(rawData as Iterable<any>);
-  } else {
-    rows = [];
-  }
-
-  const rowCount = rows.length;
-  if (rowCount === 0) {
-    return { members: [], columns: [] };
-  }
-
-  const members = Object.keys(rows[0]);
-  const memberCount = members.length;
-  const columns: any[][] = new Array(memberCount);
-
-  for (let j = 0; j < memberCount; j++) {
-    const member = members[j];
-    const col = new Array(rowCount);
-
-    for (let i = 0; i < rowCount; i++) {
-      col[i] = rows[i][member];
-    }
-
-    columns[j] = col;
-  }
-
-  return { members, columns };
 }
 
 // Prepared CheckAuthFn, default or from config: always async
