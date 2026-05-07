@@ -200,9 +200,7 @@ fn build_dataset(
         let mut col = Vec::with_capacity(row_count);
         for i in 0..row_count {
             // Format mirrors typical CubeStore output: ISO-8601 with millisecond
-            // fractional and no timezone. None of `transform_value`'s six chrono
-            // parsers fully match this shape, so the function falls through to
-            // `s.clone()` — measuring the production worst case.
+            // fractional and no timezone.
             let month = ((i + j) % 12) + 1;
             let day = ((i / 12) % 28) + 1;
             col.push(DBResponsePrimitive::String(format!(
@@ -332,7 +330,6 @@ fn bench_from_js_raw_data(c: &mut Criterion) {
         let payload = serde_json::to_vec(&dataset).expect("to_vec");
         let payload_len = payload.len();
 
-        // Print payload size once per combo so we can read wire-cost in the bench output.
         eprintln!(
             "from_js_raw_data: c{:02}_r{} payload_bytes={}",
             col_count, row_count, payload_len
