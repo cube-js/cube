@@ -114,12 +114,9 @@ impl QueryResult {
     }
 
     pub fn from_js_raw_data(js_raw_data: JsRawColumnarData) -> Result<Self, ParseError> {
-        let JsRawColumnarData {
-            members: columns,
-            columns: column_values,
-        } = js_raw_data;
+        let JsRawColumnarData { members, columns } = js_raw_data;
 
-        if columns.is_empty() {
+        if members.is_empty() {
             return Ok(QueryResult {
                 columns: vec![],
                 rows: vec![],
@@ -127,21 +124,21 @@ impl QueryResult {
             });
         }
 
-        let columns_pos: IndexMap<String, usize> = columns
+        let columns_pos: IndexMap<String, usize> = members
             .iter()
             .enumerate()
-            .map(|(index, column)| (column.clone(), index))
+            .map(|(index, member)| (member.clone(), index))
             .collect();
 
-        let row_count = column_values.first().map(|c| c.len()).unwrap_or(0);
+        let row_count = columns.first().map(|c| c.len()).unwrap_or(0);
         // Transpose column-major input into the row-major shape `QueryResult`
         // expects. Rows are pre-allocated, then we drain each column into the
         // matching slot to avoid per-cell clones.
         let mut rows: Vec<Vec<DBResponseValue>> = (0..row_count)
-            .map(|_| Vec::with_capacity(columns.len()))
+            .map(|_| Vec::with_capacity(members.len()))
             .collect();
 
-        for column in column_values.into_iter() {
+        for column in columns.into_iter() {
             for (row_idx, value) in column.into_iter().enumerate() {
                 if let Some(row) = rows.get_mut(row_idx) {
                     row.push(DBResponseValue::Primitive(value));
@@ -150,7 +147,7 @@ impl QueryResult {
         }
 
         Ok(QueryResult {
-            columns,
+            columns: members,
             rows,
             columns_pos,
         })
