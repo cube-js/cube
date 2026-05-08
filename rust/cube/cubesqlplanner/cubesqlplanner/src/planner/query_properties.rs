@@ -5,9 +5,11 @@ use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_me
 use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
+use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::{apply_static_filter_to_filter_item, apply_static_filter_to_symbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -36,6 +38,20 @@ impl OrderByItem {
     pub fn desc(&self) -> bool {
         self.desc
     }
+}
+
+impl PartialEq for OrderByItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.desc == other.desc && member_chain_eq(&self.member_evaluator, &other.member_evaluator)
+    }
+}
+
+/// Compare two member symbols by reference-chain-resolved name.
+/// For root queries this is equivalent to `MemberSymbol::eq` (full_name compare);
+/// for multi-stage states with CTE references it follows the chain to the resolved symbol.
+fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
+    a.clone().resolve_reference_chain().full_name()
+        == b.clone().resolve_reference_chain().full_name()
 }
 
 #[derive(Debug, Clone)]
@@ -85,13 +101,14 @@ pub struct QueryProperties {
     measures_filters: Vec<FilterItem>,
     segments: Vec<FilterItem>,
     time_dimensions: Vec<Rc<MemberSymbol>>,
+    time_shifts: TimeShiftState,
     order_by: Vec<OrderByItem>,
     row_limit: Option<usize>,
     offset: Option<usize>,
     query_tools: Rc<QueryTools>,
     ignore_cumulative: bool,
     ungrouped: bool,
-    multi_fact_join_groups: MultiFactJoinGroups,
+    multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
     pre_aggregation_query: bool,
     total_query: bool,
     query_join_hints: Rc<JoinHints>,
@@ -132,6 +149,7 @@ impl QueryProperties {
             measures,
             dimensions,
             time_dimensions,
+            time_shifts: TimeShiftState::default(),
             time_dimensions_filters,
             dimensions_filters,
             segments,
@@ -139,7 +157,7 @@ impl QueryProperties {
             order_by,
             row_limit,
             offset,
-            multi_fact_join_groups: MultiFactJoinGroups::empty(query_tools.clone()),
+            multi_fact_join_groups: OnceCell::new(),
             query_tools,
             ignore_cumulative,
             ungrouped,
@@ -186,7 +204,10 @@ impl QueryProperties {
             order_item.member_evaluator =
                 apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
         }
+        Ok(())
+    }
 
+    fn compute_multi_fact_join_groups(&self) -> Result<MultiFactJoinGroups, CubeError> {
         let measures_join_hints = MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&self.dimensions)
             .add_dimensions(&self.extract_dimensions_from_order())
@@ -195,16 +216,22 @@ impl QueryProperties {
             .add_filters(&self.dimensions_filters)
             .add_filters(&self.segments)
             .build(&self.all_used_measures()?)?;
-        self.multi_fact_join_groups =
-            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)?;
-        Ok(())
+        MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+    }
+
+    fn multi_fact_join_groups(&self) -> Result<&MultiFactJoinGroups, CubeError> {
+        if let Some(g) = self.multi_fact_join_groups.get() {
+            return Ok(g);
+        }
+        let computed = self.compute_multi_fact_join_groups()?;
+        Ok(self.multi_fact_join_groups.get_or_init(move || computed))
     }
 
     pub fn compute_join_multi_fact_groups_with_measures(
         &self,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
-        self.multi_fact_join_groups.for_measures(measures)
+        self.multi_fact_join_groups()?.for_measures(measures)
     }
 
     pub fn is_total_query(&self) -> bool {
@@ -224,12 +251,12 @@ impl QueryProperties {
             .collect()
     }
 
-    pub fn is_multi_fact_join(&self) -> bool {
-        self.multi_fact_join_groups.is_multi_fact()
+    pub fn is_multi_fact_join(&self) -> Result<bool, CubeError> {
+        Ok(self.multi_fact_join_groups()?.is_multi_fact())
     }
 
     pub fn simple_query_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
-        self.multi_fact_join_groups.single_join()
+        self.multi_fact_join_groups()?.single_join()
     }
 
     pub fn measures(&self) -> &Vec<Rc<MemberSymbol>> {
@@ -242,6 +269,10 @@ impl QueryProperties {
 
     pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
+    }
+
+    pub fn time_shifts(&self) -> &TimeShiftState {
+        &self.time_shifts
     }
 
     pub fn time_dimensions_filters(&self) -> &Vec<FilterItem> {
@@ -401,7 +432,7 @@ impl QueryProperties {
         let full_aggregate_measure = self.full_key_aggregate_measures()?;
         if full_aggregate_measure.multiplied_measures.is_empty()
             && (full_aggregate_measure.multi_stage_measures.is_empty() || !self.allow_multi_stage)
-            && !self.is_multi_fact_join()
+            && !self.is_multi_fact_join()?
             && (!self.has_multi_stage_dimensions()? || !self.allow_multi_stage)
         {
             Ok(true)
@@ -521,5 +552,63 @@ impl QueryProperties {
             FilterItem::Segment(_) => {}
         }
         Ok(())
+    }
+
+    /// Compare two member sequences by reference-chain-resolved name.
+    /// Required for multi-stage state dedup, where dimensions can carry CTE
+    /// references; for root queries it degenerates to plain full_name compare.
+    fn members_equivalent(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
+        a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| member_chain_eq(x, y))
+    }
+}
+
+impl PartialEq for QueryProperties {
+    fn eq(&self, other: &Self) -> bool {
+        // Destructure to fail compilation if a new field is added without an
+        // explicit decision about whether it participates in semantic equality.
+        let Self {
+            measures,
+            dimensions,
+            time_dimensions,
+            dimensions_filters,
+            time_dimensions_filters,
+            measures_filters,
+            segments,
+            time_shifts,
+            order_by,
+            row_limit,
+            offset,
+            ungrouped,
+            ignore_cumulative,
+            pre_aggregation_query,
+            total_query,
+            allow_multi_stage,
+            disable_external_pre_aggregations,
+            pre_aggregation_id,
+            query_join_hints,
+            // Not part of semantic equality:
+            query_tools: _,
+            multi_fact_join_groups: _,
+        } = self;
+
+        Self::members_equivalent(measures, &other.measures)
+            && Self::members_equivalent(dimensions, &other.dimensions)
+            && Self::members_equivalent(time_dimensions, &other.time_dimensions)
+            && *dimensions_filters == other.dimensions_filters
+            && *time_dimensions_filters == other.time_dimensions_filters
+            && *measures_filters == other.measures_filters
+            && *segments == other.segments
+            && *time_shifts == other.time_shifts
+            && *order_by == other.order_by
+            && *row_limit == other.row_limit
+            && *offset == other.offset
+            && *ungrouped == other.ungrouped
+            && *ignore_cumulative == other.ignore_cumulative
+            && *pre_aggregation_query == other.pre_aggregation_query
+            && *total_query == other.total_query
+            && *allow_multi_stage == other.allow_multi_stage
+            && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
+            && *pre_aggregation_id == other.pre_aggregation_id
+            && *query_join_hints == other.query_join_hints
     }
 }
