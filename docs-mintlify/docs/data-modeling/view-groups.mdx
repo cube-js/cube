@@ -42,16 +42,9 @@ view_group(`sales`, {
 
 ## Assigning views to a group
 
-There are two ways to assign a view to a group, and both can be combined.
-Pick whichever keeps group membership co-located with the entity you'd
-rather edit — the group definition for a curated catalog, or the view
-definition for ad-hoc additions.
-
-### From the group side
-
-List views on the group via the [`views`][ref-view-group-views] parameter.
-This keeps the full membership in one place, which is convenient when you
-want to review a group at a glance.
+To assign a view to a group, list its name on the group via the
+[`views`][ref-view-group-views] parameter. This keeps the full
+membership in one place, which makes it easy to review a group at a glance.
 
 <CodeGroup>
 
@@ -73,72 +66,8 @@ view_group(`sales`, {
 
 </CodeGroup>
 
-### From the view side
-
-Set [`view_group`][ref-view-view-group] on the view itself. The view
-declares which group it belongs to, without touching the group definition.
-
-<CodeGroup>
-
-```yaml title="YAML"
-views:
-  - name: revenue
-    view_group: sales
-    cubes:
-      - join_path: order_items
-        includes:
-          - total_sale_price
-          - created_at
-```
-
-```javascript title="JavaScript"
-view(`revenue`, {
-  view_group: sales,
-  cubes: [
-    {
-      join_path: order_items,
-      includes: [`total_sale_price`, `created_at`]
-    }
-  ]
-})
-```
-
-</CodeGroup>
-
-### Belonging to multiple groups
-
-A view can belong to more than one group. Use
-[`view_groups`][ref-view-view-groups] (plural) on the view to list every
-group it should appear in.
-
-<CodeGroup>
-
-```yaml title="YAML"
-views:
-  - name: revenue
-    view_groups:
-      - sales
-      - finance
-    cubes:
-      - join_path: order_items
-        includes:
-          - total_sale_price
-          - created_at
-```
-
-```javascript title="JavaScript"
-view(`revenue`, {
-  view_groups: [sales, finance],
-  cubes: [
-    {
-      join_path: order_items,
-      includes: [`total_sale_price`, `created_at`]
-    }
-  ]
-})
-```
-
-</CodeGroup>
+A view can belong to more than one group — list it under the `views`
+parameter of every group it should appear in.
 
 ## Where view groups live in the model
 
@@ -160,6 +89,4 @@ entity and can be split across multiple files as your model grows.
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-view-group-ref]: /reference/data-modeling/view-group
 [ref-view-group-views]: /reference/data-modeling/view-group#views
-[ref-view-view-group]: /reference/data-modeling/view#view_group
-[ref-view-view-groups]: /reference/data-modeling/view#view_groups
 [ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference
