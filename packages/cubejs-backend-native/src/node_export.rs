@@ -801,6 +801,9 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
 
     crate::template::template_register_module(&mut cx)?;
 
+    #[cfg(feature = "bridge-test-harness")]
+    crate::bridge_test_exports::register_module(&mut cx)?;
+
     #[cfg(feature = "python")]
     crate::python::python_register_module(&mut cx)?;
 
