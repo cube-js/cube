@@ -789,8 +789,6 @@ fn build_columnar_plan<'a>(
     Ok(plan)
 }
 
-/// Materialize [`TransformedData::Columnar`] columns directly from the
-/// column-major `cube_store_result.data` buffers.
 fn build_columnar_columns(
     plan: &[ColumnarColumnPlan<'_>],
     db_data: &QueryResult,
