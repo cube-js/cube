@@ -18,6 +18,10 @@ impl LegacySqlNodeOp {
 }
 
 impl OpExec for LegacySqlNodeOp {
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
         self.inner.to_sql(
             &ctx.visitor,

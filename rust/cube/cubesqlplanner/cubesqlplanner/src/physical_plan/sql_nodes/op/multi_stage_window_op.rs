@@ -5,7 +5,8 @@ use super::{Op, OpCtx, OpExec};
 
 /// Renders a multi-stage non-calculated measure as a windowed aggregate
 /// over its `input_pipeline` (`agg(agg(input)) OVER (PARTITION BY …)`).
-/// Other measures take the `else_pipeline` branch.
+/// Other measures take the `else_pipeline` branch. Discards the tail —
+/// each branch is a self-contained pipeline.
 #[derive(Clone)]
 pub struct MultiStageWindowOp {
     input_pipeline: Vec<Op>,
@@ -21,9 +22,17 @@ impl MultiStageWindowOp {
             partition,
         }
     }
+
+    pub(super) fn nested_pipelines(&self) -> [&[Op]; 2] {
+        [&self.input_pipeline, &self.else_pipeline]
+    }
 }
 
 impl OpExec for MultiStageWindowOp {
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
         let MemberSymbol::Measure(m) = ctx.sym.as_ref() else {
             return Err(CubeError::internal(

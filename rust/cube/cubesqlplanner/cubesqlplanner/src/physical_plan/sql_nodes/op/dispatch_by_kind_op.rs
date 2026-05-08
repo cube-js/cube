@@ -28,9 +28,22 @@ impl DispatchByKindOp {
             default,
         }
     }
+
+    pub(super) fn nested_pipelines(&self) -> [&[Op]; 4] {
+        [
+            &self.dimension,
+            &self.time_dimension,
+            &self.measure,
+            &self.default,
+        ]
+    }
 }
 
 impl OpExec for DispatchByKindOp {
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
         let pipeline = match ctx.sym.as_ref() {
             MemberSymbol::Dimension(_) => &self.dimension,

@@ -7,7 +7,8 @@ use super::{Op, OpCtx, OpExec};
 /// Aggregates a cumulative measure over its rolling window: SUM-able kinds
 /// (`count`, `sum`, `running_total`, `min`, `max`, HLL approx) are wrapped
 /// directly over `input_pipeline`; non-cumulative or unsupported kinds fall
-/// back to `default_pipeline` for the regular aggregation path.
+/// back to `default_pipeline` for the regular aggregation path. Discards
+/// the tail — each branch is a self-contained pipeline.
 #[derive(Clone)]
 pub struct RollingWindowOp {
     input_pipeline: Vec<Op>,
@@ -21,9 +22,17 @@ impl RollingWindowOp {
             default_pipeline,
         }
     }
+
+    pub(super) fn nested_pipelines(&self) -> [&[Op]; 2] {
+        [&self.input_pipeline, &self.default_pipeline]
+    }
 }
 
 impl OpExec for RollingWindowOp {
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
         let MemberSymbol::Measure(m) = ctx.sym.as_ref() else {
             return Err(CubeError::internal(

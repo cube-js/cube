@@ -9,6 +9,10 @@ use super::{OpCtx, OpExec};
 pub struct EvaluateSymbolOp;
 
 impl OpExec for EvaluateSymbolOp {
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
         let path = ctx.sym.compiled_path();
         let member_ctx = MemberSqlContext {
