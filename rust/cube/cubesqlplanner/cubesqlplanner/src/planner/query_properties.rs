@@ -1,21 +1,11 @@
-use super::filter::compiler::FilterCompiler;
-use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
-use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
-use crate::planner::join_hints::JoinHints;
-use crate::planner::GranularityHelper;
-use crate::planner::{
-    apply_static_filter_to_filter_item, apply_static_filter_to_symbol, MemberExpressionExpression,
-    MemberExpressionSymbol, TimeDimensionSymbol,
-};
-
 use super::MemberSymbol;
-use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::cube_bridge::options_member::OptionsMember;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::{Filter, FilterItem};
+use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
+use crate::planner::{apply_static_filter_to_filter_item, apply_static_filter_to_symbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -113,335 +103,6 @@ pub struct QueryProperties {
 impl QueryProperties {
     pub fn try_new(
         query_tools: Rc<QueryTools>,
-        options: Rc<dyn BaseQueryOptions>,
-    ) -> Result<Rc<Self>, CubeError> {
-        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-
-        let dimensions = if let Some(dimensions) = &options.dimensions()? {
-            dimensions
-                .iter()
-                .map(|d| match d {
-                    OptionsMember::MemberName(member_name) => {
-                        evaluator_compiler.add_dimension_evaluator(member_name.clone())
-                    }
-                    OptionsMember::MemberExpression(member_expression) => {
-                        let cube_name =
-                            if let Some(name) = &member_expression.static_data().cube_name {
-                                name.clone()
-                            } else {
-                                "".to_string()
-                            };
-                        let name =
-                            if let Some(name) = &member_expression.static_data().expression_name {
-                                name.clone()
-                            } else {
-                                "".to_string()
-                            };
-                        let expression_call = match member_expression.expression()? {
-                            MemberExpressionExpressionDef::Sql(sql) => {
-                                evaluator_compiler.compile_sql_call(&cube_name, sql)?
-                            }
-                            MemberExpressionExpressionDef::Struct(_) => {
-                                return Err(CubeError::user(format!(
-                                    "Expression struct not supported for dimension"
-                                )));
-                            }
-                        };
-                        let cube_symbol = evaluator_compiler
-                            .add_cube_table_evaluator(cube_name.clone(), vec![])?;
-                        let member_expression_symbol = MemberExpressionSymbol::try_new(
-                            cube_symbol,
-                            name.clone(),
-                            MemberExpressionExpression::SqlCall(expression_call),
-                            member_expression.static_data().definition.clone(),
-                            None,
-                            vec![cube_name.clone()],
-                        )?;
-                        Ok(MemberSymbol::new_member_expression(
-                            member_expression_symbol,
-                        ))
-                    }
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            Vec::new()
-        };
-
-        let time_dimensions = if let Some(time_dimensions) = &options.static_data().time_dimensions
-        {
-            time_dimensions
-                .iter()
-                .map(|d| -> Result<Rc<MemberSymbol>, CubeError> {
-                    let base_symbol =
-                        evaluator_compiler.add_dimension_evaluator(d.dimension.clone())?;
-                    let granularity_obj = GranularityHelper::make_granularity_obj(
-                        query_tools.cube_evaluator().clone(),
-                        &mut evaluator_compiler,
-                        &base_symbol.cube_name(),
-                        &base_symbol.name(),
-                        d.granularity.clone(),
-                    )?;
-                    let date_range_tuple = if let Some(date_range) = &d.date_range {
-                        assert_eq!(date_range.len(), 2);
-                        Some((date_range[0].clone(), date_range[1].clone()))
-                    } else {
-                        None
-                    };
-                    let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                        base_symbol,
-                        d.granularity.clone(),
-                        granularity_obj,
-                        date_range_tuple,
-                    ));
-                    Ok(symbol)
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            Vec::new()
-        };
-
-        let measures = if let Some(measures) = &options.measures()? {
-            measures
-                .iter()
-                .map(|d| match d {
-                    OptionsMember::MemberName(member_name) => {
-                        evaluator_compiler.add_measure_evaluator(member_name.clone())
-                    }
-                    OptionsMember::MemberExpression(member_expression) => {
-                        let cube_name =
-                            if let Some(name) = &member_expression.static_data().cube_name {
-                                name.clone()
-                            } else {
-                                "".to_string()
-                            };
-                        let name =
-                            if let Some(name) = &member_expression.static_data().expression_name {
-                                name.clone()
-                            } else if let Some(name) = &member_expression.static_data().name {
-                                format!("{}.{}", cube_name, name)
-                            } else {
-                                "".to_string()
-                            };
-                        let expression = match member_expression.expression()? {
-                            MemberExpressionExpressionDef::Sql(sql) => {
-                                MemberExpressionExpression::SqlCall(
-                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?,
-                                )
-                            }
-                            MemberExpressionExpressionDef::Struct(expr) => {
-                                if expr.static_data().expression_type != "PatchMeasure" {
-                                    return Err(CubeError::user(format!("Only `PatchMeasure` type of memeber expression is supported")));
-                                }
-
-                                if let Some(source_measure) = &expr.static_data().source_measure {
-
-                                    let new_measure_type = expr.static_data().replace_aggregation_type.clone();
-                                    let mut filters_to_add = vec![];
-                                    if let Some(add_filters) = expr.add_filters()? {
-                                        for filter in add_filters.iter() {
-                                            let node = evaluator_compiler.compile_sql_call(&cube_name, filter.sql()?)?;
-                                            filters_to_add.push(node);
-                                        }
-                                    }
-                                    let source_measure_compiled = evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
-                                    let symbol = if let Ok(source_measure) = source_measure_compiled.as_measure() {
-
-                                        let patched_measure = source_measure.new_patched(new_measure_type, filters_to_add)?;
-                                        MemberSymbol::new_measure(patched_measure)
-                                    } else {
-                                        source_measure_compiled
-                                    };
-                                    MemberExpressionExpression::PatchedSymbol(symbol)
-
-                                } else {
-                                    return Err(CubeError::user(format!("Source measure is required for `PatchMeasure` type of memeber expression")));
-                                }
-
-                            }
-                        };
-                        let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
-                        let member_expression_symbol = MemberExpressionSymbol::try_new(
-                            cube_symbol,
-                            name.clone(),
-                            expression,
-                            member_expression.static_data().definition.clone(),
-                            None,
-                            vec![cube_name.clone()],
-                        )?;
-                        Ok(MemberSymbol::new_member_expression(member_expression_symbol))
-                    }
-                })
-                .collect::<Result<Vec<_>, _>>()?
-            /* measures
-            .iter()
-            .map(|m| {
-                let evaluator = evaluator_compiler.add_measure_evaluator(m.clone())?;
-                BaseMeasure::try_new_required(evaluator, query_tools.clone())
-            })
-            .collect::<Result<Vec<_>, _>>()? */
-        } else {
-            Vec::new()
-        };
-
-        let segments = if let Some(segments) = &options.segments()? {
-            segments
-                .iter()
-                .map(|d| -> Result<_, CubeError> {
-                    let segment = match d {
-                        OptionsMember::MemberName(member_name) => {
-                            let mut iter = query_tools
-                                .cube_evaluator()
-                                .parse_path("segments".to_string(), member_name.clone())?
-                                .into_iter();
-                            let cube_name = iter.next().unwrap();
-                            let name = iter.next().unwrap();
-                            let definition = query_tools
-                                .cube_evaluator()
-                                .segment_by_path(member_name.clone())?;
-                            let expression_evaluator = evaluator_compiler
-                                .compile_sql_call(&cube_name, definition.sql()?)?;
-                            let cube_symbol = evaluator_compiler
-                                .add_cube_table_evaluator(cube_name.clone(), vec![])?;
-                            BaseSegment::try_new(
-                                expression_evaluator,
-                                cube_symbol,
-                                name,
-                                Some(member_name.clone()),
-                            )
-                        }
-                        OptionsMember::MemberExpression(member_expression) => {
-                            let cube_name =
-                                if let Some(name) = &member_expression.static_data().cube_name {
-                                    name.clone()
-                                } else {
-                                    "".to_string()
-                                };
-                            let name = if let Some(name) =
-                                &member_expression.static_data().expression_name
-                            {
-                                name.clone()
-                            } else {
-                                "".to_string()
-                            };
-                            let expression_evaluator = match member_expression.expression()? {
-                                MemberExpressionExpressionDef::Sql(sql) => {
-                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?
-                                }
-                                MemberExpressionExpressionDef::Struct(_) => {
-                                    return Err(CubeError::user(format!(
-                                        "Expression struct not supported for dimension"
-                                    )));
-                                }
-                            };
-                            let cube_symbol = evaluator_compiler
-                                .add_cube_table_evaluator(cube_name.clone(), vec![])?;
-                            BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
-                        }
-                    }?;
-                    Ok(FilterItem::Segment(segment))
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            Vec::new()
-        };
-
-        let mut filter_compiler = FilterCompiler::new(&mut evaluator_compiler, query_tools.clone());
-        if let Some(filters) = &options.static_data().filters {
-            for filter in filters {
-                filter_compiler.add_item(filter)?;
-            }
-        }
-        for time_dimension in &time_dimensions {
-            filter_compiler.add_time_dimension_item(time_dimension)?;
-        }
-        let (dimensions_filters, time_dimensions_filters, measures_filters) =
-            filter_compiler.extract_result();
-
-        //FIXME may be this filter should be applied on other place
-        let time_dimensions = time_dimensions
-            .into_iter()
-            .filter(|dim| {
-                if let Ok(td) = dim.as_time_dimension() {
-                    td.has_granularity()
-                } else {
-                    true
-                }
-            })
-            .collect_vec();
-
-        let order_by = if let Some(order) = &options.static_data().order {
-            order
-                .iter()
-                .map(|o| -> Result<_, CubeError> {
-                    let evaluator = if let Some(found) =
-                        dimensions.iter().find(|d| d.name() == o.id)
-                    {
-                        found.clone()
-                    } else if let Some(found) = time_dimensions.iter().find(|d| d.name() == o.id) {
-                        found.clone()
-                    } else if let Some(found) = measures.iter().find(|d| d.name() == o.id) {
-                        found.clone()
-                    } else {
-                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?
-                    };
-                    Ok(OrderByItem::new(evaluator, o.is_desc()))
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            Self::default_order(&dimensions, &time_dimensions, &measures)
-        };
-
-        let row_limit = if let Some(row_limit) = &options.static_data().row_limit {
-            row_limit.parse::<usize>().ok()
-        } else {
-            None
-        };
-        let offset = if let Some(offset) = &options.static_data().offset {
-            offset.parse::<usize>().ok()
-        } else {
-            None
-        };
-        let ungrouped = options.static_data().ungrouped.unwrap_or(false);
-
-        let query_join_hints = Rc::new(JoinHints::from_items(
-            options.join_hints()?.unwrap_or_default(),
-        ));
-
-        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
-        let total_query = options.static_data().total_query.unwrap_or(false);
-        let disable_external_pre_aggregations =
-            options.static_data().disable_external_pre_aggregations;
-        let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
-
-        let mut res = Self {
-            measures,
-            dimensions,
-            segments,
-            time_dimensions,
-            time_dimensions_filters,
-            dimensions_filters,
-            measures_filters,
-            order_by,
-            row_limit,
-            offset,
-            multi_fact_join_groups: MultiFactJoinGroups::empty(query_tools.clone()),
-            query_tools,
-            ignore_cumulative: false,
-            ungrouped,
-            pre_aggregation_query,
-            total_query,
-            query_join_hints,
-            allow_multi_stage: true,
-            disable_external_pre_aggregations,
-            pre_aggregation_id,
-        };
-        res.apply_static_filters()?;
-        Ok(Rc::new(res))
-    }
-
-    pub fn try_new_from_precompiled(
-        query_tools: Rc<QueryTools>,
         measures: Vec<Rc<MemberSymbol>>,
         dimensions: Vec<Rc<MemberSymbol>>,
         time_dimensions: Vec<Rc<MemberSymbol>>,
@@ -459,6 +120,7 @@ impl QueryProperties {
         query_join_hints: Rc<JoinHints>,
         allow_multi_stage: bool,
         disable_external_pre_aggregations: bool,
+        pre_aggregation_id: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -486,7 +148,7 @@ impl QueryProperties {
             query_join_hints,
             allow_multi_stage,
             disable_external_pre_aggregations,
-            pre_aggregation_id: None,
+            pre_aggregation_id,
         };
         res.apply_static_filters()?;
 
@@ -714,9 +376,9 @@ impl QueryProperties {
     }
 
     pub fn default_order(
-        dimensions: &Vec<Rc<MemberSymbol>>,
-        time_dimensions: &Vec<Rc<MemberSymbol>>,
-        measures: &Vec<Rc<MemberSymbol>>,
+        dimensions: &[Rc<MemberSymbol>],
+        time_dimensions: &[Rc<MemberSymbol>],
+        measures: &[Rc<MemberSymbol>],
     ) -> Vec<OrderByItem> {
         let mut result = Vec::new();
         if let Some(granularity_dim) = time_dimensions.iter().find(|d| {

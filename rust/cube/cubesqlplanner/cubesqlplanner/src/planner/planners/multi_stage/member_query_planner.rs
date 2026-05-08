@@ -59,7 +59,7 @@ impl MultiStageMemberQueryPlanner {
         &self,
         time_dimension: Rc<MemberSymbol>,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let cte_query_properties = QueryProperties::try_new_from_precompiled(
+        let cte_query_properties = QueryProperties::try_new(
             self.query_tools.clone(),
             vec![],
             vec![],
@@ -78,6 +78,7 @@ impl MultiStageMemberQueryPlanner {
             Rc::new(JoinHints::new()),
             true,
             self.query_properties.disable_external_pre_aggregations(),
+            None,
         )?;
 
         let simple_query_planer =
@@ -379,7 +380,7 @@ impl MultiStageMemberQueryPlanner {
             }
         }
 
-        let cte_query_properties = QueryProperties::try_new_from_precompiled(
+        let cte_query_properties = QueryProperties::try_new(
             self.query_tools.clone(),
             measures,
             dimensions,
@@ -398,6 +399,7 @@ impl MultiStageMemberQueryPlanner {
             self.query_properties.query_join_hints().clone(),
             false,
             self.query_properties.disable_external_pre_aggregations(),
+            None,
         )?;
 
         let query_planner =

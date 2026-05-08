@@ -111,7 +111,7 @@ impl DimensionSubqueryPlanner {
             (vec![], vec![])
         };
 
-        let sub_query_properties = QueryProperties::try_new_from_precompiled(
+        let sub_query_properties = QueryProperties::try_new(
             self.query_tools.clone(),
             vec![measure.clone()], //measures,
             primary_keys_dimensions.clone(),
@@ -130,6 +130,7 @@ impl DimensionSubqueryPlanner {
             Rc::new(JoinHints::new()),
             true,
             self.query_properties.disable_external_pre_aggregations(),
+            None,
         )?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan()?;
