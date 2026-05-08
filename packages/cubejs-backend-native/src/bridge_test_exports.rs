@@ -15,33 +15,62 @@ use cubenativeutils::wrappers::object::{NativeArray, NativeFunction, NativeStruc
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
-use cubesqlplanner::cube_bridge::base_tools::BaseTools;
-use cubesqlplanner::cube_bridge::driver_tools::DriverTools;
-use cubesqlplanner::cube_bridge::filter_group::{
-    filter_group_bridge_fields_meta, NativeFilterGroup,
-};
-use cubesqlplanner::cube_bridge::filter_params::{
-    filter_params_bridge_fields_meta, NativeFilterParams,
-};
-use cubesqlplanner::cube_bridge::filter_params_callback::{
-    FilterParamsCallback, NativeFilterParamsCallback,
-};
-use cubesqlplanner::cube_bridge::join_definition::JoinDefinition;
-use cubesqlplanner::cube_bridge::join_hints::JoinHintItem;
-use cubesqlplanner::cube_bridge::member_order_by::{
-    member_order_by_bridge_fields_meta, NativeMemberOrderBy,
-};
-use cubesqlplanner::cube_bridge::member_sql::{
-    FilterGroupItem, FilterParamsItem, MemberSql, NativeMemberSql, SqlTemplate, SqlTemplateArgs,
-};
-use cubesqlplanner::cube_bridge::pre_aggregation_obj::PreAggregationObj;
-use cubesqlplanner::cube_bridge::security_context::{
-    security_context_bridge_fields_meta, NativeSecurityContext, SecurityContext,
-};
-use cubesqlplanner::cube_bridge::sql_templates_render::SqlTemplatesRender;
-use cubesqlplanner::cube_bridge::sql_utils::SqlUtils;
-use cubesqlplanner::cube_bridge::timeshift_definition::{
-    time_shift_definition_bridge_fields_meta, NativeTimeShiftDefinition,
+use cubesqlplanner::cube_bridge::{
+    base_query_options::{base_query_options_bridge_fields_meta, NativeBaseQueryOptions},
+    base_tools::{base_tools_bridge_fields_meta, BaseTools, NativeBaseTools},
+    case_definition::{case_definition_bridge_fields_meta, NativeCaseDefinition},
+    case_else_item::{case_else_item_bridge_fields_meta, NativeCaseElseItem},
+    case_item::{case_item_bridge_fields_meta, NativeCaseItem},
+    case_switch_definition::{
+        case_switch_definition_bridge_fields_meta, NativeCaseSwitchDefinition,
+    },
+    case_switch_else_item::{case_switch_else_item_bridge_fields_meta, NativeCaseSwitchElseItem},
+    case_switch_item::{case_switch_item_bridge_fields_meta, NativeCaseSwitchItem},
+    cube_definition::{cube_definition_bridge_fields_meta, NativeCubeDefinition},
+    dimension_definition::{dimension_definition_bridge_fields_meta, NativeDimensionDefinition},
+    driver_tools::{driver_tools_bridge_fields_meta, DriverTools, NativeDriverTools},
+    evaluator::{cube_evaluator_bridge_fields_meta, NativeCubeEvaluator},
+    filter_group::{filter_group_bridge_fields_meta, NativeFilterGroup},
+    filter_params::{filter_params_bridge_fields_meta, NativeFilterParams},
+    filter_params_callback::{FilterParamsCallback, NativeFilterParamsCallback},
+    geo_item::{geo_item_bridge_fields_meta, NativeGeoItem},
+    granularity_definition::{
+        granularity_definition_bridge_fields_meta, NativeGranularityDefinition,
+    },
+    join_definition::{join_definition_bridge_fields_meta, JoinDefinition, NativeJoinDefinition},
+    join_graph::{join_graph_bridge_fields_meta, NativeJoinGraph},
+    join_hints::JoinHintItem,
+    join_item::{join_item_bridge_fields_meta, NativeJoinItem},
+    join_item_definition::{join_item_definition_bridge_fields_meta, NativeJoinItemDefinition},
+    measure_definition::{measure_definition_bridge_fields_meta, NativeMeasureDefinition},
+    member_definition::{member_definition_bridge_fields_meta, NativeMemberDefinition},
+    member_expression::{
+        expression_struct_bridge_fields_meta, member_expression_definition_bridge_fields_meta,
+        NativeExpressionStruct, NativeMemberExpressionDefinition,
+    },
+    member_order_by::{member_order_by_bridge_fields_meta, NativeMemberOrderBy},
+    member_sql::{
+        FilterGroupItem, FilterParamsItem, MemberSql, NativeMemberSql, SqlTemplate, SqlTemplateArgs,
+    },
+    pre_aggregation_description::{
+        pre_aggregation_description_bridge_fields_meta, NativePreAggregationDescription,
+    },
+    pre_aggregation_obj::{
+        pre_aggregation_obj_bridge_fields_meta, NativePreAggregationObj, PreAggregationObj,
+    },
+    pre_aggregation_time_dimension::{
+        pre_aggregation_time_dimension_bridge_fields_meta, NativePreAggregationTimeDimension,
+    },
+    security_context::{
+        security_context_bridge_fields_meta, NativeSecurityContext, SecurityContext,
+    },
+    segment_definition::{segment_definition_bridge_fields_meta, NativeSegmentDefinition},
+    sql_templates_render::SqlTemplatesRender,
+    sql_utils::{sql_utils_bridge_fields_meta, NativeSqlUtils, SqlUtils},
+    struct_with_sql_member::{
+        struct_with_sql_member_bridge_fields_meta, NativeStructWithSqlMember,
+    },
+    timeshift_definition::{time_shift_definition_bridge_fields_meta, NativeTimeShiftDefinition},
 };
 use neon::prelude::*;
 use std::any::Any;
@@ -291,11 +320,39 @@ macro_rules! bridge_registry {
 }
 
 bridge_registry! {
-    "filterGroup"         => NativeFilterGroup,         filter_group_bridge_fields_meta;
-    "filterParams"        => NativeFilterParams,        filter_params_bridge_fields_meta;
-    "memberOrderBy"       => NativeMemberOrderBy,       member_order_by_bridge_fields_meta;
-    "securityContext"     => NativeSecurityContext,     security_context_bridge_fields_meta;
-    "timeShiftDefinition" => NativeTimeShiftDefinition, time_shift_definition_bridge_fields_meta;
+    "baseQueryOptions"            => NativeBaseQueryOptions,            base_query_options_bridge_fields_meta;
+    "baseTools"                   => NativeBaseTools,                   base_tools_bridge_fields_meta;
+    "caseDefinition"              => NativeCaseDefinition,              case_definition_bridge_fields_meta;
+    "caseElseItem"                => NativeCaseElseItem,                case_else_item_bridge_fields_meta;
+    "caseItem"                    => NativeCaseItem,                    case_item_bridge_fields_meta;
+    "caseSwitchDefinition"        => NativeCaseSwitchDefinition,        case_switch_definition_bridge_fields_meta;
+    "caseSwitchElseItem"          => NativeCaseSwitchElseItem,          case_switch_else_item_bridge_fields_meta;
+    "caseSwitchItem"              => NativeCaseSwitchItem,              case_switch_item_bridge_fields_meta;
+    "cubeDefinition"              => NativeCubeDefinition,              cube_definition_bridge_fields_meta;
+    "cubeEvaluator"               => NativeCubeEvaluator,               cube_evaluator_bridge_fields_meta;
+    "dimensionDefinition"         => NativeDimensionDefinition,         dimension_definition_bridge_fields_meta;
+    "driverTools"                 => NativeDriverTools,                 driver_tools_bridge_fields_meta;
+    "expressionStruct"            => NativeExpressionStruct,            expression_struct_bridge_fields_meta;
+    "filterGroup"                 => NativeFilterGroup,                 filter_group_bridge_fields_meta;
+    "filterParams"                => NativeFilterParams,                filter_params_bridge_fields_meta;
+    "geoItem"                     => NativeGeoItem,                     geo_item_bridge_fields_meta;
+    "granularityDefinition"       => NativeGranularityDefinition,       granularity_definition_bridge_fields_meta;
+    "joinDefinition"              => NativeJoinDefinition,              join_definition_bridge_fields_meta;
+    "joinGraph"                   => NativeJoinGraph,                   join_graph_bridge_fields_meta;
+    "joinItem"                    => NativeJoinItem,                    join_item_bridge_fields_meta;
+    "joinItemDefinition"          => NativeJoinItemDefinition,          join_item_definition_bridge_fields_meta;
+    "measureDefinition"           => NativeMeasureDefinition,           measure_definition_bridge_fields_meta;
+    "memberDefinition"            => NativeMemberDefinition,            member_definition_bridge_fields_meta;
+    "memberExpressionDefinition"  => NativeMemberExpressionDefinition,  member_expression_definition_bridge_fields_meta;
+    "memberOrderBy"               => NativeMemberOrderBy,               member_order_by_bridge_fields_meta;
+    "preAggregationDescription"   => NativePreAggregationDescription,   pre_aggregation_description_bridge_fields_meta;
+    "preAggregationObj"           => NativePreAggregationObj,           pre_aggregation_obj_bridge_fields_meta;
+    "preAggregationTimeDimension" => NativePreAggregationTimeDimension, pre_aggregation_time_dimension_bridge_fields_meta;
+    "securityContext"             => NativeSecurityContext,             security_context_bridge_fields_meta;
+    "segmentDefinition"           => NativeSegmentDefinition,           segment_definition_bridge_fields_meta;
+    "sqlUtils"                    => NativeSqlUtils,                    sql_utils_bridge_fields_meta;
+    "structWithSqlMember"         => NativeStructWithSqlMember,         struct_with_sql_member_bridge_fields_meta;
+    "timeShiftDefinition"         => NativeTimeShiftDefinition,         time_shift_definition_bridge_fields_meta;
 }
 
 fn list_bridge_fields_inner<IT: InnerTypes>(

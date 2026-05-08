@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct MemberDefinitionStatic {
     #[serde(rename = "type")]
     pub member_type: String,
 }
 
-#[nativebridge::native_bridge(MemberDefinitionStatic)]
+#[nativebridge::native_bridge(MemberDefinitionStatic, with_static_meta)]
 pub trait MemberDefinition {
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct PreAggregationDescriptionStatic {
     pub name: String,
     #[serde(rename = "type")]
@@ -26,7 +26,7 @@ pub struct PreAggregationDescriptionStatic {
     pub allow_non_strict_date_range_match: Option<bool>,
 }
 
-#[nativebridge::native_bridge(PreAggregationDescriptionStatic)]
+#[nativebridge::native_bridge(PreAggregationDescriptionStatic, with_static_meta)]
 pub trait PreAggregationDescription {
     #[nbridge(field, optional)]
     fn measure_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;

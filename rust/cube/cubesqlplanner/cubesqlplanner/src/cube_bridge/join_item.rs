@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash, nativebridge::NativeBridgeStatic,
+)]
 pub struct JoinItemStatic {
     pub from: String,
     pub to: String,
@@ -19,7 +21,7 @@ pub struct JoinItemStatic {
     pub original_to: String,
 }
 
-#[nativebridge::native_bridge(JoinItemStatic)]
+#[nativebridge::native_bridge(JoinItemStatic, with_static_meta)]
 pub trait JoinItem {
     #[nbridge(field)]
     fn join(&self) -> Result<Rc<dyn JoinItemDefinition>, CubeError>;

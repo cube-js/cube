@@ -56,7 +56,7 @@ impl FilterItem {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct BaseQueryOptionsStatic {
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<TimeDimension>>,
@@ -88,7 +88,7 @@ pub struct BaseQueryOptionsStatic {
     pub member_to_alias: Option<HashMap<String, String>>,
 }
 
-#[nativebridge::native_bridge(BaseQueryOptionsStatic)]
+#[nativebridge::native_bridge(BaseQueryOptionsStatic, with_static_meta)]
 pub trait BaseQueryOptions {
     #[nbridge(field, optional, vec)]
     fn measures(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;

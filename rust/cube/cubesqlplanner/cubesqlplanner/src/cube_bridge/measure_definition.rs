@@ -33,7 +33,7 @@ pub struct RollingWindow {
     pub granularity: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct MeasureDefinitionStatic {
     #[serde(rename = "type")]
     pub measure_type: String,
@@ -53,7 +53,7 @@ pub struct MeasureDefinitionStatic {
     pub rolling_window: Option<RollingWindow>,
 }
 
-#[nativebridge::native_bridge(MeasureDefinitionStatic)]
+#[nativebridge::native_bridge(MeasureDefinitionStatic, with_static_meta)]
 pub trait MeasureDefinition {
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;

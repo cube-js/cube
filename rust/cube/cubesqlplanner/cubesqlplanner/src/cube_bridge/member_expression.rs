@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, nativebridge::NativeBridgeStatic)]
 pub struct ExpressionStructStatic {
     #[serde(rename = "type")]
     pub expression_type: String,
@@ -20,7 +20,7 @@ pub struct ExpressionStructStatic {
     pub replace_aggregation_type: Option<String>,
 }
 
-#[nativebridge::native_bridge(ExpressionStructStatic)]
+#[nativebridge::native_bridge(ExpressionStructStatic, with_static_meta)]
 pub trait ExpressionStruct {
     #[nbridge(field, optional, vec)]
     fn add_filters(&self) -> Result<Option<Vec<Rc<dyn StructWithSqlMember>>>, CubeError>;
@@ -45,7 +45,7 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for MemberExpressionExpressionDef {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, nativebridge::NativeBridgeStatic)]
 pub struct MemberExpressionDefinitionStatic {
     #[serde(rename = "expressionName")]
     pub expression_name: Option<String>,
@@ -55,7 +55,7 @@ pub struct MemberExpressionDefinitionStatic {
     pub definition: Option<String>,
 }
 
-#[nativebridge::native_bridge(MemberExpressionDefinitionStatic, without_imports)]
+#[nativebridge::native_bridge(MemberExpressionDefinitionStatic, without_imports, with_static_meta)]
 pub trait MemberExpressionDefinition {
     #[nbridge(field)]
     fn expression(&self) -> Result<MemberExpressionExpressionDef, CubeError>;

@@ -9,14 +9,16 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, nativebridge::NativeBridgeStatic,
+)]
 pub struct GranularityDefinitionStatic {
     pub interval: String,
     pub origin: Option<String>,
     pub offset: Option<String>,
 }
 
-#[nativebridge::native_bridge(GranularityDefinitionStatic)]
+#[nativebridge::native_bridge(GranularityDefinitionStatic, with_static_meta)]
 pub trait GranularityDefinition {
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;

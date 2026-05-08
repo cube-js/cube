@@ -9,12 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct CaseSwitchItemStatic {
     pub value: String,
 }
 
-#[nativebridge::native_bridge(CaseSwitchItemStatic)]
+#[nativebridge::native_bridge(CaseSwitchItemStatic, with_static_meta)]
 pub trait CaseSwitchItem {
     #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;

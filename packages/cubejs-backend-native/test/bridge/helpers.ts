@@ -88,3 +88,41 @@ export function parseBridge(name: string, obj: object): void {
 export function fieldNames(meta: BridgeFieldMeta[]): string[] {
   return meta.map((m) => m.name).sort();
 }
+
+/**
+ * Builds a stub fixture from bridge field meta.
+ *
+ * Override keys MUST match `BridgeFieldMeta.jsName` (i.e. the JS-side name
+ * after `#[serde(rename)]` — not the Rust ident). An unknown key is treated
+ * as a typo and throws, so a misspelled `primaryKey` does not silently
+ * cascade into a confusing serde error.
+ *
+ * Required trait fields default to `() => null` — that satisfies the
+ * `has_field` check try_new performs (both for `field` getters and for
+ * `call` methods). Required static fields default to `null`; serde rejects
+ * `null` for non-Option primitives, so callers must supply a typed override
+ * for those (e.g. `{ name: '' }` for `cubeDefinition`).
+ */
+export function buildFixture(
+  meta: BridgeFieldMeta[],
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const known = new Set(meta.map((m) => m.jsName));
+  for (const k of Object.keys(overrides)) {
+    if (!known.has(k)) {
+      throw new Error(
+        `buildFixture: override key '${k}' is not a known field of this bridge ` +
+          `(known jsName keys: ${[...known].sort().join(', ') || '(none)'})`
+      );
+    }
+  }
+  const fixture: Record<string, unknown> = {};
+  for (const field of meta) {
+    if (Object.prototype.hasOwnProperty.call(overrides, field.jsName)) {
+      fixture[field.jsName] = overrides[field.jsName];
+    } else if (!field.optional) {
+      fixture[field.jsName] = field.kind === 'static' ? null : () => null;
+    }
+  }
+  return fixture;
+}
