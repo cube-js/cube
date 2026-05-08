@@ -59,13 +59,6 @@ pub struct MeasuresJoinHints {
 }
 
 impl MeasuresJoinHints {
-    pub fn empty() -> Self {
-        Self {
-            base_hints: JoinHints::new(),
-            measure_hints: vec![],
-        }
-    }
-
     pub fn builder(query_join_hints: &JoinHints) -> MeasuresJoinHintsBuilder {
         MeasuresJoinHintsBuilder {
             initial_hints: query_join_hints.clone(),
@@ -137,16 +130,6 @@ pub struct MultiFactJoinGroups {
 }
 
 impl MultiFactJoinGroups {
-    pub fn empty(query_tools: Rc<QueryTools>) -> Self {
-        Self {
-            query_tools,
-            measures_join_hints: MeasuresJoinHints::empty(),
-            groups: vec![],
-            dimension_paths: HashMap::new(),
-            measure_paths: HashMap::new(),
-        }
-    }
-
     pub fn try_new(
         query_tools: Rc<QueryTools>,
         measures_join_hints: MeasuresJoinHints,

@@ -83,16 +83,6 @@ pub struct FullKeyAggregateMeasures {
     pub rendered_as_multiplied_measures: HashSet<String>,
 }
 
-impl FullKeyAggregateMeasures {
-    pub fn has_multiplied_measures(&self) -> bool {
-        !self.multiplied_measures.is_empty()
-    }
-
-    pub fn has_multi_stage_measures(&self) -> bool {
-        !self.multi_stage_measures.is_empty()
-    }
-}
-
 #[derive(Clone, TypedBuilder)]
 #[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
@@ -232,7 +222,7 @@ impl QueryProperties {
             .collect()
     }
 
-    pub fn is_multi_fact_join(&self) -> Result<bool, CubeError> {
+    fn is_multi_fact_join(&self) -> Result<bool, CubeError> {
         Ok(self.multi_fact_join_groups()?.is_multi_fact())
     }
 
@@ -282,11 +272,6 @@ impl QueryProperties {
 
     pub fn order_by(&self) -> &Vec<OrderByItem> {
         &self.order_by
-    }
-
-    pub fn set_order_by_to_default(&mut self) {
-        self.order_by =
-            Self::default_order(&self.dimensions, &self.time_dimensions, &self.measures);
     }
 
     pub fn ungrouped(&self) -> bool {
@@ -379,7 +364,7 @@ impl QueryProperties {
             .collect_vec()
     }
 
-    pub fn fill_all_filter_symbols(&self, members: &mut Vec<Rc<MemberSymbol>>) {
+    fn fill_all_filter_symbols(&self, members: &mut Vec<Rc<MemberSymbol>>) {
         if let Some(all_filters) = self.all_filters() {
             for filter_item in all_filters.items.iter() {
                 filter_item.find_all_member_evaluators(members);
