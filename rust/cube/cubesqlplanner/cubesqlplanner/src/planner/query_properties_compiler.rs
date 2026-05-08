@@ -362,7 +362,7 @@ impl QueryPropertiesCompiler {
             }
             MemberExpressionExpressionDef::Struct(_) => {
                 return Err(CubeError::user(
-                    "Expression struct not supported for dimension".to_string(),
+                    "Expression struct not supported for segment".to_string(),
                 ));
             }
         };

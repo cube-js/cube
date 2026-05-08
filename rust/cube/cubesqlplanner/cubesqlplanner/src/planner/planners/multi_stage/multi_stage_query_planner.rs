@@ -59,7 +59,9 @@ impl MultiStageQueryPlanner {
         let mut descriptions = Vec::new();
         // Multi-stage CTE state: a query carrying the dimensions/filters of the
         // current node in the multi-stage tree. measures_filters are
-        // intentionally dropped — CTE queries do not propagate them.
+        // intentionally dropped — CTE queries do not propagate them. order_by
+        // is set to an empty vec so the builder skips default_order: this
+        // value is used only as a state container, never planned directly.
         let state = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .dimensions(self.query_properties.dimensions().clone())
@@ -67,6 +69,7 @@ impl MultiStageQueryPlanner {
             .dimensions_filters(self.query_properties.dimensions_filters().clone())
             .time_dimensions_filters(self.query_properties.time_dimensions_filters().clone())
             .segments(self.query_properties.segments().clone())
+            .order_by(Some(vec![]))
             .build()?;
 
         let mut resolved_multi_stage_dimensions = HashSet::new();

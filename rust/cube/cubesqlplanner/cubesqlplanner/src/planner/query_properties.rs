@@ -161,7 +161,9 @@ pub struct QueryProperties {
 }
 
 /// Finalize the builder output. Wired into
-/// `QueryProperties::builder().…build()` via `build_method(into = …)`.
+/// `QueryProperties::builder().…build()` via `build_method(into = …)` —
+/// not intended for direct `.into()` conversions, which would re-apply
+/// the finalization steps.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
         if qp.order_by.is_none() {
