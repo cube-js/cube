@@ -6,7 +6,7 @@ use super::{Op, OpCtx, OpExec};
 /// Top-level dispatch over the symbol kind: dimensions, time dimensions,
 /// measures and everything else each follow their own rendering pipeline.
 /// Discards the tail — each branch is a self-contained pipeline.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DispatchByKindOp {
     dimension: Vec<Op>,
     time_dimension: Vec<Op>,

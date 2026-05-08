@@ -5,7 +5,7 @@ use super::{OpCtx, OpExec};
 
 /// Protects a compound expression from operator-precedence breakage when it
 /// is being substituted into a position that expects an atomic argument.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ParenthesizeOp;
 
 impl OpExec for ParenthesizeOp {

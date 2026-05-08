@@ -8,7 +8,7 @@ use super::{OpCtx, OpExec};
 /// Replaces a member's value with its `mask` SQL whenever the user lacks
 /// access to the underlying data, optionally guarding the substitution with
 /// the member's mask filter so authorized rows still see the real value.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MaskedOp {
     ungrouped: bool,
 }

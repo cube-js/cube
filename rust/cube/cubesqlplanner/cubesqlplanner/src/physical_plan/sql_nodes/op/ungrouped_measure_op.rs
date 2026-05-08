@@ -6,7 +6,7 @@ use super::{OpCtx, OpExec};
 /// Renders a measure for an ungrouped query at the measure level — the
 /// expression is left unaggregated, with the lone exception of `count(*)`
 /// which becomes `1` per row.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UngroupedMeasureOp;
 
 impl OpExec for UngroupedMeasureOp {

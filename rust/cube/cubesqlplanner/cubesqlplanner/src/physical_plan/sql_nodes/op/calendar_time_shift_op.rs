@@ -9,7 +9,7 @@ use super::{OpCtx, OpExec};
 /// Applies a calendar-cube shift to a dimension: either substitutes a
 /// preconfigured SQL expression for it, or moves it by an interval in the
 /// inverse direction so calendar joins line up with the requested period.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CalendarTimeShiftOp {
     shifts: Rc<HashMap<String, CalendarDimensionTimeShift>>,
 }

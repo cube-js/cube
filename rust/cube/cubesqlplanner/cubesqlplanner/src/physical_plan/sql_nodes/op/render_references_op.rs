@@ -6,7 +6,7 @@ use super::{OpCtx, OpExec};
 
 /// Reuses already-materialized columns (CTE outputs, pre-aggregation
 /// fields) for known members instead of recomputing them from raw cube data.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RenderReferencesOp {
     references: Rc<RenderReferences>,
 }

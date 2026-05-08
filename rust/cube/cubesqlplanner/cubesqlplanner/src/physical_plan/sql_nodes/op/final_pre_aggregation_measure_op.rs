@@ -10,7 +10,7 @@ use super::{OpCtx, OpExec};
 /// pre-aggregation column when one is available — `sum(state)` for
 /// pre-aggregated counts, `merge(state)` for HLL, etc. Falls through when
 /// the measure is not covered by the active pre-aggregation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FinalPreAggregationMeasureOp {
     references: Rc<RenderReferences>,
 }

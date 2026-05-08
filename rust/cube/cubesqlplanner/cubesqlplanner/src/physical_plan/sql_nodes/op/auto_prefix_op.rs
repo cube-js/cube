@@ -10,7 +10,7 @@ use super::{OpCtx, OpExec};
 
 /// Qualifies a bare identifier with its cube alias so the column resolves
 /// unambiguously when multiple cubes appear in the same query.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AutoPrefixOp {
     cube_references: Rc<HashMap<String, String>>,
 }

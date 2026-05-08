@@ -6,7 +6,7 @@ use super::{OpCtx, OpExec};
 
 /// Renders a multi-stage rank measure as a SQL `RANK() OVER (PARTITION BY …
 /// ORDER BY …)`. Other measures fall through to the rest of the pipeline.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MultiStageRankOp {
     partition: Vec<String>,
 }

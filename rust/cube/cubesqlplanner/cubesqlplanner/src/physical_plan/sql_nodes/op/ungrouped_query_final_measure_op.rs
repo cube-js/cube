@@ -7,7 +7,7 @@ use super::{OpCtx, OpExec};
 /// Renders a measure for an ungrouped query at the row level: count-likes
 /// turn into `CASE WHEN <expr> IS NOT NULL THEN 1 END` so a downstream
 /// aggregator can sum them, other measures pass through unchanged.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UngroupedQueryFinalMeasureOp;
 
 impl OpExec for UngroupedQueryFinalMeasureOp {

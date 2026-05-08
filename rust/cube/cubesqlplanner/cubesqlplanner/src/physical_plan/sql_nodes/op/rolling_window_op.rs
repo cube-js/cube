@@ -9,7 +9,7 @@ use super::{Op, OpCtx, OpExec};
 /// directly over `input_pipeline`; non-cumulative or unsupported kinds fall
 /// back to `default_pipeline` for the regular aggregation path. Discards
 /// the tail — each branch is a self-contained pipeline.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RollingWindowOp {
     input_pipeline: Vec<Op>,
     default_pipeline: Vec<Op>,

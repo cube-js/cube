@@ -5,7 +5,7 @@ use super::{OpCtx, OpExec};
 
 /// Produces the base SQL of a member from its own definition (column ref
 /// or `sql:` expression). Terminal step of any rendering pipeline.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EvaluateSymbolOp;
 
 impl OpExec for EvaluateSymbolOp {

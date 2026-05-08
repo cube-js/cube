@@ -7,7 +7,7 @@ use super::{Op, OpCtx, OpExec};
 /// over its `input_pipeline` (`agg(agg(input)) OVER (PARTITION BY …)`).
 /// Other measures take the `else_pipeline` branch. Discards the tail —
 /// each branch is a self-contained pipeline.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MultiStageWindowOp {
     input_pipeline: Vec<Op>,
     else_pipeline: Vec<Op>,

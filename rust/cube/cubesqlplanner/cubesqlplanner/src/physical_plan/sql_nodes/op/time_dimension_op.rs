@@ -9,7 +9,7 @@ use super::{OpCtx, OpExec};
 /// granularity (`week`/`month`/calendar-cube SQL/...). Covers both
 /// `TimeDimension` symbols and raw time-typed `Dimension` symbols (the
 /// latter only when raw timezone conversion is enabled).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TimeDimensionOp {
     dimensions_with_ignored_timezone: Rc<HashSet<String>>,
 }

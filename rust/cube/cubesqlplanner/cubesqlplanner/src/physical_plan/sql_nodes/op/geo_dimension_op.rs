@@ -6,7 +6,7 @@ use super::{OpCtx, OpExec};
 
 /// Emits a Geo dimension as a single `lat,lng` string column so the pair
 /// can travel through downstream queries as one value.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GeoDimensionOp;
 
 impl OpExec for GeoDimensionOp {

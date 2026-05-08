@@ -12,7 +12,7 @@ use super::{OpCtx, OpExec};
 /// Renders a member that is defined via `case:` / `case_switch:` rules as a
 /// SQL `CASE … END`. Members without a case definition fall through to the
 /// rest of the pipeline so plain dimensions/measures keep their normal path.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CaseOp;
 
 impl CaseOp {

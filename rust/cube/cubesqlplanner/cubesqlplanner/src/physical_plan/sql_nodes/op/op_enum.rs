@@ -11,15 +11,37 @@ use super::{
     TimeDimensionOp, TimeShiftOp, UngroupedMeasureOp, UngroupedQueryFinalMeasureOp,
 };
 
-/// All op variants that participate in pipeline rendering.
-///
-/// Adding a new op means three things: a new variant here, a new dispatch
-/// arm in `impl OpExec for Op`, and (preferably) a constructor on `impl Op`.
-/// The compiler enforces exhaustiveness on the dispatch — there is no
-/// central match with logic to keep in sync; per-variant logic lives in its
-/// own struct's `OpExec` impl.
-#[derive(Clone)]
-pub enum Op {
+/// Declares the `Op` enum and forwards [`OpExec`] (`exec` + `is_terminal`)
+/// to each variant via a single match — keeps the two parallel dispatch
+/// tables in lockstep so adding a new op is a one-line change here.
+macro_rules! define_op_enum {
+    ($( $variant:ident($ty:ty) ),+ $(,)?) => {
+        /// All op variants that participate in pipeline rendering. To add
+        /// one, append a `$variant($ty)` line below; the macro fills in
+        /// `OpExec for Op` and the `Clone`/`Debug` derives. A constructor
+        /// on `impl Op` is still added by hand because signatures vary.
+        #[derive(Clone, Debug)]
+        pub enum Op {
+            $( $variant($ty), )+
+        }
+
+        impl OpExec for Op {
+            fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
+                match self {
+                    $( Op::$variant(o) => o.exec(ctx), )+
+                }
+            }
+
+            fn is_terminal(&self) -> bool {
+                match self {
+                    $( Op::$variant(o) => o.is_terminal(), )+
+                }
+            }
+        }
+    };
+}
+
+define_op_enum! {
     EvaluateSymbol(EvaluateSymbolOp),
     Parenthesize(ParenthesizeOp),
     AutoPrefix(AutoPrefixOp),
@@ -140,56 +162,6 @@ impl Op {
 
     pub fn rolling_window(input_pipeline: Vec<Op>, default_pipeline: Vec<Op>) -> Self {
         Self::RollingWindow(RollingWindowOp::new(input_pipeline, default_pipeline))
-    }
-}
-
-impl OpExec for Op {
-    fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
-        match self {
-            Op::EvaluateSymbol(o) => o.exec(ctx),
-            Op::Parenthesize(o) => o.exec(ctx),
-            Op::AutoPrefix(o) => o.exec(ctx),
-            Op::GeoDimension(o) => o.exec(ctx),
-            Op::MeasureFilter(o) => o.exec(ctx),
-            Op::RenderReferences(o) => o.exec(ctx),
-            Op::Masked(o) => o.exec(ctx),
-            Op::Case(o) => o.exec(ctx),
-            Op::DispatchByKind(o) => o.exec(ctx),
-            Op::FinalMeasure(o) => o.exec(ctx),
-            Op::FinalPreAggregationMeasure(o) => o.exec(ctx),
-            Op::UngroupedMeasure(o) => o.exec(ctx),
-            Op::UngroupedQueryFinalMeasure(o) => o.exec(ctx),
-            Op::TimeDimension(o) => o.exec(ctx),
-            Op::TimeShift(o) => o.exec(ctx),
-            Op::CalendarTimeShift(o) => o.exec(ctx),
-            Op::MultiStageRank(o) => o.exec(ctx),
-            Op::MultiStageWindow(o) => o.exec(ctx),
-            Op::RollingWindow(o) => o.exec(ctx),
-        }
-    }
-
-    fn is_terminal(&self) -> bool {
-        match self {
-            Op::EvaluateSymbol(o) => o.is_terminal(),
-            Op::Parenthesize(o) => o.is_terminal(),
-            Op::AutoPrefix(o) => o.is_terminal(),
-            Op::GeoDimension(o) => o.is_terminal(),
-            Op::MeasureFilter(o) => o.is_terminal(),
-            Op::RenderReferences(o) => o.is_terminal(),
-            Op::Masked(o) => o.is_terminal(),
-            Op::Case(o) => o.is_terminal(),
-            Op::DispatchByKind(o) => o.is_terminal(),
-            Op::FinalMeasure(o) => o.is_terminal(),
-            Op::FinalPreAggregationMeasure(o) => o.is_terminal(),
-            Op::UngroupedMeasure(o) => o.is_terminal(),
-            Op::UngroupedQueryFinalMeasure(o) => o.is_terminal(),
-            Op::TimeDimension(o) => o.is_terminal(),
-            Op::TimeShift(o) => o.is_terminal(),
-            Op::CalendarTimeShift(o) => o.is_terminal(),
-            Op::MultiStageRank(o) => o.is_terminal(),
-            Op::MultiStageWindow(o) => o.is_terminal(),
-            Op::RollingWindow(o) => o.is_terminal(),
-        }
     }
 }
 

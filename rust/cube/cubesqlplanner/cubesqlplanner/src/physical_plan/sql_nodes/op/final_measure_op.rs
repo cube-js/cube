@@ -10,7 +10,7 @@ use super::{OpCtx, OpExec};
 /// Wraps the measure expression with its aggregate (`SUM`/`AVG`/`COUNT
 /// DISTINCT`/HLL state init/etc.), choosing the right form when the measure
 /// is being rendered against a multiplied join branch.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FinalMeasureOp {
     rendered_as_multiplied_measures: Rc<HashSet<String>>,
     count_approx_as_state: bool,

@@ -10,6 +10,7 @@ use super::{Op, OpCtx, OpExec};
 
 /// `Rc`-shareable carrier of a validated `Vec<Op>`. Renders the SQL of a
 /// member symbol by running the pipeline once via [`Self::to_sql`].
+#[derive(Debug)]
 pub struct NodeProcessor {
     ops: Vec<Op>,
     /// Caches the structural validation result so a pipeline reused across

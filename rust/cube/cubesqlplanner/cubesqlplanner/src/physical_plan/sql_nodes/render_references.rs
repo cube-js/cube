@@ -1,10 +1,10 @@
 use crate::physical_plan::QualifiedColumnName;
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RawReferenceValue(pub String);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RenderReferencesType {
     QualifiedColumnName(QualifiedColumnName),
     LiteralValue(String),
@@ -29,7 +29,7 @@ impl From<RawReferenceValue> for RenderReferencesType {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct RenderReferences {
     references: HashMap<String, RenderReferencesType>,
 }
