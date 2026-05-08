@@ -81,10 +81,8 @@ view_group(`sales`, {
 
 ### `views`
 
-A list of view names that belong to this group. Views listed here are
-merged with any views that reference this group via their own
-[`view_group`][ref-view-view-group] or
-[`view_groups`][ref-view-view-groups] parameter.
+A list of view names that belong to this group. This is the only way to
+assign views to a view group.
 
 <CodeGroup>
 
@@ -108,22 +106,14 @@ view_group(`sales`, {
 
 ## Assigning views to groups
 
-There are two complementary ways to associate a view with a view group:
-
-1. **On the view group** — list view names in the [`views`](#views) parameter.
-2. **On the view** — set [`view_group`][ref-view-view-group] (singular) or
-   [`view_groups`][ref-view-view-groups] (plural) on the view itself.
-
-Both approaches can be combined. Cube merges the membership from all
-sources, so a view listed under a group's `views` *and* referencing that
-group via `view_group` will appear only once.
+To associate a view with a view group, list its name in the
+[`views`](#views) parameter on the view group.
 
 ### Example
 
 The following model defines two view groups. The `sales` group lists
-`orders_overview` in its `views` parameter; `revenue` joins the same
-group via its own `view_group` property. The `customers_view` belongs to
-`people` through the group-level `views` list.
+`orders_overview` and `revenue` in its `views` parameter, while the
+`people` group lists `customers_view`.
 
 <CodeGroup>
 
@@ -182,7 +172,6 @@ views:
           - created_at
 
   - name: revenue
-    view_group: sales
     cubes:
       - join_path: order_items
         includes:
@@ -200,6 +189,7 @@ view_groups:
     description: Revenue and order views for the sales team
     views:
       - orders_overview
+      - revenue
 
   - name: people
     title: People
@@ -280,7 +270,6 @@ view(`orders_overview`, {
 })
 
 view(`revenue`, {
-  view_group: sales,
   cubes: [
     {
       join_path: order_items,
@@ -304,7 +293,7 @@ view(`customers_view`, {
 view_group(`sales`, {
   title: `Sales`,
   description: `Revenue and order views for the sales team`,
-  views: [`orders_overview`]
+  views: [`orders_overview`, `revenue`]
 })
 
 view_group(`people`, {
@@ -337,12 +326,6 @@ With this model, the `/v1/meta` response includes a `viewGroups` array:
 }
 ```
 
-Notice that `revenue` appears in the `sales` group even though it was not
-listed in the group's `views` — it was added because the view itself set
-`view_group: sales`.
-
 [ref-views]: /docs/data-modeling/views
 [ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference
-[ref-view-view-group]: /reference/data-modeling/view#view_group
-[ref-view-view-groups]: /reference/data-modeling/view#view_groups
