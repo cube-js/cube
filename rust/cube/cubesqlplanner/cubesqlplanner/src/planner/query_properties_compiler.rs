@@ -1,3 +1,7 @@
+//! Translates [`BaseQueryOptions`] into a finalized [`QueryProperties`] —
+//! resolves member/segment/filter/order references against the cube
+//! evaluator and folds them into the typed builder.
+
 use std::rc::Rc;
 
 use cubenativeutils::CubeError;
@@ -19,6 +23,8 @@ use super::{
     TimeDimensionSymbol,
 };
 
+/// One-shot translator from [`BaseQueryOptions`] into a finalized
+/// [`QueryProperties`].
 pub struct QueryPropertiesCompiler {
     query_tools: Rc<QueryTools>,
 }
@@ -118,6 +124,7 @@ impl QueryPropertiesCompiler {
             .collect()
     }
 
+    // Struct expressions are rejected; only SQL calls are accepted here.
     fn compile_member_expression_dimension(
         evaluator_compiler: &mut Compiler,
         member_expression: &Rc<dyn MemberExpressionDefinition>,
@@ -213,6 +220,8 @@ impl QueryPropertiesCompiler {
             .collect()
     }
 
+    // Accepts either a SQL call or a `PatchMeasure` struct; other struct
+    // expression types are rejected.
     fn compile_member_expression_measure(
         evaluator_compiler: &mut Compiler,
         member_expression: &Rc<dyn MemberExpressionDefinition>,
@@ -361,6 +370,9 @@ impl QueryPropertiesCompiler {
         BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
     }
 
+    // Returns `(dimension_filters, time_dimension_filters, measure_filters)`.
+    // Includes both the explicit `options.filters` entries and the implicit
+    // `dateRange` filter carried by each time dimension.
     fn compile_filters(
         &self,
         evaluator_compiler: &mut Compiler,
@@ -379,6 +391,8 @@ impl QueryPropertiesCompiler {
         Ok(filter_compiler.extract_result())
     }
 
+    // Drop time-dimension symbols that have no granularity. Non-time-
+    // dimension symbols pass through unchanged.
     fn filter_time_dimensions_with_granularity(
         time_dimensions: Vec<Rc<MemberSymbol>>,
     ) -> Vec<Rc<MemberSymbol>> {
@@ -394,10 +408,8 @@ impl QueryPropertiesCompiler {
             .collect_vec()
     }
 
-    /// Returns `None` when the caller did not supply an `order` (the builder
-    /// will fall back to `default_order`), `Some(translated)` otherwise —
-    /// including `Some(empty)` if every entry was rejected, which the
-    /// builder preserves as "render no ORDER BY clause".
+    // Returns `None` when `options.order` is absent, `Some(translated)`
+    // otherwise — including `Some(empty)` if the input was an empty array.
     fn compile_order_by(
         &self,
         evaluator_compiler: &mut Compiler,

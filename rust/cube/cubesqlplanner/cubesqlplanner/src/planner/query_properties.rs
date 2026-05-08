@@ -1,3 +1,11 @@
+//! `QueryProperties` describes what a query asks for: members, filters,
+//! ordering and the planner flags that govern compilation.
+//!
+//! Construction goes through `QueryProperties::builder()`. Most fields default
+//! to empty/false; callers spell out only what differs from a vanilla query.
+//! For inputs that originate from `BaseQueryOptions`, see
+//! [`QueryPropertiesCompiler`](super::query_properties_compiler).
+
 use super::query_tools::QueryTools;
 use super::MemberSymbol;
 use crate::cube_bridge::join_definition::JoinDefinition;
@@ -17,6 +25,9 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// One entry of a query's ORDER BY clause. Equality follows the
+/// reference-chain-resolved name of the member, matching the semantics used
+/// for member equivalence elsewhere in `QueryProperties`.
 #[derive(Clone, Debug)]
 pub struct OrderByItem {
     member_evaluator: Rc<MemberSymbol>,
@@ -50,18 +61,19 @@ impl PartialEq for OrderByItem {
     }
 }
 
-/// Compare two member symbols by reference-chain-resolved name.
-/// For root queries this is equivalent to `MemberSymbol::eq` (full_name compare);
-/// for multi-stage states with CTE references it follows the chain to the resolved symbol.
+// Compare two member symbols by their reference-chain-resolved full name.
 fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
     a.clone().resolve_reference_chain().full_name()
         == b.clone().resolve_reference_chain().full_name()
 }
 
+/// A measure paired with the cube it should be aggregated under. The bound
+/// cube can differ from the measure's own cube for member expressions
+/// referencing a dimension.
 #[derive(Debug, Clone)]
 pub struct MultipliedMeasure {
     measure: Rc<MemberSymbol>,
-    cube_name: String, //May differ from cube_name of the measure for a member_expression that refers to a dimension.
+    cube_name: String,
 }
 
 impl MultipliedMeasure {
@@ -78,6 +90,11 @@ impl MultipliedMeasure {
     }
 }
 
+/// Measures classified by how the planner must compute them: directly
+/// aggregated alongside the rest of the query, wrapped in a multiplied
+/// subquery, or planned as a multi-stage CTE. `rendered_as_multiplied`
+/// tracks symbols that were originally multiplied even after additivity
+/// reclassification flips them into `regular_measures`.
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
@@ -86,6 +103,15 @@ pub struct FullKeyAggregateMeasures {
     pub rendered_as_multiplied_measures: HashSet<String>,
 }
 
+/// The full description of a query: selected members, filters, ordering,
+/// planner flags, plus a lazy cache of the join groups derived from those
+/// members. Constructed via the typed builder; `build()` substitutes
+/// `default_order` if `order_by` was not set, applies static filters, and
+/// wraps the result in `Rc`.
+///
+/// Two equality flavours: [`PartialEq`] compares all semantic fields;
+/// [`eq_as_state`](Self::eq_as_state) compares only members, filters,
+/// segments and time-shifts.
 #[derive(Clone, TypedBuilder)]
 #[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
@@ -106,9 +132,8 @@ pub struct QueryProperties {
     measures_filters: Vec<FilterItem>,
     #[builder(default)]
     segments: Vec<FilterItem>,
-    /// `None` = builder caller did not set order_by; `From` impl will fall
-    /// back to `default_order`. `Some(vec)` is used as-is, including
-    /// `Some(empty)` meaning "render no ORDER BY clause".
+    /// `None` lets `From` substitute [`Self::default_order`]; `Some(vec)` is
+    /// used verbatim, including `Some(empty)`.
     #[builder(default)]
     order_by: Option<Vec<OrderByItem>>,
     #[builder(default)]
@@ -135,11 +160,8 @@ pub struct QueryProperties {
     multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
 }
 
-/// Finalize a QueryProperties built via the typed builder: materializes the
-/// default order if the builder caller did not set `order_by`, and applies
-/// static filters. `Some(empty)` is preserved as "no ORDER BY", `None`
-/// triggers the default. Wired into `QueryProperties::builder().…build()`
-/// via `build_method(into = …)`.
+/// Finalize the builder output. Wired into
+/// `QueryProperties::builder().…build()` via `build_method(into = …)`.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
         if qp.order_by.is_none() {
@@ -159,6 +181,9 @@ impl QueryProperties {
         self.allow_multi_stage
     }
 
+    // Push every entry of `dimensions_filters` into matching `case`
+    // expressions on each member, filter and order item. Run once at
+    // construction; mutators do not re-apply it.
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
         for dim in self.dimensions.iter_mut() {
@@ -302,6 +327,8 @@ impl QueryProperties {
         self.pre_aggregation_id.as_deref()
     }
 
+    /// Concatenation of `time_dimensions_filters`, `dimensions_filters`, and
+    /// `segments` into a single `Filter`. `measures_filters` are not included.
     pub fn all_filters(&self) -> Option<Filter> {
         let items = self
             .time_dimensions_filters
@@ -335,6 +362,9 @@ impl QueryProperties {
         }
     }
 
+    /// Every symbol the query touches: selected members, members referenced
+    /// inside filters, and measures pulled in by measure-filter or order-by
+    /// references. Deduplicated by full name.
     pub fn all_used_symbols(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let mut members = vec![];
         members.extend(self.time_dimensions.iter().cloned());
@@ -384,6 +414,9 @@ impl QueryProperties {
         }
     }
 
+    /// First time-dimension with a granularity (ASC) if any; otherwise the
+    /// first measure (DESC) when both measures and dimensions are present;
+    /// otherwise the first dimension (ASC). Empty when none apply.
     pub fn default_order(
         dimensions: &[Rc<MemberSymbol>],
         time_dimensions: &[Rc<MemberSymbol>],
@@ -532,20 +565,16 @@ impl QueryProperties {
         Ok(())
     }
 
-    /// Compare two member sequences by reference-chain-resolved name.
-    /// Required for multi-stage state dedup, where dimensions can carry CTE
-    /// references; for root queries it degenerates to plain full_name compare.
+    // Compare two member slices element-wise by reference-chain-resolved
+    // full name.
     fn members_equivalent(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
         a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| member_chain_eq(x, y))
     }
 
-    // --- multi-stage state mutations ---
+    // --- members / filters / time-shifts mutators ---
     //
-    // The methods below mutate fields that participate in
-    // `compute_multi_fact_join_groups`, so they invalidate the lazy cache.
-    // They originally lived on `MultiStageAppliedState`; that type was folded
-    // into `QueryProperties` so the multi-stage planner can carry node state
-    // as a regular query.
+    // Each mutator below changes a field that feeds into the join-groups
+    // computation and invalidates the lazy cache.
 
     pub fn set_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
         self.dimensions = dimensions;
@@ -557,9 +586,8 @@ impl QueryProperties {
         self.invalidate_join_groups_cache();
     }
 
-    /// Merge new dimensions into the existing list, deduplicating by
-    /// reference-chain-resolved full name (so a dimension reachable through
-    /// a CTE chain is treated as equal to its resolved counterpart).
+    /// Append `dimensions` to the existing list, deduplicating by
+    /// reference-chain-resolved full name.
     pub fn add_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
         self.dimensions = self
             .dimensions
@@ -576,9 +604,8 @@ impl QueryProperties {
         self.invalidate_join_groups_cache();
     }
 
-    /// Drop multi-stage dimensions that are not yet resolved at the current
-    /// stage. A dimension stays if it has no multi-stage members or if it has
-    /// already been resolved upstream.
+    /// Keep only dimensions and time-dimensions whose chain-resolved name is
+    /// in `resolved_dimensions` or that have no multi-stage members.
     pub fn remove_multistage_dimensions(
         &mut self,
         resolved_dimensions: &HashSet<String>,
@@ -605,6 +632,9 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Merge `time_shifts` into [`Self::time_shifts`]. Interval shifts on
+    /// the same dimension compose; mixing a named shift with an interval
+    /// (or two named shifts) on the same dimension returns an error.
     pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) -> Result<(), CubeError> {
         let resolved_shifts = match time_shifts {
             MeasureTimeShifts::Dimensions(dimensions) => dimensions,
@@ -767,9 +797,11 @@ impl QueryProperties {
         false
     }
 
-    /// Replace InDateRange filter with bounded version for rolling window without granularity.
-    /// Unlike `replace_regular_date_range_filter` which uses time_series CTE references,
-    /// this keeps parameter-based filters suitable for queries without a time_series CTE.
+    /// Rewrite an `InDateRange` filter on `member_name` according to the
+    /// trailing/leading bounds: both `unbounded` removes the filter entirely;
+    /// trailing-`unbounded` rewrites to `BeforeOrOnDate(to)`; leading-
+    /// `unbounded` rewrites to `AfterOrOnDate(from)`. Other inputs are
+    /// no-ops.
     pub fn replace_date_range_for_rolling_window_without_granularity(
         &mut self,
         member_name: &str,
@@ -906,6 +938,8 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Same as [`replace_range_in_date_filter`](Self::replace_range_in_date_filter)
+    /// but forces the rewritten filter to use raw (unparametrized) values.
     pub fn replace_range_to_subquery_in_date_filter(
         &mut self,
         member_name: &str,
@@ -979,14 +1013,9 @@ impl QueryProperties {
         self.multi_fact_join_groups = OnceCell::new();
     }
 
-    /// Compare only the fields that identify a node in a multi-stage CTE walk:
-    /// dimensions/time_dimensions (chain-resolved), the three filter slots,
-    /// segments and time_shifts. Other fields (`order_by`, limits, planner
-    /// flags, join_hints) propagate unchanged from the root query within a
-    /// single multi-stage tree, so including them in the comparison would
-    /// either be redundant work or, worse, prevent valid CTE deduplication if
-    /// they ever drift. Use this for multi-stage state matching; use the full
-    /// `PartialEq` for query-level equality.
+    /// Equality over members (chain-resolved), the three filter slots,
+    /// segments and time-shifts. Excludes ordering, limits, planner flags
+    /// and join hints; for those fields use the full [`PartialEq`].
     pub fn eq_as_state(&self, other: &Self) -> bool {
         Self::members_equivalent(&self.dimensions, &other.dimensions)
             && Self::members_equivalent(&self.time_dimensions, &other.time_dimensions)
@@ -998,6 +1027,9 @@ impl QueryProperties {
     }
 }
 
+/// Equality over every semantic field. Members are compared by reference-
+/// chain-resolved name; `query_tools` and the `multi_fact_join_groups` cache
+/// are excluded. See also [`eq_as_state`](QueryProperties::eq_as_state).
 impl PartialEq for QueryProperties {
     fn eq(&self, other: &Self) -> bool {
         // Destructure to fail compilation if a new field is added without an
