@@ -3,38 +3,23 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use cubeorchestrator::query_message_parser::QueryResult;
-use cubeorchestrator::query_result_transform::{DBResponsePrimitive, TransformedData};
+use cubeorchestrator::query_result_transform::TransformedData;
 use cubeorchestrator::transport::{
-    ConfigItem, JsRawColumnarData, MemberOrMemberExpression, NormalizedQuery, QueryType,
-    ResultType, TransformDataRequest,
+    ConfigItem, MemberOrMemberExpression, NormalizedQuery, QueryType, ResultType,
+    TransformDataRequest,
 };
 
-const ROW_COUNTS: &[usize] = &[1_000, 10_000, 50_000, 100_000];
-const COLUMN_COUNTS: &[usize] = &[8, 16, 32, 64];
+#[path = "common/mod.rs"]
+mod common;
+use common::{
+    build_dataset, make_member_aliases, split_dim_measure, TimeColumn, COLUMN_COUNTS, ROW_COUNTS,
+};
 
 /// Total columns and row count used by `bench_transform_time_scenarios`.
 /// Held fixed so the cells/sec figures are directly comparable to the
 /// 16-col / 100k-row entries from `bench_transform`.
 const SCENARIO_COL_COUNT: usize = 16;
 const SCENARIO_ROW_COUNT: usize = 100_000;
-
-/// Split a target column count into ~60% dimensions and ~40% measures.
-fn split_dim_measure(col_count: usize) -> (usize, usize) {
-    let dim_count = (col_count * 6) / 10;
-    let measure_count = col_count - dim_count;
-    (dim_count, measure_count)
-}
-
-fn make_member_aliases(prefix: &str, count: usize) -> Vec<(String, String)> {
-    (0..count)
-        .map(|i| {
-            (
-                format!("Sales.{}{}", prefix, i),
-                format!("sales__{}{}", prefix, i),
-            )
-        })
-        .collect()
-}
 
 fn config_item(member_type: &str) -> ConfigItem {
     ConfigItem {
@@ -50,12 +35,6 @@ fn config_item(member_type: &str) -> ConfigItem {
         granularities: None,
         granularity: None,
     }
-}
-
-#[derive(Clone)]
-struct TimeColumn {
-    member: String,
-    alias: String,
 }
 
 #[derive(Clone, Copy)]
@@ -163,55 +142,6 @@ fn build_request(
         query_type: Some(QueryType::RegularQuery),
         res_type,
     }
-}
-
-fn build_dataset(
-    row_count: usize,
-    dimensions: &[(String, String)],
-    measures: &[(String, String)],
-    time_dims: &[TimeColumn],
-) -> JsRawColumnarData {
-    let total_cols = dimensions.len() + measures.len() + time_dims.len();
-    let mut members = Vec::with_capacity(total_cols);
-    let mut columns: Vec<Vec<DBResponsePrimitive>> = Vec::with_capacity(total_cols);
-
-    for (j, (_, alias)) in dimensions.iter().enumerate() {
-        members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            col.push(DBResponsePrimitive::String(format!(
-                "dim_{}_{}",
-                j,
-                i % 1000
-            )));
-        }
-        columns.push(col);
-    }
-    for (j, (_, alias)) in measures.iter().enumerate() {
-        members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            col.push(DBResponsePrimitive::Number(((i * (j + 1)) as f64) * 0.5));
-        }
-        columns.push(col);
-    }
-    for (j, td) in time_dims.iter().enumerate() {
-        members.push(td.alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            // Format mirrors typical CubeStore output: ISO-8601 with millisecond
-            // fractional and no timezone.
-            let month = ((i + j) % 12) + 1;
-            let day = ((i / 12) % 28) + 1;
-            col.push(DBResponsePrimitive::String(format!(
-                "2024-{:02}-{:02}T00:00:00.000",
-                month, day
-            )));
-        }
-        columns.push(col);
-    }
-
-    JsRawColumnarData { members, columns }
 }
 
 fn bench_transform(c: &mut Criterion) {

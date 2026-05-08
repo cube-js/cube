@@ -2,7 +2,6 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use cubeorchestrator::query_message_parser::QueryResult;
-use cubeorchestrator::query_result_transform::DBResponsePrimitive;
 use cubeorchestrator::transport::JsRawColumnarData;
 use cubeshared::codegen::{
     HttpColumnValue, HttpColumnValueArgs, HttpCommand, HttpMessage, HttpMessageArgs, HttpResultSet,
@@ -10,59 +9,9 @@ use cubeshared::codegen::{
 };
 use cubeshared::flatbuffers::FlatBufferBuilder;
 
-const ROW_COUNTS: &[usize] = &[1_000, 10_000, 50_000, 100_000];
-const COLUMN_COUNTS: &[usize] = &[8, 16, 32, 64];
-
-/// Split a target column count into ~60% dimensions and ~40% measures.
-fn split_dim_measure(col_count: usize) -> (usize, usize) {
-    let dim_count = (col_count * 6) / 10;
-    let measure_count = col_count - dim_count;
-    (dim_count, measure_count)
-}
-
-fn make_member_aliases(prefix: &str, count: usize) -> Vec<(String, String)> {
-    (0..count)
-        .map(|i| {
-            (
-                format!("Sales.{}{}", prefix, i),
-                format!("sales__{}{}", prefix, i),
-            )
-        })
-        .collect()
-}
-
-fn build_dataset(
-    row_count: usize,
-    dimensions: &[(String, String)],
-    measures: &[(String, String)],
-) -> JsRawColumnarData {
-    let total_cols = dimensions.len() + measures.len();
-    let mut members = Vec::with_capacity(total_cols);
-    let mut columns: Vec<Vec<DBResponsePrimitive>> = Vec::with_capacity(total_cols);
-
-    for (j, (_, alias)) in dimensions.iter().enumerate() {
-        members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            col.push(DBResponsePrimitive::String(format!(
-                "dim_{}_{}",
-                j,
-                i % 1000
-            )));
-        }
-        columns.push(col);
-    }
-    for (j, (_, alias)) in measures.iter().enumerate() {
-        members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            col.push(DBResponsePrimitive::Number(((i * (j + 1)) as f64) * 0.5));
-        }
-        columns.push(col);
-    }
-
-    JsRawColumnarData { members, columns }
-}
+#[path = "common/mod.rs"]
+mod common;
+use common::{build_dataset, make_member_aliases, split_dim_measure, COLUMN_COUNTS, ROW_COUNTS};
 
 /// Build a FlatBuffer `HttpMessage` payload mirroring CubeStore's wire format
 /// for `from_cubestore_fb` to parse. Cells are 16-character strings to give
@@ -153,7 +102,7 @@ fn bench_from_js_raw_data(c: &mut Criterion) {
         let dimensions = make_member_aliases("dim", dim_count);
         let measures = make_member_aliases("measure", measure_count);
 
-        let dataset = build_dataset(row_count, &dimensions, &measures);
+        let dataset = build_dataset(row_count, &dimensions, &measures, &[]);
         let payload = serde_json::to_vec(&dataset).expect("to_vec");
         let payload_len = payload.len();
 
