@@ -13,10 +13,11 @@ use super::{
 
 /// All op variants that participate in pipeline rendering.
 ///
-/// Adding a new op = new variant here + new dispatch arm in [`OpExec for Op`]
-/// + (preferably) a constructor on `impl Op`. The compiler enforces
-/// exhaustiveness on the dispatch — there is no central match with logic to
-/// keep in sync; per-variant logic lives in its own struct's `OpExec` impl.
+/// Adding a new op means three things: a new variant here, a new dispatch
+/// arm in `impl OpExec for Op`, and (preferably) a constructor on `impl Op`.
+/// The compiler enforces exhaustiveness on the dispatch — there is no
+/// central match with logic to keep in sync; per-variant logic lives in its
+/// own struct's `OpExec` impl.
 #[derive(Clone)]
 pub enum Op {
     EvaluateSymbol(EvaluateSymbolOp),

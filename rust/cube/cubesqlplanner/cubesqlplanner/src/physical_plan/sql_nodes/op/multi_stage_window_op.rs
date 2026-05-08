@@ -39,7 +39,7 @@ impl OpExec for MultiStageWindowOp {
                 "MultiStageWindow op called for non-measure symbol".to_string(),
             ));
         };
-        if !(m.is_multi_stage() && !m.is_calculated()) {
+        if !m.is_multi_stage() || m.is_calculated() {
             return ctx.render_pipeline(&self.else_pipeline);
         }
         let measure_type = m.measure_type();
