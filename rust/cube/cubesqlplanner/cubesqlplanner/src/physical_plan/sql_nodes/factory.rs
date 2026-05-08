@@ -1,9 +1,5 @@
-use super::{
-    MultiStageRankNode, MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesType,
-    RollingWindowNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
-};
+use super::{Op, OpPipelineSqlNode, RenderReferencesType, SqlNode};
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
-use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
 use crate::physical_plan::sql_nodes::RenderReferences;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::CalendarDimensionTimeShift;
@@ -82,6 +78,53 @@ fn op_ungrouped_measure(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
 
 fn op_ungrouped_query_final_measure(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
     OpPipelineSqlNode::new(vec![Op::ungrouped_query_final_measure(), Op::legacy(input)])
+}
+
+fn op_time_dimension(
+    dimensions_with_ignored_timezone: HashSet<String>,
+    input: Rc<dyn SqlNode>,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![
+        Op::time_dimension(dimensions_with_ignored_timezone),
+        Op::legacy(input),
+    ])
+}
+
+fn op_time_shift(shifts: TimeShiftState, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::time_shift(shifts), Op::legacy(input)])
+}
+
+fn op_calendar_time_shift(
+    shifts: HashMap<String, CalendarDimensionTimeShift>,
+    input: Rc<dyn SqlNode>,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::calendar_time_shift(shifts), Op::legacy(input)])
+}
+
+fn op_multi_stage_rank(input: Rc<dyn SqlNode>, partition: Vec<String>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::multi_stage_rank(partition), Op::legacy(input)])
+}
+
+fn op_multi_stage_window(
+    multi_stage_input: Rc<dyn SqlNode>,
+    else_processor: Rc<dyn SqlNode>,
+    partition: Vec<String>,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::multi_stage_window(
+        vec![Op::legacy(multi_stage_input)],
+        vec![Op::legacy(else_processor)],
+        partition,
+    )])
+}
+
+fn op_rolling_window(
+    input: Rc<dyn SqlNode>,
+    default_processor: Rc<dyn SqlNode>,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::rolling_window(
+        vec![Op::legacy(input)],
+        vec![Op::legacy(default_processor)],
+    )])
 }
 
 #[derive(Clone, Default)]
@@ -275,7 +318,7 @@ impl SqlNodesFactory {
 
     fn add_multi_stage_rank_if_needed(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         if let Some(partition_by) = &self.multi_stage_rank {
-            MultiStageRankNode::new(default, partition_by.clone())
+            op_multi_stage_rank(default, partition_by.clone())
         } else {
             default
         }
@@ -287,7 +330,7 @@ impl SqlNodesFactory {
         multi_stage_input: Rc<dyn SqlNode>,
     ) -> Rc<dyn SqlNode> {
         if let Some(partition_by) = &self.multi_stage_window {
-            MultiStageWindowNode::new(multi_stage_input, default, partition_by.clone())
+            op_multi_stage_window(multi_stage_input, default, partition_by.clone())
         } else {
             default
         }
@@ -313,7 +356,7 @@ impl SqlNodesFactory {
                 final_processor
             };
             if self.rolling_window {
-                RollingWindowNode::new(input, final_processor)
+                op_rolling_window(input, final_processor)
             } else {
                 final_processor
             }
@@ -334,16 +377,16 @@ impl SqlNodesFactory {
         let input: Rc<dyn SqlNode> = op_paren(input);
 
         let input: Rc<dyn SqlNode> =
-            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
+            op_time_dimension(self.dimensions_with_ignored_timezone.clone(), input);
 
         let input = if !self.calendar_time_shifts.is_empty() {
-            CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
+            op_calendar_time_shift(self.calendar_time_shifts.clone(), input)
         } else {
             input
         };
 
         let input = if !self.time_shifts.is_empty() {
-            TimeShiftSqlNode::new(self.time_shifts.clone(), input)
+            op_time_shift(self.time_shifts.clone(), input)
         } else {
             input
         };
@@ -352,9 +395,6 @@ impl SqlNodesFactory {
     }
 
     fn time_dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        let input: Rc<dyn SqlNode> =
-            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
-
-        input
+        op_time_dimension(self.dimensions_with_ignored_timezone.clone(), input)
     }
 }

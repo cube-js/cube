@@ -1,12 +1,15 @@
 use crate::physical_plan::sql_nodes::{RenderReferences, SqlNode};
+use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::symbols::CalendarDimensionTimeShift;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::{
-    AutoPrefixOp, CaseOp, DispatchByKindOp, EvaluateSymbolOp, FinalMeasureOp,
+    AutoPrefixOp, CalendarTimeShiftOp, CaseOp, DispatchByKindOp, EvaluateSymbolOp, FinalMeasureOp,
     FinalPreAggregationMeasureOp, GeoDimensionOp, LegacySqlNodeOp, MaskedOp, MeasureFilterOp,
-    OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp, UngroupedMeasureOp,
+    MultiStageRankOp, MultiStageWindowOp, OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp,
+    RollingWindowOp, TimeDimensionOp, TimeShiftOp, UngroupedMeasureOp,
     UngroupedQueryFinalMeasureOp,
 };
 
@@ -34,6 +37,12 @@ pub enum Op {
     FinalPreAggregationMeasure(FinalPreAggregationMeasureOp),
     UngroupedMeasure(UngroupedMeasureOp),
     UngroupedQueryFinalMeasure(UngroupedQueryFinalMeasureOp),
+    TimeDimension(TimeDimensionOp),
+    TimeShift(TimeShiftOp),
+    CalendarTimeShift(CalendarTimeShiftOp),
+    MultiStageRank(MultiStageRankOp),
+    MultiStageWindow(MultiStageWindowOp),
+    RollingWindow(RollingWindowOp),
     LegacySqlNode(LegacySqlNodeOp),
 }
 
@@ -76,12 +85,12 @@ impl Op {
         measure: Vec<Op>,
         default: Vec<Op>,
     ) -> Self {
-        Self::DispatchByKind(DispatchByKindOp {
+        Self::DispatchByKind(DispatchByKindOp::new(
             dimension,
             time_dimension,
             measure,
             default,
-        })
+        ))
     }
 
     pub fn final_measure(
@@ -106,6 +115,38 @@ impl Op {
         Self::UngroupedQueryFinalMeasure(UngroupedQueryFinalMeasureOp)
     }
 
+    pub fn time_dimension(dimensions_with_ignored_timezone: HashSet<String>) -> Self {
+        Self::TimeDimension(TimeDimensionOp::new(dimensions_with_ignored_timezone))
+    }
+
+    pub fn time_shift(shifts: TimeShiftState) -> Self {
+        Self::TimeShift(TimeShiftOp::new(shifts))
+    }
+
+    pub fn calendar_time_shift(shifts: HashMap<String, CalendarDimensionTimeShift>) -> Self {
+        Self::CalendarTimeShift(CalendarTimeShiftOp::new(shifts))
+    }
+
+    pub fn multi_stage_rank(partition: Vec<String>) -> Self {
+        Self::MultiStageRank(MultiStageRankOp::new(partition))
+    }
+
+    pub fn multi_stage_window(
+        input_pipeline: Vec<Op>,
+        else_pipeline: Vec<Op>,
+        partition: Vec<String>,
+    ) -> Self {
+        Self::MultiStageWindow(MultiStageWindowOp::new(
+            input_pipeline,
+            else_pipeline,
+            partition,
+        ))
+    }
+
+    pub fn rolling_window(input_pipeline: Vec<Op>, default_pipeline: Vec<Op>) -> Self {
+        Self::RollingWindow(RollingWindowOp::new(input_pipeline, default_pipeline))
+    }
+
     pub fn legacy(node: Rc<dyn SqlNode>) -> Self {
         Self::LegacySqlNode(LegacySqlNodeOp::new(node))
     }
@@ -127,6 +168,12 @@ impl OpExec for Op {
             Op::FinalPreAggregationMeasure(o) => o.exec(ctx),
             Op::UngroupedMeasure(o) => o.exec(ctx),
             Op::UngroupedQueryFinalMeasure(o) => o.exec(ctx),
+            Op::TimeDimension(o) => o.exec(ctx),
+            Op::TimeShift(o) => o.exec(ctx),
+            Op::CalendarTimeShift(o) => o.exec(ctx),
+            Op::MultiStageRank(o) => o.exec(ctx),
+            Op::MultiStageWindow(o) => o.exec(ctx),
+            Op::RollingWindow(o) => o.exec(ctx),
             Op::LegacySqlNode(o) => o.exec(ctx),
         }
     }

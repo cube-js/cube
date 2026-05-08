@@ -8,10 +8,26 @@ use super::{Op, OpCtx, OpExec};
 /// Discards the tail — each branch is a self-contained pipeline.
 #[derive(Clone)]
 pub struct DispatchByKindOp {
-    pub dimension: Vec<Op>,
-    pub time_dimension: Vec<Op>,
-    pub measure: Vec<Op>,
-    pub default: Vec<Op>,
+    dimension: Vec<Op>,
+    time_dimension: Vec<Op>,
+    measure: Vec<Op>,
+    default: Vec<Op>,
+}
+
+impl DispatchByKindOp {
+    pub fn new(
+        dimension: Vec<Op>,
+        time_dimension: Vec<Op>,
+        measure: Vec<Op>,
+        default: Vec<Op>,
+    ) -> Self {
+        Self {
+            dimension,
+            time_dimension,
+            measure,
+            default,
+        }
+    }
 }
 
 impl OpExec for DispatchByKindOp {

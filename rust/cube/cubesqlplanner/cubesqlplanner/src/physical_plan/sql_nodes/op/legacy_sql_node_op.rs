@@ -8,7 +8,7 @@ use super::{OpCtx, OpExec};
 /// `SqlNode` subtree. Goes away once every node has its Op counterpart.
 #[derive(Clone)]
 pub struct LegacySqlNodeOp {
-    pub inner: Rc<dyn SqlNode>,
+    inner: Rc<dyn SqlNode>,
 }
 
 impl LegacySqlNodeOp {
