@@ -22,15 +22,15 @@ impl MultiStageWindowOp {
             partition,
         }
     }
-
-    pub(super) fn nested_pipelines(&self) -> [&[Op]; 2] {
-        [&self.input_pipeline, &self.else_pipeline]
-    }
 }
 
 impl OpExec for MultiStageWindowOp {
     fn is_terminal(&self) -> bool {
         true
+    }
+
+    fn nested_pipelines(&self) -> Vec<&[Op]> {
+        vec![&self.input_pipeline, &self.else_pipeline]
     }
 
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {

@@ -37,6 +37,12 @@ macro_rules! define_op_enum {
                     $( Op::$variant(o) => o.is_terminal(), )+
                 }
             }
+
+            fn nested_pipelines(&self) -> Vec<&[Op]> {
+                match self {
+                    $( Op::$variant(o) => o.nested_pipelines(), )+
+                }
+            }
         }
     };
 }
@@ -191,20 +197,11 @@ impl Op {
                     "Pipeline ends with a non-terminal op — render_tail will hit an empty tail at runtime".to_string(),
                 ));
             }
-            for sub in nested_pipelines(op) {
+            for sub in op.nested_pipelines() {
                 Op::validate_pipeline(sub)?;
             }
         }
         Ok(())
-    }
-}
-
-fn nested_pipelines(op: &Op) -> Vec<&[Op]> {
-    match op {
-        Op::DispatchByKind(o) => o.nested_pipelines().to_vec(),
-        Op::MultiStageWindow(o) => o.nested_pipelines().to_vec(),
-        Op::RollingWindow(o) => o.nested_pipelines().to_vec(),
-        _ => Vec::new(),
     }
 }
 

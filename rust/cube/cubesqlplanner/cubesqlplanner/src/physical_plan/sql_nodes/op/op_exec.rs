@@ -1,6 +1,6 @@
 use cubenativeutils::CubeError;
 
-use super::OpCtx;
+use super::{Op, OpCtx};
 
 /// Behavior of a single op at render time. One impl per Op variant; the
 /// dispatch on [`Op`] forwards to it.
@@ -13,5 +13,12 @@ pub trait OpExec {
     /// op; this is enforced by [`Op::validate_pipeline`].
     fn is_terminal(&self) -> bool {
         false
+    }
+
+    /// Sub-pipelines this op carries as data — branches of a kind dispatch,
+    /// the input/else legs of a multi-stage window, etc. Default is empty:
+    /// only branching ops override.
+    fn nested_pipelines(&self) -> Vec<&[Op]> {
+        Vec::new()
     }
 }
