@@ -1,11 +1,13 @@
 use crate::physical_plan::sql_nodes::{RenderReferences, SqlNode};
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::{
-    AutoPrefixOp, CaseOp, DispatchByKindOp, EvaluateSymbolOp, GeoDimensionOp, LegacySqlNodeOp,
-    MaskedOp, MeasureFilterOp, OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp,
+    AutoPrefixOp, CaseOp, DispatchByKindOp, EvaluateSymbolOp, FinalMeasureOp,
+    FinalPreAggregationMeasureOp, GeoDimensionOp, LegacySqlNodeOp, MaskedOp, MeasureFilterOp,
+    OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp, UngroupedMeasureOp,
+    UngroupedQueryFinalMeasureOp,
 };
 
 /// All op variants that participate in pipeline rendering.
@@ -28,6 +30,10 @@ pub enum Op {
     Masked(MaskedOp),
     Case(CaseOp),
     DispatchByKind(DispatchByKindOp),
+    FinalMeasure(FinalMeasureOp),
+    FinalPreAggregationMeasure(FinalPreAggregationMeasureOp),
+    UngroupedMeasure(UngroupedMeasureOp),
+    UngroupedQueryFinalMeasure(UngroupedQueryFinalMeasureOp),
     LegacySqlNode(LegacySqlNodeOp),
 }
 
@@ -78,6 +84,28 @@ impl Op {
         })
     }
 
+    pub fn final_measure(
+        rendered_as_multiplied_measures: HashSet<String>,
+        count_approx_as_state: bool,
+    ) -> Self {
+        Self::FinalMeasure(FinalMeasureOp::new(
+            rendered_as_multiplied_measures,
+            count_approx_as_state,
+        ))
+    }
+
+    pub fn final_pre_aggregation_measure(references: RenderReferences) -> Self {
+        Self::FinalPreAggregationMeasure(FinalPreAggregationMeasureOp::new(references))
+    }
+
+    pub fn ungrouped_measure() -> Self {
+        Self::UngroupedMeasure(UngroupedMeasureOp)
+    }
+
+    pub fn ungrouped_query_final_measure() -> Self {
+        Self::UngroupedQueryFinalMeasure(UngroupedQueryFinalMeasureOp)
+    }
+
     pub fn legacy(node: Rc<dyn SqlNode>) -> Self {
         Self::LegacySqlNode(LegacySqlNodeOp::new(node))
     }
@@ -95,6 +123,10 @@ impl OpExec for Op {
             Op::Masked(o) => o.exec(ctx),
             Op::Case(o) => o.exec(ctx),
             Op::DispatchByKind(o) => o.exec(ctx),
+            Op::FinalMeasure(o) => o.exec(ctx),
+            Op::FinalPreAggregationMeasure(o) => o.exec(ctx),
+            Op::UngroupedMeasure(o) => o.exec(ctx),
+            Op::UngroupedQueryFinalMeasure(o) => o.exec(ctx),
             Op::LegacySqlNode(o) => o.exec(ctx),
         }
     }

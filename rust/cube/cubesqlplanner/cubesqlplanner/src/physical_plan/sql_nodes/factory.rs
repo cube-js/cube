@@ -1,8 +1,6 @@
 use super::{
-    FinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode, MultiStageRankNode,
-    MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesType, RollingWindowNode, SqlNode,
-    TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
-    UngroupedQueryFinalMeasureSqlNode,
+    MultiStageRankNode, MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesType,
+    RollingWindowNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
 };
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
@@ -55,6 +53,35 @@ fn op_dispatch_by_kind(
         vec![Op::legacy(measure)],
         vec![Op::legacy(default)],
     )])
+}
+
+fn op_final_measure(
+    input: Rc<dyn SqlNode>,
+    rendered_as_multiplied_measures: HashSet<String>,
+    count_approx_as_state: bool,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![
+        Op::final_measure(rendered_as_multiplied_measures, count_approx_as_state),
+        Op::legacy(input),
+    ])
+}
+
+fn op_final_pre_aggregation_measure(
+    input: Rc<dyn SqlNode>,
+    references: RenderReferences,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![
+        Op::final_pre_aggregation_measure(references),
+        Op::legacy(input),
+    ])
+}
+
+fn op_ungrouped_measure(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::ungrouped_measure(), Op::legacy(input)])
+}
+
+fn op_ungrouped_query_final_measure(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::ungrouped_query_final_measure(), Op::legacy(input)])
 }
 
 #[derive(Clone, Default)]
@@ -268,17 +295,17 @@ impl SqlNodesFactory {
 
     fn final_measure_node_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         if self.ungrouped_measure {
-            UngroupedMeasureSqlNode::new(input)
+            op_ungrouped_measure(input)
         } else if self.ungrouped {
-            UngroupedQueryFinalMeasureSqlNode::new(input)
+            op_ungrouped_query_final_measure(input)
         } else {
-            let final_processor: Rc<dyn SqlNode> = FinalMeasureSqlNode::new(
+            let final_processor: Rc<dyn SqlNode> = op_final_measure(
                 input.clone(),
                 self.rendered_as_multiplied_measures.clone(),
                 self.count_approx_as_state,
             );
             let final_processor = if !self.pre_aggregation_measures_references.is_empty() {
-                FinalPreAggregationMeasureSqlNode::new(
+                op_final_pre_aggregation_measure(
                     final_processor,
                     self.pre_aggregation_measures_references.clone(),
                 )

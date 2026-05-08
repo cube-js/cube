@@ -252,7 +252,7 @@ fn masked_measure_returns_mask_literal() {
 
     let symbol = context.create_measure("masking_cube.count").unwrap();
     let sql = context.evaluate_symbol(&symbol).unwrap();
-    // FinalMeasureSqlNode skips aggregation for masked measures
+    // Masked measures skip aggregation and surface the mask literal as-is.
     assert_eq!(sql, "(12345)");
 }
 
