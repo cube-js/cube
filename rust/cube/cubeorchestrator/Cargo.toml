@@ -23,3 +23,7 @@ criterion = { version = "0.8", default-features = false, features = ["html_repor
 [[bench]]
 name = "transform"
 harness = false
+
+[[bench]]
+name = "parser"
+harness = false

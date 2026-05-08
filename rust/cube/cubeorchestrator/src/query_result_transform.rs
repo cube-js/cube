@@ -534,11 +534,7 @@ pub fn get_compact_row(
                 column_index,
                 member_type,
             } => {
-                if let Some(value) = db_data
-                    .data
-                    .get(*column_index)
-                    .and_then(|c| c.get(row_idx))
-                {
+                if let Some(value) = db_data.data.get(*column_index).and_then(|c| c.get(row_idx)) {
                     row.push(transform_value(value.clone(), member_type));
                 }
             }
