@@ -3,7 +3,6 @@ use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::physical_plan::QualifiedColumnName;
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
-use crate::planner::join_hints::JoinHints;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
@@ -111,27 +110,17 @@ impl DimensionSubqueryPlanner {
             (vec![], vec![])
         };
 
-        let sub_query_properties = QueryProperties::try_new(
-            self.query_tools.clone(),
-            vec![measure.clone()], //measures,
-            primary_keys_dimensions.clone(),
-            vec![],
-            time_dimensions_filters,
-            dimensions_filters,
-            vec![],
-            vec![],
-            vec![],
-            None,
-            None,
-            true,
-            false,
-            false,
-            false,
-            Rc::new(JoinHints::new()),
-            true,
-            self.query_properties.disable_external_pre_aggregations(),
-            None,
-        )?;
+        let sub_query_properties = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .measures(vec![measure.clone()])
+            .dimensions(primary_keys_dimensions.clone())
+            .time_dimensions_filters(time_dimensions_filters)
+            .dimensions_filters(dimensions_filters)
+            .ignore_cumulative(true)
+            .disable_external_pre_aggregations(
+                self.query_properties.disable_external_pre_aggregations(),
+            )
+            .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan()?;
         let result = Rc::new(DimensionSubQuery {

@@ -76,27 +76,25 @@ impl QueryPropertiesCompiler {
             options.join_hints()?.unwrap_or_default(),
         ));
 
-        QueryProperties::try_new(
-            self.query_tools,
-            measures,
-            dimensions,
-            time_dimensions,
-            time_dimensions_filters,
-            dimensions_filters,
-            measures_filters,
-            segments,
-            order_by,
-            row_limit,
-            offset,
-            false,
-            ungrouped,
-            pre_aggregation_query,
-            total_query,
-            query_join_hints,
-            true,
-            disable_external_pre_aggregations,
-            pre_aggregation_id,
-        )
+        QueryProperties::builder()
+            .query_tools(self.query_tools)
+            .measures(measures)
+            .dimensions(dimensions)
+            .time_dimensions(time_dimensions)
+            .time_dimensions_filters(time_dimensions_filters)
+            .dimensions_filters(dimensions_filters)
+            .measures_filters(measures_filters)
+            .segments(segments)
+            .order_by(order_by)
+            .row_limit(row_limit)
+            .offset(offset)
+            .ungrouped(ungrouped)
+            .pre_aggregation_query(pre_aggregation_query)
+            .total_query(total_query)
+            .query_join_hints(query_join_hints)
+            .disable_external_pre_aggregations(disable_external_pre_aggregations)
+            .pre_aggregation_id(pre_aggregation_id)
+            .build()
     }
 
     fn compile_dimensions(

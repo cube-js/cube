@@ -12,6 +12,7 @@ use itertools::Itertools;
 use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::rc::Rc;
+use typed_builder::TypedBuilder;
 
 #[derive(Clone, Debug)]
 pub struct OrderByItem {
@@ -92,87 +93,67 @@ impl FullKeyAggregateMeasures {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
+#[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
-    measures: Vec<Rc<MemberSymbol>>,
-    dimensions: Vec<Rc<MemberSymbol>>,
-    dimensions_filters: Vec<FilterItem>,
-    time_dimensions_filters: Vec<FilterItem>,
-    measures_filters: Vec<FilterItem>,
-    segments: Vec<FilterItem>,
-    time_dimensions: Vec<Rc<MemberSymbol>>,
-    time_shifts: TimeShiftState,
-    order_by: Vec<OrderByItem>,
-    row_limit: Option<usize>,
-    offset: Option<usize>,
     query_tools: Rc<QueryTools>,
+    #[builder(default)]
+    measures: Vec<Rc<MemberSymbol>>,
+    #[builder(default)]
+    dimensions: Vec<Rc<MemberSymbol>>,
+    #[builder(default)]
+    time_dimensions: Vec<Rc<MemberSymbol>>,
+    #[builder(setter(skip), default)]
+    time_shifts: TimeShiftState,
+    #[builder(default)]
+    dimensions_filters: Vec<FilterItem>,
+    #[builder(default)]
+    time_dimensions_filters: Vec<FilterItem>,
+    #[builder(default)]
+    measures_filters: Vec<FilterItem>,
+    #[builder(default)]
+    segments: Vec<FilterItem>,
+    #[builder(default)]
+    order_by: Vec<OrderByItem>,
+    #[builder(default)]
+    row_limit: Option<usize>,
+    #[builder(default)]
+    offset: Option<usize>,
+    #[builder(default)]
     ignore_cumulative: bool,
+    #[builder(default)]
     ungrouped: bool,
-    multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
+    #[builder(default)]
     pre_aggregation_query: bool,
+    #[builder(default)]
     total_query: bool,
+    #[builder(default = Rc::new(JoinHints::new()))]
     query_join_hints: Rc<JoinHints>,
+    #[builder(default = true)]
     allow_multi_stage: bool,
+    #[builder(default)]
     disable_external_pre_aggregations: bool,
+    #[builder(default)]
     pre_aggregation_id: Option<String>,
+    #[builder(setter(skip), default)]
+    multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
+}
+
+/// Finalize a QueryProperties built via the typed builder:
+/// fills the default order if none was set and applies static filters.
+/// Wired into `QueryProperties::builder().…build()` via `build_method(into = …)`.
+impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
+    fn from(mut qp: QueryProperties) -> Self {
+        if qp.order_by.is_empty() {
+            qp.order_by =
+                QueryProperties::default_order(&qp.dimensions, &qp.time_dimensions, &qp.measures);
+        }
+        qp.apply_static_filters()?;
+        Ok(Rc::new(qp))
+    }
 }
 
 impl QueryProperties {
-    pub fn try_new(
-        query_tools: Rc<QueryTools>,
-        measures: Vec<Rc<MemberSymbol>>,
-        dimensions: Vec<Rc<MemberSymbol>>,
-        time_dimensions: Vec<Rc<MemberSymbol>>,
-        time_dimensions_filters: Vec<FilterItem>,
-        dimensions_filters: Vec<FilterItem>,
-        measures_filters: Vec<FilterItem>,
-        segments: Vec<FilterItem>,
-        order_by: Vec<OrderByItem>,
-        row_limit: Option<usize>,
-        offset: Option<usize>,
-        ignore_cumulative: bool,
-        ungrouped: bool,
-        pre_aggregation_query: bool,
-        total_query: bool,
-        query_join_hints: Rc<JoinHints>,
-        allow_multi_stage: bool,
-        disable_external_pre_aggregations: bool,
-        pre_aggregation_id: Option<String>,
-    ) -> Result<Rc<Self>, CubeError> {
-        let order_by = if order_by.is_empty() {
-            Self::default_order(&dimensions, &time_dimensions, &measures)
-        } else {
-            order_by
-        };
-
-        let mut res = Self {
-            measures,
-            dimensions,
-            time_dimensions,
-            time_shifts: TimeShiftState::default(),
-            time_dimensions_filters,
-            dimensions_filters,
-            segments,
-            measures_filters,
-            order_by,
-            row_limit,
-            offset,
-            multi_fact_join_groups: OnceCell::new(),
-            query_tools,
-            ignore_cumulative,
-            ungrouped,
-            pre_aggregation_query,
-            total_query,
-            query_join_hints,
-            allow_multi_stage,
-            disable_external_pre_aggregations,
-            pre_aggregation_id,
-        };
-        res.apply_static_filters()?;
-
-        Ok(Rc::new(res))
-    }
-
     pub fn allow_multi_stage(&self) -> bool {
         self.allow_multi_stage
     }
