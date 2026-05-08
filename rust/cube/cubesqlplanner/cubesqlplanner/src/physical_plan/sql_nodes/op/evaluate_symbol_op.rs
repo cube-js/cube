@@ -3,10 +3,8 @@ use cubenativeutils::CubeError;
 
 use super::{OpCtx, OpExec};
 
-/// Terminal op: defers to the symbol's own `ToSql` evaluator, threading the
-/// current visitor and `legacy_node_processor` through `MemberSqlContext`.
-///
-/// Mirrors the legacy `EvaluateSqlNode`.
+/// Produces the base SQL of a member from its own definition (column ref
+/// or `sql:` expression). Terminal step of any rendering pipeline.
 pub struct EvaluateSymbolOp;
 
 impl OpExec for EvaluateSymbolOp {

@@ -1,7 +1,6 @@
 use super::{
-    AutoPrefixSqlNode, CaseSqlNode, FinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode,
-    GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode, MultiStageRankNode,
-    MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesSqlNode, RenderReferencesType,
+    CaseSqlNode, FinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode, MaskedSqlNode,
+    MultiStageRankNode, MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesType,
     RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
     UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
@@ -15,6 +14,25 @@ use std::rc::Rc;
 
 fn op_paren(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
     OpPipelineSqlNode::new(vec![Op::parenthesize(), Op::legacy(input)])
+}
+
+fn op_auto_prefix(
+    input: Rc<dyn SqlNode>,
+    cube_references: HashMap<String, String>,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::auto_prefix(cube_references), Op::legacy(input)])
+}
+
+fn op_measure_filter(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::measure_filter(), Op::legacy(input)])
+}
+
+fn op_geo_dimension(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::geo_dimension(), Op::legacy(input)])
+}
+
+fn op_render_references(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::render_references(references), Op::legacy(input)])
 }
 
 #[derive(Clone, Default)]
@@ -157,13 +175,13 @@ impl SqlNodesFactory {
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
         let evaluate_sql_processor =
             MaskedSqlNode::new(OpPipelineSqlNode::new(vec![Op::evaluate_symbol()]));
-        let auto_prefix_processor = AutoPrefixSqlNode::new(
+        let auto_prefix_processor = op_auto_prefix(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
         );
         let parenthesize_processor: Rc<dyn SqlNode> = op_paren(auto_prefix_processor.clone());
 
-        let measure_filter_processor = MeasureFilterSqlNode::new(parenthesize_processor.clone());
+        let measure_filter_processor = op_measure_filter(parenthesize_processor.clone());
         let measure_processor = CaseSqlNode::new(measure_filter_processor.clone());
 
         let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
@@ -181,7 +199,7 @@ impl SqlNodesFactory {
 
         let default_processor: Rc<dyn SqlNode> =
             if !self.pre_aggregation_dimensions_references.is_empty() {
-                RenderReferencesSqlNode::new(
+                op_render_references(
                     evaluate_sql_processor.clone(),
                     self.pre_aggregation_dimensions_references.clone(),
                 )
@@ -196,14 +214,14 @@ impl SqlNodesFactory {
             measure_processor.clone(),
             default_processor,
         );
-        RenderReferencesSqlNode::new(root_node, self.render_references.clone())
+        op_render_references(root_node, self.render_references.clone())
     }
     fn add_ungrouped_measure_reference_if_needed(
         &self,
         default: Rc<dyn SqlNode>,
     ) -> Rc<dyn SqlNode> {
         if !self.ungrouped_measure_references.is_empty() {
-            RenderReferencesSqlNode::new(default, self.ungrouped_measure_references.clone())
+            op_render_references(default, self.ungrouped_measure_references.clone())
         } else {
             default
         }
@@ -258,15 +276,14 @@ impl SqlNodesFactory {
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         let input = if !self.pre_aggregation_dimensions_references.is_empty() {
-            RenderReferencesSqlNode::new(input, self.pre_aggregation_dimensions_references.clone())
+            op_render_references(input, self.pre_aggregation_dimensions_references.clone())
         } else {
-            let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
+            let input: Rc<dyn SqlNode> = op_geo_dimension(input);
             let input: Rc<dyn SqlNode> = CaseSqlNode::new(input);
             input
         };
 
-        let input: Rc<dyn SqlNode> =
-            AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+        let input: Rc<dyn SqlNode> = op_auto_prefix(input, self.cube_name_references.clone());
 
         let input: Rc<dyn SqlNode> = op_paren(input);
 

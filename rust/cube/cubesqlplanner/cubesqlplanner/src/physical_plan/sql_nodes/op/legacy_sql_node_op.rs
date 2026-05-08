@@ -4,14 +4,8 @@ use std::rc::Rc;
 
 use super::{OpCtx, OpExec};
 
-/// Migration escape hatch: wraps a legacy `Rc<dyn SqlNode>` so it can sit
-/// inside an Op pipeline. The op simply forwards `exec` to the wrapped node's
-/// `to_sql`, threading the visitor and the current `legacy_node_processor`
-/// through unchanged.
-///
-/// Acts as the boundary between an already-migrated outer pipeline and a
-/// not-yet-migrated inner subtree. Once every legacy node has its Op
-/// counterpart, this variant can be removed.
+/// Migration-only bridge: lets an Op pipeline contain a not-yet-migrated
+/// `SqlNode` subtree. Goes away once every node has its Op counterpart.
 pub struct LegacySqlNodeOp {
     pub inner: Rc<dyn SqlNode>,
 }

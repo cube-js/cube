@@ -1,8 +1,12 @@
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::{RenderReferences, SqlNode};
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::{EvaluateSymbolOp, LegacySqlNodeOp, OpCtx, OpExec, ParenthesizeOp};
+use super::{
+    AutoPrefixOp, EvaluateSymbolOp, GeoDimensionOp, LegacySqlNodeOp, MeasureFilterOp, OpCtx,
+    OpExec, ParenthesizeOp, RenderReferencesOp,
+};
 
 /// All op variants that participate in pipeline rendering.
 ///
@@ -16,6 +20,10 @@ use super::{EvaluateSymbolOp, LegacySqlNodeOp, OpCtx, OpExec, ParenthesizeOp};
 pub enum Op {
     EvaluateSymbol(EvaluateSymbolOp),
     Parenthesize(ParenthesizeOp),
+    AutoPrefix(AutoPrefixOp),
+    GeoDimension(GeoDimensionOp),
+    MeasureFilter(MeasureFilterOp),
+    RenderReferences(RenderReferencesOp),
     LegacySqlNode(LegacySqlNodeOp),
 }
 
@@ -28,6 +36,22 @@ impl Op {
         Self::Parenthesize(ParenthesizeOp)
     }
 
+    pub fn auto_prefix(cube_references: HashMap<String, String>) -> Self {
+        Self::AutoPrefix(AutoPrefixOp::new(cube_references))
+    }
+
+    pub fn geo_dimension() -> Self {
+        Self::GeoDimension(GeoDimensionOp)
+    }
+
+    pub fn measure_filter() -> Self {
+        Self::MeasureFilter(MeasureFilterOp)
+    }
+
+    pub fn render_references(references: RenderReferences) -> Self {
+        Self::RenderReferences(RenderReferencesOp::new(references))
+    }
+
     pub fn legacy(node: Rc<dyn SqlNode>) -> Self {
         Self::LegacySqlNode(LegacySqlNodeOp::new(node))
     }
@@ -38,6 +62,10 @@ impl OpExec for Op {
         match self {
             Op::EvaluateSymbol(o) => o.exec(ctx),
             Op::Parenthesize(o) => o.exec(ctx),
+            Op::AutoPrefix(o) => o.exec(ctx),
+            Op::GeoDimension(o) => o.exec(ctx),
+            Op::MeasureFilter(o) => o.exec(ctx),
+            Op::RenderReferences(o) => o.exec(ctx),
             Op::LegacySqlNode(o) => o.exec(ctx),
         }
     }

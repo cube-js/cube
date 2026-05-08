@@ -3,11 +3,8 @@ use cubenativeutils::CubeError;
 
 use super::{OpCtx, OpExec};
 
-/// Wraps the rendered SQL of the rest of the pipeline in parentheses when
-/// the visitor signals `arg_needs_paren_safe` and the inner expression is
-/// compound at the top level.
-///
-/// Mirrors the legacy `ParenthesizeSqlNode`.
+/// Protects a compound expression from operator-precedence breakage when it
+/// is being substituted into a position that expects an atomic argument.
 pub struct ParenthesizeOp;
 
 impl OpExec for ParenthesizeOp {

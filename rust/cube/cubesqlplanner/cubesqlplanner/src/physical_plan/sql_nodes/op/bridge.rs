@@ -9,9 +9,9 @@ use std::rc::Rc;
 
 use super::{Op, OpCtx, OpExec};
 
-/// Adapter exposing a `Vec<Op>` pipeline as a `SqlNode`. Lets a pipeline be
-/// dropped into the legacy `Rc<dyn SqlNode>` tree built by `SqlNodesFactory`,
-/// so migration can proceed one node at a time.
+/// Migration-only bridge: lets an Op pipeline plug into the existing
+/// `SqlNode` tree wherever the rest of the planner expects one. Goes away
+/// once consumers switch from `Rc<dyn SqlNode>` to a `Plan`.
 pub struct OpPipelineSqlNode {
     ops: Vec<Op>,
 }
