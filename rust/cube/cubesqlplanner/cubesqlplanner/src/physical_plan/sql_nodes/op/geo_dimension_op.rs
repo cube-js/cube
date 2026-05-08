@@ -17,13 +17,13 @@ impl OpExec for GeoDimensionOp {
                     let inner_visitor = ctx.visitor.with_arg_needs_paren_safe(false);
                     let latitude_str = geo.latitude().eval(
                         &inner_visitor,
-                        ctx.legacy_node_processor.clone(),
+                        ctx.node_processor.clone(),
                         ctx.query_tools.clone(),
                         ctx.templates,
                     )?;
                     let longitude_str = geo.longitude().eval(
                         &inner_visitor,
-                        ctx.legacy_node_processor.clone(),
+                        ctx.node_processor.clone(),
                         ctx.query_tools.clone(),
                         ctx.templates,
                     )?;

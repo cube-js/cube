@@ -17,7 +17,7 @@ impl OpExec for EvaluateSymbolOp {
         let path = ctx.sym.compiled_path();
         let member_ctx = MemberSqlContext {
             visitor: &ctx.visitor,
-            node_processor: &ctx.legacy_node_processor,
+            node_processor: &ctx.node_processor,
             query_tools: &ctx.query_tools,
             templates: ctx.templates,
             name: path.name(),

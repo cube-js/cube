@@ -1,4 +1,4 @@
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::NodeProcessor;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 pub struct MemberSqlContext<'a> {
     pub visitor: &'a SqlEvaluatorVisitor,
-    pub node_processor: &'a Rc<dyn SqlNode>,
+    pub node_processor: &'a Rc<NodeProcessor>,
     pub query_tools: &'a Rc<QueryTools>,
     pub templates: &'a PlanSqlTemplates,
     pub name: &'a str,

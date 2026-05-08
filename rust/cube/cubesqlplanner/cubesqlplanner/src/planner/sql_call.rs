@@ -1,6 +1,6 @@
 use super::symbols::MemberSymbol;
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
-use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
+use crate::physical_plan::sql_nodes::{NodeProcessor, SqlNodesFactory};
 use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -157,7 +157,7 @@ impl SqlCall {
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
@@ -182,7 +182,7 @@ impl SqlCall {
     pub fn eval_vec(
         &self,
         visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<Vec<String>, CubeError> {
@@ -245,7 +245,7 @@ impl SqlCall {
     fn prepare_template_params(
         &self,
         visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         query_tools: &Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<(Vec<String>, Vec<String>, Vec<String>, Vec<String>), CubeError> {

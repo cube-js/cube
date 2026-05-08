@@ -35,7 +35,7 @@ impl OpExec for TimeDimensionOp {
                 if let Some(calendar_sql) = granularity_obj.calendar_sql() {
                     return calendar_sql.eval(
                         &ctx.visitor,
-                        ctx.legacy_node_processor.clone(),
+                        ctx.node_processor.clone(),
                         ctx.query_tools.clone(),
                         ctx.templates,
                     );

@@ -150,8 +150,8 @@ fn calculated_boolean_combined_wraps_compound_dep() {
 #[test]
 fn measure_with_case_definition_renders_safely() {
     let ctx = ctx();
-    // `CaseSqlNode` wraps the whole result in `CASE … END`. No substituted
-    // deps here, but we verify the node's reset path doesn't break anything.
+    // The full result is wrapped in `CASE … END`, so any substituted args
+    // are inside a syntactically safe scope and don't need extra parens.
     let sql = measure_sql(&ctx, "expr_cube.measure_case");
     assert_eq!(
         sql,

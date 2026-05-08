@@ -1,4 +1,4 @@
-use super::{Op, OpPipelineSqlNode, RenderReferencesType, SqlNode};
+use super::{NodeProcessor, Op, RenderReferencesType};
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::RenderReferences;
 use crate::planner::planners::multi_stage::TimeShiftState;
@@ -6,125 +6,113 @@ use crate::planner::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-fn op_paren(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::parenthesize(), Op::legacy(input)])
+/// Prepend an outer op in front of `tail` so the resulting `Vec<Op>` runs
+/// `outer` first and then continues into the previously built pipeline.
+fn prepend(outer: Op, tail: Vec<Op>) -> Vec<Op> {
+    let mut ops = Vec::with_capacity(tail.len() + 1);
+    ops.push(outer);
+    ops.extend(tail);
+    ops
 }
 
-fn op_auto_prefix(
-    input: Rc<dyn SqlNode>,
-    cube_references: HashMap<String, String>,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::auto_prefix(cube_references), Op::legacy(input)])
+fn op_paren(tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::parenthesize(), tail)
 }
 
-fn op_measure_filter(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::measure_filter(), Op::legacy(input)])
+fn op_auto_prefix(tail: Vec<Op>, cube_references: HashMap<String, String>) -> Vec<Op> {
+    prepend(Op::auto_prefix(cube_references), tail)
 }
 
-fn op_geo_dimension(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::geo_dimension(), Op::legacy(input)])
+fn op_measure_filter(tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::measure_filter(), tail)
 }
 
-fn op_render_references(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::render_references(references), Op::legacy(input)])
+fn op_geo_dimension(tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::geo_dimension(), tail)
 }
 
-fn op_masked(input: Rc<dyn SqlNode>, ungrouped: bool) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::masked(ungrouped), Op::legacy(input)])
+fn op_render_references(tail: Vec<Op>, references: RenderReferences) -> Vec<Op> {
+    prepend(Op::render_references(references), tail)
 }
 
-fn op_case(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::case(), Op::legacy(input)])
+fn op_masked(tail: Vec<Op>, ungrouped: bool) -> Vec<Op> {
+    prepend(Op::masked(ungrouped), tail)
+}
+
+fn op_case(tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::case(), tail)
 }
 
 fn op_dispatch_by_kind(
-    dimension: Rc<dyn SqlNode>,
-    time_dimension: Rc<dyn SqlNode>,
-    measure: Rc<dyn SqlNode>,
-    default: Rc<dyn SqlNode>,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::dispatch_by_kind(
-        vec![Op::legacy(dimension)],
-        vec![Op::legacy(time_dimension)],
-        vec![Op::legacy(measure)],
-        vec![Op::legacy(default)],
-    )])
+    dimension: Vec<Op>,
+    time_dimension: Vec<Op>,
+    measure: Vec<Op>,
+    default: Vec<Op>,
+) -> Vec<Op> {
+    vec![Op::dispatch_by_kind(
+        dimension,
+        time_dimension,
+        measure,
+        default,
+    )]
 }
 
 fn op_final_measure(
-    input: Rc<dyn SqlNode>,
+    tail: Vec<Op>,
     rendered_as_multiplied_measures: HashSet<String>,
     count_approx_as_state: bool,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![
+) -> Vec<Op> {
+    prepend(
         Op::final_measure(rendered_as_multiplied_measures, count_approx_as_state),
-        Op::legacy(input),
-    ])
+        tail,
+    )
 }
 
-fn op_final_pre_aggregation_measure(
-    input: Rc<dyn SqlNode>,
-    references: RenderReferences,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![
-        Op::final_pre_aggregation_measure(references),
-        Op::legacy(input),
-    ])
+fn op_final_pre_aggregation_measure(tail: Vec<Op>, references: RenderReferences) -> Vec<Op> {
+    prepend(Op::final_pre_aggregation_measure(references), tail)
 }
 
-fn op_ungrouped_measure(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::ungrouped_measure(), Op::legacy(input)])
+fn op_ungrouped_measure(tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::ungrouped_measure(), tail)
 }
 
-fn op_ungrouped_query_final_measure(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::ungrouped_query_final_measure(), Op::legacy(input)])
+fn op_ungrouped_query_final_measure(tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::ungrouped_query_final_measure(), tail)
 }
 
-fn op_time_dimension(
-    dimensions_with_ignored_timezone: HashSet<String>,
-    input: Rc<dyn SqlNode>,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![
-        Op::time_dimension(dimensions_with_ignored_timezone),
-        Op::legacy(input),
-    ])
+fn op_time_dimension(dimensions_with_ignored_timezone: HashSet<String>, tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::time_dimension(dimensions_with_ignored_timezone), tail)
 }
 
-fn op_time_shift(shifts: TimeShiftState, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::time_shift(shifts), Op::legacy(input)])
+fn op_time_shift(shifts: TimeShiftState, tail: Vec<Op>) -> Vec<Op> {
+    prepend(Op::time_shift(shifts), tail)
 }
 
 fn op_calendar_time_shift(
     shifts: HashMap<String, CalendarDimensionTimeShift>,
-    input: Rc<dyn SqlNode>,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::calendar_time_shift(shifts), Op::legacy(input)])
+    tail: Vec<Op>,
+) -> Vec<Op> {
+    prepend(Op::calendar_time_shift(shifts), tail)
 }
 
-fn op_multi_stage_rank(input: Rc<dyn SqlNode>, partition: Vec<String>) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::multi_stage_rank(partition), Op::legacy(input)])
+fn op_multi_stage_rank(tail: Vec<Op>, partition: Vec<String>) -> Vec<Op> {
+    prepend(Op::multi_stage_rank(partition), tail)
 }
 
 fn op_multi_stage_window(
-    multi_stage_input: Rc<dyn SqlNode>,
-    else_processor: Rc<dyn SqlNode>,
+    multi_stage_input: Vec<Op>,
+    else_pipeline: Vec<Op>,
     partition: Vec<String>,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::multi_stage_window(
-        vec![Op::legacy(multi_stage_input)],
-        vec![Op::legacy(else_processor)],
+) -> Vec<Op> {
+    vec![Op::multi_stage_window(
+        multi_stage_input,
+        else_pipeline,
         partition,
-    )])
+    )]
 }
 
-fn op_rolling_window(
-    input: Rc<dyn SqlNode>,
-    default_processor: Rc<dyn SqlNode>,
-) -> Rc<dyn SqlNode> {
-    OpPipelineSqlNode::new(vec![Op::rolling_window(
-        vec![Op::legacy(input)],
-        vec![Op::legacy(default_processor)],
-    )])
+fn op_rolling_window(input_pipeline: Vec<Op>, default_pipeline: Vec<Op>) -> Vec<Op> {
+    vec![Op::rolling_window(input_pipeline, default_pipeline)]
 }
 
 #[derive(Clone, Default)]
@@ -264,16 +252,15 @@ impl SqlNodesFactory {
         )
     }
 
-    pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor =
-            op_masked(OpPipelineSqlNode::new(vec![Op::evaluate_symbol()]), false);
+    pub fn default_node_processor(&self) -> Rc<NodeProcessor> {
+        let evaluate_sql_processor = op_masked(vec![Op::evaluate_symbol()], false);
         let auto_prefix_processor = op_auto_prefix(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
         );
-        let parenthesize_processor: Rc<dyn SqlNode> = op_paren(auto_prefix_processor.clone());
+        let parenthesize_processor = op_paren(auto_prefix_processor);
 
-        let measure_filter_processor = op_measure_filter(parenthesize_processor.clone());
+        let measure_filter_processor = op_measure_filter(parenthesize_processor);
         let measure_processor = op_case(measure_filter_processor.clone());
 
         let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
@@ -282,33 +269,31 @@ impl SqlNodesFactory {
         // are intercepted before aggregation/ungrouped wrapping.
         let measure_processor =
             op_masked(measure_processor, self.ungrouped || self.ungrouped_measure);
-        let measure_processor = self
-            .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
+        let measure_processor =
+            self.add_multi_stage_window_if_needed(measure_processor, measure_filter_processor);
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
-        let default_processor: Rc<dyn SqlNode> =
-            if !self.pre_aggregation_dimensions_references.is_empty() {
-                op_render_references(
-                    evaluate_sql_processor.clone(),
-                    self.pre_aggregation_dimensions_references.clone(),
-                )
-            } else {
-                evaluate_sql_processor.clone()
-            };
-        let default_processor: Rc<dyn SqlNode> = op_paren(default_processor);
+        let default_processor = if !self.pre_aggregation_dimensions_references.is_empty() {
+            op_render_references(
+                evaluate_sql_processor.clone(),
+                self.pre_aggregation_dimensions_references.clone(),
+            )
+        } else {
+            evaluate_sql_processor.clone()
+        };
+        let default_processor = op_paren(default_processor);
 
-        let root_node = op_dispatch_by_kind(
+        let root_ops = op_dispatch_by_kind(
             self.dimension_processor(evaluate_sql_processor.clone()),
-            self.time_dimension_processor(op_paren(evaluate_sql_processor.clone())),
-            measure_processor.clone(),
+            self.time_dimension_processor(op_paren(evaluate_sql_processor)),
+            measure_processor,
             default_processor,
         );
-        op_render_references(root_node, self.render_references.clone())
+        let root_ops = op_render_references(root_ops, self.render_references.clone());
+        NodeProcessor::new(root_ops)
     }
-    fn add_ungrouped_measure_reference_if_needed(
-        &self,
-        default: Rc<dyn SqlNode>,
-    ) -> Rc<dyn SqlNode> {
+
+    fn add_ungrouped_measure_reference_if_needed(&self, default: Vec<Op>) -> Vec<Op> {
         if !self.ungrouped_measure_references.is_empty() {
             op_render_references(default, self.ungrouped_measure_references.clone())
         } else {
@@ -316,7 +301,7 @@ impl SqlNodesFactory {
         }
     }
 
-    fn add_multi_stage_rank_if_needed(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    fn add_multi_stage_rank_if_needed(&self, default: Vec<Op>) -> Vec<Op> {
         if let Some(partition_by) = &self.multi_stage_rank {
             op_multi_stage_rank(default, partition_by.clone())
         } else {
@@ -326,23 +311,23 @@ impl SqlNodesFactory {
 
     fn add_multi_stage_window_if_needed(
         &self,
-        default: Rc<dyn SqlNode>,
-        multi_stage_input: Rc<dyn SqlNode>,
-    ) -> Rc<dyn SqlNode> {
+        else_pipeline: Vec<Op>,
+        multi_stage_input: Vec<Op>,
+    ) -> Vec<Op> {
         if let Some(partition_by) = &self.multi_stage_window {
-            op_multi_stage_window(multi_stage_input, default, partition_by.clone())
+            op_multi_stage_window(multi_stage_input, else_pipeline, partition_by.clone())
         } else {
-            default
+            else_pipeline
         }
     }
 
-    fn final_measure_node_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    fn final_measure_node_processor(&self, input: Vec<Op>) -> Vec<Op> {
         if self.ungrouped_measure {
             op_ungrouped_measure(input)
         } else if self.ungrouped {
             op_ungrouped_query_final_measure(input)
         } else {
-            let final_processor: Rc<dyn SqlNode> = op_final_measure(
+            let final_processor = op_final_measure(
                 input.clone(),
                 self.rendered_as_multiplied_measures.clone(),
                 self.count_approx_as_state,
@@ -363,21 +348,17 @@ impl SqlNodesFactory {
         }
     }
 
-    fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    fn dimension_processor(&self, input: Vec<Op>) -> Vec<Op> {
         let input = if !self.pre_aggregation_dimensions_references.is_empty() {
             op_render_references(input, self.pre_aggregation_dimensions_references.clone())
         } else {
-            let input: Rc<dyn SqlNode> = op_geo_dimension(input);
-            let input: Rc<dyn SqlNode> = op_case(input);
-            input
+            let input = op_geo_dimension(input);
+            op_case(input)
         };
 
-        let input: Rc<dyn SqlNode> = op_auto_prefix(input, self.cube_name_references.clone());
-
-        let input: Rc<dyn SqlNode> = op_paren(input);
-
-        let input: Rc<dyn SqlNode> =
-            op_time_dimension(self.dimensions_with_ignored_timezone.clone(), input);
+        let input = op_auto_prefix(input, self.cube_name_references.clone());
+        let input = op_paren(input);
+        let input = op_time_dimension(self.dimensions_with_ignored_timezone.clone(), input);
 
         let input = if !self.calendar_time_shifts.is_empty() {
             op_calendar_time_shift(self.calendar_time_shifts.clone(), input)
@@ -385,16 +366,14 @@ impl SqlNodesFactory {
             input
         };
 
-        let input = if !self.time_shifts.is_empty() {
+        if !self.time_shifts.is_empty() {
             op_time_shift(self.time_shifts.clone(), input)
         } else {
             input
-        };
-
-        input
+        }
     }
 
-    fn time_dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    fn time_dimension_processor(&self, input: Vec<Op>) -> Vec<Op> {
         op_time_dimension(self.dimensions_with_ignored_timezone.clone(), input)
     }
 }

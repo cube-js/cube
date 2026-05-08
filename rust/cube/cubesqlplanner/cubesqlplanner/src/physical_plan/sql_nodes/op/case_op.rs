@@ -1,4 +1,4 @@
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::NodeProcessor;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -20,7 +20,7 @@ impl CaseOp {
         visitor: &SqlEvaluatorVisitor,
         case: &CaseDefinition,
         query_tools: Rc<QueryTools>,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         // All sub-SQLs end up inside `CASE … END` — a safe wrap.
@@ -60,7 +60,7 @@ impl CaseOp {
         visitor: &SqlEvaluatorVisitor,
         case: &CaseSwitchDefinition,
         query_tools: Rc<QueryTools>,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         // Degenerate shortcuts return the inner SQL as-is — propagate the outer
@@ -137,14 +137,14 @@ impl OpExec for CaseOp {
                 &ctx.visitor,
                 c,
                 ctx.query_tools.clone(),
-                ctx.legacy_node_processor.clone(),
+                ctx.node_processor.clone(),
                 ctx.templates,
             ),
             Case::CaseSwitch(c) => Self::case_switch_to_sql(
                 &ctx.visitor,
                 c,
                 ctx.query_tools.clone(),
-                ctx.legacy_node_processor.clone(),
+                ctx.node_processor.clone(),
                 ctx.templates,
             ),
         }

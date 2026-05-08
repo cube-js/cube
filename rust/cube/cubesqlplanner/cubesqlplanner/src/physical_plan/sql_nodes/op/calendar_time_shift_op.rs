@@ -36,7 +36,7 @@ impl OpExec for CalendarTimeShiftOp {
         if let Some(sql) = &shift.sql {
             sql.eval(
                 &ctx.visitor,
-                ctx.legacy_node_processor.clone(),
+                ctx.node_processor.clone(),
                 ctx.query_tools.clone(),
                 ctx.templates,
             )

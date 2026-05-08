@@ -35,7 +35,7 @@ impl OpExec for MultiStageRankOp {
                 .map(|item| -> Result<String, CubeError> {
                     let sql = item.sql_call().eval(
                         &inner_visitor,
-                        ctx.legacy_node_processor.clone(),
+                        ctx.node_processor.clone(),
                         ctx.query_tools.clone(),
                         ctx.templates,
                     )?;

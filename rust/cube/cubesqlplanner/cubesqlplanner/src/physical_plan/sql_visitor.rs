@@ -1,4 +1,4 @@
-use super::sql_nodes::SqlNode;
+use super::sql_nodes::NodeProcessor;
 use super::CubeRefEvaluator;
 use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
@@ -58,7 +58,7 @@ impl SqlEvaluatorVisitor {
     pub fn apply(
         &self,
         node: &Rc<MemberSymbol>,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let result = node_processor.to_sql(
@@ -76,7 +76,7 @@ impl SqlEvaluatorVisitor {
     pub fn apply_for_filter(
         &self,
         node: &Rc<MemberSymbol>,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         self.with_ignore_tz_convert()
@@ -90,7 +90,7 @@ impl SqlEvaluatorVisitor {
     pub fn evaluate_cube_ref(
         &self,
         cube_ref: &CubeRef,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         self.cube_ref_evaluator.evaluate(

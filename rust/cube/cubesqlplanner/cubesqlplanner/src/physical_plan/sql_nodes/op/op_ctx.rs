@@ -1,4 +1,3 @@
-use crate::physical_plan::sql_nodes::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -6,7 +5,7 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-use super::{Op, OpExec, OpPipelineSqlNode};
+use super::{NodeProcessor, Op, OpExec};
 
 /// Per-render context passed to an Op handler. Holds the visitor and shared
 /// resources, plus the slice of the pipeline yet to be processed (`tail`).
@@ -15,17 +14,15 @@ use super::{Op, OpExec, OpPipelineSqlNode};
 /// pipeline (e.g. RollingWindow's `input_pipeline`) via [`render_pipeline`],
 /// and may temporarily override the visitor via [`with_visitor`].
 ///
-/// `legacy_node_processor` is the bridge to the existing `Rc<dyn SqlNode>`
-/// world: the leaf `EvaluateSymbol` op forwards it to `MemberSqlContext`,
-/// and during migration any sub-render that still depends on legacy plumbing
-/// goes through it.
+/// `node_processor` is the entry-point pipeline a sub-arg evaluation should
+/// re-enter through (`SqlCall::eval`, `Filter::to_sql`, etc.).
 pub struct OpCtx<'a> {
     pub visitor: SqlEvaluatorVisitor,
     pub query_tools: Rc<QueryTools>,
     pub templates: &'a PlanSqlTemplates,
     pub sym: Rc<MemberSymbol>,
     pub tail: &'a [Op],
-    pub legacy_node_processor: Rc<dyn SqlNode>,
+    pub node_processor: Rc<NodeProcessor>,
 }
 
 impl<'a> OpCtx<'a> {
@@ -44,7 +41,7 @@ impl<'a> OpCtx<'a> {
             templates: self.templates,
             sym: self.sym.clone(),
             tail: rest,
-            legacy_node_processor: self.legacy_node_processor.clone(),
+            node_processor: self.node_processor.clone(),
         };
         op.exec(&mut sub)
     }
@@ -66,22 +63,21 @@ impl<'a> OpCtx<'a> {
             templates: self.templates,
             sym: self.sym.clone(),
             tail: rest,
-            legacy_node_processor: self.legacy_node_processor.clone(),
+            node_processor: self.node_processor.clone(),
         };
         op.exec(&mut sub)
     }
 
-    /// Materialize the remaining pipeline as a `SqlNode`. Used by ops that
-    /// need to hand the rest of the chain to legacy plumbing — e.g. as a
-    /// `node_processor` for a filter expression that must avoid recursing
-    /// back through the current op.
+    /// Materialize the remaining pipeline as a `NodeProcessor`. Used by ops
+    /// that need to hand the rest of the chain to plumbing that wants its
+    /// own entry point — e.g. as a `node_processor` for a filter expression
+    /// that must avoid recursing back through the current op.
     ///
-    /// Cost: `O(tail_len)` Rc clones plus one `Rc<OpPipelineSqlNode>`
-    /// allocation per call — heavier than the legacy `Rc::clone` of an
-    /// already-built node. Fine for cold paths (mask filter rendering); call
-    /// sparingly on hot paths.
-    pub fn tail_as_sql_node(&self) -> Rc<dyn SqlNode> {
-        OpPipelineSqlNode::new(self.tail.to_vec())
+    /// Cost: `O(tail_len)` Op clones plus one `Rc<NodeProcessor>` allocation
+    /// per call. Fine for cold paths (mask filter rendering); call sparingly
+    /// on hot paths.
+    pub fn tail_as_node_processor(&self) -> Rc<NodeProcessor> {
+        NodeProcessor::new(self.tail.to_vec())
     }
 
     /// Build a fresh ctx pointing at the same tail/symbol but with a different
@@ -93,7 +89,7 @@ impl<'a> OpCtx<'a> {
             templates: self.templates,
             sym: self.sym.clone(),
             tail: self.tail,
-            legacy_node_processor: self.legacy_node_processor.clone(),
+            node_processor: self.node_processor.clone(),
         }
     }
 }

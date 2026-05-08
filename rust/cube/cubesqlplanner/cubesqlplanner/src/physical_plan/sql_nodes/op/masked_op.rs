@@ -36,7 +36,7 @@ impl MaskedOp {
             }
             mask_call.eval(
                 &ctx.visitor,
-                ctx.legacy_node_processor.clone(),
+                ctx.node_processor.clone(),
                 ctx.query_tools.clone(),
                 ctx.templates,
             )?
@@ -53,12 +53,12 @@ impl MaskedOp {
         // member references inside the filter resolve through it — prevents
         // recursing back through this MaskedOp when the filter member is
         // itself masked.
-        let tail_as_sql_node = ctx.tail_as_sql_node();
+        let tail_as_node_processor = ctx.tail_as_node_processor();
         // TODO: support FILTER_PARAMS in mask filter SQL by passing a proper
         // FiltersContext with filter_params_columns.
         let filter_sql = filter_item.to_sql(
             &ctx.visitor,
-            tail_as_sql_node,
+            tail_as_node_processor,
             ctx.query_tools.clone(),
             ctx.templates,
             &FiltersContext::default(),

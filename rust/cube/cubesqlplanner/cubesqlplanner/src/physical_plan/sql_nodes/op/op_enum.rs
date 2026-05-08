@@ -1,16 +1,14 @@
-use crate::physical_plan::sql_nodes::{RenderReferences, SqlNode};
+use crate::physical_plan::sql_nodes::RenderReferences;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::CalendarDimensionTimeShift;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
 
 use super::{
     AutoPrefixOp, CalendarTimeShiftOp, CaseOp, DispatchByKindOp, EvaluateSymbolOp, FinalMeasureOp,
-    FinalPreAggregationMeasureOp, GeoDimensionOp, LegacySqlNodeOp, MaskedOp, MeasureFilterOp,
-    MultiStageRankOp, MultiStageWindowOp, OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp,
-    RollingWindowOp, TimeDimensionOp, TimeShiftOp, UngroupedMeasureOp,
-    UngroupedQueryFinalMeasureOp,
+    FinalPreAggregationMeasureOp, GeoDimensionOp, MaskedOp, MeasureFilterOp, MultiStageRankOp,
+    MultiStageWindowOp, OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp, RollingWindowOp,
+    TimeDimensionOp, TimeShiftOp, UngroupedMeasureOp, UngroupedQueryFinalMeasureOp,
 };
 
 /// All op variants that participate in pipeline rendering.
@@ -19,9 +17,6 @@ use super::{
 /// + (preferably) a constructor on `impl Op`. The compiler enforces
 /// exhaustiveness on the dispatch — there is no central match with logic to
 /// keep in sync; per-variant logic lives in its own struct's `OpExec` impl.
-///
-/// `LegacySqlNode` is a migration-only escape hatch that wraps an
-/// `Rc<dyn SqlNode>`; it goes away once every legacy node has been migrated.
 #[derive(Clone)]
 pub enum Op {
     EvaluateSymbol(EvaluateSymbolOp),
@@ -43,7 +38,6 @@ pub enum Op {
     MultiStageRank(MultiStageRankOp),
     MultiStageWindow(MultiStageWindowOp),
     RollingWindow(RollingWindowOp),
-    LegacySqlNode(LegacySqlNodeOp),
 }
 
 impl Op {
@@ -146,10 +140,6 @@ impl Op {
     pub fn rolling_window(input_pipeline: Vec<Op>, default_pipeline: Vec<Op>) -> Self {
         Self::RollingWindow(RollingWindowOp::new(input_pipeline, default_pipeline))
     }
-
-    pub fn legacy(node: Rc<dyn SqlNode>) -> Self {
-        Self::LegacySqlNode(LegacySqlNodeOp::new(node))
-    }
 }
 
 impl OpExec for Op {
@@ -174,7 +164,6 @@ impl OpExec for Op {
             Op::MultiStageRank(o) => o.exec(ctx),
             Op::MultiStageWindow(o) => o.exec(ctx),
             Op::RollingWindow(o) => o.exec(ctx),
-            Op::LegacySqlNode(o) => o.exec(ctx),
         }
     }
 
@@ -199,7 +188,6 @@ impl OpExec for Op {
             Op::MultiStageRank(o) => o.is_terminal(),
             Op::MultiStageWindow(o) => o.is_terminal(),
             Op::RollingWindow(o) => o.is_terminal(),
-            Op::LegacySqlNode(o) => o.is_terminal(),
         }
     }
 }

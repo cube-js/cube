@@ -25,7 +25,7 @@ impl OpExec for MeasureFilterOp {
                             "({})",
                             filter.eval(
                                 &inner_visitor,
-                                ctx.legacy_node_processor.clone(),
+                                ctx.node_processor.clone(),
                                 ctx.query_tools.clone(),
                                 ctx.templates,
                             )?
