@@ -1,41 +1,35 @@
 import {
   bridgeHarnessAvailable,
-  buildFixture,
+  expectAllInvocationsOk,
   fieldNames,
+  invokeBridge,
   listBridgeFields,
+  listBridgeNames,
   parseBridge,
 } from './helpers';
+import { FIXTURES } from './bridge-fixtures';
 
 // Table-driven coverage for every bridge that uses #[nativebridge::native_bridge].
-// Each entry pins:
-//   - `expected`: full set of field names (trait + static), keyed by the
-//     Rust ident (snake_case). `fieldNames(...)` returns the same shape.
-//   - `overrides`: serde-driven static fields that need a typed value
-//     (non-Option primitives) so `from_native` does not reject the fixture.
-//     Keys here are jsName (camelCase, post-`#[serde(rename)]`) — the same
-//     shape JS sees on the wire — NOT the Rust ident from `expected`.
 //
-// Naming dualism: `expected` is Rust-side, `overrides` is JS-side. They line
-// up via `BridgeFieldMeta { name, js_name }`, surfaced through `fieldNames`
-// and `buildFixture` respectively.
+// Each row pins the field set the macro should emit for the bridge,
+// keyed by Rust ident (snake_case) — this is the same shape `fieldNames`
+// returns. Adding a method or static field on either side without
+// updating this list fails the meta assertion.
 //
-// Fully-populated fixture parsing is the smoke test for try_new: required
-// trait fields get auto-stub `() => null`, optional fields are omitted, and
-// static overrides are merged in. NB: try_new only verifies that each
-// required field is *present* on the JS object via `has_field` — it does
-// not call functions or validate signatures. So for bridges with `kind:
-// 'call'` methods (e.g. cubeEvaluator, baseTools, driverTools), parseBridge
-// here is an existence smoke test, not a behavior test. Behavior coverage
-// lives in higher-level integration tests.
+// The fully-populated fixture for the bridge lives in `bridge-fixtures.ts`.
+// That file is the executable JS-side contract: the explicit shape we
+// expect schema-compiler / cubejs-server-core to hand to Tesseract for
+// each bridge. The invoke check below fires every `field` getter and
+// every `call` method on the bridge against that fixture, so a mismatch
+// between the Rust trait and the JS contract surfaces immediately.
 //
 // Coverage scope: every trait annotated with #[nativebridge::native_bridge]
-// is registered in `bridge_registry!` and pinned by a row below. Hand-rolled
+// is registered in `bridge_registry!` and pinned here. Hand-rolled
 // bridges (MemberSql, FilterParamsCallback, SqlTemplatesRender) live
 // outside the macro and are not in scope here.
 type BridgeSpec = {
   name: string;
   expected: string[];
-  overrides?: Record<string, unknown>;
 };
 
 const BRIDGES: BridgeSpec[] = [
@@ -68,10 +62,6 @@ const BRIDGES: BridgeSpec[] = [
       'total_query',
       'ungrouped',
     ],
-    overrides: {
-      exportAnnotatedSql: false,
-      disableExternalPreAggregations: false,
-    },
   },
   {
     name: 'baseTools',
@@ -89,35 +79,15 @@ const BRIDGES: BridgeSpec[] = [
       'sql_utils_for_rust',
     ],
   },
-  {
-    name: 'caseDefinition',
-    expected: ['else_label', 'when'],
-  },
-  {
-    name: 'caseElseItem',
-    expected: ['label'],
-  },
-  {
-    name: 'caseItem',
-    expected: ['label', 'sql'],
-  },
-  {
-    name: 'caseSwitchDefinition',
-    expected: ['else_sql', 'switch', 'when'],
-  },
-  {
-    name: 'caseSwitchElseItem',
-    expected: ['sql'],
-  },
-  {
-    name: 'caseSwitchItem',
-    expected: ['sql', 'value'],
-    overrides: { value: '' },
-  },
+  { name: 'caseDefinition', expected: ['else_label', 'when'] },
+  { name: 'caseElseItem', expected: ['label'] },
+  { name: 'caseItem', expected: ['label', 'sql'] },
+  { name: 'caseSwitchDefinition', expected: ['else_sql', 'switch', 'when'] },
+  { name: 'caseSwitchElseItem', expected: ['sql'] },
+  { name: 'caseSwitchItem', expected: ['sql', 'value'] },
   {
     name: 'cubeDefinition',
     expected: ['is_calendar', 'is_view', 'join_map', 'name', 'sql', 'sql_alias', 'sql_table'],
-    overrides: { name: '' },
   },
   {
     name: 'cubeEvaluator',
@@ -137,7 +107,6 @@ const BRIDGES: BridgeSpec[] = [
       'resolve_granularity',
       'segment_by_path',
     ],
-    overrides: { primaryKeys: {} },
   },
   {
     name: 'dimensionDefinition',
@@ -157,7 +126,6 @@ const BRIDGES: BridgeSpec[] = [
       'time_shift',
       'values',
     ],
-    overrides: { type: '' },
   },
   {
     name: 'driverTools',
@@ -186,44 +154,15 @@ const BRIDGES: BridgeSpec[] = [
   {
     name: 'expressionStruct',
     expected: ['add_filters', 'expression_type', 'replace_aggregation_type', 'source_measure'],
-    overrides: { type: '' },
   },
-  {
-    name: 'filterGroup',
-    expected: [],
-  },
-  {
-    name: 'filterParams',
-    expected: [],
-  },
-  {
-    name: 'geoItem',
-    expected: ['sql'],
-  },
-  {
-    name: 'granularityDefinition',
-    expected: ['interval', 'offset', 'origin', 'sql'],
-    overrides: { interval: '' },
-  },
-  {
-    name: 'joinDefinition',
-    expected: ['joins', 'multiplication_factor', 'root'],
-    overrides: { root: '', multiplicationFactor: {} },
-  },
-  {
-    name: 'joinGraph',
-    expected: ['build_join'],
-  },
-  {
-    name: 'joinItem',
-    expected: ['from', 'join', 'original_from', 'original_to', 'to'],
-    overrides: { from: '', to: '', originalFrom: '', originalTo: '' },
-  },
-  {
-    name: 'joinItemDefinition',
-    expected: ['relationship', 'sql'],
-    overrides: { relationship: '' },
-  },
+  { name: 'filterGroup', expected: [] },
+  { name: 'filterParams', expected: [] },
+  { name: 'geoItem', expected: ['sql'] },
+  { name: 'granularityDefinition', expected: ['interval', 'offset', 'origin', 'sql'] },
+  { name: 'joinDefinition', expected: ['joins', 'multiplication_factor', 'root'] },
+  { name: 'joinGraph', expected: ['build_join'] },
+  { name: 'joinItem', expected: ['from', 'join', 'original_from', 'original_to', 'to'] },
+  { name: 'joinItemDefinition', expected: ['relationship', 'sql'] },
   {
     name: 'measureDefinition',
     expected: [
@@ -242,21 +181,13 @@ const BRIDGES: BridgeSpec[] = [
       'sql',
       'time_shift_references',
     ],
-    overrides: { type: '' },
   },
-  {
-    name: 'memberDefinition',
-    expected: ['member_type', 'sql'],
-    overrides: { type: '' },
-  },
+  { name: 'memberDefinition', expected: ['member_type', 'sql'] },
   {
     name: 'memberExpressionDefinition',
     expected: ['cube_name', 'definition', 'expression', 'expression_name', 'name'],
   },
-  {
-    name: 'memberOrderBy',
-    expected: ['dir', 'sql'],
-  },
+  { name: 'memberOrderBy', expected: ['dir', 'sql'] },
   {
     name: 'preAggregationDescription',
     expected: [
@@ -273,49 +204,48 @@ const BRIDGES: BridgeSpec[] = [
       'time_dimension_reference',
       'time_dimension_references',
     ],
-    overrides: { name: '', type: '' },
   },
   {
     name: 'preAggregationObj',
     expected: ['cube', 'pre_aggregation_id', 'pre_aggregation_name', 'table_name'],
   },
-  {
-    name: 'preAggregationTimeDimension',
-    expected: ['dimension', 'granularity'],
-    overrides: { granularity: '' },
-  },
-  {
-    name: 'securityContext',
-    expected: [],
-  },
-  {
-    name: 'segmentDefinition',
-    expected: ['owned_by_cube', 'segment_type', 'sql'],
-  },
-  {
-    name: 'sqlUtils',
-    expected: [],
-  },
-  {
-    name: 'structWithSqlMember',
-    expected: ['sql'],
-  },
-  {
-    name: 'timeShiftDefinition',
-    expected: ['interval', 'name', 'sql', 'timeshift_type'],
-  },
+  { name: 'preAggregationTimeDimension', expected: ['dimension', 'granularity'] },
+  { name: 'securityContext', expected: [] },
+  { name: 'segmentDefinition', expected: ['owned_by_cube', 'segment_type', 'sql'] },
+  { name: 'sqlUtils', expected: [] },
+  { name: 'structWithSqlMember', expected: ['sql'] },
+  { name: 'timeShiftDefinition', expected: ['interval', 'name', 'sql', 'timeshift_type'] },
 ];
 
 const describeBridge = bridgeHarnessAvailable ? describe : describe.skip;
 
-describeBridge.each(BRIDGES)('bridge object: $name', ({ name, expected, overrides }) => {
+// Cross-side completeness guard. The bridge_registry! macro on the Rust
+// side is the source of truth; both `BRIDGES` and `FIXTURES` must enumerate
+// the exact same set of bridges. Adding a bridge in Rust without wiring
+// the JS contract here (or vice versa) would otherwise be a silent gap.
+describeBridge('bridge object: registry coverage', () => {
+  it('every registered bridge has a row in BRIDGES and an entry in FIXTURES', () => {
+    const registered = [...listBridgeNames()].sort();
+    const inTests = BRIDGES.map((b) => b.name).sort();
+    const inFixtures = Object.keys(FIXTURES).sort();
+    expect(inTests).toEqual(registered);
+    expect(inFixtures).toEqual(registered);
+  });
+});
+
+describeBridge.each(BRIDGES)('bridge object: $name', ({ name, expected }) => {
   it('exposes the expected field set via the bridge meta', () => {
     expect(fieldNames(listBridgeFields(name))).toEqual(expected);
   });
 
   it('parses a fully-populated fixture without error', () => {
-    const fixture = buildFixture(listBridgeFields(name), overrides ?? {});
+    const fixture = FIXTURES[name]();
     expect(() => parseBridge(name, fixture)).not.toThrow();
+  });
+
+  it('every field-getter and call-method round-trips successfully', () => {
+    const fixture = FIXTURES[name]();
+    expectAllInvocationsOk(invokeBridge(name, fixture));
   });
 });
 
@@ -346,16 +276,5 @@ describeBridge('bridge object: meta shape', () => {
     expect(tsType?.jsName).toBe('type');
     expect(tsType?.kind).toBe('static');
     expect(tsType?.optional).toBe(true);
-  });
-});
-
-// Self-test for the helper. A misspelled override key should fail loudly,
-// not silently cascade into a confusing serde error.
-describeBridge('helpers: buildFixture', () => {
-  it('throws on an unknown override key (typo guard)', () => {
-    const meta = listBridgeFields('memberOrderBy');
-    expect(() => buildFixture(meta, { dirr: 'x' })).toThrow(
-      /override key 'dirr'/
-    );
   });
 });

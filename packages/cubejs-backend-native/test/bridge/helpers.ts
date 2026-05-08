@@ -76,7 +76,16 @@ export function listBridgeFields(name: string): BridgeFieldMeta[] {
   return native.__testBridgeListFields(name);
 }
 
-export function parseBridge(name: string, obj: object): void {
+export function listBridgeNames(): string[] {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  return native.__testBridgeListBridgeNames();
+}
+
+export function parseBridge(name: string, obj: unknown): void {
   if (!bridgeHarnessAvailable) {
     throw new Error(
       'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
@@ -89,40 +98,39 @@ export function fieldNames(meta: BridgeFieldMeta[]): string[] {
   return meta.map((m) => m.name).sort();
 }
 
+export type InvokeStatus =
+  | { status: 'ok' }
+  | { status: 'error'; message: string }
+  | { status: 'skipped'; reason: string };
+
+export type InvokeResult = Record<string, InvokeStatus>;
+
+export function invokeBridge(name: string, fixture: unknown): InvokeResult {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  return native.__testBridgeInvoke(name, fixture);
+}
+
 /**
- * Builds a stub fixture from bridge field meta.
- *
- * Override keys MUST match `BridgeFieldMeta.jsName` (i.e. the JS-side name
- * after `#[serde(rename)]` — not the Rust ident). An unknown key is treated
- * as a typo and throws, so a misspelled `primaryKey` does not silently
- * cascade into a confusing serde error.
- *
- * Required trait fields default to `() => null` — that satisfies the
- * `has_field` check try_new performs (both for `field` getters and for
- * `call` methods). Required static fields default to `null`; serde rejects
- * `null` for non-Option primitives, so callers must supply a typed override
- * for those (e.g. `{ name: '' }` for `cubeDefinition`).
+ * Asserts every recorded invocation is `ok` or `skipped`. Errors surface
+ * the offending field, the Rust-side message, and the kind of failure so
+ * they read naturally in CI logs. Skipped entries are allowed because some
+ * call-methods take Rust-only argument types (e.g. `Rc<dyn MemberSql>`)
+ * that have no auto-default.
  */
-export function buildFixture(
-  meta: BridgeFieldMeta[],
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
-  const known = new Set(meta.map((m) => m.jsName));
-  for (const k of Object.keys(overrides)) {
-    if (!known.has(k)) {
-      throw new Error(
-        `buildFixture: override key '${k}' is not a known field of this bridge ` +
-          `(known jsName keys: ${[...known].sort().join(', ') || '(none)'})`
-      );
+export function expectAllInvocationsOk(result: InvokeResult): void {
+  const failures: string[] = [];
+  for (const [field, entry] of Object.entries(result)) {
+    if (entry.status === 'error') {
+      failures.push(`${field}: error: ${entry.message}`);
     }
   }
-  const fixture: Record<string, unknown> = {};
-  for (const field of meta) {
-    if (Object.prototype.hasOwnProperty.call(overrides, field.jsName)) {
-      fixture[field.jsName] = overrides[field.jsName];
-    } else if (!field.optional) {
-      fixture[field.jsName] = field.kind === 'static' ? null : () => null;
-    }
+  if (failures.length > 0) {
+    throw new Error(
+      `Bridge invocation failed for ${failures.length} field(s):\n  ${failures.join('\n  ')}`
+    );
   }
-  return fixture;
 }
