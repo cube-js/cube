@@ -1,9 +1,9 @@
 use super::{
-    AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
-    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode, RenderReferencesSqlNode,
-    RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    AutoPrefixSqlNode, CaseSqlNode, FinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode,
+    GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode, MultiStageRankNode,
+    MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesSqlNode, RenderReferencesType,
+    RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
+    UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
@@ -12,6 +12,10 @@ use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+
+fn op_paren(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::parenthesize(), Op::legacy(input)])
+}
 
 #[derive(Clone, Default)]
 pub struct SqlNodesFactory {
@@ -151,13 +155,13 @@ impl SqlNodesFactory {
     }
 
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor = MaskedSqlNode::new(EvaluateSqlNode::new());
+        let evaluate_sql_processor =
+            MaskedSqlNode::new(OpPipelineSqlNode::new(vec![Op::evaluate_symbol()]));
         let auto_prefix_processor = AutoPrefixSqlNode::new(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
         );
-        let parenthesize_processor: Rc<dyn SqlNode> =
-            ParenthesizeSqlNode::new(auto_prefix_processor.clone());
+        let parenthesize_processor: Rc<dyn SqlNode> = op_paren(auto_prefix_processor.clone());
 
         let measure_filter_processor = MeasureFilterSqlNode::new(parenthesize_processor.clone());
         let measure_processor = CaseSqlNode::new(measure_filter_processor.clone());
@@ -184,11 +188,11 @@ impl SqlNodesFactory {
             } else {
                 evaluate_sql_processor.clone()
             };
-        let default_processor: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(default_processor);
+        let default_processor: Rc<dyn SqlNode> = op_paren(default_processor);
 
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
-            self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
+            self.time_dimension_processor(op_paren(evaluate_sql_processor.clone())),
             measure_processor.clone(),
             default_processor,
         );
@@ -264,7 +268,7 @@ impl SqlNodesFactory {
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
 
-        let input: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(input);
+        let input: Rc<dyn SqlNode> = op_paren(input);
 
         let input: Rc<dyn SqlNode> =
             TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
