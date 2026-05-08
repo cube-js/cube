@@ -106,8 +106,11 @@ pub struct QueryProperties {
     measures_filters: Vec<FilterItem>,
     #[builder(default)]
     segments: Vec<FilterItem>,
+    /// `None` = builder caller did not set order_by; `From` impl will fall
+    /// back to `default_order`. `Some(vec)` is used as-is, including
+    /// `Some(empty)` meaning "render no ORDER BY clause".
     #[builder(default)]
-    order_by: Vec<OrderByItem>,
+    order_by: Option<Vec<OrderByItem>>,
     #[builder(default)]
     row_limit: Option<usize>,
     #[builder(default)]
@@ -132,14 +135,19 @@ pub struct QueryProperties {
     multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
 }
 
-/// Finalize a QueryProperties built via the typed builder:
-/// fills the default order if none was set and applies static filters.
-/// Wired into `QueryProperties::builder().…build()` via `build_method(into = …)`.
+/// Finalize a QueryProperties built via the typed builder: materializes the
+/// default order if the builder caller did not set `order_by`, and applies
+/// static filters. `Some(empty)` is preserved as "no ORDER BY", `None`
+/// triggers the default. Wired into `QueryProperties::builder().…build()`
+/// via `build_method(into = …)`.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
-        if qp.order_by.is_empty() {
-            qp.order_by =
-                QueryProperties::default_order(&qp.dimensions, &qp.time_dimensions, &qp.measures);
+        if qp.order_by.is_none() {
+            qp.order_by = Some(QueryProperties::default_order(
+                &qp.dimensions,
+                &qp.time_dimensions,
+                &qp.measures,
+            ));
         }
         qp.apply_static_filters()?;
         Ok(Rc::new(qp))
@@ -174,7 +182,7 @@ impl QueryProperties {
         for filter_item in self.segments.iter_mut() {
             *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
-        for order_item in self.order_by.iter_mut() {
+        for order_item in self.order_by.iter_mut().flatten() {
             order_item.member_evaluator =
                 apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
         }
@@ -215,6 +223,7 @@ impl QueryProperties {
     fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()
+            .flatten()
             .filter_map(|order| {
                 if order.member_evaluator.as_dimension().is_ok() {
                     Some(order.member_evaluator.clone())
@@ -273,8 +282,8 @@ impl QueryProperties {
         self.offset
     }
 
-    pub fn order_by(&self) -> &Vec<OrderByItem> {
-        &self.order_by
+    pub fn order_by(&self) -> &[OrderByItem] {
+        self.order_by.as_deref().unwrap_or(&[])
     }
 
     pub fn ungrouped(&self) -> bool {
@@ -488,7 +497,7 @@ impl QueryProperties {
         for item in self.measures_filters.iter() {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
         }
-        for item in self.order_by.iter() {
+        for item in self.order_by.iter().flatten() {
             if let Ok(measure) = item.member_evaluator.as_measure() {
                 if !measures
                     .iter()

@@ -394,6 +394,10 @@ impl QueryPropertiesCompiler {
             .collect_vec()
     }
 
+    /// Returns `None` when the caller did not supply an `order` (the builder
+    /// will fall back to `default_order`), `Some(translated)` otherwise —
+    /// including `Some(empty)` if every entry was rejected, which the
+    /// builder preserves as "render no ORDER BY clause".
     fn compile_order_by(
         &self,
         evaluator_compiler: &mut Compiler,
@@ -401,15 +405,11 @@ impl QueryPropertiesCompiler {
         dimensions: &[Rc<MemberSymbol>],
         time_dimensions: &[Rc<MemberSymbol>],
         measures: &[Rc<MemberSymbol>],
-    ) -> Result<Vec<OrderByItem>, CubeError> {
+    ) -> Result<Option<Vec<OrderByItem>>, CubeError> {
         let Some(order) = &options.static_data().order else {
-            return Ok(QueryProperties::default_order(
-                dimensions,
-                time_dimensions,
-                measures,
-            ));
+            return Ok(None);
         };
-        order
+        let translated = order
             .iter()
             .map(|o| -> Result<_, CubeError> {
                 let evaluator = if let Some(found) = dimensions.iter().find(|d| d.name() == o.id) {
@@ -423,6 +423,7 @@ impl QueryPropertiesCompiler {
                 };
                 Ok(OrderByItem::new(evaluator, o.is_desc()))
             })
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Some(translated))
     }
 }
