@@ -1,3 +1,4 @@
+pub mod bridge_meta;
 pub mod context;
 mod functions_args_def;
 pub mod inner_types;

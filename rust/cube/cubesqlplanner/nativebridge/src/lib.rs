@@ -7,8 +7,8 @@ use syn::spanned::Spanned;
 use syn::token::PathSep;
 use syn::LitStr;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, FnArg, Item, Meta, Pat, Path, PathArguments,
-    PathSegment, ReturnType, TraitItem, TraitItemFn, Type,
+    parse_macro_input, punctuated::Punctuated, Data, DeriveInput, Fields, FnArg, Item, Meta, Pat,
+    Path, PathArguments, PathSegment, ReturnType, TraitItem, TraitItemFn, Type,
 };
 #[proc_macro_attribute]
 pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
@@ -19,6 +19,15 @@ pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::Token
             Meta::Path(p) => {
                 if p.is_ident("without_imports") {
                     svc.without_imports = true;
+                } else if p.is_ident("with_static_meta") {
+                    svc.with_static_meta = true;
+                } else if looks_like_flag(p) {
+                    return syn::Error::new(
+                        p.span(),
+                        "unknown native_bridge flag (expected `without_imports` or `with_static_meta`)",
+                    )
+                    .to_compile_error()
+                    .into();
                 } else {
                     svc.static_data_type = Some(p.clone())
                 }
@@ -26,15 +35,21 @@ pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::Token
             _ => {}
         }
     }
-    if args.len() > 0 {
-        let arg = args.first().unwrap();
-        match arg {
-            Meta::Path(p) => svc.static_data_type = Some(p.clone()),
-            _ => {}
-        }
-    }
 
     proc_macro::TokenStream::from(svc.into_token_stream())
+}
+
+fn looks_like_flag(path: &Path) -> bool {
+    if path.segments.len() != 1 {
+        return false;
+    }
+    let ident = &path.segments.first().unwrap().ident;
+    ident
+        .to_string()
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_lowercase())
+        .unwrap_or(false)
 }
 
 struct NativeService {
@@ -42,6 +57,7 @@ struct NativeService {
     methods: Vec<NativeMethod>,
     pub static_data_type: Option<Path>,
     pub without_imports: bool,
+    pub with_static_meta: bool,
 }
 
 enum NativeMethodType {
@@ -133,6 +149,7 @@ impl Parse for NativeService {
                     methods,
                     static_data_type: None,
                     without_imports: false,
+                    with_static_meta: false,
                 }
             }
             x => {
@@ -161,7 +178,7 @@ impl NativeService {
                             Err(e) => Some(Err(e)),
                         }
                     }
-                    x => panic!("Unexpected pattern: {:?}", x),
+                    _ => panic!("Unexpected pattern in native_bridge trait method argument"),
                 },
                 FnArg::Receiver(_) => None,
             })
@@ -538,6 +555,39 @@ impl NativeService {
             }
         }
     }
+
+    fn meta_fn_ident(&self) -> Ident {
+        let snake = pascal_to_snake_case(&self.ident.to_string());
+        format_ident!("{}_bridge_fields_meta", snake)
+    }
+
+    fn meta_impl(&self) -> proc_macro2::TokenStream {
+        let meta_fn = self.meta_fn_ident();
+        let trait_entries = self
+            .methods
+            .iter()
+            .map(|m| m.field_meta_entry())
+            .collect::<Vec<_>>();
+        let static_extension = match (&self.static_data_type, self.with_static_meta) {
+            (Some(static_data_type), true) => quote! {
+                v.extend(
+                    <#static_data_type>::static_fields_meta()
+                        .iter()
+                        .copied(),
+                );
+            },
+            _ => quote! {},
+        };
+        quote! {
+            pub fn #meta_fn() -> Vec<cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta> {
+                let mut v: Vec<cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta> = vec![
+                    #( #trait_entries ),*
+                ];
+                #static_extension
+                v
+            }
+        }
+    }
 }
 
 impl NativeMethod {
@@ -763,6 +813,182 @@ impl ToTokens for NativeService {
             self.struct_impl(),
             self.struct_bridge_impl(),
             self.serialization_impl(),
+            self.meta_impl(),
         ]);
     }
+}
+
+// Naive PascalCase -> snake_case for trait identifiers used to derive the
+// generated `<name>_bridge_fields_meta` free function. Treats every uppercase
+// character as a word boundary, so `HTTPSomething` becomes `h_t_t_p_something`.
+// Bridge trait names in this codebase do not use consecutive uppercase
+// acronyms; revisit if that ever changes.
+fn pascal_to_snake_case(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 4);
+    for (i, ch) in name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if i != 0 {
+                out.push('_');
+            }
+            for low in ch.to_lowercase() {
+                out.push(low);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+impl NativeMethod {
+    fn field_meta_entry(&self) -> proc_macro2::TokenStream {
+        let name_str = self.ident.to_string();
+        let js_name = self
+            .method_params
+            .custom_name
+            .clone()
+            .unwrap_or_else(|| self.camel_case_name());
+        let kind_token = match self.method_params.method_type {
+            NativeMethodType::Call => quote! {
+                cubenativeutils::wrappers::bridge_meta::BridgeFieldKind::Call
+            },
+            NativeMethodType::Getter => quote! {
+                cubenativeutils::wrappers::bridge_meta::BridgeFieldKind::Field
+            },
+        };
+        let optional = self.method_params.is_optional;
+        let vec = self.method_params.is_vec;
+        quote! {
+            cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta {
+                name: #name_str,
+                js_name: #js_name,
+                kind: #kind_token,
+                optional: #optional,
+                vec: #vec,
+            }
+        }
+    }
+}
+
+#[proc_macro_derive(NativeBridgeStatic, attributes(nbridge_static))]
+pub fn derive_native_bridge_static(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let struct_ident = input.ident.clone();
+    let entries = match collect_static_field_meta_entries(&input) {
+        Ok(entries) => entries,
+        Err(e) => return e.to_compile_error().into(),
+    };
+    let expanded = quote! {
+        impl #struct_ident {
+            pub fn static_fields_meta() -> &'static [cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta] {
+                static FIELDS: &[cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta] = &[
+                    #( #entries ),*
+                ];
+                FIELDS
+            }
+        }
+    };
+    TokenStream::from(expanded)
+}
+
+fn collect_static_field_meta_entries(
+    input: &DeriveInput,
+) -> syn::Result<Vec<proc_macro2::TokenStream>> {
+    let data = match &input.data {
+        Data::Struct(d) => d,
+        _ => {
+            return Err(syn::Error::new(
+                input.span(),
+                "NativeBridgeStatic can only be derived for structs",
+            ))
+        }
+    };
+    let fields = match &data.fields {
+        Fields::Named(named) => &named.named,
+        _ => {
+            return Err(syn::Error::new(
+                input.span(),
+                "NativeBridgeStatic requires a struct with named fields",
+            ))
+        }
+    };
+
+    let mut entries = Vec::new();
+    for field in fields {
+        let ident = field.ident.as_ref().unwrap();
+        let name_str = ident.to_string();
+        let mut js_name: Option<String> = None;
+        let mut skip = false;
+        for attr in &field.attrs {
+            if attr.path().is_ident("serde") {
+                // Best-effort: serde supports many options with `= value` shapes
+                // (e.g. `default = "fn"`) that parse_nested_meta cannot pass
+                // through to our callback unchanged, so we swallow errors and
+                // pick up only the `rename = "..."` shape we care about.
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("rename") {
+                        js_name = Some(meta.value()?.parse::<LitStr>()?.value());
+                    }
+                    Ok(())
+                });
+            }
+            if attr.path().is_ident("nbridge_static") {
+                attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("skip") {
+                        skip = true;
+                        Ok(())
+                    } else {
+                        Err(meta.error("unknown nbridge_static option (expected `skip`)"))
+                    }
+                })?;
+            }
+        }
+        if skip {
+            continue;
+        }
+        let js_name = js_name.unwrap_or_else(|| name_str.clone());
+        let optional = field_is_optional(&field.ty);
+        let vec = field_is_vec_or_optional_vec(&field.ty);
+        entries.push(quote! {
+            cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta {
+                name: #name_str,
+                js_name: #js_name,
+                kind: cubenativeutils::wrappers::bridge_meta::BridgeFieldKind::Static,
+                optional: #optional,
+                vec: #vec,
+            }
+        });
+    }
+    Ok(entries)
+}
+
+fn field_is_optional(ty: &Type) -> bool {
+    if let Type::Path(tp) = ty {
+        if let Some(seg) = tp.path.segments.last() {
+            return seg.ident == "Option";
+        }
+    }
+    false
+}
+
+fn field_is_vec_or_optional_vec(ty: &Type) -> bool {
+    if let Type::Path(tp) = ty {
+        if let Some(seg) = tp.path.segments.last() {
+            if seg.ident == "Vec" {
+                return true;
+            }
+            if seg.ident == "Option" {
+                if let PathArguments::AngleBracketed(inner) = &seg.arguments {
+                    if let Some(syn::GenericArgument::Type(inner_ty)) = inner.args.first() {
+                        if let Type::Path(itp) = inner_ty {
+                            if let Some(iseg) = itp.path.segments.last() {
+                                return iseg.ident == "Vec";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
 }

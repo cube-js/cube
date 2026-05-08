@@ -9,6 +9,7 @@
 //! Stub implementations for trait dependencies (e.g. `BaseTools`) live in this
 //! module; they should fail loudly when an unsupported code path is exercised.
 
+use cubenativeutils::wrappers::bridge_meta::BridgeFieldMeta;
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::object::{NativeArray, NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -16,18 +17,32 @@ use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeContextHolder, Na
 use cubenativeutils::CubeError;
 use cubesqlplanner::cube_bridge::base_tools::BaseTools;
 use cubesqlplanner::cube_bridge::driver_tools::DriverTools;
+use cubesqlplanner::cube_bridge::filter_group::{
+    filter_group_bridge_fields_meta, NativeFilterGroup,
+};
+use cubesqlplanner::cube_bridge::filter_params::{
+    filter_params_bridge_fields_meta, NativeFilterParams,
+};
 use cubesqlplanner::cube_bridge::filter_params_callback::{
     FilterParamsCallback, NativeFilterParamsCallback,
 };
 use cubesqlplanner::cube_bridge::join_definition::JoinDefinition;
 use cubesqlplanner::cube_bridge::join_hints::JoinHintItem;
+use cubesqlplanner::cube_bridge::member_order_by::{
+    member_order_by_bridge_fields_meta, NativeMemberOrderBy,
+};
 use cubesqlplanner::cube_bridge::member_sql::{
     FilterGroupItem, FilterParamsItem, MemberSql, NativeMemberSql, SqlTemplate, SqlTemplateArgs,
 };
 use cubesqlplanner::cube_bridge::pre_aggregation_obj::PreAggregationObj;
-use cubesqlplanner::cube_bridge::security_context::{NativeSecurityContext, SecurityContext};
+use cubesqlplanner::cube_bridge::security_context::{
+    security_context_bridge_fields_meta, NativeSecurityContext, SecurityContext,
+};
 use cubesqlplanner::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use cubesqlplanner::cube_bridge::sql_utils::SqlUtils;
+use cubesqlplanner::cube_bridge::timeshift_definition::{
+    time_shift_definition_bridge_fields_meta, NativeTimeShiftDefinition,
+};
 use neon::prelude::*;
 use std::any::Any;
 use std::rc::Rc;
@@ -247,6 +262,99 @@ fn invoke_filter_params_callback(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
+fn unknown_bridge_err(name: &str) -> CubeError {
+    CubeError::user(format!(
+        "Unknown bridge type: {} (test harness dispatcher does not register it)",
+        name
+    ))
+}
+
+macro_rules! bridge_registry {
+    ( $( $key:literal => $native:ident , $meta_fn:path );* $(;)? ) => {
+        fn fields_meta_for_bridge(name: &str) -> Result<Vec<BridgeFieldMeta>, CubeError> {
+            match name {
+                $( $key => Ok($meta_fn()), )*
+                other => Err(unknown_bridge_err(other)),
+            }
+        }
+
+        fn try_new_bridge<IT: InnerTypes>(
+            name: &str,
+            obj: NativeObjectHandle<IT>,
+        ) -> Result<(), CubeError> {
+            match name {
+                $( $key => { $native::try_new(obj)?; Ok(()) } )*
+                other => Err(unknown_bridge_err(other)),
+            }
+        }
+    };
+}
+
+bridge_registry! {
+    "filterGroup"         => NativeFilterGroup,         filter_group_bridge_fields_meta;
+    "filterParams"        => NativeFilterParams,        filter_params_bridge_fields_meta;
+    "memberOrderBy"       => NativeMemberOrderBy,       member_order_by_bridge_fields_meta;
+    "securityContext"     => NativeSecurityContext,     security_context_bridge_fields_meta;
+    "timeShiftDefinition" => NativeTimeShiftDefinition, time_shift_definition_bridge_fields_meta;
+}
+
+fn list_bridge_fields_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    name: String,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let meta = fields_meta_for_bridge(&name)?;
+    let arr = context_holder.empty_array()?;
+    for (i, m) in meta.iter().enumerate() {
+        let entry = context_holder.empty_struct()?;
+        entry.set_field(
+            "name",
+            m.name.to_string().to_native(context_holder.clone())?,
+        )?;
+        entry.set_field(
+            "jsName",
+            m.js_name.to_string().to_native(context_holder.clone())?,
+        )?;
+        entry.set_field(
+            "kind",
+            m.kind
+                .as_str()
+                .to_string()
+                .to_native(context_holder.clone())?,
+        )?;
+        entry.set_field("optional", m.optional.to_native(context_holder.clone())?)?;
+        entry.set_field("vec", m.vec.to_native(context_holder.clone())?)?;
+        arr.set(i as u32, NativeObjectHandle::new(entry.into_object()))?;
+    }
+    Ok(NativeObjectHandle::new(arr.into_object()))
+}
+
+fn list_bridge_fields(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, name: String| {
+            list_bridge_fields_inner(context_holder, name)
+        },
+    )
+}
+
+fn parse_bridge_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    name: String,
+    obj: NativeObjectHandle<IT>,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    try_new_bridge(&name, obj)?;
+    true.to_native(context_holder)
+}
+
+fn parse_bridge(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, name: String, obj: NativeObjectHandle<_>| {
+            parse_bridge_inner(context_holder, name, obj)
+        },
+    )
+}
+
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeCompileMemberSql", compile_member_sql)?;
     cx.export_function("__testBridgeParseArgsNames", parse_args_names)?;
@@ -254,5 +362,7 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
         "__testBridgeInvokeFilterParamsCallback",
         invoke_filter_params_callback,
     )?;
+    cx.export_function("__testBridgeListFields", list_bridge_fields)?;
+    cx.export_function("__testBridgeParse", parse_bridge)?;
     Ok(())
 }

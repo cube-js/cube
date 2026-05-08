@@ -56,3 +56,35 @@ export function invokeFilterParamsCallback(
 ): string {
   return native.__testBridgeInvokeFilterParamsCallback(fn, args);
 }
+
+export type BridgeFieldKind = 'field' | 'call' | 'static';
+
+export interface BridgeFieldMeta {
+  name: string;
+  jsName: string;
+  kind: BridgeFieldKind;
+  optional: boolean;
+  vec: boolean;
+}
+
+export function listBridgeFields(name: string): BridgeFieldMeta[] {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  return native.__testBridgeListFields(name);
+}
+
+export function parseBridge(name: string, obj: object): void {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  native.__testBridgeParse(name, obj);
+}
+
+export function fieldNames(meta: BridgeFieldMeta[]): string[] {
+  return meta.map((m) => m.name).sort();
+}
