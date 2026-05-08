@@ -1,7 +1,4 @@
-use crate::{
-    query_result_transform::{DBResponsePrimitive, DBResponseValue},
-    transport::JsRawColumnarData,
-};
+use crate::{query_result_transform::DBResponsePrimitive, transport::JsRawColumnarData};
 use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
 use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
@@ -35,7 +32,7 @@ impl std::error::Error for ParseError {}
 #[derive(Debug, Clone)]
 pub struct QueryResult {
     pub members: Vec<String>,
-    pub rows: Vec<Vec<DBResponseValue>>,
+    pub rows: Vec<Vec<DBResponsePrimitive>>,
     pub columns_pos: IndexMap<String, usize>,
 }
 
@@ -96,10 +93,8 @@ impl QueryResult {
                         let row_obj: Vec<_> = values
                             .iter()
                             .map(|val| match val.string_value() {
-                                Some(s) => DBResponseValue::Primitive(DBResponsePrimitive::String(
-                                    s.to_owned(),
-                                )),
-                                None => DBResponseValue::Primitive(DBResponsePrimitive::Null),
+                                Some(s) => DBResponsePrimitive::String(s.to_owned()),
+                                None => DBResponsePrimitive::Null,
                             })
                             .collect();
 
@@ -134,14 +129,14 @@ impl QueryResult {
         // Transpose column-major input into the row-major shape `QueryResult`
         // expects. Rows are pre-allocated, then we drain each column into the
         // matching slot to avoid per-cell clones.
-        let mut rows: Vec<Vec<DBResponseValue>> = (0..row_count)
+        let mut rows: Vec<Vec<DBResponsePrimitive>> = (0..row_count)
             .map(|_| Vec::with_capacity(members.len()))
             .collect();
 
         for column in columns.into_iter() {
             for (row_idx, value) in column.into_iter().enumerate() {
                 if let Some(row) = rows.get_mut(row_idx) {
-                    row.push(DBResponseValue::Primitive(value));
+                    row.push(value);
                 }
             }
         }

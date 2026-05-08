@@ -38,16 +38,9 @@ pub static GRANULARITY_LEVELS: LazyLock<HashMap<&'static str, u8>> = LazyLock::n
 const DEFAULT_LEVEL_FOR_UNKNOWN: u8 = 10;
 
 /// Transform specified `value` with specified `type` to the network protocol type.
-pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
+pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePrimitive {
     match value {
-        DBResponseValue::DateTime(dt) if type_ == "time" || type_.is_empty() => {
-            DBResponsePrimitive::String(
-                dt.with_timezone(&Utc)
-                    .format("%Y-%m-%dT%H:%M:%S%.3f")
-                    .to_string(),
-            )
-        }
-        DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
+        DBResponsePrimitive::String(ref s) if type_ == "time" => {
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
@@ -88,9 +81,7 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
                 .unwrap_or_else(|_| s.clone());
             DBResponsePrimitive::String(formatted)
         }
-        DBResponseValue::Primitive(p) => p,
-        DBResponseValue::Object { value } => value,
-        _ => DBResponsePrimitive::Null,
+        other => other,
     }
 }
 
@@ -396,7 +387,7 @@ pub(crate) fn build_compact_plan<'a>(
 /// Convert DB response row to the compact output
 pub fn get_compact_row(
     plan: &CompactPlan<'_>,
-    db_row: &[DBResponseValue],
+    db_row: &[DBResponsePrimitive],
 ) -> Vec<DBResponsePrimitive> {
     let mut row: Vec<DBResponsePrimitive> = Vec::with_capacity(plan.entries.len());
 
@@ -609,7 +600,7 @@ fn build_columnar_plan<'a>(
 /// row-major `cube_store_result.rows` matrix.
 fn build_columnar_columns(
     plan: &[ColumnarColumnPlan<'_>],
-    rows: &[Vec<DBResponseValue>],
+    rows: &[Vec<DBResponsePrimitive>],
 ) -> Vec<Vec<DBResponsePrimitive>> {
     let row_count = rows.len();
     let mut columns: Vec<Vec<DBResponsePrimitive>> =
@@ -623,7 +614,7 @@ fn build_columnar_columns(
                     let cell = row
                         .get(*index)
                         .cloned()
-                        .unwrap_or(DBResponseValue::Primitive(DBResponsePrimitive::Null));
+                        .unwrap_or(DBResponsePrimitive::Null);
                     out.push(transform_value(cell, plan_entry.member_type));
                 }
             }
@@ -644,7 +635,7 @@ pub fn get_vanilla_row(
     plan: &VanillaPlan<'_>,
     query_type: &QueryType,
     query: &NormalizedQuery,
-    db_row: &[DBResponseValue],
+    db_row: &[DBResponsePrimitive],
 ) -> Result<IndexMap<String, DBResponsePrimitive>> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
     let mut row = IndexMap::with_capacity(plan.columns.len() + 1);
@@ -995,31 +986,11 @@ impl Display for DBResponsePrimitive {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub enum DBResponseValue {
-    DateTime(DateTime<Utc>),
-    Primitive(DBResponsePrimitive),
-    // TODO: Is this variant still used?
-    Object { value: DBResponsePrimitive },
-}
-
-impl Display for DBResponseValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            DBResponseValue::DateTime(dt) => dt.to_rfc3339(),
-            DBResponseValue::Primitive(p) => p.to_string(),
-            DBResponseValue::Object { value } => value.to_string(),
-        };
-        write!(f, "{}", str)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::transport::JsRawColumnarData;
     use anyhow::Result;
-    use chrono::{TimeZone, Timelike, Utc};
     use serde_json::from_str;
     use std::{fmt, sync::LazyLock};
 
@@ -1974,42 +1945,8 @@ mod tests {
     }
 
     #[test]
-    fn test_transform_value_datetime_to_time() {
-        let dt = Utc
-            .with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
-            .unwrap()
-            .with_nanosecond(123_000_000)
-            .unwrap();
-        let value = DBResponseValue::DateTime(dt);
-        let result = transform_value(value, "time");
-
-        assert_eq!(
-            result,
-            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
-        );
-    }
-
-    #[test]
-    fn test_transform_value_datetime_empty_type() {
-        let dt = Utc
-            .with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
-            .unwrap()
-            .with_nanosecond(123_000_000)
-            .unwrap();
-        let value = DBResponseValue::DateTime(dt);
-        let result = transform_value(value, "");
-
-        assert_eq!(
-            result,
-            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
-        );
-    }
-
-    #[test]
     fn test_transform_value_string_to_time_valid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01T12:30:15.123".to_string(),
-        ));
+        let value = DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2020,9 +1957,7 @@ mod tests {
 
     #[test]
     fn test_transform_value_string_wo_t_to_time_valid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01 12:30:15.123".to_string(),
-        ));
+        let value = DBResponsePrimitive::String("2024-01-01 12:30:15.123".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2033,9 +1968,7 @@ mod tests {
 
     #[test]
     fn test_transform_value_string_wo_mssec_to_time_valid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01 12:30:15".to_string(),
-        ));
+        let value = DBResponsePrimitive::String("2024-01-01 12:30:15".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2046,9 +1979,7 @@ mod tests {
 
     #[test]
     fn test_transform_value_string_wo_mssec_w_t_to_time_valid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01T12:30:15".to_string(),
-        ));
+        let value = DBResponsePrimitive::String("2024-01-01T12:30:15".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2059,9 +1990,7 @@ mod tests {
 
     #[test]
     fn test_transform_value_string_with_tz_offset_to_time_valid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01 12:30:15.123 +00:00".to_string(),
-        ));
+        let value = DBResponsePrimitive::String("2024-01-01 12:30:15.123 +00:00".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2072,9 +2001,7 @@ mod tests {
 
     #[test]
     fn test_transform_value_string_with_tz_to_time_valid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01 12:30:15.123 UTC".to_string(),
-        ));
+        let value = DBResponsePrimitive::String("2024-01-01 12:30:15.123 UTC".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2085,8 +2012,7 @@ mod tests {
 
     #[test]
     fn test_transform_value_string_to_time_invalid_rfc3339() {
-        let value =
-            DBResponseValue::Primitive(DBResponsePrimitive::String("invalid-date".to_string()));
+        let value = DBResponsePrimitive::String("invalid-date".to_string());
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -2097,33 +2023,13 @@ mod tests {
 
     #[test]
     fn test_transform_value_primitive_string_type_not_time() {
-        let value =
-            DBResponseValue::Primitive(DBResponsePrimitive::String("some-string".to_string()));
+        let value = DBResponsePrimitive::String("some-string".to_string());
         let result = transform_value(value, "other");
 
         assert_eq!(
             result,
             DBResponsePrimitive::String("some-string".to_string())
         );
-    }
-
-    #[test]
-    fn test_transform_value_object() {
-        let obj_value = DBResponsePrimitive::String("object-value".to_string());
-        let value = DBResponseValue::Object {
-            value: obj_value.clone(),
-        };
-        let result = transform_value(value, "time");
-
-        assert_eq!(result, obj_value);
-    }
-
-    #[test]
-    fn test_transform_value_fallback_to_null() {
-        let value = DBResponseValue::DateTime(Utc::now());
-        let result = transform_value(value, "unknown");
-
-        assert_eq!(result, DBResponsePrimitive::Null);
     }
 
     #[test]

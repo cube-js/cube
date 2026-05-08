@@ -2,8 +2,7 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    DBResponsePrimitive, DBResponseValue, RequestResultData, RequestResultDataMulti,
-    TransformedData,
+    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue, ValueObject};
@@ -339,7 +338,7 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
                 for (key, value) in result.members.iter().zip(row.iter()) {
                     let js_key = cx.string(key);
                     let js_value: Handle<'_, JsValue> = match value {
-                        DBResponseValue::Primitive(DBResponsePrimitive::Null) => cx.null().upcast(),
+                        DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings
                         other => cx.string(other.to_string()).upcast(),
                     };
