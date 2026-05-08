@@ -5,6 +5,7 @@ use super::{OpCtx, OpExec};
 
 /// Applies a measure's per-row filter rules so only matching rows
 /// contribute to its aggregation.
+#[derive(Clone)]
 pub struct MeasureFilterOp;
 
 impl OpExec for MeasureFilterOp {

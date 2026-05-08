@@ -6,7 +6,7 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-use super::{Op, OpExec};
+use super::{Op, OpExec, OpPipelineSqlNode};
 
 /// Per-render context passed to an Op handler. Holds the visitor and shared
 /// resources, plus the slice of the pipeline yet to be processed (`tail`).
@@ -49,12 +49,18 @@ impl<'a> OpCtx<'a> {
         op.exec(&mut sub)
     }
 
-    /// Run a separate pipeline (e.g. RollingWindow's `input_pipeline`).
-    pub fn render_pipeline(&self, ops: &'a [Op]) -> Result<String, CubeError> {
+    /// Run a separate pipeline (e.g. RollingWindow's `input_pipeline` or a
+    /// branch of a kind dispatch). The slice may live for any lifetime
+    /// shorter than the outer ctx's; the templates reference is reborrowed
+    /// to match.
+    pub fn render_pipeline<'b>(&self, ops: &'b [Op]) -> Result<String, CubeError>
+    where
+        'a: 'b,
+    {
         let (op, rest) = ops.split_first().ok_or_else(|| {
             CubeError::internal("OpCtx::render_pipeline called with empty ops slice".to_string())
         })?;
-        let mut sub = OpCtx {
+        let mut sub = OpCtx::<'b> {
             visitor: self.visitor.clone(),
             query_tools: self.query_tools.clone(),
             templates: self.templates,
@@ -63,6 +69,19 @@ impl<'a> OpCtx<'a> {
             legacy_node_processor: self.legacy_node_processor.clone(),
         };
         op.exec(&mut sub)
+    }
+
+    /// Materialize the remaining pipeline as a `SqlNode`. Used by ops that
+    /// need to hand the rest of the chain to legacy plumbing — e.g. as a
+    /// `node_processor` for a filter expression that must avoid recursing
+    /// back through the current op.
+    ///
+    /// Cost: `O(tail_len)` Rc clones plus one `Rc<OpPipelineSqlNode>`
+    /// allocation per call — heavier than the legacy `Rc::clone` of an
+    /// already-built node. Fine for cold paths (mask filter rendering); call
+    /// sparingly on hot paths.
+    pub fn tail_as_sql_node(&self) -> Rc<dyn SqlNode> {
+        OpPipelineSqlNode::new(self.tail.to_vec())
     }
 
     /// Build a fresh ctx pointing at the same tail/symbol but with a different

@@ -6,6 +6,7 @@ use super::{OpCtx, OpExec};
 
 /// Migration-only bridge: lets an Op pipeline contain a not-yet-migrated
 /// `SqlNode` subtree. Goes away once every node has its Op counterpart.
+#[derive(Clone)]
 pub struct LegacySqlNodeOp {
     pub inner: Rc<dyn SqlNode>,
 }

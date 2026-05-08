@@ -1,8 +1,8 @@
 use super::{
-    CaseSqlNode, FinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode, MaskedSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesType,
-    RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode,
-    UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    FinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode, MultiStageRankNode,
+    MultiStageWindowNode, Op, OpPipelineSqlNode, RenderReferencesType, RollingWindowNode, SqlNode,
+    TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
+    UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
@@ -33,6 +33,28 @@ fn op_geo_dimension(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
 
 fn op_render_references(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<dyn SqlNode> {
     OpPipelineSqlNode::new(vec![Op::render_references(references), Op::legacy(input)])
+}
+
+fn op_masked(input: Rc<dyn SqlNode>, ungrouped: bool) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::masked(ungrouped), Op::legacy(input)])
+}
+
+fn op_case(input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::case(), Op::legacy(input)])
+}
+
+fn op_dispatch_by_kind(
+    dimension: Rc<dyn SqlNode>,
+    time_dimension: Rc<dyn SqlNode>,
+    measure: Rc<dyn SqlNode>,
+    default: Rc<dyn SqlNode>,
+) -> Rc<dyn SqlNode> {
+    OpPipelineSqlNode::new(vec![Op::dispatch_by_kind(
+        vec![Op::legacy(dimension)],
+        vec![Op::legacy(time_dimension)],
+        vec![Op::legacy(measure)],
+        vec![Op::legacy(default)],
+    )])
 }
 
 #[derive(Clone, Default)]
@@ -174,7 +196,7 @@ impl SqlNodesFactory {
 
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
         let evaluate_sql_processor =
-            MaskedSqlNode::new(OpPipelineSqlNode::new(vec![Op::evaluate_symbol()]));
+            op_masked(OpPipelineSqlNode::new(vec![Op::evaluate_symbol()]), false);
         let auto_prefix_processor = op_auto_prefix(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
@@ -182,17 +204,14 @@ impl SqlNodesFactory {
         let parenthesize_processor: Rc<dyn SqlNode> = op_paren(auto_prefix_processor.clone());
 
         let measure_filter_processor = op_measure_filter(parenthesize_processor.clone());
-        let measure_processor = CaseSqlNode::new(measure_filter_processor.clone());
+        let measure_processor = op_case(measure_filter_processor.clone());
 
         let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
         let measure_processor = self.final_measure_node_processor(measure_processor);
-        // Wrap the entire measure chain with MaskedSqlNode so masked measures
+        // Wrap the entire measure chain with a Masked op so masked measures
         // are intercepted before aggregation/ungrouped wrapping.
-        let measure_processor = if self.ungrouped || self.ungrouped_measure {
-            MaskedSqlNode::new_ungrouped(measure_processor)
-        } else {
-            MaskedSqlNode::new(measure_processor)
-        };
+        let measure_processor =
+            op_masked(measure_processor, self.ungrouped || self.ungrouped_measure);
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
@@ -208,7 +227,7 @@ impl SqlNodesFactory {
             };
         let default_processor: Rc<dyn SqlNode> = op_paren(default_processor);
 
-        let root_node = RootSqlNode::new(
+        let root_node = op_dispatch_by_kind(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(op_paren(evaluate_sql_processor.clone())),
             measure_processor.clone(),
@@ -279,7 +298,7 @@ impl SqlNodesFactory {
             op_render_references(input, self.pre_aggregation_dimensions_references.clone())
         } else {
             let input: Rc<dyn SqlNode> = op_geo_dimension(input);
-            let input: Rc<dyn SqlNode> = CaseSqlNode::new(input);
+            let input: Rc<dyn SqlNode> = op_case(input);
             input
         };
 

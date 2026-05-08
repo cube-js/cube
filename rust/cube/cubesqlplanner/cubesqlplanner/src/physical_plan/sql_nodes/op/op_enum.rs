@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::{
-    AutoPrefixOp, EvaluateSymbolOp, GeoDimensionOp, LegacySqlNodeOp, MeasureFilterOp, OpCtx,
-    OpExec, ParenthesizeOp, RenderReferencesOp,
+    AutoPrefixOp, CaseOp, DispatchByKindOp, EvaluateSymbolOp, GeoDimensionOp, LegacySqlNodeOp,
+    MaskedOp, MeasureFilterOp, OpCtx, OpExec, ParenthesizeOp, RenderReferencesOp,
 };
 
 /// All op variants that participate in pipeline rendering.
@@ -17,6 +17,7 @@ use super::{
 ///
 /// `LegacySqlNode` is a migration-only escape hatch that wraps an
 /// `Rc<dyn SqlNode>`; it goes away once every legacy node has been migrated.
+#[derive(Clone)]
 pub enum Op {
     EvaluateSymbol(EvaluateSymbolOp),
     Parenthesize(ParenthesizeOp),
@@ -24,6 +25,9 @@ pub enum Op {
     GeoDimension(GeoDimensionOp),
     MeasureFilter(MeasureFilterOp),
     RenderReferences(RenderReferencesOp),
+    Masked(MaskedOp),
+    Case(CaseOp),
+    DispatchByKind(DispatchByKindOp),
     LegacySqlNode(LegacySqlNodeOp),
 }
 
@@ -52,6 +56,28 @@ impl Op {
         Self::RenderReferences(RenderReferencesOp::new(references))
     }
 
+    pub fn masked(ungrouped: bool) -> Self {
+        Self::Masked(MaskedOp::new(ungrouped))
+    }
+
+    pub fn case() -> Self {
+        Self::Case(CaseOp)
+    }
+
+    pub fn dispatch_by_kind(
+        dimension: Vec<Op>,
+        time_dimension: Vec<Op>,
+        measure: Vec<Op>,
+        default: Vec<Op>,
+    ) -> Self {
+        Self::DispatchByKind(DispatchByKindOp {
+            dimension,
+            time_dimension,
+            measure,
+            default,
+        })
+    }
+
     pub fn legacy(node: Rc<dyn SqlNode>) -> Self {
         Self::LegacySqlNode(LegacySqlNodeOp::new(node))
     }
@@ -66,6 +92,9 @@ impl OpExec for Op {
             Op::GeoDimension(o) => o.exec(ctx),
             Op::MeasureFilter(o) => o.exec(ctx),
             Op::RenderReferences(o) => o.exec(ctx),
+            Op::Masked(o) => o.exec(ctx),
+            Op::Case(o) => o.exec(ctx),
+            Op::DispatchByKind(o) => o.exec(ctx),
             Op::LegacySqlNode(o) => o.exec(ctx),
         }
     }
