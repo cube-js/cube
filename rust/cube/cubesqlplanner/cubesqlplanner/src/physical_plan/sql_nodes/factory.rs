@@ -115,6 +115,10 @@ fn op_rolling_window(input_pipeline: Vec<Op>, default_pipeline: Vec<Op>) -> Vec<
     vec![Op::rolling_window(input_pipeline, default_pipeline)]
 }
 
+/// Configuration carrier for assembling a query's render pipeline. Options
+/// (time shifts, multi-stage settings, pre-aggregation references, masked
+/// measures, …) accumulate via `set_*`/`add_*` methods and feed into
+/// [`Self::default_node_processor`].
 #[derive(Clone, Default)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
@@ -252,6 +256,7 @@ impl SqlNodesFactory {
         )
     }
 
+    /// Build the `NodeProcessor` for the current configuration.
     pub fn default_node_processor(&self) -> Rc<NodeProcessor> {
         let evaluate_sql_processor = op_masked(vec![Op::evaluate_symbol()], false);
         let auto_prefix_processor = op_auto_prefix(

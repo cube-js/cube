@@ -7,15 +7,10 @@ use std::rc::Rc;
 
 use super::{NodeProcessor, Op, OpExec};
 
-/// Per-render context passed to an Op handler. Holds the visitor and shared
-/// resources, plus the slice of the pipeline yet to be processed (`tail`).
-///
-/// Op handlers continue the chain via [`render_tail`], dive into a side
-/// pipeline (e.g. RollingWindow's `input_pipeline`) via [`render_pipeline`],
-/// and may temporarily override the visitor via [`with_visitor`].
-///
-/// `node_processor` is the entry-point pipeline a sub-arg evaluation should
-/// re-enter through (`SqlCall::eval`, `Filter::to_sql`, etc.).
+/// State of one render in flight: the symbol being rendered, the visitor
+/// and shared resources, the unprocessed `tail` of the current pipeline,
+/// and the top-level `node_processor` to re-enter through for sub-arg
+/// evaluation.
 pub struct OpCtx<'a> {
     pub visitor: SqlEvaluatorVisitor,
     pub query_tools: Rc<QueryTools>,
@@ -46,10 +41,9 @@ impl<'a> OpCtx<'a> {
         op.exec(&mut sub)
     }
 
-    /// Run a separate pipeline (e.g. RollingWindow's `input_pipeline` or a
-    /// branch of a kind dispatch). The slice may live for any lifetime
-    /// shorter than the outer ctx's; the templates reference is reborrowed
-    /// to match.
+    /// Run a separate sub-pipeline against the current symbol/visitor. The
+    /// slice may live for any lifetime shorter than the outer ctx's; the
+    /// templates reference is reborrowed to match.
     pub fn render_pipeline<'b>(&self, ops: &'b [Op]) -> Result<String, CubeError>
     where
         'a: 'b,
@@ -68,20 +62,20 @@ impl<'a> OpCtx<'a> {
         op.exec(&mut sub)
     }
 
-    /// Materialize the remaining pipeline as a `NodeProcessor`. Used by ops
-    /// that need to hand the rest of the chain to plumbing that wants its
-    /// own entry point — e.g. as a `node_processor` for a filter expression
-    /// that must avoid recursing back through the current op.
+    /// Materialize the remaining pipeline as a standalone `NodeProcessor`,
+    /// suitable as a re-entry point for plumbing that must not recurse
+    /// through the current op (e.g. a filter rendered without the masking
+    /// wrapper).
     ///
     /// Cost: `O(tail_len)` Op clones plus one `Rc<NodeProcessor>` allocation
-    /// per call. Fine for cold paths (mask filter rendering); call sparingly
-    /// on hot paths.
+    /// per call. Cheap enough for cold paths; avoid on hot ones.
     pub fn tail_as_node_processor(&self) -> Rc<NodeProcessor> {
         NodeProcessor::new(self.tail.to_vec())
     }
 
-    /// Build a fresh ctx pointing at the same tail/symbol but with a different
-    /// visitor — used by ops that need to flip `arg_needs_paren_safe` etc.
+    /// Fresh ctx pointing at the same tail/symbol but with a swapped visitor
+    /// (e.g. a child render that needs different `arg_needs_paren_safe` or
+    /// `ignore_tz_convert` flags).
     pub fn with_visitor(&self, visitor: SqlEvaluatorVisitor) -> OpCtx<'a> {
         OpCtx {
             visitor,

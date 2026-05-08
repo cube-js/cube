@@ -2,6 +2,8 @@ use cubenativeutils::CubeError;
 
 use super::OpCtx;
 
+/// Behavior of a single op at render time. One impl per Op variant; the
+/// dispatch on [`Op`] forwards to it.
 pub trait OpExec {
     fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError>;
 
