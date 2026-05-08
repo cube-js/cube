@@ -1,6 +1,6 @@
 use super::{
-    CteState, MultiStageAppliedState, MultiStageInodeMember, MultiStageInodeMemberType,
-    MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
+    CteState, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType,
+    MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
     MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::cube_bridge::measure_definition::RollingWindow;
@@ -57,14 +57,17 @@ impl MultiStageQueryPlanner {
         }
 
         let mut descriptions = Vec::new();
-        let state = MultiStageAppliedState::new(
-            self.query_properties.time_dimensions().clone(),
-            self.query_properties.dimensions().clone(),
-            self.query_properties.time_dimensions_filters().clone(),
-            self.query_properties.dimensions_filters().clone(),
-            vec![], //TODO: We do not pass measures filters to CTE queries. This seems correct, but we need to check
-            self.query_properties.segments().clone(),
-        );
+        // Multi-stage CTE state: a query carrying the dimensions/filters of the
+        // current node in the multi-stage tree. measures_filters are
+        // intentionally dropped — CTE queries do not propagate them.
+        let state = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .dimensions(self.query_properties.dimensions().clone())
+            .time_dimensions(self.query_properties.time_dimensions().clone())
+            .dimensions_filters(self.query_properties.dimensions_filters().clone())
+            .time_dimensions_filters(self.query_properties.time_dimensions_filters().clone())
+            .segments(self.query_properties.segments().clone())
+            .build()?;
 
         let mut resolved_multi_stage_dimensions = HashSet::new();
 
@@ -156,7 +159,7 @@ impl MultiStageQueryPlanner {
     fn make_childs(
         &self,
         member: Rc<MemberSymbol>,
-        new_state: Rc<MultiStageAppliedState>,
+        new_state: Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
@@ -195,7 +198,7 @@ impl MultiStageQueryPlanner {
     fn default_make_childs(
         &self,
         member: Rc<MemberSymbol>,
-        new_state: Rc<MultiStageAppliedState>,
+        new_state: Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
@@ -242,7 +245,7 @@ impl MultiStageQueryPlanner {
     fn try_make_childs_for_case_switch(
         &self,
         case: &CaseSwitchDefinition,
-        new_state: Rc<MultiStageAppliedState>,
+        new_state: Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
@@ -290,7 +293,7 @@ impl MultiStageQueryPlanner {
         }
 
         for (_, (dep, values)) in deps {
-            let mut state = new_state.clone_state();
+            let mut state = new_state.as_ref().clone();
             if let Some(values) = values {
                 if !values.is_empty() {
                     let filter = BaseFilter::try_new(
@@ -319,7 +322,7 @@ impl MultiStageQueryPlanner {
     fn make_queries_descriptions(
         &self,
         member: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
+        state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         cte_state: &mut CteState,
@@ -327,7 +330,7 @@ impl MultiStageQueryPlanner {
         let member = member.resolve_reference_chain();
         let member = apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
         let state = if member.is_dimension() {
-            let mut new_state = state.clone_state();
+            let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(resolved_multi_stage_dimensions)?;
             Rc::new(new_state)
         } else {
@@ -382,7 +385,7 @@ impl MultiStageQueryPlanner {
                 || multi_stage_member.time_shift().is_some()
                 || state.has_filters_for_member(&member_name)
             {
-                let mut new_state = state.clone_state();
+                let mut new_state = state.as_ref().clone();
                 if !dimensions_to_add.is_empty() {
                     new_state.add_dimensions(dimensions_to_add.clone());
                 }
@@ -428,7 +431,7 @@ impl MultiStageQueryPlanner {
     pub fn try_plan_rolling_window(
         &self,
         member: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
+        state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         cte_state: &mut CteState,
@@ -601,7 +604,7 @@ impl MultiStageQueryPlanner {
     fn add_time_series_get_range_query(
         &self,
         time_dimension: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
+        state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let description = if let Some(description) = descriptions
@@ -632,7 +635,7 @@ impl MultiStageQueryPlanner {
     fn add_time_series(
         &self,
         time_dimension: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
+        state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let description = if let Some(description) =
@@ -678,7 +681,7 @@ impl MultiStageQueryPlanner {
     fn add_rolling_window_base(
         &self,
         member: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
+        state: Rc<QueryProperties>,
         ungrouped: bool,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         cte_state: &mut CteState,
@@ -727,9 +730,9 @@ impl MultiStageQueryPlanner {
     fn replace_date_range_for_rolling_window(
         &self,
         rolling_window: &RollingWindow,
-        state: Rc<MultiStageAppliedState>,
-    ) -> Result<Rc<MultiStageAppliedState>, CubeError> {
-        let mut new_state = state.clone_state();
+        state: Rc<QueryProperties>,
+    ) -> Result<Rc<QueryProperties>, CubeError> {
+        let mut new_state = state.as_ref().clone();
         for filter_item in state.time_dimensions_filters() {
             if let FilterItem::Item(filter) = filter_item {
                 if matches!(filter.filter_operator(), FilterOperator::InDateRange) {
@@ -748,11 +751,11 @@ impl MultiStageQueryPlanner {
         &self,
         time_dimension: Rc<MemberSymbol>,
         rolling_window: &RollingWindow,
-        state: Rc<MultiStageAppliedState>,
-    ) -> Result<(Rc<MultiStageAppliedState>, Rc<MemberSymbol>), CubeError> {
+        state: Rc<QueryProperties>,
+    ) -> Result<(Rc<QueryProperties>, Rc<MemberSymbol>), CubeError> {
         let time_dimension_symbol = time_dimension.as_time_dimension()?;
         let time_dimension_base_name = time_dimension_symbol.base_symbol().full_name();
-        let mut new_state = state.clone_state();
+        let mut new_state = state.as_ref().clone();
         let trailing_granularity =
             GranularityHelper::granularity_from_interval(&rolling_window.trailing);
         let leading_granularity =

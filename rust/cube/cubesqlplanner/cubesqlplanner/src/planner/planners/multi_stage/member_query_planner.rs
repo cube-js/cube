@@ -201,8 +201,8 @@ impl MultiStageMemberQueryPlanner {
             vec![]
         };
         let schema = LogicalSchema::default()
-            .set_dimensions(self.description.state().dimensions_symbols())
-            .set_time_dimensions(self.description.state().time_dimensions_symbols())
+            .set_dimensions(self.description.state().dimensions().clone())
+            .set_time_dimensions(self.description.state().time_dimensions().clone())
             .set_measures(measures)
             .into_rc();
 
@@ -259,8 +259,8 @@ impl MultiStageMemberQueryPlanner {
         &self,
         _multi_stage_member: &MultiStageInodeMember,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let mut dimensions = self.description.state().dimensions_symbols();
-        let mut time_dimensions = self.description.state().time_dimensions_symbols();
+        let mut dimensions = self.description.state().dimensions().clone();
+        let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         let cte_member = self.description.member().evaluation_node();
         match cte_member.as_ref() {
@@ -341,8 +341,8 @@ impl MultiStageMemberQueryPlanner {
 
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
-        let mut dimensions = self.description.state().dimensions_symbols();
-        let mut time_dimensions = self.description.state().time_dimensions_symbols();
+        let mut dimensions = self.description.state().dimensions().clone();
+        let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         if !self.description.member().is_without_member_leaf() {
             match member_node.as_ref() {
@@ -417,14 +417,14 @@ impl MultiStageMemberQueryPlanner {
             .description
             .input()
             .iter()
-            .flat_map(|descr| descr.state().dimensions_symbols().clone())
+            .flat_map(|descr| descr.state().dimensions().iter().cloned())
             .unique_by(|dim| dim.full_name())
             .collect_vec();
         let time_dimensions = self
             .description
             .input()
             .iter()
-            .flat_map(|descr| descr.state().time_dimensions_symbols().clone())
+            .flat_map(|descr| descr.state().time_dimensions().iter().cloned())
             .unique_by(|dim| dim.full_name())
             .collect_vec();
 

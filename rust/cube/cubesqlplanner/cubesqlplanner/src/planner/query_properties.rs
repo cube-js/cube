@@ -2,11 +2,14 @@ use super::query_tools::QueryTools;
 use super::MemberSymbol;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
-use crate::planner::filter::{Filter, FilterItem};
+use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::{apply_static_filter_to_filter_item, apply_static_filter_to_symbol};
+use crate::planner::{
+    apply_static_filter_to_filter_item, apply_static_filter_to_symbol, DimensionTimeShift,
+    MeasureTimeShifts,
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
@@ -525,6 +528,464 @@ impl QueryProperties {
     /// references; for root queries it degenerates to plain full_name compare.
     fn members_equivalent(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
         a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| member_chain_eq(x, y))
+    }
+
+    // --- multi-stage state mutations ---
+    //
+    // The methods below mutate fields that participate in
+    // `compute_multi_fact_join_groups`, so they invalidate the lazy cache.
+    // They originally lived on `MultiStageAppliedState`; that type was folded
+    // into `QueryProperties` so the multi-stage planner can carry node state
+    // as a regular query.
+
+    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
+        self.dimensions = dimensions;
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<MemberSymbol>>) {
+        self.time_dimensions = time_dimensions;
+        self.invalidate_join_groups_cache();
+    }
+
+    /// Merge new dimensions into the existing list, deduplicating by
+    /// reference-chain-resolved full name (so a dimension reachable through
+    /// a CTE chain is treated as equal to its resolved counterpart).
+    pub fn add_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
+        self.dimensions = self
+            .dimensions
+            .iter()
+            .cloned()
+            .chain(dimensions.into_iter())
+            .unique_by(|d| d.clone().resolve_reference_chain().full_name())
+            .collect_vec();
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn add_dimension_filter(&mut self, filter: FilterItem) {
+        self.dimensions_filters.push(filter);
+        self.invalidate_join_groups_cache();
+    }
+
+    /// Drop multi-stage dimensions that are not yet resolved at the current
+    /// stage. A dimension stays if it has no multi-stage members or if it has
+    /// already been resolved upstream.
+    pub fn remove_multistage_dimensions(
+        &mut self,
+        resolved_dimensions: &HashSet<String>,
+    ) -> Result<(), CubeError> {
+        let mut filtered = Vec::new();
+        for d in &self.dimensions {
+            if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
+                || !has_multi_stage_members(d, true)?
+            {
+                filtered.push(d.clone());
+            }
+        }
+        self.dimensions = filtered;
+        let mut filtered = Vec::new();
+        for d in &self.time_dimensions {
+            if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
+                || !has_multi_stage_members(d, true)?
+            {
+                filtered.push(d.clone());
+            }
+        }
+        self.time_dimensions = filtered;
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) -> Result<(), CubeError> {
+        let resolved_shifts = match time_shifts {
+            MeasureTimeShifts::Dimensions(dimensions) => dimensions,
+            MeasureTimeShifts::Common(interval) => self
+                .all_time_members()
+                .into_iter()
+                .map(|m| DimensionTimeShift {
+                    interval: Some(interval.clone()),
+                    dimension: m,
+                    name: None,
+                })
+                .collect_vec(),
+            MeasureTimeShifts::Named(named_shift) => self
+                .all_time_members()
+                .into_iter()
+                .map(|m| DimensionTimeShift {
+                    interval: None,
+                    dimension: m,
+                    name: Some(named_shift.clone()),
+                })
+                .collect_vec(),
+        };
+        for ts in resolved_shifts.into_iter() {
+            if let Some(exists) = self
+                .time_shifts
+                .dimensions_shifts
+                .get_mut(&ts.dimension.full_name())
+            {
+                if let Some(interval) = exists.interval.clone() {
+                    if let Some(new_interval) = ts.interval {
+                        exists.interval = Some(interval + new_interval);
+                    } else {
+                        return Err(CubeError::internal(format!(
+                            "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
+                            ts.name.clone().unwrap_or("-".to_string()),
+                            interval.to_sql(),
+                            ts.dimension.full_name(),
+                        )));
+                    }
+                } else if let Some(named_shift) = exists.name.clone() {
+                    return if let Some(new_interval) = ts.interval {
+                        Err(CubeError::internal(format!(
+                            "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
+                            named_shift,
+                            new_interval.to_sql(),
+                            ts.dimension.full_name(),
+                        )))
+                    } else {
+                        Err(CubeError::internal(format!(
+                            "Cannot use more than one named shifts ({}, {}) for the same dimension: {}.",
+                            ts.name.clone().unwrap_or("-".to_string()),
+                            named_shift,
+                            ts.dimension.full_name(),
+                        )))
+                    };
+                }
+            } else {
+                self.time_shifts
+                    .dimensions_shifts
+                    .insert(ts.dimension.full_name(), ts);
+            }
+        }
+        Ok(())
+    }
+
+    fn all_time_members(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut filter_symbols: Vec<Rc<MemberSymbol>> = self
+            .dimensions
+            .iter()
+            .cloned()
+            .chain(self.time_dimensions.iter().cloned())
+            .collect();
+        for filter_item in self
+            .time_dimensions_filters
+            .iter()
+            .chain(self.dimensions_filters.iter())
+            .chain(self.segments.iter())
+        {
+            filter_item.find_all_member_evaluators(&mut filter_symbols);
+        }
+        filter_symbols
+            .into_iter()
+            .filter_map(|m| {
+                let symbol = if let Ok(time_dim) = m.as_time_dimension() {
+                    time_dim.base_symbol().clone().resolve_reference_chain()
+                } else {
+                    m.resolve_reference_chain()
+                };
+                if let Ok(dim) = symbol.as_dimension() {
+                    if dim.is_time() {
+                        Some(symbol)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .unique_by(|s| s.full_name())
+            .collect_vec()
+    }
+
+    pub fn remove_filter_for_member(&mut self, member_name: &str) {
+        self.time_dimensions_filters =
+            Self::extract_filters_exclude_member(member_name, &self.time_dimensions_filters);
+        self.dimensions_filters =
+            Self::extract_filters_exclude_member(member_name, &self.dimensions_filters);
+        self.measures_filters =
+            Self::extract_filters_exclude_member(member_name, &self.measures_filters);
+        self.invalidate_join_groups_cache();
+    }
+
+    fn extract_filters_exclude_member(
+        member_name: &str,
+        filters: &[FilterItem],
+    ) -> Vec<FilterItem> {
+        let mut result = Vec::new();
+        for item in filters.iter() {
+            match item {
+                FilterItem::Group(group) => {
+                    let new_group = FilterItem::Group(Rc::new(FilterGroup::new(
+                        group.operator.clone(),
+                        Self::extract_filters_exclude_member(member_name, &group.items),
+                    )));
+                    result.push(new_group);
+                }
+                FilterItem::Item(itm) => {
+                    if itm.member_name() != member_name {
+                        result.push(FilterItem::Item(itm.clone()));
+                    }
+                }
+                FilterItem::Segment(_) => {}
+            }
+        }
+        result
+    }
+
+    pub fn has_filters_for_member(&self, member_name: &str) -> bool {
+        Self::has_filters_for_member_impl(member_name, &self.time_dimensions_filters)
+            || Self::has_filters_for_member_impl(member_name, &self.dimensions_filters)
+            || Self::has_filters_for_member_impl(member_name, &self.measures_filters)
+    }
+
+    fn has_filters_for_member_impl(member_name: &str, filters: &[FilterItem]) -> bool {
+        for item in filters.iter() {
+            match item {
+                FilterItem::Group(group) => {
+                    if Self::has_filters_for_member_impl(member_name, &group.items) {
+                        return true;
+                    }
+                }
+                FilterItem::Item(itm) => {
+                    if itm.member_name() == member_name {
+                        return true;
+                    }
+                }
+                FilterItem::Segment(_) => {}
+            }
+        }
+        false
+    }
+
+    /// Replace InDateRange filter with bounded version for rolling window without granularity.
+    /// Unlike `replace_regular_date_range_filter` which uses time_series CTE references,
+    /// this keeps parameter-based filters suitable for queries without a time_series CTE.
+    pub fn replace_date_range_for_rolling_window_without_granularity(
+        &mut self,
+        member_name: &str,
+        trailing: &Option<String>,
+        leading: &Option<String>,
+    ) -> Result<(), CubeError> {
+        let trailing_unbounded = trailing.as_deref() == Some("unbounded");
+        let leading_unbounded = leading.as_deref() == Some("unbounded");
+
+        if !trailing_unbounded && !leading_unbounded {
+            return Ok(());
+        }
+
+        if trailing_unbounded && leading_unbounded {
+            // Both unbounded — remove the date range filter entirely
+            self.time_dimensions_filters.retain(|item| match item {
+                FilterItem::Item(itm) => {
+                    !(itm.member_name() == member_name
+                        && matches!(itm.filter_operator(), FilterOperator::InDateRange))
+                }
+                _ => true,
+            });
+        } else if trailing_unbounded {
+            // Remove lower bound: InDateRange(from, to) → BeforeOrOnDate(to)
+            let mut new_filters = Vec::new();
+            for item in self.time_dimensions_filters.iter() {
+                match item {
+                    FilterItem::Item(itm)
+                        if itm.member_name() == member_name
+                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
+                    {
+                        let values = itm.values();
+                        let to_value = if values.len() >= 2 {
+                            vec![values[1].clone()]
+                        } else {
+                            values.clone()
+                        };
+                        new_filters.push(FilterItem::Item(itm.change_operator(
+                            FilterOperator::BeforeOrOnDate,
+                            to_value,
+                            itm.use_raw_values(),
+                        )?));
+                    }
+                    other => new_filters.push(other.clone()),
+                }
+            }
+            self.time_dimensions_filters = new_filters;
+        } else {
+            // leading unbounded: remove upper bound: InDateRange(from, to) → AfterOrOnDate(from)
+            let mut new_filters = Vec::new();
+            for item in self.time_dimensions_filters.iter() {
+                match item {
+                    FilterItem::Item(itm)
+                        if itm.member_name() == member_name
+                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
+                    {
+                        let values = itm.values();
+                        let from_value = if !values.is_empty() {
+                            vec![values[0].clone()]
+                        } else {
+                            values.clone()
+                        };
+                        new_filters.push(FilterItem::Item(itm.change_operator(
+                            FilterOperator::AfterOrOnDate,
+                            from_value,
+                            itm.use_raw_values(),
+                        )?));
+                    }
+                    other => new_filters.push(other.clone()),
+                }
+            }
+            self.time_dimensions_filters = new_filters;
+        }
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    pub fn replace_regular_date_range_filter(
+        &mut self,
+        member_name: &str,
+        left_interval: Option<String>,
+        right_interval: Option<String>,
+    ) -> Result<(), CubeError> {
+        let operator = FilterOperator::RegularRollingWindowDateRange;
+        let values = vec![left_interval.clone(), right_interval.clone()];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            None,
+            &values,
+            &None,
+        )?;
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    pub fn replace_to_date_date_range_filter(
+        &mut self,
+        member_name: &str,
+        granularity: &String,
+    ) -> Result<(), CubeError> {
+        let operator = FilterOperator::ToDateRollingWindowDateRange;
+        let values = vec![Some(granularity.clone())];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            None,
+            &values,
+            &None,
+        )?;
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    pub fn replace_range_in_date_filter(
+        &mut self,
+        member_name: &str,
+        new_from: String,
+        new_to: String,
+    ) -> Result<(), CubeError> {
+        let operator = FilterOperator::InDateRange;
+        let replacement_values = vec![Some(new_from), Some(new_to)];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            None,
+            &vec![],
+            &Some(replacement_values),
+        )?;
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    pub fn replace_range_to_subquery_in_date_filter(
+        &mut self,
+        member_name: &str,
+        new_from: String,
+        new_to: String,
+    ) -> Result<(), CubeError> {
+        let operator = FilterOperator::InDateRange;
+        let replacement_values = vec![Some(new_from), Some(new_to)];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            Some(true),
+            &vec![],
+            &Some(replacement_values),
+        )?;
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    fn change_date_range_filter_impl(
+        &self,
+        member_name: &str,
+        filters: &[FilterItem],
+        operator: &FilterOperator,
+        use_raw_values: Option<bool>,
+        additional_values: &Vec<Option<String>>,
+        replacement_values: &Option<Vec<Option<String>>>,
+    ) -> Result<Vec<FilterItem>, CubeError> {
+        let mut result = Vec::new();
+        for item in filters.iter() {
+            match item {
+                FilterItem::Group(group) => {
+                    let new_group = FilterItem::Group(Rc::new(FilterGroup::new(
+                        group.operator.clone(),
+                        self.change_date_range_filter_impl(
+                            member_name,
+                            &group.items,
+                            operator,
+                            use_raw_values,
+                            additional_values,
+                            replacement_values,
+                        )?,
+                    )));
+                    result.push(new_group);
+                }
+                FilterItem::Item(itm) => {
+                    let itm = if itm.member_name() == member_name
+                        && matches!(itm.filter_operator(), FilterOperator::InDateRange)
+                    {
+                        let mut values = if let Some(values) = replacement_values {
+                            values.clone()
+                        } else {
+                            itm.values().clone()
+                        };
+                        values.extend(additional_values.iter().cloned());
+                        let use_raw_values = use_raw_values.unwrap_or(itm.use_raw_values());
+                        itm.change_operator(operator.clone(), values, use_raw_values)?
+                    } else {
+                        itm.clone()
+                    };
+                    result.push(FilterItem::Item(itm));
+                }
+                FilterItem::Segment(segment) => result.push(FilterItem::Segment(segment.clone())),
+            }
+        }
+        Ok(result)
+    }
+
+    fn invalidate_join_groups_cache(&mut self) {
+        self.multi_fact_join_groups = OnceCell::new();
+    }
+
+    /// Compare only the fields that identify a node in a multi-stage CTE walk:
+    /// dimensions/time_dimensions (chain-resolved), the three filter slots,
+    /// segments and time_shifts. Other fields (`order_by`, limits, planner
+    /// flags, join_hints) propagate unchanged from the root query within a
+    /// single multi-stage tree, so including them in the comparison would
+    /// either be redundant work or, worse, prevent valid CTE deduplication if
+    /// they ever drift. Use this for multi-stage state matching; use the full
+    /// `PartialEq` for query-level equality.
+    pub fn eq_as_state(&self, other: &Self) -> bool {
+        Self::members_equivalent(&self.dimensions, &other.dimensions)
+            && Self::members_equivalent(&self.time_dimensions, &other.time_dimensions)
+            && self.dimensions_filters == other.dimensions_filters
+            && self.time_dimensions_filters == other.time_dimensions_filters
+            && self.measures_filters == other.measures_filters
+            && self.segments == other.segments
+            && self.time_shifts == other.time_shifts
     }
 }
 
