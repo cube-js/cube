@@ -80,12 +80,7 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
         // these never expose a struct-side `toString`, so the struct fallback
         // below would error otherwise.
         if let Ok(n) = self.to_number() {
-            let n = n.value()?;
-            return Ok(if n.fract() == 0.0 && n.is_finite() {
-                format!("{}", n as i64)
-            } else {
-                n.to_string()
-            });
+            return Ok(n.value()?.to_string());
         }
         if let Ok(b) = self.to_boolean() {
             return Ok(b.value()?.to_string());

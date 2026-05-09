@@ -390,11 +390,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             return Ok(s);
         }
         if let Ok(n) = f64::from_native(handle.clone()) {
-            return Ok(if n.fract() == 0.0 && n.is_finite() {
-                format!("{}", n as i64)
-            } else {
-                n.to_string()
-            });
+            return Ok(n.to_string());
         }
         if let Ok(b) = bool::from_native(handle.clone()) {
             return Ok(b.to_string());
@@ -437,8 +433,6 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         } else if let Ok(prop) = f64::from_native(property_value.clone()) {
             if prop == 0.0 || prop.is_nan() {
                 ParamValue::None
-            } else if prop.fract() == 0.0 && prop.is_finite() {
-                ParamValue::String(format!("{}", prop as i64))
             } else {
                 ParamValue::String(prop.to_string())
             }
@@ -557,11 +551,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             } else if let Ok(prop) = String::from_native(property_value.clone()) {
                 Some(vec![prop])
             } else if let Ok(prop) = f64::from_native(property_value.clone()) {
-                if prop.fract() == 0.0 && prop.is_finite() {
-                    Some(vec![format!("{}", prop as i64)])
-                } else {
-                    Some(vec![prop.to_string()])
-                }
+                Some(vec![prop.to_string()])
             } else if let Ok(prop) = bool::from_native(property_value.clone()) {
                 Some(vec![prop.to_string()])
             } else {
