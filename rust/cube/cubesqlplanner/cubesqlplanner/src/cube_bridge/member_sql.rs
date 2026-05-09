@@ -540,30 +540,44 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         property_value: NativeObjectHandle<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        let str_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
-            Some(prop_vec)
-        } else if let Ok(prop) = String::from_native(property_value.clone()) {
-            Some(vec![prop])
-        } else if let Ok(prop) = f64::from_native(property_value.clone()) {
-            if prop.fract() == 0.0 && prop.is_finite() {
-                Some(vec![format!("{}", prop as i64)])
-            } else {
+        // Extract the JS value into a Vec<String> eagerly — that's read-only.
+        // Placeholder allocation happens lazily inside the returned function so
+        // it only fires when the proxy is actually coerced via `${...}`,
+        // matching the JS reference (`String(allocateParam(paramValue))`).
+        let str_value: Option<Vec<String>> =
+            if property_value.is_undefined()? || property_value.is_null()? {
+                None
+            } else if let Ok(arr) = property_value.to_array() {
+                let elements = arr.to_vec()?;
+                let mut values = Vec::with_capacity(elements.len());
+                for el in elements {
+                    values.push(Self::coerce_scalar_to_string(el)?);
+                }
+                Some(values)
+            } else if let Ok(prop) = String::from_native(property_value.clone()) {
+                Some(vec![prop])
+            } else if let Ok(prop) = f64::from_native(property_value.clone()) {
+                if prop.fract() == 0.0 && prop.is_finite() {
+                    Some(vec![format!("{}", prop as i64)])
+                } else {
+                    Some(vec![prop.to_string()])
+                }
+            } else if let Ok(prop) = bool::from_native(property_value.clone()) {
                 Some(vec![prop.to_string()])
-            }
-        } else if let Ok(prop) = bool::from_native(property_value.clone()) {
-            Some(vec![prop.to_string()])
-        } else {
-            None
-        };
-        let allocated = match str_value {
-            Some(values) => values
-                .iter()
-                .map(|v| Self::process_secutity_context_value(&proxy_state, v))
-                .collect::<Result<Vec<_>, _>>()?
-                .join(","),
-            None => String::new(),
-        };
-        let result = context_holder.to_string_fn(allocated)?;
+            } else {
+                None
+            };
+        let result =
+            context_holder.make_vararg_function(move |_, _| -> Result<String, CubeError> {
+                match &str_value {
+                    Some(values) => Ok(values
+                        .iter()
+                        .map(|v| Self::process_secutity_context_value(&proxy_state, v))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(",")),
+                    None => Ok(String::new()),
+                }
+            })?;
         Ok(NativeObjectHandle::new(result.into_object()))
     }
 

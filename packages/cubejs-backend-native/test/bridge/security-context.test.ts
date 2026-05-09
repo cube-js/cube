@@ -3,35 +3,34 @@ import { bridgeHarnessAvailable, compileMemberSql } from './helpers';
 const describeBridge = bridgeHarnessAvailable ? describe : describe.skip;
 
 describeBridge('bridge: SECURITY_CONTEXT — filter input shapes', () => {
-  it('handles a string filter value as col = {sv:N}', () => {
-    // Pin current Rust behavior. Eager double-registration is a known
-    // divergence vs JS — see skipped 'JS-ref: .filter pushes value once'.
+  it('handles a string filter value as col = {sv:0}', () => {
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.filter('col')}`,
       { tenant: 'acme' }
     );
 
-    expect(result.template).toBe('col = {sv:1}');
-    expect(result.args.security_context.values).toEqual(['acme', 'acme']);
+    expect(result.template).toBe('col = {sv:0}');
+    expect(result.args.security_context.values).toEqual(['acme']);
   });
 
-  it('handles a string array as col IN (sv0, sv1, ...)', () => {
+  it('handles a string array as col IN (sv0, sv1, sv2)', () => {
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.groups.filter('col')}`,
       { groups: ['a', 'b', 'c'] }
     );
 
-    // Eager double-registration: 3 from leaf-proxy construction + 3 from
-    // .filter call. See skipped 'JS-ref: .filter pushes value once'.
-    expect(result.template).toBe('col IN ({sv:3}, {sv:4}, {sv:5})');
-    expect(result.args.security_context.values).toEqual([
-      'a',
-      'b',
-      'c',
-      'a',
-      'b',
-      'c',
-    ]);
+    expect(result.template).toBe('col IN ({sv:0}, {sv:1}, {sv:2})');
+    expect(result.args.security_context.values).toEqual(['a', 'b', 'c']);
+  });
+
+  it('handles a numeric array by stringifying each element', () => {
+    const result = compileMemberSql(
+      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.ids.filter('id')}`,
+      { ids: [1, 2, 3] }
+    );
+
+    expect(result.template).toBe('id IN ({sv:0}, {sv:1}, {sv:2})');
+    expect(result.args.security_context.values).toEqual(['1', '2', '3']);
   });
 
   it('renders an empty string array as 1 = 0 with no values registered for the filter', () => {
@@ -41,8 +40,6 @@ describeBridge('bridge: SECURITY_CONTEXT — filter input shapes', () => {
     );
 
     expect(result.template).toBe('1 = 0');
-    // Leaf proxy still constructed; an empty array contributes no eager
-    // registrations and the filter callback also produces none.
     expect(result.args.security_context.values).toEqual([]);
   });
 
@@ -63,8 +60,8 @@ describeBridge('bridge: SECURITY_CONTEXT — filter input shapes', () => {
       { user_id: 42 }
     );
 
-    expect(result.template).toBe('uid = {sv:1}');
-    expect(result.args.security_context.values).toEqual(['42', '42']);
+    expect(result.template).toBe('uid = {sv:0}');
+    expect(result.args.security_context.values).toEqual(['42']);
   });
 
   it('formats a non-integer number as a decimal string', () => {
@@ -73,34 +70,51 @@ describeBridge('bridge: SECURITY_CONTEXT — filter input shapes', () => {
       { factor: 1.5 }
     );
 
-    expect(result.template).toBe('f = {sv:1}');
-    expect(result.args.security_context.values).toEqual(['1.5', '1.5']);
+    expect(result.template).toBe('f = {sv:0}');
+    expect(result.args.security_context.values).toEqual(['1.5']);
   });
 
-  it('formats a boolean as the string true/false', () => {
+  it('formats a truthy boolean as the string "true"', () => {
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.flag.filter('f')}`,
       { flag: true }
     );
 
-    expect(result.template).toBe('f = {sv:1}');
-    expect(result.args.security_context.values).toEqual(['true', 'true']);
+    expect(result.template).toBe('f = {sv:0}');
+    expect(result.args.security_context.values).toEqual(['true']);
   });
 
-  it('returns 1 = 1 when an optional filter field is missing', () => {
+  // JS truthy short-circuit (`if (paramValue)` in `contextSymbolsProxyFrom`):
+  // missing / null / "" / 0 / false collapse to a no-op `1 = 1` filter.
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['empty string', ''],
+    ['zero', 0],
+    ['false', false],
+  ])('returns 1 = 1 when filter value is %s', (_, value) => {
+    const ctx = value === undefined ? {} : { tenant: value };
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.filter('col')}`,
-      {}
+      ctx
     );
 
     expect(result.template).toBe('1 = 1');
     expect(result.args.security_context.values).toEqual([]);
   });
 
-  it('throws a user error when requiredFilter field is missing', () => {
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['empty string', ''],
+    ['zero', 0],
+    ['false', false],
+  ])('throws when requiredFilter value is %s', (_, value) => {
+    const ctx = value === undefined ? {} : { tenant: value };
+
     expect(() => compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.requiredFilter('col')}`,
-      {}
+      ctx
     )).toThrow(/Filter for col is required/);
   });
 
@@ -119,8 +133,8 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
       { tenant: { id: '123' } }
     );
 
-    expect(result.template).toBe('col = {sv:1}');
-    expect(result.args.security_context.values).toEqual(['123', '123']);
+    expect(result.template).toBe('col = {sv:0}');
+    expect(result.args.security_context.values).toEqual(['123']);
   });
 
   it('does not crash on a deep leaf-proxy path that does not exist in the context', () => {
@@ -133,6 +147,7 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
     // the filter falls back to "1 = 1" (the path is treated as an absent
     // optional filter, not an error).
     expect(result.template).toBe('1 = 1');
+    expect(result.args.security_context.values).toEqual([]);
   });
 
   it('exposes unsafeValue() that returns the raw value without registering a placeholder', () => {
@@ -142,15 +157,14 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
     );
 
     expect(result.template).toBe('prefix-acme-suffix');
-    // Eager toString registration still pushes once; unsafeValue itself
-    // does not register anything.
-    expect(result.args.security_context.values).toEqual(['acme']);
+    expect(result.args.security_context.values).toEqual([]);
   });
 
   it('lets the user branch the template at compile time via unsafeValue()', () => {
     // Real prod pattern: unsafeValue() returns the actual JS value, so a
     // ternary in the template literal picks one branch at compile time
-    // and the resulting template is just the picked literal.
+    // and the resulting template is just the picked literal — no
+    // placeholders registered.
     const adminResult = compileMemberSql(
       (SECURITY_CONTEXT: any) => `SELECT * FROM ${
         SECURITY_CONTEXT.cubeCloud.groups.unsafeValue() === 'admin'
@@ -170,18 +184,13 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
 
     expect(adminResult.template).toBe('SELECT * FROM admin_orders');
     expect(viewerResult.template).toBe('SELECT * FROM public_orders');
-    // unsafeValue() itself does not push to values, BUT just accessing
-    // .groups constructs a leaf proxy whose toString function eagerly
-    // pushes the leaf value. So the bridge state still records the leaf
-    // even though the rendered template never references {sv:N}.
-    expect(adminResult.args.security_context.values).toEqual(['admin']);
-    expect(viewerResult.args.security_context.values).toEqual(['viewer']);
+    expect(adminResult.args.security_context.values).toEqual([]);
+    expect(viewerResult.args.security_context.values).toEqual([]);
   });
 
-  it('renders a leaf used directly in a template (no filter call) without duplicating values', () => {
-    // tenant_id = ${SECURITY_CONTEXT.cubeCloud.tenantId} — common in prod.
-    // Here the eager to_string_fn baked in during leaf-proxy construction
-    // returns the placeholder when JS coerces; nothing else pushes.
+  it('renders a scalar leaf used directly in a template as a single placeholder', () => {
+    // `tenant_id = ${SECURITY_CONTEXT.cubeCloud.tenantId}` — common in prod.
+    // Coerce-time toString fires once and registers a single placeholder.
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `tenant_id = ${SECURITY_CONTEXT.cubeCloud.tenantId}`,
       { cubeCloud: { tenantId: '123' } }
@@ -189,6 +198,42 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
 
     expect(result.template).toBe('tenant_id = {sv:0}');
     expect(result.args.security_context.values).toEqual(['123']);
+  });
+
+  it('renders an array leaf directly in a template as comma-joined placeholders', () => {
+    const result = compileMemberSql(
+      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.groups}`,
+      { groups: ['a', 'b'] }
+    );
+
+    expect(result.template).toBe('{sv:0},{sv:1}');
+    expect(result.args.security_context.values).toEqual(['a', 'b']);
+  });
+
+  it('renders an empty array leaf directly in a template as an empty string', () => {
+    const result = compileMemberSql(
+      (SECURITY_CONTEXT: any) => `[${SECURITY_CONTEXT.groups}]`,
+      { groups: [] }
+    );
+
+    expect(result.template).toBe('[]');
+    expect(result.args.security_context.values).toEqual([]);
+  });
+
+  it('allocates a fresh placeholder on every coercion of the same leaf proxy', () => {
+    // JS `toString` calls `allocateParam(paramValue)` per invocation, so
+    // each `${t}` produces its own `{sv:N}` even when the user captures
+    // the proxy in a local variable.
+    const result = compileMemberSql(
+      (SECURITY_CONTEXT: any) => {
+        const t = SECURITY_CONTEXT.tenant;
+        return `${t} | ${t}`;
+      },
+      { tenant: 'acme' }
+    );
+
+    expect(result.template).toBe('{sv:0} | {sv:1}');
+    expect(result.args.security_context.values).toEqual(['acme', 'acme']);
   });
 
   it('supports the canonical array-filter callback pattern with groups.join(...)', () => {
@@ -201,10 +246,8 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
       { cubeCloud: { groups: ['a', 'b'] } }
     );
 
-    // 2 from eager toString registration + 2 from .filter() — the last two
-    // ({sv:2}, {sv:3}) are passed to the callback.
-    expect(result.template).toBe('source IN ({sv:2},{sv:3})');
-    expect(result.args.security_context.values).toEqual(['a', 'b', 'a', 'b']);
+    expect(result.template).toBe('source IN ({sv:0},{sv:1})');
+    expect(result.args.security_context.values).toEqual(['a', 'b']);
   });
 
   it('accepts both camelCase securityContext and snake_case security_context arg names', () => {
@@ -218,106 +261,7 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
       { tenant: 'acme' }
     );
 
-    expect(camel.template).toBe('col = {sv:1}');
-    expect(snake.template).toBe('col = {sv:1}');
-  });
-});
-
-// Each skipped test below asserts what the JS reference proxy
-// (`contextSymbolsProxyFrom` in schema-compiler) does today. The Rust
-// bridge diverges; unskip together with a fix.
-describeBridge('bridge: SECURITY_CONTEXT — known divergences from JS reference', () => {
-  // Bug: bridge treats falsy non-null values as real values and emits a
-  // bind. JS short-circuits truthy on the param: false / 0 / '' return
-  // "1 = 1". Rust cascades through String/f64/bool deserialization and
-  // pushes the value.
-  it.skip('JS-ref: .filter on false returns 1 = 1', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.flag.filter('f')}`,
-      { flag: false }
-    );
-    expect(result.template).toBe('1 = 1');
-    expect(result.args.security_context.values).toEqual([]);
-  });
-
-  it.skip('JS-ref: .filter on 0 returns 1 = 1', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.user_id.filter('uid')}`,
-      { user_id: 0 }
-    );
-    expect(result.template).toBe('1 = 1');
-    expect(result.args.security_context.values).toEqual([]);
-  });
-
-  it.skip('JS-ref: .filter on \'\' returns 1 = 1', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.filter('col')}`,
-      { tenant: '' }
-    );
-    expect(result.template).toBe('1 = 1');
-    expect(result.args.security_context.values).toEqual([]);
-  });
-
-  it('JS-ref: .requiredFilter on 0 throws', () => {
-    expect(() => compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.requiredFilter('col')}`,
-      { tenant: 0 }
-    )).toThrow(/Filter for col is required/);
-  });
-
-  it('JS-ref: .requiredFilter on false throws', () => {
-    expect(() => compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.flag.requiredFilter('f')}`,
-      { flag: false }
-    )).toThrow(/Filter for f is required/);
-  });
-
-  it('JS-ref: .filter on number[] emits IN clause', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.ids.filter('id')}`,
-      { ids: [1, 2, 3] }
-    );
-    expect(result.template).toMatch(
-      /^id IN \(\{sv:\d+\}, \{sv:\d+\}, \{sv:\d+\}\)$/
-    );
-  });
-
-  // Bug: leaf proxy eagerly allocates the value at construction time, so
-  // .filter pushes a duplicate and {sv:N} starts at 1. JS allocates
-  // lazily — each .filter call pushes exactly once. Rust pre-bakes the
-  // toString output when the leaf proxy is built.
-  it.skip('JS-ref: .filter pushes value once at {sv:0}', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.filter('col')}`,
-      { tenant: 'acme' }
-    );
-    expect(result.template).toBe('col = {sv:0}');
-    expect(result.args.security_context.values).toEqual(['acme']);
-  });
-
-  it.skip('JS-ref: .filter on string[] uses indices 0..N once', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.groups.filter('col')}`,
-      { groups: ['a', 'b'] }
-    );
-    expect(result.template).toBe('col IN ({sv:0}, {sv:1})');
-    expect(result.args.security_context.values).toEqual(['a', 'b']);
-  });
-
-  it.skip('JS-ref: unsafeValue() does not register a placeholder', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `prefix-${SECURITY_CONTEXT.tenant.unsafeValue()}-suffix`,
-      { tenant: 'acme' }
-    );
-    expect(result.template).toBe('prefix-acme-suffix');
-    expect(result.args.security_context.values).toEqual([]);
-  });
-
-  it('JS-ref: array toString joins without a space', () => {
-    const result = compileMemberSql(
-      (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.groups}`,
-      { groups: ['a', 'b'] }
-    );
-    expect(result.template).toBe('{sv:0},{sv:1}');
+    expect(camel.template).toBe('col = {sv:0}');
+    expect(snake.template).toBe('col = {sv:0}');
   });
 });
