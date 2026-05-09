@@ -84,8 +84,6 @@ describeBridge('bridge: SECURITY_CONTEXT — filter input shapes', () => {
     expect(result.args.security_context.values).toEqual(['true']);
   });
 
-  // JS truthy short-circuit (`if (paramValue)` in `contextSymbolsProxyFrom`):
-  // missing / null / "" / 0 / false collapse to a no-op `1 = 1` filter.
   it.each([
     ['missing', undefined],
     ['null', null],
@@ -221,9 +219,6 @@ describeBridge('bridge: SECURITY_CONTEXT — proxy structure', () => {
   });
 
   it('allocates a fresh placeholder on every coercion of the same leaf proxy', () => {
-    // JS `toString` calls `allocateParam(paramValue)` per invocation, so
-    // each `${t}` produces its own `{sv:N}` even when the user captures
-    // the proxy in a local variable.
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => {
         const t = SECURITY_CONTEXT.tenant;

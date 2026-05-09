@@ -411,10 +411,10 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             StringVec(Vec<String>),
             None,
         }
-        // JS truthy short-circuit (`if (paramValue)` in `contextSymbolsProxyFrom`):
-        // undefined / null / "" / 0 / NaN / false collapse to a `1 = 1` filter.
-        // Empty arrays stay as `StringVec(vec![])` — handled separately below
-        // (they emit `1 = 0` to keep `IN ()` from breaking SQL).
+        // Falsy scalars (undefined / null / "" / 0 / NaN / false) collapse to
+        // `ParamValue::None` and emit `1 = 1`. Empty arrays stay as an empty
+        // `StringVec` and emit `1 = 0` separately below — `IN ()` is invalid
+        // SQL in most dialects.
         let param_value = if property_value.is_undefined()? || property_value.is_null()? {
             ParamValue::None
         } else if let Ok(arr) = property_value.to_array() {
@@ -534,10 +534,10 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         property_value: NativeObjectHandle<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        // Extract the JS value into a Vec<String> eagerly — that's read-only.
-        // Placeholder allocation happens lazily inside the returned function so
-        // it only fires when the proxy is actually coerced via `${...}`,
-        // matching the JS reference (`String(allocateParam(paramValue))`).
+        // Type extraction is read-only and runs eagerly. Placeholder
+        // allocation happens lazily inside the returned function so it only
+        // fires when the proxy is actually coerced via `${...}` — otherwise
+        // every property access would register a placeholder.
         let str_value: Option<Vec<String>> =
             if property_value.is_undefined()? || property_value.is_null()? {
                 None

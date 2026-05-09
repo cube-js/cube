@@ -76,9 +76,8 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
         if self.is_null()? {
             return Ok("".to_string());
         }
-        // Mirror JS template-literal coercion (`String(value)`) for primitives —
-        // these never expose a struct-side `toString`, so the struct fallback
-        // below would error otherwise.
+        // Primitives don't expose a struct-side `toString`, so coerce them
+        // inline before the struct fallback below — otherwise it errors.
         if let Ok(n) = self.to_number() {
             return Ok(n.value()?.to_string());
         }
