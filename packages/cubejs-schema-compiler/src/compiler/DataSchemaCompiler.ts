@@ -835,7 +835,7 @@ export class DataSchemaCompiler {
   ): Promise<(FileContent | undefined)> {
     const cacheKey = crypto.createHash('md5')
       .update(file.content)
-      .update('|')
+      .update('\0')
       .update(options.jinjaMacrosFingerprint || '')
       .digest('hex');
 
