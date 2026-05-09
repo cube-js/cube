@@ -258,28 +258,21 @@ describeBridge('bridge: SECURITY_CONTEXT — known divergences from JS reference
     expect(result.args.security_context.values).toEqual([]);
   });
 
-  // Bug: requiredFilter accepts falsy non-null values. JS throws on any
-  // falsy value (including 0 / false / ''). Rust only throws when the
-  // value is undefined or null.
-  it.skip('JS-ref: .requiredFilter on 0 throws', () => {
+  it('JS-ref: .requiredFilter on 0 throws', () => {
     expect(() => compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.tenant.requiredFilter('col')}`,
       { tenant: 0 }
     )).toThrow(/Filter for col is required/);
   });
 
-  it.skip('JS-ref: .requiredFilter on false throws', () => {
+  it('JS-ref: .requiredFilter on false throws', () => {
     expect(() => compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.flag.requiredFilter('f')}`,
       { flag: false }
     )).toThrow(/Filter for f is required/);
   });
 
-  // Bug: numeric arrays in security context error out. JS maps each
-  // element through allocateParam without type coercion and produces an
-  // IN clause. Rust requires every element to deserialize as a string and
-  // falls through to "Invalid param for security context".
-  it.skip('JS-ref: .filter on number[] emits IN clause', () => {
+  it('JS-ref: .filter on number[] emits IN clause', () => {
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.ids.filter('id')}`,
       { ids: [1, 2, 3] }
@@ -320,9 +313,7 @@ describeBridge('bridge: SECURITY_CONTEXT — known divergences from JS reference
     expect(result.args.security_context.values).toEqual([]);
   });
 
-  // Bug: array toString joins with ", " (with space). JS joins with
-  // "," (no space).
-  it.skip('JS-ref: array toString joins without a space', () => {
+  it('JS-ref: array toString joins without a space', () => {
     const result = compileMemberSql(
       (SECURITY_CONTEXT: any) => `${SECURITY_CONTEXT.groups}`,
       { groups: ['a', 'b'] }

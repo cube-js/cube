@@ -383,6 +383,27 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         }
     }
 
+    fn coerce_scalar_to_string<CIT: InnerTypes>(
+        handle: NativeObjectHandle<CIT>,
+    ) -> Result<String, CubeError> {
+        if let Ok(s) = String::from_native(handle.clone()) {
+            return Ok(s);
+        }
+        if let Ok(n) = f64::from_native(handle.clone()) {
+            return Ok(if n.fract() == 0.0 && n.is_finite() {
+                format!("{}", n as i64)
+            } else {
+                n.to_string()
+            });
+        }
+        if let Ok(b) = bool::from_native(handle.clone()) {
+            return Ok(b.to_string());
+        }
+        Err(CubeError::user(
+            "Invalid param for security context".to_string(),
+        ))
+    }
+
     fn security_context_filter_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         property_value: NativeObjectHandle<CIT>,
@@ -394,20 +415,39 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             StringVec(Vec<String>),
             None,
         }
-        let param_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
-            ParamValue::StringVec(prop_vec)
+        // JS truthy short-circuit (`if (paramValue)` in `contextSymbolsProxyFrom`):
+        // undefined / null / "" / 0 / NaN / false collapse to a `1 = 1` filter.
+        // Empty arrays stay as `StringVec(vec![])` — handled separately below
+        // (they emit `1 = 0` to keep `IN ()` from breaking SQL).
+        let param_value = if property_value.is_undefined()? || property_value.is_null()? {
+            ParamValue::None
+        } else if let Ok(arr) = property_value.to_array() {
+            let values = arr
+                .to_vec()?
+                .into_iter()
+                .map(Self::coerce_scalar_to_string)
+                .collect::<Result<Vec<_>, _>>()?;
+            ParamValue::StringVec(values)
         } else if let Ok(prop) = String::from_native(property_value.clone()) {
-            ParamValue::String(prop)
+            if prop.is_empty() {
+                ParamValue::None
+            } else {
+                ParamValue::String(prop)
+            }
         } else if let Ok(prop) = f64::from_native(property_value.clone()) {
-            if prop.fract() == 0.0 && prop.is_finite() {
+            if prop == 0.0 || prop.is_nan() {
+                ParamValue::None
+            } else if prop.fract() == 0.0 && prop.is_finite() {
                 ParamValue::String(format!("{}", prop as i64))
             } else {
                 ParamValue::String(prop.to_string())
             }
         } else if let Ok(prop) = bool::from_native(property_value.clone()) {
-            ParamValue::String(prop.to_string())
-        } else if property_value.is_undefined()? || property_value.is_null()? {
-            ParamValue::None
+            if prop {
+                ParamValue::String("true".to_string())
+            } else {
+                ParamValue::None
+            }
         } else {
             return Err(CubeError::user(
                 "Invalid param for security context".to_string(),
@@ -520,7 +560,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                 .iter()
                 .map(|v| Self::process_secutity_context_value(&proxy_state, v))
                 .collect::<Result<Vec<_>, _>>()?
-                .join(", "),
+                .join(","),
             None => String::new(),
         };
         let result = context_holder.to_string_fn(allocated)?;
