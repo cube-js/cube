@@ -29,51 +29,34 @@ describeBridge('bridge: args_names parser', () => {
     });
   });
 
-  // The skipped tests below assert how a correct parser should behave.
-  // They are buggy today because both this bridge and the JS-side
-  // schema-compiler use the same regex; a fix must touch both.
-  describe('known bugs (skip = expected behavior after fix)', () => {
-    // The named-function branch of the regex captures [A-Za-z0-9_,]* —
-    // no whitespace allowed. V8 renders `function f(x, y)` with a space
-    // after the comma, so capture stops after the first arg.
-    it.skip('parses named function declaration with multiple args', () => {
+  describe('edge cases', () => {
+    it('parses named function declaration with multiple args', () => {
       function named(x: any, y: any) {
         return [x, y];
       }
       expect(parseArgsNames(named)).toEqual(['x', 'y']);
     });
 
-    it.skip('parses async named function declaration with multiple args', () => {
+    it('parses async named function declaration with multiple args', () => {
       async function named(x: any, y: any) {
         return [x, y];
       }
       expect(parseArgsNames(named)).toEqual(['x', 'y']);
     });
 
-    // Default args land inside the (...) capture as a single token "x = 1"
-    // and survive the comma split unchanged. Special names like
-    // SECURITY_CONTEXT in this position fail to dispatch.
-    it.skip('parses default args, returning just the identifier', () => {
+    it('parses default args, returning just the identifier', () => {
       expect(parseArgsNames((x: any = 1) => x)).toEqual(['x']);
     });
 
-    // Rest args keep their leading dots after capture+split, yielding
-    // "...args" instead of "args".
-    it.skip('parses rest args, dropping the spread dots', () => {
+    it('parses rest args, dropping the spread dots', () => {
       expect(parseArgsNames((...args: any[]) => args)).toEqual(['args']);
     });
 
-    // Destructuring patterns get split by the comma inside the braces,
-    // breaking the pattern into half-tokens.
-    it.skip('parses destructuring args, returning the destructured identifiers', () => {
+    it('parses destructuring args, returning the destructured identifiers', () => {
       expect(parseArgsNames(({ a, b }: any) => [a, b])).toEqual(['a', 'b']);
     });
 
-    // Anonymous function expressions (`function (x){}`) match no branch
-    // of the regex at all. Today Rust silently returns []; the JS side
-    // throws `Can't match args for: ...`. Neither is the desired
-    // behavior — the parser should just return the args.
-    it.skip('parses anonymous function expressions', () => {
+    it('parses anonymous function expressions', () => {
       // eslint-disable-next-line func-names, prefer-arrow-callback
       const fn = function (x: any) { return x; };
       expect(parseArgsNames(fn)).toEqual(['x']);
