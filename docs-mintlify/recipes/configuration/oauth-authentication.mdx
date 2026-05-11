@@ -11,11 +11,13 @@ unavailable or expired, Cube falls back to a service account so that
 connectivity checks and background operations still work.
 
 This pattern applies to any data source that supports OAuth, including
-[Databricks][ref-databricks-jdbc] and [Snowflake][ref-snowflake].
+[Databricks][ref-databricks-jdbc] and [Snowflake][ref-snowflake]. The
+examples below use Databricks; switch the `userCredentials` key and
+driver options for any other OAuth-capable data source.
 
 Because every user connects with different credentials, you also need
-per-user caching for data model compilation results and query orchestrator
-state. Without this, one user's cached connection could leak to another.
+per-user query orchestrator state. Without this, one user's cached
+connection could leak to another.
 
 ## Prerequisites
 
@@ -37,13 +39,11 @@ to limit exposure if the credential is compromised.
 
 ## Configuration
 
-The configuration uses three options from the
+The configuration uses two options from the
 [configuration file reference][ref-config]:
 
 - [`driver_factory`][ref-driver-factory] — dynamically selects the
   authentication credential per request
-- [`context_to_app_id`][ref-context-to-app-id] — ensures data model
-  compilation results are cached per user, not globally
 - [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] — gives
   each user their own query orchestrator instance (database connections,
   execution queues, pre-aggregation table caches)
@@ -84,13 +84,17 @@ CUBEJS_DB_SNOWFLAKE_ROLE=MY_ROLE
 
 </Tabs>
 
-### Python
+### Configuration file
 
-Select the tab matching your data source:
+The examples below use Databricks. To target a different data source,
+swap `userCredentials.databricks` for the matching key (for example,
+`userCredentials.snowflake`) and update the `driver_factory` return
+value with the correct `type` and driver-specific options. See the
+[data sources reference][ref-data-sources] for available drivers.
 
 <Tabs>
 
-<Tab title="Databricks">
+<Tab title="Python">
 
 ```python cube.py
 from cube import config
@@ -100,17 +104,23 @@ import os
 @config("driver_factory")
 def driver_factory(ctx: dict) -> dict:
     # Extract the Cube Cloud security context, which contains
-    # per-user OAuth credentials when available
-    security_context = ctx.get("securityContext") or {}
-    cube_cloud = security_context.get("cubeCloud") or {}
-    user_creds = cube_cloud.get("userCredentials") or {}
-    databricks_creds = user_creds.get("databricks") or {}
+    # per-user OAuth credentials when available.
+    # For other data sources, swap "databricks" for "snowflake", etc.
+    databricks_creds = (
+        ctx
+        .get("securityContext", {})
+        .get("cubeCloud", {})
+        .get("userCredentials", {})
+        .get("databricks", {})
+    )
 
     # Only use the OAuth token when the credential status is "active".
     # An expired or revoked token falls back to the service account.
-    status = databricks_creds.get("status")
-    access_token = databricks_creds.get("accessToken")
-    oauth_token = access_token if status == "active" else None
+    oauth_token = (
+        databricks_creds.get("accessToken")
+        if databricks_creds.get("status") == "active"
+        else None
+    )
 
     return {
         "type": "databricks-jdbc",
@@ -122,24 +132,13 @@ def driver_factory(ctx: dict) -> dict:
     }
 
 
-@config("context_to_app_id")
-def context_to_app_id(ctx: dict) -> str:
-    # Cache data model compilation results per user so that each user's
-    # connection settings are isolated
-    username = (
-        ctx.get("securityContext", {})
-        .get("cubeCloud", {})
-        .get("username", "default")
-    )
-    return f"CUBE_APP_{username}"
-
-
 @config("context_to_orchestrator_id")
 def context_to_orchestrator_id(ctx: dict) -> str:
     # Give each user a separate orchestrator instance (DB connections,
     # execution queues, pre-aggregation caches)
     username = (
-        ctx.get("securityContext", {})
+        ctx
+        .get("securityContext", {})
         .get("cubeCloud", {})
         .get("username", "default")
     )
@@ -148,94 +147,16 @@ def context_to_orchestrator_id(ctx: dict) -> str:
 
 </Tab>
 
-<Tab title="Snowflake">
-
-```python cube.py
-from cube import config
-import os
-
-
-@config("driver_factory")
-def driver_factory(ctx: dict) -> dict:
-    # Extract the Cube Cloud security context, which contains
-    # per-user OAuth credentials when available
-    security_context = ctx.get("securityContext") or {}
-    cube_cloud = security_context.get("cubeCloud") or {}
-    user_creds = cube_cloud.get("userCredentials") or {}
-    snowflake_creds = user_creds.get("snowflake") or {}
-
-    # Only use the OAuth token when the credential status is "active".
-    # An expired or revoked token falls back to the service account.
-    status = snowflake_creds.get("status")
-    access_token = snowflake_creds.get("accessToken")
-    oauth_token = access_token if status == "active" else None
-
-    if oauth_token:
-        # Use the user's OAuth token
-        return {
-            "type": "snowflake",
-            "account": os.environ["CUBEJS_DB_SNOWFLAKE_ACCOUNT"],
-            "warehouse": os.environ["CUBEJS_DB_SNOWFLAKE_WAREHOUSE"],
-            "database": os.environ["CUBEJS_DB_NAME"],
-            "role": os.environ.get("CUBEJS_DB_SNOWFLAKE_ROLE"),
-            "authenticator": "OAUTH",
-            "token": oauth_token,
-        }
-
-    # Fall back to service account credentials
-    return {
-        "type": "snowflake",
-        "account": os.environ["CUBEJS_DB_SNOWFLAKE_ACCOUNT"],
-        "warehouse": os.environ["CUBEJS_DB_SNOWFLAKE_WAREHOUSE"],
-        "database": os.environ["CUBEJS_DB_NAME"],
-        "role": os.environ.get("CUBEJS_DB_SNOWFLAKE_ROLE"),
-        "username": os.environ["CUBEJS_DB_USER"],
-        "password": os.environ["CUBEJS_DB_PASS"],
-    }
-
-
-@config("context_to_app_id")
-def context_to_app_id(ctx: dict) -> str:
-    # Cache data model compilation results per user so that each user's
-    # connection settings are isolated
-    username = (
-        ctx.get("securityContext", {})
-        .get("cubeCloud", {})
-        .get("username", "default")
-    )
-    return f"CUBE_APP_{username}"
-
-
-@config("context_to_orchestrator_id")
-def context_to_orchestrator_id(ctx: dict) -> str:
-    # Give each user a separate orchestrator instance (DB connections,
-    # execution queues, pre-aggregation caches)
-    username = (
-        ctx.get("securityContext", {})
-        .get("cubeCloud", {})
-        .get("username", "default")
-    )
-    return f"CUBE_APP_{username}"
-```
-
-</Tab>
-
-</Tabs>
-
-### JavaScript
-
-<Tabs>
-
-<Tab title="Databricks">
+<Tab title="JavaScript">
 
 ```javascript cube.js
 module.exports = {
   driverFactory: ({ securityContext }) => {
     // Extract the Cube Cloud security context, which contains
-    // per-user OAuth credentials when available
-    const cubeCloud = securityContext?.cubeCloud ?? {};
-    const userCreds = cubeCloud.userCredentials ?? {};
-    const databricksCreds = userCreds.databricks ?? {};
+    // per-user OAuth credentials when available.
+    // For other data sources, swap `databricks` for `snowflake`, etc.
+    const databricksCreds =
+      securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
 
     // Only use the OAuth token when the credential status is "active".
     // An expired or revoked token falls back to the service account.
@@ -252,74 +173,6 @@ module.exports = {
       acceptPolicy: true,
       catalog: process.env.CUBEJS_DB_DATABRICKS_CATALOG,
     };
-  },
-
-  // Cache data model compilation results per user so that each user's
-  // connection settings are isolated
-  contextToAppId: ({ securityContext }) => {
-    const username = securityContext?.cubeCloud?.username ?? "default";
-    return `CUBE_APP_${username}`;
-  },
-
-  // Give each user a separate orchestrator instance (DB connections,
-  // execution queues, pre-aggregation caches)
-  contextToOrchestratorId: ({ securityContext }) => {
-    const username = securityContext?.cubeCloud?.username ?? "default";
-    return `CUBE_APP_${username}`;
-  },
-};
-```
-
-</Tab>
-
-<Tab title="Snowflake">
-
-```javascript cube.js
-module.exports = {
-  driverFactory: ({ securityContext }) => {
-    // Extract the Cube Cloud security context, which contains
-    // per-user OAuth credentials when available
-    const cubeCloud = securityContext?.cubeCloud ?? {};
-    const userCreds = cubeCloud.userCredentials ?? {};
-    const snowflakeCreds = userCreds.snowflake ?? {};
-
-    // Only use the OAuth token when the credential status is "active".
-    // An expired or revoked token falls back to the service account.
-    const oauthToken =
-      snowflakeCreds.status === "active"
-        ? snowflakeCreds.accessToken
-        : null;
-
-    if (oauthToken) {
-      // Use the user's OAuth token
-      return {
-        type: "snowflake",
-        account: process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
-        warehouse: process.env.CUBEJS_DB_SNOWFLAKE_WAREHOUSE,
-        database: process.env.CUBEJS_DB_NAME,
-        role: process.env.CUBEJS_DB_SNOWFLAKE_ROLE,
-        authenticator: "OAUTH",
-        token: oauthToken,
-      };
-    }
-
-    // Fall back to service account credentials
-    return {
-      type: "snowflake",
-      account: process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
-      warehouse: process.env.CUBEJS_DB_SNOWFLAKE_WAREHOUSE,
-      database: process.env.CUBEJS_DB_NAME,
-      role: process.env.CUBEJS_DB_SNOWFLAKE_ROLE,
-      username: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-    };
-  },
-
-  // Cache data model compilation results per user so that each user's
-  // connection settings are isolated
-  contextToAppId: ({ securityContext }) => {
-    const username = securityContext?.cubeCloud?.username ?? "default";
-    return `CUBE_APP_${username}`;
   },
 
   // Give each user a separate orchestrator instance (DB connections,
@@ -339,43 +192,25 @@ module.exports = {
 
 1. **User makes a request** — Cube Cloud attaches the user's OAuth
    credentials to `securityContext.cubeCloud.userCredentials.<data_source>`
-   (e.g., `.databricks` or `.snowflake`).
+   (for example, `.databricks` or `.snowflake`).
 
 2. **`driver_factory` resolves the credential** — If the credential status
    is `active`, the user's OAuth token is used. Otherwise, Cube falls back
    to the service account credential stored in environment variables.
 
-3. **Per-user caching** — [`context_to_app_id`][ref-context-to-app-id] and
-   [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] return
-   a unique key per username. This means each user gets their own:
-   - Data model compilation cache
-   - Query orchestrator (database connection pool, execution queues,
-     pre-aggregation table cache)
-
-   Without these overrides, Cube would share a single cached connection
-   across all users, causing one user's credentials to be reused for
-   another user's queries.
-
-## Adapting to other data sources
-
-The same pattern works with any OAuth-capable data source. To adapt the
-examples above:
-
-1. Change the credential key in `userCredentials` to match your data source
-   (e.g., `userCredentials.databricks`, `userCredentials.snowflake`)
-2. Update the `driver_factory` return value with the correct `type` and
-   driver-specific options for your data source
-3. Keep `context_to_app_id` and `context_to_orchestrator_id` as-is — they
-   are data-source-agnostic
-
-See the [data sources reference][ref-data-sources] for driver-specific
-configuration options.
+3. **Per-user orchestrator** —
+   [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] returns
+   a unique key per username, so each user gets their own database
+   connection pool, execution queues, and pre-aggregation table cache.
+   Without this, Cube would share a single cached connection across all
+   users, causing one user's credentials to be reused for another user's
+   queries.
 
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory
-[ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
 [ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
 [ref-databricks-jdbc]: /admin/connect-to-data/data-sources/databricks-jdbc
 [ref-snowflake]: /admin/connect-to-data/data-sources/snowflake
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-cube-cloud]: /docs/introduction
+
