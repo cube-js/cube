@@ -213,7 +213,8 @@
                 ]
               },
               "admin/connect-to-data/multiple-data-sources",
-              "admin/connect-to-data/concurrency"
+              "admin/connect-to-data/concurrency",
+              "admin/connect-to-data/oauth-authentication"
             ]
           },
           {
@@ -563,8 +564,7 @@
                   "recipes/configuration/using-ssl-connections-to-data-source",
                   "recipes/configuration/data-store-cost-saving-guide",
                   "recipes/configuration/multiple-sources-same-schema",
-                  "recipes/configuration/custom-data-model-per-tenant",
-                  "recipes/configuration/oauth-authentication"
+                  "recipes/configuration/custom-data-model-per-tenant"
                 ]
               },
               {
