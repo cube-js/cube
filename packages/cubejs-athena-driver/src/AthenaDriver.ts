@@ -33,6 +33,7 @@ import {
   StreamTableDataWithTypes,
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
+  SaveCancelFn,
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
@@ -260,58 +261,66 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * Executes query and returns table memory data that includes rows
    * and queried fields types.
    */
-  public async memory(
+  public memory(
     query: string,
     values: unknown[],
   ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const iter = this.lazyRowIterator(qid, query, true);
-    const types = <TableStructure><unknown>((await iter.next()).value);
-    const rows: Row[] = [];
-    for await (const row of iter) {
-      rows.push(<Row>row);
-    }
-    return { types, rows };
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const qid = await this.startQuery(query, values);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+      const iter = this.lazyRowIterator(qid, query, true);
+      const types = <TableStructure><unknown>((await iter.next()).value);
+      const rows: Row[] = [];
+      for await (const row of iter) {
+        rows.push(<Row>row);
+      }
+      return { types, rows };
+    });
   }
 
   /**
    * Returns stream table object that includes query result stream and
    * queried fields types.
    */
-  public async stream(
+  public stream(
     query: string,
     values: unknown[],
     options: StreamOptions,
   ): Promise<StreamTableDataWithTypes> {
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const iter = this.lazyRowIterator(qid, query, true);
-    const types = <TableStructure><unknown>((await iter.next()).value);
-    return {
-      rowStream: stream.Readable.from(iter, {
-        highWaterMark: options.highWaterMark,
-      }),
-      types,
-      release: async () => { /* canceling is missed in the iter */ },
-    };
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const qid = await this.startQuery(query, values);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+      const iter = this.lazyRowIterator(qid, query, true);
+      const types = <TableStructure><unknown>((await iter.next()).value);
+      return {
+        rowStream: stream.Readable.from(iter, {
+          highWaterMark: options.highWaterMark,
+        }),
+        types,
+        // If the consumer abandons the stream, ask Athena to stop the
+        // query so it stops billing on AWS's side too.
+        release: async () => { await this.stopQuery(qid); },
+      };
+    });
   }
 
   /**
    * Executes query and rerutns queried rows.
    */
-  public async query<R = unknown>(
+  public query<R = unknown>(
     query: string,
     values: unknown[],
     _options?: QueryOptions,
   ): Promise<R[]> {
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const rows: R[] = [];
-    for await (const row of this.lazyRowIterator<R>(qid, query)) {
-      rows.push(row);
-    }
-    return rows;
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const qid = await this.startQuery(query, values);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+      const rows: R[] = [];
+      for await (const row of this.lazyRowIterator<R>(qid, query)) {
+        rows.push(row);
+      }
+      return rows;
+    });
   }
 
   /**
@@ -369,7 +378,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Save pre-aggregation data into a temp table.
    */
-  public async loadPreAggregationIntoTable(
+  public loadPreAggregationIntoTable(
     preAggregationTableName: string,
     loadSql: string,
     params: any,
@@ -378,8 +387,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
     }
 
-    const qid = await this.startQuery(loadSql, params);
-    await this.waitForSuccess(qid);
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const qid = await this.startQuery(loadSql, params);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+    });
   }
 
   /**
@@ -414,54 +425,60 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Unload data from a SQL query to an export bucket.
    */
-  private async unloadWithSql(
+  private unloadWithSql(
     tableName: string,
     unloadOptions: UnloadOptions,
   ): Promise<TableStructure> {
-    const columns = await this.queryColumnTypes(unloadOptions.query!.sql, unloadOptions.query!.params);
-    const unloadSql = `
-      UNLOAD (${unloadOptions.query!.sql})
-      TO '${this.config.exportBucket}/${tableName}'
-      WITH (
-        format = 'TEXTFILE',
-        compression='GZIP'
-      )`;
-    const qid = await this.startQuery(unloadSql, unloadOptions.query!.params);
-    await this.waitForSuccess(qid);
-    await this.athena.getQueryResults(qid);
-    return columns;
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const columns = await this.queryColumnTypes(unloadOptions.query!.sql, unloadOptions.query!.params);
+      const unloadSql = `
+        UNLOAD (${unloadOptions.query!.sql})
+        TO '${this.config.exportBucket}/${tableName}'
+        WITH (
+          format = 'TEXTFILE',
+          compression='GZIP'
+        )`;
+      const qid = await this.startQuery(unloadSql, unloadOptions.query!.params);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+      await this.athena.getQueryResults(qid);
+      return columns;
+    });
   }
 
   /**
    * Unload data from a temp table to an export bucket.
    */
-  private async unloadWithTable(tableName: string): Promise<TableStructure> {
-    const types = await this.tableColumnTypes(tableName);
-    const columns = types.map(t => t.name).join(', ');
-    const unloadSql = `
-      UNLOAD (SELECT ${columns} FROM ${tableName})
-      TO '${this.config.exportBucket}/${tableName}'
-      WITH (
-        format = 'TEXTFILE',
-        compression='GZIP'
-      )`;
-    const qid = await this.startQuery(unloadSql, []);
-    await this.waitForSuccess(qid);
-    return types;
+  private unloadWithTable(tableName: string): Promise<TableStructure> {
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const types = await this.tableColumnTypes(tableName);
+      const columns = types.map(t => t.name).join(', ');
+      const unloadSql = `
+        UNLOAD (SELECT ${columns} FROM ${tableName})
+        TO '${this.config.exportBucket}/${tableName}'
+        WITH (
+          format = 'TEXTFILE',
+          compression='GZIP'
+        )`;
+      const qid = await this.startQuery(unloadSql, []);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+      return types;
+    });
   }
 
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<TableStructure> {
-    const unloadSql = `${sql} LIMIT 0`;
-    const qid = await this.startQuery(unloadSql, params || []);
-    await this.waitForSuccess(qid);
-    const results = await this.athena.getQueryResults(qid);
-    const columns = this.mapTypes(
-      <ColumnInfo[]>results.ResultSet?.ResultSetMetadata?.ColumnInfo,
-    );
-    return columns;
+  public queryColumnTypes(sql: string, params?: unknown[]): Promise<TableStructure> {
+    return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
+      const unloadSql = `${sql} LIMIT 0`;
+      const qid = await this.startQuery(unloadSql, params || []);
+      await saveCancelFn(this.waitForSuccessCancellable(qid));
+      const results = await this.athena.getQueryResults(qid);
+      const columns = this.mapTypes(
+        <ColumnInfo[]>results.ResultSet?.ResultSetMetadata?.ColumnInfo,
+      );
+      return columns;
+    });
   }
 
   /**
@@ -556,6 +573,32 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     throw new Error(
       `Athena job timeout reached ${this.config.pollTimeout}ms`
     );
+  }
+
+  /**
+   * Returns a promise that resolves when the Athena query reaches the
+   * `SUCCEEDED` state, with a `.cancel` function that calls
+   * `StopQueryExecution` so the query also stops running (and billing)
+   * on Athena's side. Used by `cancelCombinator` to propagate
+   * orchestrator-side cancellation/timeout to Athena.
+   */
+  protected waitForSuccessCancellable(qid: AthenaQueryId): Promise<void> & { cancel: () => Promise<void> } {
+    const promise = this.waitForSuccess(qid) as Promise<void> & { cancel: () => Promise<void> };
+    promise.cancel = () => this.stopQuery(qid);
+    return promise;
+  }
+
+  /**
+   * Asks Athena to stop the given query execution. Best-effort — any
+   * error is logged and swallowed because the caller is already
+   * abandoning the query.
+   */
+  protected async stopQuery(qid: AthenaQueryId): Promise<void> {
+    try {
+      await this.athena.stopQueryExecution({ QueryExecutionId: qid.QueryExecutionId });
+    } catch (e) {
+      console.warn(`[AthenaDriver] Failed to stop Athena query ${qid.QueryExecutionId}: ${e}`);
+    }
   }
 
   protected async viewsSchema(tablesSchema: DatabaseStructure): Promise<DatabaseStructure> {
