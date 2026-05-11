@@ -298,9 +298,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
           highWaterMark: options.highWaterMark,
         }),
         types,
-        // If the consumer abandons the stream, ask Athena to stop the
-        // query so it stops billing on AWS's side too.
-        release: async () => { await this.stopQuery(qid); },
       };
     });
   }
@@ -431,7 +428,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     unloadOptions: UnloadOptions,
   ): Promise<TableStructure> {
     return this.cancelCombinator(async (saveCancelFn: SaveCancelFn) => {
-      const columns = await this.queryColumnTypes(unloadOptions.query!.sql, unloadOptions.query!.params);
+      const columns = await saveCancelFn(this.queryColumnTypes(unloadOptions.query!.sql, unloadOptions.query!.params));
       const unloadSql = `
         UNLOAD (${unloadOptions.query!.sql})
         TO '${this.config.exportBucket}/${tableName}'
