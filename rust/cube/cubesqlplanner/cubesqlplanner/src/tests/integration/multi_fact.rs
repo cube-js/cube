@@ -488,6 +488,71 @@ async fn test_multiplied_aggregate_hub_sum_measure() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_aggregate_filtered_count_on_pk() {
+    let ctx = create_context();
+
+    // customers.active_count (type: count, sql: "{CUBE}.id", filters: [...])
+    // grouped by orders.status.
+    // customers→orders is one_to_many, so customers is multiplied → AggregateMultipliedSubquery
+    // The measure references only customers → source = Cube branch.
+    // Regression: the Cube branch used to render the right side of the FK-aggregate
+    // rejoin via Expr::Member, which the outer factory's render_references mapped
+    // back to the inner `keys` subquery alias — yielding a tautological
+    // `ON keys.<pk> = keys.<pk>` that cross-joined the source table and over-counted.
+    let query = indoc! {"
+        measures:
+          - customers.active_count
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    // The buggy output contained `keys.customers__id = keys.customers__id`. Flatten
+    // the SQL so the assertion survives any future line-wrapping in the planner's
+    // formatter, then walk every ON predicate and assert no tautological equality
+    // survives. The snapshot below is the airtight guard; this is a targeted
+    // structural sanity check pinned to the bug shape.
+    let flat = sql.replace('\n', " ");
+    let flat_upper = flat.to_ascii_uppercase();
+    let mut cursor = 0;
+    while let Some(rel) = flat_upper[cursor..].find(" ON ") {
+        let on_end = cursor + rel + 4;
+        let after = &flat[on_end..];
+        let after_upper = &flat_upper[on_end..];
+        let bound = [
+            " GROUP BY ",
+            " ORDER BY ",
+            " LEFT JOIN ",
+            " INNER JOIN ",
+            " RIGHT JOIN ",
+            " UNION ",
+        ]
+        .iter()
+        .filter_map(|kw| after_upper.find(kw))
+        .min()
+        .unwrap_or(after.len());
+        for chunk in after[..bound].split(" AND ") {
+            if let Some((lhs, rhs)) = chunk.split_once('=') {
+                let lhs = lhs.trim().trim_matches('(').trim();
+                let rhs = rhs.trim().trim_matches(')').trim();
+                assert!(
+                    lhs != rhs,
+                    "tautological join condition `{lhs} = {rhs}` in:\n{sql}"
+                );
+            }
+        }
+        cursor = on_end;
+    }
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multiplied_aggregate_with_measure_subquery() {
     let ctx = create_context();
 
