@@ -3,6 +3,13 @@ title: Using per-user OAuth tokens for data source authentication
 description: Configure Cube Cloud to authenticate each user with their own OAuth token, falling back to a service account for liveness checks.
 ---
 
+<Note>
+
+This feature is in beta. Reach out to your account manager to have it
+enabled for your Cube Cloud deployment.
+
+</Note>
+
 ## Use case
 
 You want each user's queries to run under their own database identity
@@ -213,4 +220,3 @@ module.exports = {
 [ref-snowflake]: /admin/connect-to-data/data-sources/snowflake
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-cube-cloud]: /docs/introduction
-
