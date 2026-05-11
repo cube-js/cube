@@ -134,6 +134,40 @@ async fn test_half_year_with_sum_measure() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_type_time_alias_wraps_compound_exprs_before_tz_cast() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.fiscal_year_alias
+          - orders.created_at_minus_one_day
+        order:
+          - id: orders.fiscal_year_alias
+        convert_tz_for_raw_time_dimension: true
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    // Two independent precedence-trap fingerprints — `::` latching onto a
+    // trailing interval literal instead of the wrapped composed expression.
+    for bad in [
+        "interval '1 month'::timestamptz",
+        "interval '1 day'::timestamptz",
+    ] {
+        assert!(
+            !sql.contains(bad),
+            "cast-precedence trap detected: {bad}\nFull SQL:\n{sql}"
+        );
+    }
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_custom_granularity_with_daterange_filter() {
     let ctx = create_context();
 
