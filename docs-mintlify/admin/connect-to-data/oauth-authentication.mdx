@@ -44,6 +44,53 @@ to limit exposure if the credential is compromised.
 
 </Warning>
 
+## Set up the OAuth app
+
+Before configuring Cube to use per-user OAuth, register your data
+source as an OAuth app in Cube Cloud:
+
+<Steps>
+
+<Step title="Open the OAuth apps settings">
+
+In Cube Cloud, go to **Admin → Integrations → OAuth apps** and click
+**Add**.
+
+<Frame>
+  <img src="/images/admin/connect-to-data/oauth-add-app.png" alt="Admin Integrations page showing the OAuth apps section with the Add button" />
+</Frame>
+
+</Step>
+
+<Step title="Fill out the OAuth app details">
+
+Provide the OAuth app metadata from your data source: **Name**,
+**Auth URL**, **Token URL**, **Client ID**, **Client Secret**, and any
+required **Scopes**. Copy the **Redirect URI** shown in this form and
+register it with your data source's OAuth provider, then click
+**Create**.
+
+<Frame>
+  <img src="/images/admin/connect-to-data/oauth-fill-fields.png" alt="New OAuth app form with fields for Name, Auth URL, Token URL, Client ID, Client Secret, Scopes, and Redirect URI" />
+</Frame>
+
+</Step>
+
+<Step title="Authorize the app">
+
+Open the user menu and go to **Connected apps**. Find your OAuth app
+and click **Authorize** to generate an access token.
+
+You'll need to repeat this step whenever the token expires.
+
+<Frame>
+  <img src="/images/admin/connect-to-data/oauth-authorize.png" alt="Connected apps page showing the OAuth integration with an Authorize action" />
+</Frame>
+
+</Step>
+
+</Steps>
+
 ## Configuration
 
 The configuration uses two options from the
