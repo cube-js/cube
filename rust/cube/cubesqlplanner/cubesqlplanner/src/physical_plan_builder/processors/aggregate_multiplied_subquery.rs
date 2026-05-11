@@ -1,6 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::ReferencesBuilder;
+use crate::physical_plan::VisitorContext;
 use crate::physical_plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
     SelectBuilder,
@@ -59,6 +60,24 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
 
         match &aggregate_multiplied_subquery.source {
             AggregateMultipliedSubquerySource::Cube(cube) => {
+                // Bind a dedicated VisitorContext to the join's right-hand side
+                // so that primary-key dimensions render against `pk_cube_alias`
+                // (the source cube join). Without it, the outer factory's
+                // render_references — populated later for the SELECT — map
+                // these dimensions to the inner `keys` subquery alias, and
+                // both sides of the ON clause collapse to `keys.<pk> = keys.<pk>`.
+                // Clone the parent factory rather than rebuilding from context so
+                // that any state already added above (currently none, but this
+                // makes the lineage explicit for future maintenance) is preserved.
+                let mut join_context_factory = context_factory.clone();
+                join_context_factory
+                    .add_cube_name_reference(cube.cube().name().clone(), pk_cube_alias.clone());
+                let join_visitor_context = Rc::new(VisitorContext::new(
+                    query_tools.clone(),
+                    &join_context_factory,
+                    None,
+                ));
+
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
@@ -67,7 +86,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                             Some(keys_query_alias.clone()),
                             alias_in_keys_query,
                         ));
-                        let pk_cube_expr = Expr::Member(MemberExpression::new(dim.clone()));
+                        let pk_cube_expr = Expr::new_member_with_context(
+                            dim.clone(),
+                            join_visitor_context.clone(),
+                        );
                         Ok(vec![(keys_query_ref, pk_cube_expr)])
                     })
                     .collect::<Result<Vec<_>, _>>()?;

@@ -50,6 +50,11 @@ cubes:
             sql: lifetime_value
             filters:
               - sql: "{regions.name} = 'East'"
+          - name: active_count
+            type: count
+            sql: "{id}"
+            filters:
+              - sql: "{name} LIKE 'A%'"
 
     - name: orders
       sql: "SELECT * FROM orders"
