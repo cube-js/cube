@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.45](https://github.com/cube-js/cube/compare/v1.6.44...v1.6.45) (2026-05-11)
+
+### Features
+
+- **cubestore:** add stale-while-revalidate timeout for SQL query cache ([#10822](https://github.com/cube-js/cube/issues/10822)) ([f050b10](https://github.com/cube-js/cube/commit/f050b103f58d40669b923ed9fdc651e50b93ee5e))
+
 ## [1.6.44](https://github.com/cube-js/cube/compare/v1.6.43...v1.6.44) (2026-05-06)
 
 ### Features
