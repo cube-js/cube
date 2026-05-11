@@ -262,7 +262,8 @@
                 ]
               },
               "admin/connect-to-data/multiple-data-sources",
-              "admin/connect-to-data/concurrency"
+              "admin/connect-to-data/concurrency",
+              "admin/connect-to-data/oauth-authentication"
             ]
           },
           {
