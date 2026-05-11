@@ -1,5 +1,6 @@
 use super::MultiStageMember;
 use crate::logical_plan::LogicalSchema;
+use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::{MemberSymbol, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -76,14 +77,9 @@ impl MultiStageQueryDescription {
         let dimensions = dimensions
             .into_iter()
             .unique_by(|d| d.full_name())
-            .filter_map(|d| match d.is_basic_dimension() {
-                Ok(res) => {
-                    if res {
-                        None
-                    } else {
-                        Some(Ok(d))
-                    }
-                }
+            .filter_map(|d| match has_multi_stage_members(&d, true) {
+                Ok(true) => None,
+                Ok(false) => Some(Ok(d)),
                 Err(e) => Some(Err(e)),
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -91,14 +87,9 @@ impl MultiStageQueryDescription {
         let time_dimensions = time_dimensions
             .into_iter()
             .unique_by(|d| d.full_name())
-            .filter_map(|d| match d.is_basic_dimension() {
-                Ok(res) => {
-                    if res {
-                        None
-                    } else {
-                        Some(Ok(d))
-                    }
-                }
+            .filter_map(|d| match has_multi_stage_members(&d, true) {
+                Ok(true) => None,
+                Ok(false) => Some(Ok(d)),
                 Err(e) => Some(Err(e)),
             })
             .collect::<Result<Vec<_>, _>>()?;
