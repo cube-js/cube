@@ -9,7 +9,10 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use itertools::multizip;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, MapAccess, SeqAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
@@ -961,7 +964,7 @@ pub struct RequestResultArray {
     pub results: Vec<RequestResultData>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum DBResponsePrimitive {
     Null,
@@ -969,6 +972,93 @@ pub enum DBResponsePrimitive {
     Number(f64),
     String(String),
     Uncommon(Value),
+}
+
+// Hand-written `Deserialize` that avoids serde's untagged-enum buffering.
+impl<'de> Deserialize<'de> for DBResponsePrimitive {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct DBResponsePrimitiveVisitor;
+
+        impl<'de> Visitor<'de> for DBResponsePrimitiveVisitor {
+            type Value = DBResponsePrimitive;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a JSON primitive (null, bool, number, string) or container")
+            }
+
+            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Boolean(v))
+            }
+
+            fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Number(v as f64))
+            }
+
+            fn visit_i128<E: de::Error>(self, v: i128) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Number(v as f64))
+            }
+
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Number(v as f64))
+            }
+
+            fn visit_u128<E: de::Error>(self, v: u128) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Number(v as f64))
+            }
+
+            fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Number(v))
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::String(v.to_owned()))
+            }
+
+            fn visit_borrowed_str<E: de::Error>(self, v: &'de str) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::String(v.to_owned()))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::String(v))
+            }
+
+            fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Null)
+            }
+
+            fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+                Ok(DBResponsePrimitive::Null)
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                Deserialize::deserialize(deserializer)
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let value = Value::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+                Ok(DBResponsePrimitive::Uncommon(value))
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let value = Value::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(DBResponsePrimitive::Uncommon(value))
+            }
+        }
+
+        deserializer.deserialize_any(DBResponsePrimitiveVisitor)
+    }
 }
 
 impl Display for DBResponsePrimitive {
