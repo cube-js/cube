@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
   checkNonNullable,
+  decorateWithCancel,
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
@@ -575,24 +576,18 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  /**
-   * Returns a promise that resolves when the Athena query reaches the
-   * `SUCCEEDED` state, with a `.cancel` function that calls
-   * `StopQueryExecution` so the query also stops running (and billing)
-   * on Athena's side. Used by `cancelCombinator` to propagate
-   * orchestrator-side cancellation/timeout to Athena.
-   */
-  protected waitForSuccessCancellable(qid: AthenaQueryId): Promise<void> & { cancel: () => Promise<void> } {
-    const promise = this.waitForSuccess(qid) as Promise<void> & { cancel: () => Promise<void> };
-    promise.cancel = () => this.stopQuery(qid);
-    return promise;
+  protected waitForSuccessCancellable(qid: AthenaQueryId) {
+    let settled = false;
+    const promise = this.waitForSuccess(qid).finally(() => { settled = true; });
+    return decorateWithCancel(promise, async () => {
+      if (!settled) {
+        await this.stopQuery(qid);
+      }
+    });
   }
 
-  /**
-   * Asks Athena to stop the given query execution. Best-effort — any
-   * error is logged and swallowed because the caller is already
-   * abandoning the query.
-   */
+  // Best-effort: a failure to stop must never bubble up to the caller,
+  // which has already abandoned the query.
   protected async stopQuery(qid: AthenaQueryId): Promise<void> {
     try {
       await this.athena.stopQueryExecution({ QueryExecutionId: qid.QueryExecutionId });

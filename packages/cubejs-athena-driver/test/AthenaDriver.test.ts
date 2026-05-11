@@ -1,6 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DriverTests, smartStringTrim } from '@cubejs-backend/testing-shared';
 import { pausePromise } from '@cubejs-backend/shared';
+import { QueryExecutionState } from '@aws-sdk/client-athena';
 
 import { AthenaDriver } from '../src';
 
@@ -16,9 +17,8 @@ class AthenaDriverTest extends DriverTests {
   }
 }
 
-// A SQL query that is guaranteed to take long enough on Athena for the
-// test to call `.cancel()` before it finishes. 100M-row aggregation is
-// reliably in the 5-30s range on a small workgroup.
+// 100M-row aggregation runs for ~5-30s on a small Athena workgroup —
+// long enough for the test to call `.cancel()` before it finishes.
 const SLOW_QUERY = `
   SELECT count(*) AS c
   FROM unnest(sequence(1, 100000000)) AS t(i)
@@ -66,20 +66,15 @@ describe('AthenaDriver', () => {
     await tests.testUnloadEmpty();
   });
 
-  // Verifies that the driver propagates orchestrator-side cancellation
-  // to Athena via StopQueryExecution. The query is captured by spying
-  // on startQueryExecution; after .cancel() resolves we poll Athena's
-  // own state for that execution id and assert it landed in a terminal
-  // non-success state (CANCELLED or FAILED), never RUNNING/QUEUED.
   const expectQueryCancelled = async (queryExecutionId: string) => {
     const athena = (driver as any).athena;
     for (let i = 0; i < 30; i++) {
       const exec = await athena.getQueryExecution({ QueryExecutionId: queryExecutionId });
       const state = exec.QueryExecution?.Status?.State;
-      if (state === 'CANCELLED' || state === 'FAILED') {
+      if (state === QueryExecutionState.CANCELLED || state === QueryExecutionState.FAILED) {
         return;
       }
-      if (state === 'SUCCEEDED') {
+      if (state === QueryExecutionState.SUCCEEDED) {
         throw new Error(`Athena query ${queryExecutionId} succeeded before cancel took effect`);
       }
       await pausePromise(500);
@@ -110,7 +105,6 @@ describe('AthenaDriver', () => {
       const promise = driver.query(SLOW_QUERY, []) as Promise<unknown> & { cancel: () => Promise<void> };
       expect(typeof promise.cancel).toBe('function');
 
-      // Wait briefly so startQueryExecution has returned a query id.
       while (!captured.id) {
         await pausePromise(100);
       }
@@ -126,12 +120,9 @@ describe('AthenaDriver', () => {
   test('stream cancel propagates StopQueryExecution to Athena', async () => {
     const { captured, restore } = captureStartedQueryId();
     try {
-      // stream() awaits the underlying query to succeed before
-      // returning the row stream, so an in-flight cancel maps to
-      // calling .cancel() on the returned promise (which the
-      // orchestrator does via cancelCombinator's saved cancels) — not
-      // to the released() callback, which only runs after stream()
-      // has already resolved.
+      // stream() awaits success before resolving, so the in-flight
+      // cancel goes through the promise's .cancel — not release(),
+      // which only runs after stream() has already resolved.
       const promise = driver.stream(SLOW_QUERY, [], { highWaterMark: 100 }) as
         Promise<unknown> & { cancel: () => Promise<void> };
       expect(typeof promise.cancel).toBe('function');
