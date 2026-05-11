@@ -383,6 +383,23 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         }
     }
 
+    fn coerce_scalar_to_string<CIT: InnerTypes>(
+        handle: NativeObjectHandle<CIT>,
+    ) -> Result<String, CubeError> {
+        if let Ok(s) = String::from_native(handle.clone()) {
+            return Ok(s);
+        }
+        if let Ok(n) = f64::from_native(handle.clone()) {
+            return Ok(n.to_string());
+        }
+        if let Ok(b) = bool::from_native(handle.clone()) {
+            return Ok(b.to_string());
+        }
+        Err(CubeError::user(
+            "Invalid param for security context".to_string(),
+        ))
+    }
+
     fn security_context_filter_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         property_value: NativeObjectHandle<CIT>,
@@ -394,20 +411,37 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             StringVec(Vec<String>),
             None,
         }
-        let param_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
-            ParamValue::StringVec(prop_vec)
+        // Falsy scalars (undefined / null / "" / 0 / NaN / false) collapse to
+        // `ParamValue::None` and emit `1 = 1`. Empty arrays stay as an empty
+        // `StringVec` and emit `1 = 0` separately below — `IN ()` is invalid
+        // SQL in most dialects.
+        let param_value = if property_value.is_undefined()? || property_value.is_null()? {
+            ParamValue::None
+        } else if let Ok(arr) = property_value.to_array() {
+            let values = arr
+                .to_vec()?
+                .into_iter()
+                .map(Self::coerce_scalar_to_string)
+                .collect::<Result<Vec<_>, _>>()?;
+            ParamValue::StringVec(values)
         } else if let Ok(prop) = String::from_native(property_value.clone()) {
-            ParamValue::String(prop)
+            if prop.is_empty() {
+                ParamValue::None
+            } else {
+                ParamValue::String(prop)
+            }
         } else if let Ok(prop) = f64::from_native(property_value.clone()) {
-            if prop.fract() == 0.0 && prop.is_finite() {
-                ParamValue::String(format!("{}", prop as i64))
+            if prop == 0.0 || prop.is_nan() {
+                ParamValue::None
             } else {
                 ParamValue::String(prop.to_string())
             }
         } else if let Ok(prop) = bool::from_native(property_value.clone()) {
-            ParamValue::String(prop.to_string())
-        } else if property_value.is_undefined()? || property_value.is_null()? {
-            ParamValue::None
+            if prop {
+                ParamValue::String("true".to_string())
+            } else {
+                ParamValue::None
+            }
         } else {
             return Err(CubeError::user(
                 "Invalid param for security context".to_string(),
@@ -500,30 +534,40 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         property_value: NativeObjectHandle<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        let str_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
-            Some(prop_vec)
-        } else if let Ok(prop) = String::from_native(property_value.clone()) {
-            Some(vec![prop])
-        } else if let Ok(prop) = f64::from_native(property_value.clone()) {
-            if prop.fract() == 0.0 && prop.is_finite() {
-                Some(vec![format!("{}", prop as i64)])
-            } else {
+        // Type extraction is read-only and runs eagerly. Placeholder
+        // allocation happens lazily inside the returned function so it only
+        // fires when the proxy is actually coerced via `${...}` — otherwise
+        // every property access would register a placeholder.
+        let str_value: Option<Vec<String>> =
+            if property_value.is_undefined()? || property_value.is_null()? {
+                None
+            } else if let Ok(arr) = property_value.to_array() {
+                let elements = arr.to_vec()?;
+                let mut values = Vec::with_capacity(elements.len());
+                for el in elements {
+                    values.push(Self::coerce_scalar_to_string(el)?);
+                }
+                Some(values)
+            } else if let Ok(prop) = String::from_native(property_value.clone()) {
+                Some(vec![prop])
+            } else if let Ok(prop) = f64::from_native(property_value.clone()) {
                 Some(vec![prop.to_string()])
-            }
-        } else if let Ok(prop) = bool::from_native(property_value.clone()) {
-            Some(vec![prop.to_string()])
-        } else {
-            None
-        };
-        let allocated = match str_value {
-            Some(values) => values
-                .iter()
-                .map(|v| Self::process_secutity_context_value(&proxy_state, v))
-                .collect::<Result<Vec<_>, _>>()?
-                .join(", "),
-            None => String::new(),
-        };
-        let result = context_holder.to_string_fn(allocated)?;
+            } else if let Ok(prop) = bool::from_native(property_value.clone()) {
+                Some(vec![prop.to_string()])
+            } else {
+                None
+            };
+        let result =
+            context_holder.make_vararg_function(move |_, _| -> Result<String, CubeError> {
+                match &str_value {
+                    Some(values) => Ok(values
+                        .iter()
+                        .map(|v| Self::process_secutity_context_value(&proxy_state, v))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(",")),
+                    None => Ok(String::new()),
+                }
+            })?;
         Ok(NativeObjectHandle::new(result.into_object()))
     }
 

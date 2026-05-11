@@ -1,5 +1,8 @@
 use super::{inner_types::InnerTypes, object::NativeObject};
-use super::{NativeContextHolder, NativeContextHolderRef, NativeString, NativeStruct};
+use super::{
+    NativeBoolean, NativeContextHolder, NativeContextHolderRef, NativeNumber, NativeString,
+    NativeStruct,
+};
 use crate::CubeError;
 
 #[derive(Clone)]
@@ -68,15 +71,23 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
 
     pub fn convert_to_string(&self) -> Result<String, CubeError> {
         if let Ok(str) = self.to_string() {
-            str.value()
-        } else if self.is_null()? {
-            Ok("".to_string())
-        } else {
-            self.to_struct()?
-                .call_method("toString", vec![])?
-                .into_string()?
-                .value()
+            return str.value();
         }
+        if self.is_null()? {
+            return Ok("".to_string());
+        }
+        // Primitives don't expose a struct-side `toString`, so coerce them
+        // inline before the struct fallback below — otherwise it errors.
+        if let Ok(n) = self.to_number() {
+            return Ok(n.value()?.to_string());
+        }
+        if let Ok(b) = self.to_boolean() {
+            return Ok(b.value()?.to_string());
+        }
+        self.to_struct()?
+            .call_method("toString", vec![])?
+            .into_string()?
+            .value()
     }
 
     pub fn try_clone_to_context_ref(

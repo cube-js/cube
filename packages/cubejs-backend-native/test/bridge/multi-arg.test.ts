@@ -12,13 +12,13 @@ describeBridge('bridge: multi-arg dispatch', () => {
     );
 
     expect(result.template).toBe(
-      'SUM({arg:0}) WHERE {fp:0} AND t = {sv:1}'
+      'SUM({arg:0}) WHERE {fp:0} AND t = {sv:0}'
     );
     expect(result.args.symbol_paths).toEqual([['CUBE', 'amount']]);
     expect(result.args.filter_params).toEqual([
       { cube_name: 'orders', name: 'status', column: 'col' },
     ]);
-    expect(result.args.security_context.values).toEqual(['acme', 'acme']);
+    expect(result.args.security_context.values).toEqual(['acme']);
   });
 
   it('throws an internal error from the StubBaseTools when SQL_UTILS is referenced', () => {
