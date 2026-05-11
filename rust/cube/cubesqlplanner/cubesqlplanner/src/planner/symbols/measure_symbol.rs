@@ -578,13 +578,6 @@ impl SymbolFactory for MeasureSymbolFactory {
             }
         }
 
-        let mut measure_order_by = vec![];
-        if let Some(group_by) = definition.order_by()? {
-            for item in group_by.iter() {
-                let node = compiler.compile_sql_call(path.cube_name(), item.sql()?)?;
-                measure_order_by.push(MeasureOrderBy::new(node, item.dir()?));
-            }
-        }
         let sql = if let Some(sql) = sql {
             Some(compiler.compile_sql_call(path.cube_name(), sql)?)
         } else {
@@ -593,21 +586,26 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
 
-        // mask.sql references are written in the context of the cube that
-        // owns the measure. When a measure is exposed through a view, the
-        // measure's sql is a direct reference to the underlying cube member;
-        // compile mask.sql against that referenced member's cube so CUBE /
-        // cross-cube references inside the mask resolve the same way as on
-        // the owning cube — and as they do on the legacy BaseQuery path,
-        // which routes mask compilation through aliasMember for the same
-        // reason.
-        let mask_sql_cube_name = sql
+        // order_by and mask.sql references are written in the context of the
+        // cube that owns the measure. For a view-exposed measure the sql is a
+        // direct reference to the underlying cube member — compile both
+        // against that cube, as the legacy BaseQuery path does via aliasMember.
+        let owning_cube_name = sql
             .as_ref()
             .and_then(|s| s.resolve_direct_reference())
             .map(|dep| dep.cube_name())
             .unwrap_or_else(|| path.cube_name().clone());
+
+        let mut measure_order_by = vec![];
+        if let Some(group_by) = definition.order_by()? {
+            for item in group_by.iter() {
+                let node = compiler.compile_sql_call(&owning_cube_name, item.sql()?)?;
+                measure_order_by.push(MeasureOrderBy::new(node, item.dir()?));
+            }
+        }
+
         let mask_sql = if let Some(mask_sql) = mask_sql {
-            Some(compiler.compile_sql_call(&mask_sql_cube_name, mask_sql)?)
+            Some(compiler.compile_sql_call(&owning_cube_name, mask_sql)?)
         } else {
             None
         };

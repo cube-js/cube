@@ -3360,7 +3360,11 @@ export class BaseQuery {
           }
         }
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        // order_by templates reference members by bare name in the cube that
+        // authored them — for view-exposed measures resolve through
+        // aliasMember (as memberMaskSql does), not the view's context, see #10856
+        const orderByCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(orderByCubeName, o.sql), dir: o.dir }));
         let sql;
         let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
@@ -3647,6 +3651,12 @@ export class BaseQuery {
           cubeName,
           name
         );
+      if (!resolvedSymbol) {
+        throw new UserError(
+          `Symbol '${name}' could not be resolved on cube '${cubeName}'. ` +
+          'Check that the referenced member exists and is accessible from this context.'
+        );
+      }
       // eslint-disable-next-line no-underscore-dangle
       if (resolvedSymbol._objectWithResolvedProperties) {
         return resolvedSymbol;
