@@ -14,6 +14,16 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Form of a dimension's value, classified from its data-model
+/// definition.
+///
+/// - `Regular` — plain dimension (a single `sql` expression).
+/// - `Geo` — `type: geo` dimension with `latitude` / `longitude`.
+/// - `Switch` — `type: switch` dimension; without a `sql` it becomes
+///   a **calc group** — an abstract enumeration cross-joined into the
+///   query rather than read from a column.
+/// - `Case` — dimension defined via a `case` body, classic or
+///   switch-style.
 #[derive(Clone)]
 pub enum DimensionKind {
     Regular(RegularDimension),
@@ -91,6 +101,9 @@ impl DimensionKind {
         matches!(self, Self::Case(_))
     }
 
+    /// True for a `Switch` dimension declared without a `sql` — a
+    /// calc group: an abstract enumeration cross-joined into the query
+    /// rather than read from a column.
     pub fn is_calc_group(&self) -> bool {
         match self {
             Self::Switch(s) => s.is_calc_group(),

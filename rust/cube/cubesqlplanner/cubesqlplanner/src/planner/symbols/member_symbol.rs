@@ -80,6 +80,8 @@ impl MemberSymbol {
         }
     }
 
+    /// Full unique identifier of the symbol: cube path, member name
+    /// and any suffix that distinguishes one symbol from another.
     pub fn full_name(&self) -> String {
         self.compiled_path().full_name().clone()
     }
