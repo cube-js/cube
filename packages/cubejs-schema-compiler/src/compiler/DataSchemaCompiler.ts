@@ -266,6 +266,10 @@ export class DataSchemaCompiler {
       : files).forEach(file => {
       if (file.fileName.endsWith('.js')) {
         originalJsFiles.push(file);
+      // Downstream Cube products mirror this filter to populate the Jinja template
+      // store before rendering a single file (e.g. preview endpoints). Keep them in
+      // sync — narrowing this filter without updating those callers will cause
+      // imports of files that fall outside the narrower set to fail at render time.
       } else if (file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX)) {
         jinjaTemplatedFiles.push(file);
