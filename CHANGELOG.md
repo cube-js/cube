@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.46](https://github.com/cube-js/cube/compare/v1.6.45...v1.6.46) (2026-05-11)
+
+### Performance Improvements
+
+- **cubeorchestrator:** Hand-written Deserialize for DBResponsePrimitive (-95%, ~20x parse) ([#10853](https://github.com/cube-js/cube/issues/10853)) ([f4eb034](https://github.com/cube-js/cube/commit/f4eb034b952dd1a07a188e8ca253b072d237e596))
+
 ## [1.6.45](https://github.com/cube-js/cube/compare/v1.6.44...v1.6.45) (2026-05-11)
 
 ### Bug Fixes
