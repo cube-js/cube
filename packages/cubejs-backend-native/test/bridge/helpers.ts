@@ -56,3 +56,81 @@ export function invokeFilterParamsCallback(
 ): string {
   return native.__testBridgeInvokeFilterParamsCallback(fn, args);
 }
+
+export type BridgeFieldKind = 'field' | 'call' | 'static';
+
+export interface BridgeFieldMeta {
+  name: string;
+  jsName: string;
+  kind: BridgeFieldKind;
+  optional: boolean;
+  vec: boolean;
+}
+
+export function listBridgeFields(name: string): BridgeFieldMeta[] {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  return native.__testBridgeListFields(name);
+}
+
+export function listBridgeNames(): string[] {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  return native.__testBridgeListBridgeNames();
+}
+
+export function parseBridge(name: string, obj: unknown): void {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  native.__testBridgeParse(name, obj);
+}
+
+export function fieldNames(meta: BridgeFieldMeta[]): string[] {
+  return meta.map((m) => m.name).sort();
+}
+
+export type InvokeStatus =
+  | { status: 'ok' }
+  | { status: 'error'; message: string }
+  | { status: 'skipped'; reason: string };
+
+export type InvokeResult = Record<string, InvokeStatus>;
+
+export function invokeBridge(name: string, fixture: unknown): InvokeResult {
+  if (!bridgeHarnessAvailable) {
+    throw new Error(
+      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
+    );
+  }
+  return native.__testBridgeInvoke(name, fixture);
+}
+
+/**
+ * Asserts every recorded invocation is `ok` or `skipped`. Errors surface
+ * the offending field, the Rust-side message, and the kind of failure so
+ * they read naturally in CI logs. Skipped entries are allowed because some
+ * call-methods take Rust-only argument types (e.g. `Rc<dyn MemberSql>`)
+ * that have no auto-default.
+ */
+export function expectAllInvocationsOk(result: InvokeResult): void {
+  const failures: string[] = [];
+  for (const [field, entry] of Object.entries(result)) {
+    if (entry.status === 'error') {
+      failures.push(`${field}: error: ${entry.message}`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      `Bridge invocation failed for ${failures.length} field(s):\n  ${failures.join('\n  ')}`
+    );
+  }
+}

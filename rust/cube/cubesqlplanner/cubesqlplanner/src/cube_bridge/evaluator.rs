@@ -21,7 +21,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct CubeEvaluatorStatic {
     #[serde(rename = "primaryKeys")]
     pub primary_keys: HashMap<String, Vec<String>>,
@@ -33,7 +33,7 @@ pub struct CallDep {
     pub parent: Option<usize>,
 }
 
-#[nativebridge::native_bridge(CubeEvaluatorStatic)]
+#[nativebridge::native_bridge(CubeEvaluatorStatic, with_static_meta)]
 pub trait CubeEvaluator {
     fn parse_path(&self, path_type: String, path: String) -> Result<Vec<String>, CubeError>;
     fn measure_by_path(&self, measure_path: String)

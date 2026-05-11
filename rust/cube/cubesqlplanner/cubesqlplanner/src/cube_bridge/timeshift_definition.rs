@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, nativebridge::NativeBridgeStatic,
+)]
 pub struct TimeShiftDefinitionStatic {
     pub interval: Option<String>,
     #[serde(rename = "type")]
@@ -17,7 +19,7 @@ pub struct TimeShiftDefinitionStatic {
     pub name: Option<String>,
 }
 
-#[nativebridge::native_bridge(TimeShiftDefinitionStatic)]
+#[nativebridge::native_bridge(TimeShiftDefinitionStatic, with_static_meta)]
 pub trait TimeShiftDefinition {
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;

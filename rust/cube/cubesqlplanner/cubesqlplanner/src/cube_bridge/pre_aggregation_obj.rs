@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct PreAggregationObjStatic {
     #[serde(rename = "tableName")]
     pub table_name: Option<String>,
@@ -17,5 +17,5 @@ pub struct PreAggregationObjStatic {
     pub pre_aggregation_id: Option<String>,
 }
 
-#[nativebridge::native_bridge(PreAggregationObjStatic)]
+#[nativebridge::native_bridge(PreAggregationObjStatic, with_static_meta)]
 pub trait PreAggregationObj {}

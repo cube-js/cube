@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct SegmentDefinitionStatic {
     #[serde(rename = "type")]
     pub segment_type: Option<String>,
@@ -17,7 +17,7 @@ pub struct SegmentDefinitionStatic {
     pub owned_by_cube: Option<bool>,
 }
 
-#[nativebridge::native_bridge(SegmentDefinitionStatic)]
+#[nativebridge::native_bridge(SegmentDefinitionStatic, with_static_meta)]
 pub trait SegmentDefinition {
     #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;

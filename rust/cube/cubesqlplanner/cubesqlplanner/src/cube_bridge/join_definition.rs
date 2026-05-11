@@ -11,14 +11,14 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct JoinDefinitionStatic {
     pub root: String,
     #[serde(rename = "multiplicationFactor")]
     pub multiplication_factor: HashMap<String, bool>,
 }
 
-#[nativebridge::native_bridge(JoinDefinitionStatic)]
+#[nativebridge::native_bridge(JoinDefinitionStatic, with_static_meta)]
 pub trait JoinDefinition {
     #[nbridge(field, vec)]
     fn joins(&self) -> Result<Vec<Rc<dyn JoinItem>>, CubeError>;
