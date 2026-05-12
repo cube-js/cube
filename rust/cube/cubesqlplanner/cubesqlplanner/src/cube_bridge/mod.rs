@@ -1,3 +1,10 @@
+//! DTO layer for talking to the JavaScript side of Cube.
+//!
+//! Every type here mirrors the shape of an object delivered by the
+//! schema compiler — cube and member definitions, filter params,
+//! callbacks, security context, and so on. Tesseract reads these
+//! types as input; no business logic lives here.
+
 pub mod base_query_options;
 pub mod base_tools;
 pub mod case_definition;

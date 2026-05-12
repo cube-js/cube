@@ -8,6 +8,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Dialect-specific SQL helpers implemented by the JS driver. Used
+/// only at SQL-generation time, once the target dialect is known:
+/// timezone conversion, granularity-grouped columns, HLL functions,
+/// interval arithmetic, type casts.
 #[nativebridge::native_bridge]
 pub trait DriverTools {
     fn convert_tz(&self, field: String) -> Result<String, CubeError>;

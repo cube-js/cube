@@ -16,6 +16,9 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell, rc::Weak};
 
+/// Result of evaluating a member's `sql` JS function: a single SQL
+/// string, or — for pre-aggregation `dimensions:` / `measures:`
+/// reference lists — one string per referenced member.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SqlTemplate {
     String(String),
@@ -40,6 +43,9 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for SqlTemplate {
     }
 }
 
+/// Column argument passed to
+/// `FILTER_PARAMS.cube.member.filter(...)`: either a plain column
+/// name string, or a JS callback that produces the SQL snippet.
 #[derive(Clone)]
 pub enum FilterParamsColumn {
     String(String),
@@ -179,6 +185,9 @@ pub struct SecutityContextProps {
     pub values: Vec<String>,
 }
 
+/// Dependencies collected while compiling a member `sql` function.
+/// Each `{arg:N}` / `{fp:N}` / `{fg:N}` / `{sv:N}` placeholder in
+/// the produced `SqlTemplate` indexes into one of these vectors.
 #[derive(Default, Clone, Debug)]
 pub struct SqlTemplateArgs {
     pub symbol_paths: Vec<Vec<String>>,
@@ -296,6 +305,11 @@ impl ProxyStateWeak {
     }
 }
 
+/// A member's `sql:` function as provided by the JS schema compiler.
+/// `compile_template_sql` invokes the function under proxied
+/// arguments (`{CUBE}`, `FILTER_PARAMS`, `FILTER_GROUP`,
+/// `SECURITY_CONTEXT`, `SQL_UTILS`) and returns the resulting SQL
+/// template together with the dependencies the function touched.
 pub trait MemberSql {
     fn args_names(&self) -> &Vec<String>;
     fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
@@ -306,6 +320,12 @@ pub trait MemberSql {
     ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError>;
 }
 
+/// Neon-backed implementation of `MemberSql`. `compile_template_sql`
+/// calls the JS function with proxy objects that record every
+/// accessed member path, `FILTER_PARAMS` / `FILTER_GROUP` call, and
+/// `SECURITY_CONTEXT.x.filter(...)` / `unsafeValue()` reference into
+/// a shared state, then returns the produced template together with
+/// that state as `SqlTemplateArgs`.
 pub struct NativeMemberSql<IT: InnerTypes> {
     native_object: NativeObjectHandle<IT>,
     args_names: Vec<String>,

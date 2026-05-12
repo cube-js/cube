@@ -13,6 +13,11 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Dialect-independent callbacks to the JavaScript side, used
+/// during compilation and planning: SQL templates, time-series
+/// generation, allocated params, pre-aggregation lookup, join-tree
+/// resolution. Dialect-specific helpers live behind `DriverTools`,
+/// reachable via `driver_tools()`.
 #[nativebridge::native_bridge]
 pub trait BaseTools {
     fn driver_tools(&self, external: bool) -> Result<Rc<dyn DriverTools>, CubeError>;
