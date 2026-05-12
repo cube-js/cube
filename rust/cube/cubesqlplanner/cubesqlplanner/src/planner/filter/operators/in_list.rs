@@ -1,3 +1,5 @@
+/// `InList` filter operation: tests whether the member belongs to,
+/// or — when `negated` — does not belong to, a list of values.
 #[derive(Clone, Debug)]
 pub struct InListOp {
     pub(crate) negated: bool,

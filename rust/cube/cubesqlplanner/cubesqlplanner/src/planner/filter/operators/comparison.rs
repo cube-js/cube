@@ -6,6 +6,8 @@ pub enum ComparisonKind {
     Lte,
 }
 
+/// `Comparison` filter operation: compares the member against a
+/// single value with `>`, `>=`, `<`, or `<=`.
 #[derive(Clone, Debug)]
 pub struct ComparisonOp {
     pub(crate) kind: ComparisonKind,

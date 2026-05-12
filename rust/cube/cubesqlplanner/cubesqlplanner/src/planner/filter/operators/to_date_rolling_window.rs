@@ -1,5 +1,7 @@
 use crate::planner::Granularity;
 
+/// `ToDateRollingWindow` filter operation: bounds a "since the start
+/// of <granularity>" window — e.g. month-to-date, year-to-date.
 #[derive(Clone)]
 pub struct ToDateRollingWindowOp {
     pub(crate) granularity: Granularity,

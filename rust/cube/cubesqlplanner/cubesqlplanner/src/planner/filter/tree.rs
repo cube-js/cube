@@ -3,12 +3,14 @@ use crate::planner::MemberSymbol;
 use std::fmt;
 use std::rc::Rc;
 
+/// Boolean operator combining the items of a `FilterGroup`.
 #[derive(Clone, PartialEq)]
 pub enum FilterGroupOperator {
     Or,
     And,
 }
 
+/// Boolean combination of nested `FilterItem`s, joined by `operator`.
 #[derive(Clone)]
 pub struct FilterGroup {
     pub operator: FilterGroupOperator,
@@ -27,6 +29,12 @@ impl FilterGroup {
     }
 }
 
+/// Node in a filter tree:
+///
+/// - `Group` — a nested boolean group (AND/OR).
+/// - `Item` — a leaf filter on a single member.
+/// - `Segment` — a segment-based filter (bool expression named in
+///   the data model).
 #[derive(Clone, PartialEq)]
 pub enum FilterItem {
     Group(Rc<FilterGroup>),
@@ -34,6 +42,8 @@ pub enum FilterItem {
     Segment(Rc<BaseSegment>),
 }
 
+/// Top-level filter tree of a query — its `items` are implicitly
+/// AND-joined.
 #[derive(Clone)]
 pub struct Filter {
     pub items: Vec<FilterItem>,
@@ -49,6 +59,8 @@ impl fmt::Display for FilterGroupOperator {
 }
 
 impl Filter {
+    /// All members referenced anywhere in the filter tree, flattened
+    /// recursively through groups.
     pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
         let mut result = Vec::new();
         for item in self.items.iter() {
@@ -57,6 +69,9 @@ impl Filter {
         result
     }
 
+    /// Collapses the filter into a single `FilterItem`: `None` when
+    /// empty, the only item directly when one is present, or an
+    /// AND-`Group` wrapping the rest.
     pub fn to_filter_item(&self) -> Option<FilterItem> {
         if self.items.is_empty() {
             None
@@ -90,9 +105,9 @@ impl FilterItem {
         }
     }
 
-    /// Extract all member symbols from this filter tree
-    /// Returns None if filter tree is invalid (e.g., empty group)
-    /// Returns Some(set) with all member symbols found in the tree
+    // Extracts all member symbols from this filter tree.
+    // Returns None when the tree is invalid (e.g. an empty group, or
+    // anything below a Segment item), Some(members) otherwise.
     fn extract_filter_members(&self) -> Option<Vec<Rc<MemberSymbol>>> {
         match self {
             FilterItem::Group(group) => {
@@ -118,11 +133,10 @@ impl FilterItem {
         }
     }
 
-    /// Find subtree of filters that only contains filters for the specified members
-    /// Returns None if no matching filters found
-    /// Returns Some(FilterItem) with the subtree containing only filters for target members
-    ///
-    /// This only processes AND groups - OR groups are not supported and will return None
+    /// Returns the largest subtree that only references the given
+    /// `target_members`, or `None` if no such subtree exists. Only
+    /// AND groups are traversed for partial matching — OR groups
+    /// either match as a whole or are dropped.
     pub fn find_subtree_for_members(&self, target_members: &[&String]) -> Option<FilterItem> {
         match self {
             FilterItem::Group(group) => {
@@ -190,11 +204,14 @@ impl FilterItem {
         }
     }
 
-    /// Find value restrictions for a given symbol across filter tree
-    /// Returns:
-    /// - None: no restrictions found for this symbol
-    /// - Some(vec![]): restrictions exist but result in empty set (contradiction)
-    /// - Some(values): list of allowed values for this symbol
+    /// Collects the set of allowed values for `symbol` from the
+    /// filter tree.
+    ///
+    /// - `None` — no restriction is placed on `symbol`.
+    /// - `Some(vec![])` — restrictions exist but contradict each
+    ///   other (empty set).
+    /// - `Some(values)` — explicit list of values the symbol may
+    ///   take. AND groups intersect, OR groups union.
     pub fn find_value_restriction(&self, symbol: &Rc<MemberSymbol>) -> Option<Vec<String>> {
         match self {
             FilterItem::Item(item) => {
