@@ -11,8 +11,8 @@ use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
 use neon::object::Object;
 use neon::prelude::{
-    JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsValue,
-    NeonResult,
+    JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsString,
+    JsValue, NeonResult,
 };
 use neon::types::buffer::TypedArray;
 use serde::Deserialize;
@@ -330,21 +330,24 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     let result = cx.argument::<JsBox<Arc<QueryResult>>>(0)?;
 
     let js_array = cx.execute_scoped(|mut cx| {
+        let js_keys: Vec<Handle<JsString>> = result.members.iter().map(|k| cx.string(k)).collect();
+
         let js_array = JsArray::new(&mut cx, result.rows.len());
 
         for (i, row) in result.rows.iter().enumerate() {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
-                for (key, value) in result.members.iter().zip(row.iter()) {
-                    let js_key = cx.string(key);
+
+                for (js_key, value) in js_keys.iter().zip(row.iter()) {
                     let js_value: Handle<'_, JsValue> = match value {
                         DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings
                         other => cx.string(other.to_string()).upcast(),
                     };
 
-                    js_row.set(&mut cx, js_key, js_value)?;
+                    js_row.set(&mut cx, *js_key, js_value)?;
                 }
+
                 Ok(js_row)
             })?;
 
