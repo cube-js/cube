@@ -3,6 +3,7 @@ use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::physical_plan::join::JoinType;
 use crate::planner::sql_templates::structs::TemplateCalcGroup;
+use crate::utils::sql_expression_scanner::is_top_level_compound;
 use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
@@ -53,7 +54,12 @@ impl PlanSqlTemplates {
     }
 
     pub fn convert_tz(&self, field: String) -> Result<String, CubeError> {
-        self.driver_tools.convert_tz(field)
+        let safe = if is_top_level_compound(&field) {
+            format!("({field})")
+        } else {
+            field
+        };
+        self.driver_tools.convert_tz(safe)
     }
 
     pub fn is_external(&self) -> bool {

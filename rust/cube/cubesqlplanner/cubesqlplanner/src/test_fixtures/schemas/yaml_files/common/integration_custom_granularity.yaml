@@ -25,6 +25,14 @@ cubes:
           - name: fiscal_year
             interval: "1 year"
             offset: "1 month"
+
+      - name: fiscal_year_alias
+        type: time
+        sql: "{created_at.fiscal_year}"
+
+      - name: created_at_minus_one_day
+        type: time
+        sql: "{CUBE}.created_at - interval '1 day'"
     measures:
       - name: count
         type: count
