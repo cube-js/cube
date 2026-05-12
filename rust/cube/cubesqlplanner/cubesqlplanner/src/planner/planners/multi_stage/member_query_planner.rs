@@ -3,7 +3,6 @@ use super::{
     MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::logical_plan::*;
-use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::GranularityHelper;
@@ -59,26 +58,15 @@ impl MultiStageMemberQueryPlanner {
         &self,
         time_dimension: Rc<MemberSymbol>,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let cte_query_properties = QueryProperties::try_new_from_precompiled(
-            self.query_tools.clone(),
-            vec![],
-            vec![],
-            vec![time_dimension.clone()],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            None,
-            None,
-            true,
-            true,
-            false,
-            false,
-            Rc::new(JoinHints::new()),
-            true,
-            self.query_properties.disable_external_pre_aggregations(),
-        )?;
+        let cte_query_properties = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .time_dimensions(vec![time_dimension.clone()])
+            .ignore_cumulative(true)
+            .ungrouped(true)
+            .disable_external_pre_aggregations(
+                self.query_properties.disable_external_pre_aggregations(),
+            )
+            .build()?;
 
         let simple_query_planer =
             SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties);
@@ -213,8 +201,8 @@ impl MultiStageMemberQueryPlanner {
             vec![]
         };
         let schema = LogicalSchema::default()
-            .set_dimensions(self.description.state().dimensions_symbols())
-            .set_time_dimensions(self.description.state().time_dimensions_symbols())
+            .set_dimensions(self.description.state().dimensions().clone())
+            .set_time_dimensions(self.description.state().time_dimensions().clone())
             .set_measures(measures)
             .into_rc();
 
@@ -271,8 +259,8 @@ impl MultiStageMemberQueryPlanner {
         &self,
         _multi_stage_member: &MultiStageInodeMember,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let mut dimensions = self.description.state().dimensions_symbols();
-        let mut time_dimensions = self.description.state().time_dimensions_symbols();
+        let mut dimensions = self.description.state().dimensions().clone();
+        let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         let cte_member = self.description.member().evaluation_node();
         match cte_member.as_ref() {
@@ -353,8 +341,8 @@ impl MultiStageMemberQueryPlanner {
 
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
-        let mut dimensions = self.description.state().dimensions_symbols();
-        let mut time_dimensions = self.description.state().time_dimensions_symbols();
+        let mut dimensions = self.description.state().dimensions().clone();
+        let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         if !self.description.member().is_without_member_leaf() {
             match member_node.as_ref() {
@@ -379,26 +367,23 @@ impl MultiStageMemberQueryPlanner {
             }
         }
 
-        let cte_query_properties = QueryProperties::try_new_from_precompiled(
-            self.query_tools.clone(),
-            measures,
-            dimensions,
-            time_dimensions,
-            self.description.state().time_dimensions_filters().clone(),
-            self.description.state().dimensions_filters().clone(),
-            self.description.state().measures_filters().clone(),
-            self.description.state().segments().clone(),
-            vec![],
-            None,
-            None,
-            true,
-            self.description.member().is_ungrupped(),
-            false,
-            false,
-            self.query_properties.query_join_hints().clone(),
-            false,
-            self.query_properties.disable_external_pre_aggregations(),
-        )?;
+        let cte_query_properties = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .measures(measures)
+            .dimensions(dimensions)
+            .time_dimensions(time_dimensions)
+            .time_dimensions_filters(self.description.state().time_dimensions_filters().clone())
+            .dimensions_filters(self.description.state().dimensions_filters().clone())
+            .measures_filters(self.description.state().measures_filters().clone())
+            .segments(self.description.state().segments().clone())
+            .ignore_cumulative(true)
+            .ungrouped(self.description.member().is_ungrupped())
+            .query_join_hints(self.query_properties.query_join_hints().clone())
+            .allow_multi_stage(false)
+            .disable_external_pre_aggregations(
+                self.query_properties.disable_external_pre_aggregations(),
+            )
+            .build()?;
 
         let query_planner =
             QueryPlanner::new(cte_query_properties.clone(), self.query_tools.clone());
@@ -432,14 +417,14 @@ impl MultiStageMemberQueryPlanner {
             .description
             .input()
             .iter()
-            .flat_map(|descr| descr.state().dimensions_symbols().clone())
+            .flat_map(|descr| descr.state().dimensions().iter().cloned())
             .unique_by(|dim| dim.full_name())
             .collect_vec();
         let time_dimensions = self
             .description
             .input()
             .iter()
-            .flat_map(|descr| descr.state().time_dimensions_symbols().clone())
+            .flat_map(|descr| descr.state().time_dimensions().iter().cloned())
             .unique_by(|dim| dim.full_name())
             .collect_vec();
 

@@ -19,10 +19,7 @@ impl OrderPlanner {
         )
     }
 
-    pub fn custom_order(
-        order_by: &Vec<OrderByItem>,
-        members: &Vec<Rc<MemberSymbol>>,
-    ) -> Vec<OrderBy> {
+    pub fn custom_order(order_by: &[OrderByItem], members: &[Rc<MemberSymbol>]) -> Vec<OrderBy> {
         let mut result = Vec::new();
         for itm in order_by.iter() {
             for found_item in members

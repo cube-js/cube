@@ -11,7 +11,7 @@ use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{GranularityHelper, QueryProperties};
+use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
 use crate::planner::{MemberSymbol, TimeDimensionSymbol};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
@@ -368,7 +368,7 @@ impl TestContext {
 
     pub fn create_query_properties(&self, yaml: &str) -> Result<Rc<QueryProperties>, CubeError> {
         let options = self.create_query_options_from_yaml(yaml);
-        QueryProperties::try_new(self.query_tools.clone(), options)
+        QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)
     }
 
     #[allow(dead_code)]
@@ -382,7 +382,7 @@ impl TestContext {
         &self,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<String, CubeError> {
-        let request = QueryProperties::try_new(self.query_tools.clone(), options)?;
+        let request = QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)?;
         let planner = TopLevelPlanner::new(request, self.query_tools.clone(), true);
         let (sql, _) = planner.plan()?;
         Ok(sql)
@@ -394,7 +394,7 @@ impl TestContext {
     ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml(query);
         let ctx = self.for_options(options.as_ref())?;
-        let request = QueryProperties::try_new(ctx.query_tools.clone(), options)?;
+        let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
         planner.plan()
     }
@@ -421,7 +421,8 @@ impl TestContext {
         let ctx = self
             .for_options(options.as_ref())
             .expect("Failed to create context");
-        let request = QueryProperties::try_new(ctx.query_tools.clone(), options)
+        let request = QueryPropertiesCompiler::new(ctx.query_tools.clone())
+            .build(options)
             .expect("Failed to create query properties");
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");

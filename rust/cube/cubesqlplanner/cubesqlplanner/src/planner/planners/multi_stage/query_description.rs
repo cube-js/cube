@@ -1,36 +1,21 @@
-use super::{MultiStageAppliedState, MultiStageMember};
+use super::MultiStageMember;
 use crate::logical_plan::LogicalSchema;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberSymbol, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::fmt::Debug;
 use std::rc::Rc;
 
 pub struct MultiStageQueryDescription {
     member: Rc<MultiStageMember>,
-    state: Rc<MultiStageAppliedState>,
+    state: Rc<QueryProperties>,
     input: Vec<Rc<MultiStageQueryDescription>>,
     alias: String,
-}
-
-impl Debug for MultiStageQueryDescription {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MultiStageQueryDescription")
-            .field(
-                "member_node",
-                &format!("node with path {}", self.member_node().full_name()),
-            )
-            .field("state", &self.state)
-            .field("input", &self.input)
-            .field("alias", &self.alias)
-            .finish()
-    }
 }
 
 impl MultiStageQueryDescription {
     pub fn new(
         member: Rc<MultiStageMember>,
-        state: Rc<MultiStageAppliedState>,
+        state: Rc<QueryProperties>,
         input: Vec<Rc<MultiStageQueryDescription>>,
         alias: String,
     ) -> Rc<Self> {
@@ -49,6 +34,7 @@ impl MultiStageQueryDescription {
             .set_measures(vec![self.member_node().clone()])
             .into_rc()
     }
+
     pub fn member_node(&self) -> &Rc<MemberSymbol> {
         &self.member.evaluation_node()
     }
@@ -61,8 +47,8 @@ impl MultiStageQueryDescription {
         &self.member
     }
 
-    pub fn state(&self) -> Rc<MultiStageAppliedState> {
-        self.state.clone()
+    pub fn state(&self) -> &Rc<QueryProperties> {
+        &self.state
     }
 
     pub fn member_name(&self) -> String {
@@ -124,8 +110,8 @@ impl MultiStageQueryDescription {
         dimensions: &mut Vec<Rc<MemberSymbol>>,
         time_dimensions: &mut Vec<Rc<MemberSymbol>>,
     ) {
-        dimensions.extend(self.state.dimensions_symbols().iter().cloned());
-        time_dimensions.extend(self.state.time_dimensions_symbols().iter().cloned());
+        dimensions.extend(self.state.dimensions().iter().cloned());
+        time_dimensions.extend(self.state.time_dimensions().iter().cloned());
         for child in self.input.iter() {
             child.collect_all_non_multi_stage_dimension_impl(dimensions, time_dimensions);
         }
@@ -134,8 +120,8 @@ impl MultiStageQueryDescription {
     pub fn is_match_member_and_state(
         &self,
         member_node: &Rc<MemberSymbol>,
-        state: &Rc<MultiStageAppliedState>,
+        state: &Rc<QueryProperties>,
     ) -> bool {
-        member_node.full_name() == self.member_name() && state == &self.state
+        member_node.full_name() == self.member_name() && state.eq_as_state(&self.state)
     }
 }

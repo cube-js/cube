@@ -1,6 +1,7 @@
-use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::test_fixtures::cube_bridge::{members_from_strings, MockBaseQueryOptions, MockSchema};
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use std::rc::Rc;
 
 #[test]
 fn test_member_to_alias() {
@@ -409,4 +410,31 @@ async fn test_segment_with_subquery_dimension_in_view_with_dimension() {
     {
         insta::assert_snapshot!(result);
     }
+}
+
+#[test]
+fn test_explicit_empty_order_omits_order_by_clause() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(test_context.query_tools().cube_evaluator().clone())
+            .base_tools(test_context.query_tools().base_tools().clone())
+            .join_graph(test_context.query_tools().join_graph().clone())
+            .security_context(test_context.security_context().clone())
+            .measures(Some(members_from_strings(vec!["cube_a.count"])))
+            .dimensions(Some(members_from_strings(vec!["cube_c.code"])))
+            .order(Some(vec![]))
+            .build(),
+    );
+
+    let sql = test_context
+        .build_sql_from_options(options)
+        .expect("Should generate SQL with explicit empty order");
+
+    assert!(
+        !sql.to_uppercase().contains("ORDER BY"),
+        "ORDER BY should be absent when order is explicitly empty, got: {sql}"
+    );
 }

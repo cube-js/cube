@@ -3,7 +3,7 @@ use crate::planner::DimensionTimeShift;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct TimeShiftState {
     pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
 }

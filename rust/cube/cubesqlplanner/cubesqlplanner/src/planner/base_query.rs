@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::top_level_planner::TopLevelPlanner;
-use super::QueryProperties;
+use super::{QueryProperties, QueryPropertiesCompiler};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
 use crate::logical_plan::PreAggregationUsage;
@@ -61,7 +61,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.static_data().member_to_alias.clone(),
         )?;
 
-        let request = QueryProperties::try_new(query_tools.clone(), options)?;
+        let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;
 
         Ok(Self {
             context,
