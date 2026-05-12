@@ -28,7 +28,7 @@ fn measure_count_properties() {
     assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn measure_sum_properties() {
     assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn measure_avg_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn measure_min_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn measure_max_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn measure_count_distinct_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn measure_count_distinct_approx_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn measure_running_total_properties() {
     assert!(measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -158,7 +158,7 @@ fn measure_number_agg_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn measure_calculated_number_properties() {
     assert!(measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn measure_rank_properties() {
     assert!(!measure.is_calculated());
     assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]

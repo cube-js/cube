@@ -487,7 +487,7 @@ impl QueryProperties {
                     }
                     let is_multiplied_measure = if item.multiplied {
                         if let Ok(measure) = item.measure.as_measure() {
-                            if measure.can_used_as_addictive_in_multplied() {
+                            if measure.is_additive_in_multiplied() {
                                 false
                             } else {
                                 true

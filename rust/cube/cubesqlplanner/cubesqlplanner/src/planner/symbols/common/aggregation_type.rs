@@ -1,5 +1,7 @@
 use cubenativeutils::CubeError;
 
+/// Aggregation function declared on a measure in the data model
+/// (`sum`, `avg`, `min`, `max`, distinct counts, etc.).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AggregationType {
     Sum,

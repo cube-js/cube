@@ -9,6 +9,10 @@ use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// `MemberSymbol::TimeDimension` body: a base time dimension viewed
+/// at a chosen granularity and (optionally) restricted to a date
+/// range. Not declared in the data model — created at query time on
+/// top of an existing time dimension.
 #[derive(Clone)]
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
@@ -75,6 +79,8 @@ impl TimeDimensionSymbol {
         Ok(res)
     }
 
+    /// Returns a copy of the symbol with the granularity replaced;
+    /// the base symbol and date range are preserved.
     pub fn change_granularity(
         &self,
         query_tools: Rc<QueryTools>,
@@ -104,14 +110,21 @@ impl TimeDimensionSymbol {
         &self.compiled_path
     }
 
+    /// Trims the join-chain prefix from `compiled_path` in place so
+    /// the path points only at the owning cube.
     pub fn strip_join_prefix(&mut self) {
         self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
+    /// Full unique identifier of the symbol: cube path, base
+    /// dimension name and the granularity suffix.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }
 
+    /// Granularity name appended to the base symbol's alias and full
+    /// name (e.g. `day`, `month`). Defaults to `day` when no
+    /// granularity is set.
     pub fn alias_suffix(&self) -> String {
         self.alias_suffix.clone()
     }
@@ -128,6 +141,9 @@ impl TimeDimensionSymbol {
         self.date_range.clone().map(|(from, to)| vec![from, to])
     }
 
+    /// Like `get_dependencies`, but wraps any time-dimension dep in
+    /// a `TimeDimensionSymbol` carrying this symbol's granularity and
+    /// date range. Non-time-dimension deps pass through unchanged.
     pub fn get_dependencies_as_time_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
         self.get_dependencies()
             .into_iter()
@@ -201,6 +217,9 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_multi_stage()
     }
 
+    /// False if the granularity defines its own calendar SQL — the
+    /// symbol then materially computes a value rather than forwarding
+    /// to its base. Otherwise delegates to the base symbol.
     pub fn is_reference(&self) -> bool {
         if let Some(granularity_obj) = &self.granularity_obj {
             if granularity_obj.calendar_sql().is_some() {
@@ -211,6 +230,9 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_reference()
     }
 
+    /// The base member this time dimension references, re-wrapped in
+    /// a `TimeDimensionSymbol` with the same granularity and date
+    /// range. `None` if the base is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if let Some(base_symbol) = self.base_symbol.clone().reference_member() {
             let new_time_dim = Self::new(
@@ -229,6 +251,8 @@ impl TimeDimensionSymbol {
         self.compiled_path.name().clone()
     }
 
+    /// Minimum granularity implied by the `date_range` bounds — the
+    /// smallest unit that still fully contains both endpoints.
     pub fn date_range_granularity(
         &self,
         query_tools: Rc<QueryTools>,
@@ -248,6 +272,10 @@ impl TimeDimensionSymbol {
         }
     }
 
+    /// Granularity to roll up to when matching this time dimension
+    /// against a pre-aggregation. For predefined granularities or
+    /// custom granularities not aligned with the requested date range,
+    /// returns the minimum granularity needed to cover both.
     pub fn rollup_granularity(
         &self,
         query_tools: Rc<QueryTools>,
@@ -289,6 +317,10 @@ impl TimeDimensionSymbol {
         }
     }
 
+    /// Adjusts `date_range` so the start aligns with the
+    /// granularity's origin when the granularity is custom
+    /// (non-predefined). Predefined granularities and missing ranges
+    /// pass through unchanged.
     pub fn get_range_for_time_series(
         &self,
         date_range: Option<Vec<String>>,

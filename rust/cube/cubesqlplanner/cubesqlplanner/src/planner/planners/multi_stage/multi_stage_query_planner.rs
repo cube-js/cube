@@ -470,7 +470,7 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
-                let ungrouped = measure.is_rolling_window() && !measure.is_addictive();
+                let ungrouped = measure.is_rolling_window() && !measure.is_additive();
 
                 let mut time_dimensions = self
                     .query_properties

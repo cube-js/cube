@@ -4,6 +4,8 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// `Aggregated` measure kind. `sql` may be absent when the measure
+/// is built from a `case` body.
 #[derive(Clone)]
 pub struct AggregatedMeasure {
     agg_type: AggregationType,
