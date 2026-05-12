@@ -24,7 +24,9 @@ You can use OIDC workload identity to authenticate to:
 - **Data sources** — AWS Athena, Redshift, BigQuery, Snowflake, and any other
   driver that supports federated credentials.
 - **Export buckets** — S3 and GCS buckets used for `EXPORT_BUCKET` pre-aggregation
-  unloads.
+  unloads. OIDC covers Cube's download of the unloaded objects; the warehouse's
+  `UNLOAD` write still needs its own credentials configured on the client side
+  — see the per-cloud guides for details.
 - **Cube Store CSPS** — a per-deployment S3 / GCS bucket that holds your
   Cube Store pre-aggregations (Customer-Supplied Pre-aggregation Storage).
 - **Bring-your-own LLM providers** — AWS Bedrock, Google Vertex AI, and Azure

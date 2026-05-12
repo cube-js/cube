@@ -261,6 +261,21 @@ deployment's service account read / write access to the bucket.
   </Step>
 </Steps>
 
+<Warning>
+
+OIDC only covers Cube's **read** side of the export bucket. The data
+warehouse itself (BigQuery, Snowflake on GCP, …) runs the `UNLOAD` /
+`EXPORT DATA` that writes objects to the bucket, and the warehouse cannot
+federate with Cube's OIDC issuer. You still need to provide **separate
+credentials for the unload** so the warehouse can write to GCS — typically
+an HMAC key pair or a warehouse-side service-account integration — via the
+standard export bucket env vars (e.g.
+`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`, or the driver-specific
+storage-integration variables). OIDC then handles Cube's download of the
+unloaded objects from the bucket.
+
+</Warning>
+
 ## Direct federation
 
 If you'd rather skip the service account impersonation hop, grant

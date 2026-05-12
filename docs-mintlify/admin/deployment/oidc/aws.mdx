@@ -309,6 +309,21 @@ deployment's default identity is the simplest place to put this.
   </Step>
 </Steps>
 
+<Warning>
+
+OIDC only covers Cube's **read** side of the export bucket. The data
+warehouse itself (Snowflake, Redshift, Athena, BigQuery, …) runs the
+`UNLOAD` that writes objects to the bucket, and the warehouse cannot
+federate with Cube's OIDC issuer. You still need to provide **separate
+credentials for the `UNLOAD`** so the warehouse can write to S3 — typically
+an AWS access key pair or a warehouse-side storage integration / IAM role
+— via the standard export bucket env vars (e.g.
+`CUBEJS_DB_EXPORT_BUCKET_AWS_KEY` and `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET`,
+or the driver-specific storage-integration variables). OIDC then handles
+Cube's download of the unloaded objects from the bucket.
+
+</Warning>
+
 ## Cube Store CSPS bucket
 
 Cube Store CSPS lets you store pre-aggregations in your own S3 bucket.

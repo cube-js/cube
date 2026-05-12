@@ -231,6 +231,21 @@ Contributor** on the storage account.
   </Step>
 </Steps>
 
+<Warning>
+
+OIDC only covers Cube's **read** side of the export bucket. The data
+warehouse itself (Snowflake on Azure, Synapse, …) runs the `UNLOAD` that
+writes objects to Blob Storage, and the warehouse cannot federate with
+Cube's OIDC issuer. You still need to provide **separate credentials for
+the unload** so the warehouse can write to the container — typically a
+storage account key, SAS token, or a warehouse-side storage integration —
+via the standard export bucket env vars (e.g.
+`CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY`, or the driver-specific
+storage-integration variables). OIDC then handles Cube's download of the
+unloaded objects from the bucket.
+
+</Warning>
+
 ## Scaling past 20 federated credentials
 
 A single app registration accepts at most **20 federated credentials**.
