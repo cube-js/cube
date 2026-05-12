@@ -1,14 +1,12 @@
-use super::collectors::JoinHintsCollector;
 use super::symbols::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use super::SymbolPath;
 use super::SymbolPathType;
 use super::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
-    DimensionSymbolFactory, MeasureSymbolFactory, SqlCall, SymbolFactory, TraversalVisitor,
+    DimensionSymbolFactory, MeasureSymbolFactory, SqlCall, SymbolFactory,
 };
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::sql_call_builder::SqlCallBuilder;
@@ -18,6 +16,11 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Compilation context for the planner. Resolves data-model
+/// declarations into `MemberSymbol`s, caches them by `SymbolPath`,
+/// and holds the JS-side interfaces (cube evaluator, base tools,
+/// security context) together with query-level metadata (timezone,
+/// alias overrides).
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
@@ -49,6 +52,9 @@ impl Compiler {
         }
     }
 
+    /// Parses `name` as a `SymbolPath` and resolves it as the
+    /// appropriate member kind (dimension, measure, or segment).
+    /// Errors if the path points at a cube reference.
     pub fn add_auto_resolved_member_evaluator(
         &mut self,
         name: String,
@@ -65,6 +71,8 @@ impl Compiler {
         }
     }
 
+    /// Resolves a measure by data-model path (`cube.measure` or a
+    /// cross-cube form). Cached.
     pub fn add_measure_evaluator(
         &mut self,
         measure: String,
@@ -87,6 +95,9 @@ impl Compiler {
         }
     }
 
+    /// Resolves a dimension by data-model path. When the path turns
+    /// out to point at a segment, falls back to a parenthesized
+    /// member-expression wrapper.
     pub fn add_dimension_evaluator(
         &mut self,
         dimension: String,
@@ -117,6 +128,9 @@ impl Compiler {
         }
     }
 
+    /// Resolves a segment by data-model path. Segments are
+    /// materialised as `MemberExpression` members so they plug into
+    /// the same machinery as other members.
     pub fn add_segment_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
         self.add_segment_evaluator_by_path(path)
@@ -149,6 +163,8 @@ impl Compiler {
         Ok(result)
     }
 
+    /// Resolves a cube as an identifier — for `{CUBE}` / `{TABLE}`
+    /// placeholders. Cached by the normalised path.
     pub fn add_cube_name_evaluator(
         &mut self,
         cube_name: String,
@@ -166,6 +182,8 @@ impl Compiler {
         }
     }
 
+    /// Resolves a cube as a table expression — for `{CUBE.sql()}`
+    /// placeholders. Cached by the normalised path.
     pub fn add_cube_table_evaluator(
         &mut self,
         cube_name: String,
@@ -183,24 +201,20 @@ impl Compiler {
         }
     }
 
-    pub fn join_hints(&self) -> Result<Vec<JoinHintItem>, CubeError> {
-        let mut collector = JoinHintsCollector::new();
-        for member in self.members.values() {
-            collector.apply(member, &())?;
-        }
-        Ok(collector.extract_result())
-    }
-
     pub fn timezone(&self) -> Tz {
         self.timezone.clone()
     }
 
+    /// Looks up an explicit alias override for a member's full name;
+    /// `None` when no override is set.
     pub fn alias_for_member(&self, full_name: &str) -> Option<String> {
         self.member_to_alias
             .as_ref()
             .and_then(|m| m.get(full_name).cloned())
     }
 
+    /// Compiles a JS `MemberSql` declaration into a `SqlCall` bound
+    /// to the given owning cube, via `SqlCallBuilder`.
     pub fn compile_sql_call(
         &mut self,
         cube_name: &String,

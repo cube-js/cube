@@ -14,6 +14,10 @@ pub enum SymbolPathType {
     CubeTable,
 }
 
+/// Resolved path of a member or cube reference in the data model:
+/// parsed from a dotted string (`cube.member`, `cube.cube2.dim`,
+/// `cube.time_dim.day`, `CUBE`, `CUBE.__sql_fn`), with its
+/// `SymbolPathType` and the chain of cubes traversed along the way.
 #[derive(Debug, Clone)]
 pub struct SymbolPath {
     path_type: SymbolPathType,
@@ -47,11 +51,16 @@ impl SymbolPath {
         }
     }
 
+    /// Parses a dotted path string by walking the data model through
+    /// the provided `CubeEvaluator`.
     pub fn parse(cube_evaluator: Rc<dyn CubeEvaluator>, path: &str) -> Result<Self, CubeError> {
         let parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
         Self::parse_parts(cube_evaluator, None, &parts)
     }
 
+    /// Parses pre-split path segments resolved relative to
+    /// `current_cube` — so the first segment may refer to a member
+    /// of `current_cube` directly.
     pub fn parse_parts(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         current_cube: Option<&str>,
