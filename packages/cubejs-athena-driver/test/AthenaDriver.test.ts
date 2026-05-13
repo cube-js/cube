@@ -75,10 +75,9 @@ describe('AthenaDriver', () => {
   });
 
   test('pollTimeout cancels the in-flight Athena query', async () => {
-    // Use a fresh driver with an aggressive pollTimeout so the test
-    // doesn't depend on the default CUBEJS_DB_QUERY_TIMEOUT.
-    const cancelDriver = new AthenaDriver({});
-    (cancelDriver as any).config.pollTimeout = 5_000;
+    // Aggressive pollTimeout (5s) so the test doesn't depend on the
+    // ambient CUBEJS_DB_QUERY_TIMEOUT. Constructor multiplies by 1000.
+    const cancelDriver = new AthenaDriver({ pollTimeout: 5 });
     const athena = (cancelDriver as any).athena;
 
     const startOriginal = athena.startQueryExecution.bind(athena);

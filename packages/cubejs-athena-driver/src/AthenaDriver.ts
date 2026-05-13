@@ -564,7 +564,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     try {
       await this.athena.stopQueryExecution({ QueryExecutionId: qid.QueryExecutionId });
     } catch (e) {
-      console.warn(`[AthenaDriver] Failed to stop Athena query ${qid.QueryExecutionId}: ${e}`);
+      console.warn(`Failed to stop Athena query ${qid.QueryExecutionId}: ${e}`);
     }
   }
 
