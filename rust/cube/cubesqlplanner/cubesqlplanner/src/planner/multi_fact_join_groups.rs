@@ -10,12 +10,17 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// A single measure paired with the complete set of join hints it
+/// needs — base query hints plus the measure's own incremental hints.
 #[derive(Clone, Debug)]
 pub struct MeasureJoinHints {
     pub measure: Rc<MemberSymbol>,
     pub hints: JoinHints,
 }
 
+/// Accumulates the join-hint context of a query (initial
+/// `query_join_hints`, dimensions, filters) and produces
+/// `MeasuresJoinHints` for a given set of measures.
 pub struct MeasuresJoinHintsBuilder {
     initial_hints: JoinHints,
     dimensions: Vec<Rc<MemberSymbol>>,
@@ -52,6 +57,13 @@ impl MeasuresJoinHintsBuilder {
     }
 }
 
+/// Join-hint context of a query split into:
+///
+/// - `base_hints` — hints shared across all measures (query-level
+///   hints plus those collected from dimensions and filters).
+/// - `measure_hints` — per-measure incremental hints, one entry per
+///   non-multi-stage measure. Multi-stage measures plan their joins
+///   separately and are skipped here.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
@@ -59,6 +71,7 @@ pub struct MeasuresJoinHints {
 }
 
 impl MeasuresJoinHints {
+    /// Start a builder seeded with the query-level join hints.
     pub fn builder(query_join_hints: &JoinHints) -> MeasuresJoinHintsBuilder {
         MeasuresJoinHintsBuilder {
             initial_hints: query_join_hints.clone(),
@@ -67,6 +80,8 @@ impl MeasuresJoinHints {
         }
     }
 
+    /// Reuse the existing `base_hints` to produce a new
+    /// `MeasuresJoinHints` over a different measure subset.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         Self::from_base_hints(self.base_hints.clone(), measures)
     }
@@ -108,6 +123,9 @@ impl MeasuresJoinHints {
         &self.measure_hints
     }
 
+    /// Combined hints for a specific measure (base plus the measure's
+    /// own), or `None` when the measure has no entry — typically
+    /// because it is multi-stage.
     pub fn hints_for_measure(&self, measure: &MemberSymbol) -> Option<JoinHints> {
         self.measure_hints
             .iter()
@@ -118,6 +136,14 @@ impl MeasuresJoinHints {
 
 // --- MultiFactJoinGroups: builds actual join trees ---
 
+/// Resolves a query's `MeasuresJoinHints` into concrete join trees
+/// and groups measures by the `JoinKey` of the cube graph they share.
+/// More than one group means the query is **multi-fact**: it touches
+/// measures from cubes that cannot be combined under a single join.
+///
+/// Per-cube join paths from the root of each group are precomputed so
+/// `resolve_join_path_for_dimension` / `resolve_join_path_for_measure`
+/// are cheap lookups at render time.
 #[derive(Clone)]
 pub struct MultiFactJoinGroups {
     query_tools: Rc<QueryTools>,
@@ -130,6 +156,8 @@ pub struct MultiFactJoinGroups {
 }
 
 impl MultiFactJoinGroups {
+    /// Builds the join trees from `measures_join_hints` and groups
+    /// measures by the resulting `JoinKey`.
     pub fn try_new(
         query_tools: Rc<QueryTools>,
         measures_join_hints: MeasuresJoinHints,
@@ -145,6 +173,8 @@ impl MultiFactJoinGroups {
         })
     }
 
+    /// Rebuilds the groups for a different measure subset, reusing
+    /// the shared `base_hints`.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         let new_hints = self.measures_join_hints.for_measures(measures)?;
         Self::try_new(self.query_tools.clone(), new_hints)
@@ -194,6 +224,7 @@ impl MultiFactJoinGroups {
         &self.measures_join_hints
     }
 
+    /// True when the query's measures span more than one join tree.
     pub fn is_multi_fact(&self) -> bool {
         self.groups.len() > 1
     }
@@ -272,6 +303,9 @@ impl MultiFactJoinGroups {
         Ok(paths)
     }
 
+    /// The only join when the query has exactly one group; errors if
+    /// the query is multi-fact, and `Ok(None)` if it has no groups
+    /// at all.
     pub fn single_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
         if self.groups.is_empty() {
             return Ok(None);
