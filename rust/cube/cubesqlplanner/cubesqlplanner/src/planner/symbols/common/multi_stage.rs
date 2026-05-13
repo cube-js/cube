@@ -42,6 +42,11 @@ pub struct MultiStageFilter {
     pub exclude: Option<Vec<Rc<MemberSymbol>>>,
     pub keep_only: Option<Vec<Rc<MemberSymbol>>>,
     pub include_dimension: Vec<FilterItem>,
+    // Currently always empty: `FilterCompiler::add_item` only buckets
+    // Dimension / Measure, so time-dim include filters land in
+    // `include_dimension`. Field kept for structural symmetry with
+    // `QueryProperties` (dim / time-dim / measure); will be populated once
+    // `FilterCompiler` classifies time-dimension filters separately.
     pub include_time_dimension: Vec<FilterItem>,
     pub include_measure: Vec<FilterItem>,
 }

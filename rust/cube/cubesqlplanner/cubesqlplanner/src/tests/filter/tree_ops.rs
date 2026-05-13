@@ -1,8 +1,8 @@
-use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::filter::base_filter::{BaseFilter, FilterType};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::filter_operator::FilterOperator;
 use crate::planner::filter::tree_ops;
+use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;

@@ -17,16 +17,15 @@ use crate::planner::symbols::AggregationType;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
-use crate::planner::MultiStageFilter;
-use crate::planner::MultiStageFilterMode;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
 use crate::planner::MemberSymbol;
+use crate::planner::MultiStageFilter;
+use crate::planner::MultiStageFilterMode;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -40,27 +39,48 @@ use std::rc::Rc;
 pub struct MultiStageQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
-    // The initial multi-stage CTE state, set on entry to `plan_queries` and
-    // used by `mode: fixed` filter directives to reset accumulated state back
-    // to root regardless of the current node's mutations.
-    root_state: RefCell<Option<Rc<QueryProperties>>>,
+    // The initial multi-stage CTE state. Shared immutably; any mutation goes
+    // through `as_ref().clone()` on the consumer side. Used both as the entry
+    // state for the recursive planner and as the reset target for `mode:
+    // fixed` filter directives.
+    root_state: Rc<QueryProperties>,
 }
 
 impl MultiStageQueryPlanner {
-    pub fn new(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
-        Self {
+    pub fn try_new(
+        query_tools: Rc<QueryTools>,
+        query_properties: Rc<QueryProperties>,
+    ) -> Result<Self, CubeError> {
+        let root_state = Self::build_root_state(&query_tools, &query_properties)?;
+        Ok(Self {
             query_tools,
             query_properties,
-            root_state: RefCell::new(None),
-        }
+            root_state,
+        })
     }
 
-    fn root_state(&self) -> Rc<QueryProperties> {
-        self.root_state
-            .borrow()
-            .as_ref()
-            .expect("root_state must be initialized in plan_queries before use")
-            .clone()
+    // The CTE-side mirror of `query_properties`: same dimensions/filters/
+    // segments, but `measures_filters` are intentionally dropped (CTE queries
+    // do not propagate them) and `order_by` is forced to an empty vec so the
+    // builder skips default_order — this value is only ever used as a state
+    // container, never planned directly.
+    fn build_root_state(
+        query_tools: &Rc<QueryTools>,
+        query_properties: &Rc<QueryProperties>,
+    ) -> Result<Rc<QueryProperties>, CubeError> {
+        QueryProperties::builder()
+            .query_tools(query_tools.clone())
+            .dimensions(query_properties.dimensions().clone())
+            .time_dimensions(query_properties.time_dimensions().clone())
+            .dimensions_filters(query_properties.dimensions_filters().clone())
+            .time_dimensions_filters(query_properties.time_dimensions_filters().clone())
+            .segments(query_properties.segments().clone())
+            .order_by(Some(vec![]))
+            .build()
+    }
+
+    fn root_state(&self) -> &Rc<QueryProperties> {
+        &self.root_state
     }
 
     /// Populates `cte_state` with multi-stage CTEs (and their
@@ -84,21 +104,7 @@ impl MultiStageQueryPlanner {
         }
 
         let mut descriptions = Vec::new();
-        // Multi-stage CTE state: a query carrying the dimensions/filters of the
-        // current node in the multi-stage tree. measures_filters are
-        // intentionally dropped — CTE queries do not propagate them. order_by
-        // is set to an empty vec so the builder skips default_order: this
-        // value is used only as a state container, never planned directly.
-        let state = QueryProperties::builder()
-            .query_tools(self.query_tools.clone())
-            .dimensions(self.query_properties.dimensions().clone())
-            .time_dimensions(self.query_properties.time_dimensions().clone())
-            .dimensions_filters(self.query_properties.dimensions_filters().clone())
-            .time_dimensions_filters(self.query_properties.time_dimensions_filters().clone())
-            .segments(self.query_properties.segments().clone())
-            .order_by(Some(vec![]))
-            .build()?;
-        *self.root_state.borrow_mut() = Some(state.clone());
+        let state = self.root_state.clone();
 
         let mut resolved_multi_stage_dimensions = HashSet::new();
 
