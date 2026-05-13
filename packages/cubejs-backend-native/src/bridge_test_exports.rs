@@ -91,6 +91,9 @@ use cubesqlplanner::cube_bridge::{
     timeshift_definition::{
         time_shift_definition_bridge_fields_meta, NativeTimeShiftDefinition, TimeShiftDefinition,
     },
+    view_filter_definition::{
+        view_filter_definition_bridge_fields_meta, NativeViewFilterDefinition,
+    },
 };
 use neon::prelude::*;
 use std::any::Any;
@@ -451,6 +454,7 @@ bridge_registry! {
     "sqlUtils"                    => NativeSqlUtils,                    sql_utils_bridge_fields_meta,                    invoke_sql_utils;
     "structWithSqlMember"         => NativeStructWithSqlMember,         struct_with_sql_member_bridge_fields_meta,       invoke_struct_with_sql_member;
     "timeShiftDefinition"         => NativeTimeShiftDefinition,         time_shift_definition_bridge_fields_meta,        invoke_time_shift_definition;
+    "viewFilterDefinition"        => NativeViewFilterDefinition,        view_filter_definition_bridge_fields_meta,       invoke_view_filter_definition;
 }
 
 fn list_bridge_fields_inner<IT: InnerTypes>(
@@ -708,10 +712,17 @@ fn invoke_time_shift_definition<IT: InnerTypes>(b: &NativeTimeShiftDefinition<IT
     r
 }
 
+fn invoke_view_filter_definition<IT: InnerTypes>(
+    _b: &NativeViewFilterDefinition<IT>,
+) -> InvokeResult {
+    InvokeResult::new()
+}
+
 fn invoke_cube_definition<IT: InnerTypes>(b: &NativeCubeDefinition<IT>) -> InvokeResult {
     let mut r = InvokeResult::new();
     r.record("sql_table", b.sql_table());
     r.record("sql", b.sql());
+    r.record("filters", b.filters());
     r
 }
 

@@ -131,10 +131,20 @@ export const preAggregationDescriptionFixture = (): unknown => ({
   // measure_references, dimension_references, etc — all optional getters
 });
 
+export const viewFilterDefinitionFixture = (): unknown => ({
+  operator: 'equals',
+  memberReference: 'orders.currency',
+  // Values are stringified by CubeEvaluator.prepareViewFilters before reaching
+  // Tesseract; nulls are kept to exercise the Option<Vec<Option<String>>> shape.
+  valuesReferences: ['USD', null],
+  unlessReferences: ['orders.currency'],
+});
+
 export const cubeDefinitionFixture = (): unknown => ({
   name: 'Orders',
   // sqlAlias, isView, isCalendar, joinMap optional
   // sql_table, sql optional getters
+  filters: [viewFilterDefinitionFixture()],
 });
 
 export const dimensionDefinitionFixture = (): unknown => ({
@@ -270,4 +280,5 @@ export const FIXTURES: Record<string, BridgeFixtureFactory> = {
   sqlUtils: sqlUtilsFixture,
   structWithSqlMember: structWithSqlMemberFixture,
   timeShiftDefinition: timeShiftDefinitionFixture,
+  viewFilterDefinition: viewFilterDefinitionFixture,
 };

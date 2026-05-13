@@ -13,6 +13,7 @@ import {
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
   type ToString,
+  ViewDefaultValueFilter,
   ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -147,6 +148,7 @@ export type EvaluatedCube = {
   accessPolicy?: AccessPolicyDefinition[];
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
+  filters?: ViewDefaultValueFilter[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -207,8 +209,84 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareFolders(cube, errorReporter);
 
     this.prepareAccessPolicy(cube, errorReporter);
+    this.prepareViewFilters(cube, errorReporter);
 
     return cube;
+  }
+
+  private prepareViewFilters(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.filters) {
+      return;
+    }
+
+    const included = (cube.includedMembers as ViewIncludedMember[] | undefined) || [];
+
+    const resolveViewMember = (memberType: string, reference: string): string | null => {
+      let lookupName = reference;
+      let lookupPath: string | null = null;
+
+      if (reference.indexOf('.') !== -1) {
+        const parts = reference.split('.');
+        if (parts[0] === cube.name) {
+          // Identifier form resolved via view's own namespace, e.g. 'orders_view.currency'
+          lookupName = parts.slice(1).join('.');
+        } else {
+          // Fully-qualified member path, e.g. 'orders.currency'
+          lookupPath = reference;
+        }
+      }
+
+      const match = lookupPath
+        ? included.find((m) => m.memberPath === lookupPath)
+        : included.find((m) => m.name === lookupName);
+
+      if (!match) {
+        errorReporter.error(
+          `Member '${reference}' used as ${memberType} in default value filter is not included in view '${cube.name}'`
+        );
+        return null;
+      }
+      return match.memberPath;
+    };
+
+    for (const filter of cube.filters as ViewDefaultValueFilter[]) {
+      const rawMember = this.evaluateReferences(cube.name, filter.member);
+      const resolved = resolveViewMember('member', rawMember);
+      if (resolved !== null) {
+        filter.memberReference = resolved;
+      }
+
+      if (filter.values) {
+        const evaluated = filter.values();
+        if (!Array.isArray(evaluated)) {
+          errorReporter.error(
+            `'values' in default value filter for view '${cube.name}' must evaluate to an array, got: ${typeof evaluated}`
+          );
+        } else {
+          // Coerce to strings to match the FilterItem.values contract used by
+          // regular query filters (Option<Vec<Option<String>>> on the Rust side).
+          filter.valuesReferences = evaluated.map(
+            (v) => (v === null || v === undefined ? null : String(v))
+          );
+        }
+      }
+
+      if (filter.unless) {
+        const rawUnless = this.evaluateReferences(
+          cube.name,
+          filter.unless,
+          { originalSorting: true }
+        );
+        const resolvedUnless: string[] = [];
+        for (const ref of rawUnless) {
+          const r = resolveViewMember('unless', ref);
+          if (r !== null) {
+            resolvedUnless.push(r);
+          }
+        }
+        filter.unlessReferences = resolvedUnless;
+      }
+    }
   }
 
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {

@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { prepareCompiler, prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaWithCustomGranularitiesAndTimeShift, createCubeSchemaWithAccessPolicy } from './utils';
+import {
+  createCubeSchema,
+  createCubeSchemaWithCustomGranularitiesAndTimeShift,
+  createCubeSchemaWithAccessPolicy,
+  createViewSchemaWithDefaultValueFilter,
+} from './utils';
 
 const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'];
 
@@ -558,6 +563,173 @@ describe('Schema Testing', () => {
   });
 
   describe('Views', () => {
+    it('default value filters resolve member/values/unless references', async () => {
+      const { compiler, cubeEvaluator } = prepareJsCompiler([
+        createViewSchemaWithDefaultValueFilter(),
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const view = cubeEvaluator.evaluatedCubes.orders_view;
+      const filters = view.filters!;
+      expect(filters).toHaveLength(3);
+
+      expect(filters[0].operator).toBe('equals');
+      expect(filters[0].memberReference).toBe('orders.currency');
+      expect(filters[0].valuesReferences).toEqual(['USD']);
+      expect(filters[0].unlessReferences).toEqual(['orders.currency', 'orders.country']);
+
+      expect(filters[1].operator).toBe('set');
+      expect(filters[1].memberReference).toBe('orders.country');
+      expect(filters[1].valuesReferences).toBeUndefined();
+      expect(filters[1].unlessReferences).toBeUndefined();
+
+      expect(filters[2].operator).toBe('in');
+      expect(filters[2].memberReference).toBe('orders.id');
+      // Values are coerced to strings to match the FilterItem contract used
+      // by regular query filters on the Rust side.
+      expect(filters[2].valuesReferences).toEqual(['1', '2', 'true', 'draft', null]);
+    });
+
+    it('default value filter: short, real-path and view-path forms all resolve to the real member path', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+          },
+          measures: {
+            count: { type: \`count\` },
+          },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{ join_path: orders, includes: '*' }],
+          filters: [
+            { member: \`currency\`, operator: 'set' },
+            { member: \`orders.currency\`, operator: 'set' },
+            { member: \`orders_view.currency\`, operator: 'set' },
+          ],
+        })
+      `;
+      const { compiler, cubeEvaluator } = prepareJsCompiler([schema]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const filters = cubeEvaluator.evaluatedCubes.orders_view.filters!;
+      expect(filters.map(f => f.memberReference)).toEqual([
+        'orders.currency',
+        'orders.currency',
+        'orders.currency',
+      ]);
+    });
+
+    it('default value filter: member not included in view raises an error', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+            country: { type: \`string\`, sql: \`country\`, public: true },
+          },
+          measures: {
+            count: { type: \`count\` },
+          },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{
+            join_path: orders,
+            includes: ['id', 'currency'],
+          }],
+          filters: [
+            { member: \`country\`, operator: 'set' },
+          ],
+        })
+      `;
+      const { compiler } = prepareJsCompiler([schema]);
+
+      try {
+        await compiler.compile();
+        compiler.throwIfAnyErrors();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(
+          /Member 'country' used as member in default value filter is not included in view 'orders_view'/
+        );
+      }
+    });
+
+    it('default value filter: unless references must also be included in the view', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+            country: { type: \`string\`, sql: \`country\`, public: true },
+          },
+          measures: {
+            count: { type: \`count\` },
+          },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{
+            join_path: orders,
+            includes: ['id', 'currency'],
+          }],
+          filters: [
+            { member: \`currency\`, operator: 'set', unless: [\`country\`] },
+          ],
+        })
+      `;
+      const { compiler } = prepareJsCompiler([schema]);
+
+      try {
+        await compiler.compile();
+        compiler.throwIfAnyErrors();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(
+          /Member 'country' used as unless in default value filter is not included in view 'orders_view'/
+        );
+      }
+    });
+
+    it('default value filter: fully-qualified path from a non-included cube raises an error', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+          },
+          measures: { count: { type: \`count\` } },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{ join_path: orders, includes: '*' }],
+          filters: [
+            { member: \`other.currency\`, operator: 'set' },
+          ],
+        })
+      `;
+      const { compiler } = prepareJsCompiler([schema]);
+
+      try {
+        await compiler.compile();
+        compiler.throwIfAnyErrors();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(
+          /Member 'other\.currency' used as member in default value filter is not included in view 'orders_view'/
+        );
+      }
+    });
+
     it('extends custom granularities and timeshifts', async () => {
       const { compiler, cubeEvaluator } = prepareJsCompiler([
         createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')

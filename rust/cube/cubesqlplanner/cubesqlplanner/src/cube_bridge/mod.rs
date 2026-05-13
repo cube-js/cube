@@ -37,3 +37,4 @@ pub mod sql_utils;
 pub mod string_or_sql;
 pub mod struct_with_sql_member;
 pub mod timeshift_definition;
+pub mod view_filter_definition;

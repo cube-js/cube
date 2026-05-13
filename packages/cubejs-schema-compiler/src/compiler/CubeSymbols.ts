@@ -148,6 +148,16 @@ export type AccessPolicyDefinition = {
   }[]
 };
 
+export type ViewDefaultValueFilter = {
+  member: (...args: Array<unknown>) => ToString;
+  memberReference?: string;
+  operator: string;
+  values?: (...args: Array<unknown>) => Array<unknown>;
+  valuesReferences?: Array<unknown>;
+  unless?: (...args: Array<unknown>) => Array<ToString>;
+  unlessReferences?: string[];
+};
+
 export type ViewIncludedMember = {
   type: string;
   memberPath: string;
@@ -216,6 +226,7 @@ export interface CubeDefinition {
   isView?: boolean;
   viewGroup?: string | ((...args: any[]) => any);
   viewGroups?: string[] | ((...args: any[]) => any);
+  filters?: ViewDefaultValueFilter[];
   calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: ViewIncludedMember[];
