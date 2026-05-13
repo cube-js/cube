@@ -10,6 +10,7 @@ import {
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
+import { pipeline } from 'stream';
 import R from 'ramda';
 import {
   BigQuery,
@@ -343,7 +344,21 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     });
 
     const rowStream = new HydrationStream();
-    stream.pipe(rowStream);
+
+    // Use stream.pipeline rather than stream.pipe so that:
+    //  (a) errors emitted by the BigQuery source stream (e.g. an HTTP
+    //      response that fails type coercion in BigQuery) propagate to the
+    //      returned rowStream's `error` event instead of escaping as an
+    //      unhandled rejection and killing the Node process — see
+    //      cube-js/cube#10875.
+    //  (b) consumer-side destruction of rowStream propagates back to the
+    //      BigQuery source stream, preventing the source from continuing to
+    //      page results into the void after the consumer has gone away.
+    pipeline(stream, rowStream, () => {
+      // No-op: pipeline destroys rowStream with the error on its own; the
+      // callback exists only to satisfy the pipeline signature and to
+      // prevent an unhandled rejection inside pipeline itself.
+    });
 
     return {
       rowStream,
