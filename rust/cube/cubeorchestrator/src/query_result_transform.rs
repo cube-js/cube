@@ -679,8 +679,6 @@ pub fn get_vanilla_row(
                 let Some(value) = row.get(source_member_name) else {
                     continue;
                 };
-
-                // so a row missing the finest column still falls back to a coarser one
                 match best {
                     Some((best_level, _)) if best_level < level => {}
                     _ => best = Some((level, value)),
