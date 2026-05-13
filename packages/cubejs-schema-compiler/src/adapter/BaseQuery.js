@@ -3793,6 +3793,16 @@ export class BaseQuery {
           funDef = this.countDistinctApprox(evaluateSql);
         } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
           funDef = `count(distinct ${evaluateSql})`;
+        } else if (symbol.type === 'p25') {
+          funDef = `PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+        } else if (symbol.type === 'p50') {
+          funDef = `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+        } else if (symbol.type === 'p75') {
+          funDef = `PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+        } else if (symbol.type === 'p90') {
+          funDef = `PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+        } else if (symbol.type === 'p95') {
+          funDef = `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${evaluateSql})`;
         } else if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
           // TODO calculated measure type will be ungrouped
           // if (this.multiStageDimensions.length !== this.dimensions.length) {
@@ -3813,6 +3823,16 @@ export class BaseQuery {
       return `count(distinct ${evaluateSql})`;
     } else if (symbol.type === 'runningTotal') {
       return `sum(${evaluateSql})`; // TODO
+    } else if (symbol.type === 'p25') {
+      return `PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+    } else if (symbol.type === 'p50') {
+      return `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+    } else if (symbol.type === 'p75') {
+      return `PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+    } else if (symbol.type === 'p90') {
+      return `PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+    } else if (symbol.type === 'p95') {
+      return `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${evaluateSql})`;
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {
