@@ -1130,6 +1130,41 @@ const folderSchema = Joi.object().keys({
   ]).required(),
 }).id('folderSchema');
 
+const ViewFilterSchema = Joi.object().keys({
+  member: Joi.func().required(),
+  operator: Joi.any().valid(
+    'equals',
+    'notEquals',
+    'contains',
+    'notContains',
+    'startsWith',
+    'notStartsWith',
+    'endsWith',
+    'notEndsWith',
+    'in',
+    'notIn',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'set',
+    'notSet',
+    'inDateRange',
+    'notInDateRange',
+    'onTheDate',
+    'beforeDate',
+    'beforeOrOnDate',
+    'afterDate',
+    'afterOrOnDate',
+  ).required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.func().optional(),
+    otherwise: Joi.func().required()
+  }),
+  unless: Joi.func(),
+});
+
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
   viewGroup: Joi.alternatives([Joi.string(), Joi.func()]),
@@ -1160,6 +1195,7 @@ const viewSchema = inherit(baseSchema, {
     })
   ),
   folders: Joi.array().items(folderSchema),
+  filters: Joi.array().items(ViewFilterSchema),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
