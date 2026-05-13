@@ -17,12 +17,20 @@ class AthenaDriverTest extends DriverTests {
   }
 }
 
-// 100M-row aggregation runs for ~5-30s on a small Athena workgroup —
-// long enough for the test to call `.cancel()` before it finishes.
+// A row-by-row regex+concat over a 49999×49999 cross-join forces full
+// materialization (no aggregate pushdown), so Athena cannot finish
+// before the driver's pollTimeout fires.
 const SLOW_QUERY = `
   SELECT count(*) AS c
-  FROM unnest(sequence(1, 100000000)) AS t(i)
-  WHERE i % 2 = 0
+  FROM (
+    SELECT length(regexp_replace(
+      CONCAT(CAST(a.i * b.j + 7919 AS VARCHAR), '-', CAST(a.i AS VARCHAR)),
+      '[0-9]', 'd'
+    )) AS n
+    FROM unnest(sequence(1, 49999)) AS a(i)
+    CROSS JOIN unnest(sequence(1, 49999)) AS b(j)
+  )
+  WHERE n > 0
 `;
 
 describe('AthenaDriver', () => {
@@ -66,76 +74,41 @@ describe('AthenaDriver', () => {
     await tests.testUnloadEmpty();
   });
 
-  const expectQueryCancelled = async (queryExecutionId: string) => {
-    const athena = (driver as any).athena;
-    for (let i = 0; i < 30; i++) {
-      const exec = await athena.getQueryExecution({ QueryExecutionId: queryExecutionId });
-      const state = exec.QueryExecution?.Status?.State;
-      if (state === QueryExecutionState.CANCELLED || state === QueryExecutionState.FAILED) {
-        return;
-      }
-      if (state === QueryExecutionState.SUCCEEDED) {
-        throw new Error(`Athena query ${queryExecutionId} succeeded before cancel took effect`);
-      }
-      await pausePromise(500);
-    }
-    throw new Error(`Athena query ${queryExecutionId} did not reach a terminal state within 15s of cancel`);
-  };
+  test('pollTimeout cancels the in-flight Athena query', async () => {
+    // Use a fresh driver with an aggressive pollTimeout so the test
+    // doesn't depend on the default CUBEJS_DB_QUERY_TIMEOUT.
+    const cancelDriver = new AthenaDriver({});
+    (cancelDriver as any).config.pollTimeout = 5_000;
+    const athena = (cancelDriver as any).athena;
 
-  const captureStartedQueryId = () => {
-    const athena = (driver as any).athena;
-    const original = athena.startQueryExecution.bind(athena);
-    const captured = { id: '' };
+    const startOriginal = athena.startQueryExecution.bind(athena);
+    let queryExecutionId = '';
     athena.startQueryExecution = async (input: any) => {
-      const result = await original(input);
-      if (!captured.id && result.QueryExecutionId) {
-        captured.id = result.QueryExecutionId;
-      }
+      const result = await startOriginal(input);
+      queryExecutionId = result.QueryExecutionId;
       return result;
     };
-    const restore = () => {
-      athena.startQueryExecution = original;
-    };
-    return { captured, restore };
-  };
 
-  test('query cancel propagates StopQueryExecution to Athena', async () => {
-    const { captured, restore } = captureStartedQueryId();
     try {
-      const promise = driver.query(SLOW_QUERY, []) as Promise<unknown> & { cancel: () => Promise<void> };
-      expect(typeof promise.cancel).toBe('function');
+      await expect(cancelDriver.query(SLOW_QUERY, [])).rejects.toThrow(/Athena job timeout/);
+      expect(queryExecutionId).toBeTruthy();
 
-      while (!captured.id) {
-        await pausePromise(100);
+      // Verify Athena's own view of the query: must be CANCELLED (or
+      // FAILED, if a cancel raced with completion) — never SUCCEEDED.
+      for (let i = 0; i < 30; i++) {
+        const exec = await athena.getQueryExecution({ QueryExecutionId: queryExecutionId });
+        const state = exec.QueryExecution?.Status?.State;
+        if (state === QueryExecutionState.CANCELLED || state === QueryExecutionState.FAILED) {
+          return;
+        }
+        if (state === QueryExecutionState.SUCCEEDED) {
+          throw new Error(`Athena query ${queryExecutionId} succeeded before cancel took effect`);
+        }
+        await pausePromise(500);
       }
-
-      await promise.cancel();
-      await expect(promise).rejects.toBeDefined();
-      await expectQueryCancelled(captured.id);
+      throw new Error(`Athena query ${queryExecutionId} did not reach a terminal state within 15s of cancel`);
     } finally {
-      restore();
-    }
-  });
-
-  test('stream cancel propagates StopQueryExecution to Athena', async () => {
-    const { captured, restore } = captureStartedQueryId();
-    try {
-      // stream() awaits success before resolving, so the in-flight
-      // cancel goes through the promise's .cancel — not release(),
-      // which only runs after stream() has already resolved.
-      const promise = driver.stream(SLOW_QUERY, [], { highWaterMark: 100 }) as
-        Promise<unknown> & { cancel: () => Promise<void> };
-      expect(typeof promise.cancel).toBe('function');
-
-      while (!captured.id) {
-        await pausePromise(100);
-      }
-
-      await promise.cancel();
-      await expect(promise).rejects.toBeDefined();
-      await expectQueryCancelled(captured.id);
-    } finally {
-      restore();
+      await cancelDriver.release();
     }
   });
 });
