@@ -110,6 +110,7 @@ impl<'de> Deserialize<'de> for InternedKey {
 /// Lookup key for `IndexMap<Arc<InternedKey>, V, PrehashedBuildHasher>` that
 /// avoids allocating an `Arc<InternedKey>` per lookup. Computes the hash of
 /// the borrowed `&str` once at construction.
+/// TODO: It will be removed after migration streaming to columnar format
 pub struct InternedKeyLookup<'a> {
     hash: u64,
     text: &'a str,
