@@ -112,3 +112,40 @@ export class FakeRowStream extends stream.Readable {
     }
   }
 }
+
+// Pushes rows whose field values are unsupported types (nested arrays) for the
+// native bridge's JsValueObject::get. Used to trigger a deterministic
+// `transform_response` failure on the Rust side without depending on a
+// specific backing database's error path.
+//
+// Each pushed row has the shape `{ <dimension>: [<nested>, <array>] }` — the
+// bridge's primitive-type extractor rejects JsArray values and returns
+// `Err(...)`. The error must flow through `JsWriteStream::reject` rather than
+// panicking; see cube-js/cube#10875.
+export class FakeMalformedRowStream extends stream.Readable {
+  protected readonly fieldNames: string[];
+
+  public constructor(query: any) {
+    super({
+      objectMode: true,
+      highWaterMark: 1024,
+    });
+    this.fieldNames = [
+      ...(query.dimensions || []),
+      ...(query.measures || []),
+    ];
+    if (this.fieldNames.length === 0) {
+      throw new Error('FakeMalformedRowStream requires at least one dimension or measure');
+    }
+    this.setMaxListeners(10);
+  }
+
+  public _read(_size: number) {
+    const row: Record<string, unknown> = {};
+    for (const field of this.fieldNames) {
+      row[field] = [1, 2, 3];
+    }
+    this.push(row);
+    this.push(null);
+  }
+}

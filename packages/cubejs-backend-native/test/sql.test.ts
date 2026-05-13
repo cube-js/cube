@@ -4,7 +4,7 @@ import { Writable } from 'stream';
 
 import * as native from '../js';
 import metaFixture from './meta';
-import { FakeRowStream } from './response-fake';
+import { FakeRowStream, FakeMalformedRowStream } from './response-fake';
 
 const _logger = jest.fn(({ event }) => {
   if (
@@ -567,5 +567,80 @@ describe('SQLInterface', () => {
     } finally {
       await native.shutdownInterface(instance, 'fast');
     }
+  });
+
+  // Regression test for #10875: a chunk that fails to decode in the native
+  // bridge's transform_response must surface as a stream error, not a panic
+  // that kills the process.
+  it('does not crash node when a stream chunk fails to transform', async () => {
+    if (process.env.CUBESQL_STREAM_MODE !== 'true') {
+      expect(process.env.CUBESQL_STREAM_MODE).toBeFalsy();
+      return;
+    }
+
+    const baseMethods = interfaceMethods();
+    const instance = await native.registerInterface({
+      pgPort: 5556,
+      ...baseMethods,
+      sqlApiLoad: jest.fn(async ({ query, streaming }) => {
+        if (streaming) {
+          return { stream: new FakeMalformedRowStream(query) };
+        }
+        return { error: 'non-streaming path not exercised by this test' };
+      }),
+      stream: jest.fn(async ({ query }) => ({
+        stream: new FakeMalformedRowStream(query),
+      })),
+      canSwitchUserForSession: (_payload) => true,
+    });
+
+    let buf = '';
+    const errors: string[] = [];
+
+    const write = jest.fn((chunk, _, callback) => {
+      const lines = (buf + chunk.toString('utf-8')).split('\n');
+      buf = lines.pop() || '';
+
+      for (const line of lines.filter((it) => it.trim().length)) {
+        const json = JSON.parse(line);
+        if (json.error) {
+          errors.push(json.error);
+        }
+      }
+
+      callback();
+    });
+
+    const cubeSqlStream = new Writable({ write });
+
+    try {
+      // LIMIT above non_streaming_query_max_row_limit (50000) forces the
+      // streaming path
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
+        cubeSqlStream
+      );
+    } catch (_e) {
+      // execSql may resolve or reject here — we only assert no crash below
+    }
+
+    if (buf.length > 0) {
+      const json = JSON.parse(buf);
+      if (json.error) {
+        errors.push(json.error);
+      }
+    }
+
+    expect(errors.length).toBeGreaterThan(0);
+
+    // A panic caught by Neon also puts the message on the wire, prefixed
+    // with "internal error in Neon module" — its absence is what
+    // distinguishes clean reject() propagation from the old panic.
+    const errorBlob = errors.join('\n');
+    expect(errorBlob).toContain('Expected primitive value');
+    expect(errorBlob).not.toContain('internal error in Neon module');
+
+    await native.shutdownInterface(instance, 'fast');
   });
 });
