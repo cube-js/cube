@@ -428,14 +428,16 @@ pub(crate) struct VanillaGranularityTrack<'a> {
     level: u8,
 }
 
-/// Resolved at plan time: for each deprecated-style base time dimension (one that
-/// appears in the query only via `{cube}.{dim}.{granularity}` aliases), points at
-/// the column whose transformed value should also be exposed under the bare
-/// `{cube}.{dim}` key. Picks the lowest granularity level; ties resolve to the
-/// last column encountered, matching the previous per-row HashMap behavior.
+/// Resolved at plan time: for each deprecated-style base time dimension (one
+/// that appears in the query only via `{cube}.{dim}.{granularity}` aliases),
+/// the list of source columns whose value can be reused under the bare
+/// `{cube}.{dim}` key. Candidates are kept in column-encounter order. At row
+/// time we pick the lowest-level candidate whose value is actually present —
+/// so a row missing the finest column still falls back to a coarser one, as
+/// the previous per-row HashMap did. Ties resolve to the last column.
 pub(crate) struct VanillaGranularityExtra<'a> {
     base_member: &'a str,
-    source_member_name: &'a str,
+    candidates: Vec<(u8, &'a str)>,
 }
 
 pub struct VanillaPlan<'a> {
@@ -450,7 +452,7 @@ pub fn build_vanilla_plan<'a>(
     query: &NormalizedQuery,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
-    let mut winners: IndexMap<&'a str, (u8, &'a str)> = IndexMap::new();
+    let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, &'a str)>> = IndexMap::new();
 
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
@@ -462,12 +464,10 @@ pub fn build_vanilla_plan<'a>(
         let member_type = annotation_for_member.member_type.as_deref().unwrap_or("");
 
         if let Some(track) = compute_vanilla_granularity_track(member_name, query) {
-            match winners.get(track.base_member) {
-                Some(&(existing_level, _)) if existing_level < track.level => {}
-                _ => {
-                    winners.insert(track.base_member, (track.level, member_name));
-                }
-            }
+            candidates_for_base
+                .entry(track.base_member)
+                .or_default()
+                .push((track.level, member_name));
         }
 
         columns.push(VanillaColumnPlan {
@@ -477,14 +477,12 @@ pub fn build_vanilla_plan<'a>(
         });
     }
 
-    let minimal_granularity_extras = winners
+    let minimal_granularity_extras = candidates_for_base
         .into_iter()
-        .map(
-            |(base_member, (_, source_member_name))| VanillaGranularityExtra {
-                base_member,
-                source_member_name,
-            },
-        )
+        .map(|(base_member, candidates)| VanillaGranularityExtra {
+            base_member,
+            candidates,
+        })
         .collect();
 
     Ok(VanillaPlan {
@@ -670,12 +668,26 @@ pub fn get_vanilla_row(
         }
     }
 
-    // Handle deprecated time dimensions without granularity. The winning column
-    // (lowest granularity level) was resolved at plan build time; copy its already
-    // transformed value out of the row rather than re-running `transform_value`.
+    // Handle deprecated time dimensions without granularity. The candidate
+    // columns were collected at plan build time; pick the lowest-level one
+    // whose transformed value is actually present in this row
     if !plan.minimal_granularity_extras.is_empty() {
         for extra in &plan.minimal_granularity_extras {
-            if let Some(value) = row.get(extra.source_member_name) {
+            let mut best: Option<(u8, &DBResponsePrimitive)> = None;
+
+            for &(level, source_member_name) in &extra.candidates {
+                let Some(value) = row.get(source_member_name) else {
+                    continue;
+                };
+
+                // so a row missing the finest column still falls back to a coarser one
+                match best {
+                    Some((best_level, _)) if best_level < level => {}
+                    _ => best = Some((level, value)),
+                }
+            }
+
+            if let Some((_, value)) = best {
                 row.insert(extra.base_member.to_string(), value.clone());
             }
         }
@@ -3341,5 +3353,108 @@ mod tests {
         let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
             .expect("should produce a track");
         assert_eq!(track.base_member, "Cube.orderDate");
+    }
+
+    fn make_config_item(member_type: &str) -> ConfigItem {
+        ConfigItem {
+            title: None,
+            short_title: None,
+            description: None,
+            member_type: Some(member_type.to_string()),
+            format: None,
+            currency: None,
+            meta: None,
+            drill_members: None,
+            drill_members_grouped: None,
+            granularities: None,
+            granularity: None,
+        }
+    }
+
+    /// Two granularity columns share the same base time dim. When the finer
+    /// candidate's value is missing from the row, the bare `{cube}.{dim}` key
+    /// must fall back to the coarser candidate — same behavior as the previous
+    /// per-row HashMap, which only considered columns whose value was present.
+    #[test]
+    fn test_get_vanilla_row_minimal_granularity_falls_back_when_finer_missing() -> Result<()> {
+        let mut columns_pos: IndexMap<String, usize> = IndexMap::new();
+        columns_pos.insert("t_day".to_string(), 2); // out of range in the row below
+        columns_pos.insert("t_month".to_string(), 0);
+        columns_pos.insert("city".to_string(), 1);
+
+        let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
+        alias_to_member_name_map.insert("t_day".to_string(), "Cube.t.day".to_string());
+        alias_to_member_name_map.insert("t_month".to_string(), "Cube.t.month".to_string());
+        alias_to_member_name_map.insert("city".to_string(), "Cube.city".to_string());
+
+        let mut annotation: HashMap<String, ConfigItem> = HashMap::new();
+        annotation.insert("Cube.t.day".to_string(), make_config_item("time"));
+        annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
+        annotation.insert("Cube.city".to_string(), make_config_item("string"));
+
+        let query = make_query_with_dims(None);
+        let plan =
+            build_vanilla_plan(&columns_pos, &alias_to_member_name_map, &annotation, &query)?;
+
+        // Row only has two cells, so column_index 2 (t_day) yields None.
+        let db_row = vec![
+            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
+            DBResponsePrimitive::String("Missouri City".to_string()),
+        ];
+        let res = get_vanilla_row(&plan, &QueryType::RegularQuery, &query, &db_row)?;
+
+        let month_transformed = transform_value(
+            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
+            "time",
+        );
+        assert_eq!(res.get("Cube.t.month"), Some(&month_transformed));
+        assert_eq!(res.get("Cube.t.day"), None, "missing column stays absent");
+        assert_eq!(
+            res.get("Cube.city"),
+            Some(&DBResponsePrimitive::String("Missouri City".to_string()))
+        );
+        assert_eq!(
+            res.get("Cube.t"),
+            Some(&month_transformed),
+            "bare base key must fall back to the coarser present candidate"
+        );
+        Ok(())
+    }
+
+    /// When all candidates are present, the bare key picks the finest level.
+    #[test]
+    fn test_get_vanilla_row_minimal_granularity_picks_finest_when_all_present() -> Result<()> {
+        let mut columns_pos: IndexMap<String, usize> = IndexMap::new();
+        columns_pos.insert("t_day".to_string(), 0);
+        columns_pos.insert("t_month".to_string(), 1);
+
+        let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
+        alias_to_member_name_map.insert("t_day".to_string(), "Cube.t.day".to_string());
+        alias_to_member_name_map.insert("t_month".to_string(), "Cube.t.month".to_string());
+
+        let mut annotation: HashMap<String, ConfigItem> = HashMap::new();
+        annotation.insert("Cube.t.day".to_string(), make_config_item("time"));
+        annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
+
+        let query = make_query_with_dims(None);
+        let plan =
+            build_vanilla_plan(&columns_pos, &alias_to_member_name_map, &annotation, &query)?;
+
+        let db_row = vec![
+            DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
+            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
+        ];
+        let res = get_vanilla_row(&plan, &QueryType::RegularQuery, &query, &db_row)?;
+
+        let day_transformed = transform_value(
+            DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
+            "time",
+        );
+        assert_eq!(
+            res.get("Cube.t"),
+            Some(&day_transformed),
+            "bare base key must use the finest (day) candidate, not month"
+        );
+        Ok(())
     }
 }
