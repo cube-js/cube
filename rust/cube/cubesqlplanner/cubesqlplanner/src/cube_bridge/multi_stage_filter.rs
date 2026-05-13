@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, nativebridge::NativeBridgeStatic)]
 pub struct MultiStageFilterReferencesStatic {
     pub mode: Option<String>,
     #[serde(rename = "excludeReferences")]
@@ -17,5 +17,5 @@ pub struct MultiStageFilterReferencesStatic {
     pub include: Option<Vec<NativeFilterItem>>,
 }
 
-#[nativebridge::native_bridge(MultiStageFilterReferencesStatic)]
+#[nativebridge::native_bridge(MultiStageFilterReferencesStatic, with_static_meta)]
 pub trait MultiStageFilterReferences {}
