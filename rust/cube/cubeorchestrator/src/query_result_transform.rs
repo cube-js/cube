@@ -418,7 +418,9 @@ pub fn get_compact_row(
 /// and member-name parsing for every cell.
 pub struct VanillaColumnPlan<'a> {
     column_index: usize,
-    member_name: &'a str,
+    /// Interned IndexMap key for this column. Cloned via [`Arc::clone`] per row
+    /// (atomic refcount inc) instead of allocating a fresh `String`.
+    key: Arc<str>,
     member_type: &'a str,
 }
 
@@ -436,13 +438,29 @@ pub(crate) struct VanillaGranularityTrack<'a> {
 /// so a row missing the finest column still falls back to a coarser one, as
 /// the previous per-row HashMap did. Ties resolve to the last column.
 pub(crate) struct VanillaGranularityExtra<'a> {
-    base_member: &'a str,
+    /// Interned IndexMap key for the bare `{cube}.{dim}` base member.
+    /// Built once at plan time and cloned via [`Arc::clone`] per row.
+    base_key: Arc<str>,
     candidates: Vec<(u8, &'a str)>,
 }
 
 pub struct VanillaPlan<'a> {
     columns: Vec<VanillaColumnPlan<'a>>,
     minimal_granularity_extras: Vec<VanillaGranularityExtra<'a>>,
+    /// Pre-computed tail entry that depends only on the query, not the row.
+    tail: VanillaTail,
+}
+
+enum VanillaTail {
+    None,
+    CompareDateRange {
+        key: Arc<str>,
+        value: DBResponsePrimitive,
+    },
+    Blending {
+        blending_key: Arc<str>,
+        response_key: String,
+    },
 }
 
 pub fn build_vanilla_plan<'a>(
@@ -450,6 +468,7 @@ pub fn build_vanilla_plan<'a>(
     alias_to_member_name_map: &'a HashMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
     query: &NormalizedQuery,
+    query_type: &QueryType,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
     let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, &'a str)>> = IndexMap::new();
@@ -472,7 +491,7 @@ pub fn build_vanilla_plan<'a>(
 
         columns.push(VanillaColumnPlan {
             column_index: index,
-            member_name,
+            key: Arc::from(member_name),
             member_type,
         });
     }
@@ -480,14 +499,29 @@ pub fn build_vanilla_plan<'a>(
     let minimal_granularity_extras = candidates_for_base
         .into_iter()
         .map(|(base_member, candidates)| VanillaGranularityExtra {
-            base_member,
+            base_key: Arc::from(base_member),
             candidates,
         })
         .collect();
 
+    let tail = match query_type {
+        QueryType::CompareDateRangeQuery => VanillaTail::CompareDateRange {
+            key: Arc::from(COMPARE_DATE_RANGE_FIELD),
+            value: get_date_range_value(query.time_dimensions.as_ref())?,
+        },
+        QueryType::BlendingQuery => VanillaTail::Blending {
+            blending_key: Arc::from(
+                get_blending_query_key(query.time_dimensions.as_ref())?.as_str(),
+            ),
+            response_key: get_blending_response_key(query.time_dimensions.as_ref())?,
+        },
+        _ => VanillaTail::None,
+    };
+
     Ok(VanillaPlan {
         columns,
         minimal_granularity_extras,
+        tail,
     })
 }
 
@@ -650,13 +684,13 @@ fn build_columnar_columns(
     columns
 }
 
-/// Convert DB response object to the vanilla output format.
+/// Convert DB response object to the vanilla output format. Keys are
+/// interned `Arc<str>` values cloned from `plan.columns[i].key` (atomic
+/// refcount inc) instead of allocating a fresh `String` per cell.
 pub fn get_vanilla_row(
     plan: &VanillaPlan<'_>,
-    query_type: &QueryType,
-    query: &NormalizedQuery,
     db_row: &[DBResponsePrimitive],
-) -> Result<IndexMap<String, DBResponsePrimitive>> {
+) -> Result<IndexMap<Arc<str>, DBResponsePrimitive>> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
     let mut row =
         IndexMap::with_capacity(plan.columns.len() + plan.minimal_granularity_extras.len() + 1);
@@ -664,7 +698,7 @@ pub fn get_vanilla_row(
     for column in &plan.columns {
         if let Some(value) = db_row.get(column.column_index) {
             let transformed_value = transform_value(value.clone(), column.member_type);
-            row.insert(column.member_name.to_string(), transformed_value);
+            row.insert(Arc::clone(&column.key), transformed_value);
         }
     }
 
@@ -686,25 +720,24 @@ pub fn get_vanilla_row(
             }
 
             if let Some((_, value)) = best {
-                row.insert(extra.base_member.to_string(), value.clone());
+                row.insert(Arc::clone(&extra.base_key), value.clone());
             }
         }
     }
 
-    match query_type {
-        QueryType::CompareDateRangeQuery => {
-            let date_range_value = get_date_range_value(query.time_dimensions.as_ref())?;
-            row.insert("compareDateRange".to_string(), date_range_value);
+    match &plan.tail {
+        VanillaTail::None => {}
+        VanillaTail::CompareDateRange { key, value } => {
+            row.insert(Arc::clone(key), value.clone());
         }
-        QueryType::BlendingQuery => {
-            let blending_key = get_blending_query_key(query.time_dimensions.as_ref())?;
-            let response_key = get_blending_response_key(query.time_dimensions.as_ref())?;
-
-            if let Some(value) = row.get(&response_key) {
-                row.insert(blending_key, value.clone());
+        VanillaTail::Blending {
+            blending_key,
+            response_key,
+        } => {
+            if let Some(value) = row.get(response_key.as_str()) {
+                row.insert(Arc::clone(blending_key), value.clone());
             }
         }
-        _ => {}
     }
 
     Ok(row)
@@ -818,7 +851,7 @@ pub enum TransformedData {
         members: Vec<String>,
         columns: Vec<Vec<DBResponsePrimitive>>,
     },
-    Vanilla(Vec<IndexMap<String, DBResponsePrimitive>>),
+    Vanilla(Vec<IndexMap<Arc<str>, DBResponsePrimitive>>),
 }
 
 impl TransformedData {
@@ -876,11 +909,12 @@ impl TransformedData {
                     alias_to_member_name_map,
                     annotation,
                     query,
+                    query_type,
                 )?;
                 let dataset: Vec<_> = cube_store_result
                     .rows
                     .iter()
-                    .map(|row| get_vanilla_row(&plan, query_type, query, row))
+                    .map(|row| get_vanilla_row(&plan, row))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(TransformedData::Vanilla(dataset))
             }
@@ -3126,15 +3160,16 @@ mod tests {
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         )?;
-        let res = get_vanilla_row(&plan, query_type, &query, &raw_data.rows[0])?;
-        let expected = IndexMap::from([
+        let res = get_vanilla_row(&plan, &raw_data.rows[0])?;
+        let expected: IndexMap<Arc<str>, DBResponsePrimitive> = IndexMap::from([
             (
-                "ECommerceRecordsUs2021.city".to_string(),
+                Arc::<str>::from("ECommerceRecordsUs2021.city"),
                 DBResponsePrimitive::String("Missouri City".to_string()),
             ),
             (
-                "ECommerceRecordsUs2021.avg_discount".to_string(),
+                Arc::<str>::from("ECommerceRecordsUs2021.avg_discount"),
                 DBResponsePrimitive::String("0.80000000000000000000".to_string()),
             ),
         ]);
@@ -3156,12 +3191,14 @@ mod tests {
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         match build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3185,12 +3222,14 @@ mod tests {
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         match build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3391,15 +3430,20 @@ mod tests {
         annotation.insert("Cube.city".to_string(), make_config_item("string"));
 
         let query = make_query_with_dims(None);
-        let plan =
-            build_vanilla_plan(&columns_pos, &alias_to_member_name_map, &annotation, &query)?;
+        let plan = build_vanilla_plan(
+            &columns_pos,
+            &alias_to_member_name_map,
+            &annotation,
+            &query,
+            &QueryType::RegularQuery,
+        )?;
 
         // Row only has two cells, so column_index 2 (t_day) yields None.
         let db_row = vec![
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
             DBResponsePrimitive::String("Missouri City".to_string()),
         ];
-        let res = get_vanilla_row(&plan, &QueryType::RegularQuery, &query, &db_row)?;
+        let res = get_vanilla_row(&plan, &db_row)?;
 
         let month_transformed = transform_value(
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
@@ -3435,14 +3479,19 @@ mod tests {
         annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
 
         let query = make_query_with_dims(None);
-        let plan =
-            build_vanilla_plan(&columns_pos, &alias_to_member_name_map, &annotation, &query)?;
+        let plan = build_vanilla_plan(
+            &columns_pos,
+            &alias_to_member_name_map,
+            &annotation,
+            &query,
+            &QueryType::RegularQuery,
+        )?;
 
         let db_row = vec![
             DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
         ];
-        let res = get_vanilla_row(&plan, &QueryType::RegularQuery, &query, &db_row)?;
+        let res = get_vanilla_row(&plan, &db_row)?;
 
         let day_transformed = transform_value(
             DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
