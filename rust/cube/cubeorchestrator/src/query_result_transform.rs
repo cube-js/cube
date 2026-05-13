@@ -108,9 +108,10 @@ impl<'de> Deserialize<'de> for InternedKey {
 }
 
 /// Lookup key for `IndexMap<Arc<InternedKey>, V, PrehashedBuildHasher>` that
-/// avoids allocating an `Arc<InternedKey>` per lookup. Computes the hash of
-/// the borrowed `&str` once at construction.
-/// TODO: It will be removed after migration streaming to columnar format
+/// avoids allocating an `Arc<InternedKey>` per lookup when the caller only has
+/// a borrowed `&str` (e.g. per-cell `field_name` lookups from the SQL scan
+/// path in `cubejs-backend-native`). Computes the hash of the borrowed `&str`
+/// once at construction.
 pub struct InternedKeyLookup<'a> {
     hash: u64,
     text: &'a str,
@@ -569,16 +570,16 @@ pub(crate) struct VanillaGranularityTrack<'a> {
 /// time we pick the lowest-level candidate whose value is actually present —
 /// so a row missing the finest column still falls back to a coarser one, as
 /// the previous per-row HashMap did. Ties resolve to the last column.
-pub(crate) struct VanillaGranularityExtra<'a> {
+pub(crate) struct VanillaGranularityExtra {
     /// Interned IndexMap key for the bare `{cube}.{dim}` base member.
     /// Built once at plan time and cloned via [`Arc::clone`] per row.
     base_key: Arc<InternedKey>,
-    candidates: Vec<(u8, &'a str)>,
+    candidates: Vec<(u8, Arc<InternedKey>)>,
 }
 
 pub struct VanillaPlan<'a> {
     columns: Vec<VanillaColumnPlan<'a>>,
-    minimal_granularity_extras: Vec<VanillaGranularityExtra<'a>>,
+    minimal_granularity_extras: Vec<VanillaGranularityExtra>,
     /// Pre-computed tail entry that depends only on the query, not the row.
     tail: VanillaTail,
 }
@@ -604,7 +605,7 @@ pub fn build_vanilla_plan<'a>(
     query_type: &QueryType,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
-    let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, &'a str)>> = IndexMap::new();
+    let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, Arc<InternedKey>)>> = IndexMap::new();
 
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
@@ -615,16 +616,18 @@ pub fn build_vanilla_plan<'a>(
         let annotation_for_member = annotation.get(member_name).unwrap();
         let member_type = annotation_for_member.member_type.as_deref().unwrap_or("");
 
+        let key = Arc::new(InternedKey::new(member_name));
+
         if let Some(track) = compute_vanilla_granularity_track(member_name, query) {
             candidates_for_base
                 .entry(track.base_member)
                 .or_default()
-                .push((track.level, member_name));
+                .push((track.level, Arc::clone(&key)));
         }
 
         columns.push(VanillaColumnPlan {
             column_index: index,
-            key: Arc::new(InternedKey::new(member_name)),
+            key,
             member_type,
         });
     }
@@ -846,13 +849,14 @@ pub fn get_vanilla_row(
         for extra in &plan.minimal_granularity_extras {
             let mut best: Option<(u8, &DBResponsePrimitive)> = None;
 
-            for &(level, source_member_name) in &extra.candidates {
-                let Some(value) = row.get(&InternedKeyLookup::new(source_member_name)) else {
+            for (level, source_key) in &extra.candidates {
+                let Some(value) = row.get::<InternedKey>(source_key) else {
                     continue;
                 };
+
                 match best {
-                    Some((best_level, _)) if best_level < level => {}
-                    _ => best = Some((level, value)),
+                    Some((best_level, _)) if best_level < *level => {}
+                    _ => best = Some((*level, value)),
                 }
             }
 
@@ -3587,20 +3591,20 @@ mod tests {
             "time",
         );
         assert_eq!(
-            res.get(&InternedKeyLookup::new("Cube.t.month")),
+            res.get(&InternedKey::new("Cube.t.month")),
             Some(&month_transformed)
         );
         assert_eq!(
-            res.get(&InternedKeyLookup::new("Cube.t.day")),
+            res.get(&InternedKey::new("Cube.t.day")),
             None,
             "missing column stays absent"
         );
         assert_eq!(
-            res.get(&InternedKeyLookup::new("Cube.city")),
+            res.get(&InternedKey::new("Cube.city")),
             Some(&DBResponsePrimitive::String("Missouri City".to_string()))
         );
         assert_eq!(
-            res.get(&InternedKeyLookup::new("Cube.t")),
+            res.get(&InternedKey::new("Cube.t")),
             Some(&month_transformed),
             "bare base key must fall back to the coarser present candidate"
         );
@@ -3642,7 +3646,7 @@ mod tests {
             "time",
         );
         assert_eq!(
-            res.get(&InternedKeyLookup::new("Cube.t")),
+            res.get(&InternedKey::new("Cube.t")),
             Some(&day_transformed),
             "bare base key must use the finest (day) candidate, not month"
         );
