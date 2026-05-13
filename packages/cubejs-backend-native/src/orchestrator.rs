@@ -2,7 +2,8 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
+    DBResponsePrimitive, InternedKeyLookup, RequestResultData, RequestResultDataMulti,
+    TransformedData,
 };
 use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue, ValueObject};
@@ -212,7 +213,8 @@ impl ValueObject for ResultWrapper {
                     )));
                 };
 
-                row.get(field_name).unwrap_or(&DBResponsePrimitive::Null)
+                row.get(&InternedKeyLookup::new(field_name))
+                    .unwrap_or(&DBResponsePrimitive::Null)
             }
         };
 

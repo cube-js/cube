@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use indexmap::IndexMap;
+use indexmap::{Equivalent, IndexMap};
 use itertools::multizip;
 use serde::{
     de::{self, MapAccess, SeqAccess, Visitor},
@@ -15,8 +15,9 @@ use serde::{
 };
 use serde_json::Value;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     fmt::Display,
+    hash::{BuildHasher, Hash, Hasher},
     sync::{Arc, LazyLock},
 };
 
@@ -39,6 +40,136 @@ pub static GRANULARITY_LEVELS: LazyLock<HashMap<&'static str, u8>> = LazyLock::n
     ])
 });
 const DEFAULT_LEVEL_FOR_UNKNOWN: u8 = 10;
+
+/// IndexMap key whose hash is computed once at construction. Combined with
+/// [`PrehashedBuildHasher`], this makes per-row `insert` skip the SipHash13
+/// pass over the string bytes — the hasher just stores and returns the
+/// pre-computed `u64`.
+pub struct InternedKey {
+    hash: u64,
+    text: Box<str>,
+}
+
+impl InternedKey {
+    pub fn new(text: &str) -> Self {
+        Self {
+            hash: hash_str(text),
+            text: text.into(),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+}
+
+fn hash_str(s: &str) -> u64 {
+    let mut h = DefaultHasher::new();
+    s.hash(&mut h);
+    h.finish()
+}
+
+impl Hash for InternedKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
+    }
+}
+
+impl PartialEq for InternedKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash && self.text == other.text
+    }
+}
+impl Eq for InternedKey {}
+
+impl std::fmt::Debug for InternedKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.text, f)
+    }
+}
+
+impl std::fmt::Display for InternedKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
+    }
+}
+
+impl Serialize for InternedKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.text)
+    }
+}
+
+impl<'de> Deserialize<'de> for InternedKey {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text: String = String::deserialize(deserializer)?;
+        Ok(InternedKey::new(&text))
+    }
+}
+
+/// Lookup key for `IndexMap<Arc<InternedKey>, V, PrehashedBuildHasher>` that
+/// avoids allocating an `Arc<InternedKey>` per lookup. Computes the hash of
+/// the borrowed `&str` once at construction.
+pub struct InternedKeyLookup<'a> {
+    hash: u64,
+    text: &'a str,
+}
+
+impl<'a> InternedKeyLookup<'a> {
+    pub fn new(text: &'a str) -> Self {
+        Self {
+            hash: hash_str(text),
+            text,
+        }
+    }
+}
+
+impl Hash for InternedKeyLookup<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
+    }
+}
+
+impl Equivalent<Arc<InternedKey>> for InternedKeyLookup<'_> {
+    fn equivalent(&self, key: &Arc<InternedKey>) -> bool {
+        self.hash == key.hash && self.text == key.as_str()
+    }
+}
+
+/// Pass-through [`BuildHasher`] for IndexMaps keyed by [`InternedKey`] /
+/// [`InternedKeyLookup`]: takes the `u64` they emit and returns it unchanged.
+#[derive(Default, Clone)]
+pub struct PrehashedBuildHasher;
+
+impl BuildHasher for PrehashedBuildHasher {
+    type Hasher = PrehashedHasher;
+
+    fn build_hasher(&self) -> PrehashedHasher {
+        PrehashedHasher(0)
+    }
+}
+
+pub struct PrehashedHasher(u64);
+
+impl Hasher for PrehashedHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, _bytes: &[u8]) {
+        unreachable!("PrehashedHasher only accepts pre-computed u64 hashes via write_u64");
+    }
+
+    fn write_u64(&mut self, n: u64) {
+        self.0 = n;
+    }
+}
+
+pub type VanillaRow = IndexMap<Arc<InternedKey>, DBResponsePrimitive, PrehashedBuildHasher>;
+
+pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
+    IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
+}
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePrimitive {
@@ -418,9 +549,9 @@ pub fn get_compact_row(
 /// and member-name parsing for every cell.
 pub struct VanillaColumnPlan<'a> {
     column_index: usize,
-    /// Interned IndexMap key for this column. Cloned via [`Arc::clone`] per row
-    /// (atomic refcount inc) instead of allocating a fresh `String`.
-    key: Arc<str>,
+    /// Interned IndexMap key for this column with a pre-computed hash.
+    /// Cloned via [`Arc::clone`] per row (atomic refcount inc).
+    key: Arc<InternedKey>,
     member_type: &'a str,
 }
 
@@ -440,7 +571,7 @@ pub(crate) struct VanillaGranularityTrack<'a> {
 pub(crate) struct VanillaGranularityExtra<'a> {
     /// Interned IndexMap key for the bare `{cube}.{dim}` base member.
     /// Built once at plan time and cloned via [`Arc::clone`] per row.
-    base_key: Arc<str>,
+    base_key: Arc<InternedKey>,
     candidates: Vec<(u8, &'a str)>,
 }
 
@@ -454,12 +585,13 @@ pub struct VanillaPlan<'a> {
 enum VanillaTail {
     None,
     CompareDateRange {
-        key: Arc<str>,
+        key: Arc<InternedKey>,
         value: DBResponsePrimitive,
     },
     Blending {
-        blending_key: Arc<str>,
-        response_key: String,
+        blending_key: Arc<InternedKey>,
+        /// Used only for lookup against the per-row map — never inserted.
+        response_key: InternedKey,
     },
 }
 
@@ -491,7 +623,7 @@ pub fn build_vanilla_plan<'a>(
 
         columns.push(VanillaColumnPlan {
             column_index: index,
-            key: Arc::from(member_name),
+            key: Arc::new(InternedKey::new(member_name)),
             member_type,
         });
     }
@@ -499,21 +631,23 @@ pub fn build_vanilla_plan<'a>(
     let minimal_granularity_extras = candidates_for_base
         .into_iter()
         .map(|(base_member, candidates)| VanillaGranularityExtra {
-            base_key: Arc::from(base_member),
+            base_key: Arc::new(InternedKey::new(base_member)),
             candidates,
         })
         .collect();
 
     let tail = match query_type {
         QueryType::CompareDateRangeQuery => VanillaTail::CompareDateRange {
-            key: Arc::from(COMPARE_DATE_RANGE_FIELD),
+            key: Arc::new(InternedKey::new(COMPARE_DATE_RANGE_FIELD)),
             value: get_date_range_value(query.time_dimensions.as_ref())?,
         },
         QueryType::BlendingQuery => VanillaTail::Blending {
-            blending_key: Arc::from(
-                get_blending_query_key(query.time_dimensions.as_ref())?.as_str(),
-            ),
-            response_key: get_blending_response_key(query.time_dimensions.as_ref())?,
+            blending_key: Arc::new(InternedKey::new(&get_blending_query_key(
+                query.time_dimensions.as_ref(),
+            )?)),
+            response_key: InternedKey::new(&get_blending_response_key(
+                query.time_dimensions.as_ref(),
+            )?),
         },
         _ => VanillaTail::None,
     };
@@ -685,15 +819,17 @@ fn build_columnar_columns(
 }
 
 /// Convert DB response object to the vanilla output format. Keys are
-/// interned `Arc<str>` values cloned from `plan.columns[i].key` (atomic
-/// refcount inc) instead of allocating a fresh `String` per cell.
+/// pre-hashed [`InternedKey`] values shared via [`Arc::clone`] from the plan,
+/// turning per-cell hashing/key allocation into an atomic refcount inc.
 pub fn get_vanilla_row(
     plan: &VanillaPlan<'_>,
     db_row: &[DBResponsePrimitive],
-) -> Result<IndexMap<Arc<str>, DBResponsePrimitive>> {
+) -> Result<VanillaRow> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
-    let mut row =
-        IndexMap::with_capacity(plan.columns.len() + plan.minimal_granularity_extras.len() + 1);
+    let mut row = IndexMap::with_capacity_and_hasher(
+        plan.columns.len() + plan.minimal_granularity_extras.len() + 1,
+        PrehashedBuildHasher,
+    );
 
     for column in &plan.columns {
         if let Some(value) = db_row.get(column.column_index) {
@@ -710,7 +846,7 @@ pub fn get_vanilla_row(
             let mut best: Option<(u8, &DBResponsePrimitive)> = None;
 
             for &(level, source_member_name) in &extra.candidates {
-                let Some(value) = row.get(source_member_name) else {
+                let Some(value) = row.get(&InternedKeyLookup::new(source_member_name)) else {
                     continue;
                 };
                 match best {
@@ -734,7 +870,7 @@ pub fn get_vanilla_row(
             blending_key,
             response_key,
         } => {
-            if let Some(value) = row.get(response_key.as_str()) {
+            if let Some(value) = row.get::<InternedKey>(response_key) {
                 row.insert(Arc::clone(blending_key), value.clone());
             }
         }
@@ -851,7 +987,7 @@ pub enum TransformedData {
         members: Vec<String>,
         columns: Vec<Vec<DBResponsePrimitive>>,
     },
-    Vanilla(Vec<IndexMap<Arc<str>, DBResponsePrimitive>>),
+    Vanilla(Vec<VanillaRow>),
 }
 
 impl TransformedData {
@@ -3163,16 +3299,16 @@ mod tests {
             query_type,
         )?;
         let res = get_vanilla_row(&plan, &raw_data.rows[0])?;
-        let expected: IndexMap<Arc<str>, DBResponsePrimitive> = IndexMap::from([
-            (
-                Arc::<str>::from("ECommerceRecordsUs2021.city"),
-                DBResponsePrimitive::String("Missouri City".to_string()),
-            ),
-            (
-                Arc::<str>::from("ECommerceRecordsUs2021.avg_discount"),
-                DBResponsePrimitive::String("0.80000000000000000000".to_string()),
-            ),
-        ]);
+
+        let mut expected: VanillaRow = empty_vanilla_row(2);
+        expected.insert(
+            Arc::new(InternedKey::new("ECommerceRecordsUs2021.city")),
+            DBResponsePrimitive::String("Missouri City".to_string()),
+        );
+        expected.insert(
+            Arc::new(InternedKey::new("ECommerceRecordsUs2021.avg_discount")),
+            DBResponsePrimitive::String("0.80000000000000000000".to_string()),
+        );
         assert_eq!(res, expected);
         Ok(())
     }
@@ -3449,14 +3585,21 @@ mod tests {
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
             "time",
         );
-        assert_eq!(res.get("Cube.t.month"), Some(&month_transformed));
-        assert_eq!(res.get("Cube.t.day"), None, "missing column stays absent");
         assert_eq!(
-            res.get("Cube.city"),
+            res.get(&InternedKeyLookup::new("Cube.t.month")),
+            Some(&month_transformed)
+        );
+        assert_eq!(
+            res.get(&InternedKeyLookup::new("Cube.t.day")),
+            None,
+            "missing column stays absent"
+        );
+        assert_eq!(
+            res.get(&InternedKeyLookup::new("Cube.city")),
             Some(&DBResponsePrimitive::String("Missouri City".to_string()))
         );
         assert_eq!(
-            res.get("Cube.t"),
+            res.get(&InternedKeyLookup::new("Cube.t")),
             Some(&month_transformed),
             "bare base key must fall back to the coarser present candidate"
         );
@@ -3498,7 +3641,7 @@ mod tests {
             "time",
         );
         assert_eq!(
-            res.get("Cube.t"),
+            res.get(&InternedKeyLookup::new("Cube.t")),
             Some(&day_transformed),
             "bare base key must use the finest (day) candidate, not month"
         );
