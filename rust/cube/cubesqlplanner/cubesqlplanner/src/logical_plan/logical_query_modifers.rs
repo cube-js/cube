@@ -1,6 +1,8 @@
 use super::*;
 use crate::planner::query_properties::OrderByItem;
 
+/// Per-query modifiers that sit outside the result schema: paging,
+/// ordering, and the ungrouped flag.
 pub struct LogicalQueryModifiers {
     pub offset: Option<usize>,
     pub limit: Option<usize>,

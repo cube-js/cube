@@ -3,6 +3,9 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// CTE that resolves the actual date range of a time dimension at
+/// query time (used by rolling windows when no literal range is
+/// given).
 pub struct MultiStageGetDateRange {
     pub time_dimension: Rc<MemberSymbol>,
     pub source: Rc<LogicalJoin>,

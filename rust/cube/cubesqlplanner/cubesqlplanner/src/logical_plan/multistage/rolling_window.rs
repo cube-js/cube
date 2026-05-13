@@ -5,6 +5,8 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Regular rolling window: trailing and/or leading bounds, plus a
+/// time-series offset.
 pub struct MultiStageRegularRollingWindow {
     pub trailing: Option<String>,
     pub leading: Option<String>,
@@ -25,6 +27,8 @@ impl PrettyPrint for MultiStageRegularRollingWindow {
     }
 }
 
+/// `to_date` rolling window — bounded by the start of the
+/// specified granularity (month-to-date, year-to-date, …).
 pub struct MultiStageToDateRollingWindow {
     pub granularity_obj: Rc<Granularity>,
 }
@@ -40,6 +44,8 @@ impl PrettyPrint for MultiStageToDateRollingWindow {
     }
 }
 
+/// Flavour of rolling-window calculation: regular trailing/leading
+/// window, `to_date` window, or a running-total accumulation.
 pub enum MultiStageRollingWindowType {
     Regular(MultiStageRegularRollingWindow),
     ToDate(MultiStageToDateRollingWindow),
@@ -58,6 +64,9 @@ impl PrettyPrint for MultiStageRollingWindowType {
     }
 }
 
+/// Rolling-window CTE — combines a time-series CTE (the date axis)
+/// with a measure CTE and applies the chosen rolling computation
+/// to each point on the series.
 pub struct MultiStageRollingWindow {
     pub schema: Rc<LogicalSchema>,
     pub is_ungrouped: bool,

@@ -2,6 +2,8 @@ use crate::logical_plan::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Body of a `LogicalMultiStageMember` — one of the multi-stage
+/// CTE shapes the planner can produce.
 pub enum MultiStageMemberLogicalType {
     LeafMeasure(Rc<MultiStageLeafMeasure>),
     MultipliedMeasure(Rc<AggregateMultipliedSubquery>),
@@ -54,6 +56,8 @@ impl PrettyPrint for MultiStageMemberLogicalType {
     }
 }
 
+/// Named CTE in a multi-stage chain. `Query.multistage_members`
+/// holds one per CTE the source depends on.
 pub struct LogicalMultiStageMember {
     pub name: String,
     pub member_type: MultiStageMemberLogicalType,

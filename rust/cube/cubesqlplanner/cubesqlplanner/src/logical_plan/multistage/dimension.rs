@@ -7,6 +7,8 @@ use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Dimension CTE in a multi-stage chain — materialises a
+/// multi-stage dimension on top of a `FullKeyAggregate` source.
 #[derive(TypedBuilder)]
 pub struct MultiStageDimensionCalculation {
     schema: Rc<LogicalSchema>,

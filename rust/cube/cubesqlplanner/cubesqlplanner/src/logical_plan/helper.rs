@@ -4,6 +4,9 @@ use crate::planner::MemberSymbol;
 
 use super::*;
 use std::rc::Rc;
+/// All member symbols reachable from a schema and its filters —
+/// schema members concatenated with every member referenced in
+/// dimension, segment and measure filter trees.
 pub fn all_symbols(schema: &Rc<LogicalSchema>, filters: &LogicalFilter) -> Vec<Rc<MemberSymbol>> {
     let mut symbols = schema.all_members().cloned().collect_vec();
 

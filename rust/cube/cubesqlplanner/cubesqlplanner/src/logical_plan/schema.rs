@@ -8,6 +8,9 @@ use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
+/// Output shape of a logical-plan node: the dimensions, time
+/// dimensions and measures it exposes, plus the full names of
+/// measures that need multiplied-aggregate handling downstream.
 #[derive(Default, Clone)]
 pub struct LogicalSchema {
     pub time_dimensions: Vec<Rc<MemberSymbol>>,

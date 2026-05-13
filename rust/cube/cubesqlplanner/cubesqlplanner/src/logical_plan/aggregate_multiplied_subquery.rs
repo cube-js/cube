@@ -5,6 +5,12 @@ use std::rc::Rc;
 
 logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, MeasureSubquery]);
 
+/// Subquery that aggregates a multiplied measure: a `keys_subquery`
+/// produces the unique key set, a `source` (cube or
+/// `MeasureSubquery`) supplies the values, optional
+/// `dimension_subqueries` materialise sub-query dimensions, and
+/// `pre_aggregation_override` lets a matched pre-aggregation
+/// short-circuit the whole CTE.
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
     pub keys_subquery: Rc<KeysSubQuery>,

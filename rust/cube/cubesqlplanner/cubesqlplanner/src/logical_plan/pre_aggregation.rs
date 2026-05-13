@@ -5,6 +5,10 @@ use itertools::Itertools;
 use std::{collections::HashMap, rc::Rc};
 use typed_builder::TypedBuilder;
 
+/// A matched pre-aggregation usable as a query source — its table
+/// (or rollup join / union), the members it exposes and its
+/// granularity. The physical builder reads members through the
+/// `*_refererences` helpers.
 #[derive(TypedBuilder)]
 pub struct PreAggregation {
     name: String,

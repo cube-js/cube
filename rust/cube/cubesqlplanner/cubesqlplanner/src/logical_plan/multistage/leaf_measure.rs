@@ -4,6 +4,10 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Leaf CTE of a multi-stage chain — a base query that produces the
+/// raw aggregated values feeding the rest of the chain. Optional
+/// state rendering (`render_measure_as_state`) and time shifts
+/// happen here.
 pub struct MultiStageLeafMeasure {
     pub measures: Vec<Rc<MemberSymbol>>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx

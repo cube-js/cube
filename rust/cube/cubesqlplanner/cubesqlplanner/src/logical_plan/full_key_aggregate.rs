@@ -4,6 +4,8 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Reference to a multi-stage CTE consumed by `FullKeyAggregate`:
+/// the CTE's name plus the symbols it exposes.
 #[derive(TypedBuilder)]
 pub struct MultiStageSubqueryRef {
     name: String,
@@ -37,6 +39,10 @@ impl PrettyPrint for MultiStageSubqueryRef {
     }
 }
 
+/// Top-level aggregating source that stitches together several
+/// multi-stage / multi-fact CTEs into one keyed result. The
+/// physical builder picks a join strategy from `multi_stage_subquery_refs`
+/// and `use_full_join_and_coalesce`.
 #[derive(Clone, TypedBuilder)]
 pub struct FullKeyAggregate {
     schema: Rc<LogicalSchema>,
@@ -50,6 +56,9 @@ impl FullKeyAggregate {
         &self.schema
     }
 
+    /// When true, multi-fact branches are stitched together via a
+    /// FULL OUTER JOIN over keys with COALESCE on dimension columns;
+    /// otherwise an INNER JOIN is used.
     pub fn use_full_join_and_coalesce(&self) -> bool {
         self.use_full_join_and_coalesce
     }
