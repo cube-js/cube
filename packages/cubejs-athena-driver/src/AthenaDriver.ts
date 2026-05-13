@@ -293,6 +293,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         highWaterMark: options.highWaterMark,
       }),
       types,
+      release: async () => { /* canceling is missed in the iter */ },
     };
   }
 
@@ -564,7 +565,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     try {
       await this.athena.stopQueryExecution({ QueryExecutionId: qid.QueryExecutionId });
     } catch (e) {
-      console.warn(`Failed to stop Athena query ${qid.QueryExecutionId}: ${e}`);
+      this.logger?.('Failed to stop Athena query', {
+        queryExecutionId: qid.QueryExecutionId,
+        error: (e as Error).message ?? String(e),
+      });
     }
   }
 
