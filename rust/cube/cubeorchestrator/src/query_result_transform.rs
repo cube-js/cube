@@ -420,7 +420,6 @@ pub struct VanillaColumnPlan<'a> {
     column_index: usize,
     member_name: &'a str,
     member_type: &'a str,
-    granularity_track: Option<VanillaGranularityTrack<'a>>,
 }
 
 pub(crate) struct VanillaGranularityTrack<'a> {
@@ -429,9 +428,19 @@ pub(crate) struct VanillaGranularityTrack<'a> {
     level: u8,
 }
 
+/// Resolved at plan time: for each deprecated-style base time dimension (one that
+/// appears in the query only via `{cube}.{dim}.{granularity}` aliases), points at
+/// the column whose transformed value should also be exposed under the bare
+/// `{cube}.{dim}` key. Picks the lowest granularity level; ties resolve to the
+/// last column encountered, matching the previous per-row HashMap behavior.
+pub(crate) struct VanillaGranularityExtra<'a> {
+    base_member: &'a str,
+    source_member_name: &'a str,
+}
+
 pub struct VanillaPlan<'a> {
     columns: Vec<VanillaColumnPlan<'a>>,
-    has_granularity_tracking: bool,
+    minimal_granularity_extras: Vec<VanillaGranularityExtra<'a>>,
 }
 
 pub fn build_vanilla_plan<'a>(
@@ -441,7 +450,7 @@ pub fn build_vanilla_plan<'a>(
     query: &NormalizedQuery,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
-    let mut has_granularity_tracking = false;
+    let mut winners: IndexMap<&'a str, (u8, &'a str)> = IndexMap::new();
 
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
@@ -452,25 +461,35 @@ pub fn build_vanilla_plan<'a>(
         let annotation_for_member = annotation.get(member_name).unwrap();
         let member_type = annotation_for_member.member_type.as_deref().unwrap_or("");
 
-        // Handle deprecated time dimensions without granularity.
-        // Try to collect minimal granularity value for time dimensions without granularity
-        // as there might be more than one granularity column for the same dimension.
-        let granularity_track = compute_vanilla_granularity_track(member_name, query);
-        if granularity_track.is_some() {
-            has_granularity_tracking = true;
+        if let Some(track) = compute_vanilla_granularity_track(member_name, query) {
+            match winners.get(track.base_member) {
+                Some(&(existing_level, _)) if existing_level < track.level => {}
+                _ => {
+                    winners.insert(track.base_member, (track.level, member_name));
+                }
+            }
         }
 
         columns.push(VanillaColumnPlan {
             column_index: index,
             member_name,
             member_type,
-            granularity_track,
         });
     }
 
+    let minimal_granularity_extras = winners
+        .into_iter()
+        .map(
+            |(base_member, (_, source_member_name))| VanillaGranularityExtra {
+                base_member,
+                source_member_name,
+            },
+        )
+        .collect();
+
     Ok(VanillaPlan {
         columns,
-        has_granularity_tracking,
+        minimal_granularity_extras,
     })
 }
 
@@ -641,41 +660,23 @@ pub fn get_vanilla_row(
     db_row: &[DBResponsePrimitive],
 ) -> Result<IndexMap<String, DBResponsePrimitive>> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
-    let mut row = IndexMap::with_capacity(plan.columns.len() + 1);
+    let mut row =
+        IndexMap::with_capacity(plan.columns.len() + plan.minimal_granularity_extras.len() + 1);
 
-    if plan.has_granularity_tracking {
-        // FIXME: For now custom granularities are not supported, only common ones.
-        // There is no granularity type/class implementation in rust yet.
-        let mut minimal_granularities: HashMap<&str, (u8, DBResponsePrimitive)> = HashMap::new();
-
-        for column in &plan.columns {
-            if let Some(value) = db_row.get(column.column_index) {
-                let transformed_value = transform_value(value.clone(), column.member_type);
-                row.insert(column.member_name.to_string(), transformed_value.clone());
-
-                if let Some(track) = &column.granularity_track {
-                    match minimal_granularities.get(track.base_member) {
-                        Some((existing_level, _)) if *existing_level < track.level => {}
-                        _ => {
-                            minimal_granularities
-                                .insert(track.base_member, (track.level, transformed_value));
-                        }
-                    }
-                }
-            }
+    for column in &plan.columns {
+        if let Some(value) = db_row.get(column.column_index) {
+            let transformed_value = transform_value(value.clone(), column.member_type);
+            row.insert(column.member_name.to_string(), transformed_value);
         }
+    }
 
-        // Handle deprecated time dimensions without granularity
-        for (base_member, (_, value)) in minimal_granularities {
-            row.insert(base_member.to_string(), value);
-        }
-    } else {
-        // Fast path: no column needs granularity bookkeeping. Skip the HashMap
-        // entirely and move the transformed value straight into the row.
-        for column in &plan.columns {
-            if let Some(value) = db_row.get(column.column_index) {
-                let transformed_value = transform_value(value.clone(), column.member_type);
-                row.insert(column.member_name.to_string(), transformed_value);
+    // Handle deprecated time dimensions without granularity. The winning column
+    // (lowest granularity level) was resolved at plan build time; copy its already
+    // transformed value out of the row rather than re-running `transform_value`.
+    if !plan.minimal_granularity_extras.is_empty() {
+        for extra in &plan.minimal_granularity_extras {
+            if let Some(value) = row.get(extra.source_member_name) {
+                row.insert(extra.base_member.to_string(), value.clone());
             }
         }
     }
