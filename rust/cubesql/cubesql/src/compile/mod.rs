@@ -3389,6 +3389,43 @@ limit
                 }]),
                 None,
             ),
+            // LIKE with `\` as escape character: `\_` and `\%` must be
+            // resolved to literal characters, not preserved in the filter
+            // value, and the resulting filter must use `equals` since the
+            // unescaped pattern contains no wildcards.
+            (
+                r"customer_gender LIKE 'fem\_ale'".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["fem_ale".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                r"customer_gender LIKE 'fem\%ale%'".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("startsWith".to_string()),
+                    values: Some(vec!["fem%ale".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                r"customer_gender NOT LIKE '%fem\_ale'".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("notEndsWith".to_string()),
+                    values: Some(vec!["fem_ale".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
             // Segment
             (
                 "is_male = true".to_string(),
@@ -11395,6 +11432,75 @@ ORDER BY "source"."str0" ASC
                 ..Default::default()
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_cube_scan_like_escaped_chars_filter() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE customer_gender LIKE '%fem\_ale%'
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("contains".to_string()),
+                    values: Some(vec!["fem_ale".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                ..Default::default()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sql_push_down_like_with_escape() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT customer_gender
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                LOWER(customer_gender) <> 'a'
+                AND customer_gender LIKE 'foo\%bar'
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "expressions/like".to_string(),
+                "{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}\
+                 {% if default_escape %} ESCAPE '\\\\'{% endif %}"
+                    .to_string(),
+            )],
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains(" LIKE "));
+        assert!(sql.contains(" ESCAPE "));
     }
 
     #[tokio::test]

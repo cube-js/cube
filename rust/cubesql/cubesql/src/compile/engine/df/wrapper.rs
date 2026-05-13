@@ -28,7 +28,7 @@ use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
         plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
-        LogicalPlan, UserDefinedLogicalNode,
+        LogicalPlan, Operator, UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
@@ -1859,15 +1859,42 @@ impl WrappedSelectNode {
                     subqueries,
                 )
                 .await?;
-                let resulting_sql = sql_generator
-                    .get_sql_templates()
-                    .binary_expr(left, op.to_string(), right)
-                    .map_err(|e| {
-                        DataFusionError::Internal(format!(
-                            "Can't generate SQL for binary expr: {}",
-                            e
-                        ))
-                    })?;
+                let resulting_sql = match op {
+                    Operator::Like => sql_generator.get_sql_templates().like_expr(
+                        LikeType::Like,
+                        left,
+                        false,
+                        right,
+                        None,
+                    ),
+                    Operator::NotLike => sql_generator.get_sql_templates().like_expr(
+                        LikeType::Like,
+                        left,
+                        true,
+                        right,
+                        None,
+                    ),
+                    Operator::ILike => sql_generator.get_sql_templates().like_expr(
+                        LikeType::ILike,
+                        left,
+                        false,
+                        right,
+                        None,
+                    ),
+                    Operator::NotILike => sql_generator.get_sql_templates().like_expr(
+                        LikeType::ILike,
+                        left,
+                        true,
+                        right,
+                        None,
+                    ),
+                    _ => sql_generator
+                        .get_sql_templates()
+                        .binary_expr(left, op.to_string(), right),
+                }
+                .map_err(|e| {
+                    DataFusionError::Internal(format!("Can't generate SQL for binary expr: {}", e))
+                })?;
                 Ok((resulting_sql, sql_query))
             }
             // Expr::AnyExpr { .. } => {}
