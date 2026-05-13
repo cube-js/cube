@@ -54,7 +54,23 @@ First, enable SAML authentication in Cube:
 4. Go to **SAML Certificates → Edit** and select **Sign SAML
    response and assertion** for the **Signing Option**.
 5. Download the **Federation Metadata XML** file — you'll need it
-   in the next step.
+   when completing the Cube configuration.
+
+## Configure attribute mappings
+
+Before returning to Cube, configure the SAML claims Entra sends during
+login. Cube uses these claims to identify the user and map optional
+attributes such as display name.
+
+Create explicit SAML claims in Entra with the names Cube uses by default.
+
+1. In your Entra Enterprise Application, go to **Single sign-on →
+   Attributes & Claims**.
+2. Add the following claims. Leave **Namespace** blank for each claim:
+   - **Email** — Set **Name** to `email` and **Source attribute** to
+     `user.userprincipalname` or `user.mail`.
+   - **Display name** — Set **Name** to `name` and **Source attribute** to
+     `user.displayname`.
 
 ## Complete configuration in Cube
 
@@ -124,20 +140,6 @@ whether that's because no default is set or the configured role no longer
 exists.
 
 </Warning>
-
-## Configure attribute mappings
-
-To map user attributes from Entra to Cube, configure the claim URIs
-in the SAML settings:
-
-- Enter the claim URI that corresponds to the user's email address in
-  the **Email** attribute field. Common values:
-  - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`
-  - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name`
-- To map a role attribute from Entra to an identically-named role
-  defined in Cube, add the corresponding claim URI to the
-  **Role** field.
-- You can also map the user's display name in the same manner.
 
 <Info>
 
