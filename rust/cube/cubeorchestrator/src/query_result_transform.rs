@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use indexmap::IndexMap;
+use indexmap::{Equivalent, IndexMap};
 use itertools::multizip;
 use serde::{
     de::{self, MapAccess, SeqAccess, Visitor},
@@ -15,8 +15,9 @@ use serde::{
 };
 use serde_json::Value;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     fmt::Display,
+    hash::{BuildHasher, Hash, Hasher},
     sync::{Arc, LazyLock},
 };
 
@@ -39,6 +40,138 @@ pub static GRANULARITY_LEVELS: LazyLock<HashMap<&'static str, u8>> = LazyLock::n
     ])
 });
 const DEFAULT_LEVEL_FOR_UNKNOWN: u8 = 10;
+
+/// IndexMap key whose hash is computed once at construction. Combined with
+/// [`PrehashedBuildHasher`], this makes per-row `insert` skip the SipHash13
+/// pass over the string bytes — the hasher just stores and returns the
+/// pre-computed `u64`.
+pub struct InternedKey {
+    hash: u64,
+    text: Box<str>,
+}
+
+impl InternedKey {
+    pub fn new(text: &str) -> Self {
+        Self {
+            hash: hash_str(text),
+            text: text.into(),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+}
+
+fn hash_str(s: &str) -> u64 {
+    let mut h = DefaultHasher::new();
+    s.hash(&mut h);
+    h.finish()
+}
+
+impl Hash for InternedKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
+    }
+}
+
+impl PartialEq for InternedKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash && self.text == other.text
+    }
+}
+impl Eq for InternedKey {}
+
+impl std::fmt::Debug for InternedKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.text, f)
+    }
+}
+
+impl std::fmt::Display for InternedKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
+    }
+}
+
+impl Serialize for InternedKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.text)
+    }
+}
+
+impl<'de> Deserialize<'de> for InternedKey {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text: String = String::deserialize(deserializer)?;
+        Ok(InternedKey::new(&text))
+    }
+}
+
+/// Lookup key for `IndexMap<Arc<InternedKey>, V, PrehashedBuildHasher>` that
+/// avoids allocating an `Arc<InternedKey>` per lookup when the caller only has
+/// a borrowed `&str` (e.g. per-cell `field_name` lookups from the SQL scan
+/// path in `cubejs-backend-native`). Computes the hash of the borrowed `&str`
+/// once at construction.
+pub struct InternedKeyLookup<'a> {
+    hash: u64,
+    text: &'a str,
+}
+
+impl<'a> InternedKeyLookup<'a> {
+    pub fn new(text: &'a str) -> Self {
+        Self {
+            hash: hash_str(text),
+            text,
+        }
+    }
+}
+
+impl Hash for InternedKeyLookup<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
+    }
+}
+
+impl Equivalent<Arc<InternedKey>> for InternedKeyLookup<'_> {
+    fn equivalent(&self, key: &Arc<InternedKey>) -> bool {
+        self.hash == key.hash && self.text == key.as_str()
+    }
+}
+
+/// Pass-through [`BuildHasher`] for IndexMaps keyed by [`InternedKey`] /
+/// [`InternedKeyLookup`]: takes the `u64` they emit and returns it unchanged.
+#[derive(Default, Clone)]
+pub struct PrehashedBuildHasher;
+
+impl BuildHasher for PrehashedBuildHasher {
+    type Hasher = PrehashedHasher;
+
+    fn build_hasher(&self) -> PrehashedHasher {
+        PrehashedHasher(0)
+    }
+}
+
+pub struct PrehashedHasher(u64);
+
+impl Hasher for PrehashedHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, _bytes: &[u8]) {
+        unreachable!("PrehashedHasher only accepts pre-computed u64 hashes via write_u64");
+    }
+
+    fn write_u64(&mut self, n: u64) {
+        self.0 = n;
+    }
+}
+
+pub type VanillaRow = IndexMap<Arc<InternedKey>, DBResponsePrimitive, PrehashedBuildHasher>;
+
+pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
+    IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
+}
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePrimitive {
@@ -418,7 +551,9 @@ pub fn get_compact_row(
 /// and member-name parsing for every cell.
 pub struct VanillaColumnPlan<'a> {
     column_index: usize,
-    member_name: &'a str,
+    /// Interned IndexMap key for this column with a pre-computed hash.
+    /// Cloned via [`Arc::clone`] per row (atomic refcount inc).
+    key: Arc<InternedKey>,
     member_type: &'a str,
 }
 
@@ -435,14 +570,31 @@ pub(crate) struct VanillaGranularityTrack<'a> {
 /// time we pick the lowest-level candidate whose value is actually present —
 /// so a row missing the finest column still falls back to a coarser one, as
 /// the previous per-row HashMap did. Ties resolve to the last column.
-pub(crate) struct VanillaGranularityExtra<'a> {
-    base_member: &'a str,
-    candidates: Vec<(u8, &'a str)>,
+pub(crate) struct VanillaGranularityExtra {
+    /// Interned IndexMap key for the bare `{cube}.{dim}` base member.
+    /// Built once at plan time and cloned via [`Arc::clone`] per row.
+    base_key: Arc<InternedKey>,
+    candidates: Vec<(u8, Arc<InternedKey>)>,
 }
 
 pub struct VanillaPlan<'a> {
     columns: Vec<VanillaColumnPlan<'a>>,
-    minimal_granularity_extras: Vec<VanillaGranularityExtra<'a>>,
+    minimal_granularity_extras: Vec<VanillaGranularityExtra>,
+    /// Pre-computed tail entry that depends only on the query, not the row.
+    tail: VanillaTail,
+}
+
+enum VanillaTail {
+    None,
+    CompareDateRange {
+        key: Arc<InternedKey>,
+        value: DBResponsePrimitive,
+    },
+    Blending {
+        blending_key: Arc<InternedKey>,
+        /// Used only for lookup against the per-row map — never inserted.
+        response_key: InternedKey,
+    },
 }
 
 pub fn build_vanilla_plan<'a>(
@@ -450,9 +602,10 @@ pub fn build_vanilla_plan<'a>(
     alias_to_member_name_map: &'a HashMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
     query: &NormalizedQuery,
+    query_type: &QueryType,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(columns_pos.len());
-    let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, &'a str)>> = IndexMap::new();
+    let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, Arc<InternedKey>)>> = IndexMap::new();
 
     for (alias, &index) in columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
@@ -463,16 +616,18 @@ pub fn build_vanilla_plan<'a>(
         let annotation_for_member = annotation.get(member_name).unwrap();
         let member_type = annotation_for_member.member_type.as_deref().unwrap_or("");
 
+        let key = Arc::new(InternedKey::new(member_name));
+
         if let Some(track) = compute_vanilla_granularity_track(member_name, query) {
             candidates_for_base
                 .entry(track.base_member)
                 .or_default()
-                .push((track.level, member_name));
+                .push((track.level, Arc::clone(&key)));
         }
 
         columns.push(VanillaColumnPlan {
             column_index: index,
-            member_name,
+            key,
             member_type,
         });
     }
@@ -480,14 +635,31 @@ pub fn build_vanilla_plan<'a>(
     let minimal_granularity_extras = candidates_for_base
         .into_iter()
         .map(|(base_member, candidates)| VanillaGranularityExtra {
-            base_member,
+            base_key: Arc::new(InternedKey::new(base_member)),
             candidates,
         })
         .collect();
 
+    let tail = match query_type {
+        QueryType::CompareDateRangeQuery => VanillaTail::CompareDateRange {
+            key: Arc::new(InternedKey::new(COMPARE_DATE_RANGE_FIELD)),
+            value: get_date_range_value(query.time_dimensions.as_ref())?,
+        },
+        QueryType::BlendingQuery => VanillaTail::Blending {
+            blending_key: Arc::new(InternedKey::new(&get_blending_query_key(
+                query.time_dimensions.as_ref(),
+            )?)),
+            response_key: InternedKey::new(&get_blending_response_key(
+                query.time_dimensions.as_ref(),
+            )?),
+        },
+        _ => VanillaTail::None,
+    };
+
     Ok(VanillaPlan {
         columns,
         minimal_granularity_extras,
+        tail,
     })
 }
 
@@ -650,21 +822,23 @@ fn build_columnar_columns(
     columns
 }
 
-/// Convert DB response object to the vanilla output format.
+/// Convert DB response object to the vanilla output format. Keys are
+/// pre-hashed [`InternedKey`] values shared via [`Arc::clone`] from the plan,
+/// turning per-cell hashing/key allocation into an atomic refcount inc.
 pub fn get_vanilla_row(
     plan: &VanillaPlan<'_>,
-    query_type: &QueryType,
-    query: &NormalizedQuery,
     db_row: &[DBResponsePrimitive],
-) -> Result<IndexMap<String, DBResponsePrimitive>> {
+) -> Result<VanillaRow> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
-    let mut row =
-        IndexMap::with_capacity(plan.columns.len() + plan.minimal_granularity_extras.len() + 1);
+    let mut row = IndexMap::with_capacity_and_hasher(
+        plan.columns.len() + plan.minimal_granularity_extras.len() + 1,
+        PrehashedBuildHasher,
+    );
 
     for column in &plan.columns {
         if let Some(value) = db_row.get(column.column_index) {
             let transformed_value = transform_value(value.clone(), column.member_type);
-            row.insert(column.member_name.to_string(), transformed_value);
+            row.insert(Arc::clone(&column.key), transformed_value);
         }
     }
 
@@ -675,36 +849,36 @@ pub fn get_vanilla_row(
         for extra in &plan.minimal_granularity_extras {
             let mut best: Option<(u8, &DBResponsePrimitive)> = None;
 
-            for &(level, source_member_name) in &extra.candidates {
-                let Some(value) = row.get(source_member_name) else {
+            for (level, source_key) in &extra.candidates {
+                let Some(value) = row.get::<InternedKey>(source_key) else {
                     continue;
                 };
+
                 match best {
-                    Some((best_level, _)) if best_level < level => {}
-                    _ => best = Some((level, value)),
+                    Some((best_level, _)) if best_level < *level => {}
+                    _ => best = Some((*level, value)),
                 }
             }
 
             if let Some((_, value)) = best {
-                row.insert(extra.base_member.to_string(), value.clone());
+                row.insert(Arc::clone(&extra.base_key), value.clone());
             }
         }
     }
 
-    match query_type {
-        QueryType::CompareDateRangeQuery => {
-            let date_range_value = get_date_range_value(query.time_dimensions.as_ref())?;
-            row.insert("compareDateRange".to_string(), date_range_value);
+    match &plan.tail {
+        VanillaTail::None => {}
+        VanillaTail::CompareDateRange { key, value } => {
+            row.insert(Arc::clone(key), value.clone());
         }
-        QueryType::BlendingQuery => {
-            let blending_key = get_blending_query_key(query.time_dimensions.as_ref())?;
-            let response_key = get_blending_response_key(query.time_dimensions.as_ref())?;
-
-            if let Some(value) = row.get(&response_key) {
-                row.insert(blending_key, value.clone());
+        VanillaTail::Blending {
+            blending_key,
+            response_key,
+        } => {
+            if let Some(value) = row.get::<InternedKey>(response_key) {
+                row.insert(Arc::clone(blending_key), value.clone());
             }
         }
-        _ => {}
     }
 
     Ok(row)
@@ -818,7 +992,7 @@ pub enum TransformedData {
         members: Vec<String>,
         columns: Vec<Vec<DBResponsePrimitive>>,
     },
-    Vanilla(Vec<IndexMap<String, DBResponsePrimitive>>),
+    Vanilla(Vec<VanillaRow>),
 }
 
 impl TransformedData {
@@ -876,11 +1050,12 @@ impl TransformedData {
                     alias_to_member_name_map,
                     annotation,
                     query,
+                    query_type,
                 )?;
                 let dataset: Vec<_> = cube_store_result
                     .rows
                     .iter()
-                    .map(|row| get_vanilla_row(&plan, query_type, query, row))
+                    .map(|row| get_vanilla_row(&plan, row))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(TransformedData::Vanilla(dataset))
             }
@@ -3126,18 +3301,19 @@ mod tests {
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         )?;
-        let res = get_vanilla_row(&plan, query_type, &query, &raw_data.rows[0])?;
-        let expected = IndexMap::from([
-            (
-                "ECommerceRecordsUs2021.city".to_string(),
-                DBResponsePrimitive::String("Missouri City".to_string()),
-            ),
-            (
-                "ECommerceRecordsUs2021.avg_discount".to_string(),
-                DBResponsePrimitive::String("0.80000000000000000000".to_string()),
-            ),
-        ]);
+        let res = get_vanilla_row(&plan, &raw_data.rows[0])?;
+
+        let mut expected: VanillaRow = empty_vanilla_row(2);
+        expected.insert(
+            Arc::new(InternedKey::new("ECommerceRecordsUs2021.city")),
+            DBResponsePrimitive::String("Missouri City".to_string()),
+        );
+        expected.insert(
+            Arc::new(InternedKey::new("ECommerceRecordsUs2021.avg_discount")),
+            DBResponsePrimitive::String("0.80000000000000000000".to_string()),
+        );
         assert_eq!(res, expected);
         Ok(())
     }
@@ -3156,12 +3332,14 @@ mod tests {
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         match build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3185,12 +3363,14 @@ mod tests {
         let alias_to_member_name_map = &test_data.request.alias_to_member_name_map;
         let annotation = &test_data.request.annotation;
         let query = test_data.request.query.clone();
+        let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         match build_vanilla_plan(
             &raw_data.columns_pos,
             alias_to_member_name_map,
             annotation,
             &query,
+            query_type,
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3391,28 +3571,40 @@ mod tests {
         annotation.insert("Cube.city".to_string(), make_config_item("string"));
 
         let query = make_query_with_dims(None);
-        let plan =
-            build_vanilla_plan(&columns_pos, &alias_to_member_name_map, &annotation, &query)?;
+        let plan = build_vanilla_plan(
+            &columns_pos,
+            &alias_to_member_name_map,
+            &annotation,
+            &query,
+            &QueryType::RegularQuery,
+        )?;
 
         // Row only has two cells, so column_index 2 (t_day) yields None.
         let db_row = vec![
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
             DBResponsePrimitive::String("Missouri City".to_string()),
         ];
-        let res = get_vanilla_row(&plan, &QueryType::RegularQuery, &query, &db_row)?;
+        let res = get_vanilla_row(&plan, &db_row)?;
 
         let month_transformed = transform_value(
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
             "time",
         );
-        assert_eq!(res.get("Cube.t.month"), Some(&month_transformed));
-        assert_eq!(res.get("Cube.t.day"), None, "missing column stays absent");
         assert_eq!(
-            res.get("Cube.city"),
+            res.get(&InternedKey::new("Cube.t.month")),
+            Some(&month_transformed)
+        );
+        assert_eq!(
+            res.get(&InternedKey::new("Cube.t.day")),
+            None,
+            "missing column stays absent"
+        );
+        assert_eq!(
+            res.get(&InternedKey::new("Cube.city")),
             Some(&DBResponsePrimitive::String("Missouri City".to_string()))
         );
         assert_eq!(
-            res.get("Cube.t"),
+            res.get(&InternedKey::new("Cube.t")),
             Some(&month_transformed),
             "bare base key must fall back to the coarser present candidate"
         );
@@ -3435,21 +3627,26 @@ mod tests {
         annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
 
         let query = make_query_with_dims(None);
-        let plan =
-            build_vanilla_plan(&columns_pos, &alias_to_member_name_map, &annotation, &query)?;
+        let plan = build_vanilla_plan(
+            &columns_pos,
+            &alias_to_member_name_map,
+            &annotation,
+            &query,
+            &QueryType::RegularQuery,
+        )?;
 
         let db_row = vec![
             DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
             DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
         ];
-        let res = get_vanilla_row(&plan, &QueryType::RegularQuery, &query, &db_row)?;
+        let res = get_vanilla_row(&plan, &db_row)?;
 
         let day_transformed = transform_value(
             DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
             "time",
         );
         assert_eq!(
-            res.get("Cube.t"),
+            res.get(&InternedKey::new("Cube.t")),
             Some(&day_transformed),
             "bare base key must use the finest (day) candidate, not month"
         );
