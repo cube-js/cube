@@ -691,7 +691,7 @@
     }
   },
   "seo": {
-    "indexing": "all",
+    "indexing": "navigable",
     "metatags": {
       "og:type": "website",
       "og:site_name": "Cube Documentation"
