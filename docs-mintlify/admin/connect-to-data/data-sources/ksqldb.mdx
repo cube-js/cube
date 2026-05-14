@@ -581,6 +581,35 @@ or table. Cube discovers its schema automatically. With Kafka streams
 mode enabled, the streaming pre-aggregation reads the backing Kafka topic
 directly — no objects are created in ksqlDB.
 
+#### Topic name matching {#topic-name-matching}
+
+In Kafka streams mode, Cube Store parses the `select_statement`
+(generated from the cube's `sql` property) and matches the `FROM` table
+name against the actual Kafka topic name. On managed platforms like
+Confluent Cloud, the Kafka topic name often differs from the ksqlDB
+stream or table name — for example, a ksqlDB stream called
+`ORDER_EVENTS_STREAM` might be backed by a Kafka topic named
+`pksqlc-abc123ORDER_EVENTS_STREAM`.
+
+The cube's `sql` property must reference the **ksqlDB stream or table
+name** (not the Kafka topic), because Cube uses ksqlDB `DESCRIBE` to
+discover the schema and resolve the backing topic. However, Cube does
+not currently rewrite the `FROM` clause in the generated
+`select_statement` to use the resolved Kafka topic name. If the ksqlDB
+object name differs from the Kafka topic name, Cube Store will fail
+with:
+
+> Topic table ORDER_EVENTS_STREAM is not found
+
+<Warning>
+
+This is a known limitation of Kafka streams mode. It does not occur
+when the ksqlDB object name and the Kafka topic name are the same,
+which is the default behavior when ksqlDB creates a stream or table
+with the default topic naming strategy.
+
+</Warning>
+
 ### Unique key columns and deduplication
 
 When `unique_key_columns` is set, Cube Store appends an internal
