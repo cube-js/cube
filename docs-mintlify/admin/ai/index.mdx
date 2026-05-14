@@ -52,7 +52,7 @@ memory_mode: user
 | `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
 | `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
 | `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
-| `accessible_views`  | array            | _all views_              | List of view names the agent is allowed to query. If omitted or empty, the agent has access to all views.               |
+| `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
 
 Rules and certified queries have their own dedicated pages:
