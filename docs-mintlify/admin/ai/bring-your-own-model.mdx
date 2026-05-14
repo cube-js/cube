@@ -103,6 +103,9 @@ model settings when creating the model.
   is used (e.g., workload identity)
 - Supports assume-role configuration for cross-account access
 - Supports inference profiles
+- Claude Opus 4.7 and newer models that deprecate sampling parameters
+  (`temperature`, `top_p`, `top_k`) are supported — Cube automatically omits
+  these parameters when calling such models via the Bedrock Converse API
 
 ### GCP Vertex AI
 
@@ -135,5 +138,14 @@ have the necessary permissions.
 
 Ensure the model ID configured in Cube matches a valid model offered by your
 provider. Model availability may vary by region.
+
+### Bedrock: `temperature is deprecated for this model`
+
+Starting with Claude Opus 4.7, AWS Bedrock no longer accepts `temperature`,
+`top_p`, or `top_k` in the Converse API `inferenceConfig`. If you see a 400
+error with the message `` `temperature` is deprecated for this model ``,
+upgrade Cube to the latest version — the fix omits sampling parameters for
+models that do not support them. As a temporary workaround, select an older
+model such as Claude Opus 4.6.
 
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
