@@ -335,12 +335,11 @@ cubes:
         time_dimension: CUBE.created_at
         granularity: second
         partition_granularity: day
-        # ksqlDB does not support NOW(), DATE_SUB, DATE_ADD, or date_trunc.
-        # Use UNIX_TIMESTAMP() (current epoch ms) with FROM_UNIXTIME() instead.
+        # ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
         build_range_start:
-          sql: "SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() - 5 * 60 * 60 * 1000)"
+          sql: "SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')"
         build_range_end:
-          sql: "SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() + 15 * 60 * 1000)"
+          sql: "SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'"
         refresh_key:
           every: 1 minute
           update_window: 1 hour
@@ -512,13 +511,12 @@ cube("order_events_stream", {
       time_dimension: CUBE.created_at,
       granularity: `second`,
       partition_granularity: `day`,
-      // ksqlDB does not support NOW(), DATE_SUB, DATE_ADD, or date_trunc.
-      // Use UNIX_TIMESTAMP() (current epoch ms) with FROM_UNIXTIME() instead.
+      // ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
       build_range_start: {
-        sql: `SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() - 5 * 60 * 60 * 1000)`,
+        sql: `SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')`,
       },
       build_range_end: {
-        sql: `SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() + 15 * 60 * 1000)`,
+        sql: `SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'`,
       },
       refresh_key: {
         every: `1 minute`,
@@ -692,12 +690,11 @@ pre_aggregations:
     time_dimension: CUBE.created_at
     granularity: second
     partition_granularity: day
-    # ksqlDB does not support NOW(), DATE_SUB, DATE_ADD, or date_trunc.
-    # Use UNIX_TIMESTAMP() (current epoch ms) with FROM_UNIXTIME() instead.
+    # ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
     build_range_start:
-      sql: "SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() - 5 * 60 * 60 * 1000)"
+      sql: "SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')"
     build_range_end:
-      sql: "SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() + 15 * 60 * 1000)"
+      sql: "SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'"
     refresh_key:
       every: 1 minute
       update_window: 1 hour
@@ -729,13 +726,12 @@ pre_aggregations: {
     time_dimension: CUBE.created_at,
     granularity: `second`,
     partition_granularity: `day`,
-    // ksqlDB does not support NOW(), DATE_SUB, DATE_ADD, or date_trunc.
-    // Use UNIX_TIMESTAMP() (current epoch ms) with FROM_UNIXTIME() instead.
+    // ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
     build_range_start: {
-      sql: `SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() - 5 * 60 * 60 * 1000)`,
+      sql: `SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')`,
     },
     build_range_end: {
-      sql: `SELECT FROM_UNIXTIME(UNIX_TIMESTAMP() + 15 * 60 * 1000)`,
+      sql: `SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'`,
     },
     refresh_key: {
       every: `1 minute`,
