@@ -175,7 +175,8 @@
                 "pages": [
                   "docs/data-modeling/visual-modeler",
                   "docs/data-modeling/data-model-ide",
-                  "docs/data-modeling/dev-mode"
+                  "docs/data-modeling/dev-mode",
+                  "docs/data-modeling/access-policies-viewer"
                 ]
               }
             ]
