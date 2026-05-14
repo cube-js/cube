@@ -1,9 +1,9 @@
 ---
 title: MCP server
-description: Connect MCP-aware assistants to Cube through a hosted HTTPS endpoint with OAuth, admin defaults, and no local bridge process.
+description: Connect MCP-aware assistants to Cube through a hosted HTTPS endpoint with OAuth and admin-managed defaults.
 ---
 
-Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth. You don’t need to run a local MCP server or manage API keys.
+Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth.
 
 <Info>
 
@@ -14,36 +14,34 @@ The MCP server is available on [Premium and Enterprise plans](https://cube.dev/p
 
 ## What is MCP?
 
-Model Context Protocol (MCP) is an open standard that enables AI assistants to securely connect to external data sources and tools. The Cube MCP Server acts as a bridge between your AI assistant and Cube's analytics platform, allowing you to ask data questions directly from your coding environment.
+Model Context Protocol (MCP) is an open standard that enables AI assistants to securely connect to external data sources and tools. The Cube MCP server acts as a bridge between your AI assistant and Cube's analytics platform, allowing you to ask data questions directly from your coding environment.
 
-## Remote MCP server (recommended)
+## Overview
 
-Cube hosts a remote MCP server endpoint for your tenant. MCP clients connect over HTTPS and authenticate via OAuth.
-
-### Overview
+Cube hosts an MCP server endpoint for your tenant. MCP clients connect over HTTPS and authenticate via OAuth.
 
 - **Endpoint:** `https://<cube-mcp-server-host>/api/mcp`
 - **OAuth discovery:** `https://<cube-mcp-server-host>/.well-known/oauth`
 - **OAuth flow:** Authorization Code + PKCE, `client_id` = `cube-mcp-client`, scope = `mcp-agent-access`
-- **Agent selection:** Uses the **Remote MCP Defaults** (default deployment + agent) set by your admin
+- **Agent selection:** Uses the **MCP Defaults** (default deployment + agent) set by your admin
 
-### Admin setup
+## Admin setup
 
-#### Prerequisites
+### Prerequisites
 
-Before enabling Remote MCP, make sure you have:
+Before enabling MCP, make sure you have:
 
 - **Admin privileges** in your Cube instance
 - An active Cube tenant
-- Remote MCP URL configured
+- MCP server URL configured
 
-#### 1) Confirm Remote MCP URL
+### 1) Confirm MCP server URL
 
-Remote MCP uses your Cube MCP server host. If the URL isn’t configured, the Remote MCP page will show “Remote MCP configuration is unavailable.”
+MCP uses your Cube MCP server host. If the URL isn’t configured, the MCP page will show “MCP configuration is unavailable.”
 
-#### 2) Set Remote MCP Defaults
+### 2) Set MCP Defaults
 
-Go to **Admin → Remote MCP** and select:
+Go to **Admin → MCP** and select:
 
 - **Default Deployment**
 - **Default Agent**
@@ -64,7 +62,7 @@ claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/a
 
 #### Authentication and usage flow:
 
-1. Run the command copied from **Admin → Remote MCP → Claude → Claude Code**.
+1. Run the command copied from **Admin → MCP → Claude → Claude Code**.
 2. Then run Claude and use `/mcp` to list available servers.
 3. Select `cube-mcp-server` and choose `Authenticate`.
 2. A browser window opens for authentication.
@@ -106,7 +104,7 @@ claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/a
 
 ## Connect to Cursor
 
-Add the Remote MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
+Add the MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
 
 ```json
 {
@@ -150,7 +148,7 @@ Then run `codex mcp login cube-mcp-server` to authenticate.
 
 For any MCP-compatible client:
 
-1. Add a new server with the **Remote MCP Endpoint**.
+1. Add a new server with the **MCP endpoint**.
 2. The client will auto-discover OAuth and prompt for authentication.
 3. Complete the OAuth flow to grant access to your Cube deployment.
 
@@ -172,9 +170,9 @@ For any MCP-compatible client:
 
 ## Troubleshooting
 
-- **Remote MCP configuration is unavailable**: Configure the Remote MCP URL.
-- **Remote MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
-- **Remote MCP defaults are not configured**: Set defaults in **Admin → Remote MCP** under **Remote MCP Defaults**.
+- **MCP configuration is unavailable**: Configure the MCP server URL.
+- **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
+- **MCP defaults are not configured**: Set defaults in **Admin → MCP** under **MCP Defaults**.
 - **redirect_uri is not allowed**: For self-hosted or custom clients, update `MCP_ALLOWED_REDIRECT_PATTERNS` on console-server.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions

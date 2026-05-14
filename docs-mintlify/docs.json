@@ -216,7 +216,7 @@
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
               },
-              "reference/mcp-server"
+              "docs/integrations/mcp-server"
             ]
           }
         ]
@@ -732,6 +732,10 @@
     {
       "source": "/embedding/creator-mode",
       "destination": "/embedding/iframe/creator-mode"
+    },
+    {
+      "source": "/reference/mcp-server",
+      "destination": "/docs/integrations/mcp-server"
     }
   ]
 }
