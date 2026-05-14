@@ -785,17 +785,17 @@ const CubeRefreshKeySchema = condition(
 
 const measureType = Joi.string().valid(
   'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
-  'p25', 'p50', 'p75', 'p90', 'p95'
+  'p25', 'p50', 'p75', 'p90', 'p95', 'p99'
 );
 
 const measureTypeWithCount = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
-  'p25', 'p50', 'p75', 'p90', 'p95'
+  'p25', 'p50', 'p75', 'p90', 'p95', 'p99'
 );
 
 const multiStageMeasureType = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox', 'numberAgg',
-  'rank', 'p25', 'p50', 'p75', 'p90', 'p95'
+  'rank', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99'
 );
 
 const timeShiftItemRequired = Joi.object({

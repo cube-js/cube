@@ -3803,6 +3803,8 @@ export class BaseQuery {
           funDef = `PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ${evaluateSql})`;
         } else if (symbol.type === 'p95') {
           funDef = `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+        } else if (symbol.type === 'p99') {
+          funDef = `PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY ${evaluateSql})`;
         } else if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
           // TODO calculated measure type will be ungrouped
           // if (this.multiStageDimensions.length !== this.dimensions.length) {
@@ -3833,6 +3835,8 @@ export class BaseQuery {
       return `PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ${evaluateSql})`;
     } else if (symbol.type === 'p95') {
       return `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${evaluateSql})`;
+    } else if (symbol.type === 'p99') {
+      return `PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY ${evaluateSql})`;
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {
