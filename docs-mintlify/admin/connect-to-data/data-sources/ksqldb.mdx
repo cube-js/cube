@@ -349,6 +349,19 @@ cubes:
               - CUBE.user_id
               - CUBE.status
         stream_offset: latest
+        output_column_types:
+          - member: CUBE.order_id
+            type: text
+          - member: CUBE.user_id
+            type: text
+          - member: CUBE.status
+            type: text
+          - member: CUBE.count
+            type: int
+          - member: CUBE.total_amount
+            type: decimal
+          - member: CUBE.failed_count
+            type: int
 ```
 
 ```javascript title="JavaScript"
@@ -514,6 +527,14 @@ cube("order_events_stream", {
         },
       },
       stream_offset: `latest`,
+      output_column_types: [
+        { member: CUBE.order_id, type: `text` },
+        { member: CUBE.user_id, type: `text` },
+        { member: CUBE.status, type: `text` },
+        { member: CUBE.count, type: `int` },
+        { member: CUBE.total_amount, type: `decimal` },
+        { member: CUBE.failed_count, type: `int` },
+      ],
     },
   },
 });
@@ -533,6 +554,9 @@ Key properties for the streaming pre-aggregation:
   from the last processed offset regardless of this setting.
 - `unique_key_columns` — columns that uniquely identify a record, used
   for deduplication (see [below](#unique-key-columns-and-deduplication)).
+- `output_column_types` — declares the output column types for the Cube
+  Store table, required for Kafka streams mode (see
+  [below](#output-column-types)).
 
 #### Primary key and ungrouped queries
 
@@ -578,6 +602,135 @@ listed in `unique_key_columns` is missing from the payload, Cube Store
 falls back to the Kafka message key: for a single unique key column, the
 raw key value is used; for composite keys, the key is expected to be a
 JSON object with matching field names.
+
+### Output column types
+
+In Kafka streams mode, Cube Store creates its internal pre-aggregation
+table based on column type information. By default, column types are
+inferred from the source ksqlDB stream using `DESCRIBE`. However, the
+pre-aggregation's `select_statement` (generated from the rollup
+definition) renames and transforms columns — for example, a source
+column `CREATED_AT` becomes `order_events_stream__created_at_second` in
+the output.
+
+When this renaming happens, the raw source column types no longer match
+the output column names, causing errors like:
+
+> Key column `order_events_stream__id` not found among column definitions
+
+To fix this, define `output_column_types` on the streaming
+pre-aggregation. This tells Cube the exact output column types to use
+for the Cube Store table, and separately passes the source schema so
+Cube Store can deserialize the raw Kafka messages correctly.
+
+<CodeGroup>
+
+```yaml title="YAML"
+pre_aggregations:
+  - name: stream
+    type: rollup
+    read_only: true
+    measures:
+      - CUBE.count
+      - CUBE.total_amount
+      - CUBE.failed_count
+    dimensions:
+      - CUBE.order_id
+      - CUBE.user_id
+      - CUBE.status
+    unique_key_columns:
+      - order_id
+    time_dimension: CUBE.created_at
+    granularity: second
+    partition_granularity: day
+    build_range_start:
+      sql: "SELECT date_trunc('day', DATE_SUB(NOW(), INTERVAL '5 hour'))"
+    build_range_end:
+      sql: "SELECT DATE_ADD(NOW(), INTERVAL '15 minute')"
+    refresh_key:
+      every: 1 minute
+      update_window: 1 hour
+      incremental: true
+    stream_offset: latest
+    output_column_types:
+      - member: CUBE.order_id
+        type: text
+      - member: CUBE.user_id
+        type: text
+      - member: CUBE.status
+        type: text
+      - member: CUBE.count
+        type: int
+      - member: CUBE.total_amount
+        type: decimal
+      - member: CUBE.failed_count
+        type: int
+```
+
+```javascript title="JavaScript"
+pre_aggregations: {
+  stream: {
+    type: `rollup`,
+    read_only: true,
+    measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
+    dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
+    unique_key_columns: [`order_id`],
+    time_dimension: CUBE.created_at,
+    granularity: `second`,
+    partition_granularity: `day`,
+    build_range_start: {
+      sql: `SELECT date_trunc('day', DATE_SUB(NOW(), INTERVAL '5 hour'))`,
+    },
+    build_range_end: {
+      sql: `SELECT DATE_ADD(NOW(), INTERVAL '15 minute')`,
+    },
+    refresh_key: {
+      every: `1 minute`,
+      update_window: `1 hour`,
+      incremental: true,
+    },
+    stream_offset: `latest`,
+    output_column_types: [
+      { member: CUBE.order_id, type: `text` },
+      { member: CUBE.user_id, type: `text` },
+      { member: CUBE.status, type: `text` },
+      { member: CUBE.count, type: `int` },
+      { member: CUBE.total_amount, type: `decimal` },
+      { member: CUBE.failed_count, type: `int` },
+    ],
+  },
+},
+```
+
+</CodeGroup>
+
+Each entry in `output_column_types` has two properties:
+
+- `member` — a reference to a dimension or measure included in the
+  pre-aggregation.
+- `type` — the Cube Store column type. Common values: `text`, `int`,
+  `bigint`, `decimal`, `float`, `boolean`, `timestamp`.
+
+The time dimension used in `time_dimension` does not need an entry in
+`output_column_types` — its type is always `timestamp` and is set
+automatically.
+
+When `output_column_types` is defined, Cube uses the aliased column
+names (matching the `select_statement`) for the Cube Store table
+definition and passes the raw source schema separately via
+`source_table`, so Cube Store knows how to deserialize incoming Kafka
+messages. Without it, column names come from the raw ksqlDB `DESCRIBE`
+output and will not match the aliased names in the `select_statement`
+or `unique_key_columns`.
+
+<Warning>
+
+`output_column_types` is required for Kafka streams mode when the
+pre-aggregation uses `unique_key_columns`. Without it, the unique key
+column names will not match the table column definitions, causing the
+pre-aggregation build to fail.
+
+</Warning>
 
 ### Stream format
 
