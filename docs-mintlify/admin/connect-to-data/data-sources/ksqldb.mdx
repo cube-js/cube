@@ -603,6 +603,22 @@ with:
 
 <Warning>
 
+**The ksqlDB stream (or table) name and the backing Kafka topic name
+MUST be identical, including case.** Kafka streams mode will fail if
+they differ in any way.
+
+Take this into account when creating the stream — explicitly set the
+topic name to match the stream name (and vice versa). For example:
+
+```sql
+CREATE STREAM ORDER_EVENTS_STREAM (...)
+  WITH (KAFKA_TOPIC='ORDER_EVENTS_STREAM', VALUE_FORMAT='JSON', ...);
+```
+
+The match is **case-sensitive**: `OrderEvents` and `ORDEREVENTS` are
+treated as different names and will cause the build to fail with
+`Topic table ... is not found`.
+
 This is a known limitation of Kafka streams mode. It does not occur
 when the ksqlDB object name and the Kafka topic name are the same,
 which is the default behavior when ksqlDB creates a stream or table
