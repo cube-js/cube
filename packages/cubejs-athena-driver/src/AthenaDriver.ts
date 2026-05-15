@@ -553,9 +553,23 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         Math.min(this.config.pollMaxInterval, 500 * i)
       );
     }
+    await this.stopQuery(qid);
     throw new Error(
       `Athena job timeout reached ${this.config.pollTimeout}ms`
     );
+  }
+
+  // Best-effort: a failure to stop must never bubble up to the caller,
+  // which has already abandoned the query.
+  protected async stopQuery(qid: AthenaQueryId): Promise<void> {
+    try {
+      await this.athena.stopQueryExecution({ QueryExecutionId: qid.QueryExecutionId });
+    } catch (e) {
+      this.logger?.('Failed to stop Athena query', {
+        queryExecutionId: qid.QueryExecutionId,
+        error: (e as Error).message ?? String(e),
+      });
+    }
   }
 
   protected async viewsSchema(tablesSchema: DatabaseStructure): Promise<DatabaseStructure> {
