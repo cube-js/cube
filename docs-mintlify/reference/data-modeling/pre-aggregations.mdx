@@ -1571,9 +1571,8 @@ cube(`orders`, {
 
 </CodeGroup>
 
-In the case that you want to reference the time dimension in the index,
-the column name as a string in the following format can be used:
-`<cube name>__<time dimension name>_<granularity>`:
+To reference a time dimension column with its granularity in the index,
+use the `CUBE.<time_dimension>.<granularity>` syntax:
 
 <CodeGroup>
 
@@ -1594,8 +1593,7 @@ cubes:
           - name: category_created_at_index
             columns:
               - CUBE.category
-              # special syntax needed
-              - "{'orders__created_at_day'}"
+              - CUBE.created_at.day
     # ...
 ```
 
@@ -1613,6 +1611,53 @@ cube(`orders`, {
       ],
       time_dimension: CUBE.created_at,
       granularity: `day`,
+      indexes: {
+        category_created_at_index: {
+          columns: [
+            CUBE.category,
+            CUBE.created_at.day
+          ]
+        }
+      }
+    }
+  },
+
+  // ...
+})
+```
+
+</CodeGroup>
+
+Alternatively, you can reference the time dimension column as a string
+using the `<cube_name>__<time_dimension_name>_<granularity>` format:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: category_and_date
+        # ...
+
+        indexes:
+          - name: category_created_at_index
+            columns:
+              - CUBE.category
+              - "{'orders__created_at_day'}"
+    # ...
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    category_and_date: {
+      // ...
+
       indexes: {
         category_created_at_index: {
           columns: [
