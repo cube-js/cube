@@ -108,11 +108,11 @@ describe('pre-aggregation index with time dimension granularity columns', () => 
     expect(partition.indexesSql.length).toEqual(2);
 
     const [timeIndexSql] = partition.indexesSql[0].sql;
-    expect(timeIndexSql).toContain('orders_pa_index_granularity__created_at_day');
-    expect(timeIndexSql).not.toContain('orders_pa_index_granularity__created_at__day');
+    expect(timeIndexSql).toContain('orders_p_a_index_granularity__created_at_day');
+    expect(timeIndexSql).not.toContain('orders_p_a_index_granularity__created_at__day');
 
     const [timeAndStatusIndexSql] = partition.indexesSql[1].sql;
-    expect(timeAndStatusIndexSql).toContain('orders_pa_index_granularity__created_at_day');
-    expect(timeAndStatusIndexSql).toContain('orders_pa_index_granularity__status');
+    expect(timeAndStatusIndexSql).toContain('orders_p_a_index_granularity__created_at_day');
+    expect(timeAndStatusIndexSql).toContain('orders_p_a_index_granularity__status');
   });
 });
