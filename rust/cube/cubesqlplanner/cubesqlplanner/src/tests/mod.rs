@@ -12,5 +12,6 @@ mod member_expressions_on_views;
 mod string_measures;
 mod subquery_dimensions;
 mod utils;
+mod view_default_filters;
 
 mod integration;

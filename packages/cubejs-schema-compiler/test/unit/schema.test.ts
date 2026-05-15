@@ -575,17 +575,17 @@ describe('Schema Testing', () => {
       expect(filters).toHaveLength(3);
 
       expect(filters[0].operator).toBe('equals');
-      expect(filters[0].memberReference).toBe('orders.currency');
+      expect(filters[0].memberReference).toBe('orders_view.currency');
       expect(filters[0].valuesReferences).toEqual(['USD']);
-      expect(filters[0].unlessReferences).toEqual(['orders.currency', 'orders.country']);
+      expect(filters[0].unlessReferences).toEqual(['orders_view.currency', 'orders_view.country']);
 
       expect(filters[1].operator).toBe('set');
-      expect(filters[1].memberReference).toBe('orders.country');
+      expect(filters[1].memberReference).toBe('orders_view.country');
       expect(filters[1].valuesReferences).toBeUndefined();
       expect(filters[1].unlessReferences).toBeUndefined();
 
       expect(filters[2].operator).toBe('in');
-      expect(filters[2].memberReference).toBe('orders.id');
+      expect(filters[2].memberReference).toBe('orders_view.id');
       // Values are coerced to strings to match the FilterItem contract used
       // by regular query filters on the Rust side.
       expect(filters[2].valuesReferences).toEqual(['1', '2', 'true', 'draft', null]);
@@ -619,9 +619,9 @@ describe('Schema Testing', () => {
 
       const filters = cubeEvaluator.evaluatedCubes.orders_view.filters!;
       expect(filters.map(f => f.memberReference)).toEqual([
-        'orders.currency',
-        'orders.currency',
-        'orders.currency',
+        'orders_view.currency',
+        'orders_view.currency',
+        'orders_view.currency',
       ]);
     });
 

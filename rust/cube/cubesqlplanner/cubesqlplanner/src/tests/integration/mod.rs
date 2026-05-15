@@ -18,4 +18,5 @@ mod single_cube;
 mod subquery_dimensions;
 mod time_dimensions;
 mod transitive_joins;
+mod view_default_filters;
 mod views;

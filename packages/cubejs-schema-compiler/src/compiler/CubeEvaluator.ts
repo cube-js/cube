@@ -221,6 +221,9 @@ export class CubeEvaluator extends CubeSymbols {
 
     const included = (cube.includedMembers as ViewIncludedMember[] | undefined) || [];
 
+    // Always returns view-scoped path `<view>.<member>` to match
+    // MemberSymbol::full_name on the Rust side, which is what `unless` and
+    // filter dispatch compare against.
     const resolveViewMember = (memberType: string, reference: string): string | null => {
       let lookupName = reference;
       let lookupPath: string | null = null;
@@ -228,10 +231,8 @@ export class CubeEvaluator extends CubeSymbols {
       if (reference.indexOf('.') !== -1) {
         const parts = reference.split('.');
         if (parts[0] === cube.name) {
-          // Identifier form resolved via view's own namespace, e.g. 'orders_view.currency'
           lookupName = parts.slice(1).join('.');
         } else {
-          // Fully-qualified member path, e.g. 'orders.currency'
           lookupPath = reference;
         }
       }
@@ -246,7 +247,7 @@ export class CubeEvaluator extends CubeSymbols {
         );
         return null;
       }
-      return match.memberPath;
+      return `${cube.name}.${match.name}`;
     };
 
     for (const filter of cube.filters as ViewDefaultValueFilter[]) {

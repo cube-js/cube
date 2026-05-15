@@ -4,6 +4,7 @@ use crate::test_fixtures::cube_bridge::yaml::{
 };
 use crate::test_fixtures::cube_bridge::{
     MockCubeDefinition, MockJoinItemDefinition, MockSchema, MockSchemaBuilder,
+    MockViewFilterDefinition,
 };
 use cubenativeutils::CubeError;
 use serde::Deserialize;
@@ -77,6 +78,21 @@ struct YamlPreAggregationEntry {
 struct YamlView {
     name: String,
     cubes: Vec<YamlViewCube>,
+    #[serde(default)]
+    filters: Vec<YamlViewFilter>,
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlViewFilter {
+    // Member references must be supplied in the view's own namespace
+    // (`<view>.<member>`); the YAML harness does not duplicate the JS
+    // evaluator's resolution logic.
+    member: String,
+    operator: String,
+    #[serde(default)]
+    values: Option<Vec<Option<String>>>,
+    #[serde(default)]
+    unless: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -170,6 +186,18 @@ impl YamlSchema {
                 let prefix = view_cube.prefix.unwrap_or(false);
                 view_builder =
                     view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
+            }
+
+            for filter in view.filters {
+                // TypedBuilder uses a type-state chain, so set both optional
+                // legs in a single expression even when one of them is None.
+                let mock_filter = MockViewFilterDefinition::builder()
+                    .operator(filter.operator)
+                    .member_reference(filter.member)
+                    .values_references(filter.values)
+                    .unless_references(filter.unless)
+                    .build();
+                view_builder = view_builder.add_default_filter(mock_filter);
             }
 
             builder = view_builder.finish_view();
