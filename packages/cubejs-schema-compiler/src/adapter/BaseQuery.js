@@ -4274,11 +4274,10 @@ export class BaseQuery {
         )
       ) {
         if (path.length === 3 && this.cubeEvaluator.isDimension(path.slice(0, 2))) {
-          const dimensionPath = `${path[0]}.${path[1]}`;
-          const dimensionDef = this.cubeEvaluator.dimensionByPath(dimensionPath);
+          const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
           if (dimensionDef.type === 'time' &&
             this.cubeEvaluator.resolveGranularity([path[0], path[1], 'granularities', path[2]])) {
-            return `${this.aliasName(dimensionPath)}_${path[2]}`;
+            return `${this.aliasName(`${path[0]}.${path[1]}`)}_${path[2]}`;
           }
         }
         return this.aliasName(column);
