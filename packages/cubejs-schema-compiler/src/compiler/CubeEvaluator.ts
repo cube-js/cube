@@ -832,15 +832,15 @@ export class CubeEvaluator extends CubeSymbols {
     return this.isInstanceOfType('segments', path);
   }
 
-  public measureByPath(measurePath: string): MeasureDefinition {
+  public measureByPath(measurePath: string | string[]): MeasureDefinition {
     return this.byPath('measures', measurePath) as MeasureDefinition;
   }
 
-  public dimensionByPath(dimensionPath: string): DimensionDefinition {
+  public dimensionByPath(dimensionPath: string | string[]): DimensionDefinition {
     return this.byPath('dimensions', dimensionPath) as DimensionDefinition;
   }
 
-  public segmentByPath(segmentPath: string): SegmentDefinition {
+  public segmentByPath(segmentPath: string | string[]): SegmentDefinition {
     return this.byPath('segments', segmentPath) as SegmentDefinition;
   }
 
