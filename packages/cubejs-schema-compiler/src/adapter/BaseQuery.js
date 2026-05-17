@@ -4277,7 +4277,11 @@ export class BaseQuery {
           const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
           if (dimensionDef.type === 'time' &&
             this.cubeEvaluator.resolveGranularity([path[0], path[1], 'granularities', path[2]])) {
-            return `${this.aliasName(`${path[0]}.${path[1]}`)}_${path[2]}`;
+            const td = this.newTimeDimension({
+              dimension: `${path[0]}.${path[1]}`,
+              granularity: path[2],
+            });
+            return td.unescapedAliasName();
           }
         }
         return this.aliasName(column);
