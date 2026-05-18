@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.47](https://github.com/cube-js/cube/compare/v1.6.46...v1.6.47) (2026-05-18)
+
+### Bug Fixes
+
+- **cubesql:** Correctly escape/unescape LIKE patterns ([#10862](https://github.com/cube-js/cube/issues/10862)) ([43331cc](https://github.com/cube-js/cube/commit/43331cc4cc572c469809ecd4bf48bc06b473d55f))
+- **schema-compiler:** resolve time dimension granularity columns in pre-aggregation indexes ([#10894](https://github.com/cube-js/cube/issues/10894)) ([c164aab](https://github.com/cube-js/cube/commit/c164aab31ec106bcff8dd26c305c3129a205f851))
+
 ## [1.6.46](https://github.com/cube-js/cube/compare/v1.6.45...v1.6.46) (2026-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.47](https://github.com/cube-js/cube/compare/v1.6.46...v1.6.47) (2026-05-18)
+
+### Bug Fixes
+
+- **tesseract:** align bridge member SQL with JS proxy reference ([#10850](https://github.com/cube-js/cube/issues/10850)) ([d5da121](https://github.com/cube-js/cube/commit/d5da121820e120d9a7012e5a787d3780953d915c))
+
+### Performance Improvements
+
+- **backend-native:** String interning for keys in get_cubestore_result ([#10869](https://github.com/cube-js/cube/issues/10869)) ([22031fb](https://github.com/cube-js/cube/commit/22031fb00b40fd553dc6aca5c2333064f04bf222))
+- **cubeorchestrator:** Improve performance of vanilla format ([#10876](https://github.com/cube-js/cube/issues/10876)) ([3975ae3](https://github.com/cube-js/cube/commit/3975ae3b41f81d29e50c3b3abd30e2d42db58b68))
+
 ## [1.6.46](https://github.com/cube-js/cube/compare/v1.6.45...v1.6.46) (2026-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/native

@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.47](https://github.com/cube-js/cube/compare/v1.6.46...v1.6.47) (2026-05-18)
+
+### Bug Fixes
+
+- **athena-driver:** propagate query cancellation to Athena via StopQueryExecution ([#10861](https://github.com/cube-js/cube/issues/10861)) ([233e86f](https://github.com/cube-js/cube/commit/233e86fba2d2b769deedcde54d0aaec3a1cb5936))
+- **cubesql:** Correctly escape/unescape LIKE patterns ([#10862](https://github.com/cube-js/cube/issues/10862)) ([43331cc](https://github.com/cube-js/cube/commit/43331cc4cc572c469809ecd4bf48bc06b473d55f))
+- **schema-compiler:** resolve time dimension granularity columns in pre-aggregation indexes ([#10894](https://github.com/cube-js/cube/issues/10894)) ([c164aab](https://github.com/cube-js/cube/commit/c164aab31ec106bcff8dd26c305c3129a205f851))
+- **tesseract:** align bridge member SQL with JS proxy reference ([#10850](https://github.com/cube-js/cube/issues/10850)) ([d5da121](https://github.com/cube-js/cube/commit/d5da121820e120d9a7012e5a787d3780953d915c))
+- **tesseract:** tautological FK-aggregate join for filtered PK counts ([#10762](https://github.com/cube-js/cube/issues/10762)) ([b647dd5](https://github.com/cube-js/cube/commit/b647dd5045fd9a01990e615631a322236885bb24))
+- **tesseract:** wrap composed expressions before timestamptz cast in convert_tz ([#10859](https://github.com/cube-js/cube/issues/10859)) ([cab0a18](https://github.com/cube-js/cube/commit/cab0a186175f1fb1e14d72d1f1c4281d0d4d77b3))
+
+### Performance Improvements
+
+- **backend-native:** String interning for keys in get_cubestore_result ([#10869](https://github.com/cube-js/cube/issues/10869)) ([22031fb](https://github.com/cube-js/cube/commit/22031fb00b40fd553dc6aca5c2333064f04bf222))
+- **cubeorchestrator:** Improve performance of vanilla format ([#10876](https://github.com/cube-js/cube/issues/10876)) ([3975ae3](https://github.com/cube-js/cube/commit/3975ae3b41f81d29e50c3b3abd30e2d42db58b68))
+- **cubeorchestrator:** Resolve minimal-granularity for vanilla at planning ([#10874](https://github.com/cube-js/cube/issues/10874)) ([4814ae3](https://github.com/cube-js/cube/commit/4814ae3278cd0e416c8af8694d56d37bdce60745))
+
 ## [1.6.46](https://github.com/cube-js/cube/compare/v1.6.45...v1.6.46) (2026-05-11)
 
 ### Performance Improvements

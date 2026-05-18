@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.47](https://github.com/cube-js/cube/compare/v1.6.46...v1.6.47) (2026-05-18)
+
+### Bug Fixes
+
+- **athena-driver:** propagate query cancellation to Athena via StopQueryExecution ([#10861](https://github.com/cube-js/cube/issues/10861)) ([233e86f](https://github.com/cube-js/cube/commit/233e86fba2d2b769deedcde54d0aaec3a1cb5936))
+
 ## [1.6.46](https://github.com/cube-js/cube/compare/v1.6.45...v1.6.46) (2026-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver
