@@ -680,6 +680,7 @@ dependencies = [
  "env_logger",
  "flatbuffers",
  "futures-util",
+ "http",
  "log",
  "percent-encoding",
  "thiserror 1.0.69",

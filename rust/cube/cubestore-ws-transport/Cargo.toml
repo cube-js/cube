@@ -17,6 +17,7 @@ base64 = "0.22"
 thiserror = "1"
 log = "0.4"
 uuid = { version = "1", features = ["v4"] }
+http = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

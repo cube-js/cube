@@ -4,10 +4,10 @@ use std::time::{Duration, Instant};
 use base64::Engine as _;
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
+use http::{HeaderValue, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::MissedTickBehavior;
-use tokio_tungstenite::tungstenite::http::{HeaderValue, Request};
 use tokio_tungstenite::tungstenite::protocol::{Message, WebSocketConfig};
 use tokio_tungstenite::{connect_async_with_config, MaybeTlsStream, WebSocketStream};
 
