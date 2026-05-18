@@ -90,6 +90,31 @@ cubes:
             type: avg
             sql: amount
 
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+
+          - name: unique_customers_reduce_category
+            type: count_distinct
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: avg_amount_reduce_category
+            type: avg
+            sql: "{CUBE.avg_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: count_reduce_category
+            type: count
+            sql: "{CUBE.count}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
           - name: amount_by_id
             type: number
             sql: "{CUBE.total_amount}"
