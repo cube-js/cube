@@ -681,6 +681,7 @@ dependencies = [
  "futures-util",
  "http 0.2.12",
  "log",
+ "percent-encoding",
  "thiserror 1.0.69",
  "tokio",
  "tokio-tungstenite",

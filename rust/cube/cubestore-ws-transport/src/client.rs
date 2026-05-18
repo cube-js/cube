@@ -58,28 +58,9 @@ fn extract_userinfo(mut url: url::Url) -> (url::Url, Option<String>, Option<Stri
 }
 
 fn percent_decode(s: &str) -> String {
-    // Lightweight percent-decoder: handles `%HH` and leaves everything else
-    // alone. Sufficient for URL-embedded Basic Auth credentials.
-    let bytes = s.as_bytes();
-    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(hi), Some(lo)) = (
-                (bytes[i + 1] as char).to_digit(16),
-                (bytes[i + 2] as char).to_digit(16),
-            ) {
-                out.push((hi * 16 + lo) as u8);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-
-    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
+    percent_encoding::percent_decode_str(s)
+        .decode_utf8_lossy()
+        .into_owned()
 }
 
 #[cfg(test)]

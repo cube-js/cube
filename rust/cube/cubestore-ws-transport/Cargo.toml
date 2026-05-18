@@ -11,6 +11,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
 futures-util = "0.3"
 url = "2"
+percent-encoding = "2"
 base64 = "0.22"
 thiserror = "1"
 log = "0.4"
