@@ -260,7 +260,13 @@ pub(crate) async fn connect_ws(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         );
 
-    if let (Some(user), Some(pass)) = (cfg.username.as_deref(), cfg.password.as_deref()) {
+    // RFC 7617 allows either side of `user:pass` to be empty (token-style auth
+    // is commonly sent as `:<token>`), so emit the header whenever any credential
+    // is configured rather than silently dropping it when one side is missing.
+    if cfg.username.is_some() || cfg.password.is_some() {
+        let user = cfg.username.as_deref().unwrap_or("");
+        let pass = cfg.password.as_deref().unwrap_or("");
+
         let token = base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}"));
         let value = HeaderValue::from_str(&format!("Basic {token}"))
             .map_err(|e| TransportError::Auth(e.to_string()))?;
