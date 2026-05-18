@@ -322,6 +322,14 @@ impl CaseSwitchDefinition {
     }
 }
 
+/// Body of a case-defined member, mapped from the `case` field of
+/// the data-model definition.
+///
+/// - `Case` — classic `CASE WHEN condition THEN label ELSE label END`.
+/// - `CaseSwitch` — switch-style `CASE switch WHEN value THEN sql
+///   ELSE sql END`. `switch` may resolve to a direct reference to
+///   another dimension (typically a `type: switch` dimension whose
+///   `values` drive the branches).
 #[derive(Clone)]
 pub enum Case {
     Case(CaseDefinition),

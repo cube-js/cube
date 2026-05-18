@@ -8,6 +8,8 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders a `Rank` measure as a SQL window function partitioned
+/// by `partition`. Non-rank measures go through `else_processor`.
 pub struct MultiStageRankNode {
     else_processor: Rc<dyn SqlNode>,
     partition: Vec<String>,

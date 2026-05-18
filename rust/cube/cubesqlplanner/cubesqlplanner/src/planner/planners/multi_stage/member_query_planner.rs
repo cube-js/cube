@@ -14,6 +14,11 @@ use itertools::Itertools;
 use std::rc::Rc;
 use std::vec;
 
+/// Renders one `MultiStageQueryDescription` into a
+/// `LogicalMultiStageMember`. The shape of the output is dispatched
+/// from the description's `MultiStageMemberType`: rolling-window /
+/// dimension / measure inode, or a leaf (base measure /
+/// time-series / time-series-get-range).
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
@@ -33,6 +38,9 @@ impl MultiStageMemberQueryPlanner {
         }
     }
 
+    /// Builds the `LogicalMultiStageMember` for this description,
+    /// dispatching on `MultiStageMemberType` to the appropriate
+    /// `plan_*` builder.
     pub fn plan_logical_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         match self.description.member().member_type() {
             MultiStageMemberType::Inode(member) => match member.inode_type() {
@@ -54,6 +62,10 @@ impl MultiStageMemberQueryPlanner {
         }
     }
 
+    /// Builds the leaf `GetDateRange` CTE used when a rolling-window
+    /// time dimension has no explicit date range — runs a
+    /// `SimpleQueryPlanner` to compute the actual bounds at query
+    /// time.
     fn plan_time_series_get_range_query(
         &self,
         time_dimension: Rc<MemberSymbol>,
@@ -85,6 +97,10 @@ impl MultiStageMemberQueryPlanner {
         Ok(Rc::new(member))
     }
 
+    /// Builds the leaf `TimeSeries` CTE — the date axis a rolling
+    /// window walks over. References a sibling `GetDateRange` CTE
+    /// for its bounds when the time dimension has no explicit
+    /// `date_range`.
     fn plan_time_series_query(
         &self,
         time_series_description: Rc<TimeSeriesDescription>,
@@ -101,6 +117,10 @@ impl MultiStageMemberQueryPlanner {
         }))
     }
 
+    /// Builds the rolling-window CTE that combines a time-series
+    /// input with a measure input, dispatching on
+    /// `RollingWindowDescription` into the regular / to-date /
+    /// running-total variant.
     fn plan_rolling_window_query(
         &self,
         rolling_window_desc: &RollingWindowDescription,
@@ -174,6 +194,12 @@ impl MultiStageMemberQueryPlanner {
         }))
     }
 
+    /// Builds a measure-calculation CTE (Rank / Aggregate /
+    /// Calculate). Picks the partition-by from the inode's
+    /// `reduce_by` / `group_by` settings, chooses a window-function
+    /// flavour (Rank, Window, or None) when the partition is
+    /// narrower than the full dimension set, and wires the input
+    /// CTEs into a `FullKeyAggregate` source.
     fn plan_for_cte_query(
         &self,
         multi_stage_member: &MultiStageInodeMember,
@@ -255,6 +281,11 @@ impl MultiStageMemberQueryPlanner {
         Ok(Rc::new(result))
     }
 
+    /// Builds a dimension-calculation CTE for a multi-stage
+    /// dimension. Includes the dimension itself plus every
+    /// non-multi-stage dimension reachable from the subtree, so the
+    /// resulting CTE can be joined back into the host query on
+    /// those dimensions.
     fn plan_for_cte_dimension_query(
         &self,
         _multi_stage_member: &MultiStageInodeMember,
@@ -339,6 +370,12 @@ impl MultiStageMemberQueryPlanner {
         Ok(Rc::new(result))
     }
 
+    /// Builds the leaf CTE for a base measure — runs a fresh
+    /// `QueryPlanner` on the description's state with
+    /// `allow_multi_stage = false`, then wraps the result in a
+    /// `MultiStageLeafMeasure`. Respects the `without-member-leaf`
+    /// shape for cases like `Rank` where the leaf selects only the
+    /// dimension grid.
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
         let mut dimensions = self.description.state().dimensions().clone();

@@ -9,6 +9,10 @@ use crate::planner::SqlCall;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Join item with its members resolved to `MemberSymbol`s on both
+/// sides — produced from a `JoinDefinition` by `JoinPlanner` so the
+/// rest of the planner can reason about the actual columns involved
+/// without re-parsing the JS-side ON clause.
 #[derive(Clone, Debug)]
 pub struct ResolvedJoinItem {
     pub original_from: String,
@@ -19,6 +23,8 @@ pub struct ResolvedJoinItem {
 }
 
 impl ResolvedJoinItem {
+    /// Equality on the cube pair and the resolved member sets — used
+    /// to detect duplicates without comparing the compiled `on_sql`.
     pub fn is_same_as(&self, other: &Self) -> bool {
         self.original_from == other.original_from
             && self.original_to == other.original_to
@@ -27,6 +33,9 @@ impl ResolvedJoinItem {
     }
 }
 
+/// Builds `LogicalJoin` trees from `JoinDefinition`s (or join
+/// hints), compiles each item's ON SQL into a `SqlCall`, and exposes
+/// helpers for resolving the members each ON clause references.
 pub struct JoinPlanner {
     utils: CommonUtils,
     query_tools: Rc<QueryTools>,
@@ -40,6 +49,8 @@ impl JoinPlanner {
         }
     }
 
+    /// Builds a `LogicalJoin` from join hints, asking the join graph
+    /// to materialise the matching `JoinDefinition`.
     pub fn make_join_logical_plan_with_join_hints(
         &self,
         join_hints: JoinHints,
@@ -52,10 +63,15 @@ impl JoinPlanner {
         self.make_join_logical_plan(join, dimension_subqueries)
     }
 
+    /// Empty `LogicalJoin` — used when the query needs no joins
+    /// (e.g. it touches a single cube and pulls nothing extra).
     pub fn make_empty_join_logical_plan(&self) -> Rc<LogicalJoin> {
         Rc::new(LogicalJoin::builder().build())
     }
 
+    /// Builds a `LogicalJoin` from an already-resolved
+    /// `JoinDefinition`, compiling each item's ON SQL and attaching
+    /// the given sub-query dimensions.
     pub fn make_join_logical_plan(
         &self,
         join: Rc<dyn JoinDefinition>,
@@ -83,6 +99,8 @@ impl JoinPlanner {
         ))
     }
 
+    /// Compiles the ON SQL of a join item into a `SqlCall` rooted at
+    /// the `from` cube.
     pub fn compile_join_condition(
         &self,
         join_item: Rc<dyn JoinItem>,
@@ -94,6 +112,8 @@ impl JoinPlanner {
             .compile_sql_call(&join_item.static_data().original_from, definition.sql()?)
     }
 
+    /// Materialises the join from `join_hints` and resolves the
+    /// members each ON clause references.
     pub fn resolve_join_members_by_hints(
         &self,
         join_hints: &JoinHints,
@@ -104,6 +124,8 @@ impl JoinPlanner {
             .build_join(join_hints.items().to_vec())?;
         self.resolve_join_members(join)
     }
+    /// Resolves the members each ON clause references for an
+    /// already-built `JoinDefinition`.
     pub fn resolve_join_members(
         &self,
         join: Rc<dyn JoinDefinition>,

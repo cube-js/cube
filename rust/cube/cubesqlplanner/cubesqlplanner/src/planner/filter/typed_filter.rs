@@ -26,6 +26,10 @@ pub fn resolve_base_symbol(symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
     }
 }
 
+/// Typed, ready-to-render filter operation. Decoded once at filter
+/// construction from a `FilterOperator` plus its value list, each
+/// variant carrying exactly the parameters its rendering needs
+/// (compared value, date bounds, granularity, etc.).
 #[derive(Clone, Debug)]
 pub enum FilterOp {
     Comparison(ComparisonOp),
@@ -40,6 +44,10 @@ pub enum FilterOp {
     ToDateRollingWindow(ToDateRollingWindowOp),
 }
 
+/// Filter bound to a member and decoded into a typed `FilterOp`.
+/// Carries both the raw operator + value list (the form that came
+/// from the data model) and the decoded form, so renderers can pick
+/// whichever view they need.
 #[derive(Clone)]
 pub struct TypedFilter {
     query_tools: Rc<QueryTools>,

@@ -1,3 +1,11 @@
+//! Chain of SQL-rendering nodes assembled by `SqlNodesFactory` and
+//! consumed by `SqlEvaluatorVisitor`. Each node decides — for a
+//! given `MemberSymbol` — whether to handle the rendering itself
+//! or to delegate to its `input`, so the chain progressively wraps
+//! the base SQL with cube prefixing, parenthesisation, CASE
+//! expressions, masking, aggregation, window functions, and
+//! pre-aggregation reference substitution.
+
 pub mod auto_prefix;
 pub mod calendar_time_shift;
 pub mod case;

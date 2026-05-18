@@ -2,6 +2,9 @@ use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Node of the logical-plan tree. Exposes its child nodes through
+/// `inputs()` / `with_inputs()` so generic passes can walk and
+/// rewrite the tree without knowing concrete node types.
 pub trait LogicalNode {
     fn inputs(&self) -> Vec<PlanNode>;
 
@@ -14,6 +17,9 @@ pub trait LogicalNode {
     fn node_name(&self) -> &'static str;
 }
 
+/// Type-erased handle for a logical-plan node. Generic traversal
+/// works in terms of `PlanNode`; concrete typed access is recovered
+/// via `into_logical_node` / each node's `try_from_plan_node`.
 #[derive(Clone)]
 pub enum PlanNode {
     Query(Rc<Query>),

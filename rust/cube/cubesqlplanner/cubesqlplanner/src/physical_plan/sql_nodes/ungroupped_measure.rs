@@ -7,6 +7,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders measures for ungrouped contexts (an ungrouped measure
+/// member-level flag) — leaves the inner SQL unwrapped instead of
+/// applying the usual aggregation.
 pub struct UngroupedMeasureSqlNode {
     input: Rc<dyn SqlNode>,
 }

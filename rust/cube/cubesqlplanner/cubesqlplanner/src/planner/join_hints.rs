@@ -1,5 +1,9 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
 
+/// Ordered list of cube-join hints. Adjacent redundant entries are
+/// silently dropped on `push` / `extend` — a `Single` is skipped when
+/// it duplicates either the previous `Single` or the tail of the
+/// previous `Vector`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct JoinHints {
     items: Vec<JoinHintItem>,

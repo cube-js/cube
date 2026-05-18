@@ -5,20 +5,20 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct MeasureMatcher {
-    only_addictive: bool,
+    only_additive: bool,
     pre_aggregation_measures: HashSet<String>,
     matched_measures: HashSet<String>,
 }
 
 impl MeasureMatcher {
-    pub fn new(pre_aggregation: &CompiledPreAggregation, only_addictive: bool) -> Self {
+    pub fn new(pre_aggregation: &CompiledPreAggregation, only_additive: bool) -> Self {
         let pre_aggregation_measures = pre_aggregation
             .measures
             .iter()
             .map(|m| m.full_name())
             .collect();
         Self {
-            only_addictive,
+            only_additive,
             pre_aggregation_measures,
             matched_measures: HashSet::new(),
         }
@@ -38,7 +38,7 @@ impl MeasureMatcher {
                     return Ok(false);
                 }
                 if self.pre_aggregation_measures.contains(&measure.full_name())
-                    && (!self.only_addictive || measure.is_addictive())
+                    && (!self.only_additive || measure.is_additive())
                 {
                     self.matched_measures.insert(measure.full_name());
                     return Ok(true);

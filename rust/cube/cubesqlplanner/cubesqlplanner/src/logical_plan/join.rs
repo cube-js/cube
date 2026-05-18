@@ -5,6 +5,8 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// One non-root cube of a `LogicalJoin`, with the SQL expression
+/// that joins it to the rest of the tree.
 #[derive(Clone, TypedBuilder)]
 pub struct LogicalJoinItem {
     cube: Rc<Cube>,
@@ -29,6 +31,9 @@ impl PrettyPrint for LogicalJoinItem {
     }
 }
 
+/// Join of cubes that backs a query source: a `root` cube plus
+/// non-root cubes (`joins`), optionally extended by sub-query
+/// dimensions that contribute their own joined-in CTEs.
 #[derive(Clone, TypedBuilder)]
 pub struct LogicalJoin {
     #[builder(default)]

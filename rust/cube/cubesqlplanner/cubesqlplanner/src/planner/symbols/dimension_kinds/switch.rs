@@ -3,6 +3,11 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// `type: switch` dimension from the data model: an enum with a
+/// fixed list of allowed string values. With a `sql` — an ordinary
+/// enum dimension reading from a real column. Without a `sql` — a
+/// **calc group**: an abstract enumeration cross-joined into the
+/// query as a virtual table of values.
 #[derive(Clone)]
 pub struct SwitchDimension {
     values: Vec<String>,
@@ -22,6 +27,9 @@ impl SwitchDimension {
         self.member_sql.as_ref()
     }
 
+    /// True when the switch dimension was declared without a `sql` —
+    /// a calc group: an abstract enumeration cross-joined into the
+    /// query rather than read from a column.
     pub fn is_calc_group(&self) -> bool {
         self.member_sql.is_none()
     }

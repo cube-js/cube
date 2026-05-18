@@ -4,6 +4,10 @@ use crate::planner::{
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// One `segments:` entry from the data model — a boolean expression
+/// attached to a cube under a name, materialised as a synthetic
+/// `MemberExpression` so it plugs into the same member machinery as
+/// dimensions and measures.
 #[derive(Clone)]
 pub struct BaseSegment {
     full_name: String,

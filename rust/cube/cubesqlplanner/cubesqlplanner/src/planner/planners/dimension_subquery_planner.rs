@@ -11,6 +11,10 @@ use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Plans `DimensionSubQuery` nodes for `sub_query: true` dimensions.
+/// Each subquery dimension becomes its own `Query` over the owning
+/// cube's primary keys plus the dimension's measure expression, then
+/// gets joined back into the host query on those keys.
 pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
     query_tools: Rc<QueryTools>,
@@ -20,6 +24,8 @@ pub struct DimensionSubqueryPlanner {
 }
 
 impl DimensionSubqueryPlanner {
+    /// Planner with no sub-query dimensions — used when the host
+    /// query has none.
     pub fn empty(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
             sub_query_dims: HashMap::new(),
@@ -29,6 +35,8 @@ impl DimensionSubqueryPlanner {
             dimensions_refs: RefCell::new(HashMap::new()),
         }
     }
+    /// Builds a planner over the given sub-query dimensions, indexed
+    /// by owning cube.
     pub fn try_new(
         dimensions: &Vec<Rc<MemberSymbol>>,
         query_tools: Rc<QueryTools>,
@@ -52,6 +60,7 @@ impl DimensionSubqueryPlanner {
         })
     }
 
+    /// Plans one `DimensionSubQuery` per dimension in the input list.
     pub fn plan_queries(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,

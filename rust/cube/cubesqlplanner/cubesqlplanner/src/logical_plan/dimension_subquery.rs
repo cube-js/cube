@@ -4,6 +4,10 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Materialisation of a `sub_query: true` dimension: a subquery
+/// that groups by the owning cube's primary keys and computes the
+/// dimension's measure expression, then is joined back to the host
+/// query on those keys.
 pub struct DimensionSubQuery {
     pub query: Rc<Query>,
     pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,

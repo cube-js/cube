@@ -9,6 +9,11 @@ use std::any::Any;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+/// Applies the final aggregation wrap to a measure (sum / avg /
+/// count_distinct / pass-through, etc.) using `MeasureKind::aggregate_wrap`.
+/// Tracks measures that were classified as multiplied so the wrap
+/// switches to a distinct-count form, and routes
+/// `count_distinct_approx` through an HLL state when requested.
 pub struct FinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
     rendered_as_multiplied_measures: HashSet<String>,

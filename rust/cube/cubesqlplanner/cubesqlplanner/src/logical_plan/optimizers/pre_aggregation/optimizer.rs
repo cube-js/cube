@@ -504,9 +504,9 @@ impl PreAggregationOptimizer {
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
-        only_addictive: bool,
+        only_additive: bool,
     ) -> Result<Option<HashSet<String>>, CubeError> {
-        let mut matcher = MeasureMatcher::new(pre_aggregation, only_addictive);
+        let mut matcher = MeasureMatcher::new(pre_aggregation, only_additive);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {
                 return Ok(None);

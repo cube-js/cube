@@ -1,3 +1,6 @@
+/// `RegularRollingWindow` filter operation: trailing and leading
+/// interval bounds of a rolling window relative to each time-series
+/// point.
 #[derive(Clone, Debug)]
 pub struct RegularRollingWindowOp {
     pub(crate) trailing: Option<String>,

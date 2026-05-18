@@ -9,6 +9,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Intercepts rendering for members masked by query-tools and
+/// substitutes the configured `mask_sql` expression. When a mask
+/// filter is set, wraps the result in a `CASE WHEN filter THEN
+/// original ELSE mask END`. Pass-through for non-masked members.
 pub struct MaskedSqlNode {
     input: Rc<dyn SqlNode>,
     ungrouped: bool,

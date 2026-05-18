@@ -13,6 +13,11 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
+/// Plans the per-measure CTEs that feed `FullKeyAggregate` in
+/// non-simple queries: regular measures become `MultiStageLeafMeasure`
+/// CTEs (one per multi-fact group), and multiplied measures become
+/// `AggregateMultipliedSubquery` CTEs (one per owning cube). Both
+/// kinds are registered into the shared `CteState`.
 pub struct MultipliedMeasuresQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
@@ -22,6 +27,9 @@ pub struct MultipliedMeasuresQueryPlanner {
 }
 
 impl MultipliedMeasuresQueryPlanner {
+    /// Constructs the planner and caches
+    /// `full_key_aggregate_measures` for later use in
+    /// `plan_queries`.
     pub fn try_new(
         query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
@@ -36,6 +44,10 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
+    /// Registers per-measure CTEs into `cte_state`: regular measures
+    /// become leaf-measure CTEs grouped by multi-fact join, multiplied
+    /// measures become `AggregateMultipliedSubquery` CTEs grouped by
+    /// owning cube. Errors if called on a simple query.
     pub fn plan_queries(&self, cte_state: &mut CteState) -> Result<(), CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(

@@ -4,6 +4,10 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Subquery that produces the primary-key set of `pk_cube` after
+/// applying the query's filters. Used as the outer key set in
+/// `AggregateMultipliedSubquery`: a measure subquery aggregates
+/// values and is joined back against this set on the primary keys.
 #[derive(Clone, TypedBuilder)]
 pub struct KeysSubQuery {
     pk_cube: Rc<Cube>,

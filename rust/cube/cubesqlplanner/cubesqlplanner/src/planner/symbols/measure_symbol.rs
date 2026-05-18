@@ -15,6 +15,7 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Per-measure `order_by` entry from the data-model definition: a
 #[derive(Clone)]
 pub struct MeasureOrderBy {
     sql_call: Rc<SqlCall>,
@@ -42,6 +43,9 @@ impl MeasureOrderBy {
     }
 }
 
+/// Time-shift entry attached to a specific time dimension. Shifts
+/// that dimension's date range by either a fixed interval or a named
+/// slot.
 #[derive(Clone, Debug)]
 pub struct DimensionTimeShift {
     pub interval: Option<SqlInterval>,
@@ -59,6 +63,13 @@ impl PartialEq for DimensionTimeShift {
 
 impl Eq for DimensionTimeShift {}
 
+/// Form of a measure's `time_shift` declaration.
+///
+/// - `Dimensions` — one or more shifts, each bound to a specific time
+///   dimension.
+/// - `Common` — a single interval applied to every time dimension in
+///   the query.
+/// - `Named` — a single named slot applied to every time dimension.
 #[derive(Clone, Debug)]
 pub enum MeasureTimeShifts {
     Dimensions(Vec<DimensionTimeShift>),
@@ -66,6 +77,9 @@ pub enum MeasureTimeShifts {
     Named(String),
 }
 
+/// `MemberSymbol::Measure` body: Tesseract representation of a
+/// `measure` declared in the data model — an aggregation, count or
+/// calculated value the query exposes.
 #[derive(Clone)]
 pub struct MeasureSymbol {
     compiled_path: CompiledMemberPath,
@@ -82,7 +96,6 @@ pub struct MeasureSymbol {
     reduce_by: Option<Vec<Rc<MemberSymbol>>>,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
     group_by: Option<Vec<Rc<MemberSymbol>>>,
-    is_splitted_source: bool,
     mask_sql: Option<Rc<SqlCall>>,
 }
 
@@ -116,7 +129,6 @@ impl MeasureSymbol {
             measure_order_by,
             is_multi_stage,
             time_shift,
-            is_splitted_source: false,
             reduce_by,
             add_group_by,
             group_by,
@@ -124,6 +136,12 @@ impl MeasureSymbol {
         })
     }
 
+    /// Returns a non-rolling copy of the symbol. A rolling-window
+    /// measure carries both the windowing context and the SQL of the
+    /// inner value it operates on; unrolling drops the window and
+    /// yields that inner value. Multi-stage rolling measures collapse
+    /// to a `Calculated` kind so they can be rendered without window-
+    /// function machinery.
     pub fn new_unrolling(&self) -> Rc<Self> {
         if self.is_rolling_window() {
             let kind = if self.is_multi_stage {
@@ -155,7 +173,6 @@ impl MeasureSymbol {
                 reduce_by: self.reduce_by.clone(),
                 add_group_by: self.add_group_by.clone(),
                 group_by: self.group_by.clone(),
-                is_splitted_source: self.is_splitted_source,
                 mask_sql: self.mask_sql.clone(),
             })
         } else {
@@ -163,6 +180,9 @@ impl MeasureSymbol {
         }
     }
 
+    /// Returns a copy of the symbol with the measure type optionally
+    /// replaced (subject to per-kind compatibility checks) and
+    /// additional measure filters merged in.
     pub fn new_patched(
         &self,
         new_measure_type: Option<String>,
@@ -208,7 +228,6 @@ impl MeasureSymbol {
             reduce_by: self.reduce_by.clone(),
             add_group_by: self.add_group_by.clone(),
             group_by: self.group_by.clone(),
-            is_splitted_source: self.is_splitted_source,
             mask_sql: self.mask_sql.clone(),
         }))
     }
@@ -223,20 +242,22 @@ impl MeasureSymbol {
         &self.compiled_path
     }
 
+    /// Trims the join-chain prefix from `compiled_path` in place so
+    /// the path points only at the owning cube.
     pub fn strip_join_prefix(&mut self) {
         self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
+    /// Full unique identifier of the symbol: cube path, member name
+    /// and any suffix that distinguishes one symbol from another.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }
 
+    /// Default alias of the measure, derived from the compiled member
+    /// path.
     pub fn alias(&self) -> String {
         self.compiled_path.alias().clone()
-    }
-
-    pub fn is_splitted_source(&self) -> bool {
-        self.is_splitted_source
     }
 
     pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {
@@ -251,11 +272,16 @@ impl MeasureSymbol {
         self.case.as_ref()
     }
 
+    /// Optional SQL expression that wraps the measure's rendered
+    /// output to mask its value (data hiding / column-level masking).
     pub fn mask_sql(&self) -> &Option<Rc<SqlCall>> {
         &self.mask_sql
     }
 
-    pub fn is_addictive(&self) -> bool {
+    /// True when the measure's aggregation distributes over row union
+    /// (sum-like). Multi-stage measures are never additive — their
+    /// value depends on the windowed stage, not on a plain sum.
+    pub fn is_additive(&self) -> bool {
         if self.is_multi_stage() {
             false
         } else {
@@ -293,15 +319,14 @@ impl MeasureSymbol {
         Ok(MemberSymbol::new_measure(Rc::new(result)))
     }
 
+    /// SQL calls inside the measure's kind and `case` body.
+    /// `mask_sql` is intentionally excluded: it is compiled against
+    /// the cube that owns the measure, which differs from the symbol's
+    /// own `cube_name` when the measure is exposed through a view.
+    /// `measure_filters` and `measure_order_by` are also skipped here
+    /// — the legacy BaseQuery validator does not check them, and we
+    /// preserve that behaviour for compatibility.
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
-        //FIXME We don't include filters and order_by here for backward compatibility
-        // because BaseQuery doesn't validate these SQL calls
-        // mask_sql is intentionally excluded here: it's compiled in the
-        // context of the cube that owns the measure (via aliasMember when
-        // the measure is exposed through a view), which may legitimately
-        // differ from the current cube_name of the symbol. Including it in
-        // the generic validate_regular_member_cube_refs would produce false
-        // foreign-cube errors for view members.
         let result = self
             .kind
             .iter_sql_calls()
@@ -349,7 +374,11 @@ impl MeasureSymbol {
         refs
     }
 
-    pub fn can_used_as_addictive_in_multplied(&self) -> bool {
+    /// True if the measure stays correct when joined into a context
+    /// that multiplies rows (one-to-many join). Distinct aggregations
+    /// are naturally immune; primary-key-based counts (`type: count`
+    /// without an explicit `sql`) are too.
+    pub fn is_additive_in_multiplied(&self) -> bool {
         match &self.kind {
             MeasureKind::Aggregated(agg) => agg.agg_type().is_distinct(),
             MeasureKind::Count(count) => count.is_owned_by_cube(),
@@ -357,6 +386,10 @@ impl MeasureSymbol {
         }
     }
 
+    /// True when the cube on the symbol's path is required in the
+    /// join to read the measure from the database. Multi-stage
+    /// measures are never owned by a cube; otherwise ownership is the
+    /// union of the kind, the measure filters and the `case` body.
     pub fn owned_by_cube(&self) -> bool {
         if self.is_multi_stage {
             return false;
@@ -382,6 +415,8 @@ impl MeasureSymbol {
         self.is_view
     }
 
+    /// The member this measure references, or `None` if it is not a
+    /// reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if !self.is_reference() {
             return None;
@@ -413,6 +448,8 @@ impl MeasureSymbol {
         matches!(&self.kind, MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::RunningTotal)
     }
 
+    /// True for rolling-window measures and running-total
+    /// aggregations.
     pub fn is_cumulative(&self) -> bool {
         self.is_rolling_window() || self.is_running_total()
     }
@@ -462,6 +499,8 @@ impl MeasureSymbol {
     }
 }
 
+/// Builds a `MeasureSymbol` from a measure definition pulled out of
+/// the cube schema.
 pub struct MeasureSymbolFactory {
     path: SymbolPath,
     sql: Option<Rc<dyn MemberSql>>,

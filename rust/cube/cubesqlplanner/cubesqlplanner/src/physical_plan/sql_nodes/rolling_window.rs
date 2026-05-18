@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders cumulative measures (rolling window / running total)
+/// through `input`, delegating non-cumulative measures to
+/// `default_processor`.
 pub struct RollingWindowNode {
     input: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,

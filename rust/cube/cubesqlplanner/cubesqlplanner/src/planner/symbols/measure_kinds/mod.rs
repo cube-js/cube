@@ -12,6 +12,9 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// How a measure kind wraps its inner SQL when rendered: no wrapper
+/// at all, a named SQL aggregate function, or one of the distinct-
+/// count special forms.
 pub enum AggregateWrap<'a> {
     PassThrough,
     Function(&'a str),
@@ -19,6 +22,17 @@ pub enum AggregateWrap<'a> {
     CountDistinctApprox,
 }
 
+/// Form of a measure's aggregation, classified from the data-model
+/// `type`.
+///
+/// - `Count` — `type: count`. Counts rows; falls back to the cube's
+///   primary keys when no explicit `sql` is given.
+/// - `Aggregated` — built-in aggregation (`sum`, `avg`, `min`, `max`,
+///   `count_distinct`, `count_distinct_approx`, `number_agg`,
+///   `running_total`).
+/// - `Calculated` — `type: number / string / time / boolean`. A
+///   plain expression with no aggregation wrapper.
+/// - `Rank` — `type: rank`. Window-function rank, no `sql`.
 #[derive(Clone)]
 pub enum MeasureKind {
     Count(CountMeasure),
@@ -112,6 +126,9 @@ impl MeasureKind {
         matches!(self, Self::Calculated(_))
     }
 
+    /// True if the kind's aggregation distributes over row union.
+    /// Counts are always additive; aggregated measures delegate to
+    /// their `AggregationType`. Calculated and rank are not additive.
     pub fn is_additive(&self) -> bool {
         match self {
             Self::Count(_) => true,
@@ -129,6 +146,11 @@ impl MeasureKind {
         }
     }
 
+    /// True when `new_type` is a compatible aggregation replacement.
+    /// Only `Aggregated` measures can have their type replaced, and
+    /// only within compatibility groups: `sum`/`avg`/`min`/`max` are
+    /// interchangeable among themselves, distinct counts among
+    /// themselves.
     pub fn can_replace_type_with(&self, new_type: &str) -> bool {
         match self {
             Self::Aggregated(a) => {
@@ -151,6 +173,9 @@ impl MeasureKind {
         }
     }
 
+    /// True if extra `measure_filters` can be merged into the kind.
+    /// Counts and the basic aggregations support it; `number_agg`,
+    /// `running_total`, calculated and rank measures do not.
     pub fn supports_additional_filters(&self) -> bool {
         match self {
             Self::Count(_) => true,
@@ -179,6 +204,10 @@ impl MeasureKind {
         }
     }
 
+    /// How the kind wraps its inner SQL when rendered as a top-level
+    /// query measure. `is_multiplied` is true when the join below the
+    /// measure can produce duplicate rows — non-distinct counts then
+    /// switch to `count_distinct` over primary keys to stay correct.
     pub fn aggregate_wrap(&self, is_multiplied: bool) -> AggregateWrap<'_> {
         match self {
             Self::Calculated(_) => AggregateWrap::PassThrough,
@@ -200,6 +229,10 @@ impl MeasureKind {
         }
     }
 
+    /// How the kind wraps its inner SQL when rolled up from a
+    /// pre-aggregation. Counts and most aggregations roll up via
+    /// `sum`; `min` / `max` preserve themselves; calculated string /
+    /// time / boolean values roll up via `max`.
     pub fn pre_aggregate_wrap(&self) -> AggregateWrap<'_> {
         match self {
             Self::Count(_) => AggregateWrap::Function("sum"),

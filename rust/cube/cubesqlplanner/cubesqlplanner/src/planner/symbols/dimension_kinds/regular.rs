@@ -4,6 +4,8 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Plain dimension from the data model — a single `sql` expression
+/// typed by `DimensionType`.
 #[derive(Clone)]
 pub struct RegularDimension {
     dimension_type: DimensionType,

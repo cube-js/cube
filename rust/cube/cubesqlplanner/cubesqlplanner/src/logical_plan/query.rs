@@ -3,6 +3,10 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Root node of a query in the logical plan: the data `source`
+/// (join / aggregate / pre-aggregation), its output `schema`,
+/// `filter` tree, query-level `modifers` (limit / offset / order /
+/// ungrouped), and the multi-stage CTEs the source depends on.
 #[derive(Clone, TypedBuilder)]
 pub struct Query {
     #[builder(default)]

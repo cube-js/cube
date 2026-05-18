@@ -11,6 +11,14 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Reference to a cube from a SQL template.
+///
+/// - `Name` — the cube as an identifier (rendered from `{CUBE}` or
+///   `{TABLE}` placeholders); resolves to the cube's quoted name or
+///   alias.
+/// - `Table` — the cube's table expression (rendered from
+///   `{CUBE.sql()}`); resolves to the result of the cube's `sql:`
+///   function, or to a registered pre-aggregation source.
 #[derive(Clone, Debug)]
 pub enum CubeRef {
     Name(Rc<CubeNameSymbol>),
@@ -47,6 +55,8 @@ impl CubeRef {
     }
 }
 
+/// One `{arg:N}` binding inside a `SqlCall` template: either a
+/// member symbol or a cube reference.
 #[derive(Clone, Debug)]
 pub enum SqlDependency {
     Symbol(Rc<MemberSymbol>),
@@ -77,6 +87,13 @@ impl SqlDependency {
     }
 }
 
+/// Namespace for the placeholder prefixes recognised inside a
+/// `SqlCall` template:
+///
+/// - `arg:N` — Nth `SqlDependency` (member symbol or cube ref).
+/// - `fp:N` — Nth filter param.
+/// - `fg:N` — Nth filter group.
+/// - `sv:N` — Nth security-context value.
 pub struct SqlCallArg;
 
 impl SqlCallArg {
@@ -99,17 +116,32 @@ impl SqlCallArg {
     }
 }
 
+/// One `FILTER_PARAMS` binding from the data-model SQL: the filter
+/// member whose predicate should be substituted at render time,
+/// together with the column information used to format it.
 #[derive(Debug, Clone)]
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
     pub column: FilterParamsColumn,
 }
 
+/// `FILTER_GROUP` binding from the data-model SQL: several
+/// `FILTER_PARAMS` items combined into a single substitution.
 #[derive(Clone, Debug)]
 pub struct SqlCallFilterGroupItem {
     pub filter_params: Vec<SqlCallFilterParamsItem>,
 }
 
+/// Tesseract representation of a SQL-like function declared in the
+/// data model (member `sql:`, `mask_sql:`, case branches, measure
+/// filters, and so on). Plays two roles: it stores the template's
+/// dependencies — already resolved to live member symbols and cube
+/// references, not symbolic paths — and it knows how to turn those
+/// dependencies into the final SQL. Placeholders `{arg:N}` /
+/// `{fp:N}` / `{fg:N}` / `{sv:N}` are substituted with the rendered
+/// SQL of the bound dependency, filter param, filter group or
+/// security-context value when the call is evaluated (`eval` /
+/// `eval_vec`).
 #[derive(Clone, Debug)]
 pub struct SqlCall {
     template: SqlTemplate,
@@ -117,9 +149,9 @@ pub struct SqlCall {
     filter_params: Vec<SqlCallFilterParamsItem>,
     filter_groups: Vec<SqlCallFilterGroupItem>,
     security_context: SecutityContextProps,
-    /// Per `{arg:N}` index: whether the surrounding context in the template
-    /// would make a compound substitution unsafe (requiring parentheses).
-    /// Computed once at construction from the template.
+    // Per `{arg:N}` index: whether the surrounding context in the template
+    // would make a compound substitution unsafe (requiring parentheses).
+    // Computed once at construction from the template.
     arg_paren_contexts: HashMap<usize, bool>,
 }
 
@@ -154,6 +186,8 @@ impl SqlCall {
         }
     }
 
+    /// Renders the template into a single SQL string. Errors when
+    /// the template is a `StringVec` — use `eval_vec` for that case.
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -179,6 +213,11 @@ impl SqlCall {
         }
     }
 
+    /// Renders the template into one SQL string per element when it
+    /// is a `StringVec`, or a single-element vector for plain
+    /// `String` templates. `StringVec` is produced by pre-aggregation
+    /// dimension / measure reference lists, where the data-model
+    /// definition returns the SQL of all referenced members at once.
     pub fn eval_vec(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -215,6 +254,9 @@ impl SqlCall {
         Ok(result)
     }
 
+    /// True when the SQL belongs to a single cube — either it has no
+    /// dependencies at all (a constant expression), or it references
+    /// the owning cube directly through a `{CUBE}` placeholder.
     pub fn is_owned_by_cube(&self) -> bool {
         if self.deps.is_empty() {
             true
@@ -223,6 +265,8 @@ impl SqlCall {
         }
     }
 
+    /// All `CubeRef::Name` dependencies — cube-name placeholders the
+    /// template refers to.
     pub fn cube_name_deps(&self) -> Vec<Rc<CubeNameSymbol>> {
         self.deps
             .iter()
@@ -415,11 +459,16 @@ impl SqlCall {
             .collect()
     }
 
+    /// True if the entire template is exactly `{arg:0}` with a single
+    /// member-symbol dependency — i.e. the SQL is a plain reference
+    /// to another member, with no wrapping expression.
     pub fn is_direct_reference(&self) -> bool {
         self.dependencies_count() == 1
             && self.template == SqlTemplate::String(SqlCallArg::dependency(0))
     }
 
+    /// The single member this call references when `is_direct_reference`
+    /// is true; `None` otherwise.
     pub fn resolve_direct_reference(&self) -> Option<Rc<MemberSymbol>> {
         if self.is_direct_reference() {
             self.deps[0].as_symbol().cloned()
@@ -428,10 +477,14 @@ impl SqlCall {
         }
     }
 
+    /// Number of member-symbol dependencies. Cube refs are not
+    /// counted.
     pub fn dependencies_count(&self) -> usize {
         self.deps.iter().filter(|d| d.is_symbol()).count()
     }
 
+    /// Member-symbol dependencies of the call. Cube refs are excluded
+    /// — use `get_cube_refs` for those.
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         self.deps
             .iter()
@@ -455,6 +508,9 @@ impl SqlCall {
         }
     }
 
+    /// Returns a new `SqlCall` with `f` applied recursively to every
+    /// member-symbol dependency. Cube refs and other placeholders
+    /// pass through unchanged.
     pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,

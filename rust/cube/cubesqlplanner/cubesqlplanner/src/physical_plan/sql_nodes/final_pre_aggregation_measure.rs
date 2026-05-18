@@ -10,6 +10,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Substitutes a measure with the matching pre-aggregation column
+/// reference (rolled up via the measure's `pre_aggregate_wrap`),
+/// or falls through to `input` when the measure has no
+/// pre-aggregation entry.
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
     references: RenderReferences,

@@ -9,6 +9,10 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Applies a calendar-cube time shift: when the dimension's
+/// resolved time-shift primary key matches an entry in `shifts`,
+/// renders the shifted reference (interval / named slot / custom
+/// SQL) declared on the calendar cube.
 pub struct CalendarTimeShiftSqlNode {
     shifts: HashMap<String, CalendarDimensionTimeShift>, // Key is the full pk name of the calendar cube
     input: Rc<dyn SqlNode>,

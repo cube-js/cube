@@ -13,6 +13,10 @@ use crate::planner::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+/// Builds the SQL-node chain for a query. Carries all the flags and
+/// reference maps the query needs (time shifts, render references,
+/// pre-aggregation refs, multi-stage partitions, etc.) and assembles
+/// them into a layered `SqlNode` via `default_node_processor`.
 #[derive(Clone, Default)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
@@ -150,6 +154,14 @@ impl SqlNodesFactory {
         )
     }
 
+    /// Assembles the full SQL-node chain for the configured options.
+    /// Three sub-chains hang off a `RootSqlNode` keyed by member
+    /// kind: a dimension chain (geo / case / time-shift / calendar
+    /// time-shift wraps), a time-dimension chain, and a measure
+    /// chain (case → measure filter → final-measure / ungrouped /
+    /// multi-stage wraps → mask). The whole tree is then wrapped in
+    /// a top-level `RenderReferencesSqlNode` for query-wide reference
+    /// substitution.
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
         let evaluate_sql_processor = MaskedSqlNode::new(EvaluateSqlNode::new());
         let auto_prefix_processor = AutoPrefixSqlNode::new(

@@ -3,6 +3,8 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Value type of a calculated (non-aggregating) measure as declared
+/// in the data model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CalculatedMeasureType {
     Number,
@@ -32,6 +34,8 @@ impl CalculatedMeasureType {
     }
 }
 
+/// `Calculated` measure kind: a non-aggregating expression. `sql`
+/// may be absent when the value is provided through a `case` body.
 #[derive(Clone)]
 pub struct CalculatedMeasure {
     calc_type: CalculatedMeasureType,

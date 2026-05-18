@@ -10,6 +10,10 @@ use crate::cube_bridge::security_context::SecurityContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Builds a `SqlCall` from a `MemberSql` declaration: compiles the
+/// template, resolves each path placeholder to a `SqlDependency`
+/// (member symbol or cube reference), and attaches filter params,
+/// filter groups and security-context bindings.
 pub struct SqlCallBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,

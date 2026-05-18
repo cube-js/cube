@@ -1,3 +1,5 @@
+/// `Like` filter operation: substring, prefix or suffix match
+/// (negated for the `not_*` variants).
 #[derive(Clone, Debug)]
 pub struct LikeOp {
     pub(crate) negated: bool,

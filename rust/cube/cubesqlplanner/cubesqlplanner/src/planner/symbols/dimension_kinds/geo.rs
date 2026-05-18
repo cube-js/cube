@@ -3,6 +3,8 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// `type: geo` dimension from the data model: a geographic dimension
+/// defined by `latitude` and `longitude` SQL expressions.
 #[derive(Clone)]
 pub struct GeoDimension {
     latitude: Rc<SqlCall>,

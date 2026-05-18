@@ -1,5 +1,6 @@
 use cubenativeutils::CubeError;
 
+/// Value type of a dimension as declared in the data model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DimensionType {
     String,

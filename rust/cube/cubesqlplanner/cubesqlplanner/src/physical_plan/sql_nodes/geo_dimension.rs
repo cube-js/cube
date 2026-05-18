@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders a `Geo` dimension by combining its latitude and
+/// longitude SQL expressions into a paired projection. Pass-through
+/// for non-geo dimensions.
 pub struct GeoDimensionSqlNode {
     input: Rc<dyn SqlNode>,
 }

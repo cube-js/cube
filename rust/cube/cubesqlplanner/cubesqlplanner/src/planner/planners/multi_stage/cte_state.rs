@@ -1,6 +1,11 @@
 use crate::logical_plan::{LogicalMultiStageMember, MultiStageSubqueryRef};
 use std::rc::Rc;
 
+/// Accumulator the multi-stage / multiplied planners write CTEs
+/// into during planning: a monotonic counter for generated CTE
+/// names (`cte_0`, `cte_1`, ...), the list of
+/// `LogicalMultiStageMember`s, and the subquery refs that the
+/// outer `FullKeyAggregate` will join over.
 pub struct CteState {
     counter: usize,
     members: Vec<Rc<LogicalMultiStageMember>>,
@@ -16,6 +21,7 @@ impl CteState {
         }
     }
 
+    /// Generates the next unique CTE name (`cte_0`, `cte_1`, ...).
     pub fn next_cte_name(&mut self) -> String {
         let name = format!("cte_{}", self.counter);
         self.counter += 1;
@@ -30,6 +36,8 @@ impl CteState {
         self.subquery_refs.push(subquery_ref);
     }
 
+    /// Consumes the state, returning the accumulated CTE members
+    /// and subquery refs.
     pub fn into_results(
         self,
     ) -> (

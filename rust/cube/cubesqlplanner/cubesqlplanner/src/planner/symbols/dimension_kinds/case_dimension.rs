@@ -4,6 +4,9 @@ use crate::planner::{CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Dimension whose value is defined via the `case` field of the
+/// data-model definition. Comes in classic and switch-style forms;
+/// see `Case`.
 #[derive(Clone)]
 pub struct CaseDimension {
     dimension_type: DimensionType,

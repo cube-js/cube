@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Applies a per-dimension time shift to time dimensions whose
+/// full name is in `shifts`, by rendering the dimension expression
+/// shifted by the configured interval.
 pub struct TimeShiftSqlNode {
     shifts: TimeShiftState,
     input: Rc<dyn SqlNode>,
