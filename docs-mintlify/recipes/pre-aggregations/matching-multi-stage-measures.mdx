@@ -410,10 +410,6 @@ must be in the rollup so Cube can rank `product` within each `country`.
   and the shift interval.
 - **Include every `group_by` / `add_group_by` / `reduce_by` dimension** in
   the rollup, in addition to the dimensions the query itself groups by.
-- **Always define `build_range_start` and `build_range_end`** on partitioned
-  rollups. Every example in this recipe sets them — without an explicit
-  build range, Cube has no bound for partitioning and will fall back to a
-  single, unpartitioned table.
 
 ## See also
 
