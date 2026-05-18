@@ -51,7 +51,7 @@ pub fn render_table(result: &QueryResult) -> Option<String> {
     // Data rows
     for row in &result.rows {
         out.push('\n');
-        for i in 0..ncols {
+        for (i, &width) in widths.iter().enumerate() {
             if i > 0 {
                 out.push('|');
             }
@@ -60,7 +60,7 @@ pub fn render_table(result: &QueryResult) -> Option<String> {
                 Some(Some(s)) => s.as_str(),
                 Some(None) | None => NULL_RENDER,
             };
-            push_left(&mut out, cell, widths[i]);
+            push_left(&mut out, cell, width);
             out.push(' ');
         }
     }
