@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use base64::Engine as _;
+use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use http::Request;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::MissedTickBehavior;
-use tokio_tungstenite::tungstenite::http::HeaderValue;
+use tokio_tungstenite::tungstenite::http::{HeaderValue, Request};
 use tokio_tungstenite::tungstenite::protocol::{Message, WebSocketConfig};
 use tokio_tungstenite::{connect_async_with_config, MaybeTlsStream, WebSocketStream};
 
@@ -28,7 +28,7 @@ pub(crate) enum ActorRequest {
 
 struct PendingQuery {
     reply: oneshot::Sender<Result<QueryResult, TransportError>>,
-    buffer: Vec<u8>,
+    buffer: Bytes,
 }
 
 pub(crate) struct Actor {
@@ -37,7 +37,7 @@ pub(crate) struct Actor {
     process_id: String,
     next_msg_id: u32,
     pending: HashMap<u32, PendingQuery>,
-    pending_resend: Vec<Vec<u8>>,
+    pending_resend: Vec<Bytes>,
     inbox: mpsc::UnboundedReceiver<ActorRequest>,
     ws: Option<WsStream>,
     last_pong: Instant,
@@ -75,7 +75,7 @@ impl Actor {
 
             // After a reconnect: flush any unanswered buffers with their original message ids.
             // Matches WebSocketConnection.ts:128-143.
-            let resend: Vec<Vec<u8>> = std::mem::take(&mut self.pending_resend);
+            let resend: Vec<Bytes> = std::mem::take(&mut self.pending_resend);
             for buf in resend {
                 if let Err(e) = sink.send(Message::Binary(buf)).await {
                     log::warn!("resend after reconnect failed: {e}");
@@ -107,9 +107,8 @@ impl Actor {
                                 let msg_id = self.next_msg_id;
                                 self.next_msg_id = self.next_msg_id.wrapping_add(1).max(1);
                                 let buf = encode_query(msg_id, &self.connection_id, &sql);
-                                let send_buf = buf.clone();
-                                self.pending.insert(msg_id, PendingQuery { reply, buffer: buf });
-                                if let Err(e) = sink.send(Message::Binary(send_buf)).await {
+                                self.pending.insert(msg_id, PendingQuery { reply, buffer: buf.clone() });
+                                if let Err(e) = sink.send(Message::Binary(buf)).await {
                                     log::warn!("send failed, will reconnect: {e}");
                                     break true;
                                 }
@@ -169,7 +168,7 @@ impl Actor {
                             log::warn!("heartbeat timeout — reconnecting");
                             break true;
                         }
-                        if let Err(e) = sink.send(Message::Ping(Vec::new())).await {
+                        if let Err(e) = sink.send(Message::Ping(Bytes::new())).await {
                             log::warn!("ping send failed: {e}");
                             break true;
                         }
@@ -279,11 +278,9 @@ pub(crate) async fn connect_ws(
     // Match cubestore's transport caps (default 64MiB message / 32MiB frame; the
     // server can be configured up to 256MiB). The tungstenite default of 16MiB
     // per frame is too tight for large query results.
-    let ws_config = WebSocketConfig {
-        max_message_size: Some(256 << 20),
-        max_frame_size: Some(256 << 20),
-        ..Default::default()
-    };
+    let ws_config = WebSocketConfig::default()
+        .max_message_size(Some(256 << 20))
+        .max_frame_size(Some(256 << 20));
     let connect_future = connect_async_with_config(request, Some(ws_config), false);
     let (ws, response) = tokio::time::timeout(cfg.connect_timeout, connect_future)
         .await

@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use cubeshared::codegen::{
     root_as_http_message, HttpCommand, HttpMessage, HttpMessageArgs, HttpQuery, HttpQueryArgs,
     QueryResultFormat,
@@ -8,7 +9,7 @@ use crate::error::TransportError;
 use crate::result::QueryResult;
 
 /// Build a binary FlatBuffer payload carrying an `HttpQuery` command.
-pub fn encode_query(message_id: u32, connection_id: &str, sql: &str) -> Vec<u8> {
+pub fn encode_query(message_id: u32, connection_id: &str, sql: &str) -> Bytes {
     let mut builder = FlatBufferBuilder::with_capacity(1024);
     let query_offset = builder.create_string(sql);
 
@@ -35,7 +36,7 @@ pub fn encode_query(message_id: u32, connection_id: &str, sql: &str) -> Vec<u8> 
         },
     );
     builder.finish(message, None);
-    builder.finished_data().to_vec()
+    Bytes::copy_from_slice(builder.finished_data())
 }
 
 /// Decoded response from the server.

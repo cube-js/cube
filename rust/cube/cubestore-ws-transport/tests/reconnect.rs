@@ -17,7 +17,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
-fn build_result_set(message_id: u32, connection_id: &str) -> Vec<u8> {
+fn build_result_set(message_id: u32, connection_id: &str) -> bytes::Bytes {
     let mut b = FlatBufferBuilder::with_capacity(256);
     let col = b.create_string("value");
     let cols = b.create_vector(&[col]);
@@ -55,7 +55,7 @@ fn build_result_set(message_id: u32, connection_id: &str) -> Vec<u8> {
         },
     );
     b.finish(msg, None);
-    b.finished_data().to_vec()
+    bytes::Bytes::copy_from_slice(b.finished_data())
 }
 
 #[tokio::test]

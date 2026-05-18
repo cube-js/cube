@@ -15,7 +15,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
-fn build_result_set(message_id: u32, connection_id: &str) -> Vec<u8> {
+fn build_result_set(message_id: u32, connection_id: &str) -> bytes::Bytes {
     let mut b = FlatBufferBuilder::with_capacity(1024);
 
     // columns: ["id", "name"]
@@ -92,10 +92,10 @@ fn build_result_set(message_id: u32, connection_id: &str) -> Vec<u8> {
         },
     );
     b.finish(msg, None);
-    b.finished_data().to_vec()
+    bytes::Bytes::copy_from_slice(b.finished_data())
 }
 
-fn build_error(message_id: u32, connection_id: &str, error: &str) -> Vec<u8> {
+fn build_error(message_id: u32, connection_id: &str, error: &str) -> bytes::Bytes {
     let mut b = FlatBufferBuilder::with_capacity(256);
     let err_off = b.create_string(error);
     let err = FbError::create(
@@ -115,7 +115,7 @@ fn build_error(message_id: u32, connection_id: &str, error: &str) -> Vec<u8> {
         },
     );
     b.finish(msg, None);
-    b.finished_data().to_vec()
+    bytes::Bytes::copy_from_slice(b.finished_data())
 }
 
 /// Boot a one-shot mock server. Returns the bound port. The server replies to every
@@ -238,7 +238,11 @@ async fn wide_result_full_round_trip() {
                         },
                     );
                     b.finish(msg, None);
-                    let _ = sink.send(Message::Binary(b.finished_data().to_vec())).await;
+                    let _ = sink
+                        .send(Message::Binary(bytes::Bytes::copy_from_slice(
+                            b.finished_data(),
+                        )))
+                        .await;
                 }
             });
         }
