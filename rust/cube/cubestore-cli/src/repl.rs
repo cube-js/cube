@@ -101,11 +101,28 @@ fn statement_complete(s: &str) -> bool {
     let mut in_single = false;
     let mut in_double = false;
     let mut last_non_ws: Option<char> = None;
+    let mut chars = s.chars().peekable();
 
-    for c in s.chars() {
+    while let Some(c) = chars.next() {
         match c {
-            '\'' if !in_double => in_single = !in_single,
-            '"' if !in_single => in_double = !in_double,
+            // Inside a single-quoted string, '' is an escaped quote — stay inside.
+            '\'' if in_single => {
+                if chars.peek() == Some(&'\'') {
+                    chars.next();
+                } else {
+                    in_single = false;
+                }
+            }
+            '\'' if !in_double => in_single = true,
+            // Same rule for double-quoted identifiers: "" is an escaped ".
+            '"' if in_double => {
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                } else {
+                    in_double = false;
+                }
+            }
+            '"' if !in_single => in_double = true,
             _ => {}
         }
         if !c.is_whitespace() {

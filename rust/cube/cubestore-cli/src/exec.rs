@@ -62,13 +62,31 @@ pub fn split_statements(input: &str) -> Vec<String> {
 
     while let Some(c) = chars.next() {
         match c {
+            // Inside a single-quoted string, '' is an escaped quote — stay inside.
+            '\'' if in_single => {
+                buf.push(c);
+                if chars.peek() == Some(&'\'') {
+                    buf.push(chars.next().unwrap());
+                } else {
+                    in_single = false;
+                }
+            }
             '\'' if !in_double => {
                 buf.push(c);
-                in_single = !in_single;
+                in_single = true;
+            }
+            // Same rule for double-quoted identifiers: "" is an escaped ".
+            '"' if in_double => {
+                buf.push(c);
+                if chars.peek() == Some(&'"') {
+                    buf.push(chars.next().unwrap());
+                } else {
+                    in_double = false;
+                }
             }
             '"' if !in_single => {
                 buf.push(c);
-                in_double = !in_double;
+                in_double = true;
             }
             ';' if !in_single && !in_double => {
                 let trimmed = buf.trim().to_string();
