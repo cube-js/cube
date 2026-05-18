@@ -1,13 +1,14 @@
 ---
 title: Matching multi-stage measures in pre-aggregations
-description: How to design rollup pre-aggregations so multi-stage measures (time shifts, period-to-date, percent of total, ranks, and nested aggregates) are matched and accelerated.
+description: How to design rollup pre-aggregations so multi-stage measures (time shifts, percent of total, ranks, and nested aggregates) are matched and accelerated.
 ---
 
 ## Use case
 
 We use [multi-stage measures][ref-multi-stage] — measures that aggregate over
 already-aggregated data — for things like year-over-year comparisons,
-period-to-date totals, percent of total, ranks, and nested aggregates. We want
+period-over-period comparisons, percent of total, ranks, and nested
+aggregates. We want
 those queries to be accelerated by
 [pre-aggregations][ref-pre-aggs] instead of falling back to the
 upstream data source.
@@ -171,71 +172,7 @@ matches `revenue_by_status` because:
 - the rollup's `created_at` granularity (`day`) is finer than the requested
   `month`.
 
-## Pattern 2: period-to-date
-
-Period-to-date measures (`rolling_window: { type: to_date, granularity: ... }`)
-don't need `multi_stage: true`, but they share the same matching rules: the
-rollup must include the base measure, all queried dimensions, and a
-`time_dimension` whose granularity divides the period-to-date granularity.
-
-<CodeGroup>
-
-```yaml title="YAML"
-measures:
-  - name: revenue_ytd
-    sql: amount
-    type: sum
-    rolling_window:
-      type: to_date
-      granularity: year
-
-pre_aggregations:
-  - name: revenue_ytd_by_status
-    measures:
-      - revenue_ytd
-    dimensions:
-      - status
-    time_dimension: created_at
-    # Use the finest granularity the rolling window needs to land on.
-    granularity: day
-    partition_granularity: month
-    build_range_start:
-      sql: "SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')"
-    build_range_end:
-      sql: "SELECT CURRENT_DATE"
-```
-
-```javascript title="JavaScript"
-measures: {
-  revenue_ytd: {
-    sql: `amount`,
-    type: `sum`,
-    rolling_window: { type: `to_date`, granularity: `year` },
-  },
-},
-
-pre_aggregations: {
-  revenue_ytd_by_status: {
-    measures: [revenue_ytd],
-    dimensions: [status],
-    time_dimension: created_at,
-    granularity: `day`,
-    partition_granularity: `month`,
-    build_range_start: {
-      sql: `SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')`,
-    },
-    build_range_end: { sql: `SELECT CURRENT_DATE` },
-  },
-},
-```
-
-</CodeGroup>
-
-For `to_date` windows, the rollup `granularity` must be **finer than or equal
-to** the `to_date` `granularity` — otherwise Cube cannot truncate the
-pre-aggregated rows to the boundary of the period.
-
-## Pattern 3: percent of total with `group_by`
+## Pattern 2: percent of total with `group_by`
 
 Percent-of-total uses [`group_by`][ref-group-by] to fix the inner aggregation
 to specific dimensions:
@@ -318,7 +255,7 @@ re-aggregates it to `country` for the inner CTE, then divides at the outer
 stage to produce the percentage. If the rollup omitted `country`, the inner
 `group_by: [country]` could not be computed and the match would fail.
 
-## Pattern 4: nested aggregates with `add_group_by`
+## Pattern 3: nested aggregates with `add_group_by`
 
 `add_group_by` computes an aggregate of an aggregate (e.g., the average of
 per-customer averages). The rollup must include the `add_group_by` dimension:
@@ -387,7 +324,7 @@ A query grouping by `region` and selecting `avg_customer_total` matches:
 Cube computes `SUM(amount)` per `(region, customer_id)` from the rollup, then
 averages over `customer_id` per `region` in the outer CTE.
 
-## Pattern 5: ranking with `reduce_by`
+## Pattern 4: ranking with `reduce_by`
 
 [`reduce_by`][ref-reduce-by] ranks rows within a group. The rollup must
 include both the rank's `reduce_by` dimension and the query's grouping
@@ -468,9 +405,9 @@ must be in the rollup so Cube can rank `product` within each `country`.
   `sum` + `count` (and compute the average at query time) and with
   `count_distinct_approx`. See the
   [non-additive measures recipe][ref-non-additivity] for the full pattern.
-- **Match granularity end-to-end.** For `time_shift` and `rolling_window`,
-  the rollup's `granularity` must be at least as fine as both the query's
-  granularity and the shift / window granularity.
+- **Match granularity end-to-end.** For `time_shift`, the rollup's
+  `granularity` must be at least as fine as both the query's granularity
+  and the shift interval.
 - **Include every `group_by` / `add_group_by` / `reduce_by` dimension** in
   the rollup, in addition to the dimensions the query itself groups by.
 - **Always define `build_range_start` and `build_range_end`** on partitioned
