@@ -193,6 +193,7 @@ impl Actor {
     }
 
     fn requeue_pending_for_resend(&mut self) {
+        self.pending_resend.clear();
         self.pending_resend
             .extend(self.pending.values().map(|p| p.buffer.clone()));
     }
