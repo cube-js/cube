@@ -1,5 +1,5 @@
 use super::ToSql;
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::NodeProcessor;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::BaseFilter;
@@ -13,7 +13,7 @@ impl ToSql for BaseFilter {
     fn to_sql(
         &self,
         visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
         filters_ctx: &FiltersContext,

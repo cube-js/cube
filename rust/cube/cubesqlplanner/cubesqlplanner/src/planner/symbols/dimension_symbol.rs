@@ -16,7 +16,7 @@ use crate::planner::{Compiler, CubeRef, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CalendarDimensionTimeShift {
     pub interval: Option<SqlInterval>,
     pub name: Option<String>,

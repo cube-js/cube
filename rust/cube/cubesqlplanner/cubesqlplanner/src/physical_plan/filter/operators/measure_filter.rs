@@ -1,4 +1,4 @@
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::NodeProcessor;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::filter::operators::measure_filter::MeasureFilterOp;
 use crate::planner::query_tools::QueryTools;
@@ -12,7 +12,7 @@ impl MeasureFilterOp {
         &self,
         member_evaluator: &Rc<MemberSymbol>,
         visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         query_tools: Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {

@@ -1,5 +1,5 @@
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
-use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
+use crate::physical_plan::sql_nodes::{NodeProcessor, SqlNodesFactory};
 use crate::physical_plan::sql_visitor::SqlEvaluatorVisitor;
 use crate::planner::filter::Filter;
 use crate::planner::query_tools::QueryTools;
@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 pub struct VisitorContext {
     query_tools: Rc<QueryTools>,
-    node_processor: Rc<dyn SqlNode>,
+    node_processor: Rc<NodeProcessor>,
     cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
     filters_context: FiltersContext,
@@ -63,7 +63,7 @@ impl VisitorContext {
         )
     }
 
-    pub fn node_processor(&self) -> Rc<dyn SqlNode> {
+    pub fn node_processor(&self) -> Rc<NodeProcessor> {
         self.node_processor.clone()
     }
 

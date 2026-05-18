@@ -1,32 +1,26 @@
-use super::SqlNode;
+use crate::physical_plan::sql_nodes::NodeProcessor;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::symbols::{Case, CaseDefinition, CaseLabel, CaseSwitchDefinition};
 use crate::planner::{CaseSwitchItem, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::any::Any;
 use std::rc::Rc;
 
-pub struct CaseSqlNode {
-    input: Rc<dyn SqlNode>,
-}
+use super::{OpCtx, OpExec};
 
-impl CaseSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
-        Rc::new(Self { input })
-    }
+/// Renders a member that is defined via `case:` / `case_switch:` rules as a
+/// SQL `CASE … END`. Members without a case definition fall through to the
+/// rest of the pipeline so plain dimensions/measures keep their normal path.
+#[derive(Clone, Debug)]
+pub struct CaseOp;
 
-    pub fn input(&self) -> &Rc<dyn SqlNode> {
-        &self.input
-    }
-
-    pub fn case_to_sql(
-        &self,
+impl CaseOp {
+    fn case_to_sql(
         visitor: &SqlEvaluatorVisitor,
         case: &CaseDefinition,
         query_tools: Rc<QueryTools>,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         // All sub-SQLs end up inside `CASE … END` — a safe wrap.
@@ -40,7 +34,7 @@ impl CaseSqlNode {
                 templates,
             )?;
             let then = match &itm.label {
-                CaseLabel::String(s) => templates.quote_string(&s)?,
+                CaseLabel::String(s) => templates.quote_string(s)?,
                 CaseLabel::Sql(sql) => sql.eval(
                     &inner_visitor,
                     node_processor.clone(),
@@ -51,7 +45,7 @@ impl CaseSqlNode {
             when_then.push((when, then));
         }
         let else_label = match &case.else_label {
-            CaseLabel::String(s) => templates.quote_string(&s)?,
+            CaseLabel::String(s) => templates.quote_string(s)?,
             CaseLabel::Sql(sql) => sql.eval(
                 &inner_visitor,
                 node_processor.clone(),
@@ -61,17 +55,16 @@ impl CaseSqlNode {
         };
         templates.case(None, when_then, Some(else_label))
     }
-    pub fn case_switch_to_sql(
-        &self,
+
+    fn case_switch_to_sql(
         visitor: &SqlEvaluatorVisitor,
         case: &CaseSwitchDefinition,
         query_tools: Rc<QueryTools>,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         // Degenerate shortcuts return the inner SQL as-is — propagate the outer
-        // visitor so an enclosing ParenthesizeSqlNode still sees the compound
-        // flag.
+        // visitor so an enclosing ParenthesizeOp still sees the compound flag.
         if case.items.len() == 1 && case.else_sql.is_none() {
             return case.items[0].sql.eval(
                 visitor,
@@ -97,7 +90,7 @@ impl CaseSqlNode {
                 templates,
             )?,
             CaseSwitchItem::Member(member_symbol) => {
-                inner_visitor.apply(&member_symbol, node_processor.clone(), templates)?
+                inner_visitor.apply(member_symbol, node_processor.clone(), templates)?
             }
         };
         let mut when_then = Vec::new();
@@ -125,78 +118,35 @@ impl CaseSqlNode {
     }
 }
 
-impl SqlNode for CaseSqlNode {
-    fn to_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        node: &Rc<MemberSymbol>,
-        query_tools: Rc<QueryTools>,
-        node_processor: Rc<dyn SqlNode>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Dimension(ev) => {
-                if let Some(case) = ev.case() {
-                    match case {
-                        Case::Case(case) => {
-                            self.case_to_sql(visitor, case, query_tools, node_processor, templates)?
-                        }
-                        Case::CaseSwitch(case) => self.case_switch_to_sql(
-                            visitor,
-                            case,
-                            query_tools,
-                            node_processor,
-                            templates,
-                        )?,
-                    }
-                } else {
-                    self.input.to_sql(
-                        visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?
-                }
-            }
-            MemberSymbol::Measure(ev) => {
-                if let Some(case) = ev.case() {
-                    match case {
-                        Case::Case(case) => {
-                            self.case_to_sql(visitor, case, query_tools, node_processor, templates)?
-                        }
-                        Case::CaseSwitch(case) => self.case_switch_to_sql(
-                            visitor,
-                            case,
-                            query_tools,
-                            node_processor,
-                            templates,
-                        )?,
-                    }
-                } else {
-                    self.input.to_sql(
-                        visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?
-                }
-            }
+impl OpExec for CaseOp {
+    fn exec(&self, ctx: &mut OpCtx<'_>) -> Result<String, CubeError> {
+        let case_opt: Option<&Case> = match ctx.sym.as_ref() {
+            MemberSymbol::Dimension(ev) => ev.case(),
+            MemberSymbol::Measure(ev) => ev.case(),
             _ => {
-                return Err(CubeError::internal(format!(
-                    "Case node processor called for wrong node",
-                )));
+                return Err(CubeError::internal(
+                    "Case op called for non-dimension/measure symbol".to_string(),
+                ));
             }
         };
-        Ok(res)
-    }
-
-    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
-        self.clone()
-    }
-
-    fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
-        vec![self.input.clone()]
+        let Some(case) = case_opt else {
+            return ctx.render_tail();
+        };
+        match case {
+            Case::Case(c) => Self::case_to_sql(
+                &ctx.visitor,
+                c,
+                ctx.query_tools.clone(),
+                ctx.node_processor.clone(),
+                ctx.templates,
+            ),
+            Case::CaseSwitch(c) => Self::case_switch_to_sql(
+                &ctx.visitor,
+                c,
+                ctx.query_tools.clone(),
+                ctx.node_processor.clone(),
+                ctx.templates,
+            ),
+        }
     }
 }

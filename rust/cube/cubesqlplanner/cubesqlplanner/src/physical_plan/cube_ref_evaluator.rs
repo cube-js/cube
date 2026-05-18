@@ -1,4 +1,4 @@
-use super::sql_nodes::SqlNode;
+use super::sql_nodes::NodeProcessor;
 use super::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::CubeRef;
@@ -27,7 +27,7 @@ impl CubeRefEvaluator {
         &self,
         cube_ref: &CubeRef,
         visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
+        node_processor: Rc<NodeProcessor>,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
