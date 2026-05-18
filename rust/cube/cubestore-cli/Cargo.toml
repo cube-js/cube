@@ -1,0 +1,24 @@
+[package]
+name = "cubestore-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive CLI for CubeStore over its native WebSocket protocol."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "csql"
+path = "src/bin/csql.rs"
+
+[dependencies]
+cubestore-ws-transport = { path = "../cubestore-ws-transport" }
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["full"] }
+rustyline = "14"
+anyhow = "1"
+url = "2"
+rpassword = "7"
+dirs = "5"
+env_logger = "0.11"
+log = "0.4"

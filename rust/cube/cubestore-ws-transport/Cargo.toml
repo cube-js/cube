@@ -1,0 +1,24 @@
+[package]
+name = "cubestore-ws-transport"
+version = "0.1.0"
+edition = "2021"
+description = "Async WebSocket client for CubeStore's binary FlatBuffers protocol."
+
+[dependencies]
+cubeshared = { path = "../cubeshared" }
+flatbuffers = "25.12.19"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
+futures-util = "0.3"
+bytes = "1"
+url = "2"
+percent-encoding = "2"
+base64 = "0.22"
+thiserror = "1"
+log = "0.4"
+uuid = { version = "1", features = ["v4"] }
+http = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+env_logger = "0.11"
