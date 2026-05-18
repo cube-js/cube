@@ -105,12 +105,6 @@ cubes:
         time_dimension: created_at
         granularity: day
         partition_granularity: month
-        # Build range must cover BOTH the queried range AND the shifted range.
-        # For a `1 year prior` shift, extend the start of the build range.
-        build_range_start:
-          sql: "SELECT NOW() - INTERVAL '3 years'"
-        build_range_end:
-          sql: "SELECT NOW()"
 ```
 
 ```javascript title="JavaScript"
@@ -142,8 +136,6 @@ cube(`orders`, {
       time_dimension: created_at,
       granularity: `day`,
       partition_granularity: `month`,
-      build_range_start: { sql: `SELECT NOW() - INTERVAL '3 years'` },
-      build_range_end: { sql: `SELECT NOW()` },
     },
   },
 });
@@ -167,20 +159,9 @@ A query like:
 matches `revenue_by_status` because:
 
 - the base `revenue` is in the rollup,
-- `status` is in the rollup,
+- `status` is in the rollup, and
 - the rollup's `created_at` granularity (`day`) is finer than the requested
-  `month`, and
-- the build range covers `2023-01-01..2024-12-31` (the queried year plus the
-  one-year shift).
-
-<Warning>
-
-A common pitfall is a build range that covers the queried range but not the
-shift. The shifted side of the time-shift CTE silently returns no rows and the
-comparison comes back as `NULL`. Extend `build_range_start` by the largest
-shift interval used by any multi-stage measure on the rollup.
-
-</Warning>
+  `month`.
 
 ## Pattern 2: period-to-date
 
@@ -432,9 +413,6 @@ must be in the rollup so Cube can rank `product` within each `country`.
 - **Match granularity end-to-end.** For `time_shift` and `rolling_window`,
   the rollup's `granularity` must be at least as fine as both the query's
   granularity and the shift / window granularity.
-- **Cover the shifted range.** Extend `build_range_start` backward (or
-  `build_range_end` forward) by the largest `time_shift` interval used. The
-  shifted CTE reads from the same rollup as the current period.
 - **Include every `group_by` / `add_group_by` / `reduce_by` dimension** in
   the rollup, in addition to the dimensions the query itself groups by.
 
