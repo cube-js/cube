@@ -116,11 +116,6 @@ async fn test_explicit_filter_overrides_default() {
     }
 }
 
-// `unless: [currency]` — but the user doesn't touch `currency`, so the
-// default filter is still in effect. The query groups by `country`, the
-// virtual switch is not in dimensions, so there is no cross-join — the
-// default filter still fires (visible as `'USD' = $`) but the result
-// table is just the per-country counts.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unless_keeps_default_filter_when_member_is_not_touched() {
     let ctx = create_context();
@@ -145,12 +140,6 @@ async fn test_unless_keeps_default_filter_when_member_is_not_touched() {
     }
 }
 
-// `amount_in_country` is a switch-case measure dispatched by `country`.
-// With `country` in dimensions every branch resolves correctly (US/CA →
-// USD amounts, DE/FR → EUR amounts, GB falls through to `else`). The
-// unconditional default filter on virtual `currency` rides along — it
-// must still appear in the SQL to confirm the filter wiring reaches
-// switch-case measures the same way it reaches plain counts.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_switch_case_measure_with_default_filter() {
     let ctx = create_context();

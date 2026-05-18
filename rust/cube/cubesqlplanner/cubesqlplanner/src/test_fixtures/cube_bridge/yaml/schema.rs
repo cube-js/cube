@@ -84,9 +84,6 @@ struct YamlView {
 
 #[derive(Debug, Deserialize)]
 struct YamlViewFilter {
-    // Member references must be supplied in the view's own namespace
-    // (`<view>.<member>`); the YAML harness does not duplicate the JS
-    // evaluator's resolution logic.
     member: String,
     operator: String,
     #[serde(default)]
@@ -189,8 +186,6 @@ impl YamlSchema {
             }
 
             for filter in view.filters {
-                // TypedBuilder uses a type-state chain, so set both optional
-                // legs in a single expression even when one of them is None.
                 let mock_filter = MockViewFilterDefinition::builder()
                     .operator(filter.operator)
                     .member_reference(filter.member)

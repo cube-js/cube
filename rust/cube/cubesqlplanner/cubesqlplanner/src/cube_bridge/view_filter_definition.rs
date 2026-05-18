@@ -6,11 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-// `values_references` mirrors the contract of `FilterItem.values` from
-// `base_query_options.rs` — query filters arriving from the API are already
-// stringified there, so the Tesseract planner treats filter values as
-// `Option<Vec<Option<String>>>` everywhere. The JS evaluator coerces with
-// `String(v)` before populating this field.
 #[derive(Serialize, Deserialize, Debug, Clone, nativebridge::NativeBridgeStatic)]
 pub struct ViewFilterDefinitionStatic {
     pub operator: String,

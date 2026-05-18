@@ -111,8 +111,6 @@ fn test_default_filter_keeps_applying_when_unless_member_is_only_in_dimensions()
 
 #[test]
 fn test_default_filter_released_when_explicit_filter_on_unless_member() {
-    // Explicit filter on the same member overrides the default — that is
-    // the scenario `unless` is meant to handle.
     let ctx = build_schema_with_default_filter(
         MockViewFilterDefinition::builder()
             .operator("equals".to_string())
@@ -133,8 +131,6 @@ fn test_default_filter_released_when_explicit_filter_on_unless_member() {
     "};
 
     let props = ctx.create_query_properties(query).unwrap();
-    // Only the user-supplied filter remains; the default `currency = USD`
-    // has been released by `unless`.
     let mentioned = extract_member_paths(props.dimensions_filters());
     assert_eq!(mentioned, vec!["orders_view.currency".to_string()]);
     assert_eq!(
@@ -171,8 +167,6 @@ fn test_default_filter_applies_when_unless_member_is_not_mentioned() {
 
 #[test]
 fn test_default_filter_applies_even_when_member_is_in_dimensions_without_unless() {
-    // With no `unless`, the filter is unconditional once the view is active —
-    // user explicitly opted into that behavior by omitting the guard.
     let ctx = build_schema_with_default_filter(
         MockViewFilterDefinition::builder()
             .operator("equals".to_string())

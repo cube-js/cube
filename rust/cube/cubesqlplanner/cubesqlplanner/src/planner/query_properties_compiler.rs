@@ -409,17 +409,6 @@ impl QueryPropertiesCompiler {
         Ok(filter_compiler.extract_result())
     }
 
-    // Adds default-value filters declared on any view that the query touches.
-    //
-    // A view is "active" when any compiled member of the query (a dimension,
-    // time dimension, measure, or member referenced by an explicit filter)
-    // is owned by a cube with `is_view == true`. We read this directly off
-    // each `MemberSymbol::compiled_path().cube_name()` — no second pass over
-    // the raw `options` string paths.
-    //
-    // A default filter is applied unless `unless_references` is provided
-    // and at least one of those member paths is mentioned in the query —
-    // "mentioned" being the full_name of any compiled member symbol.
     fn apply_view_default_filters(
         &self,
         filter_compiler: &mut FilterCompiler,
@@ -443,10 +432,6 @@ impl QueryPropertiesCompiler {
         let mentioned_in_filters: HashSet<String> =
             filter_members.iter().map(|s| s.full_name()).collect();
 
-        // View activation, by contrast, looks at every compiled member: if
-        // the query touches a view in any way (projection or filter), its
-        // default filters become candidates. De-duplicated by view name so
-        // each view is inspected at most once.
         let cube_evaluator = self.query_tools.cube_evaluator();
         let mut visited_cubes: HashSet<String> = HashSet::new();
         let mut pending_view_filters: Vec<Rc<dyn ViewFilterDefinition>> = Vec::new();

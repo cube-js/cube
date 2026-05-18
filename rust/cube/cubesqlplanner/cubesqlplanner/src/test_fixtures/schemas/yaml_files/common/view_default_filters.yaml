@@ -6,15 +6,9 @@ cubes:
             type: number
             sql: id
             primary_key: true
-          # Real dimension over the `country` column — used as the switch
-          # discriminator for `amount_in_country`.
           - name: country
             type: string
             sql: country
-          # Virtual switch dimension. No `sql:` — the planner cross-joins each
-          # base row with every value in `values`, so an unfiltered query
-          # multiplies the row count by 3. A default filter on this member is
-          # what collapses the union back to a single currency.
           - name: currency
             type: switch
             values:
@@ -28,10 +22,6 @@ cubes:
           - name: total_amount_eur
             type: sum
             sql: amount_eur
-          # Switch-case measure dispatched by `country`. Without a default
-          # filter and without `country` in the query, the planner falls back
-          # to the `else` branch (USD total) — a behaviour the customer
-          # didn't expect; see CORE-357.
           - name: amount_in_country
             type: number
             multi_stage: true
@@ -52,8 +42,6 @@ cubes:
             type: count
 
 views:
-    # Unconditional default filter on the virtual `currency` switch — pins the
-    # union to USD even when the user explicitly groups by `currency`.
     - name: orders_view
       cubes:
           - join_path: orders
@@ -64,8 +52,6 @@ views:
             values:
                 - USD
 
-    # `unless: [currency]` releases the guard when the user pivots by
-    # `currency`, so they can see the full union (USD/EUR/GBP × rows).
     - name: orders_view_with_unless
       cubes:
           - join_path: orders
