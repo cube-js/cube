@@ -105,6 +105,10 @@ cubes:
         time_dimension: created_at
         granularity: day
         partition_granularity: month
+        build_range_start:
+          sql: "SELECT date_trunc('year', CURRENT_DATE - INTERVAL '2 year')"
+        build_range_end:
+          sql: "SELECT CURRENT_DATE"
 ```
 
 ```javascript title="JavaScript"
@@ -136,6 +140,10 @@ cube(`orders`, {
       time_dimension: created_at,
       granularity: `day`,
       partition_granularity: `month`,
+      build_range_start: {
+        sql: `SELECT date_trunc('year', CURRENT_DATE - INTERVAL '2 year')`,
+      },
+      build_range_end: { sql: `SELECT CURRENT_DATE` },
     },
   },
 });
@@ -191,6 +199,10 @@ pre_aggregations:
     # Use the finest granularity the rolling window needs to land on.
     granularity: day
     partition_granularity: month
+    build_range_start:
+      sql: "SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')"
+    build_range_end:
+      sql: "SELECT CURRENT_DATE"
 ```
 
 ```javascript title="JavaScript"
@@ -209,6 +221,10 @@ pre_aggregations: {
     time_dimension: created_at,
     granularity: `day`,
     partition_granularity: `month`,
+    build_range_start: {
+      sql: `SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')`,
+    },
+    build_range_end: { sql: `SELECT CURRENT_DATE` },
   },
 },
 ```
@@ -245,14 +261,21 @@ measures:
     type: number
 
 pre_aggregations:
-  - name: revenue_by_country_and_product:
-      measures:
-        - revenue
-      # Must include every dimension referenced in any group_by used by the
-      # query's multi-stage measures, PLUS every dimension the query groups by.
-      dimensions:
-        - country
-        - product
+  - name: revenue_by_country_and_product
+    measures:
+      - revenue
+    # Must include every dimension referenced in any group_by used by the
+    # query's multi-stage measures, PLUS every dimension the query groups by.
+    dimensions:
+      - country
+      - product
+    time_dimension: created_at
+    granularity: day
+    partition_granularity: month
+    build_range_start:
+      sql: "SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')"
+    build_range_end:
+      sql: "SELECT CURRENT_DATE"
 ```
 
 ```javascript title="JavaScript"
@@ -277,6 +300,13 @@ pre_aggregations: {
   revenue_by_country_and_product: {
     measures: [revenue],
     dimensions: [country, product],
+    time_dimension: created_at,
+    granularity: `day`,
+    partition_granularity: `month`,
+    build_range_start: {
+      sql: `SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')`,
+    },
+    build_range_end: { sql: `SELECT CURRENT_DATE` },
   },
 },
 ```
@@ -315,6 +345,13 @@ pre_aggregations:
     dimensions:
       - customer_id
       - region
+    time_dimension: created_at
+    granularity: day
+    partition_granularity: month
+    build_range_start:
+      sql: "SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')"
+    build_range_end:
+      sql: "SELECT CURRENT_DATE"
 ```
 
 ```javascript title="JavaScript"
@@ -333,6 +370,13 @@ pre_aggregations: {
   orders_by_customer: {
     measures: [order_total],
     dimensions: [customer_id, region],
+    time_dimension: created_at,
+    granularity: `day`,
+    partition_granularity: `month`,
+    build_range_start: {
+      sql: `SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')`,
+    },
+    build_range_end: { sql: `SELECT CURRENT_DATE` },
   },
 },
 ```
@@ -373,6 +417,13 @@ pre_aggregations:
     dimensions:
       - country
       - product
+    time_dimension: created_at
+    granularity: day
+    partition_granularity: month
+    build_range_start:
+      sql: "SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')"
+    build_range_end:
+      sql: "SELECT CURRENT_DATE"
 ```
 
 ```javascript title="JavaScript"
@@ -391,6 +442,13 @@ pre_aggregations: {
   revenue_by_country_and_product: {
     measures: [revenue],
     dimensions: [country, product],
+    time_dimension: created_at,
+    granularity: `day`,
+    partition_granularity: `month`,
+    build_range_start: {
+      sql: `SELECT date_trunc('year', CURRENT_DATE - INTERVAL '1 year')`,
+    },
+    build_range_end: { sql: `SELECT CURRENT_DATE` },
   },
 },
 ```
@@ -415,6 +473,10 @@ must be in the rollup so Cube can rank `product` within each `country`.
   granularity and the shift / window granularity.
 - **Include every `group_by` / `add_group_by` / `reduce_by` dimension** in
   the rollup, in addition to the dimensions the query itself groups by.
+- **Always define `build_range_start` and `build_range_end`** on partitioned
+  rollups. Every example in this recipe sets them — without an explicit
+  build range, Cube has no bound for partitioning and will fall back to a
+  single, unpartitioned table.
 
 ## See also
 
