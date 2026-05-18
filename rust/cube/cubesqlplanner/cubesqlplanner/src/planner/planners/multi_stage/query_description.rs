@@ -6,6 +6,10 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
+/// One CTE in the multi-stage tree as the planner sees it: the
+/// `member` rendered, the `state` (`QueryProperties` snapshot for
+/// this CTE's scope), the input CTEs it depends on, and the alias
+/// it will be referenced by.
 pub struct MultiStageQueryDescription {
     member: Rc<MultiStageMember>,
     state: Rc<QueryProperties>,
@@ -68,6 +72,10 @@ impl MultiStageQueryDescription {
         self.input.is_empty()
     }
 
+    /// Walks the description subtree and returns
+    /// `(dimensions, time_dimensions)` whose chain-resolved members
+    /// have no multi-stage members of their own. Duplicates are
+    /// removed by full name.
     pub fn collect_all_non_multi_stage_dimension(
         &self,
     ) -> Result<(Vec<Rc<MemberSymbol>>, Vec<Rc<MemberSymbol>>), CubeError> {
@@ -108,6 +116,10 @@ impl MultiStageQueryDescription {
         }
     }
 
+    /// True if this description renders `member_node` under an
+    /// equivalent state — used to deduplicate CTEs when the same
+    /// member is reached through different paths in the dependency
+    /// graph.
     pub fn is_match_member_and_state(
         &self,
         member_node: &Rc<MemberSymbol>,

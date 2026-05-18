@@ -26,6 +26,13 @@ use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+/// Plans the multi-stage CTE tree of a query. For every multi-stage
+/// member it encounters in `all_used_symbols`, it recursively
+/// produces `MultiStageQueryDescription`s for the member and its
+/// dependencies, then asks `MultiStageMemberQueryPlanner` to render
+/// each into a `LogicalMultiStageMember`. CTEs are deduplicated by
+/// `(member, state)` so the same multi-stage subquery isn't
+/// emitted twice.
 pub struct MultiStageQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
@@ -39,6 +46,9 @@ impl MultiStageQueryPlanner {
         }
     }
 
+    /// Populates `cte_state` with multi-stage CTEs (and their
+    /// subquery refs) for every multi-stage member used by the
+    /// query. No-op when the query has none.
     pub fn plan_queries(&self, cte_state: &mut CteState) -> Result<(), CubeError> {
         let multi_stage_members = self
             .query_properties
@@ -105,6 +115,12 @@ impl MultiStageQueryPlanner {
         Ok(())
     }
 
+    /// Classifies `base_member` into a `MultiStageInodeMember` — picks
+    /// the inode kind (Rank / Aggregate / Calculate for a measure,
+    /// Dimension for a dimension) and pulls the partition-shaping
+    /// flags (`reduce_by`, `add_group_by`, `group_by`, `time_shift`)
+    /// out of the data-model definition. Returns the inode together
+    /// with the leaf's `is_ungrupped` flag.
     fn create_multi_stage_inode_member(
         &self,
         base_member: Rc<MemberSymbol>,
@@ -159,6 +175,10 @@ impl MultiStageQueryPlanner {
         Ok(inode)
     }
 
+    /// Builds child descriptions for `member`'s inode. Switches to
+    /// `try_make_childs_for_case_switch` when the member's body is a
+    /// CASE-SWITCH expression; otherwise falls through to
+    /// `default_make_childs`.
     fn make_childs(
         &self,
         member: Rc<MemberSymbol>,
@@ -190,6 +210,8 @@ impl MultiStageQueryPlanner {
         )
     }
 
+    /// True if `member` is a dimension that has multi-stage members
+    /// somewhere in its dependency tree.
     fn is_multi_stage_dimension(member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         if member.is_dimension() {
             has_multi_stage_members(member, false)
@@ -198,6 +220,12 @@ impl MultiStageQueryPlanner {
         }
     }
 
+    /// Default child-generation path: for each measure or
+    /// multi-stage-dimension dependency, recurses into
+    /// `make_queries_descriptions` and adds the result as an input
+    /// CTE. If the member has no such deps (e.g. a `Rank` measure
+    /// that only needs the dimension grid), produces a single
+    /// "without-member" leaf instead.
     fn default_make_childs(
         &self,
         member: Rc<MemberSymbol>,
@@ -245,6 +273,13 @@ impl MultiStageQueryPlanner {
         Ok(())
     }
 
+    /// Plans CASE-SWITCH dependencies: collects, per dependency, the
+    /// union of switch values it covers and renders each dependency
+    /// under a state with an equality filter on the switch member
+    /// restricted to those values. An open `ELSE` branch makes the
+    /// dependency unrestricted. Returns `false` when the switch is
+    /// not a member reference, in which case the caller falls back
+    /// to `default_make_childs`.
     fn try_make_childs_for_case_switch(
         &self,
         case: &CaseSwitchDefinition,
@@ -322,6 +357,15 @@ impl MultiStageQueryPlanner {
         Ok(true)
     }
 
+    /// Core recursive step. Given a `member` and the current
+    /// `state`, resolves the reference chain, applies static filters
+    /// from the dimensions filters, deduplicates against
+    /// already-built descriptions, tries a rolling-window path
+    /// (`try_plan_rolling_window`), and otherwise returns either a
+    /// leaf `Measure` or an inode description whose children come
+    /// from `make_childs`. Adjusts the state for inodes with any
+    /// `add_group_by`, time-shift or per-member filter changes the
+    /// inode demands.
     fn make_queries_descriptions(
         &self,
         member: Rc<MemberSymbol>,
@@ -431,6 +475,10 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
+    /// If `member` is a cumulative measure, plans the time-series
+    /// and rolling-window CTEs and returns the rolling-window
+    /// description. Returns `None` for other measures and for
+    /// non-measure members.
     pub fn try_plan_rolling_window(
         &self,
         member: Rc<MemberSymbol>,
@@ -604,6 +652,9 @@ impl MultiStageQueryPlanner {
         }
     }
 
+    /// Adds (or reuses) the `time_series_get_range` leaf CTE — used
+    /// by `add_time_series` when the requested time dimension has no
+    /// explicit date range and the planner needs to compute one.
     fn add_time_series_get_range_query(
         &self,
         time_dimension: Rc<MemberSymbol>,
@@ -635,6 +686,10 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
+    /// Adds (or reuses) the `time_series` leaf CTE that drives a
+    /// rolling window. When the time dimension has no `date_range`,
+    /// also arranges for a sibling `time_series_get_range` CTE to
+    /// feed it.
     fn add_time_series(
         &self,
         time_dimension: Rc<MemberSymbol>,
@@ -681,6 +736,10 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
+    /// Adds the leaf CTE that produces the base values for a
+    /// rolling window — selects the requested dimensions plus the
+    /// unrolled measure, marked `has_aggregates_on_top` so callers
+    /// know an outer rolling computation will consume it.
     fn add_rolling_window_base(
         &self,
         member: Rc<MemberSymbol>,
@@ -705,6 +764,9 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
+    /// Returns the granularity of a `to_date` rolling window. Errors
+    /// if the window is declared as `to_date` without a granularity,
+    /// and returns `None` for window kinds that don't carry one.
     fn get_to_date_rolling_granularity(
         &self,
         rolling_window: &RollingWindow,
@@ -750,6 +812,12 @@ impl MultiStageQueryPlanner {
         Ok(Rc::new(new_state))
     }
 
+    /// Builds the state for a rolling-window base CTE: reduces the
+    /// time dimension to the minimum granularity required by the
+    /// window, drops other dimensions that resolve to time
+    /// dimensions, and rewrites the time-dimension date-range
+    /// filter to either a `to_date` bound or a regular trailing /
+    /// leading bound.
     fn make_rolling_base_state(
         &self,
         time_dimension: Rc<MemberSymbol>,

@@ -3,6 +3,9 @@ use crate::planner::DimensionTimeShift;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 
+/// Per-dimension time-shift accumulator used during multi-stage
+/// planning. Keyed by dimension full name; aggregates the shifts
+/// applied to each dimension across nested multi-stage scopes.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct TimeShiftState {
     pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
@@ -13,6 +16,11 @@ impl TimeShiftState {
         self.dimensions_shifts.is_empty()
     }
 
+    /// Splits the accumulated shifts into two maps: regular
+    /// `DimensionTimeShift`s applied at render time, and
+    /// `CalendarDimensionTimeShift`s that come from a calendar
+    /// cube's own time-shift declarations. A named shift that does
+    /// not match a calendar declaration is an error.
     pub fn extract_time_shifts(
         &self,
     ) -> Result<

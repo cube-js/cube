@@ -1,12 +1,18 @@
 use crate::planner::{MeasureTimeShifts, MemberSymbol};
 use std::rc::Rc;
 
+/// Description of the time-series CTE driving a rolling-window
+/// computation: the time dimension and, optionally, the alias of a
+/// sibling CTE that resolves its date range at query time.
 #[derive(Clone)]
 pub struct TimeSeriesDescription {
     pub time_dimension: Rc<MemberSymbol>,
     pub date_range_cte: Option<String>,
 }
 
+/// Kind of leaf CTE in a multi-stage chain: a base measure query,
+/// a time-series axis, or a query that just resolves the date range
+/// of a time dimension.
 #[derive(Clone)]
 pub enum MultiStageLeafMemberType {
     Measure,
@@ -14,6 +20,8 @@ pub enum MultiStageLeafMemberType {
     TimeSeriesGetRange(Rc<MemberSymbol>),
 }
 
+/// Bounds of a regular rolling window: trailing / leading interval
+/// strings and a time-series offset.
 #[derive(Clone)]
 pub struct RegularRollingWindow {
     pub trailing: Option<String>,
@@ -21,11 +29,15 @@ pub struct RegularRollingWindow {
     pub offset: String,
 }
 
+/// To-date rolling window — accumulates since the start of
+/// `granularity` (month-to-date, year-to-date, …).
 #[derive(Clone)]
 pub struct ToDateRollingWindow {
     pub granularity: String,
 }
 
+/// Flavour of rolling-window computation: regular trailing/leading
+/// window, to-date window, or a running-total accumulation.
 #[derive(Clone)]
 pub enum RollingWindowType {
     Regular(RegularRollingWindow),
@@ -33,6 +45,9 @@ pub enum RollingWindowType {
     RunningTotal,
 }
 
+/// Planner-side description of a rolling window: the time
+/// dimension used for windowing (and its lower-granularity base
+/// version produced in the leaf CTE) plus the chosen window type.
 #[derive(Clone)]
 pub struct RollingWindowDescription {
     pub time_dimension: Rc<MemberSymbol>,
@@ -84,6 +99,9 @@ impl RollingWindowDescription {
     }
 }
 
+/// Semantic shape of a non-leaf multi-stage CTE: a rank window,
+/// an aggregate (possibly window-rendered), a non-aggregating
+/// calculation, a dimension calculation, or a rolling window.
 #[derive(Clone)]
 pub enum MultiStageInodeMemberType {
     Rank,
@@ -93,6 +111,11 @@ pub enum MultiStageInodeMemberType {
     RollingWindow(RollingWindowDescription),
 }
 
+/// Non-leaf node in a multi-stage tree. Bundles the semantic
+/// `inode_type` (Rank / Aggregate / Calculate / Dimension /
+/// RollingWindow) with the partition-shaping flags driven by the
+/// measure's data-model directives: `reduce_by`, `add_group_by`,
+/// `group_by`, `time_shift`.
 #[derive(Clone)]
 pub struct MultiStageInodeMember {
     inode_type: MultiStageInodeMemberType,
@@ -154,6 +177,9 @@ impl MultiStageInodeMember {
     }
 }
 
+/// Position of a CTE in the multi-stage tree: either an inner node
+/// (depends on other CTEs) or a leaf (queries the underlying data
+/// directly).
 #[derive(Clone)]
 pub enum MultiStageMemberType {
     Inode(MultiStageInodeMember),
@@ -169,6 +195,9 @@ impl MultiStageMemberType {
     }
 }
 
+/// One node in a multi-stage tree: its position (`member_type`),
+/// the member symbol it renders, and a few rendering flags
+/// (ungrouped, has-aggregates-on-top, is-without-member-leaf).
 pub struct MultiStageMember {
     member_type: MultiStageMemberType,
     member_symbol: Rc<MemberSymbol>,
@@ -193,6 +222,10 @@ impl MultiStageMember {
         })
     }
 
+    /// Builds a leaf node whose base CTE selects only dimensions —
+    /// the member itself is not computed by the leaf (e.g. for a
+    /// `Rank` measure where the value comes purely from a window
+    /// function applied on top).
     pub fn new_without_member_leaf(
         member_type: MultiStageMemberType,
         evaluation_node: Rc<MemberSymbol>,
@@ -216,6 +249,9 @@ impl MultiStageMember {
         &self.member_symbol
     }
 
+    /// True when this node is a leaf whose CTE selects dimensions
+    /// only, without computing the member's value (see
+    /// `new_without_member_leaf`).
     pub fn is_without_member_leaf(&self) -> bool {
         self.is_without_member_leaf
     }
