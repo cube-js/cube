@@ -9,6 +9,12 @@ use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Entry point of the logical-plan construction. Dispatches by
+/// `QueryProperties::is_simple_query()`: simple queries go through
+/// `SimpleQueryPlanner`; everything else is built up from
+/// multi-stage and multiplied-measure CTEs (`MultiStageQueryPlanner`,
+/// `MultipliedMeasuresQueryPlanner`) and stitched together by
+/// `FullKeyAggregateQueryPlanner`.
 pub struct QueryPlanner {
     query_tools: Rc<QueryTools>,
     request: Rc<QueryProperties>,
@@ -22,6 +28,9 @@ impl QueryPlanner {
         }
     }
 
+    /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
+    /// builds the multi-stage / multiplied CTEs and assembles them via
+    /// `FullKeyAggregateQueryPlanner`.
     pub fn plan(&self) -> Result<Rc<Query>, CubeError> {
         if self.request.is_simple_query()? {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());

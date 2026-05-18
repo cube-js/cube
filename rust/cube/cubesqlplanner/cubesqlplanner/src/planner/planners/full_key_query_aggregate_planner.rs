@@ -3,6 +3,9 @@ use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Final assembly step for non-simple queries: takes the collected
+/// multi-stage / multiplied subquery refs and members and wraps
+/// them in a `Query` whose source is a `FullKeyAggregate`.
 pub struct FullKeyAggregateQueryPlanner {
     query_properties: Rc<QueryProperties>,
 }
@@ -12,6 +15,9 @@ impl FullKeyAggregateQueryPlanner {
         Self { query_properties }
     }
 
+    /// Builds the `FullKeyAggregate` source from the collected
+    /// multi-stage subquery refs. Always renders as FULL OUTER JOIN
+    /// + COALESCE.
     pub fn plan_logical_source(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
@@ -29,6 +35,8 @@ impl FullKeyAggregateQueryPlanner {
         ))
     }
 
+    /// Wraps `plan_logical_source` in a `Query` with the request's
+    /// filters, modifiers and multi-stage members.
     pub fn plan_logical_plan(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,

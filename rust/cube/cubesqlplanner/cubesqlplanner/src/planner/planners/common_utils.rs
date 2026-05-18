@@ -4,6 +4,8 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Small helpers shared between planners — cube resolution and the
+/// list of primary-key dimensions for a given cube.
 pub struct CommonUtils {
     query_tools: Rc<QueryTools>,
 }
@@ -13,6 +15,7 @@ impl CommonUtils {
         Self { query_tools }
     }
 
+    /// Resolves the planner-level `BaseCube` for the given cube path.
     pub fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
         let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
@@ -22,6 +25,8 @@ impl CommonUtils {
         BaseCube::try_new(cube_path.to_string(), self.query_tools.clone(), evaluator)
     }
 
+    /// Primary-key dimensions of `cube_name` as planner
+    /// `MemberSymbol`s.
     pub fn primary_keys_dimensions(
         &self,
         cube_name: &String,

@@ -6,6 +6,9 @@ use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Plans a `Query` for the simple case: a single `LogicalJoin`
+/// source, no multi-stage or multiplied CTEs. Sub-query dimensions
+/// are still woven into the join.
 pub struct SimpleQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
@@ -20,6 +23,7 @@ impl SimpleQueryPlanner {
         }
     }
 
+    /// Builds the `Query` for a simple-case request.
     pub fn plan(&self) -> Result<Rc<Query>, CubeError> {
         let source = self.source_and_subquery_dimensions()?;
 
@@ -54,6 +58,8 @@ impl SimpleQueryPlanner {
         Ok(Rc::new(result))
     }
 
+    /// Resolves the query's join and the sub-query dimensions that
+    /// plug into it, returning the assembled `LogicalJoin` source.
     pub fn source_and_subquery_dimensions(&self) -> Result<Rc<LogicalJoin>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
