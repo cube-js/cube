@@ -7,6 +7,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Wraps a measure as a SQL window function partitioned by
+/// `partition`. Used for multi-stage measures whose partition is
+/// narrower than the full dimension set. Non-window measures go
+/// through `else_processor`.
 pub struct MultiStageWindowNode {
     input: Rc<dyn SqlNode>,
     else_processor: Rc<dyn SqlNode>,

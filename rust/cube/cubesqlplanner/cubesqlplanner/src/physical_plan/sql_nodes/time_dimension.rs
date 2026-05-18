@@ -8,6 +8,10 @@ use std::any::Any;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+/// Renders a time dimension: applies the granularity (predefined
+/// or calendar SQL) and timezone conversion, unless the dimension's
+/// full name is listed in `dimensions_with_ignored_timezone` (used
+/// for pre-aggregation column references).
 pub struct TimeDimensionNode {
     dimensions_with_ignored_timezone: HashSet<String>,
     input: Rc<dyn SqlNode>,

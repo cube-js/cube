@@ -11,6 +11,9 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Prefixes a bare member-name SQL fragment with its cube's quoted
+/// alias (e.g. `id` → `"users".id`). Skips fragments that are not a
+/// single identifier — those already carry their own qualification.
 pub struct AutoPrefixSqlNode {
     input: Rc<dyn SqlNode>,
     cube_references: HashMap<String, String>,

@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Base case of the SQL-node chain: invokes the member symbol's own
+/// `to_sql` to produce the raw SQL fragment. All wrapping nodes
+/// eventually delegate down to this.
 pub struct EvaluateSqlNode {}
 
 impl EvaluateSqlNode {

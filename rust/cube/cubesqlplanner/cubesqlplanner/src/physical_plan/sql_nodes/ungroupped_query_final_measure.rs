@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders measures inside an ungrouped query. Count-like measures
+/// keep their counting wrap to stay correct without GROUP BY; other
+/// measures pass through without aggregation.
 pub struct UngroupedQueryFinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
 }

@@ -7,6 +7,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// One link in the SQL-rendering chain. Given a `MemberSymbol` and
+/// the surrounding context, returns the rendered SQL — either by
+/// computing it directly or by delegating up the chain through
+/// `node_processor`.
 pub trait SqlNode {
     fn to_sql(
         &self,
@@ -22,6 +26,8 @@ pub trait SqlNode {
     fn childs(&self) -> Vec<Rc<dyn SqlNode>>;
 }
 
+/// Specialised renderer for `{CUBE}` / `{TABLE}` placeholders that
+/// only need the cube's name.
 pub trait CubeNameNode {
     fn to_sql(&self, cube_name: &String) -> Result<String, CubeError>;
 }
