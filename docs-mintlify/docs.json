@@ -515,6 +515,7 @@
                 "group": "DAX API",
                 "root": "reference/core-data-apis/dax-api/index",
                 "pages": [
+                  "reference/core-data-apis/dax-api/cross-view-filter",
                   "reference/core-data-apis/dax-api/reference"
                 ]
               }
