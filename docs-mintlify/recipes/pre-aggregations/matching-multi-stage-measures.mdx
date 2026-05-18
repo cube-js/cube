@@ -1,0 +1,463 @@
+---
+title: Matching multi-stage measures in pre-aggregations
+description: How to design rollup pre-aggregations so multi-stage measures (time shifts, period-to-date, percent of total, ranks, and nested aggregates) are matched and accelerated.
+---
+
+## Use case
+
+We use [multi-stage measures][ref-multi-stage] — measures that aggregate over
+already-aggregated data — for things like year-over-year comparisons,
+period-to-date totals, percent of total, ranks, and nested aggregates. We want
+those queries to be accelerated by
+[pre-aggregations][ref-pre-aggs] instead of falling back to the
+upstream data source.
+
+Multi-stage measures don't slot into rollups the same way as plain additive
+measures: the values themselves cannot be re-aggregated from a rollup. Cube
+matches them by including the **underlying base measures** in the rollup and
+recomputing the multi-stage CTEs on top of the pre-aggregation at query time.
+
+This recipe shows the rules for building a rollup that matches multi-stage
+measures, plus patterns for the most common cases.
+
+<Warning>
+
+Multi-stage measures are powered by Tesseract, the [next-generation data
+modeling engine][link-tesseract]. Tesseract is currently in preview. Set
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] to `true` to enable it.
+
+</Warning>
+
+## How matching works
+
+When a query references a multi-stage measure, Cube looks for a rollup that
+satisfies **three** conditions at once:
+
+1. **Base measures are included.** Every measure referenced inside the
+   multi-stage `sql` expression (directly or transitively) must be a member of
+   the rollup. The multi-stage measure itself is **not** included in
+   `measures` — only its building blocks.
+2. **All driving dimensions are included.** Anything the multi-stage parameter
+   partitions by must be present in the rollup's `dimensions`:
+    - For [`group_by`][ref-group-by] / [`add_group_by`][ref-add-group-by]:
+      every listed dimension.
+    - For [`reduce_by`][ref-reduce-by]: every listed dimension, plus the
+      dimensions the query groups by.
+    - For [`time_shift`][ref-time-shift]: the shifted
+      [`time_dimension`][ref-time-dim] and a `granularity` at least as fine
+      as the shift interval and the query's time granularity.
+3. **The base measures stay additive.** The rollup can only be used if the
+   inner aggregation can be recomputed from the rollup rows. Use
+   [additive types][ref-additive] (`count`, `sum`, `min`, `max`,
+   `count_distinct_approx`) for the base. Avoid `avg` and `count_distinct` as
+   bases — decompose them into `sum` + `count` and `count_distinct_approx`
+   respectively, the same way as for
+   [non-additive measures][ref-non-additivity].
+
+If any of these are missing, the rollup is skipped for the multi-stage query
+and Cube either picks another pre-aggregation or falls back to the data source.
+
+## Pattern 1: time shift (year-over-year)
+
+A [time-shift][ref-time-shift] measure compares the current period against a
+shifted one:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+
+      - name: revenue_prior_year
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - time_dimension: created_at
+            interval: 1 year
+            type: prior
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    pre_aggregations:
+      - name: revenue_by_status
+        # Only the *base* measure goes in.
+        measures:
+          - revenue
+        dimensions:
+          - status
+        # Shift dimension must be the time_dimension of the rollup,
+        # and its granularity must be at least as fine as the shift interval
+        # and the query's requested granularity.
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month
+        # Build range must cover BOTH the queried range AND the shifted range.
+        # For a `1 year prior` shift, extend the start of the build range.
+        build_range_start:
+          sql: "SELECT NOW() - INTERVAL '3 years'"
+        build_range_end:
+          sql: "SELECT NOW()"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    revenue: { sql: `amount`, type: `sum` },
+
+    revenue_prior_year: {
+      multi_stage: true,
+      sql: `${revenue}`,
+      type: `number`,
+      time_shift: [
+        { time_dimension: `created_at`, interval: `1 year`, type: `prior` },
+      ],
+    },
+  },
+
+  dimensions: {
+    status: { sql: `status`, type: `string` },
+    created_at: { sql: `created_at`, type: `time` },
+  },
+
+  pre_aggregations: {
+    revenue_by_status: {
+      measures: [revenue],
+      dimensions: [status],
+      time_dimension: created_at,
+      granularity: `day`,
+      partition_granularity: `month`,
+      build_range_start: { sql: `SELECT NOW() - INTERVAL '3 years'` },
+      build_range_end: { sql: `SELECT NOW()` },
+    },
+  },
+});
+```
+
+</CodeGroup>
+
+A query like:
+
+```json
+{
+  "measures": ["orders.revenue", "orders.revenue_prior_year"],
+  "dimensions": ["orders.status"],
+  "timeDimensions": [
+    { "dimension": "orders.created_at", "granularity": "month",
+      "dateRange": ["2024-01-01", "2024-12-31"] }
+  ]
+}
+```
+
+matches `revenue_by_status` because:
+
+- the base `revenue` is in the rollup,
+- `status` is in the rollup,
+- the rollup's `created_at` granularity (`day`) is finer than the requested
+  `month`, and
+- the build range covers `2023-01-01..2024-12-31` (the queried year plus the
+  one-year shift).
+
+<Warning>
+
+A common pitfall is a build range that covers the queried range but not the
+shift. The shifted side of the time-shift CTE silently returns no rows and the
+comparison comes back as `NULL`. Extend `build_range_start` by the largest
+shift interval used by any multi-stage measure on the rollup.
+
+</Warning>
+
+## Pattern 2: period-to-date
+
+Period-to-date measures (`rolling_window: { type: to_date, granularity: ... }`)
+don't need `multi_stage: true`, but they share the same matching rules: the
+rollup must include the base measure, all queried dimensions, and a
+`time_dimension` whose granularity divides the period-to-date granularity.
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue_ytd
+    sql: amount
+    type: sum
+    rolling_window:
+      type: to_date
+      granularity: year
+
+pre_aggregations:
+  - name: revenue_ytd_by_status
+    measures:
+      - revenue_ytd
+    dimensions:
+      - status
+    time_dimension: created_at
+    # Use the finest granularity the rolling window needs to land on.
+    granularity: day
+    partition_granularity: month
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue_ytd: {
+    sql: `amount`,
+    type: `sum`,
+    rolling_window: { type: `to_date`, granularity: `year` },
+  },
+},
+
+pre_aggregations: {
+  revenue_ytd_by_status: {
+    measures: [revenue_ytd],
+    dimensions: [status],
+    time_dimension: created_at,
+    granularity: `day`,
+    partition_granularity: `month`,
+  },
+},
+```
+
+</CodeGroup>
+
+For `to_date` windows, the rollup `granularity` must be **finer than or equal
+to** the `to_date` `granularity` — otherwise Cube cannot truncate the
+pre-aggregated rows to the boundary of the period.
+
+## Pattern 3: percent of total with `group_by`
+
+Percent-of-total uses [`group_by`][ref-group-by] to fix the inner aggregation
+to specific dimensions:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue
+    sql: amount
+    type: sum
+
+  - name: country_revenue
+    multi_stage: true
+    sql: "{revenue}"
+    type: sum
+    group_by:
+      - country
+
+  - name: country_revenue_percentage
+    multi_stage: true
+    sql: "{revenue} / NULLIF({country_revenue}, 0)"
+    type: number
+
+pre_aggregations:
+  - name: revenue_by_country_and_product:
+      measures:
+        - revenue
+      # Must include every dimension referenced in any group_by used by the
+      # query's multi-stage measures, PLUS every dimension the query groups by.
+      dimensions:
+        - country
+        - product
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue: { sql: `amount`, type: `sum` },
+
+  country_revenue: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `sum`,
+    group_by: [country],
+  },
+
+  country_revenue_percentage: {
+    multi_stage: true,
+    sql: `${revenue} / NULLIF(${country_revenue}, 0)`,
+    type: `number`,
+  },
+},
+
+pre_aggregations: {
+  revenue_by_country_and_product: {
+    measures: [revenue],
+    dimensions: [country, product],
+  },
+},
+```
+
+</CodeGroup>
+
+The rollup carries `revenue` grouped by `country` **and** `product`. Cube
+re-aggregates it to `country` for the inner CTE, then divides at the outer
+stage to produce the percentage. If the rollup omitted `country`, the inner
+`group_by: [country]` could not be computed and the match would fail.
+
+## Pattern 4: nested aggregates with `add_group_by`
+
+`add_group_by` computes an aggregate of an aggregate (e.g., the average of
+per-customer averages). The rollup must include the `add_group_by` dimension:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: order_total
+    sql: amount
+    type: sum
+
+  - name: avg_customer_total
+    multi_stage: true
+    sql: "{order_total}"
+    type: avg
+    add_group_by:
+      - customer_id
+
+pre_aggregations:
+  - name: orders_by_customer
+    measures:
+      - order_total
+    dimensions:
+      - customer_id
+      - region
+```
+
+```javascript title="JavaScript"
+measures: {
+  order_total: { sql: `amount`, type: `sum` },
+
+  avg_customer_total: {
+    multi_stage: true,
+    sql: `${order_total}`,
+    type: `avg`,
+    add_group_by: [customer_id],
+  },
+},
+
+pre_aggregations: {
+  orders_by_customer: {
+    measures: [order_total],
+    dimensions: [customer_id, region],
+  },
+},
+```
+
+</CodeGroup>
+
+A query grouping by `region` and selecting `avg_customer_total` matches:
+Cube computes `SUM(amount)` per `(region, customer_id)` from the rollup, then
+averages over `customer_id` per `region` in the outer CTE.
+
+## Pattern 5: ranking with `reduce_by`
+
+[`reduce_by`][ref-reduce-by] ranks rows within a group. The rollup must
+include both the rank's `reduce_by` dimension and the query's grouping
+dimensions:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue
+    sql: amount
+    type: sum
+
+  - name: product_rank_in_country
+    multi_stage: true
+    type: rank
+    order_by:
+      - sql: "{revenue}"
+        dir: desc
+    reduce_by:
+      - product
+
+pre_aggregations:
+  - name: revenue_by_country_and_product
+    measures:
+      - revenue
+    dimensions:
+      - country
+      - product
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue: { sql: `amount`, type: `sum` },
+
+  product_rank_in_country: {
+    multi_stage: true,
+    type: `rank`,
+    order_by: [{ sql: `${revenue}`, dir: `desc` }],
+    reduce_by: [product],
+  },
+},
+
+pre_aggregations: {
+  revenue_by_country_and_product: {
+    measures: [revenue],
+    dimensions: [country, product],
+  },
+},
+```
+
+</CodeGroup>
+
+Both `product` (from `reduce_by`) and `country` (from the query's `GROUP BY`)
+must be in the rollup so Cube can rank `product` within each `country`.
+
+## Common pitfalls
+
+- **Don't list the multi-stage measure in `measures`.** Only its base measures
+  belong in the rollup. Multi-stage measures are computed on top of the
+  rollup, not stored in it.
+- **Use additive bases.** `avg` and `count_distinct` make the rollup
+  non-additive and disqualify it from multi-stage matching. Replace them with
+  `sum` + `count` (and compute the average at query time) and with
+  `count_distinct_approx`. See the
+  [non-additive measures recipe][ref-non-additivity] for the full pattern.
+- **Match granularity end-to-end.** For `time_shift` and `rolling_window`,
+  the rollup's `granularity` must be at least as fine as both the query's
+  granularity and the shift / window granularity.
+- **Cover the shifted range.** Extend `build_range_start` backward (or
+  `build_range_end` forward) by the largest `time_shift` interval used. The
+  shifted CTE reads from the same rollup as the current period.
+- **Include every `group_by` / `add_group_by` / `reduce_by` dimension** in
+  the rollup, in addition to the dimensions the query itself groups by.
+
+## See also
+
+- [Multi-stage measures][ref-multi-stage] — concept and parameters
+- [Matching queries with pre-aggregations][ref-matching] — general matching rules
+- [Accelerating non-additive measures][ref-non-additivity] — how to keep base
+  measures additive
+- [Calculating share of total][ref-share-of-total] — an end-to-end
+  multi-stage example
+
+
+[ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-pre-aggs]: /docs/pre-aggregations
+[ref-matching]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-non-additivity]: /recipes/pre-aggregations/non-additivity
+[ref-share-of-total]: /recipes/data-modeling/share-of-total
+[ref-additive]: /docs/pre-aggregations/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-additivity
+[ref-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-time-dim]: /reference/data-modeling/pre-aggregations#time_dimension
+[ref-group-by]: /reference/data-modeling/measures#group_by
+[ref-add-group-by]: /reference/data-modeling/measures#add_group_by
+[ref-reduce-by]: /reference/data-modeling/measures#reduce_by
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[link-tesseract]: https://cube.dev/blog/introducing-tesseract-the-data-modeling-engine-behind-cubes-universal-semantic-layer

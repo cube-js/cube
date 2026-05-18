@@ -631,6 +631,7 @@
                 "group": "Pre-aggregations",
                 "pages": [
                   "recipes/pre-aggregations/non-additivity",
+                  "recipes/pre-aggregations/matching-multi-stage-measures",
                   "recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range",
                   "recipes/pre-aggregations/disabling-pre-aggregations",
                   "recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
