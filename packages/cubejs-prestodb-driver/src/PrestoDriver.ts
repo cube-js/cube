@@ -53,6 +53,9 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   dataSource?: string;
   queryTimeout?: number;
   preAggregations?: boolean;
+  useSelectTestConnection?: boolean;
+  // @see https://trino.io/docs/current/develop/client-protocol.html
+  headers?: Record<string, string>;
 };
 
 const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
@@ -94,7 +97,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
-    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
+    this.useSelectTestConnection = config.useSelectTestConnection ??
+      getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
 
     this.config = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
@@ -174,6 +178,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
@@ -202,6 +207,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
             fullData = concat(normalData, fullData);
@@ -312,9 +318,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     }
 
     if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
-      throw new Error(`Unsupported export bucket type: ${
-        this.config.bucketType
-      }`);
+      throw new Error(`Unsupported export bucket type: ${this.config.bucketType}`);
     }
 
     const types = options.query
@@ -336,7 +340,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return { schema, tableName };
   }
 
-  private generateTableColumnsForExport(types: {name: string, type: string}[]) {
+  private generateTableColumnsForExport(types: { name: string, type: string }[]) {
     return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
   }
 
@@ -360,7 +364,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  private async unloadGeneric(params: {tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[]}) {
+  private async unloadGeneric(params: { tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[] }) {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }

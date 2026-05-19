@@ -21,8 +21,9 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "jest dist/test",
-    "integration:trino": "jest dist/test",
+    "unit": "jest dist/test/unit",
+    "integration": "jest dist/test/integration",
+    "integration:trino": "jest dist/test/integration",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
