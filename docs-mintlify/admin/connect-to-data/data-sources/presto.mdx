@@ -121,6 +121,45 @@ To enable SSL-encrypted connections between Cube and Presto, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+## Custom headers
+
+The Presto driver supports forwarding custom HTTP headers on every request to
+the Presto coordinator. This is useful for setting headers like
+`X-Presto-Source`, `X-Presto-Client-Tags`, or any other custom header your
+Presto coordinator expects.
+
+Custom headers can't be configured via environment variables. Instead, use the
+[`driver_factory`](/reference/configuration/config#driver_factory) configuration
+option to pass a `headers` object to the driver:
+
+```javascript
+module.exports = {
+  driverFactory: ({ dataSource }) => ({
+    type: "prestodb",
+    headers: {
+      "X-Presto-Source": "cube",
+      "X-Presto-Client-Tags": "user=alice@example.com"
+    }
+  })
+};
+```
+
+In multitenant deployments, you can use the [security
+context](/embedding/authentication/security-context) to pass per-tenant headers,
+for example to forward a user token from the API request down to Presto:
+
+```javascript
+module.exports = {
+  driverFactory: ({ securityContext }) => ({
+    type: "prestodb",
+    headers: {
+      "X-Presto-Client-Tags": `user=${securityContext.user_id}`,
+      "X-Custom-User-Token": securityContext.token
+    }
+  })
+};
+```
+
 [aws-s3]: https://aws.amazon.com/s3/
 [google-cloud-storage]: https://cloud.google.com/storage
 [presto]: https://prestodb.io/

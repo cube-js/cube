@@ -121,6 +121,48 @@ To enable SSL-encrypted connections between Cube and Trino, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+## Custom headers
+
+The Trino driver supports forwarding custom HTTP headers (e.g., `X-Trino-Source`,
+`X-Trino-Routing-Group`, `X-Trino-Client-Tags`, or any other custom header) on
+every request to the Trino coordinator. See the [Trino client
+protocol][trino-docs-client-protocol] for the list of headers accepted by Trino.
+
+Custom headers can't be configured via environment variables. Instead, use the
+[`driver_factory`](/reference/configuration/config#driver_factory) configuration
+option to pass a `headers` object to the driver:
+
+```javascript
+module.exports = {
+  driverFactory: ({ dataSource }) => ({
+    type: "trino",
+    headers: {
+      "X-Trino-Source": "cube",
+      "X-Trino-Routing-Group": "etl",
+      "X-Trino-Client-Tags": "user=alice@example.com"
+    }
+  })
+};
+```
+
+In multitenant deployments, you can use the [security
+context](/embedding/authentication/security-context) to pass per-tenant headers, for example
+to forward a user token from the API request down to Trino:
+
+```javascript
+module.exports = {
+  driverFactory: ({ securityContext }) => ({
+    type: "trino",
+    headers: {
+      "X-Trino-Client-Tags": `user=${securityContext.user_id}`,
+      "X-Custom-User-Token": securityContext.token
+    }
+  })
+};
+```
+
+[trino-docs-client-protocol]: https://trino.io/docs/current/develop/client-protocol.html
+
 [aws-s3]: https://aws.amazon.com/s3/
 [google-cloud-storage]: https://cloud.google.com/storage
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
