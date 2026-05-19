@@ -313,42 +313,38 @@
               "admin/deployment/limits",
               "admin/deployment/infrastructure",
               {
-                "group": "VPC",
-                "root": "admin/deployment/vpc/index",
+                "group": "Dedicated Infrastructure",
+                "root": "admin/deployment/dedicated/index",
                 "pages": [
-                  "admin/deployment/vpc/gcp",
                   {
                     "group": "AWS",
-                    "root": "admin/deployment/vpc/aws/index",
+                    "root": "admin/deployment/dedicated/aws/index",
                     "pages": [
-                      "admin/deployment/vpc/aws/private-link",
-                      "admin/deployment/vpc/aws/vpc-peering"
+                      "admin/deployment/dedicated/aws/private-link",
+                      "admin/deployment/dedicated/aws/vpc-peering",
+                      "admin/deployment/dedicated/aws/private-api-connectivity",
+                      "admin/deployment/dedicated/aws/byoc"
                     ]
                   },
                   {
                     "group": "Azure",
-                    "root": "admin/deployment/vpc/azure/index",
+                    "root": "admin/deployment/dedicated/azure/index",
                     "pages": [
-                      "admin/deployment/vpc/azure/private-link",
-                      "admin/deployment/vpc/azure/vpc-peering"
-                    ]
-                  }
-                ]
-              },
-              {
-                "group": "BYOC",
-                "root": "admin/deployment/byoc/index",
-                "pages": [
-                  "admin/deployment/byoc/azure",
-                  {
-                    "group": "AWS",
-                    "root": "admin/deployment/byoc/aws/index",
-                    "pages": [
-                      "admin/deployment/byoc/aws/deployment",
-                      "admin/deployment/byoc/aws/privatelink"
+                      "admin/deployment/dedicated/azure/private-link",
+                      "admin/deployment/dedicated/azure/vpc-peering",
+                      "admin/deployment/dedicated/azure/byoc"
                     ]
                   },
-                  "admin/deployment/byoc/gcp/deployment"
+                  {
+                    "group": "GCP",
+                    "root": "admin/deployment/dedicated/gcp/index",
+                    "pages": [
+                      "admin/deployment/dedicated/gcp/private-service-connect",
+                      "admin/deployment/dedicated/gcp/vpc-peering",
+                      "admin/deployment/dedicated/gcp/byoc"
+                    ]
+                  },
+                  "admin/deployment/dedicated/pre-aggregation-storage"
                 ]
               }
             ]
@@ -738,6 +734,86 @@
     {
       "source": "/reference/mcp-server",
       "destination": "/docs/integrations/mcp-server"
+    },
+    {
+      "source": "/admin/deployment/byoc",
+      "destination": "/admin/deployment/dedicated"
+    },
+    {
+      "source": "/admin/deployment/byoc/aws",
+      "destination": "/admin/deployment/dedicated/aws/byoc"
+    },
+    {
+      "source": "/admin/deployment/byoc/aws/deployment",
+      "destination": "/admin/deployment/dedicated/aws/byoc"
+    },
+    {
+      "source": "/admin/deployment/byoc/aws/privatelink",
+      "destination": "/admin/deployment/dedicated/aws/private-api-connectivity"
+    },
+    {
+      "source": "/admin/deployment/byoc/azure",
+      "destination": "/admin/deployment/dedicated/azure/byoc"
+    },
+    {
+      "source": "/admin/deployment/byoc/gcp/deployment",
+      "destination": "/admin/deployment/dedicated/gcp/byoc"
+    },
+    {
+      "source": "/admin/deployment/vpc",
+      "destination": "/admin/deployment/dedicated"
+    },
+    {
+      "source": "/admin/deployment/vpc/aws",
+      "destination": "/admin/deployment/dedicated/aws"
+    },
+    {
+      "source": "/admin/deployment/vpc/aws/private-link",
+      "destination": "/admin/deployment/dedicated/aws/private-link"
+    },
+    {
+      "source": "/admin/deployment/vpc/aws/vpc-peering",
+      "destination": "/admin/deployment/dedicated/aws/vpc-peering"
+    },
+    {
+      "source": "/admin/deployment/vpc/aws/private-api-connectivity",
+      "destination": "/admin/deployment/dedicated/aws/private-api-connectivity"
+    },
+    {
+      "source": "/admin/deployment/vpc/aws/byoc",
+      "destination": "/admin/deployment/dedicated/aws/byoc"
+    },
+    {
+      "source": "/admin/deployment/vpc/azure",
+      "destination": "/admin/deployment/dedicated/azure"
+    },
+    {
+      "source": "/admin/deployment/vpc/azure/private-link",
+      "destination": "/admin/deployment/dedicated/azure/private-link"
+    },
+    {
+      "source": "/admin/deployment/vpc/azure/vpc-peering",
+      "destination": "/admin/deployment/dedicated/azure/vpc-peering"
+    },
+    {
+      "source": "/admin/deployment/vpc/azure/byoc",
+      "destination": "/admin/deployment/dedicated/azure/byoc"
+    },
+    {
+      "source": "/admin/deployment/vpc/gcp",
+      "destination": "/admin/deployment/dedicated/gcp"
+    },
+    {
+      "source": "/admin/deployment/vpc/gcp/private-service-connect",
+      "destination": "/admin/deployment/dedicated/gcp/private-service-connect"
+    },
+    {
+      "source": "/admin/deployment/vpc/gcp/vpc-peering",
+      "destination": "/admin/deployment/dedicated/gcp/vpc-peering"
+    },
+    {
+      "source": "/admin/deployment/vpc/gcp/byoc",
+      "destination": "/admin/deployment/dedicated/gcp/byoc"
     }
   ]
 }

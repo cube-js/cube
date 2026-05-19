@@ -1,23 +1,23 @@
 ---
-title: Deploying Cube Cloud BYOC on GCP
-sidebarTitle: GCP
-description: Project setup, permissions, and provisioning flow for Cube Cloud BYOC inside a dedicated GCP project.
+title: Bring Your Own Cloud on GCP
+sidebarTitle: BYOC
+description: Project setup, permissions, and provisioning flow for deploying Cube BYOC inside a dedicated GCP project.
 ---
 
 With Bring Your Own Cloud (BYOC) on Google Cloud Platform (GCP), all the components interacting with private data are deployed on
-the customer infrastructure on GCP and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
-This document provides step-by-step instructions for deploying Cube Cloud BYOC on GCP.
+the customer infrastructure on GCP and managed by the Cube Control Plane via the Cube Operator.
+This document provides step-by-step instructions for deploying Cube BYOC on GCP.
 
 ## Prerequisites
 
-The bulk of provisioning work will be done remotely by Cube Cloud automation.
+The bulk of provisioning work will be done remotely by Cube automation.
 However, to get started, you'll need:
 
 ### Required Information
 
 - **GCP Project ID:** A dedicated GCP project ID that will exclusively host Cube-managed infrastructure.
-  This should be a new, isolated project created specifically for Cube Cloud BYOC.
-- **GCP Region:** [The GCP region][gcp-docs-regions] where Cube Cloud resources
+  This should be a new, isolated project created specifically for Cube BYOC.
+- **GCP Region:** [The GCP region][gcp-docs-regions] where the BYOC resources
   should be deployed.
 
 ### Required Permissions
@@ -91,11 +91,11 @@ gcloud services enable \
 
 ### Step 3: Grant IAM permissions
 
-In order to manage resources in the Cube-dedicated GCP project, Cube Cloud Service Principal
+In order to manage resources in the Cube-dedicated GCP project, the Cube service principal
 needs to be granted administrative permissions to a set of services.
 
 Navigate to **IAM & Admin > IAM** in your dedicated project and add the following IAM
-binding for the Cube Cloud service account:
+binding for the Cube service account:
 
 **Principal:** `cube-cloud-byoc-installer@cube-cloud-byoc.iam.gserviceaccount.com`
 
@@ -115,7 +115,7 @@ You can grant these permissions through the Google Cloud Console UI or using the
 # Set your project ID (replace with your actual project ID)
 export PROJECT_ID="your-cube-byoc-project-id"
 
-# Set the Cube Cloud service account (use this exact value)
+# Set the Cube service account (use this exact value)
 export CUBE_SA="cube-cloud-byoc-installer@cube-cloud-byoc.iam.gserviceaccount.com"
 
 # Grant all required roles
@@ -146,7 +146,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 ### Step 4: Grant Service Account User permissions
 
-Additionally, the Cube Cloud service account needs permission to use the default Compute Engine service account for GKE node pools.
+Additionally, the Cube service account needs permission to use the default Compute Engine service account for GKE node pools.
 
 <Info>
 
@@ -168,7 +168,7 @@ gcloud iam service-accounts add-iam-policy-binding \
   --project=$PROJECT_ID
 ```
 
-This allows the Cube Cloud service account to create GKE clusters that use the project's default compute service account for worker nodes.
+This allows the Cube service account to create GKE clusters that use the project's default compute service account for worker nodes.
 
 ### Step 5: Verify setup
 
@@ -194,11 +194,11 @@ If all commands return the expected results, you're ready to proceed with deploy
 
 ## Deployment
 
-The actual deployment will be done by Cube Cloud automation. All that's left to
+The actual deployment will be done by Cube automation. All that's left to
 do is notify your Cube contact point that access has been granted, and pass
 along your GCP Project ID and Region information.
 
-After deployment, Cube Cloud will manage the following resources in your dedicated project:
+After deployment, Cube will manage the following resources in your dedicated project:
 
 - A VPC network with subnets, Cloud Router, and Cloud NAT for outbound connectivity
 - A GKE cluster with node pools for running Cube applications
