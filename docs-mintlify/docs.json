@@ -636,7 +636,8 @@
                   "recipes/pre-aggregations/disabling-pre-aggregations",
                   "recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
                   "recipes/pre-aggregations/refreshing-select-partitions",
-                  "recipes/pre-aggregations/joining-multiple-data-sources"
+                  "recipes/pre-aggregations/joining-multiple-data-sources",
+                  "recipes/pre-aggregations/fx-rates-rollup-join"
                 ]
               },
               {

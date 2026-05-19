@@ -1,0 +1,338 @@
+---
+title: Joining slow-changing facts with frequently-updated FX rates
+description: Use a rollup join to combine a heavy, slowly-refreshed sales pre-aggregation with a lightweight, frequently-refreshed FX rates pre-aggregation so currency-converted metrics stay fresh without rebuilding the full fact table.
+---
+
+## Use case
+
+Let's imagine we report sales in multiple currencies and want to display them
+converted to USD. The sales fact table is large and expensive to aggregate, so
+we'd like to refresh it on a slow cadence (for example, hourly). However, the
+foreign exchange (FX) rates we use for conversion change frequently and need
+to be refreshed every few minutes to stay accurate.
+
+Combining both into a single [rollup](/reference/data-modeling/pre-aggregations#rollup)
+forces the entire pre-aggregation to refresh whenever FX rates change, which is
+wasteful. In the recipe below, we'll learn how to use a
+[rollup join](/reference/data-modeling/pre-aggregations#rollup_join) to keep
+each pre-aggregation on its own refresh schedule while still serving the
+combined, currency-converted query from pre-aggregations.
+
+## Data modeling
+
+We have two cubes: `orders`, which stores per-order amounts in the original
+transaction currency, and `fx_rates`, which stores the latest exchange rate
+from each currency to USD.
+
+First, define a `rollup` pre-aggregation on `orders` that aggregates the
+amount by `currency` and day. This is the heavy pre-aggregation, so we set a
+slow `refresh_key` — for example, every hour:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+
+    sql_table: public.orders
+
+    joins:
+      - name: fx_rates
+        sql: "{CUBE}.currency = {fx_rates.currency}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: currency
+        sql: currency
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: amount
+        sql: amount
+        type: sum
+
+    pre_aggregations:
+      - name: orders_rollup
+        type: rollup
+        measures:
+          - amount
+        dimensions:
+          - currency
+        time_dimension: created_at
+        granularity: day
+        refresh_key:
+          every: 1 hour
+        indexes:
+          - name: currency_index
+            columns:
+              - currency
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `public.orders`,
+
+  joins: {
+    fx_rates: {
+      sql: `${CUBE}.currency = ${fx_rates.currency}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    currency: {
+      sql: `currency`,
+      type: `string`
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  },
+
+  measures: {
+    amount: {
+      sql: `amount`,
+      type: `sum`
+    }
+  },
+
+  pre_aggregations: {
+    orders_rollup: {
+      type: `rollup`,
+      measures: [amount],
+      dimensions: [currency],
+      time_dimension: created_at,
+      granularity: `day`,
+      refresh_key: {
+        every: `1 hour`
+      },
+      indexes: {
+        currency_index: {
+          columns: [currency]
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Next, define a `rollup` pre-aggregation on `fx_rates`. This pre-aggregation is
+small (one row per currency) and cheap to rebuild, so we set a fast
+`refresh_key` — for example, every minute:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: fx_rates
+
+    sql_table: public.fx_rates
+
+    dimensions:
+      - name: currency
+        sql: currency
+        type: string
+        primary_key: true
+
+      - name: rate_to_usd
+        sql: rate_to_usd
+        type: number
+
+    pre_aggregations:
+      - name: fx_rates_rollup
+        type: rollup
+        dimensions:
+          - currency
+          - rate_to_usd
+        refresh_key:
+          every: 1 minute
+        indexes:
+          - name: currency_index
+            columns:
+              - currency
+```
+
+```javascript title="JavaScript"
+cube(`fx_rates`, {
+  sql_table: `public.fx_rates`,
+
+  dimensions: {
+    currency: {
+      sql: `currency`,
+      type: `string`,
+      primary_key: true
+    },
+
+    rate_to_usd: {
+      sql: `rate_to_usd`,
+      type: `number`
+    }
+  },
+
+  pre_aggregations: {
+    fx_rates_rollup: {
+      type: `rollup`,
+      dimensions: [currency, rate_to_usd],
+      refresh_key: {
+        every: `1 minute`
+      },
+      indexes: {
+        currency_index: {
+          columns: [currency]
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+<Note>
+  Both pre-aggregations must include an index on the join key (`currency` in
+  this example) for the `rollup_join` to match. The `fx_rates_rollup` also
+  needs `rate_to_usd` as a dimension so it's available downstream.
+</Note>
+
+Finally, define a `rollup_join` pre-aggregation on `orders` that references
+both rollups. This is an ephemeral pre-aggregation — it doesn't materialize
+its own data, so it doesn't need a `refresh_key`. Cube serves queries from it
+by joining the two underlying rollups on the fly:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      # ...
+
+      - name: orders_with_fx_rollup
+        type: rollup_join
+        measures:
+          - amount
+        dimensions:
+          - currency
+          - fx_rates.rate_to_usd
+        time_dimension: created_at
+        granularity: day
+        rollups:
+          - fx_rates.fx_rates_rollup
+          - orders_rollup
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    // ...
+
+    orders_with_fx_rollup: {
+      type: `rollup_join`,
+      measures: [amount],
+      dimensions: [currency, fx_rates.rate_to_usd],
+      time_dimension: created_at,
+      granularity: `day`,
+      rollups: [fx_rates.fx_rates_rollup, orders_rollup]
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+To expose the USD-converted amount, add a derived measure on `orders` that
+multiplies the order amount by the FX rate from the joined cube:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      # ...
+
+      - name: amount_usd
+        sql: "{CUBE.amount} * {fx_rates.rate_to_usd}"
+        type: number
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    // ...
+
+    amount_usd: {
+      sql: `${CUBE.amount} * ${fx_rates.rate_to_usd}`,
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+## Query
+
+Let's query daily sales in USD by currency:
+
+```json
+{
+  "measures": ["orders.amount_usd"],
+  "dimensions": ["orders.currency"],
+  "timeDimensions": [
+    {
+      "dimension": "orders.created_at",
+      "granularity": "day"
+    }
+  ]
+}
+```
+
+## Result
+
+Cube serves the query from `orders_with_fx_rollup`, joining the cached
+`orders_rollup` (refreshed hourly) with the cached `fx_rates_rollup`
+(refreshed every minute). The heavy aggregation never rebuilds when FX rates
+change, but the converted totals always reflect the latest rates.
+
+```javascript
+[
+  {
+    "orders.created_at.day": "2026-05-19T00:00:00.000",
+    "orders.currency": "EUR",
+    "orders.amount_usd": "12450.32"
+  },
+  {
+    "orders.created_at.day": "2026-05-19T00:00:00.000",
+    "orders.currency": "GBP",
+    "orders.amount_usd": "8930.17"
+  }
+]
+```
