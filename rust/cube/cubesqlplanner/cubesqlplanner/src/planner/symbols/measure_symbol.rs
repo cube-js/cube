@@ -1,5 +1,8 @@
 use super::common::{AggregationType, Case, CompiledMemberPath};
-use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
+use super::cube_symbol::CubeTableSymbol;
+use super::measure_kinds::{
+    AggregatedMeasure, CalculatedMeasure, CalculatedMeasureType, MeasureKind,
+};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -134,6 +137,48 @@ impl MeasureSymbol {
             group_by,
             mask_sql,
         })
+    }
+
+    /// Build a synthetic aggregating measure (`MAX(target)`, `SUM(target)`, …)
+    /// owned by `cube_symbol`. The new measure has no filters, no case, no
+    /// time-shift and no reduce/group-by — it is a thin aggregation wrapper
+    /// around `target` produced ad hoc by the planner (e.g. for the time-
+    /// series date-range CTE), not a member declared in the cube schema.
+    pub fn new_synthetic_aggregation(
+        cube_symbol: Rc<CubeTableSymbol>,
+        name: &str,
+        agg_type: AggregationType,
+        target: Rc<MemberSymbol>,
+    ) -> Rc<Self> {
+        let cube_name = cube_symbol.cube_name().clone();
+        let compiled_path = CompiledMemberPath::new(
+            cube_symbol,
+            format!("{}.{}", cube_name, name),
+            name.to_string(),
+            name.to_string(),
+            vec![cube_name],
+        );
+        let kind = MeasureKind::Aggregated(AggregatedMeasure::new(
+            agg_type,
+            SqlCall::proxy_for_member(target),
+        ));
+        Self::new(
+            compiled_path,
+            false,
+            false,
+            None,
+            kind,
+            None,
+            false,
+            vec![],
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            None,
+            None,
+        )
     }
 
     /// Returns a non-rolling copy of the symbol. A rolling-window

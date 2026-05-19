@@ -55,9 +55,40 @@ impl PhysicalPlanBuilder {
         processor.process(logical_node, context)
     }
 
+    pub(super) fn resolve_partition_refs(
+        &self,
+        partition_by: &[Rc<MemberSymbol>],
+        references_builder: &ReferencesBuilder,
+    ) -> Result<Vec<String>, CubeError> {
+        let templates = &self.plan_sql_templates;
+        partition_by
+            .iter()
+            .map(|dim| -> Result<_, CubeError> {
+                let reference = references_builder
+                    .find_reference_for_member(dim, &None)
+                    .ok_or_else(|| {
+                        CubeError::internal(format!(
+                            "Alias not found for partition_by dimension {}",
+                            dim.full_name()
+                        ))
+                    })?;
+                let table_ref = if let Some(table_name) = reference.source() {
+                    format!("{}.", templates.quote_identifier(table_name)?)
+                } else {
+                    String::new()
+                };
+                Ok(format!(
+                    "{}{}",
+                    table_ref,
+                    templates.quote_identifier(&reference.name())?
+                ))
+            })
+            .collect()
+    }
+
     pub fn build(
         &self,
-        logical_plan: Rc<Query>,
+        logical_plan: Rc<LogicalPlan>,
         original_sql_pre_aggregations: HashMap<String, String>,
         total_query: bool,
     ) -> Result<Rc<Select>, CubeError> {
@@ -88,10 +119,17 @@ impl PhysicalPlanBuilder {
 
     fn build_impl(
         &self,
-        logical_plan: Rc<Query>,
+        logical_plan: Rc<LogicalPlan>,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
-        self.process_node(logical_plan.as_ref(), context)
+        let query_plan = self.process_node(logical_plan.as_ref(), context)?;
+        match query_plan {
+            QueryPlan::Select(select) => Ok(select),
+            other => Err(CubeError::internal(format!(
+                "Top-level LogicalPlan must produce a Select, got {:?}",
+                std::mem::discriminant(&other)
+            ))),
+        }
     }
 
     pub(super) fn measures_for_query(
@@ -115,36 +153,38 @@ impl PhysicalPlanBuilder {
         }
     }
 
-    pub(super) fn add_subquery_join(
+    /// Add a `LEFT JOIN <cte> ON ...` for a multi-stage-dim CTE ref to a
+    /// cube-join chain. Used for the `OnPrimaryKeys` flavour: the cube
+    /// the ref keys against has already been added to `join_builder`,
+    /// and we LEFT-join the CTE on its primary keys.
+    pub(super) fn add_multi_stage_dimension_pk_join(
         &self,
-        dimension_subquery: Rc<DimensionSubQuery>,
+        ref_name: &str,
+        pk_dimensions: &[Rc<MemberSymbol>],
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
-        let mut context = context.clone();
-        context.dimensions_query = false;
-        context.measure_subquery = true;
-        let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
-        let dim_name = dimension_subquery.subquery_dimension.name();
-        let cube_name = dimension_subquery.subquery_dimension.cube_name();
-        let primary_keys_dimensions = &dimension_subquery.primary_keys_dimensions;
-        let sub_query_alias = format!("{cube_name}_{dim_name}_subquery");
-        let conditions = primary_keys_dimensions
+        // Body is rendered once on the top-level Query as a CTE; here we
+        // just LEFT JOIN that CTE by name. Order contract: the top-level
+        // `QueryProcessor` MUST publish the CTE (via `add_cte_schema`)
+        // before any reference site gets to call this.
+        let cte_schema = context.get_cte_schema(ref_name)?;
+        let conditions = pk_dimensions
             .iter()
             .map(|dim| -> Result<_, CubeError> {
-                let alias_in_sub_query = sub_query.schema().resolve_member_alias(&dim);
+                let alias_in_sub_query = cte_schema.resolve_member_alias(dim);
                 let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
-                    Some(sub_query_alias.clone()),
-                    alias_in_sub_query.clone(),
+                    Some(ref_name.to_string()),
+                    alias_in_sub_query,
                 ));
-
                 Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        join_builder.left_join_subselect(
-            sub_query,
-            sub_query_alias,
+        join_builder.left_join_table_reference(
+            ref_name.to_string(),
+            cte_schema,
+            Some(ref_name.to_string()),
             JoinCondition::new_dimension_join(conditions, false),
         );
         Ok(())
@@ -200,25 +240,25 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    pub(super) fn resolve_subquery_dimensions_references(
+    /// Register outer-scope render references for each multi-stage-dim
+    /// CTE this Query consumes — `exposed.full_name()` substitutes with
+    /// the column resolved off `body_column` in the joined CTE.
+    pub(super) fn resolve_multi_stage_dimension_references(
         &self,
-        dimension_subqueries: &Vec<Rc<DimensionSubQuery>>,
+        multi_stage_dimensions: &Vec<Rc<MultiStageDimensionRef>>,
         references_builder: &ReferencesBuilder,
         context_factory: &mut SqlNodesFactory,
     ) -> Result<(), CubeError> {
-        for dimension_subquery in dimension_subqueries.iter() {
-            if let Some(dim_ref) = references_builder.find_reference_for_member(
-                &dimension_subquery.measure_for_subquery_dimension,
-                &None,
-            ) {
-                context_factory.add_render_reference(
-                    dimension_subquery.subquery_dimension.full_name(),
-                    dim_ref,
-                );
+        for ms_dim in multi_stage_dimensions.iter() {
+            if let Some(dim_ref) =
+                references_builder.find_reference_for_member(&ms_dim.body_column, &None)
+            {
+                context_factory.add_render_reference(ms_dim.exposed.full_name(), dim_ref);
             } else {
                 return Err(CubeError::internal(format!(
-                    "Can't find source for subquery dimension {}",
-                    dimension_subquery.subquery_dimension.full_name()
+                    "Can't find source for multi-stage dimension {} (body column {})",
+                    ms_dim.exposed.full_name(),
+                    ms_dim.body_column.full_name()
                 )));
             }
         }

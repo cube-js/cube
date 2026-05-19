@@ -27,3 +27,23 @@ pub fn collect_cube_names_from_node<T: LogicalNode>(
     visitor.visit(&mut collector, node)?;
     Ok(collector.cube_names.into_iter().unique().collect_vec())
 }
+
+/// `LogicalPlan` is not part of `PlanNode`, so the generic walker can't
+/// descend through it. Recurse explicitly through `ctes` and the `root`
+/// PlanNode subtree.
+pub fn collect_cube_names_from_plan(plan: &Rc<LogicalPlan>) -> Result<Vec<String>, CubeError> {
+    let mut collector = CubeNamesCollector {
+        cube_names: Vec::new(),
+    };
+    walk_plan(&mut collector, plan)?;
+    Ok(collector.cube_names.into_iter().unique().collect_vec())
+}
+
+fn walk_plan(collector: &mut CubeNamesCollector, plan: &Rc<LogicalPlan>) -> Result<(), CubeError> {
+    for cte in plan.ctes() {
+        walk_plan(collector, &cte.body)?;
+    }
+    let visitor = LogicalPlanVisitor::new();
+    visitor.visit_plan_node(collector, plan.root())?;
+    Ok(())
+}

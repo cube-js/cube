@@ -40,6 +40,17 @@ impl LogicalPlanVisitor {
         self.visit(&mut wrapper, node)
     }
 
+    /// Visit a subtree rooted at a `PlanNode` directly. Used by callers
+    /// outside the `LogicalNode` trait (e.g. `LogicalPlan` which doesn't
+    /// fit the trait because it lives above the PlanNode hierarchy).
+    pub fn visit_plan_node<T: LogicalNodeVisitor>(
+        &self,
+        node_visitor: &mut T,
+        node: &PlanNode,
+    ) -> Result<(), CubeError> {
+        self.visit_impl(node_visitor, node)
+    }
+
     fn visit_impl<T: LogicalNodeVisitor>(
         &self,
         node_visitor: &mut T,

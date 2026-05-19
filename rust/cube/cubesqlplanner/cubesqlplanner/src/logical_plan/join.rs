@@ -40,8 +40,6 @@ pub struct LogicalJoin {
     root: Option<Rc<Cube>>,
     #[builder(default)]
     joins: Vec<LogicalJoinItem>,
-    #[builder(default)]
-    dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
 }
 
 impl LogicalJoin {
@@ -51,10 +49,6 @@ impl LogicalJoin {
 
     pub fn joins(&self) -> &Vec<LogicalJoinItem> {
         &self.joins
-    }
-
-    pub fn dimension_subqueries(&self) -> &Vec<Rc<DimensionSubQuery>> {
-        &self.dimension_subqueries
     }
 }
 
@@ -68,11 +62,8 @@ impl LogicalNode for LogicalJoin {
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let LogicalJoinInputUnPacker {
-            root,
-            joins,
-            dimension_subqueries,
-        } = LogicalJoinInputUnPacker::new(&self, &inputs)?;
+        let LogicalJoinInputUnPacker { root, joins } =
+            LogicalJoinInputUnPacker::new(&self, &inputs)?;
 
         let root = if let Some(r) = root {
             Some(r.clone().into_logical_node()?)
@@ -92,16 +83,7 @@ impl LogicalNode for LogicalJoin {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = Self::builder()
-            .root(root)
-            .joins(joins)
-            .dimension_subqueries(
-                dimension_subqueries
-                    .iter()
-                    .map(|itm| itm.clone().into_logical_node())
-                    .collect::<Result<Vec<_>, _>>()?,
-            )
-            .build();
+        let result = Self::builder().root(root).joins(joins).build();
 
         Ok(Rc::new(result))
     }
@@ -127,11 +109,6 @@ impl LogicalJoinInputPacker {
             result.push(root.as_plan_node());
         }
         result.extend(join.joins().iter().map(|item| item.cube().as_plan_node()));
-        result.extend(
-            join.dimension_subqueries()
-                .iter()
-                .map(|item| item.as_plan_node()),
-        );
         result
     }
 }
@@ -139,7 +116,6 @@ impl LogicalJoinInputPacker {
 pub struct LogicalJoinInputUnPacker<'a> {
     root: Option<&'a PlanNode>,
     joins: &'a [PlanNode],
-    dimension_subqueries: &'a [PlanNode],
 }
 
 impl<'a> LogicalJoinInputUnPacker<'a> {
@@ -156,17 +132,13 @@ impl<'a> LogicalJoinInputUnPacker<'a> {
 
         let joins_end = joins_start + join.joins().len();
         let joins = &inputs[joins_start..joins_end];
-        let dimension_subqueries = &inputs[joins_end..];
 
-        Ok(Self {
-            root,
-            joins,
-            dimension_subqueries,
-        })
+        Ok(Self { root, joins })
     }
 
     fn inputs_len(join: &LogicalJoin) -> usize {
-        1 + join.joins().len() + join.dimension_subqueries().len()
+        let root_len = if join.root.is_some() { 1 } else { 0 };
+        root_len + join.joins().len()
     }
 }
 
@@ -183,13 +155,6 @@ impl PrettyPrint for LogicalJoin {
             let state = state.new_level();
             for join in self.joins().iter() {
                 join.pretty_print(result, &state);
-            }
-            if !self.dimension_subqueries().is_empty() {
-                result.println("dimension_subqueries:", &state);
-                let details_state = state.new_level();
-                for subquery in self.dimension_subqueries().iter() {
-                    subquery.pretty_print(result, &details_state);
-                }
             }
         } else {
             result.println(&format!("Empty source"), state);

@@ -29,6 +29,12 @@ impl CteState {
     }
 
     pub fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) {
+        if self.members.iter().any(|m| m.name == member.name) {
+            // Same-named bodies (e.g. the same DSQ referenced from
+            // multiple consumers) are deduplicated here so each CTE is
+            // rendered once.
+            return;
+        }
         self.members.push(member);
     }
 
@@ -45,5 +51,13 @@ impl CteState {
         Vec<Rc<MultiStageSubqueryRef>>,
     ) {
         (self.members, self.subquery_refs)
+    }
+
+    /// Drain refs accumulated since `baseline` — caller uses them as the
+    /// FK data inputs of its root Query. Members stay in this `CteState`
+    /// and are read off `into_results` to populate the `LogicalPlan`
+    /// CTE pool.
+    pub fn drain_subquery_refs_from(&mut self, baseline: usize) -> Vec<Rc<MultiStageSubqueryRef>> {
+        self.subquery_refs.split_off(baseline)
     }
 }

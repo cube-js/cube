@@ -1,6 +1,5 @@
 use super::PreAggregationsCompiler;
 use super::*;
-use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOp;
@@ -53,11 +52,11 @@ impl PreAggregationOptimizer {
 
     pub fn try_optimize(
         &mut self,
-        plan: Rc<Query>,
+        plan: Rc<LogicalPlan>,
         disable_external_pre_aggregations: bool,
         pre_aggregation_id: Option<&str>,
-    ) -> Result<Option<Rc<Query>>, CubeError> {
-        let cube_names = collect_cube_names_from_node(&plan)?;
+    ) -> Result<Option<Rc<LogicalPlan>>, CubeError> {
+        let cube_names = collect_cube_names_from_plan(&plan)?;
         let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
 
         let compiled_pre_aggregations =
@@ -73,7 +72,7 @@ impl PreAggregationOptimizer {
             compiled_pre_aggregations
         };
 
-        self.try_rewrite_query(
+        self.try_rewrite_plan(
             &plan,
             &filtered_pre_aggregations,
             &TimeShiftState::default(),
@@ -88,25 +87,38 @@ impl PreAggregationOptimizer {
         std::mem::take(&mut self.usages)
     }
 
-    fn try_rewrite_query(
+    /// Try to rewrite a whole `LogicalPlan`. Attempts a single-source
+    /// simple match against `plan.root` first (collapses the entire plan
+    /// to a `PreAggregationLeaf`, dropping bundled CTEs); falls back to
+    /// rewriting individual CTE bodies in the pool.
+    fn try_rewrite_plan(
         &mut self,
-        query: &Rc<Query>,
+        plan: &Rc<LogicalPlan>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         time_shifts: &TimeShiftState,
-    ) -> Result<Option<Rc<Query>>, CubeError> {
-        for pre_aggregation in compiled_pre_aggregations.iter() {
-            let external = pre_aggregation.external.unwrap_or(false);
-            let date_range =
-                Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
-            if let Some(rewritten) =
-                self.try_rewrite_simple_query(query, pre_aggregation, date_range)?
-            {
-                return Ok(Some(rewritten));
+    ) -> Result<Option<Rc<LogicalPlan>>, CubeError> {
+        if let PlanNode::Query(root) = plan.root() {
+            for pre_aggregation in compiled_pre_aggregations.iter() {
+                let external = pre_aggregation.external.unwrap_or(false);
+                let date_range = Self::extract_date_range(
+                    &root.filter(),
+                    &self.query_tools,
+                    time_shifts,
+                    external,
+                );
+                if let Some(rewritten_root) =
+                    self.try_rewrite_simple_query(root, pre_aggregation, date_range)?
+                {
+                    return Ok(Some(LogicalPlan::new(
+                        vec![],
+                        rewritten_root.as_plan_node(),
+                    )));
+                }
             }
         }
 
-        if self.allow_multi_stage && !query.multistage_members().is_empty() {
-            return self.try_rewrite_query_with_multistages(query, compiled_pre_aggregations);
+        if self.allow_multi_stage && !plan.ctes().is_empty() {
+            return self.try_rewrite_plan_with_multistages(plan, compiled_pre_aggregations);
         }
 
         Ok(None)
@@ -128,6 +140,7 @@ impl PreAggregationOptimizer {
                 .filter(query.filter().clone())
                 .modifers(query.modifers().clone())
                 .source(source.into())
+                .kind(QueryKind::PreAggregationLeaf)
                 .build();
             Ok(Some(Rc::new(new_query)))
         } else {
@@ -163,13 +176,9 @@ impl PreAggregationOptimizer {
                 let new_query = Query::builder()
                     .schema(schema.clone())
                     .filter(filter.clone())
-                    .modifers(Rc::new(LogicalQueryModifiers {
-                        offset: None,
-                        limit: None,
-                        ungrouped: false,
-                        order_by: vec![],
-                    }))
+                    .modifers(Rc::new(LogicalQueryModifiers::default()))
                     .source(source.into())
+                    .kind(QueryKind::PreAggregationLeaf)
                     .build();
                 return Ok(Some(Rc::new(new_query)));
             }
@@ -177,93 +186,49 @@ impl PreAggregationOptimizer {
         Ok(None)
     }
 
-    fn try_rewrite_query_with_multistages(
+    fn try_rewrite_plan_with_multistages(
         &mut self,
-        query: &Rc<Query>,
+        plan: &Rc<LogicalPlan>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
-    ) -> Result<Option<Rc<Query>>, CubeError> {
-        let rewriter = LogicalPlanRewriter::new();
-        let mut has_unrewritten_leaf = false;
-
-        // Save state in case we need to rollback
+    ) -> Result<Option<Rc<LogicalPlan>>, CubeError> {
         let saved_usages_len = self.usages.len();
         let saved_counter = self.usage_counter;
 
         // Multiplied-measure CTEs don't carry their own filter — logically
         // they apply the same filter as the root query, so we match against it.
-        let root_filter = query.filter().clone();
+        let root_filter = if let PlanNode::Query(root) = plan.root() {
+            root.filter().clone()
+        } else {
+            Rc::new(LogicalFilter::default())
+        };
 
-        let mut rewritten_multistages = Vec::new();
-        for multi_stage in query.multistage_members() {
-            let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
-                let res = match plan_node {
-                    PlanNode::MultiStageLeafMeasure(multi_stage_leaf_measure) => {
-                        if let Some(rewritten) = self.try_rewrite_query(
-                            &multi_stage_leaf_measure.query,
-                            compiled_pre_aggregations,
-                            &multi_stage_leaf_measure.time_shifts,
-                        )? {
-                            let new_leaf = Rc::new(MultiStageLeafMeasure {
-                                measures: multi_stage_leaf_measure.measures.clone(),
-                                render_measure_as_state: multi_stage_leaf_measure
-                                    .render_measure_as_state
-                                    .clone(),
-                                render_measure_for_ungrouped: multi_stage_leaf_measure
-                                    .render_measure_for_ungrouped
-                                    .clone(),
-                                time_shifts: multi_stage_leaf_measure.time_shifts.clone(),
-                                query: rewritten,
-                            });
-                            NodeRewriteResult::rewritten(new_leaf.as_plan_node())
-                        } else {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
-                        }
-                    }
-                    PlanNode::AggregateMultipliedSubquery(agg) => {
-                        if let Some(rewritten) = self.try_rewrite_schema_and_filter(
-                            &agg.schema,
-                            &root_filter,
-                            compiled_pre_aggregations,
-                        )? {
-                            let new_agg = Rc::new(AggregateMultipliedSubquery {
-                                schema: agg.schema.clone(),
-                                keys_subquery: agg.keys_subquery.clone(),
-                                source: agg.source.clone(),
-                                dimension_subqueries: agg.dimension_subqueries.clone(),
-                                pre_aggregation_override: Some(rewritten),
-                            });
-                            NodeRewriteResult::rewritten(new_agg.as_plan_node())
-                        } else {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
-                        }
-                    }
-                    PlanNode::LogicalMultiStageMember(_) => NodeRewriteResult::pass(),
-                    _ => NodeRewriteResult::stop(),
-                };
-                Ok(res)
-            })?;
-            rewritten_multistages.push(rewritten);
+        let mut rewritten_ctes = Vec::with_capacity(plan.ctes().len());
+        let mut has_unrewritten_leaf = false;
+        for cte in plan.ctes() {
+            let rewrite_attempt =
+                self.try_rewrite_cte_body(&cte.body, compiled_pre_aggregations, &root_filter)?;
+            match rewrite_attempt {
+                CteRewriteResult::Rewritten(new_body) => {
+                    rewritten_ctes.push(Rc::new(LogicalMultiStageMember {
+                        name: cte.name.clone(),
+                        body: new_body,
+                    }));
+                }
+                CteRewriteResult::PassThrough => {
+                    rewritten_ctes.push(cte.clone());
+                }
+                CteRewriteResult::NotMatched => {
+                    has_unrewritten_leaf = true;
+                    break;
+                }
+            }
         }
 
         if has_unrewritten_leaf {
-            // Rollback usages added during failed attempt
             self.usages.truncate(saved_usages_len);
             self.usage_counter = saved_counter;
             return Ok(None);
         }
-
-        let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
-            let result = FullKeyAggregate::builder()
-                .schema(full_key_aggregate.schema().clone())
-                .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
-                .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
-                .build();
-            Rc::new(result).into()
-        } else {
-            query.source().clone()
-        };
 
         // Reject mixed external/non-external pre-aggregation usages
         let new_usages = &self.usages[saved_usages_len..];
@@ -276,15 +241,53 @@ impl PreAggregationOptimizer {
             }
         }
 
-        let result = Query::builder()
-            .multistage_members(rewritten_multistages)
-            .schema(query.schema().clone())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(source)
-            .build();
+        Ok(Some(LogicalPlan::new(rewritten_ctes, plan.root().clone())))
+    }
 
-        Ok(Some(Rc::new(result)))
+    /// Rewrite an individual CTE body. The body's `root` kind determines
+    /// the rewrite role; bodies with no Query root (TimeSeries, etc.) are
+    /// passed through unchanged.
+    fn try_rewrite_cte_body(
+        &mut self,
+        body: &Rc<LogicalPlan>,
+        compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+        outer_root_filter: &Rc<LogicalFilter>,
+    ) -> Result<CteRewriteResult, CubeError> {
+        let Some(root_query) = (match body.root() {
+            PlanNode::Query(q) => Some(q),
+            _ => None,
+        }) else {
+            return Ok(CteRewriteResult::PassThrough);
+        };
+
+        match root_query.kind().pre_agg_rewrite() {
+            PreAggregationRewriteRole::NoRewrite => Ok(CteRewriteResult::PassThrough),
+            PreAggregationRewriteRole::PassThrough => Ok(CteRewriteResult::PassThrough),
+            PreAggregationRewriteRole::Leaf => {
+                let time_shifts = root_query.modifers().time_shifts.clone();
+                if let Some(rewritten) =
+                    self.try_rewrite_plan(body, compiled_pre_aggregations, &time_shifts)?
+                {
+                    Ok(CteRewriteResult::Rewritten(rewritten))
+                } else {
+                    Ok(CteRewriteResult::NotMatched)
+                }
+            }
+            PreAggregationRewriteRole::WholeSubtree => {
+                if let Some(rewritten_root) = self.try_rewrite_schema_and_filter(
+                    root_query.schema(),
+                    outer_root_filter,
+                    compiled_pre_aggregations,
+                )? {
+                    Ok(CteRewriteResult::Rewritten(LogicalPlan::new(
+                        vec![],
+                        rewritten_root.as_plan_node(),
+                    )))
+                } else {
+                    Ok(CteRewriteResult::NotMatched)
+                }
+            }
+        }
     }
 
     fn make_pre_aggregation_source(
@@ -535,4 +538,10 @@ impl PreAggregationOptimizer {
         let result = matcher.result();
         Ok(result)
     }
+}
+
+enum CteRewriteResult {
+    Rewritten(Rc<LogicalPlan>),
+    PassThrough,
+    NotMatched,
 }

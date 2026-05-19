@@ -9,17 +9,30 @@ use typed_builder::TypedBuilder;
 /// ungrouped), and the multi-stage CTEs the source depends on.
 #[derive(Clone, TypedBuilder)]
 pub struct Query {
+    /// Computed-dimension CTE references this Query consumes. Each ref
+    /// carries its own join strategy (`OnPrimaryKeys` for the ex-DSQ
+    /// pattern, `OnOuterDimensions` for the multi-stage-dim pattern).
+    /// At render time the processor passes these into the source
+    /// rendering context — they don't get embedded into `LogicalJoin` /
+    /// `FullKeyAggregate`. Bodies live on the surrounding `LogicalPlan`.
     #[builder(default)]
-    multistage_members: Vec<Rc<LogicalMultiStageMember>>,
+    multi_stage_dimensions: Vec<Rc<MultiStageDimensionRef>>,
     schema: Rc<LogicalSchema>,
     filter: Rc<LogicalFilter>,
     modifers: Rc<LogicalQueryModifiers>,
     source: QuerySource,
+    /// Explicit role of this Query in the multi-stage pipeline. Planner
+    /// places set this at construction; consumers (QueryProcessor,
+    /// pre-aggregation optimizer) match on it to pick the right render
+    /// path. Role-specific data (partition_by, multi-stage dimension,
+    /// etc.) lives inside the matching variant.
+    #[builder(default)]
+    kind: QueryKind,
 }
 
 impl Query {
-    pub fn multistage_members(&self) -> &Vec<Rc<LogicalMultiStageMember>> {
-        &self.multistage_members
+    pub fn multi_stage_dimensions(&self) -> &Vec<Rc<MultiStageDimensionRef>> {
+        &self.multi_stage_dimensions
     }
     pub fn schema(&self) -> &Rc<LogicalSchema> {
         &self.schema
@@ -36,6 +49,35 @@ impl Query {
     pub fn set_source(&mut self, source: QuerySource) {
         self.source = source;
     }
+    pub fn kind(&self) -> &QueryKind {
+        &self.kind
+    }
+
+    pub fn with_modifers(self: &Rc<Self>, modifers: Rc<LogicalQueryModifiers>) -> Rc<Self> {
+        Rc::new(Self {
+            multi_stage_dimensions: self.multi_stage_dimensions.clone(),
+            schema: self.schema.clone(),
+            filter: self.filter.clone(),
+            modifers,
+            source: self.source.clone(),
+            kind: self.kind.clone(),
+        })
+    }
+
+    /// Replace the published `multi_stage_dimensions` refs.
+    pub fn with_multi_stage_dimensions(
+        self: &Rc<Self>,
+        multi_stage_dimensions: Vec<Rc<MultiStageDimensionRef>>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            multi_stage_dimensions,
+            schema: self.schema.clone(),
+            filter: self.filter.clone(),
+            modifers: self.modifers.clone(),
+            source: self.source.clone(),
+            kind: self.kind.clone(),
+        })
+    }
 }
 
 impl LogicalNode for Query {
@@ -44,24 +86,18 @@ impl LogicalNode for Query {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        QueryInputPacker::pack(self)
+        vec![self.source.as_plan_node()]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let QueryInputUnPacker {
-            multistage_members,
-            source,
-        } = QueryInputUnPacker::new(&self, &inputs)?;
-
+        check_inputs_len(&inputs, 1, self.node_name())?;
         Ok(Rc::new(Self {
-            multistage_members: multistage_members
-                .iter()
-                .map(|member| member.clone().into_logical_node())
-                .collect::<Result<Vec<_>, _>>()?,
+            multi_stage_dimensions: self.multi_stage_dimensions.clone(),
             schema: self.schema.clone(),
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
-            source: self.source.with_plan_node(source.clone())?,
+            source: self.source.with_plan_node(inputs[0].clone())?,
+            kind: self.kind.clone(),
         }))
     }
 
@@ -77,50 +113,16 @@ impl LogicalNode for Query {
     }
 }
 
-pub struct QueryInputPacker;
-
-impl QueryInputPacker {
-    pub fn pack(query: &Query) -> Vec<PlanNode> {
-        let mut result = vec![];
-        result.extend(
-            query
-                .multistage_members
-                .iter()
-                .map(|member| member.as_plan_node()),
-        );
-        result.push(query.source.as_plan_node());
-        result
-    }
-}
-pub struct QueryInputUnPacker<'a> {
-    multistage_members: &'a [PlanNode],
-    source: &'a PlanNode,
-}
-
-impl<'a> QueryInputUnPacker<'a> {
-    pub fn new(query: &Query, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
-        check_inputs_len(&inputs, Self::inputs_len(query), query.node_name())?;
-        let multistage_members = &inputs[0..query.multistage_members.len()];
-        let source = &inputs[query.multistage_members.len()];
-        Ok(Self {
-            multistage_members,
-            source,
-        })
-    }
-    fn inputs_len(query: &Query) -> usize {
-        query.multistage_members.len() + 1
-    }
-}
-
 impl PrettyPrint for Query {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("Query: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
-        if !self.multistage_members.is_empty() {
-            result.println("multistage_members:", &state);
-            for member in self.multistage_members.iter() {
-                member.pretty_print(result, &details_state);
+        self.kind.pretty_print(result, &state);
+        if !self.multi_stage_dimensions.is_empty() {
+            result.println("multi_stage_dimensions:", &state);
+            for msd in self.multi_stage_dimensions.iter() {
+                msd.pretty_print(result, &details_state);
             }
         }
 

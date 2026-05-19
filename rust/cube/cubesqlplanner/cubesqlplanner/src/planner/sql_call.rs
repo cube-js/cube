@@ -186,6 +186,21 @@ impl SqlCall {
         }
     }
 
+    /// Build a `SqlCall` that simply proxies to the given member's SQL —
+    /// equivalent to a one-arg template `{arg:0}` referencing it. Use when
+    /// an API expects a `SqlCall` but the planner already has a symbol and
+    /// there is no real template to compile (e.g. a synthetic
+    /// `MAX(<time_dim>)` aggregation built ad hoc in the planner).
+    pub fn proxy_for_member(member: Rc<MemberSymbol>) -> Rc<Self> {
+        Rc::new(Self::new(
+            SqlTemplate::String(SqlCallArg::dependency(0)),
+            vec![SqlDependency::Symbol(member)],
+            vec![],
+            vec![],
+            SecutityContextProps::default(),
+        ))
+    }
+
     /// Renders the template into a single SQL string. Errors when
     /// the template is a `StringVec` — use `eval_vec` for that case.
     pub fn eval(

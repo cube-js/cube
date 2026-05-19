@@ -1,5 +1,6 @@
 use cubenativeutils::CubeError;
 
+use crate::logical_plan::MultiStageDimensionRef;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::TimeShiftState;
@@ -24,9 +25,19 @@ pub(super) struct PushDownBuilderContext {
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
     pub measure_subquery: bool,
-    pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
+    /// Schemas of all CTEs published on the top-level Query: multi-stage
+    /// member CTEs, dimension-subquery CTEs and measure-subquery CTEs share
+    /// this storage. Lookup is by CTE alias / name; all three kinds are
+    /// interchangeable as table references at the SQL level.
+    pub cte_schemas: HashMap<String, Rc<Schema>>,
     pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
     pub multi_stage_dimensions: Vec<String>,
+    /// MS-dim refs the current Query consumes. The source-render code
+    /// reads these out to wire `OnPrimaryKeys` LEFT JOINs inside the
+    /// cube-join chain (`LogicalJoin`) or the `OnOuterDimensions` LEFT
+    /// JOIN after the FullKeyAggregate output. QueryProcessor sets the
+    /// list before invoking `process_node(source)`.
+    pub multi_stage_dimension_refs: Vec<Rc<MultiStageDimensionRef>>,
 }
 
 impl PushDownBuilderContext {
@@ -46,8 +57,8 @@ impl PushDownBuilderContext {
         Ok(factory)
     }
 
-    pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
-        self.multi_stage_schemas.insert(name, schema);
+    pub fn add_cte_schema(&mut self, name: String, schema: Rc<Schema>) {
+        self.cte_schemas.insert(name, schema);
     }
 
     pub fn remove_multi_stage_dimensions(&mut self) {
@@ -96,12 +107,13 @@ impl PushDownBuilderContext {
         );
     }
 
-    pub fn get_multi_stage_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {
-        if let Some(schema) = self.multi_stage_schemas.get(name) {
+    pub fn get_cte_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {
+        if let Some(schema) = self.cte_schemas.get(name) {
             Ok(schema.clone())
         } else {
             Err(CubeError::internal(format!(
-                "Cannot find schema for multi stage cte {}",
+                "CTE schema for `{}` not found — caller must publish it on \
+                 the top-level Query before any reference site is processed",
                 name
             )))
         }

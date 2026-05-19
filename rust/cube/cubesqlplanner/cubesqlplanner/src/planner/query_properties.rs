@@ -122,7 +122,7 @@ pub struct QueryProperties {
     dimensions: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
     time_dimensions: Vec<Rc<MemberSymbol>>,
-    #[builder(setter(skip), default)]
+    #[builder(default)]
     time_shifts: TimeShiftState,
     #[builder(default)]
     dimensions_filters: Vec<FilterItem>,

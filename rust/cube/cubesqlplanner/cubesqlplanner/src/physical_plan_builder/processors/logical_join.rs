@@ -1,5 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::LogicalJoin;
+use crate::logical_plan::{LogicalJoin, MultiStageDimensionJoin};
 use crate::physical_plan::{From, JoinBuilder, JoinCondition};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::SqlJoinCondition;
@@ -22,6 +22,17 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let multi_stage_dimension = context.get_multi_stage_dimensions()?;
+        // OnPrimaryKeys MS-dim refs attach inside the cube-join chain
+        // after each matching cube (root or joined). OnOuterDimensions
+        // refs are applied at the QueryProcessor level over the final
+        // FROM, not here.
+        let pk_refs: Vec<_> = context
+            .multi_stage_dimension_refs
+            .iter()
+            .filter(|r| matches!(&r.join, MultiStageDimensionJoin::OnPrimaryKeys { .. }))
+            .cloned()
+            .collect();
+
         if logical_join.root().is_none() {
             let res = if let Some(multi_stage_dimension) = &multi_stage_dimension {
                 From::new_from_table_reference(
@@ -36,9 +47,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         }
 
         let root = logical_join.root().clone().unwrap().cube().clone();
-        if logical_join.joins().is_empty()
-            && logical_join.dimension_subqueries().is_empty()
-            && multi_stage_dimension.is_none()
+        if logical_join.joins().is_empty() && pk_refs.is_empty() && multi_stage_dimension.is_none()
         {
             Ok(From::new_from_cube(
                 root.clone(),
@@ -50,13 +59,17 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 Some(root.default_alias_with_prefix(&context.alias_prefix)),
             );
 
-            for dimension_subquery in logical_join
-                .dimension_subqueries() //TODO move dimension_subquery to
+            for ms_ref in pk_refs
                 .iter()
-                .filter(|d| &d.subquery_dimension.cube_name() == root.name())
+                .filter(|r| matches_pk_cube(&r.join, root.name()))
             {
-                self.builder.add_subquery_join(
-                    dimension_subquery.clone(),
+                let pk_dims = match &ms_ref.join {
+                    MultiStageDimensionJoin::OnPrimaryKeys { pk_dimensions, .. } => pk_dimensions,
+                    _ => continue,
+                };
+                self.builder.add_multi_stage_dimension_pk_join(
+                    &ms_ref.name,
+                    pk_dims,
                     &mut join_builder,
                     context,
                 )?;
@@ -71,13 +84,19 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     ),
                     JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql().clone())?),
                 );
-                for dimension_subquery in logical_join
-                    .dimension_subqueries()
+                for ms_ref in pk_refs
                     .iter()
-                    .filter(|d| &d.subquery_dimension.cube_name() == join.cube().cube().name())
+                    .filter(|r| matches_pk_cube(&r.join, join.cube().cube().name()))
                 {
-                    self.builder.add_subquery_join(
-                        dimension_subquery.clone(),
+                    let pk_dims = match &ms_ref.join {
+                        MultiStageDimensionJoin::OnPrimaryKeys { pk_dimensions, .. } => {
+                            pk_dimensions
+                        }
+                        _ => continue,
+                    };
+                    self.builder.add_multi_stage_dimension_pk_join(
+                        &ms_ref.name,
+                        pk_dims,
                         &mut join_builder,
                         context,
                     )?;
@@ -92,6 +111,15 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
             }
             Ok(From::new_from_join(join_builder.build()))
         }
+    }
+}
+
+fn matches_pk_cube(join: &MultiStageDimensionJoin, cube_name: &str) -> bool {
+    match join {
+        MultiStageDimensionJoin::OnPrimaryKeys {
+            cube_name: target, ..
+        } => target == cube_name,
+        _ => false,
     }
 }
 

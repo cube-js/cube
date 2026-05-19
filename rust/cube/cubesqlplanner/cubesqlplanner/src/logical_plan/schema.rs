@@ -98,6 +98,44 @@ impl LogicalSchema {
         Ok(result)
     }
 
+    /// Sorted full-names of all multi-stage dimensions in the schema, with
+    /// reference chains resolved. Used as a stable lookup key for the
+    /// physical builder's multi-stage dimension schema cache.
+    pub fn multi_stage_dimensions_resolved_names(&self) -> Result<Vec<String>, CubeError> {
+        let mut result = vec![];
+        for dim in self.all_dimensions() {
+            if has_multi_stage_members(dim, true)? {
+                result.push(dim.clone().resolve_reference_chain().full_name());
+            }
+        }
+        result.sort();
+        Ok(result)
+    }
+
+    /// Dimensions used to LEFT JOIN a multi-stage-dimension CTE into the
+    /// fact join: the dimension's `add_group_by` (if it has one) plus all
+    /// non-multi-stage dimensions of this schema, deduplicated.
+    pub fn multi_stage_join_dimensions(
+        &self,
+        multi_stage_dimension: &Rc<MemberSymbol>,
+    ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let mut result = if let Ok(dimension) = multi_stage_dimension.as_dimension() {
+            dimension.add_group_by().clone().unwrap_or_default()
+        } else {
+            vec![]
+        };
+        for dim in self.all_dimensions() {
+            if !has_multi_stage_members(dim, true)? {
+                result.push(dim.clone());
+            }
+        }
+        let result = result
+            .into_iter()
+            .unique_by(|d| d.full_name())
+            .collect_vec();
+        Ok(result)
+    }
+
     /// Get the member symbol at a given position (as returned by find_member_positions).
     /// Position ordering: dimensions, then time_dimensions, then measures.
     pub fn get_member_at_position(&self, position: usize) -> Option<Rc<MemberSymbol>> {

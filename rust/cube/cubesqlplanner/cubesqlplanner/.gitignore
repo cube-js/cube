@@ -11,3 +11,7 @@ node_modules
 /cubesql/egraph-debug-intermediate
 egraph-debug
 /cubesql/debug-qtrace
+
+# insta snapshot review artefacts
+*.snap.new
+*.pending-snap

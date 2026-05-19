@@ -102,19 +102,18 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
 
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
-            let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
-            let multi_stage_source = SingleAliasedSource::new_from_table_reference(
-                multi_stage_ref.name().clone(),
-                multi_stage_schema.clone(),
+        for cte_ref in full_key_aggregate.data_inputs().iter() {
+            let cte_schema = context.get_cte_schema(cte_ref.name())?;
+            let cte_source = SingleAliasedSource::new_from_table_reference(
+                cte_ref.name().clone(),
+                cte_schema.clone(),
                 None,
             );
             let sql_context = SqlNodesFactory::new();
 
-            let data_select_builder =
-                SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
+            let data_select_builder = SelectBuilder::new(From::new(FromSource::Single(cte_source)));
             let data_select = Rc::new(data_select_builder.build(query_tools.clone(), sql_context));
-            data_queries.push((data_select, multi_stage_ref.symbols().clone()));
+            data_queries.push((data_select, cte_ref.symbols().clone()));
         }
 
         if data_queries.is_empty() {

@@ -28,8 +28,7 @@ impl FullKeyAggregateQueryPlanner {
             .into_rc();
         Ok(Rc::new(
             FullKeyAggregate::builder()
-                .multi_stage_subquery_refs(multi_stage_subqueries)
-                .use_full_join_and_coalesce(true)
+                .data_inputs(multi_stage_subqueries)
                 .schema(schema)
                 .build(),
         ))
@@ -40,7 +39,6 @@ impl FullKeyAggregateQueryPlanner {
     pub fn plan_logical_plan(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
-        all_multistage_members: Vec<Rc<LogicalMultiStageMember>>,
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
         let source = source.into();
@@ -65,15 +63,17 @@ impl FullKeyAggregateQueryPlanner {
         });
         let result = Query::builder()
             .schema(schema)
-            .multistage_members(all_multistage_members)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: self.query_properties.order_by().to_vec(),
+                time_shifts: self.query_properties.time_shifts().clone(),
+                ..Default::default()
             }))
             .source(source)
+            .kind(QueryKind::TopLevelOverCtes)
             .build();
         Ok(Rc::new(result))
     }

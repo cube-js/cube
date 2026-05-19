@@ -1,3 +1,4 @@
+use super::cte_state::CteState;
 use super::{
     MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
     MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
@@ -6,7 +7,7 @@ use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::GranularityHelper;
-use crate::planner::MemberSymbol;
+use crate::planner::{AggregationType, MeasureSymbol, MemberSymbol};
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -40,8 +41,12 @@ impl MultiStageMemberQueryPlanner {
 
     /// Builds the `LogicalMultiStageMember` for this description,
     /// dispatching on `MultiStageMemberType` to the appropriate
-    /// `plan_*` builder.
-    pub fn plan_logical_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
+    /// `plan_*` builder. The `cte_state` is threaded into builders that
+    /// may publish additional CTEs (DSQ bodies, leaf bodies).
+    pub fn plan_logical_query(
+        &self,
+        cte_state: &mut CteState,
+    ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         match self.description.member().member_type() {
             MultiStageMemberType::Inode(member) => match member.inode_type() {
                 MultiStageInodeMemberType::RollingWindow(rolling_window_desc) => {
@@ -51,12 +56,12 @@ impl MultiStageMemberQueryPlanner {
                 _ => self.plan_for_cte_query(member),
             },
             MultiStageMemberType::Leaf(node) => match node {
-                super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(),
+                super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(cte_state),
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
                     self.plan_time_series_query(time_dimension.clone())
                 }
                 super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
-                    self.plan_time_series_get_range_query(time_dimension.clone())
+                    self.plan_time_series_get_range_query(time_dimension.clone(), cte_state)
                 }
             },
         }
@@ -69,6 +74,7 @@ impl MultiStageMemberQueryPlanner {
     fn plan_time_series_get_range_query(
         &self,
         time_dimension: Rc<MemberSymbol>,
+        cte_state: &mut CteState,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
@@ -83,15 +89,43 @@ impl MultiStageMemberQueryPlanner {
         let simple_query_planer =
             SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties);
 
-        let source = simple_query_planer.source_and_subquery_dimensions()?;
+        // Bodies of DSQ CTEs encountered during source build flow into
+        // the outer `cte_state` instead of being held inside this body.
+        let (source, multi_stage_dimensions) =
+            simple_query_planer.source_and_subquery_dimensions(cte_state)?;
 
-        let result = MultiStageGetDateRange {
-            time_dimension: time_dimension.clone(),
-            source,
-        };
+        let cube_symbol = self
+            .query_tools
+            .evaluator_compiler()
+            .borrow_mut()
+            .add_cube_table_evaluator(time_dimension.cube_name().clone(), vec![])?;
+        let max_date = MemberSymbol::new_measure(MeasureSymbol::new_synthetic_aggregation(
+            cube_symbol.clone(),
+            "max_date",
+            AggregationType::Max,
+            time_dimension.clone(),
+        ));
+        let min_date = MemberSymbol::new_measure(MeasureSymbol::new_synthetic_aggregation(
+            cube_symbol,
+            "min_date",
+            AggregationType::Min,
+            time_dimension.clone(),
+        ));
+
+        let schema = LogicalSchema::default()
+            .set_measures(vec![max_date, min_date])
+            .into_rc();
+        let query = Query::builder()
+            .schema(schema)
+            .filter(Rc::new(LogicalFilter::default()))
+            .modifers(Rc::new(LogicalQueryModifiers::default()))
+            .source(source.into())
+            .multi_stage_dimensions(multi_stage_dimensions)
+            .build();
+
         let member = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::GetDateRange(Rc::new(result)),
+            body: LogicalPlan::leaf(Rc::new(query).as_plan_node()),
         };
 
         Ok(Rc::new(member))
@@ -113,7 +147,7 @@ impl MultiStageMemberQueryPlanner {
             .build();
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::TimeSeries(Rc::new(result)),
+            body: LogicalPlan::leaf(Rc::new(result).as_plan_node()),
         }))
     }
 
@@ -190,7 +224,7 @@ impl MultiStageMemberQueryPlanner {
         };
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::RollingWindow(Rc::new(result)),
+            body: LogicalPlan::leaf(Rc::new(result).as_plan_node()),
         }))
     }
 
@@ -209,16 +243,21 @@ impl MultiStageMemberQueryPlanner {
             &multi_stage_member.group_by_symbols(),
         );
 
-        let window_function_to_use = match multi_stage_member.inode_type() {
-            MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
+        let stage_kind = match multi_stage_member.inode_type() {
+            MultiStageInodeMemberType::Rank => StageKind::Rank { partition_by },
             MultiStageInodeMemberType::Aggregate => {
                 if partition_by.len() != self.all_dimensions().len() {
-                    MultiStageCalculationWindowFunction::Window
+                    StageKind::Window { partition_by }
                 } else {
-                    MultiStageCalculationWindowFunction::None
+                    StageKind::Aggregation
                 }
             }
-            _ => MultiStageCalculationWindowFunction::None,
+            MultiStageInodeMemberType::Calculate => StageKind::Aggregation,
+            _ => {
+                return Err(CubeError::internal(format!(
+                    "Wrong inode type for measure calculation"
+                )))
+            }
         };
 
         let measures = if self.description.member().evaluation_node().is_measure() {
@@ -231,17 +270,6 @@ impl MultiStageMemberQueryPlanner {
             .set_time_dimensions(self.description.state().time_dimensions().clone())
             .set_measures(measures)
             .into_rc();
-
-        let calculation_type = match multi_stage_member.inode_type() {
-            MultiStageInodeMemberType::Rank => MultiStageCalculationType::Rank,
-            MultiStageInodeMemberType::Aggregate => MultiStageCalculationType::Aggregate,
-            MultiStageInodeMemberType::Calculate => MultiStageCalculationType::Calculate,
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "Wrong inode type for measure calculation"
-                )))
-            }
-        };
 
         let input_sources = self
             .input_cte_aliases()
@@ -258,25 +286,28 @@ impl MultiStageMemberQueryPlanner {
             .collect_vec();
 
         let full_key_aggregate_schema = self.input_schema();
-        let result = MultiStageMeasureCalculation::builder()
+        let source = Rc::new(
+            FullKeyAggregate::builder()
+                .schema(full_key_aggregate_schema)
+                .data_inputs(input_sources)
+                .build(),
+        );
+        let modifiers = LogicalQueryModifiers {
+            ungrouped: self.description.member().is_ungrupped(),
+            order_by: self.query_order_by()?,
+            ..Default::default()
+        };
+        let query = Query::builder()
             .schema(schema)
-            .is_ungrouped(self.description.member().is_ungrupped())
-            .calculation_type(calculation_type)
-            .partition_by(partition_by)
-            .window_function_to_use(window_function_to_use)
-            .order_by(self.query_order_by()?)
-            .source(Rc::new(
-                FullKeyAggregate::builder()
-                    .schema(full_key_aggregate_schema)
-                    .use_full_join_and_coalesce(true)
-                    .multi_stage_subquery_refs(input_sources)
-                    .build(),
-            ))
+            .filter(Rc::new(LogicalFilter::default()))
+            .modifers(Rc::new(modifiers))
+            .source(source.into())
+            .kind(QueryKind::Stage(stage_kind))
             .build();
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::MeasureCalculation(Rc::new(result)),
+            body: LogicalPlan::leaf(Rc::new(query).as_plan_node()),
         };
         Ok(Rc::new(result))
     }
@@ -350,33 +381,44 @@ impl MultiStageMemberQueryPlanner {
             .collect_vec();
 
         let full_key_aggregate_schema = self.input_schema();
-        let result = MultiStageDimensionCalculation::builder()
+        let source = Rc::new(
+            FullKeyAggregate::builder()
+                .schema(full_key_aggregate_schema)
+                .data_inputs(input_sources)
+                .build(),
+        );
+        let modifiers = LogicalQueryModifiers {
+            order_by: self.query_order_by()?,
+            ..Default::default()
+        };
+        let query = Query::builder()
             .schema(schema)
-            .order_by(self.query_order_by()?)
-            .multi_stage_dimension(cte_member.clone())
-            .source(Rc::new(
-                FullKeyAggregate::builder()
-                    .schema(full_key_aggregate_schema)
-                    .use_full_join_and_coalesce(true)
-                    .multi_stage_subquery_refs(input_sources)
-                    .build(),
-            ))
+            .filter(Rc::new(LogicalFilter::default()))
+            .modifers(Rc::new(modifiers))
+            .source(source.into())
+            .kind(QueryKind::Stage(StageKind::DimensionCalc {
+                multi_stage_dimension: cte_member.clone(),
+            }))
             .build();
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::DimensionCalculation(Rc::new(result)),
+            body: LogicalPlan::leaf(Rc::new(query).as_plan_node()),
         };
         Ok(Rc::new(result))
     }
 
-    /// Builds the leaf CTE for a base measure — runs a fresh
+    /// Builds the leaf CTE body for a base measure — runs a fresh
     /// `QueryPlanner` on the description's state with
-    /// `allow_multi_stage = false`, then wraps the result in a
-    /// `MultiStageLeafMeasure`. Respects the `without-member-leaf`
-    /// shape for cases like `Rank` where the leaf selects only the
-    /// dimension grid.
-    fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
+    /// `allow_multi_stage = false`. The resulting `LogicalPlan` carries
+    /// whatever sub-CTEs the leaf needed bundled inside, so pre-agg
+    /// sees the body as one rewrite unit. Respects the
+    /// `without-member-leaf` shape for cases like `Rank` where the leaf
+    /// selects only the dimension grid.
+    fn plan_for_leaf_cte_query(
+        &self,
+        _cte_state: &mut CteState,
+    ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
         let mut dimensions = self.description.state().dimensions().clone();
         let mut time_dimensions = self.description.state().time_dimensions().clone();
@@ -413,6 +455,7 @@ impl MultiStageMemberQueryPlanner {
             .dimensions_filters(self.description.state().dimensions_filters().clone())
             .measures_filters(self.description.state().measures_filters().clone())
             .segments(self.description.state().segments().clone())
+            .time_shifts(self.description.state().time_shifts().clone())
             .ignore_cumulative(true)
             .ungrouped(self.description.member().is_ungrupped())
             .query_join_hints(self.query_properties.query_join_hints().clone())
@@ -424,17 +467,30 @@ impl MultiStageMemberQueryPlanner {
 
         let query_planner =
             QueryPlanner::new(cte_query_properties.clone(), self.query_tools.clone());
-        let query = query_planner.plan()?;
-        let leaf_measure_plan = MultiStageLeafMeasure {
-            measures: vec![member_node.clone()],
-            query,
-            render_measure_as_state: self.description.member().has_aggregates_on_top(),
-            time_shifts: self.description.state().time_shifts().clone(),
-            render_measure_for_ungrouped: self.description.member().is_ungrupped(),
+        // The leaf body's wrapping LogicalMultiStageMember surfaces on
+        // the outer top-level WITH. Any inner CTEs it produces (e.g.
+        // multiplied-measure keys/measure/agg-multiplied bodies for a
+        // cross-cube leaf) stay bundled inside its own `LogicalPlan` so
+        // pre-agg sees the body as one rewrite unit.
+        let plan = query_planner.plan()?;
+        // Render flags are leaf-CTE-only — they describe how this body is
+        // rendered, not what it computes. Apply on top of whatever modifiers
+        // the planner produced for the inner query.
+        let PlanNode::Query(root_query) = plan.root() else {
+            return Err(CubeError::internal(format!(
+                "Leaf-CTE body root must be a Query, got {}",
+                plan.root().node_name()
+            )));
         };
+        let modifiers = LogicalQueryModifiers {
+            render_measure_as_state: self.description.member().has_aggregates_on_top(),
+            render_measure_for_ungrouped: self.description.member().is_ungrupped(),
+            ..(**root_query.modifers()).clone()
+        };
+        let plan = plan.with_root(root_query.with_modifers(Rc::new(modifiers)).as_plan_node());
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(leaf_measure_plan)),
+            body: plan,
         };
         Ok(Rc::new(result))
     }

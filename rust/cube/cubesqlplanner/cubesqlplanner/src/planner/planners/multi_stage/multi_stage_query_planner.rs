@@ -108,7 +108,7 @@ impl MultiStageQueryPlanner {
                 self.query_properties.clone(),
                 descr.clone(),
             );
-            let member = planner.plan_logical_query()?;
+            let member = planner.plan_logical_query(cte_state)?;
             cte_state.add_member(member);
         }
 

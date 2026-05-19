@@ -15,7 +15,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -39,6 +39,13 @@ pub struct QueryTools {
     // after the QueryTools Rc is constructed (FilterCompiler requires it),
     // then never mutated again — RefCell only carries the construction phase.
     member_mask_filters: RefCell<HashMap<String, FilterItem>>,
+    // Monotonic id used to disambiguate top-level CTE names produced by
+    // sub-planners (KeysSubQuery / MeasureSubquery / DimensionSubQuery).
+    // Sub-planners are created per leaf-CTE and per-instance counters can't
+    // see each other; this counter is shared across the whole top-level
+    // plan and guarantees uniqueness regardless of which sub-planner emits
+    // the body.
+    cte_name_seq: Cell<usize>,
 }
 
 impl QueryTools {
@@ -90,6 +97,7 @@ impl QueryTools {
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
             member_mask_filters: RefCell::new(HashMap::new()),
+            cte_name_seq: Cell::new(0),
         });
 
         // Phase 2: compile mask filters once now that Rc<QueryTools> exists.
@@ -185,6 +193,17 @@ impl QueryTools {
 
     pub fn evaluator_compiler(&self) -> &Rc<RefCell<Compiler>> {
         &self.evaluator_compiler
+    }
+
+    /// Allocate the next monotonic id for a top-level CTE name. Sub-planners
+    /// that produce subquery bodies (`KeysSubQuery`, `MeasureSubquery`,
+    /// `DimensionSubQuery`) call this to disambiguate names across
+    /// per-leaf-CTE planner instances — one body should never silently
+    /// shadow another with the same `(cube, dim)` key.
+    pub fn next_cte_seq_id(&self) -> usize {
+        let n = self.cte_name_seq.get();
+        self.cte_name_seq.set(n + 1);
+        n
     }
 
     pub fn alias_name(&self, name: &str) -> String {
