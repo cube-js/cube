@@ -3,6 +3,20 @@ title: Continuous deployment
 description: This guide covers features and tools you can use to deploy your Cube project to Cube Cloud.
 ---
 
+Each Cube deployment is configured to use one of the following deploy modes:
+
+- **Deploy with Git** — Cube Cloud builds and deploys your project from a Git
+  repository. Use this mode when you want commits to a production branch (or
+  merges performed from the Cube Cloud UI) to automatically trigger a
+  production build.
+- **Deploy with CLI** — you push your project to Cube Cloud from your local
+  machine or CI/CD pipeline by running the `cubejs-cli deploy` command. Cube
+  Cloud is not connected to a Git remote in this mode and will not
+  automatically pick up commits from anywhere.
+
+You can change the deploy mode at any time on the **Build & Deploy** tab of
+the **Settings** screen.
+
 ## Deploy with Git
 
 Continuous deployment works by connecting a Git repository to a Cube Cloud
@@ -10,7 +24,7 @@ deployment and keeping the two in sync.
 
 First, go to the **Build & Deploy** tab on the **Settings** screen
 to make sure your deployment is configured to deploy with Git. Then
-click **Generate Git credentials** to obtain Git credentials:
+click **Generate Git credentials** to obtain Git credentials:
 
 <Frame>
   <img src="https://ucarecdn.com/c79702ad-7a86-4a31-ac0c-9d64ccf91413/" />
@@ -48,3 +62,60 @@ session prior to connecting to your GitHub account from Cube.
 
 Cube Cloud will automatically deploy from the specified production branch
 (`master` by default).
+
+## Deploy with CLI
+
+When a deployment is configured to deploy with CLI, Cube Cloud is **not**
+connected to an external Git remote. Production builds are only triggered when
+you (or your CI/CD pipeline) push the project to Cube Cloud by running:
+
+```bash
+npx cubejs-cli deploy --token <TOKEN>
+```
+
+You can find your Deploy Token, along with copy-paste instructions, on the
+**Build & Deploy** tab of the **Settings** screen. The same screen lets you
+regenerate the token if it needs to be rotated.
+
+<Note>
+
+Cube Cloud still maintains an internal Git repository for the deployment so
+that features such as [development mode][ref-dev-mode] and branching can work.
+This internal repository is overwritten on every successful CLI deploy — only
+the contents of your most recent `cubejs-cli deploy` invocation are used to
+build and run production.
+
+</Note>
+
+### Development mode with CLI deployments
+
+[Development mode][ref-dev-mode] is fully available on CLI deployments:
+developers can enter dev mode, switch branches, save changes, commit them,
+and even merge branches into the production branch from the Cube Cloud UI.
+
+However, in CLI mode, **none of these actions trigger a production build or
+redeploy**. Specifically:
+
+- Saving or committing changes in dev mode only updates the per-developer
+  [development environment][ref-environments-dev] and the corresponding
+  branch in the internal repository. Production is not affected.
+- Merging a branch into the production branch from the Cube Cloud UI updates
+  the production branch in the internal repository but **does not** rebuild
+  or redeploy the [production environment][ref-environments-prod].
+- Any changes made through the UI are **overwritten on the next
+  `cubejs-cli deploy`**, which uploads the contents of your local project to
+  Cube Cloud and triggers a production build.
+
+In other words, a CLI-mode deployment will not change production just because
+somebody pressed **Enter Development Mode** and merged a work-in-progress
+branch — production only changes when somebody (or some pipeline) explicitly
+runs `cubejs-cli deploy` against the deployment.
+
+If you want changes made in the Cube Cloud UI to flow to production
+automatically, switch the deployment to [Deploy with Git](#deploy-with-git)
+or [Deploy with GitHub](#deploy-with-github).
+
+
+[ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-environments-dev]: /admin/deployment/environments#development-environments
+[ref-environments-prod]: /admin/deployment/environments#production-environment

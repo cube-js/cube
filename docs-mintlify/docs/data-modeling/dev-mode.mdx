@@ -81,6 +81,19 @@ They will be shown on the Overview page:
 
 Read more about the available endpoints on the [Environments][ref-environments-endpoints] page.
 
+## Behavior with CLI deployments
+
+Development mode is fully available on deployments that are configured to
+[deploy with CLI][ref-deploy-with-cli]: you can enter dev mode, switch
+branches, save and commit changes, and merge into the production branch from
+the Cube Cloud UI.
+
+However, on CLI deployments, **none of these actions trigger a production
+build or redeploy** — production only changes when somebody explicitly runs
+`cubejs-cli deploy` against the deployment, and the next deploy overwrites
+any changes made through the UI. See [Deploy with CLI →
+Development mode][ref-deploy-with-cli-dev-mode] for the full behavior.
+
 ## Limitations
 
 The Development API has some limitations compared to Production, and it is
@@ -101,3 +114,5 @@ different Git branch of the same repository.
 
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-endpoints]: /admin/deployment/environments#api-endpoints
+[ref-deploy-with-cli]: /admin/deployment/continuous-deployment#deploy-with-cli
+[ref-deploy-with-cli-dev-mode]: /admin/deployment/continuous-deployment#development-mode-with-cli-deployments
