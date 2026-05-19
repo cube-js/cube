@@ -41,7 +41,7 @@ export type PrestoDriverExportBucket = {
 
 export type PrestoDriverInternalConfiguration = {
     engine?: 'presto' | 'trino';
-}
+};
 
 export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverInternalConfiguration & {
   host?: string;
