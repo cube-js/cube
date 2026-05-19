@@ -17,10 +17,10 @@ export class TrinoDriver extends PrestoDriver {
       return this.testConnectionViaSelect();
     }
 
-    const { host, port, ssl, basic_auth: basicAuth, custom_auth: customAuth } = this.config;
+    const { host, port, ssl, basic_auth: basicAuth, custom_auth: customAuth, headers: extraHeaders } = this.config;
     const protocol = ssl ? 'https' : 'http';
     const url = `${protocol}://${host}:${port}/v1/info`;
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...extraHeaders };
 
     if (customAuth) {
       headers.Authorization = customAuth;

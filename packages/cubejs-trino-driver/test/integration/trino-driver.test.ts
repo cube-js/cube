@@ -1,4 +1,4 @@
-import { TrinoDriver } from '../src/TrinoDriver';
+import { TrinoDriver } from '../../src/TrinoDriver';
 
 const path = require('path');
 const { DockerComposeEnvironment, Wait } = require('testcontainers');
@@ -37,7 +37,7 @@ describe('TrinoDriver', () => {
     }
 
     const dc = new DockerComposeEnvironment(
-      path.resolve(path.dirname(__filename), '../../'),
+      path.resolve(path.dirname(__filename), '../../../'),
       'docker-compose.yml'
     );
 
