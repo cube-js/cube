@@ -647,6 +647,131 @@ You can also set the [`CUBEJS_NESTED_FOLDERS_DELIMITER`](/reference/configuratio
 nested folders and give them path-like names, e.g., `Customer Information / Personal
 Details`.
 
+### `filters`
+
+The `filters` parameter is used to define default value filters on a view. These
+filters are applied to every query against the view, narrowing down the result
+set to a specific subset of data without requiring data consumers to specify the
+filter explicitly.
+
+Default value filters are useful for governance scenarios where a view should
+always be scoped to a particular value (e.g., a tenant, region, or currency).
+They can also be used to provide a sensible default that consumers can override
+by adding their own filter on the same member, by leveraging the [`unless`](#unless)
+parameter.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_us
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    filters:
+      - member: country
+        operator: equals
+        values:
+          - US
+```
+
+```javascript title="JavaScript"
+view(`orders_us`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  filters: [
+    {
+      member: `country`,
+      operator: `equals`,
+      values: [`US`]
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+Each filter accepts the following parameters:
+
+#### `member`
+
+The name of the dimension to filter on. The member must be exposed by the view.
+
+#### `operator`
+
+The filter operator. Supported operators match the ones available in the
+[REST API query format][ref-rest-query-ops]: `equals`, `notEquals`, `contains`,
+`notContains`, `startsWith`, `notStartsWith`, `endsWith`, `notEndsWith`, `in`,
+`notIn`, `gt`, `gte`, `lt`, `lte`, `set`, `notSet`, `inDateRange`,
+`notInDateRange`, `onTheDate`, `beforeDate`, `beforeOrOnDate`, `afterDate`,
+`afterOrOnDate`.
+
+#### `values`
+
+A list of values for the filter operator. Required for all operators except
+`set` and `notSet`.
+
+#### `unless`
+
+The `unless` parameter optionally lists members that, when referenced in a
+query (either in the projection or in an explicit filter), will cause the
+default value filter to be released. This allows consumers to override the
+default filter by querying or filtering by one of the listed members.
+
+If `unless` is not specified, the filter is always applied.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_default_us
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    filters:
+      - member: country
+        operator: equals
+        values:
+          - US
+        unless:
+          - country
+```
+
+```javascript title="JavaScript"
+view(`orders_default_us`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  filters: [
+    {
+      member: `country`,
+      operator: `equals`,
+      values: [`US`],
+      unless: [`country`]
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+In the example above, the `country = US` filter is applied by default. However,
+if a query explicitly filters on `country` (e.g., `country = FR`), the default
+filter is released and the explicit filter is used instead.
+
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
@@ -657,6 +782,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-apis]: /reference
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
+[ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
 [ref-apis-support]: /reference#data-modeling
 [ref-playground]: /docs/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
