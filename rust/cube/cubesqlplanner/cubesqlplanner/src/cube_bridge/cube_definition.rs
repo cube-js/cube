@@ -1,7 +1,9 @@
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::view_filter_definition::{NativeViewFilterDefinition, ViewFilterDefinition};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -38,4 +40,6 @@ pub trait CubeDefinition {
     fn sql_table(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError>;
 }

@@ -1,7 +1,10 @@
 use crate::cube_bridge::cube_definition::{CubeDefinition, CubeDefinitionStatic};
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
 use crate::impl_static_data;
-use crate::test_fixtures::cube_bridge::{MockJoinItemDefinition, MockMemberSql};
+use crate::test_fixtures::cube_bridge::{
+    MockJoinItemDefinition, MockMemberSql, MockViewFilterDefinition,
+};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -27,6 +30,9 @@ pub struct MockCubeDefinition {
 
     #[builder(default)]
     joins: HashMap<String, MockJoinItemDefinition>,
+
+    #[builder(default)]
+    filters: Vec<MockViewFilterDefinition>,
 }
 
 impl_static_data!(
@@ -61,6 +67,23 @@ impl CubeDefinition for MockCubeDefinition {
         match &self.sql {
             Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
             None => Ok(None),
+        }
+    }
+
+    fn has_filters(&self) -> Result<bool, CubeError> {
+        Ok(!self.filters.is_empty())
+    }
+
+    fn filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError> {
+        if self.filters.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(
+                self.filters
+                    .iter()
+                    .map(|f| Rc::new(f.clone()) as Rc<dyn ViewFilterDefinition>)
+                    .collect(),
+            ))
         }
     }
 
@@ -275,5 +298,60 @@ mod tests {
 
         assert_eq!(cube.joins().len(), 0);
         assert!(cube.get_join("any").is_none());
+    }
+
+    #[test]
+    fn test_view_without_filters() {
+        let view = MockCubeDefinition::builder()
+            .name("orders_view".to_string())
+            .is_view(Some(true))
+            .sql("SELECT * FROM orders".to_string())
+            .build();
+
+        assert!(!view.has_filters().unwrap());
+        assert!(view.filters().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_view_with_default_value_filters() {
+        let view = MockCubeDefinition::builder()
+            .name("orders_view".to_string())
+            .is_view(Some(true))
+            .sql("SELECT * FROM orders".to_string())
+            .filters(vec![
+                MockViewFilterDefinition::builder()
+                    .operator("equals".to_string())
+                    .member_reference("orders.currency".to_string())
+                    .values_references(Some(vec![Some("USD".to_string())]))
+                    .unless_references(Some(vec!["orders.currency".to_string()]))
+                    .build(),
+                MockViewFilterDefinition::builder()
+                    .operator("set".to_string())
+                    .member_reference("orders.country".to_string())
+                    .build(),
+            ])
+            .build();
+
+        assert!(view.has_filters().unwrap());
+        let filters = view.filters().unwrap().unwrap();
+        assert_eq!(filters.len(), 2);
+
+        let first = filters[0].static_data();
+        assert_eq!(first.operator, "equals");
+        assert_eq!(first.member_reference, "orders.currency");
+        assert_eq!(
+            first.values_references.as_ref().unwrap(),
+            &vec![Some("USD".to_string())]
+        );
+        assert_eq!(
+            first.unless_references.as_ref().unwrap(),
+            &vec!["orders.currency".to_string()]
+        );
+
+        let second = filters[1].static_data();
+        assert_eq!(second.operator, "set");
+        assert_eq!(second.member_reference, "orders.country");
+        assert!(second.values_references.is_none());
+        assert!(second.unless_references.is_none());
     }
 }

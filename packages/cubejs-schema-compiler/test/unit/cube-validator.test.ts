@@ -210,6 +210,148 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeFalsy();
   });
 
+  describe('view default value filters', () => {
+    const silentReporter = new ConsoleErrorReporter();
+
+    it('view with default value filter - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders_view',
+        isView: true,
+        fileName: 'fileName',
+        filters: [
+          {
+            member: () => 'currency',
+            operator: 'equals',
+            values: () => ['USD'],
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with default value filter and unless - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders_view',
+        isView: true,
+        fileName: 'fileName',
+        filters: [
+          {
+            member: () => 'currency',
+            operator: 'equals',
+            values: () => ['USD'],
+            unless: () => ['currency'],
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view filter with set operator does not require values - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders_view',
+        isView: true,
+        fileName: 'fileName',
+        filters: [
+          {
+            member: () => 'currency',
+            operator: 'set',
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view filter with missing required values - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders_view',
+        isView: true,
+        fileName: 'fileName',
+        filters: [
+          {
+            member: () => 'currency',
+            operator: 'equals',
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('view filter with missing member - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders_view',
+        isView: true,
+        fileName: 'fileName',
+        filters: [
+          {
+            operator: 'equals',
+            values: () => ['USD'],
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('view filter with invalid operator - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders_view',
+        isView: true,
+        fileName: 'fileName',
+        filters: [
+          {
+            member: () => 'currency',
+            operator: 'someInvalidOperator',
+            values: () => ['USD'],
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('regular cube with default value filter - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders',
+        sql: () => 'SELECT * FROM orders',
+        fileName: 'fileName',
+        filters: [
+          {
+            member: () => 'currency',
+            operator: 'equals',
+            values: () => ['USD'],
+          },
+        ],
+      };
+
+      const validationResult = cubeValidator.validate(cube, silentReporter);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
+
   it('refreshKey alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {

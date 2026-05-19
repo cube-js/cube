@@ -1,0 +1,65 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM dvf_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: country
+            type: string
+            sql: country
+          - name: currency
+            type: switch
+            values:
+                - USD
+                - EUR
+                - GBP
+      measures:
+          - name: total_amount_usd
+            type: sum
+            sql: amount_usd
+          - name: total_amount_eur
+            type: sum
+            sql: amount_eur
+          - name: amount_in_country
+            type: number
+            multi_stage: true
+            case:
+              switch: "{CUBE.country}"
+              when:
+                - value: "US"
+                  sql: "{CUBE.total_amount_usd}"
+                - value: "CA"
+                  sql: "{CUBE.total_amount_usd}"
+                - value: "DE"
+                  sql: "{CUBE.total_amount_eur}"
+                - value: "FR"
+                  sql: "{CUBE.total_amount_eur}"
+              else:
+                sql: "{CUBE.total_amount_usd}"
+          - name: count
+            type: count
+
+views:
+    - name: orders_view
+      cubes:
+          - join_path: orders
+            includes: "*"
+      filters:
+          - member: orders_view.currency
+            operator: equals
+            values:
+                - USD
+
+    - name: orders_view_with_unless
+      cubes:
+          - join_path: orders
+            includes: "*"
+      filters:
+          - member: orders_view_with_unless.currency
+            operator: equals
+            values:
+                - USD
+            unless:
+                - orders_view_with_unless.currency

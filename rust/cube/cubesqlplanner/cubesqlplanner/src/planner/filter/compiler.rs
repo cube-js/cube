@@ -73,6 +73,14 @@ impl<'a> FilterCompiler<'a> {
         )
     }
 
+    /// Iterator over every compiled filter item across the three buckets.
+    pub fn iter_all_items(&self) -> impl Iterator<Item = &FilterItem> {
+        self.dimension_filters
+            .iter()
+            .chain(self.time_dimension_filters.iter())
+            .chain(self.measures_filters.iter())
+    }
+
     fn compile_item(
         &mut self,
         item: &NativeFilterItem,

@@ -2,16 +2,18 @@
 //! resolves member/segment/filter/order references against the cube
 //! evaluator and folds them into the typed builder.
 
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::cube_bridge::base_query_options::BaseQueryOptions;
+use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterItem as NativeFilterItem};
 use crate::cube_bridge::member_expression::{
     MemberExpressionDefinition, MemberExpressionExpressionDef,
 };
 use crate::cube_bridge::options_member::OptionsMember;
+use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
 
 use super::filter::compiler::FilterCompiler;
 use super::filter::{BaseSegment, FilterItem};
@@ -47,8 +49,14 @@ impl QueryPropertiesCompiler {
         let measures = self.compile_measures(&mut evaluator_compiler, options)?;
         let segments = self.compile_segments(&mut evaluator_compiler, options)?;
 
-        let (dimensions_filters, time_dimensions_filters, measures_filters) =
-            self.compile_filters(&mut evaluator_compiler, options, &time_dimensions_raw)?;
+        let (dimensions_filters, time_dimensions_filters, measures_filters) = self
+            .compile_filters(
+                &mut evaluator_compiler,
+                options,
+                &dimensions,
+                &time_dimensions_raw,
+                &measures,
+            )?;
 
         // FIXME may be this filter should be applied on other place
         let time_dimensions = Self::filter_time_dimensions_with_granularity(time_dimensions_raw);
@@ -371,13 +379,17 @@ impl QueryPropertiesCompiler {
     }
 
     // Returns `(dimension_filters, time_dimension_filters, measure_filters)`.
-    // Includes both the explicit `options.filters` entries and the implicit
-    // `dateRange` filter carried by each time dimension.
+    // Includes:
+    //   - explicit `options.filters` entries,
+    //   - the implicit `dateRange` filter carried by each time dimension,
+    //   - default-value filters declared on any view active in the query.
     fn compile_filters(
         &self,
         evaluator_compiler: &mut Compiler,
         options: &dyn BaseQueryOptions,
+        dimensions: &[Rc<MemberSymbol>],
         time_dimensions: &[Rc<MemberSymbol>],
+        measures: &[Rc<MemberSymbol>],
     ) -> Result<(Vec<FilterItem>, Vec<FilterItem>, Vec<FilterItem>), CubeError> {
         let mut filter_compiler = FilterCompiler::new(evaluator_compiler, self.query_tools.clone());
         if let Some(filters) = &options.static_data().filters {
@@ -388,7 +400,81 @@ impl QueryPropertiesCompiler {
         for time_dimension in time_dimensions {
             filter_compiler.add_time_dimension_item(time_dimension)?;
         }
+        self.apply_view_default_filters(
+            &mut filter_compiler,
+            dimensions,
+            time_dimensions,
+            measures,
+        )?;
         Ok(filter_compiler.extract_result())
+    }
+
+    fn apply_view_default_filters(
+        &self,
+        filter_compiler: &mut FilterCompiler,
+        dimensions: &[Rc<MemberSymbol>],
+        time_dimensions: &[Rc<MemberSymbol>],
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<(), CubeError> {
+        // Filter members are materialized once — we can't keep an immutable
+        // borrow on `filter_compiler` while later calling `add_item` (mutable
+        // borrow) on it inside the apply loop below.
+        let filter_members: Vec<Rc<MemberSymbol>> = filter_compiler
+            .iter_all_items()
+            .flat_map(|f| f.all_member_evaluators())
+            .collect();
+
+        // `unless` is intentionally filter-only: adding a member to the
+        // projection (dimension / measure / time dimension) should never
+        // silently change the row set, so a projection alone is not enough
+        // to drop the default filter. Only an explicit filter on the member
+        // counts as an "override" and releases the guard.
+        let mentioned_in_filters: HashSet<String> =
+            filter_members.iter().map(|s| s.full_name()).collect();
+
+        let cube_evaluator = self.query_tools.cube_evaluator();
+        let mut visited_cubes: HashSet<String> = HashSet::new();
+        let mut pending_view_filters: Vec<Rc<dyn ViewFilterDefinition>> = Vec::new();
+
+        for sym in dimensions
+            .iter()
+            .chain(time_dimensions)
+            .chain(measures)
+            .chain(filter_members.iter())
+        {
+            let cube_name = sym.compiled_path().cube_name();
+            if !visited_cubes.insert(cube_name.clone()) {
+                continue;
+            }
+            let cube_def = cube_evaluator.cube_from_path(cube_name.clone())?;
+            if !cube_def.static_data().is_view.unwrap_or(false) {
+                continue;
+            }
+            if let Some(view_filters) = cube_def.filters()? {
+                pending_view_filters.extend(view_filters);
+            }
+        }
+
+        for vf in pending_view_filters {
+            let s = vf.static_data();
+            let should_apply = match &s.unless_references {
+                None => true,
+                Some(refs) => !refs.iter().any(|r| mentioned_in_filters.contains(r)),
+            };
+            if !should_apply {
+                continue;
+            }
+            let native_filter = NativeFilterItem {
+                or: None,
+                and: None,
+                member: Some(s.member_reference.clone()),
+                dimension: None,
+                operator: Some(s.operator.clone()),
+                values: s.values_references.clone(),
+            };
+            filter_compiler.add_item(&native_filter)?;
+        }
+        Ok(())
     }
 
     // Drop time-dimension symbols that have no granularity. Non-time-

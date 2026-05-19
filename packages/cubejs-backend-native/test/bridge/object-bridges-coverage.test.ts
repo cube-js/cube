@@ -87,7 +87,16 @@ const BRIDGES: BridgeSpec[] = [
   { name: 'caseSwitchItem', expected: ['sql', 'value'] },
   {
     name: 'cubeDefinition',
-    expected: ['is_calendar', 'is_view', 'join_map', 'name', 'sql', 'sql_alias', 'sql_table'],
+    expected: [
+      'filters',
+      'is_calendar',
+      'is_view',
+      'join_map',
+      'name',
+      'sql',
+      'sql_alias',
+      'sql_table',
+    ],
   },
   {
     name: 'cubeEvaluator',
@@ -215,6 +224,10 @@ const BRIDGES: BridgeSpec[] = [
   { name: 'sqlUtils', expected: [] },
   { name: 'structWithSqlMember', expected: ['sql'] },
   { name: 'timeShiftDefinition', expected: ['interval', 'name', 'sql', 'timeshift_type'] },
+  {
+    name: 'viewFilterDefinition',
+    expected: ['member_reference', 'operator', 'unless_references', 'values_references'],
+  },
 ];
 
 const describeBridge = bridgeHarnessAvailable ? describe : describe.skip;

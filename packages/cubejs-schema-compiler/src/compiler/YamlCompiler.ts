@@ -187,15 +187,27 @@ export class YamlCompiler {
       for (const p of transpiledFieldsPatterns) {
         const fullPath = propertyPath.join('.');
         if (fullPath.match(p)) {
+          // View default filter `member` / `unless` are member references in
+          // the view's own namespace — not Python expressions — so they go
+          // through the same f-string path as `values`. The view's
+          // `includedMembers` are not resolvable at transpile time, so
+          // running them through the Python parser would treat the name
+          // as an undefined identifier.
+          const isViewFilterMember = /^filters\.\d+\.member$/.test(fullPath);
+          const isViewFilterUnless = /^filters\.\d+\.unless$/.test(fullPath);
           if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
+            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
+          } else if (typeof obj === 'string' && isViewFilterMember) {
             return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
           } else if (typeof obj === 'string') {
             return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
           } else if (Array.isArray(obj)) {
+            const treatAsLiteral =
+              propertyPath[propertyPath.length - 1] === 'values' || isViewFilterUnless;
             const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
               let ast: t.Program | t.NullLiteral | t.BooleanLiteral | t.NumericLiteral | null = null;
               // Special case for accessPolicy.rowLevel.filter.values and other values-like fields
-              if (propertyPath[propertyPath.length - 1] === 'values') {
+              if (treatAsLiteral) {
                 if (typeof code === 'string') {
                   ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code)}"`, errorsReport);
                 } else if (typeof code === 'boolean') {

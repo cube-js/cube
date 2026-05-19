@@ -2,7 +2,7 @@ use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
     MockGranularityDefinition, MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition,
-    MockPreAggregationDescription, MockSegmentDefinition,
+    MockPreAggregationDescription, MockSegmentDefinition, MockViewFilterDefinition,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -340,6 +340,7 @@ impl MockSchemaBuilder {
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
+            default_filters: Vec::new(),
         }
     }
 
@@ -468,6 +469,7 @@ pub struct MockViewBuilder {
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    default_filters: Vec<MockViewFilterDefinition>,
 }
 
 impl MockViewBuilder {
@@ -519,6 +521,11 @@ impl MockViewBuilder {
         definition: MockSegmentDefinition,
     ) -> Self {
         self.segments.insert(name.into(), Rc::new(definition));
+        self
+    }
+
+    pub fn add_default_filter(mut self, filter: MockViewFilterDefinition) -> Self {
+        self.default_filters.push(filter);
         self
     }
 
@@ -634,6 +641,7 @@ impl MockViewBuilder {
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
+            .filters(self.default_filters)
             .build();
 
         let view_cube = MockCube {

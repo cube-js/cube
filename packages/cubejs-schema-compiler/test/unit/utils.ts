@@ -377,6 +377,59 @@ export function createCubeSchemaWithCustomGranularitiesAndTimeShift(name: string
       })`;
 }
 
+export function createViewSchemaWithDefaultValueFilter(): string {
+  return `
+    cube(\`orders\`, {
+      sql: \`SELECT * FROM orders\`,
+      dimensions: {
+        id: {
+          type: \`number\`,
+          sql: \`id\`,
+          primaryKey: true,
+          public: true,
+        },
+        currency: {
+          type: \`string\`,
+          sql: \`currency\`,
+          public: true,
+        },
+        country: {
+          type: \`string\`,
+          sql: \`country\`,
+          public: true,
+        },
+      },
+      measures: {
+        count: { type: \`count\` },
+      },
+    })
+
+    view(\`orders_view\`, {
+      cubes: [{
+        join_path: orders,
+        includes: '*',
+      }],
+      filters: [
+        {
+          member: \`currency\`,
+          operator: 'equals',
+          values: [\`USD\`],
+          unless: [\`currency\`, \`country\`],
+        },
+        {
+          member: \`country\`,
+          operator: 'set',
+        },
+        {
+          member: \`id\`,
+          operator: 'in',
+          values: [1, 2, true, \`draft\`, null],
+        },
+      ],
+    })
+  `;
+}
+
 export type CreateSchemaOptions = {
   cubes?: unknown[],
   views?: unknown[]
