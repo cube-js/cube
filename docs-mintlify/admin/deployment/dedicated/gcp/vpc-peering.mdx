@@ -1,0 +1,84 @@
+---
+title: Setting up VPC Peering on GCP
+sidebarTitle: VPC Peering
+description: End-to-end checklist for VPC peering Cube's Dedicated Infrastructure with your GCP VPC network for private data access.
+---
+
+<Note>
+
+This page covers **backend connectivity** — Cube reaching into your network to
+query data sources, auth providers, BI APIs targeted by Semantic Layer Sync,
+and other upstream services. See
+[Backend and frontend connectivity][backend-frontend] for the full picture.
+For **frontend connectivity** (exposing Cube's APIs to your applications,
+browsers, BI tools, and embedded analytics clients), see
+[Private API Connectivity on AWS][aws-private-api-connectivity]; the
+equivalent pattern is available on GCP on request.
+
+</Note>
+
+VPC Peering requires Cube to be hosted on
+[Dedicated Infrastructure][cube-region]. Let the Cube team know which Cube
+Region should host your Dedicated Infrastructure.
+
+Cube will provision the Dedicated VPC and provide the following information
+you can use to create the peering request:
+
+- **GCP Project ID:** `cube-cloud-dedicated` (the project Cube uses to host
+  Dedicated VPCs).
+- **VPC Network Name:** shared with you by the Cube team once the Dedicated
+  VPC is provisioned.
+
+## Setup
+
+### Creating the peering connection
+
+After receiving the information above, create a
+[VPC peering request][gcp-docs-vpc-peering], either through the
+[GCP Web Console][gcp-console] or an infrastructure-as-code tool. To send a
+VPC peering request through the Google Cloud Console, follow
+[the instructions here][gcp-docs-create-vpc-peering], with the following
+amendments:
+
+- In Step 6, use the project ID `cube-cloud-dedicated` and the network name
+  provided by Cube.
+- In Step 7, ensure **Import custom routes** and **Export custom routes** are
+  selected so that the necessary routes are created.
+
+### Firewall and routing
+
+Once the peering is established, configure your VPC firewall rules to allow
+inbound TCP traffic from Cube's VPC CIDR block to your data source on the
+database port. Cube's VPC CIDR is shared with you alongside the peering
+request and is also visible in the GCP Console on the **VPC network** →
+**\<your VPC\>** → **VPC network peering** → **\<Cube peering\>** page as
+the **Peer VPC network** subnet ranges.
+
+If your data source is in a different project or subnet that transits a
+firewall or Cloud NAT, add a matching allow rule for Cube's CIDR there as
+well.
+
+## Cloud SQL
+
+Google Cloud SQL databases
+[can only be peered to a VPC within the same GCP project][gcp-docs-vpc-peering-restrictions].
+If you need Cube to reach a Cloud SQL instance, prefer
+[Private Service Connect][gcp-private-service-connect] (Cloud SQL supports
+PSC natively), or alternatively provision a small VM in your GCP project
+running the [Cloud SQL Auth Proxy][gcp-cloudsql-auth-proxy].
+
+## Supported Regions
+
+VPC Peering is available in all GCP commercial regions where Dedicated
+Infrastructure can be provisioned. GCP regions in mainland China (serviced
+by partner providers) are not supported.
+
+[gcp-cloudsql-auth-proxy]: https://cloud.google.com/sql/docs/mysql/connect-admin-proxy
+[gcp-console]: https://console.cloud.google.com/
+[gcp-docs-create-vpc-peering]: https://cloud.google.com/vpc/docs/using-vpc-peering#creating_a_peering_configuration
+[gcp-docs-vpc-peering]: https://cloud.google.com/vpc/docs/vpc-peering
+[gcp-docs-vpc-peering-restrictions]: https://cloud.google.com/vpc/docs/vpc-peering#restrictions
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[gcp-private-service-connect]: /admin/deployment/dedicated/gcp/private-service-connect
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity
