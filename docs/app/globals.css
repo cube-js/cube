@@ -253,6 +253,13 @@ header.nextra-navbar nav > div.x\:max-md\:hidden:has(button) {
   }
 }
 
+/* Legacy-docs Banner - taller bar so the "visit new docs" link is more prominent */
+.nextra-banner > div {
+  padding-top: 32px !important;
+  padding-bottom: 32px !important;
+  font-size: 1.125rem !important;
+}
+
 /* Purple Banner wrapper - animated reveal */
 .pb-wrapper {
   --purple-banner-font: var(--font-cera-pro), system-ui, -apple-system, sans-serif;
