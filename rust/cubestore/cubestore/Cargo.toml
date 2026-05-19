@@ -1,6 +1,6 @@
 [package]
 name = "cubestore"
-version = "1.6.47"
+version = "1.6.48"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"

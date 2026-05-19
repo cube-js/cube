@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.48](https://github.com/cube-js/cube/compare/v1.6.47...v1.6.48) (2026-05-19)
+
+### Features
+
+- **presto/trino-driver:** Support custom headers ([#10902](https://github.com/cube-js/cube/issues/10902)) ([ea2cdae](https://github.com/cube-js/cube/commit/ea2cdaef138385444dd0a71aeed5af58df7a115e))
+- **trino-driver:** Use headers prefix specifically to Trino (X-Trino-) ([#10904](https://github.com/cube-js/cube/issues/10904)) ([9d73d1f](https://github.com/cube-js/cube/commit/9d73d1f42f2dcc976ee8d08ce25d9681537c420c))
+
 ## [1.6.47](https://github.com/cube-js/cube/compare/v1.6.46...v1.6.47) (2026-05-18)
 
 **Note:** Version bump only for package @cubejs-backend/trino-driver
