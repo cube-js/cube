@@ -132,7 +132,24 @@ Custom headers can't be configured via environment variables. Instead, use the
 [`driver_factory`](/reference/configuration/config#driver_factory) configuration
 option to pass a `headers` object to the driver:
 
-```javascript
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  return {
+    'type': 'trino',
+    'headers': {
+      'X-Trino-Source': 'cube',
+      'X-Trino-Routing-Group': 'etl',
+      'X-Trino-Client-Tags': 'user=alice@example.com'
+    }
+  }
+```
+
+```javascript title="JavaScript"
 module.exports = {
   driverFactory: ({ dataSource }) => ({
     type: "trino",
@@ -145,11 +162,30 @@ module.exports = {
 };
 ```
 
+</CodeGroup>
+
 In multitenant deployments, you can use the [security
 context](/embedding/authentication/security-context) to pass per-tenant headers, for example
 to forward a user token from the API request down to Trino:
 
-```javascript
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  security_context = ctx['securityContext']
+  return {
+    'type': 'trino',
+    'headers': {
+      'X-Trino-Client-Tags': f"user={security_context['user_id']}",
+      'X-Custom-User-Token': security_context['token']
+    }
+  }
+```
+
+```javascript title="JavaScript"
 module.exports = {
   driverFactory: ({ securityContext }) => ({
     type: "trino",
@@ -160,6 +196,8 @@ module.exports = {
   })
 };
 ```
+
+</CodeGroup>
 
 [trino-docs-client-protocol]: https://trino.io/docs/current/develop/client-protocol.html
 
