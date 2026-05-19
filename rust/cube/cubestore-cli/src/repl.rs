@@ -18,6 +18,7 @@ pub async fn run(client: &Client, mut timing: bool) -> Result<()> {
     let history_path = dirs::home_dir().map(|p| p.join(".cubestore_history"));
 
     let mut rl: Editor<(), DefaultHistory> = Editor::new()?;
+
     if let Some(ref p) = history_path {
         let _ = rl.load_history(p);
     }
@@ -31,7 +32,15 @@ pub async fn run(client: &Client, mut timing: bool) -> Result<()> {
             "cubestore-> "
         };
 
-        let line = match rl.readline(prompt) {
+        let (line_res, rl_back) = tokio::task::spawn_blocking(move || {
+            let res = rl.readline(prompt);
+            (res, rl)
+        })
+        .await?;
+
+        rl = rl_back;
+
+        let line = match line_res {
             Ok(line) => line,
             Err(ReadlineError::Interrupted) => {
                 // Ctrl-C: clear current buffer, continue.
