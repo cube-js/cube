@@ -1,9 +1,11 @@
 import fetch from 'node-fetch';
-import { PrestoDriver } from '@cubejs-backend/prestodb-driver';
+import { PrestoDriver, PrestoDriverConfiguration } from '@cubejs-backend/prestodb-driver';
 import { PrestodbQuery } from '@cubejs-backend/schema-compiler';
 
+export type TrinoDriverConfiguration = Omit<PrestoDriverConfiguration, 'engine'>;
+
 export class TrinoDriver extends PrestoDriver {
-  public constructor(options: any) {
+  public constructor(options: TrinoDriverConfiguration = {}) {
     super({ ...options, engine: 'trino' });
   }
 
