@@ -1,6 +1,7 @@
 import { TrinoDriver } from '../../src/TrinoDriver';
 
 const mockFetch: jest.Mock = jest.fn();
+const mockExecute: jest.Mock = jest.fn();
 
 jest.mock('node-fetch', () => ({
   __esModule: true,
@@ -11,6 +12,13 @@ jest.mock('@cubejs-backend/schema-compiler', () => ({
   PrestodbQuery: class { },
 }));
 
+jest.mock('presto-client', () => ({
+  Client: jest.fn().mockImplementation(() => ({
+    execute: (...args: any[]) => mockExecute(...args),
+    nodes: jest.fn(),
+  })),
+}));
+
 describe('TrinoDriver headers', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -19,6 +27,11 @@ describe('TrinoDriver headers', () => {
       status: 200,
       statusText: 'OK',
       text: async () => '',
+    });
+    mockExecute.mockReset();
+    // Default: synthesize a successful query result with no rows.
+    mockExecute.mockImplementation((opts: any) => {
+      opts.success?.();
     });
   });
 
@@ -47,6 +60,29 @@ describe('TrinoDriver headers', () => {
       'X-Trino-Routing-Group': 'etl',
       'X-Trino-Client-Tags': 'user=alice@example.com',
       'X-Mozart-User-Token': 'abc.def.ghi',
+    });
+  });
+
+  it('forwards configured custom headers when useSelectTestConnection is enabled', async () => {
+    const driver = new TrinoDriver({
+      host: 'trino.local',
+      port: '8080',
+      useSelectTestConnection: true,
+      headers: {
+        'X-Trino-Source': 'cube',
+        'X-Trino-Routing-Group': 'etl',
+      },
+    });
+
+    await driver.testConnection();
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    const [executeOpts] = mockExecute.mock.calls[0];
+    expect(executeOpts.query).toBe('SELECT 1');
+    expect(executeOpts.headers).toEqual({
+      'X-Trino-Source': 'cube',
+      'X-Trino-Routing-Group': 'etl',
     });
   });
 });

@@ -53,6 +53,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   dataSource?: string;
   queryTimeout?: number;
   preAggregations?: boolean;
+  useSelectTestConnection?: boolean;
   // @see https://trino.io/docs/current/develop/client-protocol.html
   headers?: Record<string, string>;
 };
@@ -96,7 +97,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
-    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
+    this.useSelectTestConnection = config.useSelectTestConnection ??
+      getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
 
     this.config = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
