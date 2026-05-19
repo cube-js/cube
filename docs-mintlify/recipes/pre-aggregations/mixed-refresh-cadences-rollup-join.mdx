@@ -1,22 +1,46 @@
 ---
-title: Joining slow-changing facts with frequently-updated FX rates
-description: Use a rollup join to combine a heavy, slowly-refreshed sales pre-aggregation with a lightweight, frequently-refreshed FX rates pre-aggregation so currency-converted metrics stay fresh without rebuilding the full fact table.
+title: Joining pre-aggregations with different refresh cadences
+description: Use a rollup join to combine a heavy, slowly-refreshed fact pre-aggregation with a lightweight, frequently-refreshed lookup pre-aggregation so derived metrics stay fresh without rebuilding the full fact table.
 ---
 
 ## Use case
 
-Let's imagine we report sales in multiple currencies and want to display them
-converted to USD. The sales fact table is large and expensive to aggregate, so
-we'd like to refresh it on a slow cadence (for example, daily). However, the
-foreign exchange (FX) rates we use for conversion change frequently and need
-to be refreshed more often than the heavy fact aggregation.
+A common modeling problem is computing a metric that depends on two inputs
+which change at very different rates:
 
-Combining both into a single [rollup](/reference/data-modeling/pre-aggregations#rollup)
-forces the entire pre-aggregation to refresh whenever FX rates change, which is
-wasteful. In the recipe below, we'll learn how to use a
+- A **large fact table** that is expensive to aggregate and only needs to be
+  refreshed on a slow cadence (for example, daily or hourly).
+- A **small lookup table** whose values are applied to each fact row and that
+  needs to be refreshed much more frequently than the fact aggregation.
+
+Some examples of this pattern:
+
+- Converting an amount column to a target currency using the latest foreign
+  exchange (FX) rates — either a single-currency column multiplied by a rate,
+  or an `amount` and `currency` column resolved with a `CASE` statement.
+- Re-pricing inventory or order lines with a frequently-updated price list.
+- Applying a frequently-tuned scoring weight, tax rate, or commission rate to
+  historical events.
+
+Combining both inputs into a single [rollup](/reference/data-modeling/pre-aggregations#rollup)
+forces the entire pre-aggregation to refresh whenever the lookup values
+change, which is wasteful. In the recipe below, we'll learn how to use a
 [rollup join](/reference/data-modeling/pre-aggregations#rollup_join) to keep
 each pre-aggregation on its own refresh schedule while still serving the
-combined, currency-converted query from pre-aggregations.
+combined, derived query from pre-aggregations.
+
+We'll walk through the FX conversion variant as a concrete example, but the
+same pattern applies to any of the use cases above.
+
+<Warning>
+  `rollup_join` has several constraints documented on the
+  [pre-aggregations reference page](/reference/data-modeling/pre-aggregations#rollup_join).
+  In particular: it is currently in Preview, it is designed for joining data
+  across data sources, it can only join two rollups, neither rollup can have
+  more than one partition (so at least one side must be under ~1M rows), and
+  it is ephemeral — set freshness controls on the referenced rollups rather
+  than on the `rollup_join` itself.
+</Warning>
 
 ## Data modeling
 
