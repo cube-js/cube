@@ -39,7 +39,11 @@ export type PrestoDriverExportBucket = {
   exportBucketCsvEscapeSymbol?: string,
 };
 
-export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
+export type PrestoDriverInternalConfiguration = {
+    engine?: 'presto' | 'trino';
+};
+
+export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverInternalConfiguration & {
   host?: string;
   port?: string;
   catalog?: string;
@@ -125,6 +129,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     this.catalog = this.config.catalog;
     this.client = new presto.Client({
       timeout: this.config.queryTimeout,
+      engine: 'presto',
       ...this.config,
     });
   }

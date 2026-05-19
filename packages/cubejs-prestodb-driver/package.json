@@ -29,7 +29,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.6.47",
     "@cubejs-backend/shared": "1.6.47",
-    "presto-client": "^1.1.0",
+    "presto-client": "^1.2.0",
     "ramda": "^0.27.0",
     "sqlstring": "^2.3.1"
   },
