@@ -154,8 +154,8 @@ cube(`orders`, {
 </CodeGroup>
 
 Next, define a `rollup` pre-aggregation on `fx_rates`. This pre-aggregation is
-small (one row per currency) and cheap to rebuild, so we keep the same
-daily `refresh_key` as the orders rollup:
+small (one row per currency) and cheap to rebuild, so we give it a much
+faster `refresh_key` than the orders rollup — for example, every hour:
 
 <CodeGroup>
 
@@ -182,7 +182,7 @@ cubes:
           - currency
           - rate_to_usd
         refresh_key:
-          every: 1 day
+          every: 1 hour
         indexes:
           - name: currency_index
             columns:
@@ -211,7 +211,7 @@ cube(`fx_rates`, {
       type: `rollup`,
       dimensions: [currency, rate_to_usd],
       refresh_key: {
-        every: `1 day`
+        every: `1 hour`
       },
       indexes: {
         currency_index: {
@@ -337,7 +337,7 @@ Let's query daily sales in USD by currency:
 
 Cube serves the query from `orders_with_fx_rollup`, joining the cached
 `orders_rollup` (refreshed daily) with the cached `fx_rates_rollup`
-(also refreshed daily). The heavy aggregation never rebuilds when FX rates
+(refreshed hourly). The heavy aggregation never rebuilds when FX rates
 change, but the converted totals always reflect the latest rates.
 
 ```javascript
