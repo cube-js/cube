@@ -9,7 +9,7 @@ Let's imagine we report sales in multiple currencies and want to display them
 converted to USD. The sales fact table is large and expensive to aggregate, so
 we'd like to refresh it on a slow cadence (for example, hourly). However, the
 foreign exchange (FX) rates we use for conversion change frequently and need
-to be refreshed every few minutes to stay accurate.
+to be refreshed more often than the heavy fact aggregation.
 
 Combining both into a single [rollup](/reference/data-modeling/pre-aggregations#rollup)
 forces the entire pre-aggregation to refresh whenever FX rates change, which is
@@ -136,8 +136,8 @@ cube(`orders`, {
 </CodeGroup>
 
 Next, define a `rollup` pre-aggregation on `fx_rates`. This pre-aggregation is
-small (one row per currency) and cheap to rebuild, so we set a fast
-`refresh_key` — for example, every minute:
+small (one row per currency) and cheap to rebuild, so we keep the same
+hourly `refresh_key` as the orders rollup:
 
 <CodeGroup>
 
@@ -164,7 +164,7 @@ cubes:
           - currency
           - rate_to_usd
         refresh_key:
-          every: 1 minute
+          every: 1 hour
         indexes:
           - name: currency_index
             columns:
@@ -193,7 +193,7 @@ cube(`fx_rates`, {
       type: `rollup`,
       dimensions: [currency, rate_to_usd],
       refresh_key: {
-        every: `1 minute`
+        every: `1 hour`
       },
       indexes: {
         currency_index: {
@@ -319,7 +319,7 @@ Let's query daily sales in USD by currency:
 
 Cube serves the query from `orders_with_fx_rollup`, joining the cached
 `orders_rollup` (refreshed hourly) with the cached `fx_rates_rollup`
-(refreshed every minute). The heavy aggregation never rebuilds when FX rates
+(also refreshed hourly). The heavy aggregation never rebuilds when FX rates
 change, but the converted totals always reflect the latest rates.
 
 ```javascript
