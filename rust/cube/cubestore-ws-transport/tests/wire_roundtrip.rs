@@ -12,11 +12,11 @@ use cubeshared::codegen::{
     HttpRowArgs, QueryResultFormat,
 };
 use cubestore_ws_transport::codec::{decode_frame, encode_query, DecodedResponse};
-use cubestore_ws_transport::{ResponseFormat, ResultData};
+use cubestore_ws_transport::{ResponseFormat, ResultData, TransportError};
 use flatbuffers::FlatBufferBuilder;
 
 #[test]
-fn query_round_trip() {
+fn query_round_trip() -> Result<(), TransportError> {
     let bytes = encode_query(7, "conn-xyz", "SELECT 42");
     let msg = root_as_http_message(&bytes).expect("parse encoded message");
 
@@ -30,10 +30,12 @@ fn query_round_trip() {
     assert!(q.trace_obj().is_none());
     assert!(q.inline_tables().is_none());
     assert!(q.parameters().is_none());
+
+    Ok(())
 }
 
 #[test]
-fn decode_preserves_all_columns_for_wide_table() {
+fn decode_preserves_all_columns_for_wide_table() -> Result<(), TransportError> {
     let mut b = FlatBufferBuilder::with_capacity(8 * 1024);
 
     let col_names = [
@@ -82,7 +84,7 @@ fn decode_preserves_all_columns_for_wide_table() {
     b.finish(msg, None);
     let bytes = b.finished_data().to_vec();
 
-    let decoded = decode_frame(&bytes).expect("decode");
+    let decoded = decode_frame(&bytes)?;
     let r = match decoded.response {
         DecodedResponse::Ok(r) => r,
         DecodedResponse::Error(e) => panic!("err: {e}"),
@@ -101,10 +103,12 @@ fn decode_preserves_all_columns_for_wide_table() {
     for (i, cell) in rows[0].iter().enumerate() {
         assert_eq!(cell.as_deref(), Some(format!("v{i}").as_str()));
     }
+
+    Ok(())
 }
 
 #[test]
-fn decode_preserves_all_rows_and_long_strings() {
+fn decode_preserves_all_rows_and_long_strings() -> Result<(), TransportError> {
     // Build a synthetic 500-row HttpResultSet with progressively longer string values.
     let mut b = FlatBufferBuilder::with_capacity(64 * 1024);
     let col_a = b.create_string("id");
@@ -159,7 +163,7 @@ fn decode_preserves_all_rows_and_long_strings() {
     b.finish(msg, None);
     let bytes = b.finished_data().to_vec();
 
-    let decoded = decode_frame(&bytes).expect("decode");
+    let decoded = decode_frame(&bytes)?;
     assert_eq!(decoded.message_id, 1);
     let result = match decoded.response {
         DecodedResponse::Ok(r) => r,
@@ -185,10 +189,12 @@ fn decode_preserves_all_rows_and_long_strings() {
             "payload truncated at row {i}"
         );
     }
+
+    Ok(())
 }
 
 #[test]
-fn decode_arrow_ipc_result_with_nulls() {
+fn decode_arrow_ipc_result_with_nulls() -> Result<(), TransportError> {
     // Build a small RecordBatch mirroring what the server would write via
     // datafusion::arrow::ipc::writer::StreamWriter, wrap the IPC bytes into
     // the HttpQueryResult / HttpQueryResultArrow flatbuffer, and decode.
@@ -237,7 +243,7 @@ fn decode_arrow_ipc_result_with_nulls() {
     b.finish(msg, None);
     let bytes = b.finished_data().to_vec();
 
-    let decoded = decode_frame(&bytes).expect("decode arrow frame");
+    let decoded = decode_frame(&bytes)?;
     assert_eq!(decoded.message_id, 42);
     let result = match decoded.response {
         DecodedResponse::Ok(r) => r,
@@ -273,4 +279,6 @@ fn decode_arrow_ipc_result_with_nulls() {
     assert_eq!(name_col.value(0), "alice");
     assert!(name_col.is_null(1), "row 1 name should be NULL");
     assert_eq!(name_col.value(2), "carol");
+
+    Ok(())
 }

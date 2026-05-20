@@ -11,7 +11,7 @@ use cubeshared::codegen::{
     HttpMessageArgs, HttpResultSet as FbResultSet, HttpResultSetArgs, HttpRow as FbRow,
     HttpRowArgs,
 };
-use cubestore_ws_transport::{Client, ClientConfig, ResultData};
+use cubestore_ws_transport::{Client, ClientConfig, ResultData, TransportError};
 use flatbuffers::FlatBufferBuilder;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
@@ -59,7 +59,7 @@ fn build_result_set(message_id: u32, connection_id: &str) -> bytes::Bytes {
 }
 
 #[tokio::test]
-async fn resends_in_flight_query_after_reconnect() {
+async fn resends_in_flight_query_after_reconnect() -> Result<(), TransportError> {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
 
@@ -107,13 +107,12 @@ async fn resends_in_flight_query_after_reconnect() {
     let mut cfg = ClientConfig::new(url);
     cfg.connect_timeout = Duration::from_secs(2);
     cfg.max_connect_retries = 5;
-    let client = Client::connect(cfg).await.expect("initial connect");
+    let client = Client::connect(cfg).await?;
 
     // The reconnect backoff is (attempt+1)*1000ms; allow generous headroom.
     let result = tokio::time::timeout(Duration::from_secs(5), client.query("SELECT 1"))
         .await
-        .expect("query did not complete within timeout")
-        .expect("query result");
+        .expect("query did not complete within timeout")?;
 
     assert_eq!(result.get_columns(), vec!["value".to_string()]);
     let rows = match &result.data {
@@ -127,4 +126,6 @@ async fn resends_in_flight_query_after_reconnect() {
     let ids = observed_msg_ids.lock().await.clone();
     assert!(ids.len() >= 2, "expected resend, got ids: {ids:?}");
     assert_eq!(ids[0], ids[1], "resent message_id must match the original");
+
+    Ok(())
 }

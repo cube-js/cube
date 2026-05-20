@@ -169,14 +169,14 @@ async fn boot_mock_server() -> u16 {
 }
 
 #[tokio::test]
-async fn happy_path_query_returns_rows() {
+async fn happy_path_query_returns_rows() -> Result<(), TransportError> {
     let port = boot_mock_server().await;
     let url = url::Url::parse(&format!("ws://127.0.0.1:{port}/")).unwrap();
     let mut cfg = ClientConfig::new(url);
     cfg.connect_timeout = Duration::from_secs(2);
-    let client = Client::connect(cfg).await.expect("connect");
+    let client = Client::connect(cfg).await?;
 
-    let result = client.query("SELECT * FROM whatever").await.expect("query");
+    let result = client.query("SELECT * FROM whatever").await?;
 
     assert_eq!(
         result.get_columns(),
@@ -188,12 +188,14 @@ async fn happy_path_query_returns_rows() {
     assert_eq!(rows[0][1].as_deref(), Some("alice"));
     assert_eq!(rows[1][0].as_deref(), Some("2"));
     assert_eq!(rows[1][1].as_deref(), Some("bob"));
+
+    Ok(())
 }
 
 /// Full WS round-trip with a 12-column result — guards against any layer in the
 /// stack accidentally dropping columns past the first few.
 #[tokio::test]
-async fn wide_result_full_round_trip() {
+async fn wide_result_full_round_trip() -> Result<(), TransportError> {
     use cubeshared::codegen::{HttpColumnValue as Cv, HttpMessage as FbMsg, HttpMessageArgs};
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -265,9 +267,9 @@ async fn wide_result_full_round_trip() {
     let url = url::Url::parse(&format!("ws://127.0.0.1:{port}/")).unwrap();
     let mut cfg = ClientConfig::new(url);
     cfg.connect_timeout = Duration::from_secs(2);
-    let client = Client::connect(cfg).await.expect("connect");
+    let client = Client::connect(cfg).await?;
 
-    let result = client.query("SELECT *").await.expect("query");
+    let result = client.query("SELECT *").await?;
     assert_eq!(
         result.get_columns(),
         ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11"]
@@ -279,30 +281,34 @@ async fn wide_result_full_round_trip() {
     let rows = legacy_rows(&result);
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].len(), 12);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn server_error_surfaces_as_query_error() {
+async fn server_error_surfaces_as_query_error() -> Result<(), TransportError> {
     let port = boot_mock_server().await;
     let url = url::Url::parse(&format!("ws://127.0.0.1:{port}/")).unwrap();
     let mut cfg = ClientConfig::new(url);
     cfg.connect_timeout = Duration::from_secs(2);
-    let client = Client::connect(cfg).await.expect("connect");
+    let client = Client::connect(cfg).await?;
 
     let err = client.query("ERR boom: bad sql").await.unwrap_err();
     match err {
         TransportError::Query(msg) => assert_eq!(msg, "boom: bad sql"),
         other => panic!("expected Query error, got {other:?}"),
     }
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn many_queries_correlate_by_message_id() {
+async fn many_queries_correlate_by_message_id() -> Result<(), TransportError> {
     let port = boot_mock_server().await;
     let url = url::Url::parse(&format!("ws://127.0.0.1:{port}/")).unwrap();
     let mut cfg = ClientConfig::new(url);
     cfg.connect_timeout = Duration::from_secs(2);
-    let client = Client::connect(cfg).await.expect("connect");
+    let client = Client::connect(cfg).await?;
 
     let mut handles = Vec::new();
     for i in 0..10 {
@@ -312,7 +318,9 @@ async fn many_queries_correlate_by_message_id() {
         ));
     }
     for h in handles {
-        let r = h.await.unwrap().expect("query ok");
+        let r = h.await.unwrap()?;
         assert_eq!(legacy_rows(&r).len(), 2);
     }
+
+    Ok(())
 }
