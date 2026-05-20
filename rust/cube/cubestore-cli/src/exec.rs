@@ -37,15 +37,18 @@ fn make_footer(
     show_timing: bool,
     elapsed_ms: u128,
 ) -> String {
-    let has_table = !result.columns.is_empty();
-    let n = result.rows.len();
+    let has_table = !result.get_columns().is_empty();
+    let n = result.row_count();
     let rows_part = if has_table {
         format!("{n} {}", if n == 1 { "row" } else { "rows" })
     } else {
         "OK".to_string()
     };
     if show_timing {
-        format!("({rows_part}, Time: {elapsed_ms} ms)")
+        format!(
+            "({rows_part}, Time: {elapsed_ms} ms, Format: {})",
+            result.get_format()
+        )
     } else {
         format!("({rows_part})")
     }

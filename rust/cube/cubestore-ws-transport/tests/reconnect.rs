@@ -11,7 +11,7 @@ use cubeshared::codegen::{
     HttpMessageArgs, HttpResultSet as FbResultSet, HttpResultSetArgs, HttpRow as FbRow,
     HttpRowArgs,
 };
-use cubestore_ws_transport::{Client, ClientConfig};
+use cubestore_ws_transport::{Client, ClientConfig, ResultData};
 use flatbuffers::FlatBufferBuilder;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
@@ -115,9 +115,13 @@ async fn resends_in_flight_query_after_reconnect() {
         .expect("query did not complete within timeout")
         .expect("query result");
 
-    assert_eq!(result.columns, vec!["value".to_string()]);
-    assert_eq!(result.rows.len(), 1);
-    assert_eq!(result.rows[0][0].as_deref(), Some("ok"));
+    assert_eq!(result.get_columns(), vec!["value".to_string()]);
+    let rows = match &result.data {
+        ResultData::Legacy { rows, .. } => rows,
+        _ => panic!("expected ResultData::Legacy"),
+    };
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0][0].as_deref(), Some("ok"));
 
     // Both connections should have seen the *same* message id — the resend preserves it.
     let ids = observed_msg_ids.lock().await.clone();

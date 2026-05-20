@@ -9,11 +9,21 @@ use cubeshared::codegen::{
     HttpErrorArgs, HttpMessage, HttpMessageArgs, HttpResultSet as FbResultSet, HttpResultSetArgs,
     HttpRow as FbRow, HttpRowArgs,
 };
-use cubestore_ws_transport::{Client, ClientConfig, TransportError};
+use cubestore_ws_transport::{Client, ClientConfig, QueryResult, ResultData, TransportError};
 use flatbuffers::FlatBufferBuilder;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::protocol::Message;
+
+/// Pull legacy stringified rows out of a `QueryResult`. The mock server always
+/// emits the legacy `HttpResultSet` envelope, so this is exhaustive enough for
+/// the tests in this file.
+fn legacy_rows(r: &QueryResult) -> &Vec<Vec<Option<String>>> {
+    match &r.data {
+        ResultData::Legacy { rows, .. } => rows,
+        ResultData::Arrow { .. } => panic!("expected ResultData::Legacy, got Arrow"),
+    }
+}
 
 fn build_result_set(message_id: u32, connection_id: &str) -> bytes::Bytes {
     let mut b = FlatBufferBuilder::with_capacity(1024);
@@ -168,12 +178,16 @@ async fn happy_path_query_returns_rows() {
 
     let result = client.query("SELECT * FROM whatever").await.expect("query");
 
-    assert_eq!(result.columns, vec!["id".to_string(), "name".to_string()]);
-    assert_eq!(result.rows.len(), 2);
-    assert_eq!(result.rows[0][0].as_deref(), Some("1"));
-    assert_eq!(result.rows[0][1].as_deref(), Some("alice"));
-    assert_eq!(result.rows[1][0].as_deref(), Some("2"));
-    assert_eq!(result.rows[1][1].as_deref(), Some("bob"));
+    assert_eq!(
+        result.get_columns(),
+        vec!["id".to_string(), "name".to_string()]
+    );
+    let rows = legacy_rows(&result);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0][0].as_deref(), Some("1"));
+    assert_eq!(rows[0][1].as_deref(), Some("alice"));
+    assert_eq!(rows[1][0].as_deref(), Some("2"));
+    assert_eq!(rows[1][1].as_deref(), Some("bob"));
 }
 
 /// Full WS round-trip with a 12-column result — guards against any layer in the
@@ -255,15 +269,16 @@ async fn wide_result_full_round_trip() {
 
     let result = client.query("SELECT *").await.expect("query");
     assert_eq!(
-        result.columns,
+        result.get_columns(),
         ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11"]
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>(),
         "all 12 columns should survive WS round-trip"
     );
-    assert_eq!(result.rows.len(), 1);
-    assert_eq!(result.rows[0].len(), 12);
+    let rows = legacy_rows(&result);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].len(), 12);
 }
 
 #[tokio::test]
@@ -298,6 +313,6 @@ async fn many_queries_correlate_by_message_id() {
     }
     for h in handles {
         let r = h.await.unwrap().expect("query ok");
-        assert_eq!(r.rows.len(), 2);
+        assert_eq!(legacy_rows(&r).len(), 2);
     }
 }
