@@ -1475,6 +1475,10 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
     )
 }
 
+/// The names `create_current_timestamp_udf` is registered under, whose body
+/// panics if the rewrite has not replaced it.
+pub const CURRENT_TIMESTAMP_STAND_INS: [&str; 2] = ["current_timestamp", "localtimestamp"];
+
 pub fn create_current_timestamp_udf(name: &str) -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |_| panic!("Should be rewritten with UtcTimestamp function"));
