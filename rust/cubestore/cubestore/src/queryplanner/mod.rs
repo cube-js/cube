@@ -23,6 +23,8 @@ pub use topk::MIN_TOPK_STREAM_ROWS;
 mod filter_by_key_range;
 pub mod info_schema;
 mod inline_aggregate;
+#[cfg(test)]
+mod is_not_distinct_from_join_test;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
@@ -55,6 +57,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopKLower;
 
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
@@ -316,6 +319,7 @@ impl QueryPlannerImpl {
         // TODO upgrade DF: build SessionContexts consistently
         let state = Self::minimal_session_state_from_final_config(config)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
+            .with_optimizer_rule(Arc::new(IsNotDistinctFromJoinKeysRule {}))
             .build();
 
         let context = SessionContext::new_with_state(state);
