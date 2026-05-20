@@ -125,7 +125,7 @@ impl MultiStageMemberQueryPlanner {
 
         let member = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: LogicalPlan::leaf(Rc::new(query).as_plan_node()),
+            body: MultiStageMemberBody::Plan(LogicalPlan::just(Rc::new(query))),
         };
 
         Ok(Rc::new(member))
@@ -147,7 +147,7 @@ impl MultiStageMemberQueryPlanner {
             .build();
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: LogicalPlan::leaf(Rc::new(result).as_plan_node()),
+            body: MultiStageMemberBody::TimeSeries(Rc::new(result)),
         }))
     }
 
@@ -224,7 +224,7 @@ impl MultiStageMemberQueryPlanner {
         };
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: LogicalPlan::leaf(Rc::new(result).as_plan_node()),
+            body: MultiStageMemberBody::RollingWindow(Rc::new(result)),
         }))
     }
 
@@ -307,7 +307,7 @@ impl MultiStageMemberQueryPlanner {
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: LogicalPlan::leaf(Rc::new(query).as_plan_node()),
+            body: MultiStageMemberBody::Plan(LogicalPlan::just(Rc::new(query))),
         };
         Ok(Rc::new(result))
     }
@@ -403,7 +403,7 @@ impl MultiStageMemberQueryPlanner {
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: LogicalPlan::leaf(Rc::new(query).as_plan_node()),
+            body: MultiStageMemberBody::Plan(LogicalPlan::just(Rc::new(query))),
         };
         Ok(Rc::new(result))
     }
@@ -476,21 +476,15 @@ impl MultiStageMemberQueryPlanner {
         // Render flags are leaf-CTE-only — they describe how this body is
         // rendered, not what it computes. Apply on top of whatever modifiers
         // the planner produced for the inner query.
-        let PlanNode::Query(root_query) = plan.root() else {
-            return Err(CubeError::internal(format!(
-                "Leaf-CTE body root must be a Query, got {}",
-                plan.root().node_name()
-            )));
-        };
         let modifiers = LogicalQueryModifiers {
             render_measure_as_state: self.description.member().has_aggregates_on_top(),
             render_measure_for_ungrouped: self.description.member().is_ungrupped(),
-            ..(**root_query.modifers()).clone()
+            ..(**plan.root().modifers()).clone()
         };
-        let plan = plan.with_root(root_query.with_modifers(Rc::new(modifiers)).as_plan_node());
+        let plan = plan.with_root(plan.root().with_modifers(Rc::new(modifiers)));
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: plan,
+            body: MultiStageMemberBody::Plan(plan),
         };
         Ok(Rc::new(result))
     }

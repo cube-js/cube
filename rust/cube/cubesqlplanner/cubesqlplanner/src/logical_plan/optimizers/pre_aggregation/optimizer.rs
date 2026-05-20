@@ -97,23 +97,15 @@ impl PreAggregationOptimizer {
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<LogicalPlan>>, CubeError> {
-        if let PlanNode::Query(root) = plan.root() {
-            for pre_aggregation in compiled_pre_aggregations.iter() {
-                let external = pre_aggregation.external.unwrap_or(false);
-                let date_range = Self::extract_date_range(
-                    &root.filter(),
-                    &self.query_tools,
-                    time_shifts,
-                    external,
-                );
-                if let Some(rewritten_root) =
-                    self.try_rewrite_simple_query(root, pre_aggregation, date_range)?
-                {
-                    return Ok(Some(LogicalPlan::new(
-                        vec![],
-                        rewritten_root.as_plan_node(),
-                    )));
-                }
+        let root = plan.root();
+        for pre_aggregation in compiled_pre_aggregations.iter() {
+            let external = pre_aggregation.external.unwrap_or(false);
+            let date_range =
+                Self::extract_date_range(&root.filter(), &self.query_tools, time_shifts, external);
+            if let Some(rewritten_root) =
+                self.try_rewrite_simple_query(root, pre_aggregation, date_range)?
+            {
+                return Ok(Some(LogicalPlan::new(vec![], rewritten_root)));
             }
         }
 
@@ -196,11 +188,7 @@ impl PreAggregationOptimizer {
 
         // Multiplied-measure CTEs don't carry their own filter — logically
         // they apply the same filter as the root query, so we match against it.
-        let root_filter = if let PlanNode::Query(root) = plan.root() {
-            root.filter().clone()
-        } else {
-            Rc::new(LogicalFilter::default())
-        };
+        let root_filter = plan.root().filter().clone();
 
         let mut rewritten_ctes = Vec::with_capacity(plan.ctes().len());
         let mut has_unrewritten_leaf = false;
@@ -244,21 +232,22 @@ impl PreAggregationOptimizer {
         Ok(Some(LogicalPlan::new(rewritten_ctes, plan.root().clone())))
     }
 
-    /// Rewrite an individual CTE body. The body's `root` kind determines
-    /// the rewrite role; bodies with no Query root (TimeSeries, etc.) are
+    /// Rewrite an individual CTE body. Plan-shaped bodies dispatch on the
+    /// inner root Query's `kind`; TimeSeries / RollingWindow bodies are
     /// passed through unchanged.
     fn try_rewrite_cte_body(
         &mut self,
-        body: &Rc<LogicalPlan>,
+        body: &MultiStageMemberBody,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         outer_root_filter: &Rc<LogicalFilter>,
     ) -> Result<CteRewriteResult, CubeError> {
-        let Some(root_query) = (match body.root() {
-            PlanNode::Query(q) => Some(q),
-            _ => None,
-        }) else {
-            return Ok(CteRewriteResult::PassThrough);
+        let plan = match body {
+            MultiStageMemberBody::Plan(p) => p,
+            MultiStageMemberBody::TimeSeries(_) | MultiStageMemberBody::RollingWindow(_) => {
+                return Ok(CteRewriteResult::PassThrough);
+            }
         };
+        let root_query = plan.root();
 
         match root_query.kind().pre_agg_rewrite() {
             PreAggregationRewriteRole::NoRewrite => Ok(CteRewriteResult::PassThrough),
@@ -266,9 +255,11 @@ impl PreAggregationOptimizer {
             PreAggregationRewriteRole::Leaf => {
                 let time_shifts = root_query.modifers().time_shifts.clone();
                 if let Some(rewritten) =
-                    self.try_rewrite_plan(body, compiled_pre_aggregations, &time_shifts)?
+                    self.try_rewrite_plan(plan, compiled_pre_aggregations, &time_shifts)?
                 {
-                    Ok(CteRewriteResult::Rewritten(rewritten))
+                    Ok(CteRewriteResult::Rewritten(MultiStageMemberBody::Plan(
+                        rewritten,
+                    )))
                 } else {
                     Ok(CteRewriteResult::NotMatched)
                 }
@@ -279,9 +270,8 @@ impl PreAggregationOptimizer {
                     outer_root_filter,
                     compiled_pre_aggregations,
                 )? {
-                    Ok(CteRewriteResult::Rewritten(LogicalPlan::new(
-                        vec![],
-                        rewritten_root.as_plan_node(),
+                    Ok(CteRewriteResult::Rewritten(MultiStageMemberBody::Plan(
+                        LogicalPlan::just(rewritten_root),
                     )))
                 } else {
                     Ok(CteRewriteResult::NotMatched)
@@ -541,7 +531,7 @@ impl PreAggregationOptimizer {
 }
 
 enum CteRewriteResult {
-    Rewritten(Rc<LogicalPlan>),
+    Rewritten(MultiStageMemberBody),
     PassThrough,
     NotMatched,
 }

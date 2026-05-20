@@ -59,6 +59,6 @@ impl QueryPlanner {
             full_key_aggregate_planner.plan_logical_plan(all_refs)?
         };
         let (ctes, _) = cte_state.into_results();
-        Ok(LogicalPlan::new(ctes, root.as_plan_node()))
+        Ok(LogicalPlan::new(ctes, root))
     }
 }

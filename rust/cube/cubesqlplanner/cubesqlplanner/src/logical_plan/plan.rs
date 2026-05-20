@@ -2,27 +2,27 @@ use super::*;
 use std::rc::Rc;
 
 /// Root container of a planned query: a WITH-clause `ctes` pool plus a
-/// `root` SELECT-shaped PlanNode that consumes them. Not part of
-/// `PlanNode` itself — it sits one level above tree traversal, marking
-/// the boundary where a CTE pool is materialised. Nested plans (DSQ
-/// body, multi-stage leaf body) live on `LogicalMultiStageMember.body`
-/// as another `LogicalPlan`; tree walkers cross that boundary through
-/// the dedicated visitor entry point, not through `PlanNode.inputs`.
+/// `root` Query that consumes them. Not part of `PlanNode` — it sits
+/// one level above the tree, marking the boundary where a CTE pool is
+/// materialised. Nested plans (DSQ body, multi-stage leaf body) live
+/// on `LogicalMultiStageMember::body` via `MultiStageMemberBody::Plan`;
+/// tree walkers cross that boundary through the dedicated visitor
+/// entry point, not through `PlanNode.inputs`.
 #[derive(Clone)]
 pub struct LogicalPlan {
     pub ctes: Vec<Rc<LogicalMultiStageMember>>,
-    pub root: PlanNode,
+    pub root: Rc<Query>,
 }
 
 impl LogicalPlan {
-    pub fn new(ctes: Vec<Rc<LogicalMultiStageMember>>, root: PlanNode) -> Rc<Self> {
+    pub fn new(ctes: Vec<Rc<LogicalMultiStageMember>>, root: Rc<Query>) -> Rc<Self> {
         Rc::new(Self { ctes, root })
     }
 
-    /// Wrap a node that doesn't bring its own CTE pool (TimeSeries,
-    /// RollingWindow, a Stage inode Query) into a `LogicalPlan` with an
-    /// empty pool so `LogicalMultiStageMember.body` has a uniform type.
-    pub fn leaf(root: PlanNode) -> Rc<Self> {
+    /// Wrap a Query as a plan with no CTEs of its own — used for bodies
+    /// that don't bring a CTE pool (Stage inode, multiplied-measure
+    /// bodies, etc.).
+    pub fn just(root: Rc<Query>) -> Rc<Self> {
         Rc::new(Self {
             ctes: Vec::new(),
             root,
@@ -33,11 +33,11 @@ impl LogicalPlan {
         &self.ctes
     }
 
-    pub fn root(&self) -> &PlanNode {
+    pub fn root(&self) -> &Rc<Query> {
         &self.root
     }
 
-    pub fn with_root(self: &Rc<Self>, root: PlanNode) -> Rc<Self> {
+    pub fn with_root(self: &Rc<Self>, root: Rc<Query>) -> Rc<Self> {
         Rc::new(Self {
             ctes: self.ctes.clone(),
             root,

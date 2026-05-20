@@ -40,10 +40,14 @@ pub fn collect_cube_names_from_plan(plan: &Rc<LogicalPlan>) -> Result<Vec<String
 }
 
 fn walk_plan(collector: &mut CubeNamesCollector, plan: &Rc<LogicalPlan>) -> Result<(), CubeError> {
-    for cte in plan.ctes() {
-        walk_plan(collector, &cte.body)?;
-    }
     let visitor = LogicalPlanVisitor::new();
-    visitor.visit_plan_node(collector, plan.root())?;
+    for cte in plan.ctes() {
+        match &cte.body {
+            MultiStageMemberBody::Plan(nested) => walk_plan(collector, nested)?,
+            MultiStageMemberBody::TimeSeries(ts) => visitor.visit(collector, ts)?,
+            MultiStageMemberBody::RollingWindow(rw) => visitor.visit(collector, rw)?,
+        }
+    }
+    visitor.visit(collector, plan.root())?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{
-    LogicalMultiStageMember, MultiStageDimensionJoin, MultiStageDimensionRef, PlanNode,
+    LogicalMultiStageMember, MultiStageDimensionJoin, MultiStageDimensionRef, MultiStageMemberBody,
 };
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
@@ -152,16 +152,10 @@ impl DimensionSubqueryPlanner {
         // semantics for the same pair (e.g. per-call-site `time_shifts`),
         // the name needs an extra discriminator.
         let cte_name = format!("{}_{}_dimension_subquery", cube_name, dim_name);
-        let PlanNode::Query(root_query) = body.root() else {
-            return Err(CubeError::internal(format!(
-                "DSQ body root must be a Query, got {}",
-                body.root().node_name()
-            )));
-        };
-        let schema = root_query.schema().clone();
+        let schema = body.root().schema().clone();
         cte_state.add_member(Rc::new(LogicalMultiStageMember {
             name: cte_name.clone(),
-            body,
+            body: MultiStageMemberBody::Plan(body),
         }));
 
         Ok(Rc::new(MultiStageDimensionRef {

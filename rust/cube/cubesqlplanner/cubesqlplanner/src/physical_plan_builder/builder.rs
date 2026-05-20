@@ -122,14 +122,7 @@ impl PhysicalPlanBuilder {
         logical_plan: Rc<LogicalPlan>,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
-        let query_plan = self.process_node(logical_plan.as_ref(), context)?;
-        match query_plan {
-            QueryPlan::Select(select) => Ok(select),
-            other => Err(CubeError::internal(format!(
-                "Top-level LogicalPlan must produce a Select, got {:?}",
-                std::mem::discriminant(&other)
-            ))),
-        }
+        self.process_node(logical_plan.as_ref(), context)
     }
 
     pub(super) fn measures_for_query(
