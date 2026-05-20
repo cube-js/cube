@@ -4,7 +4,7 @@ use crate::logical_plan::{
 };
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
-use crate::planner::planners::multi_stage::CteState;
+use crate::planner::planners::multi_stage::{CteRole, CteState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
 use crate::planner::{MeasureSymbol, MemberSymbol};
@@ -114,18 +114,24 @@ impl DimensionSubqueryPlanner {
                 self.query_properties.disable_external_pre_aggregations(),
             )
             .build()?;
-        let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
+        let query_planner =
+            QueryPlanner::new(sub_query_properties.clone(), self.query_tools.clone());
         let body = query_planner.plan_into(cte_state)?;
 
-        let cte_name = cte_state.next_cte_name();
+        let cte_name = cte_state.next_cte_name(CteRole::MultiStageDimension);
         let schema = body.schema().clone();
-        cte_state.add_member(Rc::new(LogicalMultiStageMember {
-            name: cte_name.clone(),
-            body: MultiStageMemberBody::Query(body),
-        }));
+        let registered_name = cte_state.add_member(
+            CteRole::MultiStageDimension,
+            vec![dimension.clone()],
+            sub_query_properties,
+            Rc::new(LogicalMultiStageMember {
+                name: cte_name,
+                body: MultiStageMemberBody::Query(body),
+            }),
+        );
 
         Ok(Rc::new(MultiStageDimensionRef {
-            name: cte_name,
+            name: registered_name,
             schema,
             join: MultiStageDimensionJoin::OnPrimaryKeys {
                 cube_name,

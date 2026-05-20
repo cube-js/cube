@@ -1,5 +1,5 @@
 use super::{
-    CteState, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType,
+    CteRole, CteState, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType,
     MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
     MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
 };
@@ -25,6 +25,18 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
+
+/// Routes a multi-stage CTE node to its `CteRole`: dimension-flavoured
+/// members (DimensionSymbol / TimeDimensionSymbol) become
+/// `MultiStageDimension`, everything else (measures, member-expression
+/// aggregates, rolling-window inodes) becomes `MultiStageMeasure`.
+fn role_for_multi_stage(member: &Rc<MemberSymbol>) -> CteRole {
+    if member.is_dimension() {
+        CteRole::MultiStageDimension
+    } else {
+        CteRole::MultiStageMeasure
+    }
+}
 
 /// Plans the multi-stage CTE tree of a query. For every multi-stage
 /// member it encounters in `all_used_symbols`, it recursively
@@ -109,7 +121,17 @@ impl MultiStageQueryPlanner {
                 descr.clone(),
             );
             let member = planner.plan_logical_query(cte_state)?;
-            cte_state.add_member(member);
+            let role = if descr.is_multi_stage_dimension() {
+                CteRole::MultiStageDimension
+            } else {
+                CteRole::MultiStageMeasure
+            };
+            cte_state.add_member(
+                role,
+                vec![descr.member_node().clone()],
+                descr.state().clone(),
+                member,
+            );
         }
 
         Ok(())
@@ -255,7 +277,7 @@ impl MultiStageQueryPlanner {
         if !has_inputs {
             //Rank and similas cases
 
-            let alias = cte_state.next_cte_name();
+            let alias = cte_state.next_cte_name(role_for_multi_stage(&member));
             let description = MultiStageQueryDescription::new(
                 MultiStageMember::new_without_member_leaf(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -404,7 +426,7 @@ impl MultiStageQueryPlanner {
 
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
         let description = if !has_multi_stage_members {
-            let alias = cte_state.next_cte_name();
+            let alias = cte_state.next_cte_name(role_for_multi_stage(&member));
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -457,7 +479,7 @@ impl MultiStageQueryPlanner {
                 cte_state,
             )?;
 
-            let alias = cte_state.next_cte_name();
+            let alias = cte_state.next_cte_name(role_for_multi_stage(&member));
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
                     MultiStageMemberType::Inode(multi_stage_member),
@@ -601,7 +623,7 @@ impl MultiStageQueryPlanner {
 
                 let input = vec![time_series, rolling_base];
 
-                let alias = cte_state.next_cte_name();
+                let alias = cte_state.next_cte_name(CteRole::MultiStageMeasure);
 
                 let rolling_window_descr = if measure.is_running_total() {
                     RollingWindowDescription::new_running_total(time_dimension, base_time_dimension)
@@ -748,7 +770,7 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         cte_state: &mut CteState,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let alias = cte_state.next_cte_name();
+        let alias = cte_state.next_cte_name(CteRole::MultiStageMeasure);
         let description = MultiStageQueryDescription::new(
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
