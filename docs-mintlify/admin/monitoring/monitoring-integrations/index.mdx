@@ -1,9 +1,7 @@
 ---
-title: Strategy, credentials, etc.
+title: Overview
 description: Export Cube Cloud logs and metrics to external monitoring tools like Datadog, Grafana Cloud, and New Relic.
 ---
-
- Monitoring Integrations
 
 Cube Cloud allows exporting logs and metrics to external monitoring tools so you
 can leverage your existing monitoring stack and retain logs and metrics for the
@@ -11,8 +9,7 @@ long term.
 
 <Note>
 
-Available on [Enterprise plan](https://cube.dev/pricing).
-You can also choose a [Monitoring Integrations tier](/admin/account-billing/pricing#monitoring-integrations-tiers).
+Available as an add-on on the [Enterprise plan](https://cube.dev/pricing).
 
 </Note>
 
@@ -47,16 +44,21 @@ destinations][vector-docs-sinks], also known as _sinks_.
 Monitoring integrations work with various popular monitoring tools. Check the
 following guides and configuration examples to get tool-specific instructions:
 
-<CardGroup cols={2}>
-  <Card title="Amazon CloudWatch" img="https://static.cube.dev/icons/aws.svg" href="/admin/monitoring/monitoring-integrations/cloudwatch">
+<CardGroup cols={3}>
+  <Card title="Amazon CloudWatch" href="/admin/monitoring/monitoring-integrations/cloudwatch">
+    Export logs and metrics to Amazon CloudWatch.
   </Card>
-  <Card title="Amazon S3" img="https://static.cube.dev/icons/aws.svg" href="/admin/monitoring/monitoring-integrations/s3">
+  <Card title="Amazon S3" href="/admin/monitoring/monitoring-integrations/s3">
+    Archive logs to an Amazon S3 bucket.
   </Card>
-  <Card title="Datadog" img="https://static.cube.dev/icons/datadog.svg" href="/admin/monitoring/monitoring-integrations/datadog">
+  <Card title="Datadog" href="/admin/monitoring/monitoring-integrations/datadog">
+    Export logs and metrics to Datadog.
   </Card>
-  <Card title="Grafana Cloud" img="https://static.cube.dev/icons/grafana.svg" href="/admin/monitoring/monitoring-integrations/grafana-cloud">
+  <Card title="Grafana Cloud" href="/admin/monitoring/monitoring-integrations/grafana-cloud">
+    Export logs and metrics to Grafana Cloud.
   </Card>
-  <Card title="New Relic" img="https://static.cube.dev/icons/new-relic.svg" href="/admin/monitoring/monitoring-integrations/new-relic">
+  <Card title="New Relic" href="/admin/monitoring/monitoring-integrations/new-relic">
+    Export logs and metrics to New Relic.
   </Card>
 </CardGroup>
 
@@ -64,8 +66,7 @@ following guides and configuration examples to get tool-specific instructions:
 
 To enable monitoring integrations, navigate to **Settings → Monitoring
 Integrations** and click **Enable Vector** to add a Vector agent to
-your deployment. You can use the dropdown to select a [Monitoring Integrations
-tier](/admin/account-billing/pricing#monitoring-integrations-tiers).
+your deployment.
 
 <Frame>
   <img src="https://ucarecdn.com/bf05182f-bbb0-4c20-a95e-ca7aeb03829e/" />
@@ -283,12 +284,12 @@ external monitoring solution for further analysis, for example:
 * Set up alerts for queries that exceed a certain duration.
 * Attribute usage to specific users and implement chargebacks.
 
-<Info>
+<Note>
 
-Requires the [M tier](/admin/account-billing/pricing#monitoring-integrations-tiers)
-of Monitoring Integrations.
+Query History export is part of the Monitoring Integrations add-on,
+available on the [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 <iframe
   width="100%"
