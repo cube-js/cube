@@ -18,9 +18,9 @@ auth providers, BI APIs targeted by SLS, and other upstream services), see
 With Dedicated Infrastructure and Bring Your Own Cloud on AWS, Cube supports
 establishing **AWS PrivateLink** connections from your AWS accounts to the Cube
 API endpoints. This lets your applications, internal BI tools, and end-user
-browsers reach the Cube HTTP and SQL APIs entirely over private AWS networking
-— never touching the public internet. When private connectivity is in place,
-the public API endpoints can be disabled completely on request.
+browsers reach the Cube HTTP, SQL, and AI APIs entirely over private AWS
+networking — never touching the public internet. When private connectivity is
+in place, the public API endpoints can be disabled completely on request.
 
 <Note>
 
@@ -41,10 +41,12 @@ Cube runs as two cooperating planes:
   private connectivity — it is a SaaS UI like any other.
 - The **data plane** runs your Cube deployments and serves all Cube HTTP and
   SQL **data API** traffic — REST/GraphQL queries from your applications,
-  live data calls issued by the Cube UI while rendering charts, and SQL
-  connections from BI tools. The data plane is the part that talks to your
-  databases and returns query results, and the part this document teaches you
-  how to expose privately.
+  live data calls issued by the Cube UI while rendering charts, SQL
+  connections from BI tools, and AI traffic to the [Chat API][chat-api] and
+  other AI endpoints (including data-plane-hosted AI Engineer agents and
+  external agentic clients [calling the Chat API as a tool][agent-to-agent]).
+  The data plane is the part that talks to your databases and returns query
+  results, and the part this document teaches you how to expose privately.
 
 [AWS PrivateLink][aws-privatelink] lets a service running in one VPC be
 consumed from another VPC over the AWS internal network, without VPC peering
@@ -330,6 +332,8 @@ the VPC's CIDR.
 [cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
 [aws-private-link]: /admin/deployment/dedicated/aws/private-link
 [aws-vpc-peering]: /admin/deployment/dedicated/aws/vpc-peering
+[chat-api]: /reference/embed-apis/chat-api
+[agent-to-agent]: /recipes/ai/agent-to-agent
 [aws-privatelink]: https://docs.aws.amazon.com/vpc/latest/privatelink/what-is-privatelink.html
 [aws-endpoint-service]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html
 [aws-interface-endpoint]: https://docs.aws.amazon.com/vpc/latest/privatelink/create-interface-endpoint.html
