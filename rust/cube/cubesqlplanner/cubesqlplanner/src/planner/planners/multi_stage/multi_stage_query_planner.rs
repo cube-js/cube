@@ -75,14 +75,19 @@ impl MultiStageQueryPlanner {
     }
 
     /// Populates `cte_state` with multi-stage CTEs (and their
-    /// subquery refs) for every multi-stage member used by the
-    /// query. No-op when the query has none.
+    /// subquery refs) for every multi-stage measure used by the
+    /// query. Multi-stage dimensions are planned by
+    /// `DimensionSubqueryPlanner` at the leaves — top-level only
+    /// covers measures here. No-op when the query has none.
     pub fn plan_queries(&self, cte_state: &mut CteState) -> Result<(), CubeError> {
         let multi_stage_members = self
             .query_properties
             .all_used_symbols()?
             .into_iter()
             .filter_map(|memb| -> Option<Result<_, CubeError>> {
+                if memb.is_dimension() {
+                    return None;
+                }
                 match has_multi_stage_members(&memb, false) {
                     Ok(true) => Some(Ok(memb)),
                     Ok(false) => None,
@@ -121,15 +126,63 @@ impl MultiStageQueryPlanner {
                 cte_state,
                 &mut time_series_cache,
             )?;
-            // Top-level non-dimension members surface as inputs of the
-            // outer `FullKeyAggregate`. Dimension members are stitched
-            // back as `MultiStageDimensionRef` through other channels.
-            if !Self::is_multi_stage_dimension(&member)? {
-                cte_state.add_subquery_ref(cte_ref);
-            }
+            // Top-level measure members surface as inputs of the outer
+            // `FullKeyAggregate`. Dimension members go through
+            // `DimensionSubqueryPlanner` and are stitched back as
+            // `MultiStageDimensionRef`.
+            cte_state.add_subquery_ref(cte_ref);
         }
 
         Ok(())
+    }
+
+    /// Build a `MultiStageDimensionRef` for a single multi-stage
+    /// dimension. Used by `DimensionSubqueryPlanner` so that DSQ and
+    /// multi-stage dim share one leaf-level planning point.
+    ///
+    /// Reuses the same dedup keys as the top-level recursion: a fresh
+    /// state-only `QueryProperties` (mirrors what `plan_queries`
+    /// builds), then `build_multi_stage_cte` recurses with fresh
+    /// resolved/time-series caches. Top-level still re-walks the same
+    /// multi-stage dim for now; `cte_state.find_matching` keys on
+    /// `(role, members, state)` so the body is registered once.
+    ///
+    /// The returned ref carries `OnOuterDimensions { dimensions: [] }`.
+    /// The physical builder currently joins multi-stage dim CTEs via
+    /// the `schema().multi_stage_dimensions()` walk in `QueryProcessor`;
+    /// the placeholder `OnOuterDimensions` is intentionally inert
+    /// (LogicalJoinProcessor only matches `OnPrimaryKeys`). Will be
+    /// populated once the schema-walk path is replaced by explicit
+    /// `OnOuterDimensions` joins.
+    pub(crate) fn build_multi_stage_dim_ref(
+        &self,
+        member: Rc<MemberSymbol>,
+        cte_state: &mut CteState,
+    ) -> Result<Rc<MultiStageDimensionRef>, CubeError> {
+        let state = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .dimensions(self.query_properties.dimensions().clone())
+            .time_dimensions(self.query_properties.time_dimensions().clone())
+            .dimensions_filters(self.query_properties.dimensions_filters().clone())
+            .time_dimensions_filters(self.query_properties.time_dimensions_filters().clone())
+            .segments(self.query_properties.segments().clone())
+            .order_by(Some(vec![]))
+            .build()?;
+        let mut resolved = HashSet::new();
+        let mut time_series_cache = TimeSeriesCache::default();
+        let cte_ref = self.build_multi_stage_cte(
+            member.clone(),
+            state,
+            &mut resolved,
+            cte_state,
+            &mut time_series_cache,
+        )?;
+        Ok(Rc::new(MultiStageDimensionRef {
+            name: cte_ref.name().clone(),
+            schema: cte_ref.schema().clone(),
+            join: MultiStageDimensionJoin::OnOuterDimensions { dimensions: vec![] },
+            dimension: member,
+        }))
     }
 
     /// Core recursive step. Resolves the reference chain, applies

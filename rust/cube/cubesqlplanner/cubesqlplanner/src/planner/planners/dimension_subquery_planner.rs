@@ -1,3 +1,4 @@
+use super::multi_stage::MultiStageQueryPlanner;
 use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{
     LogicalMultiStageMember, MultiStageDimensionJoin, MultiStageDimensionRef, MultiStageMemberBody,
@@ -63,12 +64,13 @@ impl DimensionSubqueryPlanner {
     /// Build a `MultiStageDimensionRef` per synthetic dimension and
     /// publish each body as a `LogicalMultiStageMember` on `cte_state`.
     /// Dispatches on the dim flavour:
-    /// - `sub_query: true` → DSQ CTE (`plan_sub_query`).
-    /// - `multi_stage: true` → routed elsewhere (currently planned by
-    ///   `MultiStageQueryPlanner` top-level; will fold in here later).
-    ///   For now the leaf consumer doesn't see these in
-    ///   `Query.multi_stage_dimensions` — they reach it through the
-    ///   outer `FullKeyAggregate` path.
+    /// - `sub_query: true` → DSQ CTE (`plan_sub_query`), keyed
+    ///   `OnPrimaryKeys`.
+    /// - `multi_stage: true` → delegated to
+    ///   `MultiStageQueryPlanner::build_multi_stage_dim_ref`, returned
+    ///   with `OnOuterDimensions` (placeholder — the physical builder
+    ///   still wires the actual JOIN through the
+    ///   `schema().multi_stage_dimensions()` walk).
     /// The caller stores returned refs on `Query.multi_stage_dimensions`
     /// of the Query that consumes them; the QueryProcessor reads them
     /// from there to wire CTE joins and render references.
@@ -84,9 +86,14 @@ impl DimensionSubqueryPlanner {
             };
             if dim_symbol.is_sub_query() {
                 result.push(self.plan_sub_query(synthetic_dim.clone(), cte_state)?);
+            } else if dim_symbol.is_multi_stage() {
+                let ms_planner = MultiStageQueryPlanner::new(
+                    self.query_tools.clone(),
+                    self.query_properties.clone(),
+                );
+                result
+                    .push(ms_planner.build_multi_stage_dim_ref(synthetic_dim.clone(), cte_state)?);
             }
-            // `is_multi_stage()` dims are intentionally skipped here —
-            // see method docstring.
         }
         Ok(result)
     }
