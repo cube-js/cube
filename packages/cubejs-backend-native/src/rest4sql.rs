@@ -14,7 +14,7 @@ use cubesql::compile::engine::df::scan::CubeScanNode;
 use cubesql::transport::TransportLoadRequestQuery;
 use cubesql::CubeError;
 
-fn json_value_to_js<'ctx>(
+pub(crate) fn json_value_to_js<'ctx>(
     cx: &mut impl Context<'ctx>,
     value: &serde_json::Value,
 ) -> JsResult<'ctx, JsValue> {
