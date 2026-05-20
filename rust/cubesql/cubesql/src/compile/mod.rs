@@ -10199,6 +10199,40 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_cast_to_timestamp_with_tz_offset() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        insta::assert_snapshot!(
+            "test_cast_to_timestamp_with_tz_offset_hh",
+            execute_query(
+                "SELECT CAST('2026-01-26 00:00:00+00' AS timestamp);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_cast_to_timestamp_with_tz_offset_hh_mm",
+            execute_query(
+                "SELECT CAST('2026-01-26 00:00:00+00:00' AS timestamp);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_cast_to_timestamp_with_tz_offset_hh_mm_ss",
+            execute_query(
+                "SELECT CAST('2026-01-26 00:00:00+00:00:00' AS timestamp);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_join_with_distinct() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "test_join_with_distinct",
