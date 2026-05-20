@@ -234,10 +234,7 @@ impl PhysicalPlanBuilder {
     }
 
     /// Register outer-scope render references for each multi-stage-dim
-    /// CTE this Query consumes — the body's projected column substitutes
-    /// for `body_column.full_name()` in the outer scope. The synthetic
-    /// body symbol is built so its `full_name` matches the dim symbol
-    /// the outer scope references.
+    /// CTE this Query consumes.
     pub(super) fn resolve_multi_stage_dimension_references(
         &self,
         multi_stage_dimensions: &Vec<Rc<MultiStageDimensionRef>>,
@@ -246,13 +243,13 @@ impl PhysicalPlanBuilder {
     ) -> Result<(), CubeError> {
         for ms_dim in multi_stage_dimensions.iter() {
             if let Some(dim_ref) =
-                references_builder.find_reference_for_member(&ms_dim.body_column, &None)
+                references_builder.find_reference_for_member(&ms_dim.dimension, &None)
             {
-                context_factory.add_render_reference(ms_dim.body_column.full_name(), dim_ref);
+                context_factory.add_render_reference(ms_dim.dimension.full_name(), dim_ref);
             } else {
                 return Err(CubeError::internal(format!(
                     "Can't find source for multi-stage dimension {}",
-                    ms_dim.body_column.full_name()
+                    ms_dim.dimension.full_name()
                 )));
             }
         }

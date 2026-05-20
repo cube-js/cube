@@ -132,21 +132,6 @@ impl MultipliedMeasuresQueryPlanner {
         key_join: Rc<dyn JoinDefinition>,
         cte_state: &mut CteState,
     ) -> Result<Rc<Query>, CubeError> {
-        // FIXME: subquery dimensions for the outer aggregate SELECT are
-        // currently flowed through `MeasureSubquery` (its inner LogicalJoin
-        // owns the DSQ joins). Revisit if outer dimensions ever need DSQ
-        // refs at this level.
-        //
-        // let subquery_dimensions =
-        //     collect_sub_query_dimensions_from_symbols(&measures, &self.join_planner, &key_join)?;
-        // let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-        //     &subquery_dimensions,
-        //     self.query_tools.clone(),
-        //     self.query_properties.clone(),
-        // )?;
-        // let subquery_dimension_queries =
-        //     dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
-
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
         self.assert_measures_not_multiplied(measures, key_cube_name)?;
 

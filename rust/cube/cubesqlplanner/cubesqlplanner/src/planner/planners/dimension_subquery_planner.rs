@@ -86,11 +86,7 @@ impl DimensionSubqueryPlanner {
 
         let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;
 
-        // The body projects the dim's SQL as a synthetic measure whose
-        // `compiled_path` is the dim's — so the body's projection alias
-        // and the outer-scope full_name are the same, and the consumer
-        // can resolve the substitution by the dim symbol directly.
-        let body_column = MemberSymbol::new_measure(MeasureSymbol::new_synthetic_from_dimension(
+        let dimension = MemberSymbol::new_measure(MeasureSymbol::new_synthetic_from_dimension(
             &dimension_symbol,
         )?);
 
@@ -109,7 +105,7 @@ impl DimensionSubqueryPlanner {
 
         let sub_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
-            .measures(vec![body_column.clone()])
+            .measures(vec![dimension.clone()])
             .dimensions(primary_keys_dimensions.clone())
             .time_dimensions_filters(time_dimensions_filters)
             .dimensions_filters(dimensions_filters)
@@ -119,9 +115,6 @@ impl DimensionSubqueryPlanner {
             )
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
-        // The DSQ body and every CTE it produces internally flatten into
-        // the outer `cte_state`. Pre-agg walks the resulting pool as a
-        // single graph from `root.source` FK refs.
         let body = query_planner.plan_into(cte_state)?;
 
         let cte_name = cte_state.next_cte_name();
@@ -138,7 +131,7 @@ impl DimensionSubqueryPlanner {
                 cube_name,
                 pk_dimensions: primary_keys_dimensions,
             },
-            body_column,
+            dimension,
         }))
     }
 

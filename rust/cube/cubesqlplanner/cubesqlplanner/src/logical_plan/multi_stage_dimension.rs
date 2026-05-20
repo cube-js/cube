@@ -19,16 +19,13 @@ pub struct MultiStageDimensionRef {
     /// holds the body on the surrounding `LogicalPlan.ctes`.
     pub name: String,
     /// Schema of the CTE body — used to resolve the column alias for
-    /// `body_column` during render.
+    /// `dimension` during render.
     pub schema: Rc<LogicalSchema>,
     /// How the consumer joins this CTE into its FROM.
     pub join: MultiStageDimensionJoin,
-    /// The MemberSymbol the body projects as the value column AND the
-    /// outer scope references for substitution — `full_name`-equal in
-    /// both scopes by construction (synthetic measure built off the
-    /// dimension's compiled path for the ex-DSQ pattern; the dim's own
-    /// symbol for the multi-stage-dim pattern).
-    pub body_column: Rc<MemberSymbol>,
+    /// The dimension this CTE represents — same symbol the body
+    /// projects and the outer scope reads from the joined CTE.
+    pub dimension: Rc<MemberSymbol>,
 }
 
 /// How a `MultiStageDimensionRef` CTE is joined into the consumer's
@@ -63,7 +60,7 @@ impl PrettyPrint for MultiStageDimensionRef {
             &format!(
                 "MultiStageDimensionRef `{}` -> {} ({})",
                 self.name,
-                self.body_column.full_name(),
+                self.dimension.full_name(),
                 self.join.label()
             ),
             state,
