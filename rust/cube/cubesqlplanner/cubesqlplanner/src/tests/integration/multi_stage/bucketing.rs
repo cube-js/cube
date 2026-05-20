@@ -205,18 +205,6 @@ async fn test_bucketing_with_two_dimensions() {
     }
 }
 
-// FIXME: dim-only CTE body now uses cube-join + OnOuterDimensions
-// LEFT JOINs (no more FullKeyAggregate UNION), but `customer_id` is
-// in the body schema (needed for consumer JOIN), and
-// `references_builder.find_reference_for_member` resolves it from
-// the LEFT-joined ms-dim CTE first (cube sources return None),
-// setting a render_reference that pollutes the cube JOIN ON itself
-// — output: `ON ms_dim_2.first_date__customer_id =
-// ms_dim_1.orders__customer_id` instead of
-// `first_date.customer_id = orders.customer_id`. Needs separation
-// between "projected by CTE for consumer JOIN keys" and "treated as
-// outer dim for render_reference purposes".
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bucketing_with_two_dims_concated() {
     let ctx = create_context();

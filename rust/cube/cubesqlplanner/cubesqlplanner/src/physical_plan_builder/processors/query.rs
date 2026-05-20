@@ -7,6 +7,7 @@ use crate::physical_plan::{
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::get_filtered_values;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -188,15 +189,37 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // join of CTE refs and need `process_query_dimension`'s COALESCE
         // logic. MeasureSubquery-shape Queries project raw (no resolve).
         let is_stage_calculation = matches!(logical_plan.kind(), QueryKind::Stage(_));
+        // For the dim-only DimensionCalc shape (source = LogicalJoin), the
+        // `multi_stage_dimension` itself must resolve through outer LEFT-
+        // joined ms-dim CTE columns, but extension/payload dims projected
+        // for consumer JOIN keys (e.g. `orders.customer_id`) must NOT —
+        // otherwise the cube JOIN ON inside the source picks up the CTE-
+        // column render_reference and renders ms_dim.col instead of
+        // cube.col. Resolve only the stage's own member when source is a
+        // cube join.
+        let dim_calc_member: Option<Rc<MemberSymbol>> = match logical_plan.kind() {
+            QueryKind::Stage(StageKind::DimensionCalc {
+                multi_stage_dimension,
+            }) if matches!(logical_plan.source(), QuerySource::LogicalJoin(_)) => {
+                Some(multi_stage_dimension.clone())
+            }
+            _ => None,
+        };
         for dimension in logical_plan.schema().all_dimensions() {
             if is_ungrouped_measure {
                 select_builder.add_projection_member(dimension, None);
             } else if is_stage_calculation {
-                references_builder.resolve_references_for_member(
-                    dimension.clone(),
-                    &None,
-                    context_factory.render_references_mut(),
-                )?;
+                let resolve = match &dim_calc_member {
+                    Some(stage_dim) => dimension.full_name() == stage_dim.full_name(),
+                    None => true,
+                };
+                if resolve {
+                    references_builder.resolve_references_for_member(
+                        dimension.clone(),
+                        &None,
+                        context_factory.render_references_mut(),
+                    )?;
+                }
                 select_builder.add_projection_member(dimension, None);
             } else {
                 self.builder.process_query_dimension(
