@@ -2,12 +2,10 @@ use super::*;
 use std::rc::Rc;
 
 /// Root container of a planned query: a WITH-clause `ctes` pool plus a
-/// `root` Query that consumes them. Not part of `PlanNode` — it sits
-/// one level above the tree, marking the boundary where a CTE pool is
-/// materialised. Nested plans (DSQ body, multi-stage leaf body) live
-/// on `LogicalMultiStageMember::body` via `MultiStageMemberBody::Plan`;
-/// tree walkers cross that boundary through the dedicated visitor
-/// entry point, not through `PlanNode.inputs`.
+/// `root` Query that consumes them. All CTEs the plan needs live here
+/// at one level — there's no nested pool inside member bodies. FK refs
+/// inside Queries reach pool entries by name; tree walkers cross the
+/// `LogicalPlan ↔ PlanNode` boundary explicitly.
 #[derive(Clone)]
 pub struct LogicalPlan {
     pub ctes: Vec<Rc<LogicalMultiStageMember>>,
@@ -17,16 +15,6 @@ pub struct LogicalPlan {
 impl LogicalPlan {
     pub fn new(ctes: Vec<Rc<LogicalMultiStageMember>>, root: Rc<Query>) -> Rc<Self> {
         Rc::new(Self { ctes, root })
-    }
-
-    /// Wrap a Query as a plan with no CTEs of its own — used for bodies
-    /// that don't bring a CTE pool (Stage inode, multiplied-measure
-    /// bodies, etc.).
-    pub fn just(root: Rc<Query>) -> Rc<Self> {
-        Rc::new(Self {
-            ctes: Vec::new(),
-            root,
-        })
     }
 
     pub fn ctes(&self) -> &Vec<Rc<LogicalMultiStageMember>> {

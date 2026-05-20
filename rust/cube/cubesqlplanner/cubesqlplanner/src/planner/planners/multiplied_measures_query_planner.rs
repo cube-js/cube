@@ -69,7 +69,7 @@ impl MultipliedMeasuresQueryPlanner {
 
                 let member = Rc::new(LogicalMultiStageMember {
                     name: cte_name.clone(),
-                    body: MultiStageMemberBody::Plan(LogicalPlan::just(query.clone())),
+                    body: MultiStageMemberBody::Query(query.clone()),
                 });
                 cte_state.add_member(member);
 
@@ -108,9 +108,7 @@ impl MultipliedMeasuresQueryPlanner {
             let ref_schema = aggregate_subquery_logical_plan.schema().clone();
             let member = Rc::new(LogicalMultiStageMember {
                 name: cte_name.clone(),
-                body: MultiStageMemberBody::Plan(LogicalPlan::just(
-                    aggregate_subquery_logical_plan.clone(),
-                )),
+                body: MultiStageMemberBody::Query(aggregate_subquery_logical_plan.clone()),
             });
             cte_state.add_member(member);
 
@@ -172,7 +170,7 @@ impl MultipliedMeasuresQueryPlanner {
         );
         cte_state.add_member(Rc::new(LogicalMultiStageMember {
             name: keys_cte_name,
-            body: MultiStageMemberBody::Plan(LogicalPlan::just(keys_query)),
+            body: MultiStageMemberBody::Query(keys_query),
         }));
 
         // Build the MeasureSubquery-shaped body and publish it as a
@@ -204,7 +202,7 @@ impl MultipliedMeasuresQueryPlanner {
         );
         cte_state.add_member(Rc::new(LogicalMultiStageMember {
             name: measure_cte_name,
-            body: MultiStageMemberBody::Plan(LogicalPlan::just(measure_query)),
+            body: MultiStageMemberBody::Query(measure_query),
         }));
 
         let schema = LogicalSchema::default()

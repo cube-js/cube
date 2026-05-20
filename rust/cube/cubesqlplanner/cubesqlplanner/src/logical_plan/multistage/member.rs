@@ -2,33 +2,32 @@ use crate::logical_plan::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// What sits inside a `LogicalMultiStageMember`: either a nested plan
-/// (Query-rooted, with its own bundled CTE pool) or one of the
-/// special leaf nodes that don't need a CTE pool of their own.
+/// What sits inside a `LogicalMultiStageMember`: a Query body (the
+/// regular case — leaf, DSQ, multi-stage inode, multiplied bodies) or
+/// one of the special leaf nodes that don't fit the Query shape.
+/// There's no nested CTE pool here — every CTE lives at the top-level
+/// `LogicalPlan.ctes`, and FK refs reach them by name.
 #[derive(Clone)]
 pub enum MultiStageMemberBody {
-    /// Query-rooted body. Pre-agg treats it as one rewrite unit.
-    Plan(Rc<LogicalPlan>),
-    /// Time-series CTE — drives the date-range scaffold for rolling windows.
+    Query(Rc<Query>),
     TimeSeries(Rc<MultiStageTimeSeries>),
-    /// Rolling-window CTE — applies the window function over a time-series + leaf.
     RollingWindow(Rc<MultiStageRollingWindow>),
 }
 
 impl PrettyPrint for MultiStageMemberBody {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
-            Self::Plan(plan) => plan.pretty_print(result, state),
+            Self::Query(q) => q.pretty_print(result, state),
             Self::TimeSeries(ts) => ts.pretty_print(result, state),
             Self::RollingWindow(rw) => rw.pretty_print(result, state),
         }
     }
 }
 
-/// Named CTE in a multi-stage chain. The surrounding `LogicalPlan`
-/// holds one per CTE its root consumes; `body` is a
-/// `MultiStageMemberBody` (a nested plan, time-series, or
-/// rolling-window node).
+/// Named CTE in the top-level pool: the surrounding `LogicalPlan` holds
+/// one per CTE its tree of FK refs reaches by name. `body` is a
+/// `MultiStageMemberBody` — the actual SELECT-shaped node rendered as
+/// the CTE body.
 pub struct LogicalMultiStageMember {
     pub name: String,
     pub body: MultiStageMemberBody,
@@ -40,41 +39,30 @@ impl LogicalNode for LogicalMultiStageMember {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        // For TimeSeries / RollingWindow we surface the underlying node
-        // so generic `PlanNode` traversals (cube-name collection,
-        // pre-agg rewriter) keep working. For nested plans we stop here
-        // — the nested `LogicalPlan` sits outside the PlanNode tree;
-        // walkers that need to descend cross the boundary explicitly.
         match &self.body {
-            MultiStageMemberBody::Plan(_) => vec![],
+            MultiStageMemberBody::Query(q) => vec![q.as_plan_node()],
             MultiStageMemberBody::TimeSeries(ts) => vec![ts.as_plan_node()],
             MultiStageMemberBody::RollingWindow(rw) => vec![rw.as_plan_node()],
         }
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        match &self.body {
-            MultiStageMemberBody::Plan(_) => {
-                check_inputs_len(&inputs, 0, self.node_name())?;
-                Ok(self)
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let new_body = match &self.body {
+            MultiStageMemberBody::Query(_) => {
+                MultiStageMemberBody::Query(inputs[0].clone().into_logical_node()?)
             }
-            MultiStageMemberBody::TimeSeries(_) | MultiStageMemberBody::RollingWindow(_) => {
-                check_inputs_len(&inputs, 1, self.node_name())?;
-                let new_body = match &self.body {
-                    MultiStageMemberBody::TimeSeries(_) => {
-                        MultiStageMemberBody::TimeSeries(inputs[0].clone().into_logical_node()?)
-                    }
-                    MultiStageMemberBody::RollingWindow(_) => {
-                        MultiStageMemberBody::RollingWindow(inputs[0].clone().into_logical_node()?)
-                    }
-                    MultiStageMemberBody::Plan(_) => unreachable!(),
-                };
-                Ok(Rc::new(Self {
-                    name: self.name.clone(),
-                    body: new_body,
-                }))
+            MultiStageMemberBody::TimeSeries(_) => {
+                MultiStageMemberBody::TimeSeries(inputs[0].clone().into_logical_node()?)
             }
-        }
+            MultiStageMemberBody::RollingWindow(_) => {
+                MultiStageMemberBody::RollingWindow(inputs[0].clone().into_logical_node()?)
+            }
+        };
+        Ok(Rc::new(Self {
+            name: self.name.clone(),
+            body: new_body,
+        }))
     }
 
     fn node_name(&self) -> &'static str {

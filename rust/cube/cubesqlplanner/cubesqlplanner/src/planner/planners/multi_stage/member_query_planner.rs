@@ -125,7 +125,7 @@ impl MultiStageMemberQueryPlanner {
 
         let member = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: MultiStageMemberBody::Plan(LogicalPlan::just(Rc::new(query))),
+            body: MultiStageMemberBody::Query(Rc::new(query)),
         };
 
         Ok(Rc::new(member))
@@ -307,7 +307,7 @@ impl MultiStageMemberQueryPlanner {
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: MultiStageMemberBody::Plan(LogicalPlan::just(Rc::new(query))),
+            body: MultiStageMemberBody::Query(Rc::new(query)),
         };
         Ok(Rc::new(result))
     }
@@ -403,7 +403,7 @@ impl MultiStageMemberQueryPlanner {
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: MultiStageMemberBody::Plan(LogicalPlan::just(Rc::new(query))),
+            body: MultiStageMemberBody::Query(Rc::new(query)),
         };
         Ok(Rc::new(result))
     }
@@ -417,7 +417,7 @@ impl MultiStageMemberQueryPlanner {
     /// selects only the dimension grid.
     fn plan_for_leaf_cte_query(
         &self,
-        _cte_state: &mut CteState,
+        cte_state: &mut CteState,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
         let mut dimensions = self.description.state().dimensions().clone();
@@ -467,24 +467,22 @@ impl MultiStageMemberQueryPlanner {
 
         let query_planner =
             QueryPlanner::new(cte_query_properties.clone(), self.query_tools.clone());
-        // The leaf body's wrapping LogicalMultiStageMember surfaces on
-        // the outer top-level WITH. Any inner CTEs it produces (e.g.
-        // multiplied-measure keys/measure/agg-multiplied bodies for a
-        // cross-cube leaf) stay bundled inside its own `LogicalPlan` so
-        // pre-agg sees the body as one rewrite unit.
-        let plan = query_planner.plan()?;
+        // Inner CTEs (multiplied-measure keys/measure/agg-multiplied
+        // bodies for a cross-cube leaf) flow into the outer `cte_state`;
+        // pre-agg walks the resulting pool as a single graph from FK refs.
+        let leaf_root = query_planner.plan_into(cte_state)?;
         // Render flags are leaf-CTE-only — they describe how this body is
         // rendered, not what it computes. Apply on top of whatever modifiers
         // the planner produced for the inner query.
         let modifiers = LogicalQueryModifiers {
             render_measure_as_state: self.description.member().has_aggregates_on_top(),
             render_measure_for_ungrouped: self.description.member().is_ungrupped(),
-            ..(**plan.root().modifers()).clone()
+            ..(**leaf_root.modifers()).clone()
         };
-        let plan = plan.with_root(plan.root().with_modifers(Rc::new(modifiers)));
+        let leaf_root = leaf_root.with_modifers(Rc::new(modifiers));
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            body: MultiStageMemberBody::Plan(plan),
+            body: MultiStageMemberBody::Query(leaf_root),
         };
         Ok(Rc::new(result))
     }

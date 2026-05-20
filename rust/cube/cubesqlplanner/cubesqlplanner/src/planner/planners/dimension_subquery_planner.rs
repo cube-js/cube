@@ -136,12 +136,10 @@ impl DimensionSubqueryPlanner {
             )
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
-        // The DSQ body itself surfaces on the outer top-level WITH via
-        // `cte_state.add_member` below. Any CTEs it produces internally
-        // (multiplied-measure keys/measure/agg-multiplied bodies) stay
-        // bundled inside its own `LogicalPlan` so the pre-agg optimizer
-        // treats the DSQ body as one rewrite unit.
-        let body = query_planner.plan()?;
+        // The DSQ body and every CTE it produces internally flatten into
+        // the outer `cte_state`. Pre-agg walks the resulting pool as a
+        // single graph from `root.source` FK refs.
+        let body = query_planner.plan_into(cte_state)?;
 
         // CTE name uses only `(cube, dim)`. Top-level deduplication relies on
         // the assumption that within one outer query the same `(cube, dim)`
@@ -152,10 +150,10 @@ impl DimensionSubqueryPlanner {
         // semantics for the same pair (e.g. per-call-site `time_shifts`),
         // the name needs an extra discriminator.
         let cte_name = format!("{}_{}_dimension_subquery", cube_name, dim_name);
-        let schema = body.root().schema().clone();
+        let schema = body.schema().clone();
         cte_state.add_member(Rc::new(LogicalMultiStageMember {
             name: cte_name.clone(),
-            body: MultiStageMemberBody::Plan(body),
+            body: MultiStageMemberBody::Query(body),
         }));
 
         Ok(Rc::new(MultiStageDimensionRef {

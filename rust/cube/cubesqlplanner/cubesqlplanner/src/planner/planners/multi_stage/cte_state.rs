@@ -53,6 +53,12 @@ impl CteState {
         (self.members, self.subquery_refs)
     }
 
+    /// Current number of subquery refs — used by `plan_into` to mark
+    /// a per-scope baseline before driving sub-planners.
+    pub fn subquery_refs_len(&self) -> usize {
+        self.subquery_refs.len()
+    }
+
     /// Drain refs accumulated since `baseline` — caller uses them as the
     /// FK data inputs of its root Query. Members stay in this `CteState`
     /// and are read off `into_results` to populate the `LogicalPlan`

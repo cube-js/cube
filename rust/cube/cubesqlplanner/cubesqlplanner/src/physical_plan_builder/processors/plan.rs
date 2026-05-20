@@ -32,12 +32,12 @@ impl<'a> LogicalNodeProcessor<'a, LogicalPlan> for PlanProcessor<'a> {
             let alias = member.name.clone();
             context.add_cte_schema(alias.clone(), body_plan.schema());
 
-            if let MultiStageMemberBody::Plan(plan) = &member.body {
+            if let MultiStageMemberBody::Query(q) = &member.body {
                 if let QueryKind::Stage(StageKind::DimensionCalc {
                     multi_stage_dimension,
-                }) = plan.root().kind()
+                }) = q.kind()
                 {
-                    let inner_schema = plan.root().schema();
+                    let inner_schema = q.schema();
                     context.add_multi_stage_dimension_schema(
                         inner_schema.multi_stage_dimensions_resolved_names()?,
                         alias.clone(),
@@ -64,8 +64,8 @@ impl<'a> PlanProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<QueryPlan, CubeError> {
         match body {
-            MultiStageMemberBody::Plan(plan) => {
-                let select = self.builder.process_node(plan.as_ref(), context)?;
+            MultiStageMemberBody::Query(q) => {
+                let select = self.builder.process_node(q.as_ref(), context)?;
                 Ok(QueryPlan::Select(select))
             }
             MultiStageMemberBody::TimeSeries(ts) => self.builder.process_node(ts.as_ref(), context),

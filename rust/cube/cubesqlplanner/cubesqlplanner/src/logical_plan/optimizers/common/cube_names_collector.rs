@@ -43,7 +43,7 @@ fn walk_plan(collector: &mut CubeNamesCollector, plan: &Rc<LogicalPlan>) -> Resu
     let visitor = LogicalPlanVisitor::new();
     for cte in plan.ctes() {
         match &cte.body {
-            MultiStageMemberBody::Plan(nested) => walk_plan(collector, nested)?,
+            MultiStageMemberBody::Query(q) => visitor.visit(collector, q)?,
             MultiStageMemberBody::TimeSeries(ts) => visitor.visit(collector, ts)?,
             MultiStageMemberBody::RollingWindow(rw) => visitor.visit(collector, rw)?,
         }
