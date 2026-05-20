@@ -59,6 +59,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 Some(root.default_alias_with_prefix(&context.alias_prefix)),
             );
 
+            let root_alias = root.default_alias_with_prefix(&context.alias_prefix);
             for ms_ref in pk_refs
                 .iter()
                 .filter(|r| matches_pk_cube(&r.join, root.name()))
@@ -70,18 +71,19 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 self.builder.add_multi_stage_dimension_pk_join(
                     &ms_ref.name,
                     pk_dims,
+                    &root_alias,
                     &mut join_builder,
                     context,
                 )?;
             }
             for join in logical_join.joins().iter() {
+                let joined_alias = join
+                    .cube()
+                    .cube()
+                    .default_alias_with_prefix(&context.alias_prefix);
                 join_builder.left_join_cube(
                     join.cube().cube().clone(),
-                    Some(
-                        join.cube()
-                            .cube()
-                            .default_alias_with_prefix(&context.alias_prefix),
-                    ),
+                    Some(joined_alias.clone()),
                     JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql().clone())?),
                 );
                 for ms_ref in pk_refs
@@ -97,6 +99,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     self.builder.add_multi_stage_dimension_pk_join(
                         &ms_ref.name,
                         pk_dims,
+                        &joined_alias,
                         &mut join_builder,
                         context,
                     )?;

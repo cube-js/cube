@@ -1,0 +1,52 @@
+cubes:
+    - name: A
+      sql: "SELECT * FROM a"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: foo_id
+            type: number
+            sql: "{CUBE}.foo_id"
+      measures:
+          - name: max_foo_id
+            type: max
+            sql: foo_id
+
+    - name: B
+      sql: "SELECT * FROM b"
+      joins:
+          - name: A
+            relationship: one_to_one
+            sql: "{A}.foo_id = {B}.foo_id"
+          - name: C
+            relationship: one_to_many
+            sql: "{B}.bar_id = {C}.bar_id AND {B.foo_id} > 3"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: foo_id
+            type: number
+            sql: "{A.max_foo_id}"
+            sub_query: true
+      measures:
+          - name: count
+            type: count
+
+    - name: C
+      sql: "SELECT * FROM c"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: bar_id
+            type: number
+            sql: "{CUBE}.bar_id"
+      measures:
+          - name: important_value
+            type: sum
+            sql: important_value

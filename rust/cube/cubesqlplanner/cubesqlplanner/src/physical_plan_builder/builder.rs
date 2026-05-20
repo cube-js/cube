@@ -150,10 +150,18 @@ impl PhysicalPlanBuilder {
     /// cube-join chain. Used for the `OnPrimaryKeys` flavour: the cube
     /// the ref keys against has already been added to `join_builder`,
     /// and we LEFT-join the CTE on its primary keys.
+    ///
+    /// Each side of the ON condition is resolved per-source — CTE side
+    /// via the CTE's projected schema, cube side as a direct column
+    /// reference to `cube_alias.<dim_name>`. We can't route the
+    /// cube-side through a `MemberExpression`: once the outer SELECT
+    /// resolves the same PK dim, `render_references` would map it to
+    /// the CTE column and the ON would degenerate into a self-equal.
     pub(super) fn add_multi_stage_dimension_pk_join(
         &self,
         ref_name: &str,
         pk_dimensions: &[Rc<MemberSymbol>],
+        cube_alias: &str,
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
@@ -170,7 +178,11 @@ impl PhysicalPlanBuilder {
                     Some(ref_name.to_string()),
                     alias_in_sub_query,
                 ));
-                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
+                let cube_side_ref = Expr::Reference(QualifiedColumnName::new(
+                    Some(cube_alias.to_string()),
+                    dim.name(),
+                ));
+                Ok(vec![(sub_query_ref, cube_side_ref)])
             })
             .collect::<Result<Vec<_>, _>>()?;
 
