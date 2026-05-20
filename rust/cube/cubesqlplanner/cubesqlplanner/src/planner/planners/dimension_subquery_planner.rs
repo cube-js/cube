@@ -7,7 +7,7 @@ use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::CteState;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
-use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
+use crate::planner::{MeasureSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -81,35 +81,18 @@ impl DimensionSubqueryPlanner {
         subquery_dimension: Rc<MemberSymbol>,
         cte_state: &mut CteState,
     ) -> Result<Rc<MultiStageDimensionRef>, CubeError> {
-        let dim_name = subquery_dimension.name();
         let cube_name = subquery_dimension.cube_name().clone();
         let dimension_symbol = subquery_dimension.as_dimension()?;
 
         let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;
 
-        let expression = if let Some(sql_call) = dimension_symbol.member_sql() {
-            sql_call.clone()
-        } else {
-            return Err(CubeError::user(format!(
-                "Subquery dimension {} must have `sql` field",
-                subquery_dimension.full_name()
-            )));
-        };
-
-        let cube_symbol = self
-            .query_tools
-            .evaluator_compiler()
-            .borrow_mut()
-            .add_cube_table_evaluator(cube_name.clone(), vec![])?;
-        let member_expression_symbol = MemberExpressionSymbol::try_new(
-            cube_symbol,
-            dim_name.clone(),
-            MemberExpressionExpression::SqlCall(expression),
-            None,
-            None,
-            vec![cube_name.clone()],
-        )?;
-        let body_column = MemberSymbol::new_member_expression(member_expression_symbol);
+        // The body projects the dim's SQL as a synthetic measure whose
+        // `compiled_path` is the dim's — so the body's projection alias
+        // and the outer-scope full_name are the same, and the consumer
+        // can resolve the substitution by the dim symbol directly.
+        let body_column = MemberSymbol::new_measure(MeasureSymbol::new_synthetic_from_dimension(
+            &dimension_symbol,
+        )?);
 
         let (dimensions_filters, time_dimensions_filters) = if dimension_symbol
             .propagate_filters_to_sub_query()
@@ -141,15 +124,7 @@ impl DimensionSubqueryPlanner {
         // single graph from `root.source` FK refs.
         let body = query_planner.plan_into(cte_state)?;
 
-        // CTE name uses only `(cube, dim)`. Top-level deduplication relies on
-        // the assumption that within one outer query the same `(cube, dim)`
-        // pair maps to one body — the only inputs to `sub_query_properties`
-        // here come from the outer `query_properties`, which is constant for
-        // every call site, plus `propagate_filters_to_sub_query` which is a
-        // dimension-level setting. If a future caller starts varying body
-        // semantics for the same pair (e.g. per-call-site `time_shifts`),
-        // the name needs an extra discriminator.
-        let cte_name = format!("{}_{}_dimension_subquery", cube_name, dim_name);
+        let cte_name = cte_state.next_cte_name();
         let schema = body.schema().clone();
         cte_state.add_member(Rc::new(LogicalMultiStageMember {
             name: cte_name.clone(),
@@ -163,7 +138,6 @@ impl DimensionSubqueryPlanner {
                 cube_name,
                 pk_dimensions: primary_keys_dimensions,
             },
-            exposed: subquery_dimension,
             body_column,
         }))
     }

@@ -9,29 +9,25 @@ use std::rc::Rc;
 /// `StageDimensionCalc` (multi-stage dim body joined by outer
 /// dimensions) under one descriptor.
 ///
-/// The CTE body lives on the top-level `Query` as a normal
-/// `LogicalMultiStageMember` (same publication path as KS/MS/AggMS-Query
-/// bodies). This ref carries everything a consumer needs to wire the
-/// CTE into its FROM and to resolve render references for the exposed
-/// symbol — no body inside.
+/// The CTE body lives in the surrounding `LogicalPlan.ctes` as a
+/// `LogicalMultiStageMember`. This ref carries everything a consumer
+/// needs to wire the CTE into its FROM and to resolve render
+/// references for the exposed column — no body inside.
 #[derive(Debug)]
 pub struct MultiStageDimensionRef {
     /// Stable CTE name. Matches the `LogicalMultiStageMember.name` that
-    /// holds the body on the top-level Query.
+    /// holds the body on the surrounding `LogicalPlan.ctes`.
     pub name: String,
     /// Schema of the CTE body — used to resolve the column alias for
     /// `body_column` during render.
     pub schema: Rc<LogicalSchema>,
     /// How the consumer joins this CTE into its FROM.
     pub join: MultiStageDimensionJoin,
-    /// The MemberSymbol exposed to the outer scope by this CTE. The
-    /// outer SELECT substitutes `exposed.full_name()` with a reference
-    /// to the column corresponding to `body_column` in this CTE.
-    pub exposed: Rc<MemberSymbol>,
-    /// The MemberSymbol that the body actually projects as the value
-    /// column. For the ex-DSQ pattern this is the synthetic
-    /// `measure_for_subquery_dimension` produced by the planner; for
-    /// the multi-stage-dim pattern this is the dim's own symbol.
+    /// The MemberSymbol the body projects as the value column AND the
+    /// outer scope references for substitution — `full_name`-equal in
+    /// both scopes by construction (synthetic measure built off the
+    /// dimension's compiled path for the ex-DSQ pattern; the dim's own
+    /// symbol for the multi-stage-dim pattern).
     pub body_column: Rc<MemberSymbol>,
 }
 
@@ -67,7 +63,7 @@ impl PrettyPrint for MultiStageDimensionRef {
             &format!(
                 "MultiStageDimensionRef `{}` -> {} ({})",
                 self.name,
-                self.exposed.full_name(),
+                self.body_column.full_name(),
                 self.join.label()
             ),
             state,

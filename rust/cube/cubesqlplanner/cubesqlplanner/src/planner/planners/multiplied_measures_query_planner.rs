@@ -150,17 +150,9 @@ impl MultipliedMeasuresQueryPlanner {
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
         self.assert_measures_not_multiplied(measures, key_cube_name)?;
 
-        // Build the KeysSubQuery-shaped body and publish it as a top-level
-        // CTE. The same pk cube may need distinct bodies (e.g. shifted vs
-        // unshifted leaf in time-shifted multiplied measures produces
-        // different filter sets), so the CTE name carries a global sequence
-        // id from `QueryTools` to disambiguate.
+        // KeysSubQuery body.
         let keys_query = self.key_query(&primary_keys_dimensions, key_join.clone(), cte_state)?;
-        let keys_cte_name = format!(
-            "{}_keys_subquery_{}",
-            key_cube_name,
-            self.query_tools.next_cte_seq_id()
-        );
+        let keys_cte_name = cte_state.next_cte_name();
         let keys_ref = Rc::new(
             MultiStageSubqueryRef::builder()
                 .name(keys_cte_name.clone())
@@ -173,25 +165,16 @@ impl MultipliedMeasuresQueryPlanner {
             body: MultiStageMemberBody::Query(keys_query),
         }));
 
-        // Build the MeasureSubquery-shaped body and publish it as a
-        // top-level CTE. The same pk cube may need distinct bodies (e.g.
-        // shifted vs unshifted leaf in time-shifted multiplied measures
-        // produces different filter sets), so the CTE name carries a
-        // global sequence id from `QueryTools` to disambiguate.
+        // MeasureSubQuery body — projects raw ungrouped columns; the outer
+        // aggregate-multiplied SELECT wraps them in the right aggregate via
+        // `ungrouped_measure_reference`.
         let measure_query = self.aggregate_subquery_measure(
             &measures,
             &primary_keys_dimensions,
             key_join.clone(),
             cte_state,
         )?;
-        let measure_cte_name = format!(
-            "{}_measure_subquery_{}",
-            key_cube_name,
-            self.query_tools.next_cte_seq_id()
-        );
-        // The CTE body projects measures as raw ungrouped columns; the outer
-        // aggregate-multiplied SELECT wraps them in the right aggregate via
-        // `ungrouped_measure_reference`.
+        let measure_cte_name = cte_state.next_cte_name();
         let measure_ref = Rc::new(
             MultiStageSubqueryRef::builder()
                 .name(measure_cte_name.clone())

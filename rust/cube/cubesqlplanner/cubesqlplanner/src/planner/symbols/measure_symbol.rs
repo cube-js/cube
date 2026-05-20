@@ -1,5 +1,6 @@
 use super::common::{AggregationType, Case, CompiledMemberPath};
 use super::cube_symbol::CubeTableSymbol;
+use super::dimension_symbol::DimensionSymbol;
 use super::measure_kinds::{
     AggregatedMeasure, CalculatedMeasure, CalculatedMeasureType, MeasureKind,
 };
@@ -137,6 +138,49 @@ impl MeasureSymbol {
             group_by,
             mask_sql,
         })
+    }
+
+    /// Build a synthetic calculated measure that proxies a dimension's
+    /// SQL: same `compiled_path` (so `full_name`/`alias` match the
+    /// dim's), same `SqlCall`, `Calculated` kind matching the dim's
+    /// type. No filters, no case, no time-shift, no reduce/group-by —
+    /// a thin projection wrapper used by sub-query-dimension bodies
+    /// to expose the dim value as a column.
+    ///
+    /// Errors out when the dim has no `member_sql` (e.g. Geo) or its
+    /// type doesn't map to a `CalculatedMeasureType`.
+    pub fn new_synthetic_from_dimension(dim: &DimensionSymbol) -> Result<Rc<Self>, CubeError> {
+        let sql = dim.member_sql().cloned().ok_or_else(|| {
+            CubeError::user(format!(
+                "Cannot build a synthetic measure for dimension `{}` — it has no `sql`",
+                dim.full_name()
+            ))
+        })?;
+        let calc_type = CalculatedMeasureType::from_str(dim.dimension_type()).ok_or_else(|| {
+            CubeError::user(format!(
+                "Cannot build a synthetic measure for dimension `{}` — type `{}` doesn't map to a calculated measure type",
+                dim.full_name(),
+                dim.dimension_type()
+            ))
+        })?;
+        let kind = MeasureKind::Calculated(CalculatedMeasure::new(calc_type, sql));
+        Ok(Self::new(
+            dim.compiled_path().clone(),
+            false,
+            false,
+            None,
+            kind,
+            None,
+            false,
+            vec![],
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            None,
+            None,
+        ))
     }
 
     /// Build a synthetic aggregating measure (`MAX(target)`, `SUM(target)`, …)
