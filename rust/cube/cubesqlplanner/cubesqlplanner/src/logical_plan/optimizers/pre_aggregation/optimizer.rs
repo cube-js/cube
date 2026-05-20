@@ -166,7 +166,6 @@ impl PreAggregationOptimizer {
                 let new_query = Query::builder()
                     .schema(schema.clone())
                     .filter(filter.clone())
-                    .modifers(Rc::new(LogicalQueryModifiers::default()))
                     .source(source.into())
                     .kind(QueryKind::PreAggregationLeaf)
                     .build();

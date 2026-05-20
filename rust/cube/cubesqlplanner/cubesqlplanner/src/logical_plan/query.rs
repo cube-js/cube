@@ -18,7 +18,9 @@ pub struct Query {
     #[builder(default)]
     multi_stage_dimensions: Vec<Rc<MultiStageDimensionRef>>,
     schema: Rc<LogicalSchema>,
+    #[builder(default)]
     filter: Rc<LogicalFilter>,
+    #[builder(default)]
     modifers: Rc<LogicalQueryModifiers>,
     source: QuerySource,
     /// Explicit role of this Query in the multi-stage pipeline. Planner

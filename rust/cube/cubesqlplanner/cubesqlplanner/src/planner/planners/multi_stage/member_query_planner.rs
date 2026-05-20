@@ -117,8 +117,6 @@ impl MultiStageMemberQueryPlanner {
             .into_rc();
         let query = Query::builder()
             .schema(schema)
-            .filter(Rc::new(LogicalFilter::default()))
-            .modifers(Rc::new(LogicalQueryModifiers::default()))
             .source(source.into())
             .multi_stage_dimensions(multi_stage_dimensions)
             .build();
@@ -299,7 +297,6 @@ impl MultiStageMemberQueryPlanner {
         };
         let query = Query::builder()
             .schema(schema)
-            .filter(Rc::new(LogicalFilter::default()))
             .modifers(Rc::new(modifiers))
             .source(source.into())
             .kind(QueryKind::Stage(stage_kind))
@@ -393,7 +390,6 @@ impl MultiStageMemberQueryPlanner {
         };
         let query = Query::builder()
             .schema(schema)
-            .filter(Rc::new(LogicalFilter::default()))
             .modifers(Rc::new(modifiers))
             .source(source.into())
             .kind(QueryKind::Stage(StageKind::DimensionCalc {

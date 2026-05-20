@@ -199,8 +199,6 @@ impl MultipliedMeasuresQueryPlanner {
 
         let query = Query::builder()
             .schema(schema)
-            .filter(Rc::new(LogicalFilter::default()))
-            .modifers(Rc::new(LogicalQueryModifiers::default()))
             .source(full_key_aggregate.into())
             .kind(QueryKind::AggregateMultiplied)
             .build();
@@ -275,8 +273,6 @@ impl MultipliedMeasuresQueryPlanner {
         // the source join; the upstream `Query{FullKeyAggregate}` re-aggregates.
         let query = Query::builder()
             .schema(schema)
-            .filter(Rc::new(LogicalFilter::default()))
-            .modifers(Rc::new(LogicalQueryModifiers::default()))
             .source(source.into())
             .multi_stage_dimensions(multi_stage_dimensions)
             .kind(QueryKind::InternalFact(FactKind::Measures))
