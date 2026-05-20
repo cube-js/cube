@@ -58,7 +58,7 @@ export function CubeBiPage() {
       </StyledHeader>
       <VideoContainer>
         <iframe
-          src="https://www.youtube.com/embed/n-U1FvHqE2Q?start=59"
+          src="https://www.youtube.com/embed/7ZQGGepDjUQ?start=1289"
           title="Cube BI Video"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
