@@ -146,14 +146,6 @@ async fn test_many_to_one_view_root_distinct_dim() {
     }
 }
 
-// FIXME: aggregate inside member-expression SQL (e.g. SUM, COUNT DISTINCT) is
-// not supported in the MeasureSubquery CTE path. `set_ungrouped_measure` only
-// strips the outer aggregate wrapper of native measures; the aggregate sitting
-// inside a member-expression body is rendered verbatim, which both (a) yields
-// invalid SQL without GROUP BY in the CTE and (b) breaks outer re-aggregation
-// (SUM over per-pk SUMs row-multiplies via the inner join chain). Re-enable
-// once the MS-CTE rendering for aggregate member-expressions is reworked.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_many_to_one_view_child_val_sum() {
     let ctx = create_test_context();
@@ -173,9 +165,6 @@ async fn test_many_to_one_view_child_val_sum() {
     }
 }
 
-// FIXME: same as test_many_to_one_view_child_val_sum — aggregate inside
-// member-expression SQL is not supported in the MeasureSubquery CTE path.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_many_to_one_view_child_distinct_dim() {
     let ctx = create_test_context();

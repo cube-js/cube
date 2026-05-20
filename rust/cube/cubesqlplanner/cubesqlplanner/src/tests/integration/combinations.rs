@@ -409,10 +409,13 @@ async fn test_empty_result_from_filters() {
 //       dedicated `*_measure_subquery_*` CTE that joins the source cube to
 //       the cross-cube column and then LEFT-joins the keys CTE onto it.
 //
-// FIXME: still regresses values vs. baseline. Same MS-CTE aggregate-
-// inside-member-expression structural limitation as the view tests
-// ignored in `tests/member_expressions_on_views.rs`. Re-enable once
-// MS-CTE rendering for aggregate member-expressions is reworked.
+// FIXME: `MeasureSubquery` for this measure picks `customers` as the join
+// root (driven by JoinGraph) and emits `FROM customers LEFT JOIN orders`.
+// That preserves customers with no orders, leaking their `lifetime_value`
+// into reason buckets through the NULL=NULL key match in the outer FK
+// join — yielding inflated sums (e.g. `wrong_item = 6500` instead of the
+// classic `6000`). Re-enable after the MeasureSubquery is rooted at the
+// owning cube (`orders`) instead of the cross-cube dep's home.
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_aggregating_cross_cube_measure_with_fanout_dim() {

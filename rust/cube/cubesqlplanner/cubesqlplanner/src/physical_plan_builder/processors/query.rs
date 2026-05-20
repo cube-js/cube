@@ -227,7 +227,15 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             .measures_for_query(&logical_plan.schema().measures, &context)
         {
             if exists {
-                if resolve_measure_refs {
+                // Resolve inner deps either for the whole measure (default)
+                // or only for member-expressions when the source carries
+                // ungrouped data inputs: their atomic measure column has
+                // no `ungrouped_measure_reference`, but their inner dim/
+                // measure refs need `render_reference` pointing at the
+                // CTE columns the subquery projected (e.g. inner
+                // `child.test_dim` → `q_0.child__test_dim`).
+                let needs_resolve = resolve_measure_refs || measure.as_member_expression().is_ok();
+                if needs_resolve {
                     references_builder.resolve_references_for_member(
                         measure.clone(),
                         &None,
