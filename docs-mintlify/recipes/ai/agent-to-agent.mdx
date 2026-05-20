@@ -364,6 +364,111 @@ With this approach, the second question — *"Now break that down by
 product line"* — is understood in the context of the first, just like a
 human conversation.
 
+### Orchestrating multiple Cube agents
+
+If your deployment uses [multi-agent][ref-multi-agent] — with specialized
+Cube agents like a Sales Assistant and a Marketing Analyst living in the
+same deployment — your orchestrating agent can choose the right Cube
+agent for each question and route to it.
+
+The [Chat API URL](#endpoint) embeds an `agentId`, so every agent in
+your deployment has its own Chat API URL. Copy each one from **Admin →
+Agents** for the corresponding agent. Switching between Cube agents
+from your code is then just a matter of POSTing to a different URL —
+the request shape is identical.
+
+How your orchestrating agent learns which Cube agents exist is up to
+you. Two common patterns:
+
+- **List them in the system prompt.** Hardcode the agents (name,
+  description, the domain each one covers) in your orchestrator's
+  system prompt. Simple, and works well when the set of agents rarely
+  changes.
+- **Expose a discovery tool.** Add a `list_cube_agents` tool that
+  returns the available agents at runtime. Useful when agents come and
+  go, or when you want the orchestrator to pick them up without a code
+  change.
+
+The example below combines both: a `list_cube_agents` tool for
+discovery and a single `ask_cube_agent` tool that takes an agent name
+plus the question and routes the request to the matching Chat API URL.
+It builds on the `query_cube_agent` helper from above, extended to
+accept a `chat_api_url` argument instead of using a single hardcoded
+URL.
+
+```python
+import json
+import os
+from langchain_core.tools import tool
+
+
+CUBE_AGENTS = {
+    "sales-assistant": {
+        "url": os.environ["CUBE_SALES_AGENT_URL"],
+        "description": (
+            "Sales pipeline, deals, reps, quotas, and revenue by territory."
+        ),
+    },
+    "marketing-analyst": {
+        "url": os.environ["CUBE_MARKETING_AGENT_URL"],
+        "description": (
+            "Campaigns, channel attribution, traffic sources, and funnel "
+            "conversion."
+        ),
+    },
+}
+
+
+@tool
+def list_cube_agents() -> str:
+    """List the available Cube agents and the domain each one covers.
+    Call this first when you need data, then pick the most relevant
+    agent for the user's question."""
+
+    return json.dumps(
+        {name: agent["description"] for name, agent in CUBE_AGENTS.items()}
+    )
+
+
+@tool
+def ask_cube_agent(agent_name: str, question: str) -> str:
+    """Ask a data analytics question to a specific Cube agent.
+
+    Call `list_cube_agents` first to see which agents are available and
+    which domain each one covers, then pass the chosen `agent_name`
+    along with a focused, self-contained question."""
+
+    agent = CUBE_AGENTS.get(agent_name)
+    if agent is None:
+        available = ", ".join(CUBE_AGENTS.keys())
+        return (
+            f"Unknown Cube agent '{agent_name}'. "
+            f"Available agents: {available}."
+        )
+
+    return query_cube_agent(question, chat_api_url=agent["url"])
+```
+
+<Info>
+
+Alternatively, skip the discovery tool entirely and inline the list of
+agents and their domains in your orchestrator's system prompt. The
+orchestrator will then pass an `agent_name` directly to `ask_cube_agent`
+without an extra round trip.
+
+</Info>
+
+This pattern gives your orchestrating agent a clean routing layer: it
+picks the right Cube agent for each question, and each Cube agent
+answers using the rules, certified queries, and accessible views
+configured for its [space][ref-spaces]. A sales question is routed to
+the Sales Assistant and answered against the sales views; a marketing
+question is routed to the Marketing Analyst and answered against the
+marketing views — without your orchestrator needing to know any of
+those details.
+
 
 [ref-chat-api]: /reference/embed-apis/chat-api
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-multi-agent]: /admin/ai/multi-agent
+[ref-spaces]: /admin/ai/multi-agent#spaces
