@@ -19,10 +19,19 @@ pub async fn run_one(client: &Client, sql: &str, show_timing: bool) -> Result<bo
             // get clipped at the right edge of the terminal instead of wrapping.
             print!("\x1b[?7h");
             match format::render_table(&result) {
-                Some(table) => println!("{table}\n{footer}"),
-                None => println!("{footer}"),
+                Ok(Some(table)) => {
+                    println!("{table}\n{footer}");
+                    Ok(true)
+                }
+                Ok(None) => {
+                    println!("{footer}");
+                    Ok(true)
+                }
+                Err(e) => {
+                    eprintln!("ERROR: failed to render result: {e}");
+                    Ok(false)
+                }
             }
-            Ok(true)
         }
         Err(e) => {
             print!("\x1b[?7h");

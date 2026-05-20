@@ -1,20 +1,24 @@
 use cubestore_ws_transport::arrow::array::RecordBatch;
+use cubestore_ws_transport::arrow::error::ArrowError;
 use cubestore_ws_transport::arrow::util::display::{ArrayFormatter, FormatOptions};
 use cubestore_ws_transport::{QueryResult, ResultData};
 
+use crate::CliError;
+
 const NULL_RENDER: &str = "NULL";
 
-/// psql-style aligned text table. Returns `None` for empty (DDL/INSERT) results.
-pub fn render_table(result: &QueryResult) -> Option<String> {
+/// psql-style aligned text table. Returns `Ok(None)` for empty (DDL/INSERT) results.
+pub fn render_table(result: &QueryResult) -> Result<Option<String>, CliError> {
     let columns = result.get_columns();
     if columns.is_empty() {
-        return None;
+        return Ok(None);
     }
 
-    Some(match &result.data {
+    let table = match &result.data {
         ResultData::Legacy { rows, .. } => render_legacy_rows(&columns, rows),
-        ResultData::Arrow { batches, .. } => render_arrow_batches(&columns, batches),
-    })
+        ResultData::Arrow { batches, .. } => render_arrow_batches(&columns, batches)?,
+    };
+    Ok(Some(table))
 }
 
 fn render_legacy_rows(columns: &[String], rows: &[Vec<Option<String>>]) -> String {
@@ -42,13 +46,13 @@ fn render_legacy_rows(columns: &[String], rows: &[Vec<Option<String>>]) -> Strin
 /// Render Arrow batches directly. Each cell is formatted twice — once to size
 /// the columns, once to emit the row — which trades a bit of CPU for not
 /// materializing the entire result into row based format
-fn render_arrow_batches(columns: &[String], batches: &[RecordBatch]) -> String {
+fn render_arrow_batches(columns: &[String], batches: &[RecordBatch]) -> Result<String, ArrowError> {
     let ncols = columns.len();
     let fmt_options = FormatOptions::default().with_display_error(true);
     let mut widths = header_widths(columns);
 
     for batch in batches {
-        let formatters = batch_formatters(batch, &fmt_options);
+        let formatters = batch_formatters(batch, &fmt_options)?;
         let batch_cols = formatters.len().min(ncols);
         for row_idx in 0..batch.num_rows() {
             for col_idx in 0..batch_cols {
@@ -62,7 +66,7 @@ fn render_arrow_batches(columns: &[String], batches: &[RecordBatch]) -> String {
     write_header(&mut out, columns, &widths);
     write_separator(&mut out, &widths);
     for batch in batches {
-        let formatters = batch_formatters(batch, &fmt_options);
+        let formatters = batch_formatters(batch, &fmt_options)?;
         let batch_cols = formatters.len().min(ncols);
         for row_idx in 0..batch.num_rows() {
             out.push('\n');
@@ -76,7 +80,7 @@ fn render_arrow_batches(columns: &[String], batches: &[RecordBatch]) -> String {
             }
         }
     }
-    out
+    Ok(out)
 }
 
 fn arrow_cell(
@@ -95,13 +99,12 @@ fn arrow_cell(
 fn batch_formatters<'a>(
     batch: &'a RecordBatch,
     options: &'a FormatOptions,
-) -> Vec<ArrayFormatter<'a>> {
+) -> Result<Vec<ArrayFormatter<'a>>, ArrowError> {
     batch
         .columns()
         .iter()
         .map(|col| ArrayFormatter::try_new(col.as_ref(), options))
-        .collect::<Result<_, _>>()
-        .expect("arrow ArrayFormatter init")
+        .collect()
 }
 
 fn header_widths(columns: &[String]) -> Vec<usize> {
@@ -181,7 +184,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn renders_all_rows_without_truncation() {
+    fn renders_all_rows_without_truncation() -> Result<(), CliError> {
         let result = QueryResult {
             data: ResultData::Legacy {
                 columns: vec!["table_catalog".to_string(), "table_schema".to_string()],
@@ -203,7 +206,7 @@ mod tests {
                 ],
             },
         };
-        let out = render_table(&result).expect("table");
+        let out = render_table(&result)?.expect("table");
 
         // header line + separator + 5 data rows = 7 lines
         assert_eq!(out.lines().count(), 7);
@@ -219,10 +222,12 @@ mod tests {
             header.contains("    table_schema    "),
             "header centered to data width: {header:?}"
         );
+
+        Ok(())
     }
 
     #[test]
-    fn preserves_long_cell_values() {
+    fn preserves_long_cell_values() -> Result<(), CliError> {
         let long = "x".repeat(500);
         let result = QueryResult {
             data: ResultData::Legacy {
@@ -230,7 +235,9 @@ mod tests {
                 rows: vec![vec![Some(long.clone())]],
             },
         };
-        let out = render_table(&result).expect("table");
+        let out = render_table(&result)?.expect("table");
         assert!(out.contains(&long), "long value preserved in output");
+
+        Ok(())
     }
 }
