@@ -368,17 +368,14 @@ impl MultipliedMeasuresQueryPlanner {
             segments: self.query_properties.segments().clone(),
         });
 
-        // pk dimensions are projected as ordinary schema dimensions: the
-        // CTE consumer reads them off `schema` to build join keys.
-        let mut schema_dimensions = self.query_properties.dimensions().clone();
-        for pk in dimensions.iter() {
-            if !schema_dimensions
-                .iter()
-                .any(|d| d.full_name() == pk.full_name())
-            {
-                schema_dimensions.push(pk.clone());
-            }
-        }
+        let schema_dimensions = self
+            .query_properties
+            .dimensions()
+            .iter()
+            .chain(dimensions.iter())
+            .cloned()
+            .unique_by(|d| d.full_name())
+            .collect_vec();
         let schema = LogicalSchema::default()
             .set_dimensions(schema_dimensions)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
