@@ -39,7 +39,6 @@ on:
       - 'yarn.lock'
 
 env:
-  CUBEJS_TESSERACT_ORCHESTRATOR: true
   # Current user version for Python. Should be aligned between build-native & docker-dev
   PYTHON_VERSION_CURRENT: 3.11
 

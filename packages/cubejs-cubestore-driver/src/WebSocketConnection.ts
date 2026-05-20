@@ -150,64 +150,19 @@ export class WebSocketConnection {
         webSocket.on('message', async (msg: Buffer) => {
           const buf = new flatbuffers.ByteBuffer(msg);
           const httpMessage = HttpMessage.getRootAsHttpMessage(buf);
-          const resolvers = webSocket.sentMessages[httpMessage.messageId()];
-          delete webSocket.sentMessages[httpMessage.messageId()];
-          if (!resolvers) {
+
+          const resolver = webSocket.sentMessages[httpMessage.messageId()];
+          if (!resolver) {
             throw new QueryError(`Cube Store missed message id: ${httpMessage.messageId()}`);
           }
 
-          if (getEnv('nativeOrchestrator') && msg.length > 1000) {
-            try {
-              const nativeResMsg = await parseCubestoreResultMessage(msg);
-              resolvers.resolve(nativeResMsg);
-            } catch (e) {
-              resolvers.reject(e);
-            }
-          } else {
-            const commandType = httpMessage.commandType();
+          delete webSocket.sentMessages[httpMessage.messageId()];
 
-            if (commandType === HttpCommand.HttpError) {
-              resolvers.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
-            } else if (commandType === HttpCommand.HttpResultSet) {
-              const resultSet = httpMessage.command(new HttpResultSet());
-
-              if (!resultSet) {
-                resolvers.reject(new QueryError('Empty resultSet'));
-                return;
-              }
-
-              const columnsLen = resultSet.columnsLength();
-              const columns: Array<string> = [];
-              for (let i = 0; i < columnsLen; i++) {
-                const columnName = resultSet.columns(i);
-                if (!columnName) {
-                  resolvers.reject(new QueryError('Column name is not defined'));
-                  return;
-                }
-                columns.push(columnName);
-              }
-
-              const rowLen = resultSet.rowsLength();
-              const result: any[] = [];
-              for (let i = 0; i < rowLen; i++) {
-                const row = resultSet.rows(i);
-                if (!row) {
-                  resolvers.reject(new QueryError('Null row'));
-                  return;
-                }
-                const valueLen = row.valuesLength();
-                const rowObj = {};
-                for (let j = 0; j < valueLen; j++) {
-                  const value = row.values(j);
-                  rowObj[columns[j]] = value?.stringValue();
-                }
-                result.push(rowObj);
-              }
-
-              resolvers.resolve(result);
-            } else {
-              resolvers.reject(new QueryError('Unsupported command'));
-            }
+          try {
+            const nativeResMsg = await parseCubestoreResultMessage(msg);
+            resolver.resolve(nativeResMsg);
+          } catch (e) {
+            resolver.reject(e);
           }
         });
       });
