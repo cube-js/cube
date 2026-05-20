@@ -94,6 +94,29 @@ pub struct NativeSQLAuthContext {
     pub security_context: NonDebugInRelease<Option<serde_json::Value>>,
 }
 
+/// Reads a security context passed from JS as a JSON string. An argument
+/// that is missing, is not a string, or does not parse leaves the context
+/// empty: the caller is trusted to have built it, and a request without one
+/// is how an unauthenticated call arrives.
+pub fn parse_security_context_arg(
+    cx: &mut FunctionContext,
+    index: usize,
+) -> Arc<NativeSQLAuthContext> {
+    let security_context: Option<serde_json::Value> = match cx.argument::<JsValue>(index) {
+        Ok(string) => match string.downcast::<JsString, _>(cx) {
+            Ok(v) => v.value(cx).parse::<serde_json::Value>().ok(),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    Arc::new(NativeSQLAuthContext {
+        user: Some(String::from("unknown")),
+        superuser: false,
+        security_context: NonDebugInRelease::from(security_context),
+    })
+}
+
 impl AuthContext for NativeSQLAuthContext {
     fn as_any(&self) -> &dyn Any {
         self

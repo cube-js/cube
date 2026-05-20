@@ -3,18 +3,17 @@ use std::sync::Arc;
 use neon::prelude::*;
 use serde_json;
 
-use crate::auth::NativeSQLAuthContext;
+use crate::auth::{parse_security_context_arg, NativeSQLAuthContext};
 use crate::config::NodeCubeServices;
 use crate::cubesql_utils::with_session;
 use crate::tokio_runtime_node;
-use crate::utils::NonDebugInRelease;
 use cubesql::compile::convert_sql_to_cube_query;
 use cubesql::compile::datafusion::logical_plan::LogicalPlan;
 use cubesql::compile::engine::df::scan::CubeScanNode;
 use cubesql::transport::TransportLoadRequestQuery;
 use cubesql::CubeError;
 
-fn json_value_to_js<'ctx>(
+pub(crate) fn json_value_to_js<'ctx>(
     cx: &mut impl Context<'ctx>,
     value: &serde_json::Value,
 ) -> JsResult<'ctx, JsValue> {
@@ -128,24 +127,12 @@ pub fn rest4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let interface = cx.argument::<JsBox<crate::node_export::SQLInterface>>(0)?;
     let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
 
-    let security_context: Option<serde_json::Value> = match cx.argument::<JsValue>(2) {
-        Ok(string) => match string.downcast::<JsString, _>(&mut cx) {
-            Ok(v) => v.value(&mut cx).parse::<serde_json::Value>().ok(),
-            Err(_) => None,
-        },
-        Err(_) => None,
-    };
+    let native_auth_ctx = parse_security_context_arg(&mut cx, 2);
 
     let services = interface.services.clone();
     let runtime = tokio_runtime_node(&mut cx)?;
 
     let channel = cx.channel();
-
-    let native_auth_ctx = Arc::new(NativeSQLAuthContext {
-        user: Some(String::from("unknown")),
-        superuser: false,
-        security_context: NonDebugInRelease::from(security_context),
-    });
 
     let (deferred, promise) = cx.promise();
 
