@@ -1,6 +1,6 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::{LogicalPlan, MultiStageMemberBody, QueryKind, StageKind};
+use crate::logical_plan::{LogicalPlan, MultiStageMemberBody};
 use crate::physical_plan::{Cte, QueryPlan, Select};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -31,22 +31,6 @@ impl<'a> LogicalNodeProcessor<'a, LogicalPlan> for PlanProcessor<'a> {
             let body_plan = self.render_body(&member.body, &context)?;
             let alias = member.name.clone();
             context.add_cte_schema(alias.clone(), body_plan.schema());
-
-            if let MultiStageMemberBody::Query(q) = &member.body {
-                if let QueryKind::Stage(StageKind::DimensionCalc {
-                    multi_stage_dimension,
-                }) = q.kind()
-                {
-                    let inner_schema = q.schema();
-                    context.add_multi_stage_dimension_schema(
-                        inner_schema.multi_stage_dimensions_resolved_names()?,
-                        alias.clone(),
-                        inner_schema.multi_stage_join_dimensions(multi_stage_dimension)?,
-                        body_plan.schema(),
-                    );
-                }
-            }
-
             ctes.push(Rc::new(Cte::new(Rc::new(body_plan), alias)));
         }
 

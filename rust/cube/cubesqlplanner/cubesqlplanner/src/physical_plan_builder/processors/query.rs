@@ -38,11 +38,14 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // AggMS-Query bodies, multi-stage-dim ex-DSQ bodies) are owned by
         // the surrounding `LogicalPlan`. `PlanProcessor` renders them and
         // pre-registers their schemas on `context` before we see this
-        // Query; here we just consume those references.
-        context.remove_multi_stage_dimensions();
-
-        //FIXME This is hack but good solution require refactor
-        let resolved_multistage_dimension =
+        // Query; here we just consume the references.
+        //
+        // MS-dim refs are wired into the join chain by
+        // `LogicalJoinProcessor` — `OnPrimaryKeys` inside the cube chain,
+        // `OnOuterDimensions` at the chain tail. Any ref already covered
+        // by a FullKeyAggregate data input is dropped here so we don't
+        // double-join it.
+        let resolved_multistage_dimensions =
             if let QuerySource::FullKeyAggregate(fk_source) = logical_plan.source() {
                 if let Some(first_cte_ref) = fk_source.data_inputs().first() {
                     first_cte_ref.schema().multi_stage_dimensions()?
@@ -52,20 +55,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             } else {
                 vec![]
             };
-        for member in logical_plan.schema().multi_stage_dimensions()? {
-            if resolved_multistage_dimension
-                .iter()
-                .all(|d| d.full_name() != member.full_name())
-            {
-                context.add_multi_stage_dimension(member.full_name());
-            }
-        }
-
-        // Hand the MS-dim refs this Query consumes down to source
-        // rendering. `LogicalJoinProcessor` wires `OnPrimaryKeys` LEFT
-        // JOINs inside the cube chain; `OnOuterDimensions` is applied
-        // by QueryProcessor below over the final FROM.
-        context.multi_stage_dimension_refs = logical_plan.multi_stage_dimensions().clone();
+        context.multi_stage_dimension_refs = logical_plan
+            .multi_stage_dimensions()
+            .iter()
+            .filter(|ms_ref| {
+                resolved_multistage_dimensions
+                    .iter()
+                    .all(|d| d.full_name() != ms_ref.dimension.full_name())
+            })
+            .cloned()
+            .collect();
 
         let from = self.builder.process_node(logical_plan.source(), &context)?;
         let filter = logical_plan.filter().all_filters();

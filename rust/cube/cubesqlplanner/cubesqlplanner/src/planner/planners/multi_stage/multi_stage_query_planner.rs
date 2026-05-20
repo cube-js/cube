@@ -143,17 +143,15 @@ impl MultiStageQueryPlanner {
     /// Reuses the same dedup keys as the top-level recursion: a fresh
     /// state-only `QueryProperties` (mirrors what `plan_queries`
     /// builds), then `build_multi_stage_cte` recurses with fresh
-    /// resolved/time-series caches. Top-level still re-walks the same
-    /// multi-stage dim for now; `cte_state.find_matching` keys on
-    /// `(role, members, state)` so the body is registered once.
+    /// resolved/time-series caches.
     ///
-    /// The returned ref carries `OnOuterDimensions { dimensions: [] }`.
-    /// The physical builder currently joins multi-stage dim CTEs via
-    /// the `schema().multi_stage_dimensions()` walk in `QueryProcessor`;
-    /// the placeholder `OnOuterDimensions` is intentionally inert
-    /// (LogicalJoinProcessor only matches `OnPrimaryKeys`). Will be
-    /// populated once the schema-walk path is replaced by explicit
-    /// `OnOuterDimensions` joins.
+    /// The returned ref carries `OnOuterDimensions { dimensions: ... }`
+    /// populated from the CTE body's outer schema — same set as the
+    /// legacy `LogicalSchema::multi_stage_join_dimensions`: the dim's
+    /// own `add_group_by` plus every non-multi-stage dim projected by
+    /// the CTE. Consumer-side JOIN ON for the CTE is built from this
+    /// list once the physical builder switches off the context-based
+    /// `multi_stage_dimensions` lookup.
     pub(crate) fn build_multi_stage_dim_ref(
         &self,
         member: Rc<MemberSymbol>,
@@ -177,10 +175,13 @@ impl MultiStageQueryPlanner {
             cte_state,
             &mut time_series_cache,
         )?;
+        let join_dimensions = cte_ref.schema().multi_stage_join_dimensions(&member)?;
         Ok(Rc::new(MultiStageDimensionRef {
             name: cte_ref.name().clone(),
             schema: cte_ref.schema().clone(),
-            join: MultiStageDimensionJoin::OnOuterDimensions { dimensions: vec![] },
+            join: MultiStageDimensionJoin::OnOuterDimensions {
+                dimensions: join_dimensions,
+            },
             dimension: member,
         }))
     }

@@ -9,13 +9,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
-pub struct MultiStageDimensionContext {
-    pub name: String,
-    pub schema: Rc<Schema>,
-    pub join_dimensions: Vec<Rc<MemberSymbol>>,
-}
-
-#[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
@@ -30,13 +23,11 @@ pub(super) struct PushDownBuilderContext {
     /// this storage. Lookup is by CTE alias / name; all three kinds are
     /// interchangeable as table references at the SQL level.
     pub cte_schemas: HashMap<String, Rc<Schema>>,
-    pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
-    pub multi_stage_dimensions: Vec<String>,
     /// MS-dim refs the current Query consumes. The source-render code
     /// reads these out to wire `OnPrimaryKeys` LEFT JOINs inside the
-    /// cube-join chain (`LogicalJoin`) or the `OnOuterDimensions` LEFT
-    /// JOIN after the FullKeyAggregate output. QueryProcessor sets the
-    /// list before invoking `process_node(source)`.
+    /// cube-join chain (`LogicalJoin`) and `OnOuterDimensions` LEFT
+    /// JOINs at the chain tail. QueryProcessor sets the list before
+    /// invoking `process_node(source)`.
     pub multi_stage_dimension_refs: Vec<Rc<MultiStageDimensionRef>>,
 }
 
@@ -59,52 +50,6 @@ impl PushDownBuilderContext {
 
     pub fn add_cte_schema(&mut self, name: String, schema: Rc<Schema>) {
         self.cte_schemas.insert(name, schema);
-    }
-
-    pub fn remove_multi_stage_dimensions(&mut self) {
-        self.multi_stage_dimensions = Vec::new();
-    }
-
-    pub fn add_multi_stage_dimension(&mut self, name: String) {
-        self.multi_stage_dimensions.push(name);
-    }
-
-    pub fn get_multi_stage_dimensions(
-        &self,
-    ) -> Result<Option<Rc<MultiStageDimensionContext>>, CubeError> {
-        if self.multi_stage_dimensions.is_empty() {
-            return Ok(None);
-        }
-        let mut dimensions_to_resolve = self.multi_stage_dimensions.clone();
-        dimensions_to_resolve.sort();
-        if let Some(schema) = self
-            .multi_stage_dimension_schemas
-            .get(&dimensions_to_resolve)
-        {
-            Ok(Some(schema.clone()))
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot find source for resolve multi stage dimensions {}",
-                dimensions_to_resolve.join(", ")
-            )))
-        }
-    }
-
-    pub fn add_multi_stage_dimension_schema(
-        &mut self,
-        resolved_dimensions: Vec<String>,
-        cte_name: String,
-        join_dimensions: Vec<Rc<MemberSymbol>>,
-        schema: Rc<Schema>,
-    ) {
-        self.multi_stage_dimension_schemas.insert(
-            resolved_dimensions,
-            Rc::new(MultiStageDimensionContext {
-                name: cte_name,
-                join_dimensions,
-                schema,
-            }),
-        );
     }
 
     pub fn get_cte_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {
