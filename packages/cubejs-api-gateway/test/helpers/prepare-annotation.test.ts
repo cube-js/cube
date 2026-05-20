@@ -182,6 +182,7 @@ describe('prepareAnnotation helpers', () => {
       }).timeDimensions
     ).toEqual({
       'cube_name.member': {
+        currency: undefined,
         description: undefined,
         format: undefined,
         meta: undefined,
@@ -190,6 +191,7 @@ describe('prepareAnnotation helpers', () => {
         type: undefined,
       },
       'cube_name.member.day': {
+        currency: undefined,
         description: undefined,
         format: undefined,
         meta: undefined,
@@ -198,8 +200,10 @@ describe('prepareAnnotation helpers', () => {
         type: undefined,
         granularity: {
           name: 'day',
-          title: 'day',
+          type: 'built-in',
+          title: 'Day',
           interval: '1 day',
+          format: '%Y-%m-%d',
         }
       },
     });

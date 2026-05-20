@@ -52,6 +52,19 @@ type ScheduledRefreshContextsFn =
 
 type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
 
+type GranularityListItem = string | {
+  name: string;
+  title?: string;
+  format?: string;
+  interval?: string;
+  origin?: string;
+  offset?: string;
+};
+type GranularityList = GranularityListItem[];
+type GranularitiesOption =
+  | GranularityList
+  | ((context: RequestContext) => GranularityList | Promise<GranularityList>);
+
 /**
  * Gateway configuration options interface.
  */
@@ -64,6 +77,13 @@ interface ApiGatewayOptions {
   scheduledRefreshTimeZones?: ScheduledRefreshTimeZonesFn;
   basePath: string;
   extendContext?: ExtendContextFn;
+  /**
+   * Enabled granularities (built-in names and/or custom definitions), or a function called per
+   * request to produce the same. Drives /v1/granularities and the /v1/meta enrichment.
+   * Shape mirrors `GranularityList` in @cubejs-backend/schema-compiler; redeclared locally to
+   * avoid a dependency on schema-compiler from this types module.
+   */
+  granularities?: GranularitiesOption;
   jwt?: JWTOptions;
   requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
   queryRewrite?: QueryRewriteFn;

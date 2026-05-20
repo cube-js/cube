@@ -481,6 +481,7 @@ export class CubejsServerCore {
         queryRewrite:
           this.options.queryRewrite || this.options.queryTransformer,
         extendContext: this.options.extendContext,
+        granularities: this.options.granularities,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         apiSecrets: this.options.apiSecrets,
         jwt: this.options.jwt,
