@@ -1,7 +1,7 @@
 use super::member_query_planner::{
-    build_for_cte_dimension_query, build_for_cte_query, build_for_leaf_cte_query,
-    build_rolling_window_query, build_time_series_get_range_query, build_time_series_query,
-    ref_for_body,
+    build_for_cte_dim_only_query, build_for_cte_dimension_query, build_for_cte_query,
+    build_for_leaf_cte_query, build_rolling_window_query, build_time_series_get_range_query,
+    build_time_series_query, ref_for_body,
 };
 use super::{
     CteRole, CteState, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType,
@@ -285,14 +285,6 @@ impl MultiStageQueryPlanner {
             state.clone()
         };
 
-        let children = self.make_childs(
-            member.clone(),
-            new_state.clone(),
-            resolved_multi_stage_dimensions,
-            cte_state,
-            time_series_cache,
-        )?;
-
         let ms_member = MultiStageMember::new(
             MultiStageMemberType::Inode(multi_stage_member.clone()),
             member.clone(),
@@ -301,17 +293,51 @@ impl MultiStageQueryPlanner {
         );
 
         let alias = cte_state.next_cte_name(role);
-        let body = match multi_stage_member.inode_type() {
-            MultiStageInodeMemberType::Dimension => {
-                build_for_cte_dimension_query(alias.clone(), &state, &ms_member, &children)?
-            }
-            _ => build_for_cte_query(
+        let body = if matches!(
+            multi_stage_member.inode_type(),
+            MultiStageInodeMemberType::Dimension
+        ) && self.dim_only_deps(&member)?
+            && member.case().is_none()
+        {
+            // Dim-CTE whose multi-stage deps are all dimensions:
+            // build leaf-style query with cube-join source + ms-dim
+            // refs (OnOuterDimensions), bypassing the FullKeyAggregate
+            // UNION which can't merge heterogenous dim-child schemas.
+            let dim_refs = self.build_dim_only_child_refs(
+                member.clone(),
+                new_state.clone(),
+                resolved_multi_stage_dimensions,
+                cte_state,
+                time_series_cache,
+            )?;
+            build_for_cte_dim_only_query(
+                &self.query_tools,
+                &self.query_properties,
                 alias.clone(),
                 &state,
                 &ms_member,
-                &multi_stage_member,
-                &children,
-            )?,
+                &dim_refs,
+            )?
+        } else {
+            let children = self.make_childs(
+                member.clone(),
+                new_state.clone(),
+                resolved_multi_stage_dimensions,
+                cte_state,
+                time_series_cache,
+            )?;
+            match multi_stage_member.inode_type() {
+                MultiStageInodeMemberType::Dimension => {
+                    build_for_cte_dimension_query(alias.clone(), &state, &ms_member, &children)?
+                }
+                _ => build_for_cte_query(
+                    alias.clone(),
+                    &state,
+                    &ms_member,
+                    &multi_stage_member,
+                    &children,
+                )?,
+            }
         };
         let cte_ref = ref_for_body(alias, &member, &body);
         cte_state.add_member(
@@ -322,6 +348,63 @@ impl MultiStageQueryPlanner {
             cte_ref.clone(),
         );
         Ok(cte_ref)
+    }
+
+    /// True if every direct dependency of `member` is either a non-
+    /// multi-stage dimension/time-dim (which doesn't materialise as a
+    /// child CTE) or itself a multi-stage *dimension*. The dim-only
+    /// flavour bypasses `FullKeyAggregate` UNION over heterogenous
+    /// child schemas in favour of a cube-join + `OnOuterDimensions`
+    /// JOIN.
+    fn dim_only_deps(&self, member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+        for dep in member.get_dependencies() {
+            let dep = dep.resolve_reference_chain();
+            if dep.is_measure() {
+                return Ok(false);
+            }
+            if Self::is_multi_stage_dimension(&dep)? {
+                continue;
+            }
+            // non-ms dim/time-dim — fine, won't become a child CTE.
+        }
+        Ok(true)
+    }
+
+    /// Builds CTEs for each multi-stage dim dependency of `member` and
+    /// wraps each as a `MultiStageDimensionRef::OnOuterDimensions`
+    /// ready to be attached as a LEFT JOIN by the consumer.
+    fn build_dim_only_child_refs(
+        &self,
+        member: Rc<MemberSymbol>,
+        new_state: Rc<QueryProperties>,
+        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        cte_state: &mut CteState,
+        time_series_cache: &mut TimeSeriesCache,
+    ) -> Result<Vec<Rc<MultiStageDimensionRef>>, CubeError> {
+        let mut refs = vec![];
+        for dep in member.get_dependencies() {
+            let dep = dep.resolve_reference_chain();
+            if !Self::is_multi_stage_dimension(&dep)? {
+                continue;
+            }
+            let sub_ref = self.build_multi_stage_cte(
+                dep.clone(),
+                new_state.clone(),
+                resolved_multi_stage_dimensions,
+                cte_state,
+                time_series_cache,
+            )?;
+            let join_dimensions = sub_ref.schema().multi_stage_join_dimensions(&dep)?;
+            refs.push(Rc::new(MultiStageDimensionRef {
+                name: sub_ref.name().clone(),
+                schema: sub_ref.schema().clone(),
+                join: MultiStageDimensionJoin::OnOuterDimensions {
+                    dimensions: join_dimensions,
+                },
+                dimension: dep,
+            }));
+        }
+        Ok(refs)
     }
 
     /// Classifies `base_member` into a `MultiStageInodeMember` — picks

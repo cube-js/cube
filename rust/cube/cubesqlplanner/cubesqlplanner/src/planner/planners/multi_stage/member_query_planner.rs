@@ -4,7 +4,9 @@ use super::{
     TimeSeriesDescription,
 };
 use crate::logical_plan::*;
-use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
+use crate::planner::planners::{
+    multi_stage::RollingWindowType, JoinPlanner, QueryPlanner, SimpleQueryPlanner,
+};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::GranularityHelper;
 use crate::planner::{AggregationType, MeasureSymbol, MemberSymbol};
@@ -395,6 +397,104 @@ pub(crate) fn build_for_leaf_cte_query(
     Ok(Rc::new(LogicalMultiStageMember {
         name: alias,
         body: MultiStageMemberBody::Query(leaf_root),
+    }))
+}
+
+/// Dimension-calculation CTE whose only multi-stage deps are other
+/// multi-stage *dimensions* (no measure children). Instead of a
+/// `FullKeyAggregate` UNION over heterogenous dim children, we build a
+/// leaf-style query over the cube join and attach the pre-built ms-dim
+/// CTEs as `MultiStageDimensionRef::OnOuterDimensions` joins — the
+/// cube-join itself resolves cross-cube key equivalence (e.g.
+/// `first_date.customer_id = orders.customer_id`), so each child's
+/// disjoint key set lines up naturally.
+pub(crate) fn build_for_cte_dim_only_query(
+    query_tools: &Rc<QueryTools>,
+    query_properties: &Rc<QueryProperties>,
+    alias: String,
+    state: &Rc<QueryProperties>,
+    multi_stage_member: &Rc<MultiStageMember>,
+    dim_refs: &[Rc<MultiStageDimensionRef>],
+) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
+    let cte_member = multi_stage_member.evaluation_node();
+    let mut dimensions = state.dimensions().clone();
+    let mut time_dimensions = state.time_dimensions().clone();
+    match cte_member.as_ref() {
+        MemberSymbol::Dimension(_) => {
+            if !dimensions.iter().any(|d| {
+                d.clone().resolve_reference_chain() == cte_member.clone().resolve_reference_chain()
+            }) {
+                dimensions.push(cte_member.clone());
+            }
+        }
+        MemberSymbol::TimeDimension(_) => {
+            if !time_dimensions.iter().any(|d| {
+                d.clone().resolve_reference_chain() == cte_member.clone().resolve_reference_chain()
+            }) {
+                time_dimensions.push(cte_member.clone());
+            }
+        }
+        _ => {}
+    }
+    // Carry up extension dims from each pre-built ms-dim CTE so outer
+    // join keys stay visible (e.g. customer_id chains).
+    for r in dim_refs.iter() {
+        for d in r.schema.dimensions.iter() {
+            dimensions.push(d.clone());
+        }
+        for d in r.schema.time_dimensions.iter() {
+            time_dimensions.push(d.clone());
+        }
+    }
+    dimensions = dimensions
+        .into_iter()
+        .unique_by(|d| d.full_name())
+        .collect_vec();
+    time_dimensions = time_dimensions
+        .into_iter()
+        .unique_by(|d| d.full_name())
+        .collect_vec();
+
+    let cte_query_properties = QueryProperties::builder()
+        .query_tools(query_tools.clone())
+        .dimensions(dimensions.clone())
+        .time_dimensions(time_dimensions.clone())
+        .time_dimensions_filters(state.time_dimensions_filters().clone())
+        .dimensions_filters(state.dimensions_filters().clone())
+        .segments(state.segments().clone())
+        .ignore_cumulative(true)
+        .disable_external_pre_aggregations(query_properties.disable_external_pre_aggregations())
+        .build()?;
+
+    let join_planner = JoinPlanner::new(query_tools.clone());
+    let source = if let Some(join) = cte_query_properties.simple_query_join()? {
+        join_planner.make_join_logical_plan(join)?
+    } else {
+        join_planner.make_empty_join_logical_plan()
+    };
+
+    let schema = LogicalSchema::default()
+        .set_dimensions(dimensions)
+        .set_time_dimensions(time_dimensions)
+        .into_rc();
+
+    let modifiers = LogicalQueryModifiers {
+        order_by: default_order_for_member(state, cte_member),
+        ..Default::default()
+    };
+    let query = Query::builder()
+        .schema(schema)
+        .modifers(Rc::new(modifiers))
+        .source(source.into())
+        .multi_stage_dimensions(dim_refs.to_vec())
+        .kind(QueryKind::Stage(StageKind::DimensionCalc {
+            multi_stage_dimension: cte_member.clone(),
+        }))
+        .build();
+
+    Ok(Rc::new(LogicalMultiStageMember {
+        name: alias,
+        body: MultiStageMemberBody::Query(Rc::new(query)),
     }))
 }
 
