@@ -96,7 +96,7 @@ of deployments within a Cube Cloud account. The consumption is measured in 5-min
 | Cube Store Worker | <nobr>1..2</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
 | [Semantic Catalog][ref-semantic-catalog] | <nobr>2..4</nobr> | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
-| [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
+| [Monitoring Integrations][ref-monitoring-integrations] | — | Available as an [add-on](#monitoring-integrations) on the Enterprise plan |
 
 The following resource types incur CCU consumption and apply to the _whole Cube Cloud
 account_:
@@ -169,18 +169,11 @@ features analyze and visualize the data available under the following tiers:
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
 
-### Monitoring Integrations tiers
+### Monitoring Integrations
 
-[Monitoring Integrations][ref-monitoring-integrations] feature has the following tiers:
-
-| Tier | CCUs per hour | Exported data  | Dependent features |
-| ---- | :-----------: | -------------- | --- |
-| XS   | 1             | Up to 10 GB/mo | — |
-| S    | 2             | Up to 25 GB/mo | — |
-| M    | 4             | Up to 50 GB/mo | [Query History export][ref-query-history-export] |
-
-You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
-**Settings** of your deployment.
+[Monitoring Integrations][ref-monitoring-integrations], including [Query History
+export][ref-query-history-export], are available as an add-on on the Enterprise
+plan. [Contact us][cube-contact-us] for pricing.
 
 ### Audit Log tiers
 
@@ -330,7 +323,6 @@ for the AI token consumption at the **Billing** page of their Cube Cloud account
 [ref-cloud-deployment-prod-cluster]: /docs/deployment/cloud/deployment-types#dedicated
 [ref-cloud-limits]: /docs/deployment/cloud/limits
 [ref-monitoring-integrations]: /docs/monitoring/integrations
-[ref-monitoring-integrations-config]: /admin/deployment/monitoring-integrations#configuration
 [ref-cloud-acl]: /admin/users-and-permissions/custom-roles
 [ref-cloud-deployment-prod-multicluster]: /docs/deployment/cloud/deployment-types#multi-cluster
 [ref-cloud-custom-domains]: /docs/deployment/cloud/custom-domains
