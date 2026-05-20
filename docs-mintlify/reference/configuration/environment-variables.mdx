@@ -116,8 +116,8 @@ If you'd like to adjust the concurrency for the refresh worker, use
 
 ## `CUBEJS_REFRESH_WORKER_CONCURRENCY`
 
-The number of concurrent connections each query queue of the refresh worker
-has to the database.
+The number of pre-aggregation queries the refresh worker executes concurrently
+against the source database.
 
 | Possible Values | Default in Development       | Default in Production        |
 | --------------- | ---------------------------- | ---------------------------- |
