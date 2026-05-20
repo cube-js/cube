@@ -165,8 +165,23 @@ export type Sql4SqlCommon = {
 export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
 
 export type QueryConvertResponse = {
-  status: string;
+  status: 'ok' | 'error';
   query: any;
+  error?: string;
+};
+
+export type SqlFilterItem = {
+  member?: string;
+  operator?: string;
+  values?: string[];
+  and?: SqlFilterItem[];
+  or?: SqlFilterItem[];
+};
+
+export type SqlFiltersResponse = {
+  status: 'ok' | 'error';
+  sql?: string;
+  filters?: SqlFilterItem[];
   error?: string;
 };
 
@@ -466,6 +481,36 @@ export const rest4sql = async (instance: SqlInterfaceInstance, sqlQuery: string,
   const native = loadNative();
 
   return native.rest4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const getSqlFilters = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: unknown): Promise<SqlFiltersResponse> => {
+  const native = loadNative();
+
+  return native.getSqlFilters(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const addSqlFilters = async (instance: SqlInterfaceInstance, sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> => {
+  const native = loadNative();
+
+  return native.addSqlFilters(instance, sqlQuery, JSON.stringify(filters), securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const setSqlFilters = async (instance: SqlInterfaceInstance, sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> => {
+  const native = loadNative();
+
+  return native.setSqlFilters(instance, sqlQuery, JSON.stringify(filters), securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const deleteSqlFilters = async (instance: SqlInterfaceInstance, sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> => {
+  const native = loadNative();
+
+  return native.deleteSqlFilters(instance, sqlQuery, JSON.stringify(filters), securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const replaceSqlFilters = async (instance: SqlInterfaceInstance, sqlQuery: string, oldFilters: SqlFilterItem[], newFilters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> => {
+  const native = loadNative();
+
+  return native.replaceSqlFilters(instance, sqlQuery, JSON.stringify(oldFilters), JSON.stringify(newFilters), securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): any[] => {

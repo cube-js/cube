@@ -5,11 +5,18 @@ import {
   execSql,
   sql4sql,
   rest4sql,
+  getSqlFilters,
+  addSqlFilters,
+  setSqlFilters,
+  deleteSqlFilters,
+  replaceSqlFilters,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
   Sql4SqlResponse,
   QueryConvertResponse,
+  SqlFilterItem,
+  SqlFiltersResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
@@ -86,6 +93,26 @@ export class SQLServer {
 
   public async rest4sql(sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> {
     return rest4sql(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
+  }
+
+  public async getSqlFilters(sqlQuery: string, securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return getSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
+  }
+
+  public async addSqlFilters(sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return addSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, filters, securityContext);
+  }
+
+  public async setSqlFilters(sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return setSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, filters, securityContext);
+  }
+
+  public async deleteSqlFilters(sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return deleteSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, filters, securityContext);
+  }
+
+  public async replaceSqlFilters(sqlQuery: string, oldFilters: SqlFilterItem[], newFilters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return replaceSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, oldFilters, newFilters, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
