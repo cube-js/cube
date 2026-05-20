@@ -7,6 +7,7 @@
 
 import R from 'ramda';
 import { isPredefinedGranularity } from '@cubejs-backend/shared';
+import { BUILT_IN_GRANULARITIES } from '@cubejs-backend/schema-compiler';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './to-config-map';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
@@ -14,7 +15,10 @@ import { MemberExpression } from '../types/query';
 
 type GranularityMeta = {
   name: string;
+  type?: 'built-in' | 'custom';
   title: string;
+  /** d3-time-format string for displaying bucketed timestamps. */
+  format?: string;
   interval: string;
   offset?: string;
   origin?: string;
@@ -115,14 +119,25 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               if (an) {
                 let granularityMeta: GranularityMeta | undefined;
                 if (isPredefinedGranularity(td.granularity)) {
+                  // Prefer values the meta endpoint already attached (these honor any global
+                  // title/format override). Fall back to BUILT_IN_GRANULARITIES, then to the bare name.
+                  const fromMeta = an[1].granularities?.find(g => g.name === td.granularity);
+                  const builtInDefaults = BUILT_IN_GRANULARITIES[td.granularity] || {};
                   granularityMeta = {
                     name: td.granularity,
-                    title: td.granularity,
-                    interval: `1 ${td.granularity}`,
+                    type: 'built-in',
+                    title: fromMeta?.title || builtInDefaults.title || td.granularity,
+                    interval: fromMeta?.interval || `1 ${td.granularity}`,
+                    ...(fromMeta?.format || builtInDefaults.format
+                      ? { format: fromMeta?.format || builtInDefaults.format }
+                      : {}),
                   };
                 } else if (an[1].granularities) {
-                  // No need to send all the granularities defined, only those make sense for this query
+                  // Forward only the granularity in play for this query; siblings stay in /v1/meta.
                   granularityMeta = an[1].granularities.find(g => g.name === td.granularity);
+                  if (granularityMeta && !granularityMeta.type) {
+                    granularityMeta = { ...granularityMeta, type: 'custom' };
+                  }
                 }
 
                 const { granularities: _, ...rest } = an[1];
