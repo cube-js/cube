@@ -18,13 +18,9 @@ auth providers, BI APIs targeted by SLS, and other upstream services), see
 With Dedicated Infrastructure and Bring Your Own Cloud on AWS, Cube supports
 establishing **AWS PrivateLink** connections from your AWS accounts to the Cube
 API endpoints. This lets your applications, internal BI tools, and end-user
-browsers reach the Cube HTTP and SQL APIs entirely over private AWS networking
-— never touching the public internet. All traffic to the Cube data plane flows
-through the same HTTP and SQL ingress controllers, so this includes AI traffic
-to the [Chat API][chat-api] and other AI endpoints — both from Cube's
-data-plane-hosted AI Engineer and from external agents that call the Chat API
-as a tool. When private connectivity is in place, the public API endpoints can
-be disabled completely on request.
+browsers reach the Cube HTTP, SQL, and AI APIs entirely over private AWS
+networking — never touching the public internet. When private connectivity is
+in place, the public API endpoints can be disabled completely on request.
 
 <Note>
 
