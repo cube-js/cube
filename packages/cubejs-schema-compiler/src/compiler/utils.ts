@@ -4,6 +4,11 @@ import { camelize } from 'inflection';
 const IGNORE_CAMELIZE = {
   1: {
     granularities: true,
+  },
+  // Custom granularity names live one level deeper than the legacy flat-array form
+  // (`granularities.custom.<name>`), so they need their own guard.
+  2: {
+    custom: true,
   }
 };
 

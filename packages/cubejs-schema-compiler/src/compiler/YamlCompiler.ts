@@ -416,10 +416,22 @@ export class YamlCompiler {
       }
 
       if (memberType === 'dimension' && granularities) {
-        granularities = this.yamlArrayToObj(granularities || [], 'dimension.granularity', errorsReport, {
-          cubeName: ctx.cubeName,
-          parent: { type: 'time dimension', name }
-        });
+        if (Array.isArray(granularities)) {
+          // Legacy form: `granularities: [{ name, ... }]` -> `{ name: { ... } }`.
+          granularities = this.yamlArrayToObj(granularities || [], 'dimension.granularity', errorsReport, {
+            cubeName: ctx.cubeName,
+            parent: { type: 'time dimension', name }
+          });
+        } else if (granularities && typeof granularities === 'object' && Array.isArray(granularities.custom)) {
+          // New dict form: only the inner `custom` array needs keying; includes/excludes pass through.
+          granularities = {
+            ...granularities,
+            custom: this.yamlArrayToObj(granularities.custom, 'dimension.granularity', errorsReport, {
+              cubeName: ctx.cubeName,
+              parent: { type: 'time dimension', name }
+            }),
+          };
+        }
         res[name] = { granularities, ...res[name] };
       }
 

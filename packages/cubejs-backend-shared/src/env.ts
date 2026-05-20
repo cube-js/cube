@@ -2063,6 +2063,18 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   accessPolicyMaskNumber: () => get('CUBEJS_ACCESS_POLICY_MASK_NUMBER')
     .asString(),
+  // Comma-separated names (built-in or custom). Empty/unset = all 8 built-ins enabled.
+  granularities: () => get('CUBEJS_GRANULARITIES')
+    .asArray(','),
+  // `getEnv` forwards `opts` positionally, so callers pass `{ name }` (matches dbType: { dataSource }).
+  granularityCustomInterval: ({ name }: { name: string }) => get(`CUBEJS_GRANULARITIES_${name.toUpperCase()}_INTERVAL`)
+    .asString(),
+  granularityCustomTitle: ({ name }: { name: string }) => get(`CUBEJS_GRANULARITIES_${name.toUpperCase()}_TITLE`)
+    .asString(),
+  granularityCustomOffset: ({ name }: { name: string }) => get(`CUBEJS_GRANULARITIES_${name.toUpperCase()}_OFFSET`)
+    .asString(),
+  granularityCustomOrigin: ({ name }: { name: string }) => get(`CUBEJS_GRANULARITIES_${name.toUpperCase()}_ORIGIN`)
+    .asString(),
 };
 
 type Vars = typeof variables;

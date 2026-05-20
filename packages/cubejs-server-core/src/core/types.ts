@@ -10,7 +10,7 @@ import {
   UserBackgroundContext,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
-import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import { BaseQuery, GranularityList } from '@cubejs-backend/schema-compiler';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -222,6 +222,7 @@ export interface CreateOptions {
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
+  granularities?: GranularityList | ((context: RequestContext) => GranularityList | Promise<GranularityList>);
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
