@@ -2,7 +2,7 @@
 name = "cubestore-ws-transport"
 version = "0.1.0"
 edition = "2021"
-description = "Async WebSocket client for CubeStore's binary FlatBuffers protocol."
+description = "Async WebSocket client for CubeStore's binary protocol."
 
 [dependencies]
 cubeshared = { path = "../cubeshared" }
@@ -18,6 +18,7 @@ thiserror = "1"
 log = "0.4"
 uuid = { version = "1", features = ["v4"] }
 http = "1"
+arrow = { version = "58", default-features = false, features = ["ipc"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

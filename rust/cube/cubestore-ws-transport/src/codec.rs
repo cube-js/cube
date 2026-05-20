@@ -1,3 +1,7 @@
+use std::io::Cursor;
+
+use arrow::array::RecordBatch;
+use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use cubeshared::codegen::{
     root_as_http_message, HttpCommand, HttpMessage, HttpMessageArgs, HttpQuery, HttpQueryArgs,
@@ -6,7 +10,7 @@ use cubeshared::codegen::{
 use flatbuffers::FlatBufferBuilder;
 
 use crate::error::TransportError;
-use crate::result::QueryResult;
+use crate::result::{QueryResult, ResultData};
 
 /// Build a binary FlatBuffer payload carrying an `HttpQuery` command.
 pub fn encode_query(message_id: u32, connection_id: &str, sql: &str) -> Bytes {
@@ -20,7 +24,7 @@ pub fn encode_query(message_id: u32, connection_id: &str, sql: &str) -> Bytes {
             trace_obj: None,
             inline_tables: None,
             parameters: None,
-            response_format: QueryResultFormat::Legacy,
+            response_format: QueryResultFormat::Arrow,
         },
     );
 
@@ -92,14 +96,29 @@ pub fn decode_frame(bytes: &[u8]) -> Result<DecodedFrame, TransportError> {
                 columns.len(),
                 rows.len()
             );
-            DecodedResponse::Ok(QueryResult { columns, rows })
+
+            DecodedResponse::Ok(QueryResult {
+                data: ResultData::Legacy { columns, rows },
+            })
         }
         HttpCommand::HttpQueryResult => {
-            // Arrow format is not supported in this transport version.
-            return Err(TransportError::Protocol(
-                "Arrow result format is not supported by this client (request Legacy format)"
-                    .into(),
-            ));
+            let qr = msg.command_as_http_query_result().ok_or_else(|| {
+                TransportError::Protocol("HttpQueryResult union variant missing".into())
+            })?;
+            let arrow = qr.data_as_http_query_result_arrow().ok_or_else(|| {
+                TransportError::Protocol(
+                    "HttpQueryResult.data variant is not HttpQueryResultArrow".into(),
+                )
+            })?;
+
+            let result = decode_arrow_ipc(arrow.data().bytes())?;
+            log::debug!(
+                "decoded HttpQueryResult (Arrow IPC): {} columns, {} rows",
+                result.get_columns().len(),
+                result.row_count()
+            );
+
+            DecodedResponse::Ok(result)
         }
         other => {
             return Err(TransportError::Protocol(format!(
@@ -112,5 +131,19 @@ pub fn decode_frame(bytes: &[u8]) -> Result<DecodedFrame, TransportError> {
     Ok(DecodedFrame {
         message_id,
         response,
+    })
+}
+
+fn decode_arrow_ipc(bytes: &[u8]) -> Result<QueryResult, TransportError> {
+    let reader = StreamReader::try_new(Cursor::new(bytes), None)
+        .map_err(|e| TransportError::Protocol(format!("arrow IPC open: {e}")))?;
+
+    let schema = reader.schema();
+    let batches: Vec<RecordBatch> = reader
+        .collect::<Result<_, _>>()
+        .map_err(|e| TransportError::Protocol(format!("arrow IPC read batch: {e}")))?;
+
+    Ok(QueryResult {
+        data: ResultData::Arrow { schema, batches },
     })
 }
