@@ -15,9 +15,6 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
-/// Pull legacy stringified rows out of a `QueryResult`. The mock server always
-/// emits the legacy `HttpResultSet` envelope, so this is exhaustive enough for
-/// the tests in this file.
 fn legacy_rows(r: &QueryResult) -> &Vec<Vec<Option<String>>> {
     match &r.data {
         ResultData::Legacy { rows, .. } => rows,
