@@ -126,11 +126,19 @@ impl MultiStageQueryPlanner {
             } else {
                 CteRole::MultiStageMeasure
             };
+            let cte_ref = Rc::new(
+                MultiStageSubqueryRef::builder()
+                    .name(descr.alias().clone())
+                    .symbols(vec![descr.member_node().clone()])
+                    .schema(descr.schema().clone())
+                    .build(),
+            );
             cte_state.add_member(
                 role,
                 vec![descr.member_node().clone()],
                 descr.state().clone(),
                 member,
+                cte_ref,
             );
         }
 

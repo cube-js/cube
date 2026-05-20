@@ -1,6 +1,7 @@
 use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{
     LogicalMultiStageMember, MultiStageDimensionJoin, MultiStageDimensionRef, MultiStageMemberBody,
+    MultiStageSubqueryRef,
 };
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
@@ -120,18 +121,31 @@ impl DimensionSubqueryPlanner {
 
         let cte_name = cte_state.next_cte_name(CteRole::MultiStageDimension);
         let schema = body.schema().clone();
-        let registered_name = cte_state.add_member(
+        // DSQ uses MultiStageDimensionRef on the consumer side, not
+        // MultiStageSubqueryRef — but the CteState dedup cache holds
+        // MultiStageSubqueryRef. Stash a parallel SubqueryRef so the
+        // entry can serve any future caller looking up by
+        // (role, members, state).
+        let cte_ref = Rc::new(
+            MultiStageSubqueryRef::builder()
+                .name(cte_name.clone())
+                .symbols(vec![dimension.clone()])
+                .schema(schema.clone())
+                .build(),
+        );
+        cte_state.add_member(
             CteRole::MultiStageDimension,
             vec![dimension.clone()],
             sub_query_properties,
             Rc::new(LogicalMultiStageMember {
-                name: cte_name,
+                name: cte_name.clone(),
                 body: MultiStageMemberBody::Query(body),
             }),
+            cte_ref,
         );
 
         Ok(Rc::new(MultiStageDimensionRef {
-            name: registered_name,
+            name: cte_name,
             schema,
             join: MultiStageDimensionJoin::OnPrimaryKeys {
                 cube_name,

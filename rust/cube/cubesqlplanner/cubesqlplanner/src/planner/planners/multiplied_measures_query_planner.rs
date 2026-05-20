@@ -71,20 +71,19 @@ impl MultipliedMeasuresQueryPlanner {
                     name: cte_name.clone(),
                     body: MultiStageMemberBody::Query(query.clone()),
                 });
-                let registered_name = cte_state.add_member(
+                let subquery_ref = Rc::new(
+                    MultiStageSubqueryRef::builder()
+                        .name(cte_name)
+                        .symbols(measures.clone())
+                        .schema(query.schema().clone())
+                        .build(),
+                );
+                cte_state.add_member(
                     CteRole::FactMeasure,
                     measures.clone(),
                     self.query_properties.clone(),
                     member,
-                );
-
-                let ref_schema = query.schema().clone();
-                let subquery_ref = Rc::new(
-                    MultiStageSubqueryRef::builder()
-                        .name(registered_name)
-                        .symbols(measures.clone())
-                        .schema(ref_schema)
-                        .build(),
+                    subquery_ref.clone(),
                 );
                 cte_state.add_subquery_ref(subquery_ref);
             }
@@ -110,24 +109,23 @@ impl MultipliedMeasuresQueryPlanner {
                 self.aggregate_subquery_plan(&cube_name, &measures, join, cte_state)?;
 
             let cte_name = cte_state.next_cte_name(CteRole::MultipliedMeasureSubquery);
-            let ref_schema = aggregate_subquery_logical_plan.schema().clone();
             let member = Rc::new(LogicalMultiStageMember {
                 name: cte_name.clone(),
                 body: MultiStageMemberBody::Query(aggregate_subquery_logical_plan.clone()),
             });
-            let registered_name = cte_state.add_member(
+            let subquery_ref = Rc::new(
+                MultiStageSubqueryRef::builder()
+                    .name(cte_name)
+                    .symbols(measures.clone())
+                    .schema(aggregate_subquery_logical_plan.schema().clone())
+                    .build(),
+            );
+            cte_state.add_member(
                 CteRole::MultipliedMeasureSubquery,
                 measures.clone(),
                 self.query_properties.clone(),
                 member,
-            );
-
-            let subquery_ref = Rc::new(
-                MultiStageSubqueryRef::builder()
-                    .name(registered_name)
-                    .symbols(measures.clone())
-                    .schema(ref_schema)
-                    .build(),
+                subquery_ref.clone(),
             );
             cte_state.add_subquery_ref(subquery_ref);
         }
@@ -148,21 +146,22 @@ impl MultipliedMeasuresQueryPlanner {
         // KeysSubQuery body.
         let keys_query = self.key_query(&primary_keys_dimensions, key_join.clone(), cte_state)?;
         let keys_cte_name = cte_state.next_cte_name(CteRole::Keys);
-        let registered_keys_name = cte_state.add_member(
+        let keys_ref = Rc::new(
+            MultiStageSubqueryRef::builder()
+                .name(keys_cte_name.clone())
+                .symbols(primary_keys_dimensions.clone())
+                .schema(keys_query.schema().clone())
+                .build(),
+        );
+        cte_state.add_member(
             CteRole::Keys,
             primary_keys_dimensions.clone(),
             self.query_properties.clone(),
             Rc::new(LogicalMultiStageMember {
                 name: keys_cte_name,
-                body: MultiStageMemberBody::Query(keys_query.clone()),
+                body: MultiStageMemberBody::Query(keys_query),
             }),
-        );
-        let keys_ref = Rc::new(
-            MultiStageSubqueryRef::builder()
-                .name(registered_keys_name)
-                .symbols(primary_keys_dimensions.clone())
-                .schema(keys_query.schema().clone())
-                .build(),
+            keys_ref.clone(),
         );
 
         // MeasureSubQuery body — projects raw ungrouped columns; the outer
@@ -183,22 +182,23 @@ impl MultipliedMeasuresQueryPlanner {
         // resolve their inner deps via the standard render-reference
         // mechanism (which finds them by origin_member in the CTE schema).
         let measure_symbols = measure_query.schema().measures.clone();
-        let registered_measure_name = cte_state.add_member(
-            CteRole::MultipliedMeasureSubquery,
-            measure_symbols.clone(),
-            self.query_properties.clone(),
-            Rc::new(LogicalMultiStageMember {
-                name: measure_cte_name,
-                body: MultiStageMemberBody::Query(measure_query.clone()),
-            }),
-        );
         let measure_ref = Rc::new(
             MultiStageSubqueryRef::builder()
-                .name(registered_measure_name)
-                .symbols(measure_symbols)
+                .name(measure_cte_name.clone())
+                .symbols(measure_symbols.clone())
                 .schema(measure_query.schema().clone())
                 .is_ungrouped(true)
                 .build(),
+        );
+        cte_state.add_member(
+            CteRole::MultipliedMeasureSubquery,
+            measure_symbols,
+            self.query_properties.clone(),
+            Rc::new(LogicalMultiStageMember {
+                name: measure_cte_name,
+                body: MultiStageMemberBody::Query(measure_query),
+            }),
+            measure_ref.clone(),
         );
 
         let schema = LogicalSchema::default()

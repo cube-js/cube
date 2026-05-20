@@ -46,12 +46,16 @@ impl CteRole {
 
 /// One CTE registered in `CteState`: its role, the members it
 /// projects (drives matching), the `QueryProperties` state under
-/// which it was planned (drives matching), and the rendered body.
+/// which it was planned (drives matching), the rendered body, and
+/// the `MultiStageSubqueryRef` consumers use to point at this CTE.
+/// `cte_ref` is cached here so dedup can hand back the same ref to a
+/// later builder asking for the same `(role, members, state)`.
 pub struct CteEntry {
     pub role: CteRole,
     pub members: Vec<Rc<MemberSymbol>>,
     pub state: Rc<QueryProperties>,
     pub body: Rc<LogicalMultiStageMember>,
+    pub cte_ref: Rc<MultiStageSubqueryRef>,
 }
 
 /// Accumulator the multi-stage / multiplied planners write CTEs
@@ -82,17 +86,17 @@ impl CteState {
         name
     }
 
-    /// Registers `body` under `role + members + state`. Returns the
-    /// final CTE name to use in refs and SQL — this is `body.name` for
-    /// fresh entries, and the existing entry's name when a same-named
-    /// body is already registered (so callers can't accidentally pin
-    /// a name that won't appear in the WITH clause).
+    /// Registers `body` and its consumer-facing `cte_ref` under
+    /// `role + members + state`. Returns the final CTE name to use in
+    /// SQL — `body.name` for fresh entries, the existing entry's
+    /// name when a same-named body is already registered.
     pub fn add_member(
         &mut self,
         role: CteRole,
         members: Vec<Rc<MemberSymbol>>,
         state: Rc<QueryProperties>,
         body: Rc<LogicalMultiStageMember>,
+        cte_ref: Rc<MultiStageSubqueryRef>,
     ) -> String {
         if let Some(existing) = self.entries.iter().find(|e| e.body.name == body.name) {
             // Same-named bodies (e.g. the same DSQ referenced from
@@ -106,6 +110,7 @@ impl CteState {
             members,
             state,
             body,
+            cte_ref,
         });
         name
     }
