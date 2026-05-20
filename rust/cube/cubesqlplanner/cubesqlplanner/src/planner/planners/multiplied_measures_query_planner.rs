@@ -259,7 +259,16 @@ impl MultipliedMeasuresQueryPlanner {
         )?;
         let multi_stage_dimensions =
             dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
-        let measure_join_hints = collect_join_hints_for_measures(&measures)?;
+        // Strip the join-chain prefix from each measure before collecting
+        // join hints: the MeasureSubquery is the dedup-by-pk subselect of
+        // the owning cube alone — including the outer cubes the measure
+        // was reached through (e.g. a view's `join_path`) would multiply
+        // rows back, defeating the dedup.
+        let owned_measures = measures
+            .iter()
+            .map(|m| m.with_stripped_join_prefix())
+            .collect_vec();
+        let measure_join_hints = collect_join_hints_for_measures(&owned_measures)?;
         let source = self
             .join_planner
             .make_join_logical_plan_with_join_hints(measure_join_hints)?;
