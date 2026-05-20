@@ -67,7 +67,8 @@ impl QueryPlanner {
 
         let all_refs = cte_state.drain_subquery_refs_from(refs_baseline);
 
-        let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-        full_key_aggregate_planner.plan_logical_plan(all_refs)
+        let full_key_aggregate_planner =
+            FullKeyAggregateQueryPlanner::new(self.query_tools.clone(), request.clone());
+        full_key_aggregate_planner.plan_logical_plan(all_refs, cte_state)
     }
 }

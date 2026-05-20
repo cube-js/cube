@@ -77,9 +77,14 @@ struct YamlPreAggregationEntry {
 #[derive(Debug, Deserialize)]
 struct YamlView {
     name: String,
+    #[serde(default)]
     cubes: Vec<YamlViewCube>,
     #[serde(default)]
     filters: Vec<YamlViewFilter>,
+    #[serde(default)]
+    dimensions: Vec<YamlDimensionEntry>,
+    #[serde(default)]
+    measures: Vec<YamlMeasureEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -193,6 +198,19 @@ impl YamlSchema {
                     .unless_references(filter.unless)
                     .build();
                 view_builder = view_builder.add_default_filter(mock_filter);
+            }
+
+            for dim_entry in view.dimensions {
+                let result = dim_entry.definition.build();
+                view_builder = view_builder.add_dimension(dim_entry.name, result.definition);
+            }
+
+            for meas_entry in view.measures {
+                let meas_rc = meas_entry.definition.build_with_cube_name(None);
+                let meas_def = Rc::try_unwrap(meas_rc)
+                    .ok()
+                    .expect("Rc should have single owner");
+                view_builder = view_builder.add_measure(meas_entry.name, meas_def);
             }
 
             builder = view_builder.finish_view();

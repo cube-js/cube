@@ -1,5 +1,6 @@
 mod advanced_features;
 mod advanced_filters;
+mod calc_groups;
 mod calendar;
 mod chained_subquery;
 mod combinations;
