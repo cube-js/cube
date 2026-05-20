@@ -308,6 +308,23 @@ describe('PreAggregationsMultiStage', () => {
           type: 'prior',
         }],
       },
+      revenue_no_id_sum: {
+        multi_stage: true,
+        sql: \`\${revenue}\`,
+        type: 'sum',
+        reduce_by: [monthly_data.id],
+      },
+      revenue_doubled_no_id_sum: {
+        multi_stage: true,
+        sql: \`\${revenue} * 2\`,
+        type: 'sum',
+        reduce_by: [monthly_data.id],
+      },
+      revenue_no_id_pct: {
+        multi_stage: true,
+        sql: \`(100 * \${revenue_no_id_sum}) / NULLIF(\${revenue_doubled_no_id_sum}, 0)\`,
+        type: 'number',
+      },
     },
 
     preAggregations: {
@@ -513,6 +530,55 @@ describe('PreAggregationsMultiStage', () => {
               md__created_at_month: '2017-03-01T00:00:00.000Z',
               md__revenue_per_id: '30.0000000000000000',
               md__count_by_category: '2'
+            }
+          ]
+        );
+      });
+    }));
+
+    it('two multi-stage branches sharing one pre-aggregation', () => compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'monthly_data.revenue',
+          'monthly_data.revenue_no_id_sum',
+        ],
+        timeDimensions: [{
+          dimension: 'monthly_data.created_at',
+          granularity: 'month',
+          dateRange: ['2017-01-01', '2017-03-31']
+        }],
+        timezone: 'UTC',
+        order: [{
+          id: 'monthly_data.created_at'
+        }],
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      const sqlAndParams = query.buildSqlAndParams();
+      expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+      expect(preAggregationsDescription.every((d: any) => d.tableName.startsWith('md_revenue_by_id'))).toBe(true);
+      expect(sqlAndParams[0]).toContain('md_revenue_by_id');
+      expect(sqlAndParams[0]).not.toContain('select * from monthly_data');
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            {
+              md__created_at_month: '2017-01-01T00:00:00.000Z',
+              md__revenue_no_id_sum: '30',
+              md__revenue_no_id_pct: '50.0000000000000000'
+            },
+            {
+              md__created_at_month: '2017-02-01T00:00:00.000Z',
+              md__revenue_no_id_sum: '200',
+              md__revenue_no_id_pct: '50.0000000000000000'
+            },
+            {
+              md__created_at_month: '2017-03-01T00:00:00.000Z',
+              md__revenue_no_id_sum: '400',
+              md__revenue_no_id_pct: '50.0000000000000000'
             }
           ]
         );

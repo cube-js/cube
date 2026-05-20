@@ -123,6 +123,13 @@
         "measures": [
           "CUBE.countApproxByCustomer"
         ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
       }
     ]
   },
@@ -177,6 +184,7 @@
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
     "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
 
     "---------------------------------------",
     "SKIPPED SQL API (Need work)",

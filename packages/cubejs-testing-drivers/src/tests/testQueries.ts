@@ -205,6 +205,14 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
       await delay(OP_DELAY);
 
+      await buildPreaggs(env.cube.port, apiToken, {
+        timezones: ['UTC'],
+        preAggregations: ['BigECommerce.CategoryFlatExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+
+      await delay(OP_DELAY);
+
       if (includeHLLSuite) {
         await buildPreaggs(env.cube.port, apiToken, {
           timezones: ['UTC'],
@@ -1881,6 +1889,43 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           granularity: 'month',
           dateRange: ['2020-01-01', '2020-12-31'],
         }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfit',
+          'BigECommerce.profitInCategory',
+        ],
+        dimensions: [
+          'BigECommerce.category',
+          'BigECommerce.productName',
+        ],
+        order: [
+          ['BigECommerce.totalProfit', 'desc'],
+          ['BigECommerce.category', 'asc'],
+          ['BigECommerce.productName', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: two multi-stage branches sharing one pre-aggregation', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfitNoId',
+          'BigECommerce.totalProfitNoIdPct',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
       });
       expect(response.rawData()).toMatchSnapshot();
     });
