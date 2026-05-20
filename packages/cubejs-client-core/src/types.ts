@@ -12,7 +12,11 @@ export type TQueryOrderArray = Array<[string, QueryOrder]>;
 
 export type GranularityAnnotation = {
   name: string;
+  type?: 'built-in' | 'custom';
   title: string;
+  /** d3-time-format string for displaying bucketed timestamps. */
+  format?: string;
+  /** Always present: built-ins use "1 <unit>"; customs carry the user-defined interval. */
   interval: string;
   offset?: string;
   origin?: string;
