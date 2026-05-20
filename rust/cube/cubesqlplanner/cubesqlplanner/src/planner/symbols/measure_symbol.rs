@@ -626,33 +626,6 @@ impl SymbolFactory for MeasureSymbolFactory {
             cube_evaluator,
         } = self;
 
-        let pk_sqls = if sql.is_none() {
-            cube_evaluator
-                .static_data()
-                .primary_keys
-                .get(path.cube_name())
-                .cloned()
-                .unwrap_or_else(|| vec![])
-                .into_iter()
-                .map(|primary_key| -> Result<_, CubeError> {
-                    let key_dimension_name = format!("{}.{}", path.cube_name(), primary_key);
-                    let key_dimension =
-                        cube_evaluator.dimension_by_path(key_dimension_name.clone())?;
-                    let key_dimension_sql = if let Some(key_dimension_sql) = key_dimension.sql()? {
-                        Ok(key_dimension_sql)
-                    } else {
-                        Err(CubeError::internal(format!(
-                            "Key dimension {} hasn't sql evaluator",
-                            key_dimension_name
-                        )))
-                    }?;
-                    compiler.compile_sql_call(path.cube_name(), key_dimension_sql)
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            vec![]
-        };
-
         let mut measure_filters = vec![];
         if let Some(filters) = definition.filters()? {
             for filter in filters.iter() {
@@ -680,6 +653,42 @@ impl SymbolFactory for MeasureSymbolFactory {
             Some(compiler.compile_sql_call(path.cube_name(), sql)?)
         } else {
             None
+        };
+
+        // pk_sqls are collected when this measure may render as a row-count
+        // (`type: count` with no `sql`, or the `type: number` + `sql: count(*)`
+        // idiom — `MeasureKind::from_type_str` promotes the latter to `Count`
+        // and needs the pk list to drive `COUNT(DISTINCT pk)` under a
+        // multiplied join).
+        let needs_count_pks = sql
+            .as_ref()
+            .map(|sql_call| sql_call.is_count_star())
+            .unwrap_or(true);
+        let pk_sqls = if needs_count_pks {
+            cube_evaluator
+                .static_data()
+                .primary_keys
+                .get(path.cube_name())
+                .cloned()
+                .unwrap_or_else(|| vec![])
+                .into_iter()
+                .map(|primary_key| -> Result<_, CubeError> {
+                    let key_dimension_name = format!("{}.{}", path.cube_name(), primary_key);
+                    let key_dimension =
+                        cube_evaluator.dimension_by_path(key_dimension_name.clone())?;
+                    let key_dimension_sql = if let Some(key_dimension_sql) = key_dimension.sql()? {
+                        Ok(key_dimension_sql)
+                    } else {
+                        Err(CubeError::internal(format!(
+                            "Key dimension {} hasn't sql evaluator",
+                            key_dimension_name
+                        )))
+                    }?;
+                    compiler.compile_sql_call(path.cube_name(), key_dimension_sql)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            vec![]
         };
 
         let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());

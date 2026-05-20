@@ -55,6 +55,15 @@ impl MeasureKind {
         } else if measure_type == "rank" {
             Ok(Self::Rank)
         } else if let Some(calc_type) = CalculatedMeasureType::from_str(measure_type) {
+            // `type: number, sql: count(*)` is the classic-compiler idiom for
+            // a row-count measure. Promote it to a `Count` kind here so the
+            // rest of the planner (additivity-in-multiplied, aggregate-wrap)
+            // treats it identically to `type: count` with no `sql`.
+            if let Some(sql) = &member_sql {
+                if calc_type == CalculatedMeasureType::Number && sql.is_count_star() {
+                    return Ok(Self::Count(CountMeasure::new(CountSql::Auto(pk_sqls))));
+                }
+            }
             Ok(if let Some(sql) = member_sql {
                 Self::Calculated(CalculatedMeasure::new(calc_type, sql))
             } else {

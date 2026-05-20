@@ -1,0 +1,55 @@
+cubes:
+    - name: visitors
+      sql: "SELECT * FROM visitors"
+      joins:
+          - name: visitor_checkins
+            relationship: one_to_many
+            sql: "{CUBE}.id = {visitor_checkins.visitor_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: source
+            type: string
+            sql: source
+      measures:
+          - name: visitor_count
+            type: number
+            sql: "count(*)"
+
+    - name: visitor_checkins
+      sql: "SELECT * FROM visitor_checkins"
+      joins:
+          - name: cards
+            relationship: one_to_many
+            sql: "{CUBE}.id = {cards.visitor_checkin_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: visitor_id
+            type: number
+            sql: visitor_id
+          - name: cards_count
+            type: number
+            sql: "{cards.count}"
+            sub_query: true
+      measures:
+          - name: visitor_checkins_count
+            type: count
+
+    - name: cards
+      sql: "SELECT * FROM cards"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: visitor_checkin_id
+            type: number
+            sql: visitor_checkin_id
+      measures:
+          - name: count
+            type: count

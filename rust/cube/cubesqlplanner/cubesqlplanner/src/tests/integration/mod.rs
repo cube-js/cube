@@ -1,6 +1,7 @@
 mod advanced_features;
 mod advanced_filters;
 mod calendar;
+mod chained_subquery;
 mod combinations;
 mod custom_granularities;
 mod filtered_measures;
