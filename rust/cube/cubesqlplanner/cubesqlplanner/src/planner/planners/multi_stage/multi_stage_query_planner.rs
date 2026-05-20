@@ -1,7 +1,7 @@
 use super::member_query_planner::{
     build_for_cte_dimension_query, build_for_cte_query, build_for_leaf_cte_query,
     build_rolling_window_query, build_time_series_get_range_query, build_time_series_query,
-    ref_for_member,
+    ref_for_body,
 };
 use super::{
     CteRole, CteState, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType,
@@ -243,7 +243,7 @@ impl MultiStageQueryPlanner {
                 &ms_member,
                 cte_state,
             )?;
-            let cte_ref = ref_for_member(alias, &member, &state);
+            let cte_ref = ref_for_body(alias, &member, &body);
             cte_state.add_member(
                 role,
                 vec![member.clone()],
@@ -313,7 +313,7 @@ impl MultiStageQueryPlanner {
                 &children,
             )?,
         };
-        let cte_ref = ref_for_member(alias, &member, &state);
+        let cte_ref = ref_for_body(alias, &member, &body);
         cte_state.add_member(
             role,
             vec![member.clone()],
@@ -484,7 +484,7 @@ impl MultiStageQueryPlanner {
                 &ms_member,
                 cte_state,
             )?;
-            let cte_ref = ref_for_member(alias, &member, &new_state);
+            let cte_ref = ref_for_body(alias, &member, &body);
             cte_state.add_member(
                 role,
                 vec![member.clone()],
@@ -742,7 +742,7 @@ impl MultiStageQueryPlanner {
             &rolling_window_descr,
             &children,
         )?;
-        let cte_ref = ref_for_member(alias, &member, &state);
+        let cte_ref = ref_for_body(alias, &member, &body);
         cte_state.add_member(
             CteRole::MultiStageMeasure,
             vec![member.clone()],
@@ -774,7 +774,7 @@ impl MultiStageQueryPlanner {
             time_dimension.clone(),
             cte_state,
         )?;
-        let cte_ref = ref_for_member(alias, &time_dimension, &state);
+        let cte_ref = ref_for_body(alias, &time_dimension, &body);
         cte_state.add_member(
             CteRole::MultiStageMeasure,
             vec![time_dimension.clone()],
@@ -822,7 +822,7 @@ impl MultiStageQueryPlanner {
                 date_range_cte: get_range_cte.map(|r| r.name().clone()),
             }),
         )?;
-        let cte_ref = ref_for_member(alias, &time_dimension, &state);
+        let cte_ref = ref_for_body(alias, &time_dimension, &body);
         cte_state.add_member(
             CteRole::MultiStageMeasure,
             vec![time_dimension.clone()],
@@ -861,7 +861,7 @@ impl MultiStageQueryPlanner {
             &ms_member,
             cte_state,
         )?;
-        let cte_ref = ref_for_member(alias, &member, &state);
+        let cte_ref = ref_for_body(alias, &member, &body);
         cte_state.add_member(
             role,
             vec![member.clone()],

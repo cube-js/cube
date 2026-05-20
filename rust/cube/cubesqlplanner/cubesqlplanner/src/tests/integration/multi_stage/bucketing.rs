@@ -96,14 +96,6 @@ async fn test_bucketing_with_complex_bucket_dimension() {
     }
 }
 
-// FIXME: bottom-up `child.schema().dimensions` union in
-// `build_for_cte_dimension_query` doesn't reproduce the old
-// `collect_all_non_multi_stage_dimension` walk for chained /
-// multi-dim multi-stage dimension setups — extension dims from
-// deeper inode states don't propagate up correctly. Re-enable after
-// the multi-stage dim walk is restored on top of the new bottom-up
-// recursion.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bucketing_with_dimension_over_complex_dimension() {
     let ctx = create_context();
@@ -183,9 +175,6 @@ async fn test_bucketing_dim_reference_other_cube_measure() {
     }
 }
 
-// FIXME: see `test_bucketing_with_dimension_over_complex_dimension` —
-// same bottom-up multi-stage-dim walk regression.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bucketing_with_two_dimensions() {
     let ctx = create_context();
@@ -216,8 +205,12 @@ async fn test_bucketing_with_two_dimensions() {
     }
 }
 
-// FIXME: see `test_bucketing_with_dimension_over_complex_dimension` —
-// same bottom-up multi-stage-dim walk regression.
+// FIXME: pk_aggregate_keys_source UNION ALL requires all child CTEs
+// to project the same columns; when one multi-stage dim ref-chain
+// branch carries `first_date.customer_type2` and another carries
+// only `orders.change_type_complex` deps, the UNION misses the
+// off-branch dim column. Needs the keys-source to NULL-pad missing
+// columns or restrict the DISTINCT projection to the intersection.
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bucketing_with_two_dims_concated() {

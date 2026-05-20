@@ -398,26 +398,20 @@ pub(crate) fn build_for_leaf_cte_query(
     }))
 }
 
-/// Builds a `MultiStageSubqueryRef` for a freshly registered CTE.
-/// The schema mirrors the state-derived shape used historically by
-/// `input_cte_aliases` — `state.dimensions + state.time_dimensions +
-/// [member]` — which keeps the ref interchangeable with what former
-/// description-tree consumers expected.
-pub(crate) fn ref_for_member(
+/// Builds a `MultiStageSubqueryRef` for a freshly rendered CTE body.
+/// The ref's schema mirrors the body's own output schema — so any
+/// extension dim carried up through the recursive `build_for_cte_*`
+/// union is visible to outer consumers (chained multi-stage dim).
+pub(crate) fn ref_for_body(
     alias: String,
     member: &Rc<MemberSymbol>,
-    state: &Rc<QueryProperties>,
+    body: &LogicalMultiStageMember,
 ) -> Rc<MultiStageSubqueryRef> {
-    let schema = LogicalSchema::default()
-        .set_time_dimensions(state.time_dimensions().clone())
-        .set_dimensions(state.dimensions().clone())
-        .set_measures(vec![member.clone()])
-        .into_rc();
     Rc::new(
         MultiStageSubqueryRef::builder()
             .name(alias)
             .symbols(vec![member.clone()])
-            .schema(schema)
+            .schema(body.body.schema())
             .build(),
     )
 }

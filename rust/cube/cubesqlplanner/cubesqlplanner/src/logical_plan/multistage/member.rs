@@ -14,6 +14,22 @@ pub enum MultiStageMemberBody {
     RollingWindow(Rc<MultiStageRollingWindow>),
 }
 
+impl MultiStageMemberBody {
+    /// Output schema of this CTE body: dimensions/measures projected by
+    /// the rendered SQL. For `Query`, this is the embedded
+    /// `LogicalSchema`; for `RollingWindow`, the schema it carries; for
+    /// `TimeSeries`, a synthetic schema with just the time dimension.
+    pub fn schema(&self) -> Rc<LogicalSchema> {
+        match self {
+            Self::Query(q) => q.schema().clone(),
+            Self::RollingWindow(rw) => rw.schema.clone(),
+            Self::TimeSeries(ts) => LogicalSchema::default()
+                .set_time_dimensions(vec![ts.time_dimension().clone()])
+                .into_rc(),
+        }
+    }
+}
+
 impl PrettyPrint for MultiStageMemberBody {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
