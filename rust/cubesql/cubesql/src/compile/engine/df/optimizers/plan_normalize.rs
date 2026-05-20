@@ -11,8 +11,8 @@ use datafusion::{
             Limit, Partitioning, Projection, Repartition, Sort, Subquery, TableScan, TableUDFs,
             Union, Values, Window,
         },
-        union_with_alias, Column, DFSchema, ExprRewritable, ExprSchemable, LogicalPlan,
-        LogicalPlanBuilder, Operator,
+        union_with_alias, Column, DFSchema, ExprRewritable, ExprSchemable, ExprVisitable,
+        ExpressionVisitor, LogicalPlan, LogicalPlanBuilder, Operator, Recursion,
     },
     optimizer::{
         optimizer::{OptimizerConfig, OptimizerRule},
@@ -23,7 +23,9 @@ use datafusion::{
 };
 
 use crate::compile::{
-    date_parser::parse_date_str, engine::CubeContext, rewrite::rules::utils::DatePartToken,
+    date_parser::parse_date_str,
+    engine::{udf::CURRENT_TIMESTAMP_STAND_INS, CubeContext},
+    rewrite::rules::utils::DatePartToken,
 };
 
 /// PlanNormalize optimizer rule walks through the query and applies transformations
@@ -1422,12 +1424,12 @@ fn binary_expr_normalize(
             return Ok(Box::new(Expr::BinaryExpr {
                 left,
                 op,
-                right: cast_date_to_timestamp(optimizer, right, &left_type, schema),
+                right: cast_date_unless_stand_in(optimizer, right, &left_type, schema),
             }));
         }
         (DataType::Date32, DataType::Timestamp(_, _)) => {
             return Ok(Box::new(Expr::BinaryExpr {
-                left: cast_date_to_timestamp(optimizer, left, &right_type, schema),
+                left: cast_date_unless_stand_in(optimizer, left, &right_type, schema),
                 op,
                 right,
             }));
@@ -1476,7 +1478,8 @@ fn normalize_temporal_operand(
             data_type: target_type.clone(),
         }));
     }
-    if matches!(expr_type, DataType::Date32) {
+    // A stand-in the rewrite replaces is not folded; see `holds_timestamp_stand_in`
+    if matches!(expr_type, DataType::Date32) && !holds_timestamp_stand_in(&expr) {
         return Ok(
             fold_date_to_timestamp(optimizer, &expr, target_type, schema)
                 .or_else(|| fold_date_to_millis(optimizer, &expr, target_type, schema))
@@ -1484,6 +1487,23 @@ fn normalize_temporal_operand(
         );
     }
     Ok(expr)
+}
+
+/// [`cast_date_to_timestamp`], but a `DATE` holding a stand-in the rewrite
+/// replaces keeps the explicit cast unfolded; see `holds_timestamp_stand_in`.
+fn cast_date_unless_stand_in(
+    optimizer: &PlanNormalize,
+    expr: Box<Expr>,
+    data_type: &DataType,
+    schema: &DFSchema,
+) -> Box<Expr> {
+    if holds_timestamp_stand_in(&expr) {
+        return Box::new(Expr::Cast {
+            expr,
+            data_type: data_type.clone(),
+        });
+    }
+    cast_date_to_timestamp(optimizer, expr, data_type, schema)
 }
 
 /// Casts a `DATE` operand of `TIMESTAMP` arithmetic and folds it to a constant. When it can't
@@ -1693,7 +1713,9 @@ fn in_list_expr_normalize(
             }
 
             let list_expr_type = list_expr_normalized.get_type(schema)?;
-            if !matches!(list_expr_type, DataType::Date32) {
+            if !matches!(list_expr_type, DataType::Date32)
+                || holds_timestamp_stand_in(&list_expr_normalized)
+            {
                 return Ok(list_expr_normalized);
             }
 
@@ -1759,6 +1781,12 @@ fn between_expr_normalize(
         if !bound_is_temporal || (bound_type == expr_type && !bound_is_computed) {
             return Ok(Box::new(bound));
         }
+        // `current_timestamp` and `localtimestamp` are stand-ins the rewrite
+        // replaces, which constant folding must not run; a bound holding one
+        // is left to the rewrite, as a comparison operand or IN item is
+        if holds_timestamp_stand_in(&bound) {
+            return Ok(Box::new(bound));
+        }
 
         let casted = Expr::Cast {
             expr: Box::new(bound.clone()),
@@ -1791,6 +1819,31 @@ fn between_expr_normalize(
         low,
         high,
     }))
+}
+
+/// Whether the expression holds `current_timestamp` or `localtimestamp`, the
+/// stand-ins whose body panics, anywhere in it.
+fn holds_timestamp_stand_in(expr: &Expr) -> bool {
+    struct Finder(bool);
+
+    impl ExpressionVisitor for Finder {
+        fn pre_visit(mut self, expr: &Expr) -> Result<Recursion<Self>> {
+            let is_stand_in = matches!(
+                expr,
+                Expr::ScalarUDF { fun, .. }
+                    if CURRENT_TIMESTAMP_STAND_INS.contains(&fun.name.as_str())
+            );
+            if is_stand_in {
+                self.0 = true;
+                return Ok(Recursion::Stop(self));
+            }
+            Ok(Recursion::Continue(self))
+        }
+    }
+
+    expr.accept(Finder(false))
+        .map(|found| found.0)
+        .unwrap_or(true)
 }
 
 fn evaluate_expr_stacked(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> {
