@@ -50,6 +50,19 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                         )));
                     }
                     self.sub_query_dimensions.push(node.clone());
+                    // sub_query CTE owns its own scope — don't descend
+                    // into the measures it references from the host.
+                    return Ok(None);
+                }
+                if dim.is_multi_stage() {
+                    // Multi-stage dimension surfaces at the same place
+                    // as a DSQ in the host query — they share the
+                    // `MultiStageDimensionRef` mechanism on the
+                    // consumer side. The planner downstream dispatches
+                    // by `is_sub_query` vs `is_multi_stage` to pick the
+                    // right build path.
+                    self.sub_query_dimensions.push(node.clone());
+                    return Ok(None);
                 }
                 Ok(Some(()))
             }

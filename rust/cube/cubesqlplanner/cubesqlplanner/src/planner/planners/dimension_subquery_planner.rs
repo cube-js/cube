@@ -60,8 +60,15 @@ impl DimensionSubqueryPlanner {
         })
     }
 
-    /// Build a `MultiStageDimensionRef` per subquery dim and publish the
-    /// body of each one as a `LogicalMultiStageMember` on `cte_state`.
+    /// Build a `MultiStageDimensionRef` per synthetic dimension and
+    /// publish each body as a `LogicalMultiStageMember` on `cte_state`.
+    /// Dispatches on the dim flavour:
+    /// - `sub_query: true` → DSQ CTE (`plan_sub_query`).
+    /// - `multi_stage: true` → routed elsewhere (currently planned by
+    ///   `MultiStageQueryPlanner` top-level; will fold in here later).
+    ///   For now the leaf consumer doesn't see these in
+    ///   `Query.multi_stage_dimensions` — they reach it through the
+    ///   outer `FullKeyAggregate` path.
     /// The caller stores returned refs on `Query.multi_stage_dimensions`
     /// of the Query that consumes them; the QueryProcessor reads them
     /// from there to wire CTE joins and render references.
@@ -71,13 +78,20 @@ impl DimensionSubqueryPlanner {
         cte_state: &mut CteState,
     ) -> Result<Vec<Rc<MultiStageDimensionRef>>, CubeError> {
         let mut result = Vec::new();
-        for subquery_dimension in dimensions.iter() {
-            result.push(self.plan_query(subquery_dimension.clone(), cte_state)?);
+        for synthetic_dim in dimensions.iter() {
+            let Ok(dim_symbol) = synthetic_dim.as_dimension() else {
+                continue;
+            };
+            if dim_symbol.is_sub_query() {
+                result.push(self.plan_sub_query(synthetic_dim.clone(), cte_state)?);
+            }
+            // `is_multi_stage()` dims are intentionally skipped here —
+            // see method docstring.
         }
         Ok(result)
     }
 
-    fn plan_query(
+    fn plan_sub_query(
         &self,
         subquery_dimension: Rc<MemberSymbol>,
         cte_state: &mut CteState,
