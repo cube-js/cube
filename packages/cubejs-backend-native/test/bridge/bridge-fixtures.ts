@@ -144,7 +144,7 @@ export const cubeDefinitionFixture = (): unknown => ({
   name: 'Orders',
   // sqlAlias, isView, isCalendar, joinMap optional
   // sql_table, sql optional getters
-  filters: [viewFilterDefinitionFixture()],
+  defaultFilters: [viewFilterDefinitionFixture()],
 });
 
 export const dimensionDefinitionFixture = (): unknown => ({

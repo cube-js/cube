@@ -46,7 +46,7 @@ views:
       cubes:
           - join_path: orders
             includes: "*"
-      filters:
+      default_filters:
           - member: orders_view.currency
             operator: equals
             values:
@@ -56,7 +56,7 @@ views:
       cubes:
           - join_path: orders
             includes: "*"
-      filters:
+      default_filters:
           - member: orders_view_with_unless.currency
             operator: equals
             values:

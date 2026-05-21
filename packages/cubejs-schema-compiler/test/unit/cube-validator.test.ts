@@ -219,7 +219,7 @@ describe('Cube Validation', () => {
         name: 'orders_view',
         isView: true,
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             member: () => 'currency',
             operator: 'equals',
@@ -239,7 +239,7 @@ describe('Cube Validation', () => {
         name: 'orders_view',
         isView: true,
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             member: () => 'currency',
             operator: 'equals',
@@ -260,7 +260,7 @@ describe('Cube Validation', () => {
         name: 'orders_view',
         isView: true,
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             member: () => 'currency',
             operator: 'set',
@@ -279,7 +279,7 @@ describe('Cube Validation', () => {
         name: 'orders_view',
         isView: true,
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             member: () => 'currency',
             operator: 'equals',
@@ -298,7 +298,7 @@ describe('Cube Validation', () => {
         name: 'orders_view',
         isView: true,
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             operator: 'equals',
             values: () => ['USD'],
@@ -317,7 +317,7 @@ describe('Cube Validation', () => {
         name: 'orders_view',
         isView: true,
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             member: () => 'currency',
             operator: 'someInvalidOperator',
@@ -337,7 +337,7 @@ describe('Cube Validation', () => {
         name: 'orders',
         sql: () => 'SELECT * FROM orders',
         fileName: 'fileName',
-        filters: [
+        defaultFilters: [
           {
             member: () => 'currency',
             operator: 'equals',

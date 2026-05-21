@@ -32,7 +32,7 @@ pub struct MockCubeDefinition {
     joins: HashMap<String, MockJoinItemDefinition>,
 
     #[builder(default)]
-    filters: Vec<MockViewFilterDefinition>,
+    default_filters: Vec<MockViewFilterDefinition>,
 }
 
 impl_static_data!(
@@ -70,16 +70,16 @@ impl CubeDefinition for MockCubeDefinition {
         }
     }
 
-    fn has_filters(&self) -> Result<bool, CubeError> {
-        Ok(!self.filters.is_empty())
+    fn has_default_filters(&self) -> Result<bool, CubeError> {
+        Ok(!self.default_filters.is_empty())
     }
 
-    fn filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError> {
-        if self.filters.is_empty() {
+    fn default_filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError> {
+        if self.default_filters.is_empty() {
             Ok(None)
         } else {
             Ok(Some(
-                self.filters
+                self.default_filters
                     .iter()
                     .map(|f| Rc::new(f.clone()) as Rc<dyn ViewFilterDefinition>)
                     .collect(),
@@ -308,8 +308,8 @@ mod tests {
             .sql("SELECT * FROM orders".to_string())
             .build();
 
-        assert!(!view.has_filters().unwrap());
-        assert!(view.filters().unwrap().is_none());
+        assert!(!view.has_default_filters().unwrap());
+        assert!(view.default_filters().unwrap().is_none());
     }
 
     #[test]
@@ -318,7 +318,7 @@ mod tests {
             .name("orders_view".to_string())
             .is_view(Some(true))
             .sql("SELECT * FROM orders".to_string())
-            .filters(vec![
+            .default_filters(vec![
                 MockViewFilterDefinition::builder()
                     .operator("equals".to_string())
                     .member_reference("orders.currency".to_string())
@@ -332,8 +332,8 @@ mod tests {
             ])
             .build();
 
-        assert!(view.has_filters().unwrap());
-        let filters = view.filters().unwrap().unwrap();
+        assert!(view.has_default_filters().unwrap());
+        let filters = view.default_filters().unwrap().unwrap();
         assert_eq!(filters.len(), 2);
 
         let first = filters[0].static_data();

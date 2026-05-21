@@ -722,7 +722,7 @@ fn invoke_cube_definition<IT: InnerTypes>(b: &NativeCubeDefinition<IT>) -> Invok
     let mut r = InvokeResult::new();
     r.record("sql_table", b.sql_table());
     r.record("sql", b.sql());
-    r.record("filters", b.filters());
+    r.record("default_filters", b.default_filters());
     r
 }
 

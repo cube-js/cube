@@ -226,7 +226,7 @@ export interface CubeDefinition {
   isView?: boolean;
   viewGroup?: string | ((...args: any[]) => any);
   viewGroups?: string[] | ((...args: any[]) => any);
-  filters?: ViewDefaultValueFilter[];
+  defaultFilters?: ViewDefaultValueFilter[];
   calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: ViewIncludedMember[];

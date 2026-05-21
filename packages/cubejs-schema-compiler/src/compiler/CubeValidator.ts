@@ -1130,7 +1130,7 @@ const folderSchema = Joi.object().keys({
   ]).required(),
 }).id('folderSchema');
 
-const ViewFilterSchema = Joi.object().keys({
+const ViewDefaultFilterSchema = Joi.object().keys({
   member: Joi.func().required(),
   operator: Joi.any().valid(
     'equals',
@@ -1195,7 +1195,7 @@ const viewSchema = inherit(baseSchema, {
     })
   ),
   folders: Joi.array().items(folderSchema),
-  filters: Joi.array().items(ViewFilterSchema),
+  defaultFilters: Joi.array().items(ViewDefaultFilterSchema),
 });
 
 function formatErrorMessageFromDetails(explain, d) {

@@ -79,11 +79,11 @@ struct YamlView {
     name: String,
     cubes: Vec<YamlViewCube>,
     #[serde(default)]
-    filters: Vec<YamlViewFilter>,
+    default_filters: Vec<YamlViewDefaultFilter>,
 }
 
 #[derive(Debug, Deserialize)]
-struct YamlViewFilter {
+struct YamlViewDefaultFilter {
     member: String,
     operator: String,
     #[serde(default)]
@@ -185,7 +185,7 @@ impl YamlSchema {
                     view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
             }
 
-            for filter in view.filters {
+            for filter in view.default_filters {
                 let mock_filter = MockViewFilterDefinition::builder()
                     .operator(filter.operator)
                     .member_reference(filter.member)

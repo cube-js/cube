@@ -148,7 +148,7 @@ export type EvaluatedCube = {
   accessPolicy?: AccessPolicyDefinition[];
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
-  filters?: ViewDefaultValueFilter[];
+  defaultFilters?: ViewDefaultValueFilter[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -215,7 +215,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   private prepareViewFilters(cube: any, errorReporter: ErrorReporter) {
-    if (!cube.filters) {
+    if (!cube.defaultFilters) {
       return;
     }
 
@@ -250,7 +250,7 @@ export class CubeEvaluator extends CubeSymbols {
       return `${cube.name}.${match.name}`;
     };
 
-    for (const filter of cube.filters as ViewDefaultValueFilter[]) {
+    for (const filter of cube.defaultFilters as ViewDefaultValueFilter[]) {
       const rawMember = this.evaluateReferences(cube.name, filter.member);
       const resolved = resolveViewMember('member', rawMember);
       if (resolved !== null) {
