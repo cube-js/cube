@@ -165,13 +165,6 @@
           "name": "category_index",
           "columns": ["CUBE.productName"]
         }]
-      },
-      {
-        "name": "CategoryFlat",
-        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
-        "measures": [
-          "CUBE.totalProfit"
-        ]
       }
     ]
   },
