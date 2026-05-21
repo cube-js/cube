@@ -124,7 +124,7 @@ impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
                 .value
                 .downcast::<JsObject, _>(self.cx)
                 .or_throw(self.cx)?;
-            let deserializer = JsObjectDeserializer::new(self.cx, js_object);
+            let deserializer = JsObjectDeserializer::new(self.cx, js_object)?;
             visitor.visit_map(deserializer)
         } else if self.value.is_a::<JsNull, _>(self.cx)
             || self.value.is_a::<JsUndefined, _>(self.cx)
@@ -224,7 +224,7 @@ impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
                 .value
                 .downcast::<JsObject, _>(self.cx)
                 .or_throw(self.cx)?;
-            let deserializer = JsObjectDeserializer::new(self.cx, js_object);
+            let deserializer = JsObjectDeserializer::new(self.cx, js_object)?;
             visitor.visit_map(deserializer)
         } else {
             Err(JsDeserializationError("expected an object".to_string()))
@@ -270,12 +270,18 @@ struct JsObjectDeserializer<'a, 'b> {
 }
 
 impl<'a, 'b> JsObjectDeserializer<'a, 'b> {
-    fn new(cx: &'a mut FunctionContext<'b>, js_object: Handle<'a, JsObject>) -> Self {
-        let keys = js_object
-            .get_own_property_names(cx)
-            .expect("Failed to get object keys")
-            .to_vec(cx)
-            .expect("Failed to convert keys to Vec")
+    fn new(
+        cx: &'a mut FunctionContext<'b>,
+        js_object: Handle<'a, JsObject>,
+    ) -> Result<Self, JsDeserializationError> {
+        let keys_array = js_object.get_own_property_names(cx).map_err(|err| {
+            JsDeserializationError(format!("Unable to get keys from object '{}'", err))
+        })?;
+        let keys_vec = keys_array.to_vec(cx).map_err(|err| {
+            JsDeserializationError(format!("Unable to get keys from object '{}'", err))
+        })?;
+
+        let keys = keys_vec
             .iter()
             .filter_map(|k| {
                 k.downcast_or_throw::<JsString, _>(cx)
@@ -283,12 +289,13 @@ impl<'a, 'b> JsObjectDeserializer<'a, 'b> {
                     .map(|js_string| js_string.value(cx))
             })
             .collect::<Vec<String>>();
-        Self {
+
+        Ok(Self {
             cx,
             js_object,
             keys,
             index: 0,
-        }
+        })
     }
 }
 
