@@ -170,6 +170,7 @@
                   "docs/data-modeling/dynamic/schema-execution-environment"
                 ]
               },
+              "docs/data-modeling/configuration",
               {
                 "group": "Developing Model",
                 "pages": [

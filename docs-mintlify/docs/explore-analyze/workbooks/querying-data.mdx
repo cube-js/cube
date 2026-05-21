@@ -21,7 +21,28 @@ Note that chart tables are different from results tables. You can configure pivo
 
 ## Limiting
 
-By default, queries are limited to 5,000 rows of data, but the limit can be adjusted up to 50,000.
+Every query in a workbook returns at most a fixed number of rows. By
+default, queries are limited to **5,000 rows**, and you can adjust the
+limit up to **50,000 rows** from the query controls.
+
+The default and maximum values available in the workbook are governed by
+the deployment's [Model Configuration][ref-configuration]:
+
+- **Default row limit** is applied when a query doesn't specify one
+  explicitly.
+- **Maximum row limit** is the upper bound — any value you pick in the
+  workbook is capped at this number.
+
+Updating those settings at the deployment level changes what every
+workbook in the deployment can request.
+
+<Warning>
+
+Large result sets can slow down chart rendering and may hit browser
+memory limits, especially for tables. When possible, aggregate in the
+semantic layer instead of pulling raw rows into the workbook.
+
+</Warning>
 
 ## Sorting
 
@@ -92,4 +113,5 @@ Currently, advanced semantic queries can be placed on dashboards, but dashboard 
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
+[ref-configuration]: /docs/data-modeling/configuration
 
