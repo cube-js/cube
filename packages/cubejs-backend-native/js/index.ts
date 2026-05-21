@@ -4,7 +4,7 @@ import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
 import { CacheMode } from '@cubejs-backend/shared';
-import { ResultWrapper } from './ResultWrapper';
+import { NativeQueryResultRef, ResultWrapper } from './ResultWrapper';
 
 export * from './ResultWrapper';
 
@@ -468,11 +468,11 @@ export type ResultRow = Record<string, string>;
 export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
   const native = loadNative();
 
-  const msg = await native.parseCubestoreResultMessage(message);
+  const msg = await native.parseCubestoreResultMessage(message) as NativeQueryResultRef;
   return new ResultWrapper(msg);
 };
 
-export const getCubestoreResult = (ref: ResultWrapper): ResultRow[] => {
+export const getCubestoreResult = (ref: NativeQueryResultRef): ResultRow[] => {
   const native = loadNative();
 
   return native.getCubestoreResult(ref);
