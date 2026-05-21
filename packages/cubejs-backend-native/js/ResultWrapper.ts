@@ -58,16 +58,22 @@ class BaseWrapper {
   public readonly isWrapper: boolean = true;
 }
 
-export class ResultWrapper extends BaseWrapper implements DataResult {
-  private readonly proxy: any;
+// `nativeReference` holds a Neon `JsBox<Arc<QueryResult>>` — a Rust-backed
+// external, Symbol is used to keep it protecting from deserializing in a case of a leak to JsObjectDeserializer
+const NATIVE_REFERENCE = Symbol('nativeReference');
 
+export type NativeQueryResultRef = {
+  __typename?: 'NativeQueryResultRef';
+};
+
+export class ResultWrapper extends BaseWrapper implements DataResult {
   private cache: any;
 
   public cached: Boolean = false;
 
   private readonly isNative: Boolean = false;
 
-  private readonly nativeReference: any;
+  private readonly [NATIVE_REFERENCE]: NativeQueryResultRef | null = null;
 
   private readonly jsResult: any = null;
 
@@ -86,10 +92,10 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
       this.jsResult = input;
     } else {
       this.isNative = true;
-      this.nativeReference = input;
+      this[NATIVE_REFERENCE] = input;
     }
 
-    this.proxy = new Proxy(this, {
+    const proxy = new Proxy(this, {
       get: (target, prop: string | symbol) => {
         // To support iterative access
         if (prop === Symbol.iterator) {
@@ -157,15 +163,15 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
         ]));
       }
     });
-    Object.setPrototypeOf(this.proxy, ResultWrapper.prototype);
+    Object.setPrototypeOf(proxy, ResultWrapper.prototype);
 
-    return this.proxy;
+    return proxy;
   }
 
   private getArray(): ResultRow[] {
     if (!this.cache) {
-      if (this.isNative) {
-        this.cache = getCubestoreResult(this.nativeReference);
+      if (this.isNative && this[NATIVE_REFERENCE] !== null) {
+        this.cache = getCubestoreResult(this[NATIVE_REFERENCE]);
       } else {
         this.cache = this.jsResult;
       }
@@ -182,7 +188,7 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
 
   public getRawData(): any[] {
     if (this.isNative) {
-      return [this.nativeReference];
+      return [this[NATIVE_REFERENCE]];
     }
 
     // Pivot to columnar before serializing: the row-oriented form repeats
