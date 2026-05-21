@@ -148,7 +148,13 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
 
       ownKeys: (target) => {
         const array = this.getArray();
-        return [...Object.keys(target), ...Object.keys(array), 'length', 'isNative'];
+
+        return Array.from(new Set<string>([
+          ...Object.keys(target),
+          ...Object.keys(array),
+          'length',
+          'isNative',
+        ]));
       }
     });
     Object.setPrototypeOf(this.proxy, ResultWrapper.prototype);
