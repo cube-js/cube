@@ -173,6 +173,17 @@ environment variables.
 CUBEJS_DATASOURCES=default,datasource1
 ```
 
+<Info>
+
+In Cube Cloud, this variable is **auto-maintained** when sources are managed
+from [**Settings → Data Sources**][ref-config-multiple-ds-cloud]. The page
+writes, updates, and removes it as you add or delete named sources — you
+only need to hand-edit it when configuring Cube Core or when overriding
+the UI from
+[**Settings → Environment Variables**](/admin/index#environment-variables).
+
+</Info>
+
 ## `CUBEJS_DB_BQ_CREDENTIALS`
 
 A Base64 encoded JSON key file for connecting to Google BigQuery.
@@ -1878,7 +1889,8 @@ The port for a Cube deployment to listen to API connections on.
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
 [ref-config-db]: /admin/connect-to-data/data-sources
-[ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-config-multiple-ds-cloud]: /admin/connect-to-data/multiple-data-sources
+[ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-config-sched-refresh-timer]: /reference/configuration/config#scheduled_refresh_timer
 [ref-rest-scopes]: /reference/rest-api#configuration-api-scopes
 [snowflake-docs-account-id]:
