@@ -205,13 +205,17 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
       await delay(OP_DELAY);
 
-      await buildPreaggs(env.cube.port, apiToken, {
-        timezones: ['UTC'],
-        preAggregations: ['BigECommerce.CategoryFlatExternal'],
-        contexts: [{ securityContext: { tenant: 't1' } }],
-      });
+      if (type !== 'clickhouse') {
+        // ClickHouse cannot build this non-partitioned rollup; the
+        // corresponding test is skipped in both skip lists for clickhouse.
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.CategoryFlatExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
 
-      await delay(OP_DELAY);
+        await delay(OP_DELAY);
+      }
 
       if (includeHLLSuite) {
         await buildPreaggs(env.cube.port, apiToken, {
