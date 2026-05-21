@@ -539,8 +539,8 @@ describe('PreAggregationsMultiStage', () => {
     it('two multi-stage branches sharing one pre-aggregation', () => compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
-          'monthly_data.revenue',
           'monthly_data.revenue_no_id_sum',
+          'monthly_data.revenue_no_id_pct',
         ],
         timeDimensions: [{
           dimension: 'monthly_data.created_at',
