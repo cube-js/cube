@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.49](https://github.com/cube-js/cube/compare/v1.6.48...v1.6.49) (2026-05-21)
+
+### Bug Fixes
+
+- **cubestore-cli:** Incorrect reconnections ([#10914](https://github.com/cube-js/cube/issues/10914)) ([0fa472b](https://github.com/cube-js/cube/commit/0fa472bc28c89f5f36bc0e72febec58811f700ae))
+- **tesseract:** multi-stage pre-aggregation usage substitution and IS NOT DISTINCT FROM ([#10925](https://github.com/cube-js/cube/issues/10925)) ([81b9de0](https://github.com/cube-js/cube/commit/81b9de02799c829fa982539537ebf1af24ce3e62))
+
+### Features
+
+- **cubesql:** Allow grouped joins with SQL push down ([#10234](https://github.com/cube-js/cube/issues/10234)) ([041d753](https://github.com/cube-js/cube/commit/041d753ca045d60453af6d5d737cff19ce411ca0))
+- **cubesql:** Support parsing extra timezone formats ([#10913](https://github.com/cube-js/cube/issues/10913)) ([346eb56](https://github.com/cube-js/cube/commit/346eb567808363efb39c623f25f056018ce5a981))
+- **cubestore-cli:** Support Arrow format for responses ([#10915](https://github.com/cube-js/cube/issues/10915)) ([e4c8c43](https://github.com/cube-js/cube/commit/e4c8c43d2e060acfddd4288fa356b25f0df150bd))
+- **cubestore:** Fold IS NOT DISTINCT FROM join predicates into HashJoin keys ([#10923](https://github.com/cube-js/cube/issues/10923)) ([858c1e4](https://github.com/cube-js/cube/commit/858c1e450f0279d1139088122746ea8253edbf6b))
+- **tesseract:** default value filters for views (CORE-357) ([#10892](https://github.com/cube-js/cube/issues/10892)) ([3477776](https://github.com/cube-js/cube/commit/34777768be099310e59fa02f0c2db6ef5e74aed4))
+
 ## [1.6.48](https://github.com/cube-js/cube/compare/v1.6.47...v1.6.48) (2026-05-19)
 
 ### Features

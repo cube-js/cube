@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.49](https://github.com/cube-js/cube/compare/v1.6.48...v1.6.49) (2026-05-21)
+
+### Bug Fixes
+
+- **tesseract:** multi-stage pre-aggregation usage substitution and IS NOT DISTINCT FROM ([#10925](https://github.com/cube-js/cube/issues/10925)) ([81b9de0](https://github.com/cube-js/cube/commit/81b9de02799c829fa982539537ebf1af24ce3e62))
+
 ## [1.6.48](https://github.com/cube-js/cube/compare/v1.6.47...v1.6.48) (2026-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

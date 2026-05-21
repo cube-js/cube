@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.49](https://github.com/cube-js/cube/compare/v1.6.48...v1.6.49) (2026-05-21)
+
+### Features
+
+- **cubestore:** Fold IS NOT DISTINCT FROM join predicates into HashJoin keys ([#10923](https://github.com/cube-js/cube/issues/10923)) ([858c1e4](https://github.com/cube-js/cube/commit/858c1e450f0279d1139088122746ea8253edbf6b))
+
 ## [1.6.48](https://github.com/cube-js/cube/compare/v1.6.47...v1.6.48) (2026-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
