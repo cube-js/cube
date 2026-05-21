@@ -73,6 +73,34 @@ certified_queries:
 
 Inline certified queries accept the same properties as Markdown ones — `name`, `description`, `user_request` (required), and `sql_query` (required).
 
+### Comments and agent visibility
+
+When the agent searches for a matching certified query, it only considers the `description` and `user_request` fields. Comments are never used for matching, but Markdown comments are included in the query content the agent reads once a query has been selected — so they can provide additional information about the query (context, caveats, or hints) that influences how the agent uses it.
+
+- **Markdown comments** (`<!-- ... -->`) in the body of the file **are included** in the content the agent reads. Use them to add extra context, caveats, or hints about the query once it's selected.
+- **YAML comments** (`# ...`) in the frontmatter **are not included** in the content the agent reads. Use them for internal notes, authorship, or review metadata that should stay hidden from the agent.
+
+```markdown
+<!-- agents/certified_queries/quarterly-revenue.md -->
+---
+# Internal note: reviewed by the analytics team on 2025-01-15 — hidden from the agent
+description: "Get revenue by fiscal quarter"
+user_request: "What is the revenue by quarter?"
+---
+<!-- Exclude cancelled orders; finance considers these non-revenue. -->
+SELECT
+  DATE_TRUNC('quarter', order_date) AS quarter,
+  SUM(amount) AS revenue
+FROM orders
+WHERE status != 'cancelled'
+GROUP BY 1
+ORDER BY 1
+```
+
+<Tip>
+To make a query discoverable by the agent, put matching signals in `description` and `user_request` — those are the only fields used for search. Use Markdown comments for additional context the agent should consider when using the query, and keep YAML comments for notes aimed at other developers.
+</Tip>
+
 ## Writing effective certified queries
 
 - **Phrase `user_request` like a real user question.** This is what the agent matches against incoming requests.
