@@ -110,6 +110,13 @@
         "measures": [
           "CUBE.count"
         ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
       }
     ]
   },
@@ -156,6 +163,8 @@
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
     "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
 
     "---------------------------------------",
     "SKIPPED SQL API (Need work)",
@@ -251,6 +260,8 @@
     "querying BigECommerce: rolling window YTD (month + week + day + no gran)",
     "SQL API: Timeshift measure from cube",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
-    "querying BigECommerce: rolling window YTD (month + week + day)"
+    "querying BigECommerce: rolling window YTD (month + week + day)",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation"
   ]
 }

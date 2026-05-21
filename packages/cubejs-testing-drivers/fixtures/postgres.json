@@ -165,6 +165,13 @@
         "measures": [
           "CUBE.countApproxByCustomer"
         ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
       }
     ]
   },
@@ -193,7 +200,9 @@
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
-    "querying BigECommerce: SeveralMultiStageMeasures"
+    "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
