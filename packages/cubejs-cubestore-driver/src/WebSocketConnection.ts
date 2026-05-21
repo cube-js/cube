@@ -7,8 +7,10 @@ import { parseCubestoreResultMessage } from '@cubejs-backend/native';
 import { ConnectionError, QueryError } from './errors';
 import {
   BinaryValue,
-  BoolValue, Float64Value,
+  BoolValue,
+  Float64Value,
   HttpCommand,
+  HttpError,
   HttpMessage,
   HttpParameter,
   HttpParameterValue,
@@ -155,6 +157,11 @@ export class WebSocketConnection {
           }
 
           delete webSocket.sentMessages[httpMessage.messageId()];
+
+          if (httpMessage.commandType() === HttpCommand.HttpError) {
+            resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
+            return;
+          }
 
           try {
             const nativeResMsg = await parseCubestoreResultMessage(msg);
