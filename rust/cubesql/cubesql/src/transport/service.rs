@@ -75,6 +75,10 @@ impl LoadRequestMeta {
         self.change_user = change_user;
     }
 
+    pub fn database(&self) -> Option<String> {
+        self.database.clone()
+    }
+
     pub fn set_database(&mut self, database: Option<String>) {
         self.database = database;
     }
