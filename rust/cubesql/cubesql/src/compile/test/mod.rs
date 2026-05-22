@@ -31,11 +31,11 @@ pub mod test_bi_workarounds;
 #[cfg(test)]
 pub mod test_cube_join;
 #[cfg(test)]
-pub mod test_database_meta;
-#[cfg(test)]
 pub mod test_cube_join_grouped;
 #[cfg(test)]
 pub mod test_cube_scan;
+#[cfg(test)]
+pub mod test_database_meta;
 #[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
