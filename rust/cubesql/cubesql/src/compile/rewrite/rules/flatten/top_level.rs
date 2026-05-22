@@ -1,10 +1,10 @@
 use crate::{
     compile::rewrite::{
-        aggregate, cube_scan, flatten_pushdown_replacer, projection,
+        aggregate, cube_scan, filter, flatten_pushdown_replacer, projection,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::{flatten::FlattenRules, replacer_flat_push_down_node, replacer_push_down_node},
-        transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias, ListType,
-        LogicalPlanLanguage, ProjectionAlias,
+        transforming_chain_rewrite, transforming_chain_rewrite_with_root,
+        FlattenPushdownReplacerInnerAlias, ListType, LogicalPlanLanguage, ProjectionAlias,
     },
     var, var_iter,
 };
@@ -159,6 +159,93 @@ impl FlattenRules {
             ),
         )]);
 
+        rules.extend(vec![transforming_chain_rewrite_with_root(
+            "flatten-filter-pushdown",
+            aggregate(
+                "?filter_node",
+                "?outer_group_expr",
+                "?outer_aggregate_expr",
+                "AggregateSplit:false",
+            ),
+            vec![
+                (
+                    "?filter_node",
+                    filter("?filter_expr", "?inner_projection"),
+                ),
+                (
+                    "?inner_projection",
+                    projection(
+                        "?inner_projection_expr",
+                        "?cube_scan",
+                        "?inner_projection_alias",
+                        "ProjectionSplit:false",
+                    ),
+                ),
+                (
+                    "?cube_scan",
+                    cube_scan(
+                        "?alias_to_cube",
+                        "?members",
+                        "?filters",
+                        "?orders",
+                        "?limit",
+                        "?offset",
+                        "CubeScanSplit:false",
+                        "?can_pushdown_join",
+                        "CubeScanWrapped:false",
+                        "?ungrouped",
+                        "?join_hints",
+                    ),
+                ),
+            ],
+            aggregate(
+                filter(
+                    flatten_pushdown_replacer(
+                        "?filter_expr",
+                        "?inner_projection_expr",
+                        "?inner_alias",
+                        "FlattenPushdownReplacerTopLevel:false",
+                    ),
+                    cube_scan(
+                        "?alias_to_cube",
+                        "?members",
+                        "?filters",
+                        "?orders",
+                        "?limit",
+                        "?offset",
+                        "CubeScanSplit:false",
+                        "?can_pushdown_join",
+                        "CubeScanWrapped:false",
+                        "?ungrouped",
+                        "?join_hints",
+                    ),
+                ),
+                flatten_pushdown_replacer(
+                    "?outer_group_expr",
+                    "?inner_projection_expr",
+                    "?inner_alias",
+                    "FlattenPushdownReplacerTopLevel:false",
+                ),
+                flatten_pushdown_replacer(
+                    "?outer_aggregate_expr",
+                    "?inner_projection_expr",
+                    "?inner_alias",
+                    "FlattenPushdownReplacerTopLevel:false",
+                ),
+                "AggregateSplit:false",
+            ),
+            self.flatten_aggregate(
+                "?inner_projection",
+                "?cube_scan",
+                "?members",
+                "?inner_projection_expr",
+                "?outer_group_expr",
+                "?outer_aggregate_expr",
+                "?inner_projection_alias",
+                "?inner_alias",
+            ),
+        )]);
+
         if self.config_obj.push_down_pull_up_split() {
             Self::flat_list_pushdown_rules(
                 "flatten-projection-expr",
@@ -175,11 +262,28 @@ impl FlattenRules {
                 ListType::AggregateGroupExpr,
                 rules,
             );
+            Self::flat_list_pushdown_rules(
+                "flatten-scalar-fun-args",
+                ListType::ScalarFunctionExprArgs,
+                rules,
+            );
         } else {
             Self::list_pushdown_rules("flatten-projection-expr", "ProjectionExpr", rules);
             Self::list_pushdown_rules("flatten-aggregate-expr", "AggregateAggrExpr", rules);
             Self::list_pushdown_rules("flatten-group-expr", "AggregateGroupExpr", rules);
+            Self::list_pushdown_rules(
+                "flatten-scalar-fun-args",
+                "ScalarFunctionExprArgs",
+                rules,
+            );
         }
+        Self::list_pushdown_rules("flatten-udf-fun-args", "ScalarUDFExprArgs", rules);
+        Self::list_pushdown_rules(
+            "flatten-agg-fun-args",
+            "AggregateFunctionExprArgs",
+            rules,
+        );
+        Self::list_pushdown_rules("flatten-udaf-fun-args", "AggregateUDFExprArgs", rules);
     }
 
     pub fn flatten_projection(

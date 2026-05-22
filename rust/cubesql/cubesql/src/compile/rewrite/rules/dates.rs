@@ -15,7 +15,7 @@ use crate::{
     var, var_iter,
 };
 use datafusion::{
-    arrow::datatypes::{DataType, TimeUnit},
+    arrow::datatypes::{DataType, DataType as ArrowDataType, TimeUnit},
     logical_plan::DFSchema,
     scalar::ScalarValue,
 };
@@ -407,6 +407,62 @@ impl RewriteRules for DateRules {
                     "?outer_granularity",
                     "?inner_granularity",
                     "?new_granularity",
+                ),
+            ),
+            // ThoughtSpot's PostgreSQL quarter start calculation uses INTERVAL arithmetic
+            // that is incompatible with non-PostgreSQL dialects. Recognize the pattern and
+            // replace with DATE_TRUNC('quarter', col) which all dialects support.
+            rewrite(
+                "thoughtspot-pg-quarter-start-to-date-trunc",
+                alias_expr(
+                    binary_expr(
+                        cast_expr_explicit(
+                            binary_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        self.fun_expr(
+                                            "DatePart",
+                                            vec![
+                                                literal_string("year"),
+                                                column_expr("?column"),
+                                            ],
+                                        ),
+                                        "||",
+                                        literal_string("-"),
+                                    ),
+                                    "||",
+                                    self.fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("month"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                ),
+                                "||",
+                                literal_string("-01"),
+                            ),
+                            ArrowDataType::Date32,
+                        ),
+                        "+",
+                        binary_expr(
+                            binary_expr(
+                                "?mod_part",
+                                "*",
+                                "?neg_one",
+                            ),
+                            "*",
+                            "?interval_val",
+                        ),
+                    ),
+                    "?alias",
+                ),
+                alias_expr(
+                    self.fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("quarter"), column_expr("?column")],
+                    ),
+                    "?alias",
                 ),
             ),
             // AGE function seems to be a popular choice for this date arithmetic,
