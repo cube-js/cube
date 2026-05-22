@@ -1537,4 +1537,134 @@ describe('Schema Testing', () => {
       });
     });
   });
+
+  describe('Duplicate cube and view name detection in JS models', () => {
+    it('detects duplicate cube names in a single JS file', async () => {
+      const content = `
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true }
+          }
+        });
+        cube('orders', {
+          sql_table: 'orders_v2',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true }
+          }
+        });
+      `;
+
+      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
+      }
+    });
+
+    it('detects duplicate cube names across JS files', async () => {
+      const { compiler } = prepareCompiler([
+        {
+          content: `cube('orders', {
+            sql_table: 'orders',
+            dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+          });`,
+          fileName: 'orders1.js',
+        },
+        {
+          content: `cube('orders', {
+            sql_table: 'orders_v2',
+            dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+          });`,
+          fileName: 'orders2.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
+      }
+    });
+
+    it('detects duplicate view names in a single JS file', async () => {
+      const content = `
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            status: { sql: 'status', type: 'string' }
+          }
+        });
+        view('orders_view', {
+          cubes: [{ join_path: orders, includes: ['id'] }]
+        });
+        view('orders_view', {
+          cubes: [{ join_path: orders, includes: ['status'] }]
+        });
+      `;
+
+      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate view name 'orders_view'");
+      }
+    });
+
+    it('detects conflicting cube and view with the same name', async () => {
+      const content = `
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            status: { sql: 'status', type: 'string' }
+          }
+        });
+        view('orders', {
+          cubes: [{ join_path: orders, includes: ['id'] }]
+        });
+      `;
+
+      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found conflicting cube and view name 'orders'");
+      }
+    });
+
+    it('detects conflicting cube and view names across files', async () => {
+      const { compiler } = prepareCompiler([
+        {
+          content: `cube('orders', {
+            sql_table: 'orders',
+            dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+          });`,
+          fileName: 'orders_cube.js',
+        },
+        {
+          content: `view('orders', {
+            cubes: [{ join_path: orders, includes: ['id'] }]
+          });`,
+          fileName: 'orders_view.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found conflicting cube and view name 'orders'");
+      }
+    });
+  });
 });
