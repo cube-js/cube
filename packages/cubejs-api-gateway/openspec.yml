@@ -4,6 +4,30 @@ info:
   version: "1.0.0"
   title: "Cube.js"
 paths:
+  "/v1/granularities":
+    get:
+      summary: "List the granularities available for this deployment"
+      description: "Returns the granularities enabled in this deployment — built-ins plus any custom granularities defined via `CUBEJS_GRANULARITIES` or `config.granularities`. Evaluated per request context."
+      operationId: "granularitiesV1"
+      responses:
+        "200":
+          description: "successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1GranularitiesResponse"
+        "4XX":
+          description: "Request could not be completed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
+        "5XX":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
   "/v1/meta":
     get:
       summary: "Load Metadata"
@@ -115,8 +139,17 @@ components:
       properties:
         name:
           type: "string"
+        type:
+          type: "string"
+          description: "Built-in (year/quarter/month/...) or user-defined custom granularity."
+          enum:
+            - built-in
+            - custom
         title:
           type: "string"
+        format:
+          type: "string"
+          description: "d3-time-format string used by clients to display bucketed timestamps."
         interval:
           type: "string"
         sql:
@@ -125,6 +158,17 @@ components:
           type: "string"
         origin:
           type: "string"
+    V1GranularitiesResponse:
+      type: "object"
+      description: "Response shape of GET /v1/granularities."
+      properties:
+        data:
+          type: "object"
+          properties:
+            granularities:
+              type: array
+              items:
+                $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
     V1CubeMetaDimension:
       type: "object"
       required:

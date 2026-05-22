@@ -5,6 +5,7 @@ import { camelize } from 'inflection';
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
+import { normalizeGranularitiesBlock, NormalizedGranularitiesBlock } from './GranularityResolver';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
@@ -16,6 +17,8 @@ export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
   name?: string;
   title?: string;
+  /** d3-time-format string used by the client to display bucketed timestamps. */
+  format?: string;
   interval?: string;
   offset?: string;
   origin?: string;
@@ -33,6 +36,7 @@ export type CubeSymbolDefinition = {
   sql?: (...args: any[]) => string;
   primaryKey?: boolean;
   granularities?: Record<string, GranularityDefinition>;
+  granularitiesBlock?: NormalizedGranularitiesBlock;
   timeShift?: TimeshiftDefinition[];
   format?: string;
   currency?: string;
@@ -561,6 +565,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     this.camelCaseTypes(cube.preAggregations);
     this.camelCaseTypes(cube.accessPolicy);
 
+    this.normalizeDimensionGranularities(cube.dimensions);
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
     }
@@ -577,6 +583,23 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       ...cube.segments || {},
       ...cube.preAggregations || {}
     } as CubeSymbolsDefinition;
+  }
+
+  // Stores the canonical `granularitiesBlock` on each time dimension and rewrites
+  // `granularities` to the dict of locally-defined customs only — preserving the legacy shape
+  // that BaseQuery, prepare-annotation, and CubeToMetaTransformer already read.
+  private normalizeDimensionGranularities(dimensions: Record<string, any> | undefined) {
+    if (!dimensions) {
+      return;
+    }
+
+    for (const dim of Object.values(dimensions)) {
+      if (dim && dim.type === 'time' && 'granularities' in dim) {
+        const block: NormalizedGranularitiesBlock = normalizeGranularitiesBlock(dim.granularities);
+        dim.granularitiesBlock = block;
+        dim.granularities = block.custom;
+      }
+    }
   }
 
   private camelCaseTypes(obj: Object | Array<any> | undefined) {

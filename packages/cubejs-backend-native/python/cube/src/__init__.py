@@ -70,6 +70,9 @@ class Configuration:
     check_sql_auth: Callable
     can_switch_sql_user: Callable
     extend_context: Callable
+    # Mirrors `granularities` in the JS config: a list of granularity names and/or custom-granularity
+    # definitions, or a function returning the same. Drives /v1/granularities and /v1/meta enrichment.
+    granularities: Union[list, Callable[[RequestContext], list]]
     scheduled_refresh_contexts: Callable
     context_to_api_scopes: Callable
     repository_factory: Callable
@@ -120,6 +123,7 @@ class Configuration:
         self.can_switch_sql_user = None
         self.query_rewrite = None
         self.extend_context = None
+        self.granularities = None
         self.scheduled_refresh_contexts = None
         self.scheduled_refresh_time_zones = None
         self.context_to_api_scopes = None

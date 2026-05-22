@@ -280,6 +280,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
             ? this.isVisible(extendedDimDef, !extendedDimDef.primaryKey)
             : false;
           const granularitiesObj = extendedDimDef.granularities;
+          // The gateway reconciles `granularitiesBlock` (includes/excludes/custom) with global
+          // config per request. Forwarded as-is; the flat `granularities` field alone can't
+          // represent `includes: '*'` vs `includes: []`.
+          const { granularitiesBlock } = extendedDimDef as any;
           const dimType = this.dimensionDataType(extendedDimDef.type || 'string');
           const dimFormat = this.transformDimensionFormat(extendedDimDef);
           const dimCurrency = extendedDimDef.currency?.toUpperCase();
@@ -306,12 +310,15 @@ export class CubeToMetaTransformer implements CompilerInterface {
               granularitiesObj
                 ? Object.entries(granularitiesObj).map(([gName, gDef]: [string, any]) => ({
                   name: gName,
+                  type: 'custom',
                   title: this.title(cubeTitle, [gName, gDef], true),
+                  ...(gDef.format !== undefined ? { format: gDef.format } : {}),
                   interval: gDef.interval,
                   offset: gDef.offset,
                   origin: gDef.origin,
                 }))
                 : undefined,
+            granularitiesBlock,
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
           };

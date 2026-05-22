@@ -33,6 +33,13 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 
 import { QueryBody } from '@cubejs-backend/query-orchestrator';
 import {
+  resolveGlobalGranularities,
+  resolveDimensionGranularities,
+  normalizeGranularitiesBlock,
+  buildBuiltInsCatalog,
+  BUILT_IN_GRANULARITIES,
+} from '@cubejs-backend/schema-compiler';
+import {
   QueryType,
   ApiScopes,
 } from './types/strings';
@@ -154,6 +161,8 @@ class ApiGateway {
 
   protected readonly extendContext?: ExtendContextFn;
 
+  protected readonly granularitiesOption?: ApiGatewayOptions['granularities'];
+
   protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: PreparedCheckAuthFn;
@@ -207,6 +216,7 @@ class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
+    this.granularitiesOption = options.granularities;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
@@ -453,6 +463,17 @@ class ApiGateway {
       })
     );
 
+    app.get(
+      `${this.basePath}/v1/granularities`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        await this.granularities({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      })
+    );
+
     app.post(
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
@@ -668,7 +689,9 @@ class ApiGateway {
       const cubesConfig = onlyViews
         ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
         : metaConfig.cubes;
-      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
+      const filteredCubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
+      // Apply after the visibility filter so we only enrich what the client will actually receive.
+      const cubes = await this.applyGlobalGranularitiesToMetaCubes(context, filteredCubes);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
         .map(group => ({
@@ -684,6 +707,47 @@ class ApiGateway {
         response.compilerId = metaConfig.compilerId;
       }
       res(response);
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        // @ts-ignore
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async granularities({ context, res }: {
+    context: RequestContext,
+    res: ResponseResultFn,
+  }) {
+    const requestStarted = new Date();
+    try {
+      await this.assertApiScope('meta', context.securityContext);
+      const globalConfig = await this.resolveGlobalGranularitiesForRequest(context);
+      const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
+
+      const granularities: any[] = [];
+      for (const [name, entry] of Object.entries(builtInsCatalog)) {
+        granularities.push({ type: 'built-in', name, ...entry });
+      }
+      for (const [name, def] of Object.entries<any>(globalConfig.customGranularities)) {
+        // Skip names already emitted by `buildBuiltInsCatalog` (their inline overrides are folded in there).
+        if (!(name in BUILT_IN_GRANULARITIES)) {
+          const entry: any = {
+            type: 'custom',
+            name,
+            title: def.title || name,
+          };
+          if (def.interval !== undefined) entry.interval = def.interval;
+          if (def.origin !== undefined) entry.origin = def.origin;
+          if (def.offset !== undefined) entry.offset = def.offset;
+          if (def.format !== undefined) entry.format = def.format;
+          granularities.push(entry);
+        }
+      }
+      res({ data: { granularities } });
     } catch (e: any) {
       this.handleError({
         e,
@@ -1998,6 +2062,13 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      // Annotation reads from this meta. Without enrichment, /v1/load and /v1/cubesql would
+      // omit the type/title/format/interval fields that /v1/meta exposes.
+      const enrichedCubes = await this.applyGlobalGranularitiesToMetaCubes(
+        context,
+        metaConfigResult.map((m: any) => m.config),
+      );
+      metaConfigResult = metaConfigResult.map((m: any, i: number) => ({ ...m, config: enrichedCubes[i] }));
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2294,6 +2365,57 @@ class ApiGateway {
 
   protected async getAdapterApi(context: RequestContext) {
     return this.adapterApi(context);
+  }
+
+  protected async resolveGlobalGranularitiesForRequest(context: RequestContext) {
+    return resolveGlobalGranularities(this.granularitiesOption, context);
+  }
+
+  // Reconcile each time dimension's `granularitiesBlock` against the request's global config
+  // and emit the effective granularity array. Built-ins get tagged `built-in`, locals/globals
+  // become `custom`. Replaces the per-dim `granularities` array on the returned cube.
+  protected async applyGlobalGranularitiesToMetaCubes(context: RequestContext, cubes: any[]): Promise<any[]> {
+    const globalConfig = await this.resolveGlobalGranularitiesForRequest(context);
+    const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
+
+    return cubes.map(cube => ({
+      ...cube,
+      dimensions: cube.dimensions?.map((dim: any) => {
+        if (dim.type !== 'time') return dim;
+        // Re-key the local-custom array CubeToMetaTransformer produced so the resolver can
+        // merge it back into `granularitiesBlock.custom` cleanly.
+        const localCustom: Record<string, any> = {};
+        for (const g of dim.granularities || []) {
+          localCustom[g.name] = {
+            title: g.title,
+            interval: g.interval,
+            offset: g.offset,
+            origin: g.origin,
+            ...(g.format !== undefined ? { format: g.format } : {}),
+          };
+        }
+        const block = dim.granularitiesBlock || normalizeGranularitiesBlock(undefined);
+        const blockWithLocal = { ...block, custom: { ...block.custom, ...localCustom } };
+        const resolved = resolveDimensionGranularities(
+          blockWithLocal,
+          globalConfig.enabledBuiltIns,
+          globalConfig.customGranularities,
+          builtInsCatalog,
+        );
+        const resolvedArray = Object.entries(resolved).map(([name, def]: [string, any]) => ({
+          name,
+          type: def.type,
+          title: def.title,
+          ...(def.interval !== undefined ? { interval: def.interval } : {}),
+          ...(def.offset !== undefined ? { offset: def.offset } : {}),
+          ...(def.origin !== undefined ? { origin: def.origin } : {}),
+          ...(def.format !== undefined ? { format: def.format } : {}),
+        }));
+        // Strip the transport-only block; clients only see the resolved `granularities` array.
+        const { granularitiesBlock, ...rest } = dim;
+        return { ...rest, granularities: resolvedArray };
+      }),
+    }));
   }
 
   public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {

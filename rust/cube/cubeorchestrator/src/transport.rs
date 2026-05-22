@@ -164,7 +164,13 @@ pub type MembersMap = IndexMap<String, String>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GranularityMeta {
     pub name: String,
+    /// Serialized as `type`: "built-in" or "custom". Field is named `kind` to avoid Rust's keyword.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
     pub title: String,
+    /// d3-time-format string used by the client to display bucketed timestamps.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interval: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

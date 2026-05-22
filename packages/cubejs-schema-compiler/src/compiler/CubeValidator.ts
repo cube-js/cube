@@ -113,6 +113,74 @@ const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day
 // Do not allow negative intervals for granularities, while offsets could be negative
 const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
 
+// One custom granularity entry: with-origin, with-offset (interval must be aligned), or sql-defined.
+// Reused by the legacy `granularities: { name: {...} }` form and the new `custom: { name: {...} }` form.
+const CustomGranularityEntrySchema = Joi.alternatives([
+  Joi.object().keys({
+    title: Joi.string(),
+    format: Joi.string(),
+    interval: GranularityInterval.required(),
+    origin: Joi.string().required().custom((value, helpers) => {
+      const date = new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return helpers.message({ custom: 'Origin should be valid date-only form: YYYY[-MM[-DD]] or date-time form: YYYY-MM-DD[T]HH:mm[:ss[.sss[Z]]]' });
+      }
+      return value;
+    }),
+  }),
+  Joi.object().keys({
+    title: Joi.string(),
+    format: Joi.string(),
+    interval: GranularityInterval.required().custom((value, helper) => {
+      const intParsed = value.split(' ');
+      const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
+
+      if (intParsed.length !== 2) {
+        return helper.message(msg);
+      }
+
+      const v = parseInt(intParsed[0], 10);
+      const unit = intParsed[1];
+
+      const validIntervals = {
+        // Any number of years is valid
+        year: () => true,
+        // Only months divisible by a year with no remainder are valid
+        month: () => 12 % v === 0,
+        // Only quarters divisible by a year with no remainder are valid
+        quarter: () => 4 % v === 0,
+        // Only 1 week is valid
+        week: () => v === 1,
+        // Only 1 day is valid
+        day: () => v === 1,
+        // Only hours divisible by a day with no remainder are valid
+        hour: () => 24 % v === 0,
+        // Only minutes divisible by an hour with no remainder are valid
+        minute: () => 60 % v === 0,
+        // Only seconds divisible by a minute with no remainder are valid
+        second: () => 60 % v === 0,
+      };
+
+      const isValid = Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
+
+      return isValid ? value : helper.message(msg);
+    }),
+    offset: GranularityOffset.optional(),
+  }),
+  Joi.object().keys({
+    title: Joi.string(),
+    format: Joi.string(),
+    sql: Joi.func().required()
+  })
+]);
+
+// `includes` / `excludes` accept a list of granularity names or the wildcard `'*'`.
+const GranularityInclusionListSchema = Joi.alternatives([
+  Joi.string().valid('*'),
+  Joi.array().items(Joi.string()),
+]);
+
 const formatAlternatives = [
   Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
   Joi.object().keys({
@@ -349,65 +417,32 @@ const BaseDimensionWithoutSubQuery = {
   }),
   granularities: Joi.when('type', {
     is: 'time',
-    then: Joi.object().pattern(identifierRegex,
-      Joi.alternatives([
-        Joi.object().keys({
-          title: Joi.string(),
-          interval: GranularityInterval.required(),
-          origin: Joi.string().required().custom((value, helpers) => {
-            const date = new Date(value);
-
-            if (Number.isNaN(date.getTime())) {
-              return helpers.message({ custom: 'Origin should be valid date-only form: YYYY[-MM[-DD]] or date-time form: YYYY-MM-DD[T]HH:mm[:ss[.sss[Z]]]' });
-            }
-            return value;
-          }),
+    then: Joi.alternatives()
+      .conditional(Joi.ref('.'), {
+        // Discriminate by shape: only the new dict form has includes/excludes/custom and no other keys.
+        is: Joi.object().keys({
+          includes: Joi.any(),
+          excludes: Joi.any(),
+          custom: Joi.any(),
+        }).unknown(false),
+        then: Joi.object().keys({
+          includes: GranularityInclusionListSchema,
+          excludes: GranularityInclusionListSchema,
+          custom: Joi.object().pattern(identifierRegex, CustomGranularityEntrySchema),
+        }).custom((value, helper) => {
+          if (value && value.includes !== undefined && value.excludes !== undefined && value.includes !== '*') {
+            return helper.message({ custom: '"includes" and "excludes" cannot be used together unless includes is "*"' } as any);
+          }
+          return value;
         }),
-        Joi.object().keys({
-          title: Joi.string(),
-          interval: GranularityInterval.required().custom((value, helper) => {
-            const intParsed = value.split(' ');
-            const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
-
-            if (intParsed.length !== 2) {
-              return helper.message(msg);
-            }
-
-            const v = parseInt(intParsed[0], 10);
-            const unit = intParsed[1];
-
-            const validIntervals = {
-              // Any number of years is valid
-              year: () => true,
-              // Only months divisible by a year with no remainder are valid
-              month: () => 12 % v === 0,
-              // Only quarters divisible by a year with no remainder are valid
-              quarter: () => 4 % v === 0,
-              // Only 1 week is valid
-              week: () => v === 1,
-              // Only 1 day is valid
-              day: () => v === 1,
-              // Only hours divisible by a day with no remainder are valid
-              hour: () => 24 % v === 0,
-              // Only minutes divisible by an hour with no remainder are valid
-              minute: () => 60 % v === 0,
-              // Only seconds divisible by a minute with no remainder are valid
-              second: () => 60 % v === 0,
-            };
-
-            const isValid = Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
-
-            return isValid ? value : helper.message(msg);
-          }),
-          offset: GranularityOffset.optional(),
-        }),
-        Joi.object().keys({
-          title: Joi.string(),
-          sql: Joi.func().required()
-        })
-      ])).optional(),
+        otherwise: Joi.object().pattern(identifierRegex, CustomGranularityEntrySchema),
+      })
+      .optional(),
     otherwise: Joi.forbidden()
-  })
+  }),
+  // Internal field written by CubeSymbols.normalizeDimensionGranularities before the validator runs.
+  // Not user-facing; declared so unknown-key validation doesn't reject it.
+  granularitiesBlock: Joi.any()
 };
 
 const BaseDimension = {
