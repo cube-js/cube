@@ -84,6 +84,27 @@ Users**.
 
 </Info>
 
+## Map roles by SCIM group
+
+If you have configured [Map roles by group][ref-saml-map-roles-by-group]
+on the SAML setup page, the same `groupsRolesMap` is applied whenever
+SCIM provisions group memberships from Entra:
+
+- When Entra adds a user to a synchronized group, Cube looks up the
+  group's **display name** (case-insensitive) in the configured mapping
+  and assigns the corresponding Cube role to that user.
+- Role assignment is **additive**: a user is never demoted on subsequent
+  group sync. Removing a user from an Entra group does not strip the
+  corresponding Cube role — adjust the user's roles in Cube manually.
+- The match is on the SCIM group **display name** that Entra pushes (the
+  `displayName` attribute in the **Group** mapping), not the group
+  object ID. Make sure the **IdP group name** entries in Cube match
+  exactly (case-insensitive) what Entra sends.
+
+No separate configuration is required on the SCIM side — once the
+mapping is defined on the SAML page, it drives both SAML SSO login and
+SCIM group sync.
+
 ## Syncing user attributes
 
 You can sync [user attributes][ref-user-attributes] from Microsoft Entra to
@@ -126,5 +147,6 @@ provisioned as [user attributes][ref-user-attributes] in Cube.
 
 [ref-saml]: /admin/sso/microsoft-entra-id/saml
 [ref-saml-default-role]: /admin/sso/microsoft-entra-id/saml#default-role-for-new-users
+[ref-saml-map-roles-by-group]: /admin/sso/microsoft-entra-id/saml#map-roles-by-group
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
