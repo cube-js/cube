@@ -15,6 +15,8 @@ export interface BaseMeta {
   apiType: string,
   // Application name, for example Metabase
   appName?: string,
+  // Database name from the client startup message (e.g. psql dbname parameter)
+  database?: string,
 }
 
 export interface LoadRequestMeta extends BaseMeta {

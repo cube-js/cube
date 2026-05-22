@@ -51,6 +51,8 @@ pub struct LoadRequestMeta {
     // Optional fields
     #[serde(rename = "changeUser", skip_serializing_if = "Option::is_none")]
     change_user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    database: Option<String>,
 }
 
 impl LoadRequestMeta {
@@ -61,6 +63,7 @@ impl LoadRequestMeta {
             api_type,
             app_name,
             change_user: None,
+            database: None,
         }
     }
 
@@ -70,6 +73,10 @@ impl LoadRequestMeta {
 
     pub fn set_change_user(&mut self, change_user: Option<String>) {
         self.change_user = change_user;
+    }
+
+    pub fn set_database(&mut self, database: Option<String>) {
+        self.database = database;
     }
 }
 
