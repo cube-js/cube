@@ -163,10 +163,12 @@ To configure group-based role mapping:
    - **Cube Cloud role** — pick a default or [custom role][ref-custom-roles].
 
 For SAML SSO, group mappings are evaluated **only when a new user is
-auto-provisioned** on first login. Each matching group adds its mapped
-role to the new user, on top of the
-[default role](#default-role-for-new-users). Existing users are not
-modified on subsequent logins.
+auto-provisioned** on first login. If any matching group resolves to a
+Cube Cloud role, those roles are assigned to the new user **instead of**
+the configured [default role](#default-role-for-new-users). The default
+role is used as a fallback when no IdP group matches (or when the mapped
+Cube Cloud roles no longer exist). Existing users' role assignments are
+never modified by subsequent logins.
 
 The same mapping is also applied by [SCIM][ref-scim] when group
 memberships are pushed, so a single configuration drives both SAML SSO
