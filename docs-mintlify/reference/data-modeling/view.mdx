@@ -647,14 +647,14 @@ You can also set the [`CUBEJS_NESTED_FOLDERS_DELIMITER`](/reference/configuratio
 nested folders and give them path-like names, e.g., `Customer Information / Personal
 Details`.
 
-### `filters`
+### `default_filters`
 
-The `filters` parameter is used to define default value filters on a view. These
-filters are applied to every query against the view, narrowing down the result
-set to a specific subset of data without requiring data consumers to specify the
-filter explicitly.
+The `default_filters` parameter is used to define default filters on a view.
+These filters are applied to every query against the view, narrowing down the
+result set to a specific subset of data without requiring data consumers to
+specify the filter explicitly.
 
-Default value filters are useful for governance scenarios where a view should
+Default filters are useful for governance scenarios where a view should
 always be scoped to a particular value (e.g., a tenant, region, or currency).
 They can also be used to provide a sensible default that consumers can override
 by adding their own filter on the same member, by leveraging the [`unless`](#unless)
@@ -670,7 +670,7 @@ views:
       - join_path: orders
         includes: "*"
 
-    filters:
+    default_filters:
       - member: country
         operator: equals
         values:
@@ -686,7 +686,7 @@ view(`orders_us`, {
     }
   ],
 
-  filters: [
+  defaultFilters: [
     {
       member: `country`,
       operator: `equals`,
@@ -698,7 +698,7 @@ view(`orders_us`, {
 
 </CodeGroup>
 
-Each filter accepts the following parameters:
+Each default filter accepts the following parameters:
 
 #### `member`
 
@@ -722,7 +722,7 @@ A list of values for the filter operator. Required for all operators except
 
 The `unless` parameter optionally lists members that, when referenced in a
 query (either in the projection or in an explicit filter), will cause the
-default value filter to be released. This allows consumers to override the
+default filter to be released. This allows consumers to override the
 default filter by querying or filtering by one of the listed members.
 
 If `unless` is not specified, the filter is always applied.
@@ -737,7 +737,7 @@ views:
       - join_path: orders
         includes: "*"
 
-    filters:
+    default_filters:
       - member: country
         operator: equals
         values:
@@ -755,7 +755,7 @@ view(`orders_default_us`, {
     }
   ],
 
-  filters: [
+  defaultFilters: [
     {
       member: `country`,
       operator: `equals`,
