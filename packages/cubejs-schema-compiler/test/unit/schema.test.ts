@@ -571,7 +571,7 @@ describe('Schema Testing', () => {
       compiler.throwIfAnyErrors();
 
       const view = cubeEvaluator.evaluatedCubes.orders_view;
-      const filters = view.filters!;
+      const filters = view.defaultFilters!;
       expect(filters).toHaveLength(3);
 
       expect(filters[0].operator).toBe('equals');
@@ -606,7 +606,7 @@ describe('Schema Testing', () => {
 
         view(\`orders_view\`, {
           cubes: [{ join_path: orders, includes: '*' }],
-          filters: [
+          defaultFilters: [
             { member: \`currency\`, operator: 'set' },
             { member: \`orders.currency\`, operator: 'set' },
             { member: \`orders_view.currency\`, operator: 'set' },
@@ -617,7 +617,7 @@ describe('Schema Testing', () => {
       await compiler.compile();
       compiler.throwIfAnyErrors();
 
-      const filters = cubeEvaluator.evaluatedCubes.orders_view.filters!;
+      const filters = cubeEvaluator.evaluatedCubes.orders_view.defaultFilters!;
       expect(filters.map(f => f.memberReference)).toEqual([
         'orders_view.currency',
         'orders_view.currency',
@@ -644,7 +644,7 @@ describe('Schema Testing', () => {
             join_path: orders,
             includes: ['id', 'currency'],
           }],
-          filters: [
+          defaultFilters: [
             { member: \`country\`, operator: 'set' },
           ],
         })
@@ -681,7 +681,7 @@ describe('Schema Testing', () => {
             join_path: orders,
             includes: ['id', 'currency'],
           }],
-          filters: [
+          defaultFilters: [
             { member: \`currency\`, operator: 'set', unless: [\`country\`] },
           ],
         })
@@ -712,7 +712,7 @@ describe('Schema Testing', () => {
 
         view(\`orders_view\`, {
           cubes: [{ join_path: orders, includes: '*' }],
-          filters: [
+          defaultFilters: [
             { member: \`other.currency\`, operator: 'set' },
           ],
         })

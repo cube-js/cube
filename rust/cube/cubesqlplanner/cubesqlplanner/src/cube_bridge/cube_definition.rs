@@ -41,5 +41,5 @@ pub trait CubeDefinition {
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
     #[nbridge(field, optional, vec)]
-    fn filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError>;
+    fn default_filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError>;
 }

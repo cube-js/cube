@@ -450,7 +450,7 @@ impl QueryPropertiesCompiler {
             if !cube_def.static_data().is_view.unwrap_or(false) {
                 continue;
             }
-            if let Some(view_filters) = cube_def.filters()? {
+            if let Some(view_filters) = cube_def.default_filters()? {
                 pending_view_filters.extend(view_filters);
             }
         }

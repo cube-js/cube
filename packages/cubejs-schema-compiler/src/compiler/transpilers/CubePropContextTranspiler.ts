@@ -37,9 +37,9 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.member$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.values$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.conditions.[0-9]+\.if$/,
-  /^filters\.[0-9]+\.member$/,
-  /^filters\.[0-9]+\.values$/,
-  /^filters\.[0-9]+\.unless$/,
+  /^(defaultFilters|default_filters)\.[0-9]+\.member$/,
+  /^(defaultFilters|default_filters)\.[0-9]+\.values$/,
+  /^(defaultFilters|default_filters)\.[0-9]+\.unless$/,
   /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.mask\.sql$/,
 ];
 
