@@ -58,7 +58,7 @@
     "semver": "^7.6.3",
     "serve-static": "^1.13.2",
     "sqlstring": "^2.3.1",
-    "uuid": "^8.3.2",
+    "uuid": "^14.0.0",
     "ws": "^7.5.3"
   },
   "devDependencies": {

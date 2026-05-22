@@ -37,7 +37,7 @@
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.2",
     "source-map-support": "^0.5.19",
-    "uuid": "^8.3.2"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.50",
