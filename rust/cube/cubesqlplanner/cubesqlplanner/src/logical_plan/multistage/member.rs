@@ -2,65 +2,51 @@ use crate::logical_plan::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Body of a `LogicalMultiStageMember` — one of the multi-stage
-/// CTE shapes the planner can produce.
-pub enum MultiStageMemberLogicalType {
-    LeafMeasure(Rc<MultiStageLeafMeasure>),
-    MultipliedMeasure(Rc<AggregateMultipliedSubquery>),
-    MeasureCalculation(Rc<MultiStageMeasureCalculation>),
-    DimensionCalculation(Rc<MultiStageDimensionCalculation>),
-    GetDateRange(Rc<MultiStageGetDateRange>),
+/// What sits inside a `LogicalMultiStageMember`: a Query body (the
+/// regular case — leaf, DSQ, multi-stage inode, multiplied bodies) or
+/// one of the special leaf nodes that don't fit the Query shape.
+/// There's no nested CTE pool here — every CTE lives at the top-level
+/// `LogicalPlan.ctes`, and FK refs reach them by name.
+#[derive(Clone)]
+pub enum MultiStageMemberBody {
+    Query(Rc<Query>),
     TimeSeries(Rc<MultiStageTimeSeries>),
     RollingWindow(Rc<MultiStageRollingWindow>),
 }
 
-impl MultiStageMemberLogicalType {
-    fn as_plan_node(&self) -> PlanNode {
+impl MultiStageMemberBody {
+    /// Output schema of this CTE body: dimensions/measures projected by
+    /// the rendered SQL. For `Query`, this is the embedded
+    /// `LogicalSchema`; for `RollingWindow`, the schema it carries; for
+    /// `TimeSeries`, a synthetic schema with just the time dimension.
+    pub fn schema(&self) -> Rc<LogicalSchema> {
         match self {
-            Self::LeafMeasure(item) => item.as_plan_node(),
-            Self::MultipliedMeasure(item) => item.as_plan_node(),
-            Self::MeasureCalculation(item) => item.as_plan_node(),
-            Self::DimensionCalculation(item) => item.as_plan_node(),
-            Self::GetDateRange(item) => item.as_plan_node(),
-            Self::TimeSeries(item) => item.as_plan_node(),
-            Self::RollingWindow(item) => item.as_plan_node(),
+            Self::Query(q) => q.schema().clone(),
+            Self::RollingWindow(rw) => rw.schema.clone(),
+            Self::TimeSeries(ts) => LogicalSchema::default()
+                .set_time_dimensions(vec![ts.time_dimension().clone()])
+                .into_rc(),
         }
-    }
-
-    fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
-        Ok(match self {
-            Self::LeafMeasure(_) => Self::LeafMeasure(plan_node.into_logical_node()?),
-            Self::MultipliedMeasure(_) => Self::MultipliedMeasure(plan_node.into_logical_node()?),
-            Self::MeasureCalculation(_) => Self::MeasureCalculation(plan_node.into_logical_node()?),
-            Self::DimensionCalculation(_) => {
-                Self::DimensionCalculation(plan_node.into_logical_node()?)
-            }
-            Self::GetDateRange(_) => Self::GetDateRange(plan_node.into_logical_node()?),
-            Self::TimeSeries(_) => Self::TimeSeries(plan_node.into_logical_node()?),
-            Self::RollingWindow(_) => Self::RollingWindow(plan_node.into_logical_node()?),
-        })
     }
 }
 
-impl PrettyPrint for MultiStageMemberLogicalType {
+impl PrettyPrint for MultiStageMemberBody {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
-            Self::LeafMeasure(measure) => measure.pretty_print(result, state),
-            Self::MultipliedMeasure(subquery) => subquery.pretty_print(result, state),
-            Self::MeasureCalculation(calculation) => calculation.pretty_print(result, state),
-            Self::DimensionCalculation(calculation) => calculation.pretty_print(result, state),
-            Self::GetDateRange(get_date_range) => get_date_range.pretty_print(result, state),
-            Self::TimeSeries(time_series) => time_series.pretty_print(result, state),
-            Self::RollingWindow(rolling_window) => rolling_window.pretty_print(result, state),
+            Self::Query(q) => q.pretty_print(result, state),
+            Self::TimeSeries(ts) => ts.pretty_print(result, state),
+            Self::RollingWindow(rw) => rw.pretty_print(result, state),
         }
     }
 }
 
-/// Named CTE in a multi-stage chain. `Query.multistage_members`
-/// holds one per CTE the source depends on.
+/// Named CTE in the top-level pool: the surrounding `LogicalPlan` holds
+/// one per CTE its tree of FK refs reaches by name. `body` is a
+/// `MultiStageMemberBody` — the actual SELECT-shaped node rendered as
+/// the CTE body.
 pub struct LogicalMultiStageMember {
     pub name: String,
-    pub member_type: MultiStageMemberLogicalType,
+    pub body: MultiStageMemberBody,
 }
 
 impl LogicalNode for LogicalMultiStageMember {
@@ -69,16 +55,29 @@ impl LogicalNode for LogicalMultiStageMember {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        vec![self.member_type.as_plan_node()]
+        match &self.body {
+            MultiStageMemberBody::Query(q) => vec![q.as_plan_node()],
+            MultiStageMemberBody::TimeSeries(ts) => vec![ts.as_plan_node()],
+            MultiStageMemberBody::RollingWindow(rw) => vec![rw.as_plan_node()],
+        }
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
         check_inputs_len(&inputs, 1, self.node_name())?;
-        let input = inputs[0].clone();
-
+        let new_body = match &self.body {
+            MultiStageMemberBody::Query(_) => {
+                MultiStageMemberBody::Query(inputs[0].clone().into_logical_node()?)
+            }
+            MultiStageMemberBody::TimeSeries(_) => {
+                MultiStageMemberBody::TimeSeries(inputs[0].clone().into_logical_node()?)
+            }
+            MultiStageMemberBody::RollingWindow(_) => {
+                MultiStageMemberBody::RollingWindow(inputs[0].clone().into_logical_node()?)
+            }
+        };
         Ok(Rc::new(Self {
             name: self.name.clone(),
-            member_type: self.member_type.with_plan_node(input)?,
+            body: new_body,
         }))
     }
 
@@ -99,6 +98,6 @@ impl PrettyPrint for LogicalMultiStageMember {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(&format!("MultiStageMember `{}`: ", self.name), state);
         let details_state = state.new_level();
-        self.member_type.pretty_print(result, &details_state);
+        self.body.pretty_print(result, &details_state);
     }
 }

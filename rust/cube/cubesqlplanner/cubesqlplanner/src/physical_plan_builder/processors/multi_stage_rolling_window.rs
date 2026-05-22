@@ -32,9 +32,9 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         let time_series_ref = rolling_window.time_series_input.name().clone();
         let measure_input_ref = rolling_window.measure_input.name().clone();
 
-        let time_series_schema = context.get_multi_stage_schema(&time_series_ref)?;
+        let time_series_schema = context.get_cte_schema(&time_series_ref)?;
 
-        let measure_input_schema = context.get_multi_stage_schema(&measure_input_ref)?;
+        let measure_input_schema = context.get_cte_schema(&measure_input_ref)?;
 
         let base_time_dimension_alias = measure_input_schema
             .resolve_member_alias(&rolling_window.time_dimension_in_measure_input);

@@ -28,33 +28,47 @@ impl QueryPlanner {
         }
     }
 
-    /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
-    /// builds the multi-stage / multiplied CTEs and assembles them via
-    /// `FullKeyAggregateQueryPlanner`.
-    pub fn plan(&self) -> Result<Rc<Query>, CubeError> {
+    /// Top-level entry: owns a fresh `CteState`, runs `plan_into`, and
+    /// packs the accumulated CTE bodies with the produced root into a
+    /// `LogicalPlan`.
+    pub fn plan(&self) -> Result<Rc<LogicalPlan>, CubeError> {
+        let mut cte_state = CteState::new();
+        let root = self.plan_into(&mut cte_state)?;
+        let (ctes, _) = cte_state.into_results();
+        Ok(LogicalPlan::new(ctes, root))
+    }
+
+    /// Sub-plan entry: drives sub-planners into the caller-owned
+    /// `cte_state` and returns just the root Query. Used when this
+    /// plan's CTEs should flatten into the surrounding `LogicalPlan`'s
+    /// pool (DSQ body, multi-stage leaf body).
+    ///
+    /// Subquery refs added during the call are pulled out via
+    /// `drain_subquery_refs_from(baseline)` and become the FK data
+    /// inputs of the returned root Query — they don't leak to the
+    /// outer scope.
+    pub fn plan_into(&self, cte_state: &mut CteState) -> Result<Rc<Query>, CubeError> {
         if self.request.is_simple_query()? {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
-            planner.plan()
-        } else {
-            let request = self.request.clone();
-            let mut cte_state = CteState::new();
-
-            let multi_stage_query_planner =
-                MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
-            if self.request.allow_multi_stage() {
-                multi_stage_query_planner.plan_queries(&mut cte_state)?;
-            }
-
-            let multiplied_measures_query_planner =
-                MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
-            multiplied_measures_query_planner.plan_queries(&mut cte_state)?;
-
-            let (all_members, all_refs) = cte_state.into_results();
-
-            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result = full_key_aggregate_planner.plan_logical_plan(all_refs, all_members)?;
-
-            Ok(result)
+            return planner.plan(cte_state);
         }
+        let request = self.request.clone();
+        let refs_baseline = cte_state.subquery_refs_len();
+
+        let multi_stage_query_planner =
+            MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
+        if self.request.allow_multi_stage() {
+            multi_stage_query_planner.plan_queries(cte_state)?;
+        }
+
+        let multiplied_measures_query_planner =
+            MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
+        multiplied_measures_query_planner.plan_queries(cte_state)?;
+
+        let all_refs = cte_state.drain_subquery_refs_from(refs_baseline);
+
+        let full_key_aggregate_planner =
+            FullKeyAggregateQueryPlanner::new(self.query_tools.clone(), request.clone());
+        full_key_aggregate_planner.plan_logical_plan(all_refs, cte_state)
     }
 }

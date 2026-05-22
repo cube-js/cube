@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/combinations.rs
+assertion_line: 431
+expression: result
+---
+returns__reason | orders__customer_lifetime_per_order
+----------------+------------------------------------
+defective       | 10000.00                           
+not_needed      | NULL                               
+wrong_item      | 6000.00                            
+NULL            | 1500.00

@@ -1,28 +1,19 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{all_symbols, MultiStageMemberLogicalType, Query, QuerySource};
+use crate::logical_plan::{all_symbols, FactKind, Query, QueryKind, QuerySource, StageKind};
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, ReferencesBuilder, Select,
-    SelectBuilder,
+    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, QualifiedColumnName,
+    ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::get_filtered_values;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
-}
-
-impl QueryProcessor<'_> {
-    fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
-        match logical_plan.source() {
-            QuerySource::FullKeyAggregate(fk) => !fk.is_empty(),
-            QuerySource::PreAggregation(_) => false,
-            QuerySource::LogicalJoin(_) => false,
-        }
-    }
 }
 
 impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
@@ -37,35 +28,27 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut context_factory = context.make_sql_nodes_factory()?;
+        let modifiers = logical_plan.modifers();
         let mut context = context.clone();
-        let mut ctes = vec![];
+        context.time_shifts = modifiers.time_shifts.clone();
+        context.render_measure_as_state = modifiers.render_measure_as_state;
+        context.render_measure_for_ungrouped = modifiers.render_measure_for_ungrouped;
+        let mut context_factory = context.make_sql_nodes_factory()?;
 
-        for multi_stage_member in logical_plan.multistage_members().iter() {
-            let query = self
-                .builder
-                .process_node(&multi_stage_member.member_type, &context)?;
-            let alias = multi_stage_member.name.clone();
-            context.add_multi_stage_schema(alias.clone(), query.schema());
-            if let MultiStageMemberLogicalType::DimensionCalculation(dimension_calculation) =
-                &multi_stage_member.member_type
-            {
-                context.add_multi_stage_dimension_schema(
-                    dimension_calculation.resolved_dimensions()?,
-                    alias.clone(),
-                    dimension_calculation.join_dimensions()?,
-                    query.schema(),
-                );
-            }
-            ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
-        }
-
-        context.remove_multi_stage_dimensions();
-
-        //FIXME This is hack but good solution require refactor
-        let resolved_multistage_dimension =
+        // CTE bodies (multi-stage measure stages, KS/MS bodies,
+        // AggMS-Query bodies, multi-stage-dim ex-DSQ bodies) are owned by
+        // the surrounding `LogicalPlan`. `PlanProcessor` renders them and
+        // pre-registers their schemas on `context` before we see this
+        // Query; here we just consume the references.
+        //
+        // MS-dim refs are wired into the join chain by
+        // `LogicalJoinProcessor` — `OnPrimaryKeys` inside the cube chain,
+        // `OnOuterDimensions` at the chain tail. Any ref already covered
+        // by a FullKeyAggregate data input is dropped here so we don't
+        // double-join it.
+        let resolved_multistage_dimensions =
             if let QuerySource::FullKeyAggregate(fk_source) = logical_plan.source() {
-                if let Some(first_cte_ref) = fk_source.multi_stage_subquery_refs().first() {
+                if let Some(first_cte_ref) = fk_source.data_inputs().first() {
                     first_cte_ref.schema().multi_stage_dimensions()?
                 } else {
                     vec![]
@@ -73,14 +56,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             } else {
                 vec![]
             };
-        for member in logical_plan.schema().multi_stage_dimensions()? {
-            if resolved_multistage_dimension
-                .iter()
-                .all(|d| d.full_name() != member.full_name())
-            {
-                context.add_multi_stage_dimension(member.full_name());
-            }
-        }
+        context.multi_stage_dimension_refs = logical_plan
+            .multi_stage_dimensions()
+            .iter()
+            .filter(|ms_ref| {
+                resolved_multistage_dimensions
+                    .iter()
+                    .all(|d| d.full_name() != ms_ref.dimension.full_name())
+            })
+            .cloned()
+            .collect();
 
         let from = self.builder.process_node(logical_plan.source(), &context)?;
         let filter = logical_plan.filter().all_filters();
@@ -119,10 +104,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         };
 
         match logical_plan.source() {
-            QuerySource::LogicalJoin(join) => {
+            QuerySource::LogicalJoin(_) => {
                 let references_builder = ReferencesBuilder::new(from.clone());
-                self.builder.resolve_subquery_dimensions_references(
-                    &join.dimension_subqueries(),
+                self.builder.resolve_multi_stage_dimension_references(
+                    logical_plan.multi_stage_dimensions(),
                     &references_builder,
                     &mut context_factory,
                 )?;
@@ -140,48 +125,156 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     context_factory.add_pre_aggregation_measure_reference(name, column);
                 }
             }
-            QuerySource::FullKeyAggregate(_) => {}
+            QuerySource::FullKeyAggregate(fk) => {
+                // Data inputs flagged `is_ungrouped` carry raw measure
+                // columns (no aggregate wrap yet); we must register
+                // `ungrouped_measure_reference` per symbol so the final
+                // `FinalMeasureSqlNode` still wraps in the aggregate (e.g.
+                // SUM). Pushing these through `render_references` would
+                // bypass the measure-processor chain and emit the column
+                // raw, breaking GROUP BY. `KeysFullKeyAggregateStrategy`
+                // joins each data input as `q_0`, `q_1`, ...
+                for (i, data_input) in fk.data_inputs().iter().enumerate() {
+                    if !data_input.is_ungrouped() {
+                        continue;
+                    }
+                    let q_alias = format!("q_{}", i);
+                    let cte_schema = context.get_cte_schema(data_input.name())?;
+                    for symbol in data_input.symbols().iter() {
+                        let column_alias = cte_schema.resolve_member_alias(symbol);
+                        context_factory.add_ungrouped_measure_reference(
+                            symbol.full_name(),
+                            QualifiedColumnName::new(Some(q_alias.clone()), column_alias),
+                        );
+                    }
+                }
+            }
         }
 
         let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
 
         let references_builder = ReferencesBuilder::new(from.clone());
 
-        let mut select_builder = SelectBuilder::new(from);
-        select_builder.set_ctes(ctes);
-        context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
-
-        for dimension in logical_plan.schema().all_dimensions() {
-            self.builder.process_query_dimension(
-                dimension,
-                &references_builder,
-                &mut select_builder,
-                &mut context_factory,
-                &context,
-            )?;
+        // Stage Calculation: resolve partition_by columns and route the
+        // window function through the SQL nodes factory before any
+        // projection is rendered.
+        if let QueryKind::Stage(stage_kind) = logical_plan.kind() {
+            match stage_kind {
+                StageKind::Rank { partition_by } => {
+                    let refs = self
+                        .builder
+                        .resolve_partition_refs(partition_by, &references_builder)?;
+                    context_factory.set_multi_stage_rank(refs);
+                }
+                StageKind::Window { partition_by } => {
+                    let refs = self
+                        .builder
+                        .resolve_partition_refs(partition_by, &references_builder)?;
+                    context_factory.set_multi_stage_window(refs);
+                }
+                StageKind::Aggregation | StageKind::DimensionCalc { .. } => {}
+            }
         }
 
+        let mut select_builder = SelectBuilder::new(from);
+        context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
+        let is_ungrouped_measure = matches!(
+            logical_plan.kind(),
+            QueryKind::InternalFact(FactKind::Measures)
+        );
+
+        // Stage Calculation projects each dimension directly off its single
+        // FK-input alias — no COALESCE merging across join sides. Top-level
+        // / leaf-wrapper Queries, by contrast, sit on top of the full-outer-
+        // join of CTE refs and need `process_query_dimension`'s COALESCE
+        // logic. MeasureSubquery-shape Queries project raw (no resolve).
+        let is_stage_calculation = matches!(logical_plan.kind(), QueryKind::Stage(_));
+        // For the dim-only DimensionCalc shape (source = LogicalJoin), the
+        // `multi_stage_dimension` itself must resolve through outer LEFT-
+        // joined ms-dim CTE columns, but extension/payload dims projected
+        // for consumer JOIN keys (e.g. `orders.customer_id`) must NOT —
+        // otherwise the cube JOIN ON inside the source picks up the CTE-
+        // column render_reference and renders ms_dim.col instead of
+        // cube.col. Resolve only the stage's own member when source is a
+        // cube join.
+        let dim_calc_member: Option<Rc<MemberSymbol>> = match logical_plan.kind() {
+            QueryKind::Stage(StageKind::DimensionCalc {
+                multi_stage_dimension,
+            }) if matches!(logical_plan.source(), QuerySource::LogicalJoin(_)) => {
+                Some(multi_stage_dimension.clone())
+            }
+            _ => None,
+        };
+        for dimension in logical_plan.schema().all_dimensions() {
+            if is_ungrouped_measure {
+                select_builder.add_projection_member(dimension, None);
+            } else if is_stage_calculation {
+                let resolve = match &dim_calc_member {
+                    Some(stage_dim) => dimension.full_name() == stage_dim.full_name(),
+                    None => true,
+                };
+                if resolve {
+                    references_builder.resolve_references_for_member(
+                        dimension.clone(),
+                        &None,
+                        context_factory.render_references_mut(),
+                    )?;
+                }
+                select_builder.add_projection_member(dimension, None);
+            } else {
+                self.builder.process_query_dimension(
+                    dimension,
+                    &references_builder,
+                    &mut select_builder,
+                    &mut context_factory,
+                    &context,
+                )?;
+            }
+        }
+
+        // When the source carries ungrouped data inputs we've already wired
+        // measure substitutions through `ungrouped_measure_references`;
+        // calling `resolve_references_for_member` here would short-circuit
+        // the measure-processor chain and bypass the SUM wrap. The MS-shape
+        // Query itself projects raw — the consumer applies the aggregate.
+        let resolve_measure_refs = !is_ungrouped_measure
+            && match logical_plan.source() {
+                QuerySource::FullKeyAggregate(fk) => {
+                    !fk.data_inputs().iter().any(|r| r.is_ungrouped())
+                }
+                _ => true,
+            };
         for (measure, exists) in self
             .builder
             .measures_for_query(&logical_plan.schema().measures, &context)
         {
             if exists {
-                references_builder.resolve_references_for_member(
-                    measure.clone(),
-                    &None,
-                    context_factory.render_references_mut(),
-                )?;
+                // Resolve inner deps either for the whole measure (default)
+                // or only for member-expressions when the source carries
+                // ungrouped data inputs: their atomic measure column has
+                // no `ungrouped_measure_reference`, but their inner dim/
+                // measure refs need `render_reference` pointing at the
+                // CTE columns the subquery projected (e.g. inner
+                // `child.test_dim` → `q_0.child__test_dim`).
+                let needs_resolve = resolve_measure_refs || measure.as_member_expression().is_ok();
+                if needs_resolve {
+                    references_builder.resolve_references_for_member(
+                        measure.clone(),
+                        &None,
+                        context_factory.render_references_mut(),
+                    )?;
+                }
                 select_builder.add_projection_member(&measure, None);
             } else {
                 select_builder.add_null_projection(&measure, None);
             }
         }
 
-        if self.is_over_full_aggregated_source(logical_plan) {
+        if matches!(logical_plan.kind(), QueryKind::TopLevelOverCtes { .. }) {
             references_builder
                 .resolve_references_for_filter(&having, context_factory.render_references_mut())?;
             select_builder.set_filter(having);
-        } else {
+        } else if !is_ungrouped_measure {
             if !logical_plan.modifers().ungrouped {
                 let group_by = logical_plan
                     .schema()
@@ -198,9 +291,28 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
+        if matches!(logical_plan.kind(), QueryKind::InternalFact(FactKind::Keys)) {
+            select_builder.set_distinct();
+        }
 
-        context_factory
-            .set_rendered_as_multiplied_measures(logical_plan.schema().multiplied_measures.clone());
+        // MS-shape marks ALL its measures `rendered_as_multiplied` (the
+        // consumer never sees the original aggregate); other shapes
+        // propagate only the measures already flagged in schema.
+        if is_ungrouped_measure {
+            context_factory.set_rendered_as_multiplied_measures(
+                logical_plan
+                    .schema()
+                    .measures
+                    .iter()
+                    .map(|m| m.full_name())
+                    .collect(),
+            );
+            context_factory.set_ungrouped_measure(true);
+        } else {
+            context_factory.set_rendered_as_multiplied_measures(
+                logical_plan.schema().multiplied_measures.clone(),
+            );
+        }
 
         if is_pre_aggregation {
             context_factory.clear_render_references();

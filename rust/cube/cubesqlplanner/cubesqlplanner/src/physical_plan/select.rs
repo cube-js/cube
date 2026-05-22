@@ -55,6 +55,12 @@ impl Select {
         self.schema.clone()
     }
 
+    pub fn with_ctes(self: &Rc<Self>, ctes: Vec<Rc<Cte>>) -> Rc<Self> {
+        let mut clone = (**self).clone();
+        clone.ctes = ctes;
+        Rc::new(clone)
+    }
+
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
         let projection = if !self.projection_columns.is_empty() {
             self.projection_columns

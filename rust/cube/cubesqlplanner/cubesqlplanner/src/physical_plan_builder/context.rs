@@ -1,18 +1,12 @@
 use cubenativeutils::CubeError;
 
+use crate::logical_plan::MultiStageDimensionRef;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::MemberSymbol;
 use std::collections::HashMap;
 use std::rc::Rc;
-
-#[derive(Clone, Debug, Default)]
-pub struct MultiStageDimensionContext {
-    pub name: String,
-    pub schema: Rc<Schema>,
-    pub join_dimensions: Vec<Rc<MemberSymbol>>,
-}
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
@@ -24,9 +18,17 @@ pub(super) struct PushDownBuilderContext {
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
     pub measure_subquery: bool,
-    pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
-    pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
-    pub multi_stage_dimensions: Vec<String>,
+    /// Schemas of all CTEs published on the top-level Query: multi-stage
+    /// member CTEs, dimension-subquery CTEs and measure-subquery CTEs share
+    /// this storage. Lookup is by CTE alias / name; all three kinds are
+    /// interchangeable as table references at the SQL level.
+    pub cte_schemas: HashMap<String, Rc<Schema>>,
+    /// MS-dim refs the current Query consumes. The source-render code
+    /// reads these out to wire `OnPrimaryKeys` LEFT JOINs inside the
+    /// cube-join chain (`LogicalJoin`) and `OnOuterDimensions` LEFT
+    /// JOINs at the chain tail. QueryProcessor sets the list before
+    /// invoking `process_node(source)`.
+    pub multi_stage_dimension_refs: Vec<Rc<MultiStageDimensionRef>>,
 }
 
 impl PushDownBuilderContext {
@@ -46,62 +48,17 @@ impl PushDownBuilderContext {
         Ok(factory)
     }
 
-    pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
-        self.multi_stage_schemas.insert(name, schema);
+    pub fn add_cte_schema(&mut self, name: String, schema: Rc<Schema>) {
+        self.cte_schemas.insert(name, schema);
     }
 
-    pub fn remove_multi_stage_dimensions(&mut self) {
-        self.multi_stage_dimensions = Vec::new();
-    }
-
-    pub fn add_multi_stage_dimension(&mut self, name: String) {
-        self.multi_stage_dimensions.push(name);
-    }
-
-    pub fn get_multi_stage_dimensions(
-        &self,
-    ) -> Result<Option<Rc<MultiStageDimensionContext>>, CubeError> {
-        if self.multi_stage_dimensions.is_empty() {
-            return Ok(None);
-        }
-        let mut dimensions_to_resolve = self.multi_stage_dimensions.clone();
-        dimensions_to_resolve.sort();
-        if let Some(schema) = self
-            .multi_stage_dimension_schemas
-            .get(&dimensions_to_resolve)
-        {
-            Ok(Some(schema.clone()))
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot find source for resolve multi stage dimensions {}",
-                dimensions_to_resolve.join(", ")
-            )))
-        }
-    }
-
-    pub fn add_multi_stage_dimension_schema(
-        &mut self,
-        resolved_dimensions: Vec<String>,
-        cte_name: String,
-        join_dimensions: Vec<Rc<MemberSymbol>>,
-        schema: Rc<Schema>,
-    ) {
-        self.multi_stage_dimension_schemas.insert(
-            resolved_dimensions,
-            Rc::new(MultiStageDimensionContext {
-                name: cte_name,
-                join_dimensions,
-                schema,
-            }),
-        );
-    }
-
-    pub fn get_multi_stage_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {
-        if let Some(schema) = self.multi_stage_schemas.get(name) {
+    pub fn get_cte_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {
+        if let Some(schema) = self.cte_schemas.get(name) {
             Ok(schema.clone())
         } else {
             Err(CubeError::internal(format!(
-                "Cannot find schema for multi stage cte {}",
+                "CTE schema for `{}` not found — caller must publish it on \
+                 the top-level Query before any reference site is processed",
                 name
             )))
         }

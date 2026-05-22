@@ -186,6 +186,43 @@ impl SqlCall {
         }
     }
 
+    /// Detects the `count(*)` literal pattern: no dependencies, no
+    /// filter params / groups, no security-context bindings, and a
+    /// single-string template that is `count(*)` (case-insensitive,
+    /// leading/trailing whitespace ignored). Used to recognise a
+    /// `type: number, sql: count(*)` measure as the same shape as a
+    /// `type: count` measure with no `sql`, so the planner can treat
+    /// it as additive in a multiplied join.
+    pub fn is_count_star(&self) -> bool {
+        if !self.deps.is_empty()
+            || !self.filter_params.is_empty()
+            || !self.filter_groups.is_empty()
+            || !self.security_context.values.is_empty()
+        {
+            return false;
+        }
+        let SqlTemplate::String(template) = &self.template else {
+            return false;
+        };
+        let trimmed = template.trim();
+        trimmed.len() == "count(*)".len() && trimmed.eq_ignore_ascii_case("count(*)")
+    }
+
+    /// Build a `SqlCall` that simply proxies to the given member's SQL —
+    /// equivalent to a one-arg template `{arg:0}` referencing it. Use when
+    /// an API expects a `SqlCall` but the planner already has a symbol and
+    /// there is no real template to compile (e.g. a synthetic
+    /// `MAX(<time_dim>)` aggregation built ad hoc in the planner).
+    pub fn proxy_for_member(member: Rc<MemberSymbol>) -> Rc<Self> {
+        Rc::new(Self::new(
+            SqlTemplate::String(SqlCallArg::dependency(0)),
+            vec![SqlDependency::Symbol(member)],
+            vec![],
+            vec![],
+            SecutityContextProps::default(),
+        ))
+    }
+
     /// Renders the template into a single SQL string. Errors when
     /// the template is a `StringVec` — use `eval_vec` for that case.
     pub fn eval(

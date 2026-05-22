@@ -1,26 +1,29 @@
+use super::multi_stage::MultiStageQueryPlanner;
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
-use crate::physical_plan::QualifiedColumnName;
+use crate::logical_plan::{
+    LogicalMultiStageMember, MultiStageDimensionJoin, MultiStageDimensionRef, MultiStageMemberBody,
+    MultiStageSubqueryRef,
+};
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
+use crate::planner::planners::multi_stage::{CteRole, CteState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
-use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
+use crate::planner::{MeasureSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Plans `DimensionSubQuery` nodes for `sub_query: true` dimensions.
-/// Each subquery dimension becomes its own `Query` over the owning
-/// cube's primary keys plus the dimension's measure expression, then
-/// gets joined back into the host query on those keys.
+/// Plans `MultiStageDimensionRef` CTEs for `sub_query: true` dimensions.
+/// Each subquery dimension becomes its own `LogicalPlan` over the owning
+/// cube's primary keys plus the dimension's measure expression; the
+/// reference carries an `OnPrimaryKeys` join descriptor so consumers can
+/// stitch the CTE back into the host query.
 pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
     sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>>,
-    dimensions_refs: RefCell<HashMap<String, QualifiedColumnName>>,
 }
 
 impl DimensionSubqueryPlanner {
@@ -32,7 +35,6 @@ impl DimensionSubqueryPlanner {
             utils: CommonUtils::new(query_tools.clone()),
             query_tools,
             query_properties,
-            dimensions_refs: RefCell::new(HashMap::new()),
         }
     }
     /// Builds a planner over the given sub-query dimensions, indexed
@@ -56,55 +58,59 @@ impl DimensionSubqueryPlanner {
             utils: CommonUtils::new(query_tools.clone()),
             query_tools,
             query_properties,
-            dimensions_refs: RefCell::new(HashMap::new()),
         })
     }
 
-    /// Plans one `DimensionSubQuery` per dimension in the input list.
+    /// Build a `MultiStageDimensionRef` per synthetic dimension and
+    /// publish each body as a `LogicalMultiStageMember` on `cte_state`.
+    /// Dispatches on the dim flavour:
+    /// - `sub_query: true` → DSQ CTE (`plan_sub_query`), keyed
+    ///   `OnPrimaryKeys`.
+    /// - `multi_stage: true` → delegated to
+    ///   `MultiStageQueryPlanner::build_multi_stage_dim_ref`, returned
+    ///   with `OnOuterDimensions` (placeholder — the physical builder
+    ///   still wires the actual JOIN through the
+    ///   `schema().multi_stage_dimensions()` walk).
+    /// The caller stores returned refs on `Query.multi_stage_dimensions`
+    /// of the Query that consumes them; the QueryProcessor reads them
+    /// from there to wire CTE joins and render references.
     pub fn plan_queries(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<Vec<Rc<DimensionSubQuery>>, CubeError> {
+        cte_state: &mut CteState,
+    ) -> Result<Vec<Rc<MultiStageDimensionRef>>, CubeError> {
         let mut result = Vec::new();
-        for subquery_dimension in dimensions.iter() {
-            result.push(self.plan_query(subquery_dimension.clone())?)
+        for synthetic_dim in dimensions.iter() {
+            let Ok(dim_symbol) = synthetic_dim.as_dimension() else {
+                continue;
+            };
+            if dim_symbol.is_sub_query() {
+                result.push(self.plan_sub_query(synthetic_dim.clone(), cte_state)?);
+            } else if dim_symbol.is_multi_stage() {
+                let ms_planner = MultiStageQueryPlanner::new(
+                    self.query_tools.clone(),
+                    self.query_properties.clone(),
+                );
+                result
+                    .push(ms_planner.build_multi_stage_dim_ref(synthetic_dim.clone(), cte_state)?);
+            }
         }
         Ok(result)
     }
 
-    fn plan_query(
+    fn plan_sub_query(
         &self,
         subquery_dimension: Rc<MemberSymbol>,
-    ) -> Result<Rc<DimensionSubQuery>, CubeError> {
-        let dim_name = subquery_dimension.name();
+        cte_state: &mut CteState,
+    ) -> Result<Rc<MultiStageDimensionRef>, CubeError> {
         let cube_name = subquery_dimension.cube_name().clone();
         let dimension_symbol = subquery_dimension.as_dimension()?;
 
         let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;
 
-        let expression = if let Some(sql_call) = dimension_symbol.member_sql() {
-            sql_call.clone()
-        } else {
-            return Err(CubeError::user(format!(
-                "Subquery dimension {} must have `sql` field",
-                subquery_dimension.full_name()
-            )));
-        };
-
-        let cube_symbol = self
-            .query_tools
-            .evaluator_compiler()
-            .borrow_mut()
-            .add_cube_table_evaluator(cube_name.clone(), vec![])?;
-        let member_expression_symbol = MemberExpressionSymbol::try_new(
-            cube_symbol,
-            dim_name.clone(),
-            MemberExpressionExpression::SqlCall(expression),
-            None,
-            None,
-            vec![cube_name.clone()],
-        )?;
-        let measure = MemberSymbol::new_member_expression(member_expression_symbol);
+        let dimension = MemberSymbol::new_measure(MeasureSymbol::new_synthetic_from_dimension(
+            &dimension_symbol,
+        )?);
 
         let (dimensions_filters, time_dimensions_filters) = if dimension_symbol
             .propagate_filters_to_sub_query()
@@ -121,7 +127,7 @@ impl DimensionSubqueryPlanner {
 
         let sub_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
-            .measures(vec![measure.clone()])
+            .measures(vec![dimension.clone()])
             .dimensions(primary_keys_dimensions.clone())
             .time_dimensions_filters(time_dimensions_filters)
             .dimensions_filters(dimensions_filters)
@@ -130,16 +136,44 @@ impl DimensionSubqueryPlanner {
                 self.query_properties.disable_external_pre_aggregations(),
             )
             .build()?;
-        let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
-        let sub_query = query_planner.plan()?;
-        let result = Rc::new(DimensionSubQuery {
-            query: sub_query,
-            primary_keys_dimensions,
-            subquery_dimension,
-            measure_for_subquery_dimension: measure,
-        });
-        pretty_print_rc(&result);
-        Ok(result)
+        let query_planner =
+            QueryPlanner::new(sub_query_properties.clone(), self.query_tools.clone());
+        let body = query_planner.plan_into(cte_state)?;
+
+        let cte_name = cte_state.next_cte_name(CteRole::MultiStageDimension);
+        let schema = body.schema().clone();
+        // DSQ uses MultiStageDimensionRef on the consumer side, not
+        // MultiStageSubqueryRef — but the CteState dedup cache holds
+        // MultiStageSubqueryRef. Stash a parallel SubqueryRef so the
+        // entry can serve any future caller looking up by
+        // (role, members, state).
+        let cte_ref = Rc::new(
+            MultiStageSubqueryRef::builder()
+                .name(cte_name.clone())
+                .symbols(vec![dimension.clone()])
+                .schema(schema.clone())
+                .build(),
+        );
+        cte_state.add_member(
+            CteRole::MultiStageDimension,
+            vec![dimension.clone()],
+            sub_query_properties,
+            Rc::new(LogicalMultiStageMember {
+                name: cte_name.clone(),
+                body: MultiStageMemberBody::Query(body),
+            }),
+            cte_ref,
+        );
+
+        Ok(Rc::new(MultiStageDimensionRef {
+            name: cte_name,
+            schema,
+            join: MultiStageDimensionJoin::OnPrimaryKeys {
+                cube_name,
+                pk_dimensions: primary_keys_dimensions,
+            },
+            dimension,
+        }))
     }
 
     fn extract_filters_without_subqueries(
@@ -177,9 +211,5 @@ impl DimensionSubqueryPlanner {
 
     pub fn is_empty(&self) -> bool {
         self.sub_query_dims.is_empty()
-    }
-
-    pub fn dimensions_refs(&self) -> Ref<'_, HashMap<String, QualifiedColumnName>> {
-        self.dimensions_refs.borrow()
     }
 }

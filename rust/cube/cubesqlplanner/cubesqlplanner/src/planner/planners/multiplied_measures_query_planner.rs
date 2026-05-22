@@ -5,7 +5,7 @@ use crate::planner::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
     collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
-use crate::planner::planners::multi_stage::{CteState, TimeShiftState};
+use crate::planner::planners::multi_stage::{CteRole, CteState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::MemberSymbol;
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
@@ -64,29 +64,26 @@ impl MultipliedMeasuresQueryPlanner {
                     &full_key_aggregate_measures.regular_measures,
                 )?;
             for (join, measures) in join_multi_fact_groups.groups().iter() {
-                let query = self.regular_measures_subquery(measures, join.clone())?;
-                let cte_name = cte_state.next_cte_name();
+                let query = self.regular_measures_subquery(measures, join.clone(), cte_state)?;
+                let cte_name = cte_state.next_cte_name(CteRole::FactMeasure);
 
-                let leaf = Rc::new(MultiStageLeafMeasure {
-                    measures: measures.clone(),
-                    render_measure_as_state: false,
-                    render_measure_for_ungrouped: false,
-                    time_shifts: TimeShiftState::default(),
-                    query: query.clone(),
-                });
                 let member = Rc::new(LogicalMultiStageMember {
                     name: cte_name.clone(),
-                    member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
+                    body: MultiStageMemberBody::Query(query.clone()),
                 });
-                cte_state.add_member(member);
-
-                let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(cte_name)
                         .symbols(measures.clone())
-                        .schema(ref_schema)
+                        .schema(query.schema().clone())
                         .build(),
+                );
+                cte_state.add_member(
+                    CteRole::FactMeasure,
+                    measures.clone(),
+                    self.query_properties.clone(),
+                    member,
+                    subquery_ref.clone(),
                 );
                 cte_state.add_subquery_ref(subquery_ref);
             }
@@ -109,24 +106,26 @@ impl MultipliedMeasuresQueryPlanner {
                 CubeError::internal("No join groups returned for aggregate measures".to_string())
             })?;
             let aggregate_subquery_logical_plan =
-                self.aggregate_subquery_plan(&cube_name, &measures, join)?;
+                self.aggregate_subquery_plan(&cube_name, &measures, join, cte_state)?;
 
-            let cte_name = cte_state.next_cte_name();
+            let cte_name = cte_state.next_cte_name(CteRole::MultipliedMeasureSubquery);
             let member = Rc::new(LogicalMultiStageMember {
                 name: cte_name.clone(),
-                member_type: MultiStageMemberLogicalType::MultipliedMeasure(
-                    aggregate_subquery_logical_plan.clone(),
-                ),
+                body: MultiStageMemberBody::Query(aggregate_subquery_logical_plan.clone()),
             });
-            cte_state.add_member(member);
-
-            let ref_schema = aggregate_subquery_logical_plan.schema.clone();
             let subquery_ref = Rc::new(
                 MultiStageSubqueryRef::builder()
-                    .name(cte_name.clone())
+                    .name(cte_name)
                     .symbols(measures.clone())
-                    .schema(ref_schema)
+                    .schema(aggregate_subquery_logical_plan.schema().clone())
                     .build(),
+            );
+            cte_state.add_member(
+                CteRole::MultipliedMeasureSubquery,
+                measures.clone(),
+                self.query_properties.clone(),
+                member,
+                subquery_ref.clone(),
             );
             cte_state.add_subquery_ref(subquery_ref);
         }
@@ -139,23 +138,68 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
         measures: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<dyn JoinDefinition>,
-    ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
-        let pk_cube = self.common_utils.cube_from_path(key_cube_name.clone())?;
-        let pk_cube = Cube::new(pk_cube);
-        let subquery_dimensions =
-            collect_sub_query_dimensions_from_symbols(&measures, &self.join_planner, &key_join)?;
-
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
-
+        cte_state: &mut CteState,
+    ) -> Result<Rc<Query>, CubeError> {
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
-        let keys_subquery =
-            self.key_query(&primary_keys_dimensions, key_join.clone(), pk_cube.clone())?;
+        self.assert_measures_not_multiplied(measures, key_cube_name)?;
+
+        // KeysSubQuery body.
+        let keys_query = self.key_query(&primary_keys_dimensions, key_join.clone(), cte_state)?;
+        let keys_cte_name = cte_state.next_cte_name(CteRole::Keys);
+        let keys_ref = Rc::new(
+            MultiStageSubqueryRef::builder()
+                .name(keys_cte_name.clone())
+                .symbols(primary_keys_dimensions.clone())
+                .schema(keys_query.schema().clone())
+                .build(),
+        );
+        cte_state.add_member(
+            CteRole::Keys,
+            primary_keys_dimensions.clone(),
+            self.query_properties.clone(),
+            Rc::new(LogicalMultiStageMember {
+                name: keys_cte_name,
+                body: MultiStageMemberBody::Query(keys_query),
+            }),
+            keys_ref.clone(),
+        );
+
+        // MeasureSubQuery body — projects raw ungrouped columns; the outer
+        // aggregate-multiplied SELECT wraps them in the right aggregate via
+        // `ungrouped_measure_reference`.
+        let measure_query = self.aggregate_subquery_measure(
+            &measures,
+            &primary_keys_dimensions,
+            key_join.clone(),
+            cte_state,
+        )?;
+        let measure_cte_name = cte_state.next_cte_name(CteRole::MultipliedMeasureSubquery);
+        // `symbols` drive `ungrouped_measure_reference` setup on the outer
+        // Query: we only want the wrap-in-aggregate behaviour for what the
+        // subquery actually projects as a measure column — native measures
+        // and the measure-deps surfaced from member-expressions. The
+        // member-expressions themselves stay on the outer schema and
+        // resolve their inner deps via the standard render-reference
+        // mechanism (which finds them by origin_member in the CTE schema).
+        let measure_symbols = measure_query.schema().measures.clone();
+        let measure_ref = Rc::new(
+            MultiStageSubqueryRef::builder()
+                .name(measure_cte_name.clone())
+                .symbols(measure_symbols.clone())
+                .schema(measure_query.schema().clone())
+                .is_ungrouped(true)
+                .build(),
+        );
+        cte_state.add_member(
+            CteRole::MultipliedMeasureSubquery,
+            measure_symbols,
+            self.query_properties.clone(),
+            Rc::new(LogicalMultiStageMember {
+                name: measure_cte_name,
+                body: MultiStageMemberBody::Query(measure_query),
+            }),
+            measure_ref.clone(),
+        );
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
@@ -167,32 +211,33 @@ impl MultipliedMeasuresQueryPlanner {
                     .clone(),
             )
             .into_rc();
-        let should_build_join_for_measure_select =
-            self.check_should_build_join_for_measure_select(measures, key_cube_name)?;
-        let source = if should_build_join_for_measure_select {
-            let measure_subquery = self.aggregate_subquery_measure(
-                key_join.clone(),
-                &measures,
-                &primary_keys_dimensions,
-            )?;
-            measure_subquery.into()
-        } else {
-            pk_cube.into()
-        };
-        Ok(Rc::new(AggregateMultipliedSubquery {
-            schema,
-            keys_subquery,
-            dimension_subqueries: subquery_dimension_queries,
-            source,
-            pre_aggregation_override: None,
-        }))
+
+        // Aggregate-multiplied subquery shape: FullKeyAggregate joins the
+        // MeasureSubquery CTE to the KeysSubQuery CTE on the pk cube's
+        // primary-key dimensions. Outer `Query` re-aggregates measures over
+        // the outer dimensions.
+        let full_key_aggregate = Rc::new(
+            FullKeyAggregate::builder()
+                .schema(schema.clone())
+                .data_inputs(vec![measure_ref])
+                .keys_subquery_ref(Some(keys_ref))
+                .join_keys(primary_keys_dimensions.clone())
+                .build(),
+        );
+
+        let query = Query::builder()
+            .schema(schema)
+            .source(full_key_aggregate.into())
+            .kind(QueryKind::AggregateMultiplied)
+            .build();
+        Ok(Rc::new(query))
     }
 
-    fn check_should_build_join_for_measure_select(
+    fn assert_measures_not_multiplied(
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
         key_cube_name: &String,
-    ) -> Result<bool, CubeError> {
+    ) -> Result<(), CubeError> {
         for measure in measures.iter() {
             let owned_measure = measure.with_stripped_join_prefix();
             let member_expression_over_dimensions_cubes =
@@ -206,32 +251,89 @@ impl MultipliedMeasuresQueryPlanner {
             } else {
                 collect_cube_names(&owned_measure)?
             };
+            if !cubes.iter().any(|cube| cube != key_cube_name) {
+                continue;
+            }
             let join_hints = collect_join_hints(&owned_measure)?;
-            if cubes.iter().any(|cube| cube != key_cube_name) {
-                let measures_join = self
-                    .query_tools
-                    .join_graph()
-                    .build_join(join_hints.into_items())?;
-                if *measures_join
-                    .static_data()
-                    .multiplication_factor
-                    .get(key_cube_name)
-                    .unwrap_or(&false)
-                {
-                    return Err(CubeError::user(format!("{}' references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.join(", "))));
-                }
-                return Ok(true);
+            let measures_join = self
+                .query_tools
+                .join_graph()
+                .build_join(join_hints.into_items())?;
+            if *measures_join
+                .static_data()
+                .multiplication_factor
+                .get(key_cube_name)
+                .unwrap_or(&false)
+            {
+                return Err(CubeError::user(format!("{}' references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.join(", "))));
             }
         }
-        Ok(false)
+        Ok(())
+    }
+
+    /// Splits multiplied measures into the parts the MeasureSubquery
+    /// actually needs to project:
+    /// - `native_measures`: declared cube measures, projected raw and
+    ///   re-aggregated by the outer FullKeyAggregate.
+    /// - `extra_dim_deps`: dim symbols referenced by member-expressions;
+    ///   projected as dimensions on the subquery so the outer rendering
+    ///   of the member-expression resolves its dim refs against the CTE
+    ///   instead of the multiplied join chain.
+    /// - `extra_measure_deps`: native measure symbols referenced by
+    ///   member-expressions; projected raw alongside `native_measures`.
+    ///
+    /// The member-expression itself stays on the outer
+    /// `Query{AggregateMultiplied}` schema — its inner aggregate is
+    /// computed against the dedup-by-pk subquery output.
+    fn split_member_expression_deps(
+        measures: &Vec<Rc<MemberSymbol>>,
+    ) -> (
+        Vec<Rc<MemberSymbol>>, // native_measures
+        Vec<Rc<MemberSymbol>>, // extra_dim_deps
+        Vec<Rc<MemberSymbol>>, // extra_measure_deps
+    ) {
+        let mut native_measures = Vec::new();
+        let mut extra_dim_deps: Vec<Rc<MemberSymbol>> = Vec::new();
+        let mut extra_measure_deps: Vec<Rc<MemberSymbol>> = Vec::new();
+        for measure in measures.iter() {
+            if let Ok(me) = measure.as_member_expression() {
+                for dep in me.get_dependencies() {
+                    let resolved = dep.resolve_reference_chain();
+                    match resolved.as_ref() {
+                        MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {
+                            if !extra_dim_deps
+                                .iter()
+                                .any(|d| d.full_name() == resolved.full_name())
+                            {
+                                extra_dim_deps.push(resolved);
+                            }
+                        }
+                        MemberSymbol::Measure(_) => {
+                            if !extra_measure_deps
+                                .iter()
+                                .any(|d| d.full_name() == resolved.full_name())
+                            {
+                                extra_measure_deps.push(resolved);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                let _ = me;
+            } else {
+                native_measures.push(measure.clone());
+            }
+        }
+        (native_measures, extra_dim_deps, extra_measure_deps)
     }
 
     fn aggregate_subquery_measure(
         &self,
-        key_join: Rc<dyn JoinDefinition>,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<Rc<MeasureSubquery>, CubeError> {
+        key_join: Rc<dyn JoinDefinition>,
+        cte_state: &mut CteState,
+    ) -> Result<Rc<Query>, CubeError> {
         let subquery_dimensions =
             collect_sub_query_dimensions_from_members(&measures, &self.join_planner, &key_join)?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
@@ -239,27 +341,62 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_tools.clone(),
             self.query_properties.clone(),
         )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
-        let measure_join_hints = collect_join_hints_for_measures(&measures)?;
-        let source = self.join_planner.make_join_logical_plan_with_join_hints(
-            measure_join_hints,
-            subquery_dimension_queries,
-        )?;
+        let multi_stage_dimensions =
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
+
+        let (native_measures, extra_dim_deps, extra_measure_deps) =
+            Self::split_member_expression_deps(measures);
+        let projected_measures = native_measures
+            .iter()
+            .cloned()
+            .chain(extra_measure_deps.iter().cloned())
+            .collect_vec();
+        let projected_dimensions = primary_keys_dimensions
+            .iter()
+            .cloned()
+            .chain(extra_dim_deps.iter().cloned())
+            .collect_vec();
+
+        // Strip the join-chain prefix from each projected measure before
+        // collecting join hints: the MeasureSubquery is the dedup-by-pk
+        // subselect of the owning cube alone — including the outer cubes
+        // the measure was reached through (e.g. a view's `join_path`)
+        // would multiply rows back, defeating the dedup. Member-
+        // expressions are decomposed into their deps (the member-
+        // expression itself emits no hints — see `JoinHintsCollector`);
+        // those deps drive the join from their own owning cubes.
+        let hint_sources = projected_measures
+            .iter()
+            .map(|m| m.with_stripped_join_prefix())
+            .collect_vec();
+        let measure_join_hints = collect_join_hints_for_measures(&hint_sources)?;
+        let source = self
+            .join_planner
+            .make_join_logical_plan_with_join_hints(measure_join_hints)?;
 
         let schema = LogicalSchema::default()
-            .set_dimensions(primary_keys_dimensions.clone())
-            .set_measures(measures.clone())
+            .set_dimensions(projected_dimensions)
+            .set_measures(projected_measures)
             .into_rc();
 
-        let result = MeasureSubquery { schema, source };
-        Ok(Rc::new(result))
+        // MeasureSubquery shape: raw column projection of pk + dim-deps +
+        // native measures + measure-deps over the (stripped) source join.
+        // The outer `Query{FullKeyAggregate}` re-aggregates measure
+        // columns and renders member-expressions against this CTE.
+        let query = Query::builder()
+            .schema(schema)
+            .source(source.into())
+            .multi_stage_dimensions(multi_stage_dimensions)
+            .kind(QueryKind::InternalFact(FactKind::Measures))
+            .build();
+        Ok(Rc::new(query))
     }
 
     fn regular_measures_subquery(
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
         join: Rc<dyn JoinDefinition>,
+        cte_state: &mut CteState,
     ) -> Result<Rc<Query>, CubeError> {
         let all_symbols = self
             .query_properties
@@ -273,12 +410,10 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_tools.clone(),
             self.query_properties.clone(),
         )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
+        let multi_stage_dimensions =
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
 
-        let source = self
-            .join_planner
-            .make_join_logical_plan(join, subquery_dimension_queries.clone())?;
+        let source = self.join_planner.make_join_logical_plan(join)?;
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
@@ -302,12 +437,11 @@ impl MultipliedMeasuresQueryPlanner {
             .schema(schema)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
-                offset: None,
-                limit: None,
                 ungrouped: self.query_properties.ungrouped(),
-                order_by: vec![],
+                ..Default::default()
             }))
             .source(source.into())
+            .multi_stage_dimensions(multi_stage_dimensions)
             .build();
         Ok(Rc::new(query))
     }
@@ -316,8 +450,8 @@ impl MultipliedMeasuresQueryPlanner {
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<dyn JoinDefinition>,
-        key_cube: Rc<Cube>,
-    ) -> Result<Rc<KeysSubQuery>, CubeError> {
+        cte_state: &mut CteState,
+    ) -> Result<Rc<Query>, CubeError> {
         let all_symbols =
             self.query_properties
                 .get_member_symbols(true, true, false, true, &dimensions);
@@ -330,12 +464,10 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_tools.clone(),
             self.query_properties.clone(),
         )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
+        let multi_stage_dimensions =
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
 
-        let source = self
-            .join_planner
-            .make_join_logical_plan(key_join.clone(), subquery_dimension_queries)?;
+        let source = self.join_planner.make_join_logical_plan(key_join.clone())?;
 
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
@@ -344,19 +476,34 @@ impl MultipliedMeasuresQueryPlanner {
             segments: self.query_properties.segments().clone(),
         });
 
+        let schema_dimensions = self
+            .query_properties
+            .dimensions()
+            .iter()
+            .chain(dimensions.iter())
+            .cloned()
+            .unique_by(|d| d.full_name())
+            .collect_vec();
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_dimensions(schema_dimensions)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
 
-        let keys_query = KeysSubQuery::builder()
+        // KeysSubQuery shape: a `SELECT DISTINCT` projection of outer +
+        // pk-cube dimensions over the keys join, with the leaf time-shift
+        // snapshot pinned on the modifiers. The upstream
+        // `Query{FullKeyAggregate}` joins to its CTE by name.
+        let query = Query::builder()
             .schema(schema)
-            .primary_keys_dimensions(dimensions.clone())
             .filter(logical_filter)
-            .source(source)
-            .pk_cube(key_cube)
+            .modifers(Rc::new(LogicalQueryModifiers {
+                time_shifts: self.query_properties.time_shifts().clone(),
+                ..Default::default()
+            }))
+            .source(source.into())
+            .multi_stage_dimensions(multi_stage_dimensions)
+            .kind(QueryKind::InternalFact(FactKind::Keys))
             .build();
-
-        Ok(Rc::new(keys_query))
+        Ok(Rc::new(query))
     }
 }

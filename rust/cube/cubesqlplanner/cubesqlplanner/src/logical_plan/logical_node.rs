@@ -1,3 +1,4 @@
+use super::pretty_print::*;
 use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -26,15 +27,7 @@ pub enum PlanNode {
     LogicalJoin(Rc<LogicalJoin>),
     FullKeyAggregate(Rc<FullKeyAggregate>),
     PreAggregation(Rc<PreAggregation>),
-    AggregateMultipliedSubquery(Rc<AggregateMultipliedSubquery>),
     Cube(Rc<Cube>),
-    MeasureSubquery(Rc<MeasureSubquery>),
-    DimensionSubQuery(Rc<DimensionSubQuery>),
-    KeysSubQuery(Rc<KeysSubQuery>),
-    MultiStageGetDateRange(Rc<MultiStageGetDateRange>),
-    MultiStageLeafMeasure(Rc<MultiStageLeafMeasure>),
-    MultiStageMeasureCalculation(Rc<MultiStageMeasureCalculation>),
-    MultiStageDimensionCalculation(Rc<MultiStageDimensionCalculation>),
     MultiStageTimeSeries(Rc<MultiStageTimeSeries>),
     MultiStageRollingWindow(Rc<MultiStageRollingWindow>),
     LogicalMultiStageMember(Rc<LogicalMultiStageMember>),
@@ -48,15 +41,7 @@ macro_rules! match_plan_node {
             PlanNode::LogicalJoin($node) => $block,
             PlanNode::FullKeyAggregate($node) => $block,
             PlanNode::PreAggregation($node) => $block,
-            PlanNode::AggregateMultipliedSubquery($node) => $block,
             PlanNode::Cube($node) => $block,
-            PlanNode::MeasureSubquery($node) => $block,
-            PlanNode::DimensionSubQuery($node) => $block,
-            PlanNode::KeysSubQuery($node) => $block,
-            PlanNode::MultiStageGetDateRange($node) => $block,
-            PlanNode::MultiStageLeafMeasure($node) => $block,
-            PlanNode::MultiStageMeasureCalculation($node) => $block,
-            PlanNode::MultiStageDimensionCalculation($node) => $block,
             PlanNode::MultiStageTimeSeries($node) => $block,
             PlanNode::MultiStageRollingWindow($node) => $block,
             PlanNode::LogicalMultiStageMember($node) => $block,
@@ -86,6 +71,38 @@ impl PlanNode {
             node.with_inputs(inputs)?.as_plan_node()
         });
         Ok(result)
+    }
+
+    /// Semantic classification — leaf/stage distinction independent of where
+    /// the node currently sits in the plan structure.
+    /// Returns `None` only for nodes that are pure plan scaffolding and do
+    /// not produce a SELECT-shaped result on their own.
+    pub fn multi_stage_kind(&self) -> Option<MultiStageKind> {
+        match self {
+            // Leaves — produce a CTE from base sources, no multi-stage CTE deps.
+            // `Query` covers both true leaves and the aggregate-multiplied
+            // subquery shape (`FullKeyAggregate` over already-published
+            // KS/MS CTEs); the latter is conceptually a Stage but is
+            // structurally a Query at this point.
+            PlanNode::Query(_) | PlanNode::MultiStageTimeSeries(_) => Some(MultiStageKind::Leaf),
+
+            PlanNode::MultiStageRollingWindow(_) => Some(MultiStageKind::Stage),
+
+            // Pure plan scaffolding — never has a SELECT result on its own.
+            PlanNode::LogicalJoin(_)
+            | PlanNode::FullKeyAggregate(_)
+            | PlanNode::PreAggregation(_)
+            | PlanNode::Cube(_)
+            | PlanNode::LogicalMultiStageMember(_) => None,
+        }
+    }
+}
+
+impl PrettyPrint for PlanNode {
+    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+        match_plan_node!(self, node => {
+            node.pretty_print(result, state);
+        });
     }
 }
 

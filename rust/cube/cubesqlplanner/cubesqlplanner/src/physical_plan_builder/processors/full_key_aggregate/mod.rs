@@ -35,8 +35,14 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
         full_key_aggregate: &FullKeyAggregate,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
+        // Aggregate-multiplied subquery shape (keys CTE + measure CTE
+        // joined by pk) is always served by `KeysFullKeyAggregateStrategy`
+        // — its `keys_subquery_ref` carries the keys side, so dimension
+        // emptiness is not a signal to fall back to inner-join.
         let strategy: Rc<dyn FullKeyAggregateStrategy> =
-            if !full_key_aggregate.schema().has_dimensions() {
+            if full_key_aggregate.keys_subquery_ref().is_some() {
+                KeysFullKeyAggregateStrategy::new(self.builder)
+            } else if !full_key_aggregate.schema().has_dimensions() {
                 InnerJoinFullKeyAggregateStrategy::new(self.builder)
             } else if self.builder.templates().supports_full_join() {
                 FullJoinFullKeyAggregateStrategy::new(self.builder)

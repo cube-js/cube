@@ -1,5 +1,9 @@
 use super::common::{AggregationType, Case, CompiledMemberPath};
-use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
+use super::cube_symbol::CubeTableSymbol;
+use super::dimension_symbol::DimensionSymbol;
+use super::measure_kinds::{
+    AggregatedMeasure, CalculatedMeasure, CalculatedMeasureType, MeasureKind,
+};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -134,6 +138,91 @@ impl MeasureSymbol {
             group_by,
             mask_sql,
         })
+    }
+
+    /// Build a synthetic calculated measure that proxies a dimension's
+    /// SQL: same `compiled_path` (so `full_name`/`alias` match the
+    /// dim's), same `SqlCall`, `Calculated` kind matching the dim's
+    /// type. No filters, no case, no time-shift, no reduce/group-by —
+    /// a thin projection wrapper used by sub-query-dimension bodies
+    /// to expose the dim value as a column.
+    ///
+    /// Errors out when the dim has no `member_sql` (e.g. Geo) or its
+    /// type doesn't map to a `CalculatedMeasureType`.
+    pub fn new_synthetic_from_dimension(dim: &DimensionSymbol) -> Result<Rc<Self>, CubeError> {
+        let sql = dim.member_sql().cloned().ok_or_else(|| {
+            CubeError::user(format!(
+                "Cannot build a synthetic measure for dimension `{}` — it has no `sql`",
+                dim.full_name()
+            ))
+        })?;
+        let calc_type = CalculatedMeasureType::from_str(dim.dimension_type()).ok_or_else(|| {
+            CubeError::user(format!(
+                "Cannot build a synthetic measure for dimension `{}` — type `{}` doesn't map to a calculated measure type",
+                dim.full_name(),
+                dim.dimension_type()
+            ))
+        })?;
+        let kind = MeasureKind::Calculated(CalculatedMeasure::new(calc_type, sql));
+        Ok(Self::new(
+            dim.compiled_path().clone(),
+            false,
+            false,
+            None,
+            kind,
+            None,
+            false,
+            vec![],
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            None,
+            None,
+        ))
+    }
+
+    /// Build a synthetic aggregating measure (`MAX(target)`, `SUM(target)`, …)
+    /// owned by `cube_symbol`. The new measure has no filters, no case, no
+    /// time-shift and no reduce/group-by — it is a thin aggregation wrapper
+    /// around `target` produced ad hoc by the planner (e.g. for the time-
+    /// series date-range CTE), not a member declared in the cube schema.
+    pub fn new_synthetic_aggregation(
+        cube_symbol: Rc<CubeTableSymbol>,
+        name: &str,
+        agg_type: AggregationType,
+        target: Rc<MemberSymbol>,
+    ) -> Rc<Self> {
+        let cube_name = cube_symbol.cube_name().clone();
+        let compiled_path = CompiledMemberPath::new(
+            cube_symbol,
+            format!("{}.{}", cube_name, name),
+            name.to_string(),
+            name.to_string(),
+            vec![cube_name],
+        );
+        let kind = MeasureKind::Aggregated(AggregatedMeasure::new(
+            agg_type,
+            SqlCall::proxy_for_member(target),
+        ));
+        Self::new(
+            compiled_path,
+            false,
+            false,
+            None,
+            kind,
+            None,
+            false,
+            vec![],
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            None,
+            None,
+        )
     }
 
     /// Returns a non-rolling copy of the symbol. A rolling-window
@@ -537,33 +626,6 @@ impl SymbolFactory for MeasureSymbolFactory {
             cube_evaluator,
         } = self;
 
-        let pk_sqls = if sql.is_none() {
-            cube_evaluator
-                .static_data()
-                .primary_keys
-                .get(path.cube_name())
-                .cloned()
-                .unwrap_or_else(|| vec![])
-                .into_iter()
-                .map(|primary_key| -> Result<_, CubeError> {
-                    let key_dimension_name = format!("{}.{}", path.cube_name(), primary_key);
-                    let key_dimension =
-                        cube_evaluator.dimension_by_path(key_dimension_name.clone())?;
-                    let key_dimension_sql = if let Some(key_dimension_sql) = key_dimension.sql()? {
-                        Ok(key_dimension_sql)
-                    } else {
-                        Err(CubeError::internal(format!(
-                            "Key dimension {} hasn't sql evaluator",
-                            key_dimension_name
-                        )))
-                    }?;
-                    compiler.compile_sql_call(path.cube_name(), key_dimension_sql)
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            vec![]
-        };
-
         let mut measure_filters = vec![];
         if let Some(filters) = definition.filters()? {
             for filter in filters.iter() {
@@ -591,6 +653,42 @@ impl SymbolFactory for MeasureSymbolFactory {
             Some(compiler.compile_sql_call(path.cube_name(), sql)?)
         } else {
             None
+        };
+
+        // pk_sqls are collected when this measure may render as a row-count
+        // (`type: count` with no `sql`, or the `type: number` + `sql: count(*)`
+        // idiom — `MeasureKind::from_type_str` promotes the latter to `Count`
+        // and needs the pk list to drive `COUNT(DISTINCT pk)` under a
+        // multiplied join).
+        let needs_count_pks = sql
+            .as_ref()
+            .map(|sql_call| sql_call.is_count_star())
+            .unwrap_or(true);
+        let pk_sqls = if needs_count_pks {
+            cube_evaluator
+                .static_data()
+                .primary_keys
+                .get(path.cube_name())
+                .cloned()
+                .unwrap_or_else(|| vec![])
+                .into_iter()
+                .map(|primary_key| -> Result<_, CubeError> {
+                    let key_dimension_name = format!("{}.{}", path.cube_name(), primary_key);
+                    let key_dimension =
+                        cube_evaluator.dimension_by_path(key_dimension_name.clone())?;
+                    let key_dimension_sql = if let Some(key_dimension_sql) = key_dimension.sql()? {
+                        Ok(key_dimension_sql)
+                    } else {
+                        Err(CubeError::internal(format!(
+                            "Key dimension {} hasn't sql evaluator",
+                            key_dimension_name
+                        )))
+                    }?;
+                    compiler.compile_sql_call(path.cube_name(), key_dimension_sql)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            vec![]
         };
 
         let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
