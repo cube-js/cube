@@ -814,6 +814,22 @@
     {
       "source": "/admin/deployment/vpc/gcp/byoc",
       "destination": "/admin/deployment/dedicated/gcp/byoc"
+    },
+    {
+      "source": "/docs/deployment/cloud/deployment-types",
+      "destination": "/admin/deployment/deployment-types"
+    },
+    {
+      "source": "/docs/deployment/cloud/auto-suspension",
+      "destination": "/admin/deployment/auto-suspension"
+    },
+    {
+      "source": "/docs/deployment/cloud/limits",
+      "destination": "/admin/deployment/limits"
+    },
+    {
+      "source": "/docs/deployment/cloud/scalability",
+      "destination": "/admin/deployment/scalability"
     }
   ]
 }
