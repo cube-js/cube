@@ -119,8 +119,7 @@ the **Viewer** role by default. To assign a different role, expand the
 
 The selected role applies **only when a user is first created** during
 provisioning. Existing users are not modified on subsequent SSO logins or
-SCIM updates. It is applied **in addition to** any roles your identity
-provider sends via the role attribute (subject to the `rolesMap`).
+SCIM updates.
 
 <Info>
 
@@ -163,32 +162,17 @@ To configure group-based role mapping:
      appears in the SAML assertion (case-insensitive).
    - **Cube Cloud role** — pick a default or [custom role][ref-custom-roles].
 
-How it's applied:
+For SAML SSO, group mappings are evaluated **only when a new user is
+auto-provisioned** on first login. If any matching group resolves to a
+Cube Cloud role, those roles are assigned to the new user **instead of**
+the configured [default role](#default-role-for-new-users). The default
+role is used as a fallback when no IdP group matches (or when the mapped
+Cube Cloud roles no longer exist). Existing users' role assignments are
+never modified by subsequent logins.
 
-- On every SAML SSO login, Cube Cloud reads the user's groups from the
-  configured **Groups attribute** and assigns the mapped role for each
-  group that matches.
-- Group mapping is **additive**: roles are added on every login, but a
-  user is never demoted on subsequent logins (e.g. removing them from an
-  Okta group does not strip the corresponding Cube role — adjust the
-  user's roles in Cube Cloud manually).
-- Users whose groups don't match any entry still receive the
-  [default role](#default-role-for-new-users) on first login.
-- The **Default role for new users** picker continues to apply at
-  provisioning time as the always-on baseline.
-
-The same `groupsRolesMap` is also consumed by [SCIM][ref-scim] when groups
-are pushed and members are added, so a single configuration drives both
-SAML SSO and SCIM group sync.
-
-<Info>
-
-The legacy `rolesMap` setting (a translation from raw IdP role values to
-Cube role names, applied to the **Role attribute**) continues to work
-and is applied **in addition to** `groupsRolesMap`. They read different
-SAML attributes (`role` vs. `groups`) and can be used side by side.
-
-</Info>
+The same mapping is also applied by [SCIM][ref-scim] when group
+memberships are pushed, so a single configuration drives both SAML SSO
+and SCIM group sync.
 
 ## Test SAML authentication
 

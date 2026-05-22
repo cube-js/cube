@@ -134,23 +134,16 @@ profile updates.
 ## Map roles by SCIM group
 
 If you have configured [Map roles by group][ref-saml-map-roles-by-group]
-on the SAML setup page, the same `groupsRolesMap` is applied whenever
-SCIM pushes group memberships:
-
-- When Okta adds a user to a pushed group, Cube Cloud looks up the
-  group's **display name** (case-insensitive) in the configured mapping
-  and assigns the corresponding Cube Cloud role to that user.
-- Role assignment is **additive**: a user is never demoted on subsequent
-  group sync. Removing a user from an Okta group does not strip the
-  corresponding Cube Cloud role — adjust the user's roles in Cube Cloud
-  manually.
-- The match is on the **group display name** that Okta pushes via SCIM,
-  not the Okta group ID. Make sure the **IdP group name** entries in
-  Cube Cloud match exactly (case-insensitive) what Okta sends.
+on the SAML setup page, the same mapping is applied when SCIM pushes
+group memberships from Okta — when Okta adds a user to a pushed group,
+Cube Cloud assigns the mapped role to that user. Role assignment is
+**additive**: removing a user from an Okta group does not strip the
+corresponding role; adjust the user's roles in Cube Cloud manually.
 
 No separate configuration is required on the SCIM side — once the
-mapping is defined on the SAML page, it drives both SAML SSO login and
-SCIM group sync.
+mapping is defined on the SAML page, it drives both SAML SSO and SCIM
+group sync. Match is on the group **display name** Okta pushes
+(case-insensitive).
 
 [ref-saml]: /admin/sso/okta/saml
 [ref-saml-default-role]: /admin/sso/okta/saml#default-role-for-new-users
