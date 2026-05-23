@@ -3,11 +3,14 @@ import crypto from 'crypto';
 
 import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
-import { CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
 
 import { QueryQueue, QueryQueueOptions } from '../../src';
 import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
 import { processUidRE } from '../../src/orchestrator/utils';
+
+type CubestoreQueueDriverConnectionLike = {
+  useExternalId(): Promise<boolean>;
+};
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
@@ -465,7 +468,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       test('useExternalId should return true', async () => {
         const connection = await queue.queueDriver.createConnection();
         try {
-          expect(await (connection as CubestoreQueueDriverConnection).useExternalId()).toBe(true);
+          expect(await (connection as unknown as CubestoreQueueDriverConnectionLike).useExternalId()).toBe(true);
         } finally {
           queue.queueDriver.release(connection);
         }

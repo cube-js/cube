@@ -1,6 +1,6 @@
 import R from 'ramda';
 import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -13,6 +13,7 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
+import { LoggerFn } from './Logger';
 import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';

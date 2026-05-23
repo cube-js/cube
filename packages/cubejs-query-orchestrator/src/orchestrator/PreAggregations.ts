@@ -1,6 +1,6 @@
 import R from 'ramda';
 import crypto from 'crypto';
-import { getEnv, LoggerFn } from '@cubejs-backend/shared';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
@@ -13,6 +13,7 @@ import { CacheAndQueryDriverType } from './QueryOrchestrator';
 import { PreAggregationPartitionRangeLoader } from './PreAggregationPartitionRangeLoader';
 import { PreAggregationLoader } from './PreAggregationLoader';
 import { PreAggregationLoadCache } from './PreAggregationLoadCache';
+import { LoggerFn } from './Logger';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';

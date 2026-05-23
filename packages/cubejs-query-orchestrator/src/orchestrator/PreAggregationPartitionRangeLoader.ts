@@ -10,7 +10,6 @@ import {
   timeSeries,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
-  LoggerFn,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -28,6 +27,7 @@ import {
 } from './PreAggregations';
 import { PreAggregationLoader } from './PreAggregationLoader';
 import { PreAggregationLoadCache } from './PreAggregationLoadCache';
+import { LoggerFn } from './Logger';
 
 const DEFAULT_TS_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSS';
 

@@ -8,7 +8,6 @@ import {
   MaybeCancelablePromise,
   streamToArray,
   CacheMode,
-  LoggerFn,
 } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -23,6 +22,7 @@ import { QueryQueue, QueryQueueOptions } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { LoggerFn } from './Logger';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';

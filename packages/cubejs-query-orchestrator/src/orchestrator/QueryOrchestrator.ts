@@ -1,6 +1,6 @@
 import * as stream from 'stream';
 import R from 'ramda';
-import { CacheMode, getEnv, LoggerFn } from '@cubejs-backend/shared';
+import { CacheMode, getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   QuerySchemasResult,
@@ -12,6 +12,7 @@ import {
 import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { LoggerFn } from './Logger';
 import { QueryStream } from './QueryStream';
 
 export type CacheAndQueryDriverType = 'memory' | 'cubestore' | /** removed, used for exception */ 'redis';

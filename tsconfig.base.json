@@ -13,8 +13,10 @@
     "baseUrl": ".",
     "paths": {
       "@cubejs-backend/*": [
-        "rust/js-wrapper",
+        "packages/cubejs-backend-shared/src",
+        "packages/cubejs-base-driver/src",
         "packages/cubejs-cubestore-driver/src",
+        "rust/js-wrapper",
         "packages/cubejs-api-gateway/src",
         "packages/cubejs-cli/src",
         "packages/cubejs-query-orchestrator/src",

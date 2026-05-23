@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { getEnv, getProcessUid, LoggerFn } from '@cubejs-backend/shared';
+import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import {
   QueueDriverInterface,
   QueryKey,
@@ -14,6 +14,7 @@ import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalQueueDriver } from './LocalQueueDriver';
+import { LoggerFn } from './Logger';
 import { QueryStream } from './QueryStream';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
@@ -192,11 +193,12 @@ export class QueryQueue {
       queueId: this.generateQueueId(),
       ...executeOptions,
     };
-
-    if (options.requestId) {
-      const idx = options.requestId.lastIndexOf('-span-');
-      options.externalId = idx !== -1 ? options.requestId.substring(0, idx) : options.requestId;
-    }
+    const externalId = options.requestId
+      ? (() => {
+        const idx = options.requestId.lastIndexOf('-span-');
+        return idx !== -1 ? options.requestId.substring(0, idx) : options.requestId;
+      })()
+      : undefined;
 
     if (this.skipQueue) {
       const queryDef = {
@@ -238,7 +240,7 @@ export class QueryQueue {
       // Result here won't be fetched for a forced build query and a jobbed build
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
-      let result = !query.forceBuild && await queueConnection.getResult(queryKey, options.externalId);
+      let result = !query.forceBuild && await (queueConnection as any).getResult(queryKey, externalId);
       if (result && !result.streamResult) {
         return this.parseResult(result);
       }
