@@ -430,5 +430,19 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       // @ts-ignore
       expect(key4.persistent).toEqual(false);
     });
+
+    it('replacePreAggregationTableNames replaces usage aliases before the base table', () => {
+      const result = QueryCache.replacePreAggregationTableNames(
+        'SELECT * FROM prod_pre_aggregations.ra_client_m_abc__usage_0 JOIN prod_pre_aggregations.ra_client_m_abc ON true',
+        [
+          ['ra_client_m_abc', { targetTableName: 'base_table' }],
+          ['ra_client_m_abc__usage_0', { targetTableName: 'usage_table' }],
+        ]
+      );
+
+      expect(result).toEqual(
+        'SELECT * FROM prod_pre_aggregations.usage_table JOIN prod_pre_aggregations.base_table ON true'
+      );
+    });
   });
 };

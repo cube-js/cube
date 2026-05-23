@@ -428,7 +428,9 @@ export class QueryCache {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
+    const sortedPreAggregationsTablesToTempTables = [...preAggregationsTablesToTempTables]
+      .sort((a, b) => b[0].length - a[0].length);
+    const replacedKeyQuery: string = sortedPreAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
