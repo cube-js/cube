@@ -1,4 +1,4 @@
-import { ProgressResponse } from './types';
+import { ProgressResponse } from './types.js';
 
 export default class ProgressResult {
   private progressResponse: ProgressResponse;

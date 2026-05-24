@@ -1,0 +1,60 @@
+---
+title: Axes
+description: Configure axis titles, grid lines, label formatting, dual Y-axis, and reference lines.
+---
+
+The **Axes** section in the Style tab controls the appearance and behavior of the X axis and Y axis (or left and right Y axes in dual-axis charts). Most axis settings are available for all Vega-based chart types (bar, line, area, scatter, heatmap).
+
+{/* TODO screenshot: axes configuration panel open in Style tab (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## X axis
+
+| Setting | Description |
+|---|---|
+| **Show axis** | Toggle the X axis on or off |
+| **Title** | Custom axis label — leave blank to hide the axis title |
+| **Grid lines** | Toggle grid lines perpendicular to the X axis |
+| **Labels** | Toggle axis tick labels |
+| **Label angle** | Rotate axis labels (useful for long category names) |
+| **Label format** | Number or date format applied to axis labels |
+
+## Y axis (left)
+
+| Setting | Description |
+|---|---|
+| **Show axis** | Toggle the Y axis on or off |
+| **Title** | Custom axis label |
+| **Grid lines** | Toggle horizontal grid lines |
+| **Labels** | Toggle axis tick labels |
+| **Label format** | Number format applied to axis labels (e.g. `$,.0f` for currency) |
+| **Min / Max** | Override the axis scale minimum and maximum values |
+
+{/* TODO screenshot: Y-axis settings panel with title and grid controls (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Dual Y axis (right axis)
+
+Add a second Y axis on the right side of the chart to plot a series on a different scale. This is useful for combining measures with different units or magnitudes — for example, showing order count on the left axis and average order value on the right.
+
+To use the right axis:
+1. In the **Series configuration** for a specific series, change the **Y axis** assignment from **Left** to **Right**.
+2. The right axis settings appear in the Style tab — configure its title, labels, and scale independently from the left axis.
+
+{/* TODO screenshot: dual-axis chart with bar on left axis and line on right axis (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Reference lines
+
+Add horizontal reference lines to mark a target, threshold, or benchmark value. Reference lines appear at a fixed Y value across the full width of the chart.
+
+To add a reference line:
+1. In the **Y axis** section of the Style tab, click **Add reference line**.
+2. Set the **Value** — the Y position of the line.
+3. Optionally set a **Label** that appears next to the line.
+4. Configure **Color** and **Style** (solid, dashed, or dotted).
+
+{/* TODO screenshot: chart with a dashed reference line and label (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+You can add multiple reference lines to the same axis. Each is configured independently.
+
+<Note>
+Reference lines are only available on the left Y axis. For right-axis reference lines, use a [custom Vega-Lite spec](/docs/explore-analyze/charts/chart-types/custom).
+</Note>

@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable global-require */
-import R from 'ramda';
 import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
   FROM_PARTITION_RANGE,
   TO_PARTITION_RANGE
 } from '@cubejs-backend/shared';
-import { PreAggregationPartitionRangeLoader, PreAggregations, version } from '../../src';
+import crypto from 'crypto';
+
+import { PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version } from '../../src';
 
 class MockDriver {
   public tables: string[] = [];
@@ -123,34 +123,32 @@ describe('PreAggregations', () => {
   let mockExternalDriverFactory: (() => Promise<MockDriver>) | null = null;
   let queryCache: any = null;
 
-  const basicQuery: any = {
+  const defaultCacheKeyQuery: [string, any[], Record<string, any>] = ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
+    renewalThreshold: 10,
+    external: false,
+  }];
+
+  const createBasicQuery = (overrides: Record<string, any> = {}): any => ({
     query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
     values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
     cacheKeyQueries: {
       renewalThreshold: 21600,
-      queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
-        renewalThreshold: 10,
-        external: false,
-      }]]
+      queries: [defaultCacheKeyQuery]
     },
     preAggregations: [{
       preAggregationsSchema: 'stb_pre_aggregations',
       tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
       loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
-      invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
-        renewalThreshold: 10,
-        external: false,
-      }]]
+      invalidateKeyQueries: [defaultCacheKeyQuery],
     }],
-    requestId: 'basic'
-  };
+    requestId: 'basic',
+    ...overrides,
+  });
 
-  const basicQueryExternal = R.clone(basicQuery);
-  basicQueryExternal.preAggregations[0].external = true;
-  const basicQueryWithRenew = R.clone(basicQuery);
-  basicQueryWithRenew.renewQuery = true;
-  const basicQueryExternalWithRenew = R.clone(basicQueryExternal);
-  basicQueryExternalWithRenew.renewQuery = true;
+  const basicQuery: any = createBasicQuery();
+  const basicQueryExternal = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }] });
+  const basicQueryWithRenew = createBasicQuery({ renewQuery: true });
+  const basicQueryExternalWithRenew = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }], renewQuery: true });
 
   beforeEach(() => {
     mockDriver = new MockDriver();
@@ -167,11 +165,6 @@ describe('PreAggregations', () => {
       return driver;
     };
 
-    jest.resetModules();
-
-    // Dynamic require after resetModules to ensure fresh module state
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { QueryCache } = require('../../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       'TEST',
       mockDriverFactory as any,
@@ -179,12 +172,15 @@ describe('PreAggregations', () => {
       () => {},
       {
         cacheAndQueueDriver: 'memory',
-        queueOptions: () => ({
+        queueOptions: async () => ({
           executionTimeout: 1,
           concurrency: 2,
         }),
       },
     );
+
+    // Reset the shared in-memory cache store between tests
+    (queryCache.getCacheDriver() as LocalCacheDriver).reset();
   });
 
   describe('loadAllPreAggregationsIfNeeded', () => {
@@ -198,7 +194,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -225,7 +221,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -252,7 +248,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -279,7 +275,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -310,7 +306,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -344,7 +340,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -395,7 +391,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -932,8 +928,6 @@ describe('PreAggregations', () => {
       // Old implementation (before the unsigned shift fix)
       // This would hang on certain inputs, but for inputs that don't trigger the bug,
       // it should produce the same results as the new implementation
-      const crypto = require('crypto');
-
       function oldVersion(cacheKey: any): string | null {
         let result = '';
 

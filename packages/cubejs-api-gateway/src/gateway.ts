@@ -19,6 +19,7 @@ import {
   ResultArrayWrapper,
   ResultMultiWrapper,
   ResultWrapper,
+  rowsToColumnar,
 } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
@@ -56,6 +57,7 @@ import {
   SqlApiRequest,
   MetaResponseResultFn,
   RequestQuery,
+  QueryConvertRequest,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -290,12 +292,15 @@ class ApiGateway {
         );
 
         const compilerApi = await this.getCompilerApi(req.context);
+
+        // Cache unfiltered schema - RBAC enforcement happens at query execution time
+        // via annotation-based validation in the Rust result transform layer
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig(req.context, {
+          const metaConfig = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
+            skipVisibilityPatch: true,
           });
-          metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
           schema = makeSchema(metaConfig);
           compilerApi.setGraphQLSchema(schema);
         }
@@ -415,6 +420,14 @@ class ApiGateway {
       });
     }));
 
+    app.post(`${this.basePath}/v1/convert-query`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      await this.convertQuery({
+        payload: req.body,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
     /** **************************************************************
      * meta scope                                                    *
      *************************************************************** */
@@ -423,15 +436,18 @@ class ApiGateway {
       `${this.basePath}/v1/meta`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        const onlyViews = req.query.onlyViews === 'true';
         if ('extended' in req.query) {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
+            onlyViews,
           });
         } else {
           await this.meta({
             context: req.context,
             res: this.resToResultFn(res),
+            onlyViews,
           });
         }
       })
@@ -451,8 +467,13 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone);
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {
+          // Quickfix for https://github.com/cube-js/cube/issues/10450,
+          // Right now, it's too complicated to fix the issue correctly, because
+          // native side control stream, without understanding that it's Express.response
+          res.removeHeader('Transfer-Encoding');
+
           this.handleError({
             e,
             query: {
@@ -619,11 +640,12 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res, includeCompilerId, onlyCompilerId }: {
+  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
     context: RequestContext,
     res: MetaResponseResultFn,
     includeCompilerId?: boolean,
-    onlyCompilerId?: boolean
+    onlyCompilerId?: boolean,
+    onlyViews?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -632,19 +654,32 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const metaConfig = await compilerApi.metaConfig(context, {
         requestId: context.requestId,
-        includeCompilerId: includeCompilerId || onlyCompilerId
+        includeCompilerId: includeCompilerId || onlyCompilerId,
+        includeViewGroups: true,
       });
       if (onlyCompilerId) {
-        const response: { cubes: any[], compilerId?: string } = {
+        const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = {
           cubes: [],
           compilerId: metaConfig.compilerId
         };
         res(response);
         return;
       }
-      const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
+      const cubesConfig = onlyViews
+        ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
+        : metaConfig.cubes;
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
-      const response: { cubes: any[], compilerId?: string } = { cubes };
+      const visibleCubeNames = new Set(cubes.map(c => c.name));
+      const viewGroups = (metaConfig.viewGroups || [])
+        .map(group => ({
+          ...group,
+          views: group.views.filter((v: string) => visibleCubeNames.has(v)),
+        }))
+        .filter(group => group.views.length > 0);
+      const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
+      if (viewGroups.length > 0) {
+        response.viewGroups = viewGroups;
+      }
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;
       }
@@ -660,7 +695,11 @@ class ApiGateway {
     }
   }
 
-  public async metaExtended({ context, res }: { context: ExtendedRequestContext, res: ResponseResultFn }) {
+  public async metaExtended({ context, res, onlyViews }: {
+    context: ExtendedRequestContext,
+    res: ResponseResultFn,
+    onlyViews?: boolean,
+  }) {
     const requestStarted = new Date();
 
     try {
@@ -671,7 +710,10 @@ class ApiGateway {
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
 
-      const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
+      const filteredMetaConfig = onlyViews
+        ? metaConfig.filter((c: any) => c.config?.type === 'view')
+        : metaConfig;
+      const cubes = this.filterVisibleItemsInMeta(context, filteredMetaConfig)
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),
@@ -1268,6 +1310,10 @@ class ApiGateway {
         currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
       }
 
+      if ((currentQuery as any).maskedMembers) {
+        throw new UserError('maskedMembers cannot be provided in the query');
+      }
+
       return {
         normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
         hasExpressionsInQuery
@@ -1296,6 +1342,8 @@ class ApiGateway {
             queryWithRlsFilters,
             context
           ) : queryWithRlsFilters;
+
+          rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
           // if that's the case, we should run an extra pass of parsing here to make sure
@@ -1591,6 +1639,35 @@ class ApiGateway {
       },
       requestId: context.requestId
     };
+  }
+
+  protected async convertQuery({ payload, context, res }: QueryConvertRequest) {
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      if (payload.input !== 'sql') {
+        throw new Error(`Unexpected input parameter value '${payload.input}'`);
+      }
+
+      if (payload.output !== 'rest') {
+        throw new Error(`Unexpected output parameter value '${payload.output}'`);
+      }
+
+      if (typeof payload.query !== 'string' || !payload.query.trim()) {
+        throw new Error('query parameter must be a non-empty string');
+      }
+
+      const result = await this.sqlServer.rest4sql(payload.query, context.securityContext);
+
+      await res(result);
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: payload,
+        res,
+      });
+    }
   }
 
   protected async dryRun({ query, context, res }: QueryRequest) {
@@ -2004,11 +2081,6 @@ class ApiGateway {
       await this.assertApiScope('data', context.securityContext);
 
       query = this.parseQueryParam(request.query);
-      let resType: ResultType = ResultType.DEFAULT;
-
-      if (!Array.isArray(query) && query.responseFormat) {
-        resType = query.responseFormat;
-      }
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions, cacheMode);
@@ -2073,7 +2145,16 @@ class ApiGateway {
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           results = [{
-            data: response.data,
+            /**
+             * I am still working on improving cpu/memory performance of moving results from ResultWrapper
+             * into RecordBatch on a rust side. Right now, it's slower then doing transpose and JSON serialize on JS side +
+             * deserializing on Rust.
+             *
+             * Right now, it's a temporary solution, which means it will probably outlive us all.
+             *
+             * TODO(ovr): You must finish it, move to ResultWrapper after optimizing it.
+             */
+            data: rowsToColumnar(response.data),
             annotation
           }];
         }
@@ -2106,7 +2187,7 @@ class ApiGateway {
               sqlQueries[index],
               annotation,
               response,
-              resType,
+              ResultType.COLUMNAR,
             );
           })
         );

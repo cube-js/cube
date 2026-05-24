@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+sum_amount
+----------
+1440.00

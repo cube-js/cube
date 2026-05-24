@@ -1,0 +1,440 @@
+use crate::test_fixtures::cube_bridge::{members_from_strings, MockBaseQueryOptions, MockSchema};
+use crate::test_fixtures::test_utils::TestContext;
+use indoc::indoc;
+use std::rc::Rc;
+
+#[test]
+fn test_member_to_alias() {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {r#"
+        measures:
+          - visitors.count
+        dimensions:
+          - visitors.source
+        time_dimensions:
+          - dimension: visitors.created_at
+            granularity: day
+        memberToAlias:
+          visitors.count: "custom_count"
+          visitors.source: "custom_source"
+          visitors.created_at: "custom_created_at"
+    "#};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with custom aliases");
+
+    assert!(
+        sql.contains("custom_count"),
+        "SQL should contain custom alias for measure, got: {sql}"
+    );
+    assert!(
+        sql.contains("custom_source"),
+        "SQL should contain custom alias for dimension, got: {sql}"
+    );
+    assert!(
+        sql.contains("custom_created_at"),
+        "SQL should contain custom alias for time dimension base, got: {sql}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_simple_join_sql() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - cube_a.count
+        dimensions:
+          - cube_c.code
+    "};
+
+    test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for simple join");
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_simple_paths_in_request_sql() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - cube_a.count
+        dimensions:
+          - cube_a.cube_c.code
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL");
+
+    assert!(
+        sql.contains(r#"ON "cube_a".c_id = "cube_c".id"#),
+        "SQL should contain join condition between cube_a and cube_c"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_simple_paths_in_time_dimension_request_sql() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - cube_a.count
+        time_dimensions:
+          - dimension: cube_a.cube_c.created_at
+            granularity: day
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL");
+
+    assert!(
+        sql.contains(r#"ON "cube_a".c_id = "cube_c".id"#),
+        "SQL should contain join condition between cube_a and cube_c"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_diamond_join_over_view_sql() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - cube_a.count
+        dimensions:
+          - a_with_b_and_c.code
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for simple join");
+
+    assert!(
+        sql.contains(r#"ON "cube_a".b_id = "cube_b".id"#),
+        "SQL should contain join condition between cube_a and cube_b"
+    );
+
+    assert!(
+        sql.contains(r#"ON "cube_b".c_id = "cube_c".id"#),
+        "SQL should contain join condition between cube_b and cube_c"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_diamond_join_over_direct_path_sql() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - cube_a.count
+        dimensions:
+          - cube_a.cube_b.cube_c.code
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for simple join");
+
+    assert!(
+        sql.contains(r#"ON "cube_a".b_id = "cube_b".id"#),
+        "SQL should contain join condition between cube_a and cube_b"
+    );
+
+    assert!(
+        sql.contains(r#"ON "cube_b".c_id = "cube_c".id"#),
+        "SQL should contain join condition between cube_b and cube_c"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "diamond_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_simple_segment_sql() {
+    let schema = MockSchema::from_yaml_file("common/simple.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - customers.count
+        segments:
+          - customers.new_york
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with segment");
+
+    assert!(
+        sql.contains("city = 'New York'"),
+        "SQL should contain segment condition"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "simple_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_as_dimension_in_pre_aggregation_query() {
+    let schema = MockSchema::from_yaml_file("common/simple.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    // In JS, evaluatePreAggregationReferences() concatenates segments into dimensions
+    // before sending the query. So segments arrive as dimensions, not as segments.
+    let query_yaml = indoc! {"
+        measures:
+          - customers.count
+        dimensions:
+          - customers.new_york
+        pre_aggregation_query: true
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with segment as dimension");
+
+    assert!(
+        !sql.contains("WHERE"),
+        "Segment should not be in WHERE clause for pre-aggregation query"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "simple_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_two_measures_from_different_cubes() {
+    let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+    "};
+
+    test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for multi-fact query");
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "multi_fact_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_switch_cross_join() {
+    let schema = MockSchema::from_yaml_file("common/calc_groups.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - orders.currency
+        measures:
+          - orders.amount_usd
+          - orders.amount_in_currency
+        time_dimensions:
+          - dimension: orders.date
+            granularity: year
+            dateRange:
+              - \"2024-01-01\"
+              - \"2026-01-01\"
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for case-switch measure");
+
+    // amount_in_currency is type "number" — a calculated measure.
+    // It must NOT be wrapped in an aggregation function like number(...).
+    assert!(
+        !sql.contains("number("),
+        "Calculated measure must not be wrapped in number() aggregation"
+    );
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "calc_groups_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_query_level_join_hints() {
+    let schema = MockSchema::from_yaml_file("common/multiple_join_paths.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - A.a_id
+          - X.x_name
+        joinHints:
+          - [A, D]
+          - [D, E]
+          - [E, X]
+    "};
+
+    let sql = test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL with join hints");
+
+    assert!(
+        sql.contains("'A' = 'D'"),
+        "SQL should use A->D join, got: {sql}"
+    );
+    assert!(
+        sql.contains("'D' = 'E'"),
+        "SQL should use D->E join, got: {sql}"
+    );
+    assert!(
+        sql.contains("'E' = 'X'"),
+        "SQL should use E->X join, got: {sql}"
+    );
+    assert!(
+        !sql.contains("'A' = 'B'"),
+        "SQL should NOT use A->B join, got: {sql}"
+    );
+    assert!(
+        !sql.contains("'B' = 'C'"),
+        "SQL should NOT use B->C join, got: {sql}"
+    );
+    assert!(
+        !sql.contains("'A' = 'F'"),
+        "SQL should NOT use A->F join, got: {sql}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_with_subquery_dimension_in_view() {
+    let schema = MockSchema::from_yaml_file("common/segments_in_view.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - accountOverview.count
+        segments:
+          - accountOverview.hasNoTickets
+    "};
+
+    test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for segment with subquery dimension in view");
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "segments_in_view_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_with_subquery_dimension_in_view_with_dimension() {
+    let schema = MockSchema::from_yaml_file("common/segments_in_view.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - accountOverview.count
+        segments:
+          - accountOverview.hasNoTickets
+        dimensions:
+          - accountOverview.region
+        order:
+          - id: accountOverview.region
+    "};
+
+    test_context
+        .build_sql(query_yaml)
+        .expect("Should generate SQL for segment with subquery dimension in view with dimension");
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "segments_in_view_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_explicit_empty_order_omits_order_by_clause() {
+    let schema = MockSchema::from_yaml_file("common/diamond_joins.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(test_context.query_tools().cube_evaluator().clone())
+            .base_tools(test_context.query_tools().base_tools().clone())
+            .join_graph(test_context.query_tools().join_graph().clone())
+            .security_context(test_context.security_context().clone())
+            .measures(Some(members_from_strings(vec!["cube_a.count"])))
+            .dimensions(Some(members_from_strings(vec!["cube_c.code"])))
+            .order(Some(vec![]))
+            .build(),
+    );
+
+    let sql = test_context
+        .build_sql_from_options(options)
+        .expect("Should generate SQL with explicit empty order");
+
+    assert!(
+        !sql.to_uppercase().contains("ORDER BY"),
+        "ORDER BY should be absent when order is explicitly empty, got: {sql}"
+    );
+}

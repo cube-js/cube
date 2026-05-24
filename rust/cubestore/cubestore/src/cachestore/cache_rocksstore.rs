@@ -5,6 +5,7 @@ use crate::cachestore::cache_item::{
 use crate::cachestore::queue_item::{
     QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
     QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
+    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN, QUEUE_ITEM_PROCESS_ID_MAX_LEN,
 };
 use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
 use crate::cachestore::{compaction, QueueItemPayload, QueueResult};
@@ -497,14 +498,14 @@ impl RocksCacheStore {
         f: F,
     ) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+        F: for<'a> FnOnce(DbTableRef<'a>, &mut BatchPipe<'a>) -> Result<R, CubeError>
             + Send
             + Sync
             + 'static,
         R: Send + Sync + 'static,
     {
         self.store
-            .write_operation_impl::<F, R>(&self.rw_loop_queue_cf, op_name, f)
+            .write_operation_impl::<F, R, ()>(&self.rw_loop_queue_cf, op_name, f, ())
             .await
     }
 
@@ -553,8 +554,12 @@ impl RocksCacheStore {
         queue_result: IdRow<QueueResult>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         if queue_result.get_row().is_deleted() {
+            let id = queue_result.get_id();
+            let external_id = queue_result.get_row().get_external_id().clone();
             return Ok(Some(QueueResultResponse::Success {
                 value: Some(queue_result.into_row().value),
+                id,
+                external_id,
             }));
         }
 
@@ -566,38 +571,77 @@ impl RocksCacheStore {
         // TODO: Partial update? Index?
         let queue_result = result_schema.update(row_id, new_row, &row, batch_pipe)?;
 
+        let id = queue_result.get_id();
+        let external_id = queue_result.get_row().get_external_id().clone();
         Ok(Some(QueueResultResponse::Success {
             value: Some(queue_result.into_row().value),
+            id,
+            external_id,
         }))
     }
 
     async fn lookup_queue_result_by_key(
         &self,
         key: QueueKey,
+        external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         self.write_operation_queue("lookup_queue_result_by_key", move |db_ref, batch_pipe| {
             let result_schema = QueueResultRocksTable::new(db_ref.clone());
-            let query_key_is_path = key.is_path();
-            let queue_result = result_schema.get_row_by_key(key.clone())?;
 
-            if let Some(queue_result) = queue_result {
-                if query_key_is_path {
-                    if queue_result.get_row().is_deleted() {
-                        Ok(None)
-                    } else {
-                        Self::queue_result_ready_to_delete_impl(
-                            &result_schema,
-                            batch_pipe,
-                            queue_result,
-                        )
+            // Try id first
+            if key.is_id() {
+                let Some(queue_result) = result_schema.get_row_by_key(key)? else {
+                    return Ok(None);
+                };
+
+                let id = queue_result.get_id();
+                let row_external_id = queue_result.get_row().get_external_id().clone();
+
+                if let Some(ref external_id) = external_id {
+                    if row_external_id.as_ref() != Some(external_id) {
+                        return Err(CubeError::user(format!(
+                            "Queue result (id = {}) external_id mismatch: expected {}, got {:?}",
+                            id, external_id, row_external_id
+                        )));
                     }
-                } else {
-                    Ok(Some(QueueResultResponse::Success {
-                        value: Some(queue_result.into_row().value),
-                    }))
                 }
-            } else {
+
+                return Ok(Some(QueueResultResponse::Success {
+                    value: Some(queue_result.into_row().value),
+                    id,
+                    external_id: row_external_id,
+                }));
+            };
+
+            // try (path, external_id) first (if provided), then fall back to path lookup
+            // external_id can be different for path, because path is re-used across different requests across time
+            if let Some(ref external_id) = external_id {
+                let path = match &key {
+                    QueueKey::ByPath(p) => p.clone(),
+                    QueueKey::ById(_) => unreachable!("already handled ById above"),
+                };
+                if let Some(queue_result) =
+                    result_schema.get_row_by_path_and_external_id(path, external_id.clone())?
+                {
+                    let id = queue_result.get_id();
+                    let external_id = queue_result.get_row().get_external_id().clone();
+
+                    return Ok(Some(QueueResultResponse::Success {
+                        value: Some(queue_result.into_row().value),
+                        id,
+                        external_id,
+                    }));
+                }
+            }
+
+            let Some(queue_result) = result_schema.get_row_by_key(key)? else {
+                return Ok(None);
+            };
+
+            if queue_result.get_row().is_deleted() {
                 Ok(None)
+            } else {
+                Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, queue_result)
             }
         })
         .await
@@ -658,7 +702,14 @@ impl QueueKey {
     pub(crate) fn is_path(&self) -> bool {
         match self {
             QueueKey::ByPath(_) => true,
-            QueueKey::ById(_) => false,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_id(&self) -> bool {
+        match self {
+            QueueKey::ById(_) => true,
+            _ => false,
         }
     }
 }
@@ -681,6 +732,9 @@ pub struct QueueAddPayload {
     pub value: String,
     pub priority: i64,
     pub orphaned: Option<u32>,
+    pub process_id: Option<String>,
+    pub exclusive: bool,
+    pub external_id: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -706,19 +760,35 @@ impl QueueCancelResponse {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueResultResponse {
-    Success { value: Option<String> },
+    Success {
+        value: Option<String>,
+        #[serde(default)]
+        id: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        external_id: Option<String>,
+    },
 }
 
 impl QueueResultResponse {
     pub fn into_queue_result_row(self) -> Row {
         match self {
-            QueueResultResponse::Success { value } => Row::new(vec![
+            QueueResultResponse::Success {
+                value,
+                id,
+                external_id,
+            } => Row::new(vec![
                 if let Some(v) = value {
                     TableValue::String(v)
                 } else {
                     TableValue::Null
                 },
                 TableValue::String("success".to_string()),
+                TableValue::String(id.to_string()),
+                if let Some(ext_id) = external_id {
+                    TableValue::String(ext_id)
+                } else {
+                    TableValue::Null
+                },
             ]),
         }
     }
@@ -822,6 +892,7 @@ pub trait CacheStore: DIService + Send + Sync {
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
         with_payload: bool,
+        caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError>;
     // API with Path
     async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError>;
@@ -831,12 +902,15 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         path: String,
         allow_concurrency: u32,
+        caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError>;
     async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError>;
-    async fn queue_result_by_path(
+    async fn queue_result(
         &self,
-        path: String,
+        key: QueueKey,
+        external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError>;
+
     async fn queue_result_blocking(
         &self,
         key: QueueKey,
@@ -1080,6 +1154,23 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
+        if let Some(ref id) = payload.process_id {
+            if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
+                return Err(CubeError::user(format!(
+                    "process_id exceeds maximum allowed length of {} characters",
+                    QUEUE_ITEM_PROCESS_ID_MAX_LEN
+                )));
+            }
+        }
+        if let Some(ref id) = payload.external_id {
+            if id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
+                return Err(CubeError::user(format!(
+                    "external_id exceeds maximum allowed length of {} characters",
+                    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN
+                )));
+            }
+        }
+
         self.write_operation_queue("queue_add", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let pending = queue_schema.count_rows_by_index(
@@ -1103,6 +1194,9 @@ impl CacheStore for RocksCacheStore {
                         QueueItem::status_default(),
                         payload.priority,
                         payload.orphaned.clone(),
+                        payload.process_id,
+                        payload.exclusive,
+                        payload.external_id,
                     ),
                     batch_pipe,
                 )?;
@@ -1175,6 +1269,7 @@ impl CacheStore for RocksCacheStore {
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
         with_payload: bool,
+        caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError> {
         self.read_operation_queue("queue_list", move |db_ref| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -1187,6 +1282,11 @@ impl CacheStore for RocksCacheStore {
                 let index_key = QueueItemIndexKey::ByPrefix(prefix);
                 queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?
             };
+
+            let items: Vec<IdRow<QueueItem>> = items
+                .into_iter()
+                .filter(|id_row| id_row.get_row().is_visible_for(&caller_process_id))
+                .collect();
 
             let items = if priority_sort {
                 items
@@ -1300,6 +1400,7 @@ impl CacheStore for RocksCacheStore {
         &self,
         path: String,
         allow_concurrency: u32,
+        caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         self.write_operation_queue("queue_retrieve_by_path", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -1334,9 +1435,33 @@ impl CacheStore for RocksCacheStore {
             };
 
             if id_row.get_row().get_status() == &QueueItemStatus::Pending {
+                if id_row.get_row().get_exclusive() {
+                    match (id_row.get_row().get_process_id(), &caller_process_id) {
+                        (Some(_), None) => return Err(CubeError::user(
+                            "QUEUE RETRIEVE requires a process_id in the connection context (x-process-id header)".to_string(),
+                        )),
+                        (None, Some(_)) => {
+                            log::warn!("Incorrect queue_item with exclusive flag, empty process_id, id: {:?}", caller_process_id);
+
+                            return Ok(QueueRetrieveResponse::NotFound { pending, active })
+                        }
+                        (Some(item_process_id), Some(caller_id)) => if item_process_id == caller_id {
+                            // OK, caller matches the exclusive item owner
+                        } else {
+                            return Ok(QueueRetrieveResponse::ExclusiveAccessFailed {
+                                pending,
+                                active,
+                            })
+                        },
+                        (None, None) => {
+                            // No process_id on item and no caller — allow retrieval
+                        }
+                    }
+                }
+
                 let mut new = id_row.get_row().clone();
                 new.status = QueueItemStatus::Active;
-                // It's  important to insert heartbeat, because
+                // It's important to insert heartbeat, because
                 // without that created datetime will be used for orphaned filtering
                 new.update_heartbeat();
 
@@ -1382,12 +1507,13 @@ impl CacheStore for RocksCacheStore {
             if let Some(item_row) = item_row {
                 let path = item_row.get_row().get_path();
                 let id = item_row.get_id();
+                let external_id = item_row.get_row().get_external_id().clone();
 
                 queue_item_tbl.delete_row(item_row, batch_pipe)?;
                 queue_item_payload_tbl.try_delete(id, batch_pipe)?;
 
                 if let Some(result) = result {
-                    let queue_result = QueueResult::new(path.clone(), result);
+                    let queue_result = QueueResult::new(path.clone(), result, external_id);
                     let result_schema = QueueResultRocksTable::new(db_ref.clone());
                     // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
                     let result_row = result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
@@ -1417,12 +1543,12 @@ impl CacheStore for RocksCacheStore {
         .await
     }
 
-    async fn queue_result_by_path(
+    async fn queue_result(
         &self,
-        path: String,
+        key: QueueKey,
+        external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.lookup_queue_result_by_key(QueueKey::ByPath(path))
-            .await
+        self.lookup_queue_result_by_key(key, external_id).await
     }
 
     async fn queue_result_blocking(
@@ -1434,7 +1560,7 @@ impl CacheStore for RocksCacheStore {
         // it will fix the position (subscribe) of a broadcast channel
         let listener = self.get_listener().await;
 
-        let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
+        let store_in_result = self.lookup_queue_result_by_key(key.clone(), None).await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
@@ -1448,20 +1574,24 @@ impl CacheStore for RocksCacheStore {
         if let Ok(res) = fut.await {
             match res {
                 Ok(Some(ack_event)) => match ack_event.result {
-                    QueueResultAckEventResult::Empty => {
-                        Ok(Some(QueueResultResponse::Success { value: None }))
-                    }
+                    QueueResultAckEventResult::Empty => Ok(Some(QueueResultResponse::Success {
+                        value: None,
+                        id: ack_event.id,
+                        external_id: None,
+                    })),
                     QueueResultAckEventResult::WithResult { result } => {
                         if query_key_is_path {
-                            // Queue v1 behaviour
+                            // Queue v1 behavior
                             self.queue_result_delete_by_id(ack_event.id).await?;
                         } else {
-                            // Queue v2 behaviour
+                            // Queue v2 behavior
                             self.queue_result_ready_to_delete(ack_event.id).await?;
                         }
 
                         Ok(Some(QueueResultResponse::Success {
                             value: Some(result.to_string()),
+                            id: ack_event.id,
+                            external_id: None,
                         }))
                     }
                 },
@@ -1632,6 +1762,7 @@ impl CacheStore for ClusterCacheStoreClient {
         _status_filter: Option<QueueItemStatus>,
         _priority_sort: bool,
         _with_payload: bool,
+        _caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_list was used.")
     }
@@ -1652,6 +1783,7 @@ impl CacheStore for ClusterCacheStoreClient {
         &self,
         _path: String,
         _allow_concurrency: u32,
+        _caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_retrieve_by_path was used.")
     }
@@ -1660,11 +1792,12 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
     }
 
-    async fn queue_result_by_path(
+    async fn queue_result(
         &self,
-        _path: String,
+        _key: QueueKey,
+        _external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_result_by_path was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_result was used.")
     }
 
     async fn queue_result_blocking(
@@ -2074,19 +2207,51 @@ mod tests {
         let now = Utc::now();
         let item_pending_custom_orphaned = IdRow::new(
             1,
-            QueueItem::new("1".to_string(), QueueItemStatus::Pending, 1, Some(10)),
+            QueueItem::new(
+                "1".to_string(),
+                QueueItemStatus::Pending,
+                1,
+                Some(10),
+                None,
+                false,
+                None,
+            ),
         );
         let item_pending_custom_orphaned_expired = IdRow::new(
             2,
-            QueueItem::new("2".to_string(), QueueItemStatus::Pending, 1, Some(1)),
+            QueueItem::new(
+                "2".to_string(),
+                QueueItemStatus::Pending,
+                1,
+                Some(1),
+                None,
+                false,
+                None,
+            ),
         );
         let item_active_custom_orphaned = IdRow::new(
             3,
-            QueueItem::new("3".to_string(), QueueItemStatus::Active, 1, Some(10)),
+            QueueItem::new(
+                "3".to_string(),
+                QueueItemStatus::Active,
+                1,
+                Some(10),
+                None,
+                false,
+                None,
+            ),
         );
         let mut item_active_custom_orphaned_expired = IdRow::new(
             4,
-            QueueItem::new("4".to_string(), QueueItemStatus::Active, 1, Some(1)),
+            QueueItem::new(
+                "4".to_string(),
+                QueueItemStatus::Active,
+                1,
+                Some(1),
+                None,
+                false,
+                None,
+            ),
         );
 
         assert_eq!(
@@ -2166,5 +2331,247 @@ mod tests {
             .collect::<Vec<u64>>(),
             vec![2, 3]
         );
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_validations() -> Result<(), CubeError> {
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_validations",
+            Config::test("test_queue_add_validations"),
+        );
+
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path1".to_string(),
+                value: "v1".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-dup".to_string()),
+            })
+            .await;
+        assert!(res.is_ok(), "First insert with external_id should succeed");
+        assert!(res.unwrap().added);
+
+        // Same external_id but different path should succeed (uniqueness is per path now)
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path2".to_string(),
+                value: "v2".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-dup".to_string()),
+            })
+            .await;
+        assert!(
+            res.is_ok(),
+            "Same external_id with different path should succeed"
+        );
+        assert!(res.unwrap().added);
+
+        // Same path returns added: false (ByPath uniqueness), not an error
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path1".to_string(),
+                value: "v1-dup".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-dup".to_string()),
+            })
+            .await;
+        assert!(res.is_ok(), "Duplicate path should return added: false");
+        assert!(!res.unwrap().added);
+
+        // Multiple inserts with None external_id should all succeed
+        {
+            let res = cachestore
+                .queue_add(QueueAddPayload {
+                    path: "prefix:path3".to_string(),
+                    value: "v3".to_string(),
+                    priority: 0,
+                    orphaned: None,
+                    process_id: None,
+                    exclusive: false,
+                    external_id: None,
+                })
+                .await;
+            assert!(
+                res.is_ok(),
+                "First insert with None external_id should succeed"
+            );
+            assert!(res.unwrap().added);
+
+            let res = cachestore
+                .queue_add(QueueAddPayload {
+                    path: "prefix:path4".to_string(),
+                    value: "v4".to_string(),
+                    priority: 0,
+                    orphaned: None,
+                    process_id: None,
+                    exclusive: false,
+                    external_id: None,
+                })
+                .await;
+            assert!(
+                res.is_ok(),
+                "Second insert with None external_id should succeed"
+            );
+            assert!(res.unwrap().added);
+        }
+
+        // external_id exceeding max length should fail
+        {
+            let long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
+            let res = cachestore
+                .queue_add(QueueAddPayload {
+                    path: "prefix:path5".to_string(),
+                    value: "v5".to_string(),
+                    priority: 0,
+                    orphaned: None,
+                    process_id: None,
+                    exclusive: false,
+                    external_id: Some(long_id),
+                })
+                .await;
+            assert!(res.is_err(), "external_id exceeding max length should fail");
+            assert!(res
+                .unwrap_err()
+                .to_string()
+                .contains("external_id exceeds maximum allowed length"));
+        }
+
+        // process_id exceeding max length should fail
+        {
+            let long_id = "x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1);
+            let res = cachestore
+                .queue_add(QueueAddPayload {
+                    path: "prefix:path6".to_string(),
+                    value: "v6".to_string(),
+                    priority: 0,
+                    orphaned: None,
+                    process_id: Some(long_id),
+                    exclusive: false,
+                    external_id: None,
+                })
+                .await;
+            assert!(res.is_err(), "process_id exceeding max length should fail");
+            assert!(res
+                .unwrap_err()
+                .to_string()
+                .contains("process_id exceeds maximum allowed length"));
+        }
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_validations");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_none_external_id_after_rebuild() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_none_ext_rebuild",
+            Config::test("test_queue_add_none_ext_rebuild"),
+        );
+
+        // Add two queue items without external_id
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path1".to_string(),
+                value: "v1".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path2".to_string(),
+                value: "v2".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        // Add one item with a real external_id
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path_ext".to_string(),
+                value: "v_ext".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-real".to_string()),
+            })
+            .await?;
+
+        // Simulate migration: rebuild the ByPathAndExternalId index.
+        cachestore
+            .read_operation_queue("test_rebuild_index", move |db_ref| {
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let indexes = QueueItemRocksTable::indexes();
+
+                // Force rebuild index manually, instead of relying on the automatic rebuild (it will ignore).
+                for index in indexes.iter() {
+                    queue_schema.rebuild_index(index)?;
+                }
+
+                Ok(())
+            })
+            .await?;
+
+        // After rebuild, adding another item without external_id should still succeed
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path3".to_string(),
+                value: "v3".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await;
+        assert!(
+            res.is_ok(),
+            "Insert with None external_id after index rebuild should succeed, got: {:?}",
+            res.err()
+        );
+
+        // Same external_id with different path should succeed after rebuild (uniqueness is per path)
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path_ext_dup".to_string(),
+                value: "v_ext_dup".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: Some("ext-real".to_string()),
+            })
+            .await;
+        assert!(
+            res.is_ok(),
+            "Same external_id with different path should succeed after rebuild, got: {:?}",
+            res.err()
+        );
+        assert!(res.unwrap().added);
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_none_ext_rebuild");
+
+        Ok(())
     }
 }

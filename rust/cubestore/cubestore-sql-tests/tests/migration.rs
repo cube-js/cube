@@ -60,7 +60,10 @@ fn main() {
         r.block_on(Config::run_migration_test(
             &test_name,
             |services| async move {
-                test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service))).await;
+                test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service)))
+                    .await
+                    .unwrap();
+                Ok(())
             },
         ));
     });
@@ -145,7 +148,9 @@ impl FilterWritesSqlClient {
 impl SqlClient for FilterWritesSqlClient {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError> {
         match self.compute_filter_flag(query) {
-            FilterQueryResult::RunQuery => self.sql_service.exec_query(query).await,
+            FilterQueryResult::RunQuery => {
+                self.sql_service.exec_query(query).await?.collect().await
+            }
             FilterQueryResult::Hardcoded(result) => result,
             FilterQueryResult::UnrecognizedQueryType => unimplemented!(
                 "FilterWritesSqlClient does not support query prefix for '{}'",
@@ -162,6 +167,8 @@ impl SqlClient for FilterWritesSqlClient {
             FilterQueryResult::RunQuery => {
                 self.sql_service
                     .exec_query_with_context(context, query)
+                    .await?
+                    .collect()
                     .await
             }
             FilterQueryResult::Hardcoded(result) => result,

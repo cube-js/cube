@@ -1,0 +1,225 @@
+cubes:
+  - name: custom_calendar
+    calendar: true
+    sql: >
+      WITH base AS (SELECT gs.n - 1                       AS day_offset,
+                           DATE '2024-02-04' + (gs.n - 1) AS date_val
+                    FROM generate_series(1, 728) AS gs(n)
+      ),
+           retail_calc AS (SELECT date_val,
+                                  date_val                      AS retail_date,
+                                  CASE
+                                      WHEN day_offset < 364 THEN '2024'
+                                      ELSE '2025'
+                                      END                       AS retail_year_name,
+                                  (day_offset % 364)            AS day_of_retail_year,
+                                  ((day_offset % 364) / 7) + 1  AS retail_week,
+                                  ((day_offset % 364) / 91) + 1 AS retail_quarter,
+                                  ((day_offset % 364) / 7) % 13 AS week_in_quarter,
+                                  DATE '2024-02-04' + CASE
+                                                          WHEN day_offset < 364 THEN 0
+                                                          ELSE 364
+                                      END                       AS retail_year_begin_date,
+                                  ((day_offset / 7) / 13) * 3 +
+                                  CASE
+                                      WHEN ((day_offset / 7) % 13) < 4 THEN 1
+                                      WHEN ((day_offset / 7) % 13) < 9 THEN 2
+                                      ELSE 3
+                                      END                       AS global_month,
+                                  ((day_offset / 7) / 13) + 1   AS global_quarter,
+                                  day_offset + 1                AS global_day_number,
+                                  ((day_offset / 7) / 13) * 3 +
+                                  CASE
+                                      WHEN ((day_offset / 7) % 13) < 4 THEN 1
+                                      WHEN ((day_offset / 7) % 13) < 9 THEN 2
+                                      ELSE 3
+                                      END - CASE
+                                                WHEN day_offset < 364 THEN 0
+                                                ELSE 12
+                                      END                       AS retail_month_in_year,
+                                  row_number() OVER (
+                                      PARTITION BY
+                                          ((day_offset / 7) / 13) * 3 +
+                                          CASE
+                                              WHEN ((day_offset / 7) % 13) < 4 THEN 1
+                                              WHEN ((day_offset / 7) % 13) < 9 THEN 2
+                                              ELSE 3
+                                              END
+                                      ORDER BY date_val
+                                      )                         AS day_in_retail_month,
+                                  row_number() OVER (
+                                      PARTITION BY ((day_offset / 7) / 13) + 1
+                                      ORDER BY date_val
+                                      )                         AS day_in_retail_quarter,
+                                  row_number() OVER (
+                                      ORDER BY date_val
+                                      )                         AS day_in_retail_year
+                           FROM base),
+           final AS (SELECT r.date_val::timestamp,
+                            r.retail_date::timestamp,
+                            r.retail_year_name,
+                            ('Retail Month ' || r.retail_month_in_year)                        AS retail_month_long_name,
+                            ('WK' || LPAD(r.retail_week::text, 2, '0'))                        AS retail_week_name,
+                            r.retail_year_begin_date,
+                            ('Q' || r.retail_quarter || ' ' || r.retail_year_name)             AS retail_quarter_year,
+                            (SELECT MIN(date_val)
+                             FROM retail_calc r2
+                             WHERE r2.global_month = r.global_month
+                               AND r2.day_in_retail_month = 1)                                 AS retail_month_begin_date,
+                            r.date_val - (extract(dow from r.date_val)::int)                   AS retail_week_begin_date,
+                            (r.retail_year_name || '-WK' || LPAD(r.retail_week::text, 2, '0')) AS retail_year_week,
+                            r_prev_month.date_val::timestamp                                   AS retail_date_prev_month,
+                            r_prev_year.date_val::timestamp                                    AS retail_date_prev_year
+                     FROM retail_calc r
+                              LEFT JOIN retail_calc r_prev_month
+                                        ON r_prev_month.global_month = r.global_month - 1
+                                            AND r_prev_month.day_in_retail_month = r.day_in_retail_month
+                              LEFT JOIN retail_calc r_prev_year
+                                        ON r_prev_year.global_day_number = r.global_day_number - 364)
+      SELECT *
+      FROM final
+      ORDER BY date_val
+
+    dimensions:
+      - name: date_val
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+
+        granularities:
+          - name: year
+            sql: "{CUBE.retail_year_begin_date}"
+
+          - name: week
+            sql: "{CUBE.retail_week_begin_date}"
+
+          - name: fortnight
+            interval: 2 week
+            origin: "2025-01-01"
+
+        time_shift:
+          - interval: 1 month
+            type: prior
+            sql: "{CUBE}.retail_date_prev_month"
+
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.retail_date_prev_year"
+
+          - name: one_year
+            sql: "{CUBE}.retail_date_prev_year"
+
+          - name: one_year_common_interval
+            interval: 1 year
+            type: prior
+
+      - name: retail_date
+        sql: retail_date
+        type: time
+
+        granularities:
+          - name: year
+            sql: "{CUBE.retail_year_begin_date}"
+
+          - name: week
+            sql: "{CUBE.retail_week_begin_date}"
+
+          - name: fortnight
+            interval: 2 week
+            origin: "2025-01-01"
+
+        time_shift:
+          - interval: 1 month
+            type: prior
+            sql: "{CUBE}.retail_date_prev_month"
+
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.retail_date_prev_year"
+
+          - name: one_year
+            sql: "{CUBE}.retail_date_prev_year"
+
+          - name: one_year_common_interval
+            interval: 1 year
+            type: prior
+
+      - name: retail_year_begin_date
+        sql: "{CUBE}.retail_year_begin_date"
+        type: time
+
+      - name: retail_week_begin_date
+        sql: "{CUBE}.retail_week_begin_date"
+        type: string
+
+      - name: retail_date_prev_month
+        sql: "{CUBE}.retail_date_prev_month"
+        type: time
+
+      - name: retail_date_prev_year
+        sql: "{CUBE}.retail_date_prev_year"
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+  - name: calendar_orders
+    sql: "SELECT * FROM cal_orders"
+
+    joins:
+      - name: custom_calendar
+        sql: "{CUBE}.created_at = {custom_calendar.date_val}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: count_shifted_calendar_y
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+      - name: count_shifted_calendar_m
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - interval: 1 month
+            type: prior
+
+      - name: count_shifted_calendar_w
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - interval: 1 week
+            type: prior
+
+      - name: count_shifted_y_named
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - name: one_year
+
+      - name: count_shifted_y_named_common_interval
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - name: one_year_common_interval

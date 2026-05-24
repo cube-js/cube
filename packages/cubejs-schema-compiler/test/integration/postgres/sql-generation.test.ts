@@ -109,6 +109,14 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        revenueRollingQuarter: {
+          type: 'sum',
+          sql: 'amount',
+          rollingWindow: {
+            trailing: '2 quarters',
+            offset: 'start'
+          }
+        },
         revenueRollingThreeDay: {
           type: 'sum',
           sql: 'amount',
@@ -1010,6 +1018,54 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     visitors__str_case: 'More than 1'
   }]));
 
+  it('simple join member to alias', async () => runQueryTest({
+    measures: [
+      'visitors.visitor_revenue',
+      'visitors.visitor_count',
+      'visitors.per_visitor_revenue'
+    ],
+    dimensions: [
+      'visitors.source'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30'],
+      granularity: 'month'
+    }],
+    timezone: 'America/Los_Angeles',
+    memberToAlias: {
+      'visitors.visitor_revenue': 'custom_revenue',
+      'visitors.visitor_count': 'custom_count',
+      'visitors.source': 'custom_source',
+      'visitors.created_at': 'custom_created_at',
+    },
+    order: []
+  },
+
+  [
+    {
+      custom_source: 'google',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '1',
+      visitors__per_visitor_revenue: null
+    },
+    {
+      custom_source: 'some',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: '300',
+      custom_count: '2',
+      visitors__per_visitor_revenue: '150'
+    },
+    {
+      custom_source: null,
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '2',
+      visitors__per_visitor_revenue: null
+    }
+  ]));
+
   it('running total', async () => {
     await compiler.compile();
 
@@ -1093,6 +1149,48 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_rolling: '900' },
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling: null },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
+  ]));
+
+  it('rolling quarter', async () => runQueryTest({
+    measures: [
+      'visitors.revenueRolling'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'quarter',
+      dateRange: ['2016-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_quarter: '2016-01-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-04-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-07-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-10-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling: null }
+  ]));
+
+  it('rolling over 2 quarters', async () => runQueryTest({
+    measures: [
+      'visitors.revenueRollingQuarter'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'quarter',
+      dateRange: ['2016-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_quarter: '2016-01-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-04-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-07-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-10-01T00:00:00.000Z', visitors__revenue_rolling_quarter: '500' },
+    { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling_quarter: '500' }
   ]));
 
   if (getEnv('nativeSqlPlanner')) {
@@ -1646,6 +1744,24 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   {
     visitors__count_rolling_week_to_date: null,
     visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+  }]));
+
+  it('rolling window with unbounded without time dimension', async () => runQueryTest({
+    measures: [
+      'visitors.countRollingUnbounded',
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
+        dateRange: ['2017-01-05', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [{
+    visitors__count_rolling_unbounded: '6'
   }]));
 
   it('two rolling windows with two time dimension granularities', async () => runQueryTest({
@@ -4101,7 +4217,11 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
       ],
     },
-    [{ compound__count: '4' }]
+    // Tesseract computes compound.count without join multiplication, so counts all 5 rows.
+    // JS planner uses count(distinct PK) due to join multiplication, getting 4.
+    getEnv('nativeSqlPlanner')
+      ? [{ compound__count: '5' }]
+      : [{ compound__count: '4' }]
   ));
 
   it('compound key self join', async () => runQueryTest(
@@ -4123,10 +4243,17 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
       ],
     },
-    [
-      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
-      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
-    ]
+    // Tesseract correctly filters per-group: 2017-01-04 has only visitor 2 (rank=8), avg=8.0.
+    // JS planner's join multiplication merges both (2,2) PK rows, getting avg(7,8)=7.5.
+    getEnv('nativeSqlPlanner')
+      ? [
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+        { compound__rank_avg: '8.0000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+      ]
+      : [
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+      ]
   ));
 
   it('rank measure', async () => runQueryTest(
@@ -4949,6 +5076,47 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     [{
       visitors__revenue_1d_d1_dd: '2000',
     }]
+  ));
+
+  it('raw time dimension with timezone', async () => runQueryTest(
+    {
+      measures: [
+        'visitors.visitor_revenue',
+      ],
+      dimensions: ['visitors.created_at'],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      convertTzForRawTimeDimension: true,
+      order: [{
+        id: 'visitors.created_at'
+      }]
+    },
+    [
+      {
+        visitors__created_at: '2017-01-02T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100'
+      },
+      {
+        visitors__created_at: '2017-01-04T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitor_revenue: '200'
+      },
+      {
+        visitors__created_at: '2017-01-05T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__visitor_revenue: null
+      },
+      {
+        visitors__created_at: '2017-01-06T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__visitor_revenue: null
+      }
+    ]
   ));
 
   it('simple join with segment', async () => runQueryTest(

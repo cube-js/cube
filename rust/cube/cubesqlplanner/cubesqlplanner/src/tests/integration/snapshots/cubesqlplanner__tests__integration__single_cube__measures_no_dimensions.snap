@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+orders__count | orders__total_amount | orders__avg_amount   | orders__min_amount | orders__max_amount
+--------------+----------------------+----------------------+--------------------+-------------------
+9             | 1440.00              | 160.0000000000000000 | 25.00              | 500.00

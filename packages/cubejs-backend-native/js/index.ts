@@ -4,7 +4,7 @@ import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
 import { CacheMode } from '@cubejs-backend/shared';
-import { ResultWrapper } from './ResultWrapper';
+import { NativeQueryResultRef, ResultWrapper } from './ResultWrapper';
 
 export * from './ResultWrapper';
 
@@ -110,7 +110,6 @@ export type SQLInterfaceOptions = {
   contextToApiScopes: (payload: ContextToApiScopesPayload) => ContextToApiScopesResponse | Promise<ContextToApiScopesResponse>,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
-  load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
   stream: (payload: LoadPayload) => unknown | Promise<unknown>,
@@ -161,7 +160,14 @@ export type Sql4SqlCommon = {
     pushdown: boolean;
   }
 };
+
 export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
+
+export type QueryConvertResponse = {
+  status: string;
+  query: any;
+  error?: string;
+};
 
 let loadedNative: any = null;
 
@@ -389,10 +395,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.checkSqlAuth must be a function');
   }
 
-  if (typeof options.load !== 'function') {
-    throw new Error('options.load must be a function');
-  }
-
   if (typeof options.meta !== 'function') {
     throw new Error('options.meta must be a function');
   }
@@ -419,7 +421,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     contextToApiScopes: wrapNativeFunctionWithChannelCallback(options.contextToApiScopes),
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
     checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
-    load: wrapNativeFunctionWithChannelCallback(options.load),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
     stream: wrapNativeFunctionWithStream(options.stream),
@@ -438,10 +439,10 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string): Promise<void> => {
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId);
 };
 
 // TODO parse result from native code
@@ -449,6 +450,12 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   const native = loadNative();
 
   return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const rest4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> => {
+  const native = loadNative();
+
+  return native.rest4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
@@ -461,11 +468,11 @@ export type ResultRow = Record<string, string>;
 export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
   const native = loadNative();
 
-  const msg = await native.parseCubestoreResultMessage(message);
+  const msg = await native.parseCubestoreResultMessage(message) as NativeQueryResultRef;
   return new ResultWrapper(msg);
 };
 
-export const getCubestoreResult = (ref: ResultWrapper): ResultRow[] => {
+export const getCubestoreResult = (ref: NativeQueryResultRef): ResultRow[] => {
   const native = loadNative();
 
   return native.getCubestoreResult(ref);

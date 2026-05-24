@@ -148,6 +148,7 @@ export class PrestodbQuery extends BaseQuery {
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} {% elif from_prepared %}\n' +
       'FROM {{ from_prepared }}' +
       '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
@@ -161,6 +162,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.expressions.binary = '{% if op == \'||\' %}' +
       '(CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR))' +
       '{% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.float = 'REAL';

@@ -1,0 +1,65 @@
+---
+title: Map
+description: Plot geographic data using latitude and longitude coordinates on an interactive Mapbox map.
+---
+
+Map charts visualize geographic data as interactive point maps. Each data point is plotted at its latitude/longitude coordinates and can be sized and colored by additional measures or dimensions in your query.
+
+{/* TODO screenshot: map chart with colored and sized point pins (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## When to use
+
+- Visualizing events or entities with known geographic coordinates (e.g. store locations, shipment origins, user sign-up cities)
+- Identifying geographic clusters or outliers
+- Showing how a measure varies across geographic locations
+
+For region-based maps (countries, states), use the [Custom visualization](/docs/explore-analyze/charts/chart-types/custom) with a Vega-Lite geographic spec.
+
+## Data structure
+
+A map chart requires at minimum:
+- A **Latitude** field — a numeric measure or dimension containing decimal latitude values
+- A **Longitude** field — a numeric measure or dimension containing decimal longitude values
+
+Optionally:
+- A **Size** field — a numeric measure that scales point radius proportionally
+- A **Color** field — a dimension or measure that colors points by category or value
+
+{/* TODO screenshot: map builder panel with latitude, longitude, size, and color fields assigned (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Configuring the map
+
+### Point color
+
+When no **Color** field is assigned, all points render in a single configurable color. Use the color picker in the style panel to change it.
+
+When a dimension is assigned to the **Color** channel, each unique dimension value gets a distinct color from the active [color palette](/docs/explore-analyze/charts/configuration/color-and-stacking).
+
+### Point size
+
+Assign a numeric measure to the **Size** channel to scale point radius by value. The size range (minimum and maximum radius in pixels) can be configured in the style panel.
+
+When no Size field is assigned, all points render at the same fixed radius.
+
+### Tooltip fields
+
+Add fields to the **Tooltip** channel to control what appears when a user hovers over a point. By default, all mapped fields (latitude, longitude, size, color) appear in the tooltip. Remove or reorder them in the **Tooltips** section of the Fields tab.
+
+See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips) for details.
+
+## Projection
+
+The map supports two projection types:
+
+| Projection | Description |
+|---|---|
+| **Mercator (2D)** | Standard flat map projection — best for most use cases |
+| **Globe (3D)** | Spherical globe view — useful for data spanning multiple continents |
+
+Switch the projection in the style panel.
+
+{/* TODO screenshot: Mercator vs Globe projection side-by-side (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Map interaction
+
+The map is interactive by default — users can pan and zoom. Initial center coordinates and zoom level can be configured in the style panel.

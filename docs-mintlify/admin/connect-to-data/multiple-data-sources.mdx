@@ -1,0 +1,102 @@
+---
+title: Connecting to multiple data sources
+description: Manage one or more data source connections per Cube Cloud deployment from a single place.
+---
+
+A Cube Cloud deployment always has a single **default** data source plus,
+optionally, one or more **named** data sources. [Cubes](/reference/data-modeling/cube)
+reference whichever source they need via the
+[`data_source`](/reference/data-modeling/cube#data_source) property.
+
+Manage data sources from your deployment's **Settings → Data Sources** page.
+
+## Adding a data source
+
+Click **+ Add data source**, pick the driver, give the source a short
+name (see [Source name rules](#source-name-rules)), and fill in the
+connection form — the same form the deployment wizard uses.
+
+Cube Cloud tests the connection before saving; on success it persists the
+env vars and restarts the development environment, on failure it surfaces
+the driver's error and saves nothing.
+
+## Editing and deleting
+
+Use the **Edit** action on a row to update credentials, or the **Delete**
+action to remove a named source. The **default** source can be edited but
+not deleted — to remove it, clear the bare `CUBEJS_DB_*` variables from
+[**Settings → Environment Variables**][ref-config-ref-env] by hand.
+
+## Source name rules
+
+- Letters, digits, and underscores; must start with a letter.
+- `default` is reserved; use the **Use as default** button on the naming
+  step instead.
+- Flat names (`analytics`, `warehouse`) are safer than names with
+  underscores, which can collide with the env-var parser when they end in
+  `_db`, `_aws`, or `_jdbc`.
+
+## Using a data source from a cube
+
+Reference a source from the
+[`data_source`](/reference/data-modeling/cube#data_source) property using
+the name you gave it when you created it:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders_from_other_data_source
+    # ...
+    data_source: analytics
+```
+
+```javascript title="JavaScript"
+cube(`orders_from_other_data_source`, {
+  // ...
+  data_source: `analytics`
+})
+```
+
+</CodeGroup>
+
+Cubes that don't set `data_source` use the default source — there's no
+need to write `data_source: default` explicitly, though you can if you
+prefer to be explicit.
+
+For multitenancy scenarios where the data source is selected dynamically
+per request, see [`driver_factory`](/reference/configuration/config#driver_factory)
+and the [multitenancy guide][ref-config-multitenancy].
+
+## Workbooks
+
+Sources show up immediately in
+[Workbooks](/docs/explore-analyze/workbooks) — open a
+[Source SQL tab](/docs/explore-analyze/workbooks/source-sql-tabs) and they
+appear in the data sources sidebar without needing a cube to reference
+them first.
+
+## Under the hood
+
+The UI is a friendlier surface over the deployment's environment
+variables — inspect or hand-edit them from
+[**Settings → Environment Variables**][ref-config-ref-env] at any time.
+
+The default source uses bare `CUBEJS_DB_*` variables; each named source
+uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` is auto-maintained
+whenever at least one named source exists, with `default` first and named
+entries lowercased:
+
+```dotenv
+CUBEJS_DATASOURCES=default,analytics
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_HOST=localhost
+CUBEJS_DS_ANALYTICS_DB_TYPE=postgres
+CUBEJS_DS_ANALYTICS_DB_HOST=remotehost
+```
+
+For the full list of variables that support decoration, see the
+[environment variables reference][ref-config-ref-env].
+
+[ref-config-ref-env]: /reference/configuration/environment-variables
+[ref-config-multitenancy]: /embedding/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources

@@ -1620,6 +1620,7 @@ impl MemberRules {
                         // as it doesn't make sense for measures
                         match member {
                             Member::Dimension { .. } => true,
+                            Member::TimeDimension { .. } => true,
                             Member::VirtualField { .. } => true,
                             Member::LiteralMember { .. } => true,
                             _ => false,

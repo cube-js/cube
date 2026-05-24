@@ -1,6 +1,7 @@
 use crate::sql::{
     dataframe::{Decimal128Value, ListValue},
     df_type_to_pg_tid,
+    postgres::extended::ResultFormat,
 };
 use bytes::{BufMut, BytesMut};
 use datafusion::arrow::{
@@ -166,17 +167,17 @@ impl ToProtocolValue for ListValue {
 
 #[derive(Debug)]
 pub struct BatchWriter {
-    format: Format,
+    format: ResultFormat,
     // Data of whole rows
     data: BytesMut,
-    // Current row
+    // Current column index within the current row
     current: u32,
     rows: u32,
     row: BytesMut,
 }
 
 impl BatchWriter {
-    pub fn new(format: Format) -> Self {
+    pub fn new(format: ResultFormat) -> Self {
         Self {
             format,
             data: BytesMut::new(),
@@ -186,10 +187,15 @@ impl BatchWriter {
         }
     }
 
+    fn current_format(&self) -> Format {
+        self.format.format_for(self.current as usize)
+    }
+
     pub fn write_value<T: ToProtocolValue>(&mut self, value: T) -> Result<(), ProtocolError> {
+        let format = self.current_format();
         self.current += 1;
 
-        match self.format {
+        match format {
             Format::Text => value.to_text(&mut self.row)?,
             Format::Binary => value.to_binary(&mut self.row)?,
         };
@@ -238,6 +244,7 @@ mod tests {
     use crate::sql::{
         dataframe::{Decimal128Value, ListValue},
         error::ConnectionError,
+        postgres::extended::ResultFormat,
         writer::{BatchWriter, ToProtocolValue},
     };
     use bytes::BytesMut;
@@ -297,7 +304,7 @@ mod tests {
     async fn test_backend_writer_text_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(Format::Text);
+        let mut writer = BatchWriter::new(ResultFormat::AllText);
         writer.write_value("test1".to_string())?;
         writer.write_value(true)?;
         writer.end_row()?;
@@ -325,7 +332,7 @@ mod tests {
     async fn test_backend_writer_binary_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(Format::Binary);
+        let mut writer = BatchWriter::new(ResultFormat::AllBinary);
         writer.write_value("test1".to_string())?;
         writer.write_value(true)?;
         writer.end_row()?;
@@ -355,7 +362,7 @@ mod tests {
         // fetch 2 in test;
         let mut cursor = Cursor::new(vec![]);
 
-        let mut writer = BatchWriter::new(Format::Binary);
+        let mut writer = BatchWriter::new(ResultFormat::AllBinary);
         writer.write_value(Decimal128Value::new(1, 5))?;
         writer.end_row()?;
 
@@ -380,7 +387,7 @@ mod tests {
     #[tokio::test]
     async fn test_backend_writer_binary_int8_array() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
-        let mut writer = BatchWriter::new(Format::Binary);
+        let mut writer = BatchWriter::new(ResultFormat::AllBinary);
 
         // Row 1
         let mut col = Int64Builder::new(3);
@@ -410,6 +417,67 @@ mod tests {
                 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3, 68, 0, 0, 0, 50, 0, 1, 0, 0, 0, 40, 0, 0, 0,
                 1, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 3, 0, 0, 0, 1, 255, 255, 255, 255, 0, 0, 0, 8,
                 0, 0, 0, 0, 0, 0, 0, 2, 255, 255, 255, 255
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_backend_writer_per_column_format() -> Result<(), ConnectionError> {
+        // Simulates Tableau/JDBC: text for col0 (string), binary for col1 (int64), binary for col2 (f64)
+        let mut cursor = Cursor::new(vec![]);
+
+        let mut writer = BatchWriter::new(ResultFormat::PerColumn(vec![
+            Format::Text,
+            Format::Binary,
+            Format::Binary,
+        ]));
+        writer.write_value("hello".to_string())?;
+        writer.write_value(42_i64)?;
+        writer.write_value(2.5_f64)?;
+        writer.end_row()?;
+
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
+
+        assert_eq!(
+            cursor.get_ref()[0..],
+            vec![
+                // row: "hello" as text, 42_i64 as binary, 2.5_f64 as binary
+                68, 0, 0, 0, 39, 0, 3, 0, 0, 0, 5, 104, 101, 108, 108, 111, 0, 0, 0, 8, 0, 0, 0, 0,
+                0, 0, 0, 42, 0, 0, 0, 8, 64, 4, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_backend_writer_per_column_format_multiple_rows() -> Result<(), ConnectionError> {
+        // Ensure per-column format resets correctly across rows
+        let mut cursor = Cursor::new(vec![]);
+
+        let mut writer =
+            BatchWriter::new(ResultFormat::PerColumn(vec![Format::Text, Format::Binary]));
+
+        writer.write_value("row1".to_string())?;
+        writer.write_value(100_i64)?;
+        writer.end_row()?;
+
+        writer.write_value("row2".to_string())?;
+        writer.write_value(200_i64)?;
+        writer.end_row()?;
+
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
+
+        assert_eq!(
+            cursor.get_ref()[0..],
+            vec![
+                // row 1: "row1" as text, 100_i64 as binary
+                68, 0, 0, 0, 26, 0, 2, 0, 0, 0, 4, 114, 111, 119, 49, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
+                0, 100, // row 2: "row2" as text, 200_i64 as binary
+                68, 0, 0, 0, 26, 0, 2, 0, 0, 0, 4, 114, 111, 119, 50, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
+                0, 200
             ]
         );
 

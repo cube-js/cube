@@ -7,13 +7,12 @@ asIndexPage: true
 Semantic Layer Sync synchronizes the [data model][ref-data-model] of a semantic
 layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
 
-<SuccessBox>
+<InfoBox>
 
-Semantic Layer Sync is available in Cube Cloud.
-<br/>Support for Preset and Superset is available on [all product tiers](https://cube.dev/pricing).
-<br/>Support for Tableau is available on [Enterprise and above](https://cube.dev/pricing) product tiers.
+Support for Preset and Superset is available on [all plans](https://cube.dev/pricing).
+Support for Tableau is available on [Enterprise and above plans](https://cube.dev/pricing).
 
-</SuccessBox>
+</InfoBox>
 
 Semantic Layer Sync programmatically connects a BI tool to Cube via the [SQL
 API][ref-sql-api] and creates or updates BI-specific entities that correspond to
@@ -50,13 +49,6 @@ on configuration and features for specific tools:
     title="Tableau"
   />
 </Grid>
-
-<InfoBox>
-
-Previously, Semantic Layer Sync provided a way to connect to [Microsoft Power BI][ref-powerbi].
-Currently, it's recommended to use the [DAX API][ref-dax-api].
-
-</InfoBox>
 
 ## Creating syncs
 
@@ -382,10 +374,8 @@ on, i.e., your development mode branch, shared branch, or main branch.
 
 [ref-data-model]: /product/data-modeling/overview
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-powerbi]: /product/configuration/visualization-tools/powerbi
-[ref-dax-api]: /product/apis-integrations/dax-api
 [ref-config-file]: /product/configuration#configuration-options
 [ref-config-contexts]: /product/configuration/reference/config#scheduledrefreshcontexts
 [ref-config-schemaversion]: /product/configuration/reference/config#schema_version
-[ref-dev-mode]: /product/workspace/dev-mode
+[ref-dev-mode]: /product/data-modeling/dev-mode
 [ref-auto-sus]: /product/deployment/cloud/auto-suspension

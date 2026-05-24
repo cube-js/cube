@@ -89,14 +89,20 @@ export class MySqlDbRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    const version = process.env.TEST_MYSQL_VERSION || '5.7';
+    const DEFAULT_VERSION = '5.7';
+    const version = process.env.TEST_MYSQL_VERSION || DEFAULT_VERSION;
 
-    return new GenericContainer(`mysql:${version}`)
+    const container = new GenericContainer(`mysql:${version}`)
       .withEnvironment({ MYSQL_ROOT_PASSWORD: this.password() })
       .withExposedPorts(this.port())
       // workaround for MySQL 8 unsupported auth
-      .withCommand(['--default-authentication-plugin=mysql_native_password'])
-      .start();
+      .withCommand(['--default-authentication-plugin=mysql_native_password']);
+
+    if (process.platform === 'darwin' && process.arch === 'arm64' && version === DEFAULT_VERSION) {
+      container.withPlatform('linux/amd64');
+    }
+
+    return container.start();
   }
 
   port() {

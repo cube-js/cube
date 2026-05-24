@@ -1,0 +1,79 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM ms_customers"
+      joins:
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+
+          # Multi-stage + time_shift on cross-cube time dim: leaf must be
+          # rendered as a full AggregateMultipliedSubquery (keys subquery +
+          # re-join by primary key).
+          - name: total_lifetime_value_prev_month_by_returns
+            type: number
+            sql: "{CUBE.total_lifetime_value}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+
+      pre_aggregations:
+          # Pre-agg for the multiplied leaf subquery: base total_lifetime_value
+          # aggregated by returns.created_at (one_to_many join).
+          - name: customers_lifetime_by_returns_month
+            type: rollup
+            measures:
+                - total_lifetime_value
+            time_dimension: returns.created_at
+            granularity: month
+
+          # Pre-agg that directly materializes the multi-stage time_shift
+          # measure. Query for it should match this pre-agg as-is.
+          - name: customers_lifetime_prev_month_pre_agg
+            type: rollup
+            measures:
+                - total_lifetime_value_prev_month_by_returns
+            time_dimension: returns.created_at
+            granularity: month
+
+    - name: returns
+      sql: "SELECT * FROM ms_returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          - name: returns_count_by_month
+            type: rollup
+            measures:
+                - count
+            time_dimension: created_at
+            granularity: month

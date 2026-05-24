@@ -16,6 +16,13 @@ impl fmt::Display for JsDeserializationError {
     }
 }
 
+fn js_exception_message(cx: &mut FunctionContext, js_err: Handle<JsValue>) -> String {
+    match cx.try_catch(|cx| js_err.to_string(cx)) {
+        Ok(s) => s.value(cx),
+        Err(_) => "<JS exception (couldn't stringify)>".to_string(),
+    }
+}
+
 impl From<Throw> for JsDeserializationError {
     fn from(throw: Throw) -> Self {
         JsDeserializationError(throw.to_string())
@@ -124,7 +131,7 @@ impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
                 .value
                 .downcast::<JsObject, _>(self.cx)
                 .or_throw(self.cx)?;
-            let deserializer = JsObjectDeserializer::new(self.cx, js_object);
+            let deserializer = JsObjectDeserializer::new(self.cx, js_object)?;
             visitor.visit_map(deserializer)
         } else if self.value.is_a::<JsNull, _>(self.cx)
             || self.value.is_a::<JsUndefined, _>(self.cx)
@@ -224,7 +231,7 @@ impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
                 .value
                 .downcast::<JsObject, _>(self.cx)
                 .or_throw(self.cx)?;
-            let deserializer = JsObjectDeserializer::new(self.cx, js_object);
+            let deserializer = JsObjectDeserializer::new(self.cx, js_object)?;
             visitor.visit_map(deserializer)
         } else {
             Err(JsDeserializationError("expected an object".to_string()))
@@ -270,25 +277,39 @@ struct JsObjectDeserializer<'a, 'b> {
 }
 
 impl<'a, 'b> JsObjectDeserializer<'a, 'b> {
-    fn new(cx: &'a mut FunctionContext<'b>, js_object: Handle<'a, JsObject>) -> Self {
-        let keys = js_object
-            .get_own_property_names(cx)
-            .expect("Failed to get object keys")
-            .to_vec(cx)
-            .expect("Failed to convert keys to Vec")
+    fn new(
+        cx: &'a mut FunctionContext<'b>,
+        js_object: Handle<'a, JsObject>,
+    ) -> Result<Self, JsDeserializationError> {
+        let keys_array = match cx.try_catch(|cx| js_object.get_own_property_names(cx)) {
+            Ok(keys) => keys,
+            Err(js_err) => {
+                let msg = js_exception_message(cx, js_err);
+                return Err(JsDeserializationError(format!(
+                    "Unable to get keys from object: {}",
+                    msg
+                )));
+            }
+        };
+        let keys_vec = keys_array.to_vec(cx).map_err(|err| {
+            JsDeserializationError(format!("Unable to convert keys to Vec: '{}'", err))
+        })?;
+
+        let keys = keys_vec
             .iter()
             .filter_map(|k| {
-                k.downcast_or_throw::<JsString, _>(cx)
+                k.downcast::<JsString, _>(cx)
                     .ok()
                     .map(|js_string| js_string.value(cx))
             })
             .collect::<Vec<String>>();
-        Self {
+
+        Ok(Self {
             cx,
             js_object,
             keys,
             index: 0,
-        }
+        })
     }
 }
 
@@ -313,11 +334,20 @@ impl<'de> MapAccess<'de> for JsObjectDeserializer<'_, '_> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        let key = &self.keys[self.index - 1];
-        let value = self
-            .js_object
-            .get(self.cx, key.as_str())
-            .expect("Failed to get value by key");
+        let key = self.keys[self.index - 1].clone();
+
+        let js_object = self.js_object;
+        let value = match self.cx.try_catch(|cx| js_object.get(cx, key.as_str())) {
+            Ok(v) => v,
+            Err(js_err) => {
+                return Err(JsDeserializationError(format!(
+                    "Failed to get value by key '{}': {}",
+                    key,
+                    js_exception_message(self.cx, js_err),
+                )));
+            }
+        };
+
         seed.deserialize(JsValueDeserializer::new(self.cx, value))
     }
 }
@@ -353,10 +383,19 @@ impl<'de> SeqAccess<'de> for JsArrayDeserializer<'_, '_> {
         if self.index >= self.length {
             return Ok(None);
         }
-        let value = self
-            .js_array
-            .get(self.cx, self.index as u32)
-            .map_err(JsDeserializationError::from)?;
+        let idx = self.index as u32;
+
+        let js_array = self.js_array;
+        let value = match self.cx.try_catch(|cx| js_array.get(cx, idx)) {
+            Ok(v) => v,
+            Err(js_err) => {
+                return Err(JsDeserializationError(format!(
+                    "Failed to get array element at index {}: {}",
+                    idx,
+                    js_exception_message(self.cx, js_err)
+                )));
+            }
+        };
         self.index += 1;
 
         seed.deserialize(JsValueDeserializer::new(self.cx, value))

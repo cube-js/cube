@@ -10,7 +10,7 @@ mod queue_result;
 mod scheduler;
 
 pub use cache_eviction_manager::{
-    CacheEvictionManager, CacheEvictionPolicy, EvictionFinishedResult, EvictionResult,
+    CacheEvictionManager, CacheEvictionPolicy, EvictionFinishedResult, EvictionResult, LFU_INIT_VAL,
 };
 pub use cache_item::CacheItem;
 pub use cache_rocksstore::{

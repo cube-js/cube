@@ -1,0 +1,115 @@
+---
+title: KPI
+description: Highlight key metrics with composable blocks — numbers, comparisons, progress bars, sparklines, text, and HTML.
+---
+
+KPI tiles highlight important metrics and key performance indicators. Rather than a single fixed layout, KPIs are **row-based and composable** — you build the tile by stacking blocks of different types, each configured independently.
+
+{/* TODO screenshot: KPI tile with Number + Comparison + Sparkline blocks stacked (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Getting started
+
+The KPI visualization starts with a **Number** block that compares the first and second rows of your result for the first numeric column.
+
+To add a new block, click the **+** button inside the visualization and choose the block type. To edit a block, click it in the visualization — the configuration panel updates to show that block's settings.
+
+Reorder blocks by dragging the handle on the left side of each block. Delete a block with the trash icon in its configuration panel.
+
+{/* TODO screenshot: KPI builder panel showing block list with drag handles (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Block types
+
+### Number
+
+Displays a single value from your query result.
+
+| Setting | Description |
+|---|---|
+| **Field** | The measure or dimension to display |
+| **Row** | Which row of the result to read from |
+| **Format** | Number formatting (currency, percent, etc.) |
+| **Font size / color** | Text appearance |
+| **Alignment** | Left, center, or right |
+
+{/* TODO screenshot: Number block (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Comparison
+
+Displays a current value alongside a previous value with a calculated difference. Use this to show period-over-period change or target vs. actual.
+
+| Setting | Description |
+|---|---|
+| **Current field / row** | The primary value |
+| **Previous field / row** | The value to compare against — can be a different column or a different row from the same column |
+| **Difference format** | Absolute, percentage, or both |
+| **Positive color / Negative color** | Colors applied based on whether the change is positive or negative |
+
+To compare to a static goal, add a column to your query that always returns the same number (e.g. a calculated field with a constant), then select it as the **Previous** field.
+
+{/* TODO screenshot: Comparison block showing current vs. previous with colored delta (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Progress bar
+
+Shows a value relative to a target as a progress bar or circle. Useful for goal tracking.
+
+| Setting | Description |
+|---|---|
+| **Value field / row** | The current progress value |
+| **Target field / row** | The goal or maximum value |
+| **Style** | Bar or circle |
+| **Color** | Fill color for the progress indicator |
+
+<Tip>
+To compare against a static number like a quarterly goal, add a calculated field that always returns that number and use it as the **Target** field.
+</Tip>
+
+{/* TODO screenshot: Progress bar block (bar style) and circle style (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Sparkline
+
+Renders a compact trend chart — either a bar or line — within the KPI tile. Use this to show the trend behind the headline number.
+
+| Setting | Description |
+|---|---|
+| **Series measure** | The measure to plot |
+| **Series dimension** | The dimension to use as the X axis (typically a time dimension) |
+| **Chart type** | Bar or line |
+| **Height / Width** | Dimensions of the sparkline in the tile |
+| **Max points** | Limits the number of data points rendered |
+| **Colors** | Line/fill colors |
+
+{/* TODO screenshot: Sparkline block showing a trend line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Text
+
+A Markdown-enabled text field for titles, headings, or descriptions within the tile. Supports standard Markdown formatting.
+
+Use text blocks for short labels and headings inside the KPI. For complex layouts with Markdown, use the [HTML block](#html) or consider the [Custom visualization](/docs/explore-analyze/charts/chart-types/custom) instead.
+
+{/* TODO screenshot: Text block with a heading (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### HTML
+
+A free-form HTML block rendered inside the KPI tile. Use this for advanced custom layouts that go beyond what the other block types support.
+
+{/* TODO screenshot: HTML block with custom content (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Layout controls
+
+KPI tiles have a layout panel that controls how blocks are arranged:
+
+| Setting | Description |
+|---|---|
+| **Direction** | Row (blocks side-by-side) or Column (blocks stacked vertically) |
+| **Alignment** | How blocks align on the cross axis |
+| **Justify** | How blocks are distributed along the main axis |
+| **Gap** | Spacing between blocks |
+| **Wrap** | Whether blocks wrap to a new line when the tile is narrow |
+
+## Converting to raw Markdown
+
+If you need customization beyond what the block builder supports, you can convert the KPI visualization directly to Markdown by clicking on the Markdown visualization option.
+
+<Warning>
+Converting to Markdown is a one-way operation. If you do this accidentally, use the undo button to revert.
+</Warning>

@@ -146,6 +146,7 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn load_stream(
@@ -157,6 +158,7 @@ pub trait TransportService: Send + Sync + Debug {
         meta_fields: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        throw_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError>;
 
     async fn can_switch_user_for_session(
@@ -287,6 +289,7 @@ impl TransportService for HttpTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        _throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
@@ -309,7 +312,7 @@ impl TransportService for HttpTransport {
 
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
-            query: Some(query),
+            query: Some(Box::new(query)),
             query_type: Some("multi".to_string()),
             cache: cache_mode,
         };
@@ -328,6 +331,7 @@ impl TransportService for HttpTransport {
         _meta_fields: LoadRequestMeta,
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
+        _throw_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("Does not work for standalone mode yet");
     }
@@ -420,6 +424,7 @@ impl SqlTemplates {
     pub fn select(
         &self,
         from: String,
+        joins: Vec<String>,
         projection: Vec<AliasedColumn>,
         group_by: Vec<AliasedColumn>,
         group_descs: Vec<Option<GroupingSetDesc>>,
@@ -459,6 +464,7 @@ impl SqlTemplates {
             "statements/select",
             context! {
                 from => from,
+                joins => joins,
                 select_concat => select_concat,
                 group_by => group_by_expr,
                 aggregate => aggregate,
@@ -908,7 +914,12 @@ impl SqlTemplates {
 
         let rendered_like = self.render_template(
             &format!("expressions/{}", expression_name),
-            context! { expr => expr, negated => negated, pattern => pattern },
+            context! {
+                expr => expr,
+                negated => negated,
+                pattern => pattern,
+                default_escape => escape_char.is_none(),
+            },
         )?;
 
         let Some(escape_char) = escape_char else {
@@ -983,5 +994,26 @@ impl SqlTemplates {
 
     pub fn inner_join(&self) -> Result<String, CubeError> {
         self.render_template("join_types/inner", context! {})
+    }
+
+    pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
+        let bracketed_query = format!("({})", query);
+        let quoted_alias = self.quote_identifier(alias)?;
+        self.render_template(
+            "expressions/query_aliased",
+            context! { query => bracketed_query, quoted_alias => quoted_alias },
+        )
+    }
+
+    pub fn join(
+        &self,
+        join_type: &str,
+        source: &str,
+        condition: &str,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "statements/join",
+            context! { join_type => join_type, source => source, condition => condition },
+        )
     }
 }

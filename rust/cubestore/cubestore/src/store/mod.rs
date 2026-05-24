@@ -69,6 +69,13 @@ impl DataFrame {
         DataFrame { columns, data }
     }
 
+    pub fn empty() -> DataFrame {
+        DataFrame {
+            columns: vec![],
+            data: vec![],
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -88,6 +95,25 @@ impl DataFrame {
 
     pub fn get_rows(&self) -> &Vec<Row> {
         &self.data
+    }
+
+    pub fn print(&self) -> String {
+        use comfy_table::{Cell, Table};
+
+        let mut table = Table::new();
+        table.load_preset("||--+-++|    ++++++");
+        table.set_header(self.columns.iter().map(|c| Cell::new(c.get_name())));
+
+        for row in &self.data {
+            table.add_row(
+                self.columns
+                    .iter()
+                    .zip(row.values().iter())
+                    .map(|(col, value)| value.format_with(col.get_column_type())),
+            );
+        }
+
+        table.trim_fmt()
     }
 
     pub fn to_execution_plan(

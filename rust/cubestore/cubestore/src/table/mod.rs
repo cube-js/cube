@@ -1,3 +1,4 @@
+use crate::metastore::ColumnType;
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 
@@ -115,6 +116,45 @@ impl TableValue {
                 "unexpected array type when converting to TableValue: {:?}",
                 other
             ),
+        }
+    }
+
+    /// Render the value as a string, using `column_type` for context-dependent
+    /// variants (currently `Decimal` / `Decimal96`, where scale lives on the
+    /// column rather than on the value). Falls back to `Display` otherwise.
+    pub fn format_with(&self, column_type: &ColumnType) -> String {
+        match (self, column_type) {
+            (TableValue::Decimal(v), ColumnType::Decimal { scale, .. }) => {
+                v.to_string(*scale as u8)
+            }
+            (TableValue::Decimal96(v), ColumnType::Decimal96 { scale, .. }) => {
+                v.to_string(*scale as u8)
+            }
+            (v, _) => v.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for TableValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TableValue::Null => f.write_str("NULL"),
+            TableValue::String(v) => f.write_str(v),
+            TableValue::Int(v) => write!(f, "{}", v),
+            TableValue::Int96(v) => f.write_str(&v.to_string()),
+            // Scale-unaware fallbacks; `format_with` produces the proper form.
+            TableValue::Decimal(v) => write!(f, "{}", v.raw_value()),
+            TableValue::Decimal96(v) => write!(f, "{}", v.raw_value()),
+            TableValue::Float(v) => write!(f, "{}", v.0),
+            TableValue::Bytes(v) => {
+                f.write_str("0x")?;
+                for b in v {
+                    write!(f, "{:02x}", b)?;
+                }
+                Ok(())
+            }
+            TableValue::Timestamp(v) => f.write_str(&v.to_string()),
+            TableValue::Boolean(v) => write!(f, "{}", v),
         }
     }
 }

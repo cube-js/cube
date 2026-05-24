@@ -1,24 +1,22 @@
 export default {
-  "vizard": "Chart Prototyping",
-  "data-model": "Data Model",
-  "visual-model": "Visual Model",
-  "saved-reports": "Saved Reports",
-  "rollup-designer": "Rollup Designer",
-  "dev-mode": "Development mode",
-  "environments": "Environments",
-  "integrations": "Integrations",
-  "sql-runner": "SQL Runner",
-  "query-history": "Query History",
-  "pre-aggregations": "Pre-aggregations",
-  "performance": "Performance Insights",
-  "monitoring": "Monitoring Integrations",
-  "audit-log": "Audit Log",
-  "chats-history": "Chats History",
-  "api-keys": "API keys",
-  "encryption-keys": "Encryption keys",
-  "budgets": "Budgets",
-  "preferences": "Preferences",
-  "cli": "CLI",
-  "semantic-catalog": "Semantic Catalog",
-  "recipes": "Recipes",
+  "integrations": {
+    title: "Integrations",
+    display: "hidden"
+  },
+  "preferences": {
+    title: "Preferences",
+    display: "hidden"
+  },
+  "cli": {
+    title: "CLI",
+    display: "hidden"
+  },
+  "semantic-catalog": {
+    title: "Semantic Catalog",
+    display: "hidden"
+  },
+  "maintenance-window": {
+    title: "Maintenance window",
+    display: "hidden"
+  },
 }

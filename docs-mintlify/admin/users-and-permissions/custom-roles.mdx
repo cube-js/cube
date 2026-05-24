@@ -1,0 +1,252 @@
+---
+title: Custom roles
+description: Define fine-grained custom roles for your organization on the Enterprise plan.
+---
+
+<Info>
+
+Custom roles are available on the [Enterprise plan](https://cube.dev/pricing).
+
+</Info>
+
+Cube comes with [default roles][ref-default-roles] (Admin, Developer, Explorer, Viewer) that cover common use cases. When you need finer control — for example, to let a user edit the data model on a single deployment but nothing else — you can define **custom roles** with a tailored set of permissions.
+
+[ref-default-roles]: /admin/users-and-permissions/roles-and-permissions
+
+## How custom roles work
+
+Each custom role is built around three concepts:
+
+1. **Base Role** (required) — Viewer, Explorer, or Developer. Determines the user's license tier and the inherited level of access.
+2. **Global permissions** — org-wide capabilities such as billing, customization, integrations, and account-wide deployment management.
+3. **Deployment permissions** — one or more policies, each targeting "All deployments" or specific deployments.
+
+Permissions stack: a user gets the union of every role assigned to them, so a user with multiple custom roles holds the broadest set of granted permissions.
+
+## Browsing roles
+
+To see the list of custom roles, go to **Admin → Custom Roles** in your Cube account. Click on a role to edit it, or click **Add Role** to create a new one.
+
+{/* TODO: Upload screenshot of /admin/roles list page */}
+
+## Anatomy of a custom role
+
+The role builder uses a two-column layout. The left column (sticky as you scroll) holds the role's identity and the **Create / Update** button. The right column (scrollable) holds the permission cards.
+
+{/* TODO: Upload screenshot of empty Create Role page showing the two-column layout */}
+
+### Name and description
+
+- **Name** is required and must be unique within the account. The names `Admin`, `Guest`, `Developer`, `None`, and `All` are reserved.
+- **Description** is optional but recommended — it shows up alongside the role on the Custom Roles list and on user profile pages.
+
+### Base Role
+
+Every custom role has exactly one **Base Role**. It determines:
+
+- The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
+- The **inherited** capabilities the role grants out of the box.
+
+| Base Role  | Description                                                  |
+| ---------- | ------------------------------------------------------------ |
+| Viewer     | Read-only access to dashboards and chats.                    |
+| Explorer   | Viewer + create/edit workbooks, run queries.                 |
+| Developer  | Explorer + edit data model, manage deployments.              |
+
+Inheritance is hierarchical:
+
+- **Explorer** automatically grants Viewer access.
+- **Developer** automatically grants Explorer and Viewer access.
+
+{/* TODO: Upload screenshot of Base Role section with all three options visible */}
+
+<Note>
+
+The Base Role is required. Save is disabled until one is selected.
+
+</Note>
+
+#### Auto-bump to Developer
+
+If you check any deployment-scoped action stronger than **Access deployment** (`DeploymentRead`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
+
+> Selected actions require Developer role
+
+Removing the elevated action re-enables the lower tiers. This mirrors the server-side rule that any deployment write or data-model write requires the Developer license tier.
+
+{/* TODO: Upload screenshot of the auto-bump state — Viewer originally selected, "Edit deployment" checked, Base Role bumped to Developer with tooltip */}
+
+### Global permissions
+
+Global permissions are org-wide. Check any number of them on the **Global permissions** card:
+
+| Group                                | Permission                          | What it grants                                            |
+| ------------------------------------ | ----------------------------------- | --------------------------------------------------------- |
+| Audit & Billing                      | Manage audit log                    | Access and configure the audit log.                       |
+| Audit & Billing                      | View billing                        | View invoices and usage.                                  |
+| Customization                        | Manage chart palettes               | Create and edit org-wide chart palettes.                  |
+| Customization                        | Manage dashboard themes             | Create and edit org-wide dashboard themes.                |
+| Integrations / Network               | Manage OAuth integrations           | Configure OAuth integrations and clients.                 |
+| Integrations / Network               | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
+| Deployment management (account-wide) | Manage deployments (account-wide)   | Create and list deployments across the account.           |
+
+### Deployment permissions
+
+Deployment permissions are scoped to specific deployments. A custom role can have any number of **deployment policies**, each represented as its own card. Click **Add deployment policy** to add another card.
+
+Each card has two sections:
+
+#### Scope
+
+Choose which deployments the policy applies to:
+
+- **All deployments** — the policy covers every deployment in the account, including ones added later.
+- **Specific deployments** — pick deployments from a searchable multi-select picker.
+
+{/* TODO: Upload screenshot of a deployment policy card with "Specific deployments" selected and multiple deployments picked */}
+
+#### Actions
+
+Either grant **Full access** (a shortcut that enables every current and future deployment-scoped permission) or pick granular actions:
+
+| Group       | Permission                          | What it grants                                                                                                                                                            |
+| ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| General     | Access deployment                   | Foundation permission required to access the deployment at all. A Viewer needs this just to open it.                                                                      |
+| General     | Edit deployment                     | Modify deployment settings.                                                                                                                                               |
+| General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
+| Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
+| Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
+| Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
+
+When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
+
+{/* TODO: Upload screenshot of a deployment policy card with "Full access" checked, granular checkboxes shown checked + disabled */}
+
+<Tip>
+
+**Access deployment** (`DeploymentRead`) is special. It's the only deployment action that does **not** auto-bump the Base Role to Developer, because Viewers also need it just to open a deployment.
+
+</Tip>
+
+## Walkthroughs
+
+### Create a Viewer with read access to all deployments
+
+A common pattern: someone who consumes dashboards and chats but never edits anything.
+
+<Steps>
+  <Step title="Open the role builder">
+    Go to **Admin → Custom Roles** and click **Add Role**.
+  </Step>
+  <Step title="Name it">
+    Set the **Name** to, e.g., `Org Viewer`.
+  </Step>
+  <Step title="Pick the Base Role">
+    Select **Viewer**.
+  </Step>
+  <Step title="Add a deployment policy">
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General.
+  </Step>
+  <Step title="Save">
+    Click **Create**.
+  </Step>
+</Steps>
+
+### Create an Explorer for a single deployment
+
+For an analyst who works in one deployment.
+
+<Steps>
+  <Step title="Set up the basics">
+    Name the role (e.g., `Marketing Analyst`) and pick **Explorer** as the Base Role.
+  </Step>
+  <Step title="Scope the policy">
+    Add a deployment policy, switch **Scope** to **Specific deployments**, and pick the relevant deployment(s) from the picker.
+  </Step>
+  <Step title="Pick actions">
+    Check **Access deployment** so the user can open the deployment, and add **Access query history** if they should see query performance.
+  </Step>
+  <Step title="Save">
+    Click **Create**.
+  </Step>
+</Steps>
+
+### Create a Developer with Full access to specific deployments
+
+For a data engineer who owns a subset of deployments end-to-end.
+
+<Steps>
+  <Step title="Set up the basics">
+    Name the role (e.g., `Sales Domain Owner`).
+  </Step>
+  <Step title="Add the deployment policy">
+    Add a deployment policy, switch **Scope** to **Specific deployments**, pick the relevant deployments, and check **Full access**.
+  </Step>
+  <Step title="Confirm the auto-bump">
+    The Base Role automatically switches to **Developer** and the Viewer/Explorer radios are disabled.
+  </Step>
+  <Step title="Save">
+    Click **Create**.
+  </Step>
+</Steps>
+
+## Assigning roles to users
+
+To assign a custom role to a user:
+
+1. Navigate to **Admin → Users**.
+2. Either change the role from the dropdown in the users table, or click into the user's profile page.
+3. Add one or more custom roles. Multiple roles stack — the user holds the union of permissions.
+
+See [Manage users][ref-manage-users] for more.
+
+[ref-manage-users]: /admin/users-and-permissions/manage-users
+
+## Validation
+
+The role builder enforces a few rules client-side:
+
+- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected.
+- **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
+- A deployment policy with **no actions selected** is silently dropped on save (treated as a no-op).
+- A deployment policy with **Specific deployments** scope but no deployments selected is also dropped on save.
+
+## Reference: action catalog
+
+This section lists every action a custom role can grant. The internal action names match the names shown in the [audit log][ref-audit-log].
+
+[ref-audit-log]: /admin/monitoring/audit-log
+
+### Base Role actions (Global)
+
+| Internal name   | Label     | Description                                                |
+| --------------- | --------- | ---------------------------------------------------------- |
+| `AIBIView`      | Viewer    | Read-only access to dashboards and chats.                  |
+| `AIBIExplore`   | Explorer  | Viewer + create/edit workbooks, run queries.               |
+| `AIBIDevelop`   | Developer | Explorer + edit data model, manage deployments.            |
+
+### Global actions
+
+| Internal name                  | Label                             |
+| ------------------------------ | --------------------------------- |
+| `AuditLogManage`               | Manage audit log                  |
+| `BillingRead`                  | View billing                      |
+| `ChartPalettesManage`          | Manage chart palettes             |
+| `DashboardThemesManage`        | Manage dashboard themes           |
+| `OAuthIntegrationsManage`      | Manage OAuth integrations         |
+| `OAuthIntegrationsIssueTokens` | Issue OAuth tokens                |
+| `DeploymentsManage`            | Manage deployments (account-wide) |
+
+### Deployment-scoped actions
+
+| Internal name             | Label                                                       |
+| ------------------------- | ----------------------------------------------------------- |
+| `All`                     | Full access (every current and future deployment action)    |
+| `DeploymentRead`          | Access deployment                                           |
+| `DeploymentUpdate`        | Edit deployment                                             |
+| `DeploymentDelete`        | Delete deployment                                           |
+| `SchemaRead`              | View data model                                             |
+| `SchemaUpdate`            | Edit data model                                             |
+| `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
+| `APMRead`                 | Access query history                                        |

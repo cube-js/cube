@@ -14,9 +14,19 @@ export class CubeDictionary implements TranspilerCubeResolver, CompilerInterface
     this.byId = new Map<string, Cube>();
   }
 
-  public compile(cubes: Cube[], _errorReporter?: ErrorReporter): void {
+  public compile(cubes: Cube[], errorReporter?: ErrorReporter): void {
     this.byId = new Map<string, Cube>();
     for (const cube of cubes) {
+      if (errorReporter && this.byId.has(cube.name)) {
+        const existing = this.byId.get(cube.name)!;
+        const existingType = existing.isView ? 'view' : 'cube';
+        const newType = cube.isView ? 'view' : 'cube';
+        if (existingType === newType) {
+          errorReporter.error(`Found duplicate ${newType} name '${cube.name}'.`);
+        } else {
+          errorReporter.error(`Found conflicting cube and view name '${cube.name}'.`);
+        }
+      }
       this.byId.set(cube.name, cube);
     }
   }

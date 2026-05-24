@@ -39,7 +39,11 @@ export type PrestoDriverExportBucket = {
   exportBucketCsvEscapeSymbol?: string,
 };
 
-export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
+export type PrestoDriverInternalConfiguration = {
+    engine?: 'presto' | 'trino';
+};
+
+export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverInternalConfiguration & {
   host?: string;
   port?: string;
   catalog?: string;
@@ -52,6 +56,10 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
+  preAggregations?: boolean;
+  useSelectTestConnection?: boolean;
+  // @see https://trino.io/docs/current/develop/client-protocol.html
+  headers?: Record<string, string>;
 };
 
 const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
@@ -83,42 +91,45 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    const dbUser = getEnv('dbUser', { dataSource });
-    const dbPassword = getEnv('dbPass', { dataSource });
-    const authToken = getEnv('prestoAuthToken', { dataSource });
+    const dbUser = getEnv('dbUser', { dataSource, preAggregations });
+    const dbPassword = getEnv('dbPass', { dataSource, preAggregations });
+    const authToken = getEnv('prestoAuthToken', { dataSource, preAggregations });
 
     if (authToken && dbPassword) {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
-    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource });
+    this.useSelectTestConnection = config.useSelectTestConnection ??
+      getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
       catalog:
-        getEnv('prestoCatalog', { dataSource }) ||
-        getEnv('dbCatalog', { dataSource }),
+        getEnv('prestoCatalog', { dataSource, preAggregations }) ||
+        getEnv('dbCatalog', { dataSource, preAggregations }),
       schema:
-        getEnv('dbName', { dataSource }) ||
-        getEnv('dbSchema', { dataSource }),
+        getEnv('dbName', { dataSource, preAggregations }) ||
+        getEnv('dbSchema', { dataSource, preAggregations }),
       user: dbUser,
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
       ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
-      ssl: this.getSslOptions(dataSource),
-      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
-      exportBucket: getEnv('dbExportBucket', { dataSource }),
-      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource }),
-      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
-      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource }),
-      credentials: getEnv('dbExportGCSCredentials', { dataSource }),
-      queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
+      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource, preAggregations }),
+      exportBucket: getEnv('dbExportBucket', { dataSource, preAggregations }),
+      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
+      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
+      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
+      credentials: getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
+      queryTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
       ...config
     };
     this.catalog = this.config.catalog;
     this.client = new presto.Client({
       timeout: this.config.queryTimeout,
+      engine: 'presto',
       ...this.config,
     });
   }
@@ -172,6 +183,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
@@ -200,6 +212,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
             fullData = concat(normalData, fullData);
@@ -310,9 +323,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     }
 
     if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
-      throw new Error(`Unsupported export bucket type: ${
-        this.config.bucketType
-      }`);
+      throw new Error(`Unsupported export bucket type: ${this.config.bucketType}`);
     }
 
     const types = options.query
@@ -334,7 +345,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return { schema, tableName };
   }
 
-  private generateTableColumnsForExport(types: {name: string, type: string}[]) {
+  private generateTableColumnsForExport(types: { name: string, type: string }[]) {
     return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
   }
 
@@ -358,7 +369,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  private async unloadGeneric(params: {tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[]}) {
+  private async unloadGeneric(params: { tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[] }) {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }

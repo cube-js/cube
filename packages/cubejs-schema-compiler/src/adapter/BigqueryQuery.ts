@@ -367,15 +367,15 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
-    templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
+    templates.statements.time_series_select = 'SELECT TIMESTAMP(f) date_from, TIMESTAMP(t) date_to \n' +
     'FROM (\n' +
     '{% for time_item in seria  %}' +
     '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}' +
     ') AS dates';
-    templates.statements.generated_time_series_select = 'SELECT DATETIME(d) AS date_from,\n' +
-    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    templates.statements.generated_time_series_select = 'SELECT TIMESTAMP(DATETIME(d)) AS date_from,\n' +
+    'TIMESTAMP(DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND)) AS date_to \n' +
     'FROM UNNEST(\n' +
     '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
     'GENERATE_DATE_ARRAY(DATE({{ start }}), DATE({{ end }}), INTERVAL {{ granularity }})\n' +
@@ -384,8 +384,8 @@ export class BigqueryQuery extends BaseQuery {
     '{% endif %}' +
     ') AS d';
 
-    templates.statements.generated_time_series_with_cte_range_source = 'SELECT DATETIME(d) AS date_from,\n' +
-    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT TIMESTAMP(DATETIME(d)) AS date_from,\n' +
+    'TIMESTAMP(DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND)) AS date_to \n' +
     'FROM {{ range_source }}, UNNEST(\n' +
     '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
     'GENERATE_DATE_ARRAY(DATE({{ range_source }}.{{ min_name }}), DATE({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +

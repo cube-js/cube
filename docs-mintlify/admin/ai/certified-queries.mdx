@@ -1,0 +1,81 @@
+---
+title: Certified queries
+description: Provide a library of trusted SQL queries that the agent uses as reference examples when answering user requests.
+---
+
+Certified queries are pre-approved SQL queries that the agent treats as a **library of trusted examples**. They guide the agent toward correct business logic and well-formed query patterns without restricting it to a fixed set of queries.
+
+Certified queries are configured as code in your [data model repository](/admin/ai#agent-configuration), alongside your cubes and views.
+
+<Note>
+The agent is not limited to running only certified queries. When answering a user request, the agent may:
+
+- Use a certified query directly if it matches the request
+- Use a certified query as a **starting point** and adapt it (e.g., add filters, dimensions, or measures) to fit the user's question
+- Generate a new query independently if no certified query is relevant
+
+Certified queries help the agent toward trusted patterns and correct business logic, but the agent retains full flexibility to construct the query that best answers each question.
+</Note>
+
+## Defining certified queries
+
+Certified queries are defined as Markdown files under `agents/certified_queries/`. Each query lives in its own file: the YAML frontmatter holds metadata, and the Markdown body is the SQL query.
+
+```markdown
+<!-- agents/certified_queries/quarterly-revenue.md -->
+---
+description: "Get revenue by fiscal quarter"
+user_request: "What is the revenue by quarter?"
+---
+SELECT
+  DATE_TRUNC('quarter', order_date) AS quarter,
+  SUM(amount) AS revenue
+FROM orders
+WHERE status != 'cancelled'
+GROUP BY 1
+ORDER BY 1
+```
+
+Files placed under a `certified_queries/`, `certified-queries/`, or `queries/` directory are treated as certified queries automatically — no `kind` property is required. The `name` is inferred from the file name (e.g., `quarterly-revenue.md` → `quarterly-revenue`).
+
+### Frontmatter properties
+
+| Property        | Type   | Required | Description                                                                          |
+|-----------------|--------|:--------:|--------------------------------------------------------------------------------------|
+| `name`          | string | No       | Unique identifier. Inferred from the file name if omitted.                          |
+| `description`   | string | No       | Human-readable description.                                                          |
+| `user_request`  | string | Yes      | The user request pattern this query answers.                                         |
+| `sql_query`     | string | No       | The SQL query. Falls back to the Markdown body if omitted.                           |
+
+### Inlining certified queries in YAML
+
+You can also inline certified queries directly in `agents/config.yml` under a `certified_queries` key:
+
+```yaml
+# agents/config.yml
+certified_queries:
+  - name: total-revenue
+    description: "Calculate total revenue"
+    user_request: "What is the total revenue?"
+    sql_query: "SELECT SUM(amount) AS total_revenue FROM orders WHERE status = 'completed'"
+
+  - name: monthly-sales
+    description: "Monthly sales breakdown"
+    user_request: "Show me sales by month"
+    sql_query: |
+      SELECT
+        DATE_TRUNC('month', order_date) AS month,
+        SUM(amount) AS total_sales
+      FROM orders
+      GROUP BY 1
+      ORDER BY 1
+```
+
+Inline certified queries accept the same properties as Markdown ones — `name`, `description`, `user_request` (required), and `sql_query` (required).
+
+## Writing effective certified queries
+
+- **Phrase `user_request` like a real user question.** This is what the agent matches against incoming requests.
+- **Keep queries focused.** A certified query should answer one well-defined question; the agent will adapt it for variations.
+- **Use canonical business logic.** Certified queries are the reference for "the right way" to compute something — encode the definitions you want the agent to follow.
+- **Cover common patterns first.** Start with the questions users ask most often, and grow the library based on usage.

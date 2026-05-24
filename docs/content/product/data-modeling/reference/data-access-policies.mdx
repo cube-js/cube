@@ -13,6 +13,8 @@ can be configured using the following parameters:
 takes effect.
 - [`member_level`](#member-level) and [`row_level`](#row-level) parameters are used
 to configure [member-level][ref-dap-mls] and [row-level][ref-dap-rls] access.
+- [`member_masking`](#member-masking) can be optionally used to configure
+[data masking][ref-dap-masking] for members not included in `member_level`.
 
 <InfoBox>
 
@@ -295,6 +297,60 @@ Note that access policies also respect [member-level security][ref-mls] restrict
 configured via `public` parameters. See [member-level access][ref-dap-mls] to
 learn more about policy evaluation.
 
+### `member_masking`
+
+The optional `member_masking` parameter, when present, configures [data
+masking][ref-dap-masking] for a policy. It requires `member_level` to be
+defined in the same policy.
+
+Members included in `member_level` get full access. Members not in
+`member_level` but included in `member_masking` return masked values instead
+of being denied. The mask value is defined by the [`mask` parameter][ref-mask-dim]
+on each dimension or measure.
+
+You can provide a list of maskable members with `includes`, or a list of
+non-maskable members with `excludes`. Use `"*"` as a shorthand for all members.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+    
+    access_policy:
+      - group: manager
+        member_level:
+          includes:
+            - status
+            - count
+        member_masking:
+          includes: "*"
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `manager`,
+      member_level: {
+        includes: [
+          `status`,
+          `count`
+        ]
+      },
+      member_masking: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
 ### `row_level`
 
 The optional `row_level` parameter, when present, configures [row-level
@@ -406,6 +462,8 @@ cube(`orders`, {
 [ref-rls]: /product/auth/row-level-security
 [ref-sec-ctx]: /product/auth/context
 [ref-core-data-apis]: /product/apis-integrations/core-data-apis
+[ref-dap-masking]: /product/auth/data-access-policies#data-masking
+[ref-mask-dim]: /product/data-modeling/reference/dimensions#mask
 [ref-rest-query-filters]: /product/apis-integrations/rest-api/query-format#filters-format
 [ref-rest-query-ops]: /product/apis-integrations/rest-api/query-format#filters-operators
 [ref-rest-boolean-ops]: /product/apis-integrations/rest-api/query-format#boolean-logical-operators

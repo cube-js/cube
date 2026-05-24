@@ -1,0 +1,67 @@
+---
+title: Creator Mode
+description: Embed the full Cube application so users can build and modify their own dashboards.
+---
+
+<Info>
+  Creator Mode is available on the [Enterprise plan](https://cube.dev/pricing).
+</Info>
+
+Creator Mode embeds the full Cube application instead of an individual dashboard or chat. Users can create and modify workbooks, dashboards, and reports inside the iframe.
+
+To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generate-session].
+
+<Note>
+  Creator Mode requires [Signed embedding](/embedding/iframe/auth/signed). Private embedding is not supported.
+</Note>
+
+## Embed tenant scoping
+
+In Creator Mode, content (workbooks, dashboards) and the groups/user attributes referenced by the session are scoped to an **embed tenant**. Pass `embedTenantName` to isolate content per customer; omit it to use the current tenant.
+
+`embedTenantName` must be lowercase, 5–36 chars, start with a letter, end with a letter or digit, and contain only `a-z`, `0-9`, or `-`.
+
+## Provisioning groups and user attributes
+
+In Creator Mode, `groups` and `userAttributes` resolve against the embed tenant's scoped catalog (separate from the tenant-wide one used by read-only embedding). To define those entries from your backend in the same call, pass `groupDefinitions` and `userAttributeDefinitions` — they are idempotent and validated before memberships and values are applied.
+
+See [Generate Session → Creator mode bootstrap][ref-bootstrap] for the input shape, value types, and the immutable-`type` rule on attribute definitions.
+
+## Example
+
+```javascript
+const session = await fetch(
+  "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Api-Key ${API_KEY}`,
+    },
+    body: JSON.stringify({
+      deploymentId: 32,
+      externalId: "user@example.com",
+      embedTenantName: "acme-corp",
+      creatorMode: true,
+    }),
+  },
+);
+
+const { sessionId } = await session.json();
+```
+
+Embed the app with the returned session ID:
+
+```html
+<iframe
+  title="Cube App"
+  src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+For a complete working example, see the [cube-embedding-demo](https://github.com/cubedevinc/cube-embedding-demo) repository.
+
+[ref-generate-session]: /reference/embed-apis/generate-session
+[ref-bootstrap]: /reference/embed-apis/generate-session#creator-mode-bootstrapping-groups-and-user-attributes

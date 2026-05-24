@@ -10,7 +10,7 @@ export async function testWithPreAggregation(
   const preAggSql = preAggregationsDescription
     .loadSql[0]
     // Without `ON COMMIT DROP` temp tables are session-bound, and can live across multiple transactions
-    .replace(/CREATE TABLE (.+) AS SELECT/, 'CREATE TEMP TABLE $1 ON COMMIT DROP AS SELECT');
+    .replace(/CREATE TABLE (.+) AS\s+(SELECT|WITH)/, 'CREATE TEMP TABLE $1 ON COMMIT DROP AS $2');
   const preAggParams = preAggregationsDescription.loadSql[1];
 
   const queries = [

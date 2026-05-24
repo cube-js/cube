@@ -23,6 +23,8 @@ pub use topk::MIN_TOPK_STREAM_ROWS;
 mod filter_by_key_range;
 pub mod info_schema;
 mod inline_aggregate;
+#[cfg(test)]
+mod is_not_distinct_from_join_test;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
@@ -55,6 +57,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopKLower;
 
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
@@ -316,6 +319,7 @@ impl QueryPlannerImpl {
         // TODO upgrade DF: build SessionContexts consistently
         let state = Self::minimal_session_state_from_final_config(config)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
+            .with_optimizer_rule(Arc::new(IsNotDistinctFromJoinKeysRule {}))
             .build();
 
         let context = SessionContext::new_with_state(state);
@@ -677,9 +681,9 @@ pub trait InfoSchemaTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError>;
+    ) -> Result<Vec<Self::T>, CubeError>;
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>>;
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef>;
 
     fn schema(&self) -> Vec<Field>;
 }
@@ -711,11 +715,7 @@ macro_rules! base_info_schema_table_def {
             ) -> Result<datafusion::arrow::record_batch::RecordBatch, crate::CubeError> {
                 let rows = self.rows(ctx, limit).await?;
                 let schema = self.schema_ref();
-                let columns = self.columns();
-                let columns = columns
-                    .into_iter()
-                    .map(|c| c(rows.clone()))
-                    .collect::<Vec<_>>();
+                let columns = self.columns(rows);
                 Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
                     schema, columns,
                 )?)
@@ -1046,7 +1046,11 @@ pub mod tests {
     use pretty_assertions::assert_eq;
 
     fn initial_plan(s: &str, ctx: MetaStoreSchemaProvider) -> LogicalPlan {
-        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+        let statement = match CubeStoreParser::new(s, None)
+            .unwrap()
+            .parse_statement()
+            .unwrap()
+        {
             Statement::Statement(s) => s,
             other => panic!("not a statement, actual {:?}", other),
         };
@@ -1063,7 +1067,7 @@ pub mod tests {
             Arc::new(test_utils::MetaStoreMock {}),
             Arc::new(test_utils::CacheStoreMock {}),
             &vec![],
-            Arc::new(SqlResultCache::new(1 << 20, None, 10000)),
+            Arc::new(SqlResultCache::new(1 << 20, None, 10000, None)),
             Arc::new(SessionContext::new().state()),
         )
     }

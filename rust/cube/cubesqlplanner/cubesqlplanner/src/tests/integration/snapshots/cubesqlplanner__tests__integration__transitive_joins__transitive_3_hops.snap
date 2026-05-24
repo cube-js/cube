@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/transitive_joins.rs
+expression: result
+---
+cube_d__label | cube_a__total_value
+--------------+--------------------
+X             | 30.00              
+Y             | 30.00

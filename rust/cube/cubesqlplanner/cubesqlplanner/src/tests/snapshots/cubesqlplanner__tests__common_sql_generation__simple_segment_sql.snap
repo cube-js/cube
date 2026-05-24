@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: result
+---
+customers__count
+----------------
+2

@@ -1,5 +1,9 @@
-import Meta from './Meta';
-import { TimeDimensionGranularity } from './time';
+import Meta from './Meta.js';
+import { TimeDimensionGranularity } from './time.js';
+
+export type DeeplyReadonly<T> = {
+  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+};
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
@@ -14,12 +18,47 @@ export type GranularityAnnotation = {
   origin?: string;
 };
 
-export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type DimensionCustomTimeFormat = {
+  type: 'custom-time';
+  /** POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S'). See https://d3js.org/d3-time-format */
+  value: string;
+};
+export type CustomNumericFormat = {
+  type: 'custom-numeric';
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format */
+  value: string;
+  /** Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used. */
+  alias?: string;
+};
 export type DimensionLinkFormat = { type: 'link'; label: string };
+
+type FormatDescriptionBaseName = 'number' | 'percent' | 'currency' | 'abbr' | 'accounting';
+type FormatDescriptionPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type FormatDescriptionName = 'custom' | 'id' | FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
+
+type NamedNumericPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type NamedNumericFormatName =
+  | `number_${NamedNumericPrecision}`
+  | `percent_${NamedNumericPrecision}`
+  | `currency_${NamedNumericPrecision}`
+  | `decimal_${NamedNumericPrecision}`
+  | `abbr_${NamedNumericPrecision}`
+  | `accounting_${NamedNumericPrecision}`
+  | 'decimal' | 'abbr' | 'accounting';
+
 export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
+  | NamedNumericFormatName
   | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFormat;
+export type MeasureFormat = 'percent' | 'currency' | 'number' | NamedNumericFormatName | CustomNumericFormat;
+
+export type FormatDescription = {
+  /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */
+  name: FormatDescriptionName;
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f'). See https://d3js.org/d3-format */
+  specifier: string;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR). Present when a currency format is used. */
+  currency?: string;
+};
 
 export type Annotation = {
   title: string;
@@ -27,6 +66,10 @@ export type Annotation = {
   type: string;
   meta?: any;
   format?: DimensionFormat | MeasureFormat;
+  /** Resolved format description with the predefined name and d3-format specifier */
+  formatDescription?: FormatDescription;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -122,7 +165,7 @@ export interface Query {
   // @deprecated
   renewQuery?: boolean;
   ungrouped?: boolean;
-  responseFormat?: 'compact' | 'default';
+  responseFormat?: 'compact' | 'columnar' | 'default';
   total?: boolean;
 }
 
@@ -316,6 +359,10 @@ export type TableColumn = {
   title: string;
   shortTitle: string;
   format?: any;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR). Carried over from the annotation for currency-formatted members. */
+  currency?: string;
+  /** Granularity name (e.g. 'day', 'month', 'year'). Carried over from the annotation for time dimensions. */
+  granularity?: string;
   children?: TableColumn[];
 };
 
@@ -384,6 +431,8 @@ export type TCubeMeasure = BaseCubeMember & {
     dimensions: string[];
   };
   format?: 'currency' | 'percent';
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
 };
 
 export type CubeTimeDimensionGranularity = {
@@ -395,6 +444,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   key?: string;
 };
 
@@ -476,6 +527,7 @@ export type Cube = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  viewGroups?: string[];
 };
 
 export type CubeMap = {
@@ -489,8 +541,16 @@ export type CubesMap = Record<
   CubeMap
 >;
 
+export type ViewGroup = {
+  name: string;
+  title?: string;
+  description?: string;
+  views: string[];
+};
+
 export type MetaResponse = {
   cubes: Cube[];
+  viewGroups?: ViewGroup[];
 };
 
 export type FilterOperator = {

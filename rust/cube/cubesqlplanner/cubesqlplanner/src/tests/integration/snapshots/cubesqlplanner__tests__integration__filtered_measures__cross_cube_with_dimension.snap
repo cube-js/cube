@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/filtered_measures.rs
+expression: result
+---
+customers__name | orders__avg_amount_per_return
+----------------+------------------------------
+Alice           | 425.0000000000000000         
+Bob             | 275.0000000000000000         
+Charlie         | NULL                         
+Diana           | NULL

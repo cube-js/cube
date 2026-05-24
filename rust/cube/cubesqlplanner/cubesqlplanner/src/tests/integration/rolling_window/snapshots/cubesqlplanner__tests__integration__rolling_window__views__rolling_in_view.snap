@@ -1,0 +1,38 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/views.rs
+expression: result
+---
+orders_rolling_view__name | orders_rolling_view__created_at_day | orders_rolling_view__rolling_sum_trailing_7d
+--------------------------+-------------------------------------+---------------------------------------------
+Alice Johnson             | 2024-01-10 00:00:00                 | 75.00                                       
+Alice Johnson             | 2024-01-12 00:00:00                 | 350.00                                      
+Alice Johnson             | 2024-01-13 00:00:00                 | 350.00                                      
+Alice Johnson             | 2024-01-14 00:00:00                 | 350.00                                      
+Alice Johnson             | 2024-01-15 00:00:00                 | 350.00                                      
+Alice Johnson             | 2024-01-16 00:00:00                 | 470.00                                      
+Alice Johnson             | 2024-01-17 00:00:00                 | 470.00                                      
+Alice Johnson             | 2024-01-18 00:00:00                 | 470.00                                      
+Alice Johnson             | 2024-01-19 00:00:00                 | 120.00                                      
+Alice Johnson             | 2024-01-20 00:00:00                 | 120.00                                      
+Bob Smith                 | 2024-01-10 00:00:00                 | 30.00                                       
+Bob Smith                 | 2024-01-11 00:00:00                 | 30.00                                       
+Bob Smith                 | 2024-01-12 00:00:00                 | 30.00                                       
+Bob Smith                 | 2024-01-13 00:00:00                 | 30.00                                       
+Bob Smith                 | 2024-01-14 00:00:00                 | 30.00                                       
+Bob Smith                 | 2024-01-15 00:00:00                 | 90.00                                       
+Bob Smith                 | 2024-01-16 00:00:00                 | 90.00                                       
+Bob Smith                 | 2024-01-17 00:00:00                 | 60.00                                       
+Bob Smith                 | 2024-01-18 00:00:00                 | 60.00                                       
+Bob Smith                 | 2024-01-19 00:00:00                 | 60.00                                       
+Bob Smith                 | 2024-01-20 00:00:00                 | 60.00                                       
+Charlie Brown             | 2024-01-10 00:00:00                 | 200.00                                      
+Charlie Brown             | 2024-01-11 00:00:00                 | 200.00                                      
+Charlie Brown             | 2024-01-12 00:00:00                 | 200.00                                      
+Charlie Brown             | 2024-01-13 00:00:00                 | 200.00                                      
+Charlie Brown             | 2024-01-14 00:00:00                 | 290.00                                      
+Charlie Brown             | 2024-01-15 00:00:00                 | 90.00                                       
+Charlie Brown             | 2024-01-16 00:00:00                 | 90.00                                       
+Charlie Brown             | 2024-01-17 00:00:00                 | 90.00                                       
+Charlie Brown             | 2024-01-18 00:00:00                 | 270.00                                      
+Charlie Brown             | 2024-01-19 00:00:00                 | 270.00                                      
+Charlie Brown             | 2024-01-20 00:00:00                 | 270.00

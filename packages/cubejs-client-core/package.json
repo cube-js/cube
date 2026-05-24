@@ -1,25 +1,42 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.6.17",
+  "version": "1.6.50",
   "engines": {},
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-core"
   },
   "description": "Cube client",
-  "main": "dist/cubejs-client-core.cjs.js",
+  "main": "dist/cubejs-client-core.cjs",
   "browser": "dist/cubejs-client-core.umd.js",
   "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
   "exports": {
-    "types": "./dist/src/index.d.ts",
-    "import": "./dist/src/index.js",
-    "require": "./dist/cubejs-client-core.cjs.js"
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./dist/cubejs-client-core.cjs"
+    },
+    "./format": {
+      "types": "./dist/src/format.d.ts",
+      "import": "./dist/src/format.js",
+      "require": "./dist/format.cjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "format": [
+        "./dist/src/format.d.ts"
+      ]
+    }
   },
   "dependencies": {
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
+    "d3-format": "^3.1.0",
+    "d3-time-format": "^4.1.0",
     "dayjs": "^1.10.4",
     "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
@@ -30,7 +47,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest --coverage",
+    "unit": "vitest run --coverage",
+    "bench": "vitest bench",
     "lint": "eslint src/* test/ --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
@@ -39,14 +57,14 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.17",
-    "@types/jest": "^29",
+    "@cubejs-backend/linter": "1.6.50",
+    "@types/d3-format": "^3",
+    "@types/d3-time-format": "^4",
     "@types/moment-range": "^4.0.0",
     "@types/ramda": "^0.27.34",
-    "babel-jest": "^29",
-    "jest": "^29",
-    "ts-jest": "^29",
-    "typescript": "~5.2.2"
+    "@vitest/coverage-v8": "^4",
+    "typescript": "~5.2.2",
+    "vitest": "^4"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

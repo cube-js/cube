@@ -441,8 +441,35 @@
         {
           "name": "percentageOfTotalForStatus",
           "type": "number",
-          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
+          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0), 0)",
           "multi_stage": true
+        },
+        {
+          "name": "totalProfitNoId",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "multi_stage": true,
+          "reduce_by": ["id"]
+        },
+        {
+          "name": "totalProfitDoubledNoId",
+          "type": "sum",
+          "sql": "{totalProfit} * 2",
+          "multi_stage": true,
+          "reduce_by": ["id"]
+        },
+        {
+          "name": "totalProfitNoIdPct",
+          "type": "number",
+          "sql": "ROUND(100 * {totalProfitNoId} / NULLIF({totalProfitDoubledNoId}, 0), 0)",
+          "multi_stage": true
+        },
+        {
+          "name": "profitInCategory",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "multi_stage": true,
+          "group_by": ["category"]
         },
         {
           "name": "hiddenSum",

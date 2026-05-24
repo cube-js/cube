@@ -211,6 +211,18 @@ to establish too many connections at once can lead to an out-of-memory crash.
 You can use the <EnvVar>CUBEJS_MAX_SESSIONS</EnvVar> environment variable to adjust the session
 limit.
 
+## Cache control
+
+You can use the `cube_cache` session variable with the [`SET` command][ref-set-command]
+to control [in-memory cache][ref-caching] behavior.
+It works the same way as [cache control in the REST API][ref-rest-cache-control].
+
+Example:
+
+```sql
+SET cube_cache = 'must-revalidate';
+```
+
 ## Troubleshooting
 
 ### `Can't find rewrite`
@@ -255,3 +267,6 @@ Use the following environment variables to allocate more resources for query pla
 [ref-queries-row-limit]: /product/apis-integrations/queries#row-limit
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-rest-api-cubesql]: /product/apis-integrations/rest-api/reference#base_pathv1cubesql
+[ref-caching]: /product/caching
+[ref-rest-cache-control]: /product/apis-integrations/rest-api#cache-control
+[ref-set-command]: /product/apis-integrations/sql-api/reference#set

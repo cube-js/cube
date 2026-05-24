@@ -4,6 +4,8 @@
 extern crate findshlibs;
 
 pub mod auth;
+#[cfg(feature = "bridge-test-harness")]
+pub mod bridge_test_exports;
 pub mod channel;
 pub mod config;
 pub mod cross;
@@ -16,6 +18,7 @@ pub mod node_obj_serializer;
 pub mod orchestrator;
 #[cfg(feature = "python")]
 pub mod python;
+pub mod rest4sql;
 pub mod sql4sql;
 pub mod stream;
 pub mod template;

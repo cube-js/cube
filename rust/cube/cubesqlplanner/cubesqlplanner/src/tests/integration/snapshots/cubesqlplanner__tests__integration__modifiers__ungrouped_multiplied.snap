@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/modifiers.rs
+expression: result
+---
+orders__status | customers__name | customers__count
+---------------+-----------------+-----------------
+completed      | Alice           | 1               
+completed      | Alice           | 1               
+pending        | Alice           | 1               
+completed      | Bob             | 1               
+pending        | Bob             | 1               
+completed      | Diana           | 1               
+pending        | Alice           | 1               
+completed      | Bob             | 1               
+NULL           | Charlie         | 1

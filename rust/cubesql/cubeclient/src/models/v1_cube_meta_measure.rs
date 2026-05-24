@@ -29,6 +29,11 @@ pub struct V1CubeMetaMeasure {
     pub meta: Option<serde_json::Value>,
     #[serde(rename = "format", skip_serializing_if = "Option::is_none")]
     pub format: Option<Box<models::V1CubeMetaFormat>>,
+    #[serde(rename = "formatDescription", skip_serializing_if = "Option::is_none")]
+    pub format_description: Option<Box<models::V1CubeMetaFormatDescription>>,
+    /// ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)
+    #[serde(rename = "currency", skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
     /// When measure is defined in View, it keeps the original path: Cube.measure
     #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
     pub alias_member: Option<String>,
@@ -45,6 +50,8 @@ impl V1CubeMetaMeasure {
             agg_type: None,
             meta: None,
             format: None,
+            format_description: None,
+            currency: None,
             alias_member: None,
         }
     }

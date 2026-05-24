@@ -132,6 +132,153 @@ module.exports = {
         },
       };
     }
+    // User for masking tests - no special roles, sees only masked values
+    if (user === 'masking_viewer') {
+      if (password && password !== 'masking_viewer_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'masking_viewer',
+            userAttributes: {},
+            roles: [],
+            groups: [],
+          },
+        },
+      };
+    }
+    // User for masking tests - has full access role
+    if (user === 'masking_full') {
+      if (password && password !== 'masking_full_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'masking_full',
+            userAttributes: {},
+            roles: ['masking_full_access'],
+            groups: [],
+          },
+        },
+      };
+    }
+    // User for masking tests - has partial access + masking
+    if (user === 'masking_partial') {
+      if (password && password !== 'masking_partial_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'masking_partial',
+            userAttributes: {},
+            roles: ['masking_partial'],
+            groups: [],
+          },
+        },
+      };
+    }
+    if (user === 'region_user') {
+      if (password && password !== 'region_user_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'region_user',
+            userAttributes: {
+              allowedProductIds: [1, 2],
+            },
+            roles: [],
+            groups: ['user_group', 'region_group'],
+          },
+        },
+      };
+    }
+    if (user === 'region_user_no_filter') {
+      if (password && password !== 'region_user_no_filter_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'region_user_no_filter',
+            userAttributes: {},
+            roles: [],
+            groups: ['user_group'],
+          },
+        },
+      };
+    }
+    if (user === 'sc_test') {
+      if (password && password !== 'sc_test_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          cubeCloud: {
+            userAttributes: {
+              tenantId: '1',
+            },
+            groups: ['1', '2'],
+          },
+          auth: {
+            username: 'sc_test',
+            userAttributes: {},
+            roles: [],
+            groups: [],
+          },
+        },
+      };
+    }
+    if (user === 'conditional_mask_user') {
+      if (password && password !== 'conditional_mask_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'conditional_mask_user',
+            userAttributes: {},
+            roles: ['conditional_mask_role'],
+            groups: [],
+          },
+        },
+      };
+    }
+    if (user === 'conditional_mask_multi_user') {
+      if (password && password !== 'conditional_mask_multi_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'conditional_mask_multi_user',
+            userAttributes: {},
+            roles: ['conditional_mask_role', 'conditional_mask_role_extra'],
+            groups: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };

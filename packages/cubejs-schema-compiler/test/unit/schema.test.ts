@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { prepareCompiler, prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaWithCustomGranularitiesAndTimeShift, createCubeSchemaWithAccessPolicy } from './utils';
+import {
+  createCubeSchema,
+  createCubeSchemaWithCustomGranularitiesAndTimeShift,
+  createCubeSchemaWithAccessPolicy,
+  createViewSchemaWithDefaultValueFilter,
+} from './utils';
 
 const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'];
 
@@ -558,6 +563,173 @@ describe('Schema Testing', () => {
   });
 
   describe('Views', () => {
+    it('default value filters resolve member/values/unless references', async () => {
+      const { compiler, cubeEvaluator } = prepareJsCompiler([
+        createViewSchemaWithDefaultValueFilter(),
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const view = cubeEvaluator.evaluatedCubes.orders_view;
+      const filters = view.defaultFilters!;
+      expect(filters).toHaveLength(3);
+
+      expect(filters[0].operator).toBe('equals');
+      expect(filters[0].memberReference).toBe('orders_view.currency');
+      expect(filters[0].valuesReferences).toEqual(['USD']);
+      expect(filters[0].unlessReferences).toEqual(['orders_view.currency', 'orders_view.country']);
+
+      expect(filters[1].operator).toBe('set');
+      expect(filters[1].memberReference).toBe('orders_view.country');
+      expect(filters[1].valuesReferences).toBeUndefined();
+      expect(filters[1].unlessReferences).toBeUndefined();
+
+      expect(filters[2].operator).toBe('in');
+      expect(filters[2].memberReference).toBe('orders_view.id');
+      // Values are coerced to strings to match the FilterItem contract used
+      // by regular query filters on the Rust side.
+      expect(filters[2].valuesReferences).toEqual(['1', '2', 'true', 'draft', null]);
+    });
+
+    it('default value filter: short, real-path and view-path forms all resolve to the real member path', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+          },
+          measures: {
+            count: { type: \`count\` },
+          },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{ join_path: orders, includes: '*' }],
+          defaultFilters: [
+            { member: \`currency\`, operator: 'set' },
+            { member: \`orders.currency\`, operator: 'set' },
+            { member: \`orders_view.currency\`, operator: 'set' },
+          ],
+        })
+      `;
+      const { compiler, cubeEvaluator } = prepareJsCompiler([schema]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const filters = cubeEvaluator.evaluatedCubes.orders_view.defaultFilters!;
+      expect(filters.map(f => f.memberReference)).toEqual([
+        'orders_view.currency',
+        'orders_view.currency',
+        'orders_view.currency',
+      ]);
+    });
+
+    it('default value filter: member not included in view raises an error', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+            country: { type: \`string\`, sql: \`country\`, public: true },
+          },
+          measures: {
+            count: { type: \`count\` },
+          },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{
+            join_path: orders,
+            includes: ['id', 'currency'],
+          }],
+          defaultFilters: [
+            { member: \`country\`, operator: 'set' },
+          ],
+        })
+      `;
+      const { compiler } = prepareJsCompiler([schema]);
+
+      try {
+        await compiler.compile();
+        compiler.throwIfAnyErrors();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(
+          /Member 'country' used as member in default value filter is not included in view 'orders_view'/
+        );
+      }
+    });
+
+    it('default value filter: unless references must also be included in the view', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+            country: { type: \`string\`, sql: \`country\`, public: true },
+          },
+          measures: {
+            count: { type: \`count\` },
+          },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{
+            join_path: orders,
+            includes: ['id', 'currency'],
+          }],
+          defaultFilters: [
+            { member: \`currency\`, operator: 'set', unless: [\`country\`] },
+          ],
+        })
+      `;
+      const { compiler } = prepareJsCompiler([schema]);
+
+      try {
+        await compiler.compile();
+        compiler.throwIfAnyErrors();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(
+          /Member 'country' used as unless in default value filter is not included in view 'orders_view'/
+        );
+      }
+    });
+
+    it('default value filter: fully-qualified path from a non-included cube raises an error', async () => {
+      const schema = `
+        cube(\`orders\`, {
+          sql: \`SELECT * FROM orders\`,
+          dimensions: {
+            id: { type: \`number\`, sql: \`id\`, primaryKey: true, public: true },
+            currency: { type: \`string\`, sql: \`currency\`, public: true },
+          },
+          measures: { count: { type: \`count\` } },
+        })
+
+        view(\`orders_view\`, {
+          cubes: [{ join_path: orders, includes: '*' }],
+          defaultFilters: [
+            { member: \`other.currency\`, operator: 'set' },
+          ],
+        })
+      `;
+      const { compiler } = prepareJsCompiler([schema]);
+
+      try {
+        await compiler.compile();
+        compiler.throwIfAnyErrors();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(
+          /Member 'other\.currency' used as member in default value filter is not included in view 'orders_view'/
+        );
+      }
+    });
+
     it('extends custom granularities and timeshifts', async () => {
       const { compiler, cubeEvaluator } = prepareJsCompiler([
         createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
@@ -1363,6 +1535,136 @@ describe('Schema Testing', () => {
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
       });
+    });
+  });
+
+  describe('Duplicate cube and view name detection in JS models', () => {
+    it('detects duplicate cube names in a single JS file', async () => {
+      const content = `
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true }
+          }
+        });
+        cube('orders', {
+          sql_table: 'orders_v2',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true }
+          }
+        });
+      `;
+
+      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
+      }
+    });
+
+    it('detects duplicate cube names across JS files', async () => {
+      const { compiler } = prepareCompiler([
+        {
+          content: `cube('orders', {
+            sql_table: 'orders',
+            dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+          });`,
+          fileName: 'orders1.js',
+        },
+        {
+          content: `cube('orders', {
+            sql_table: 'orders_v2',
+            dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+          });`,
+          fileName: 'orders2.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate cube name 'orders'");
+      }
+    });
+
+    it('detects duplicate view names in a single JS file', async () => {
+      const content = `
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            status: { sql: 'status', type: 'string' }
+          }
+        });
+        view('orders_view', {
+          cubes: [{ join_path: orders, includes: ['id'] }]
+        });
+        view('orders_view', {
+          cubes: [{ join_path: orders, includes: ['status'] }]
+        });
+      `;
+
+      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate view name 'orders_view'");
+      }
+    });
+
+    it('detects conflicting cube and view with the same name', async () => {
+      const content = `
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            status: { sql: 'status', type: 'string' }
+          }
+        });
+        view('orders', {
+          cubes: [{ join_path: orders, includes: ['id'] }]
+        });
+      `;
+
+      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found conflicting cube and view name 'orders'");
+      }
+    });
+
+    it('detects conflicting cube and view names across files', async () => {
+      const { compiler } = prepareCompiler([
+        {
+          content: `cube('orders', {
+            sql_table: 'orders',
+            dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+          });`,
+          fileName: 'orders_cube.js',
+        },
+        {
+          content: `view('orders', {
+            cubes: [{ join_path: orders, includes: ['id'] }]
+          });`,
+          fileName: 'orders_view.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found conflicting cube and view name 'orders'");
+      }
     });
   });
 });

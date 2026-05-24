@@ -1193,6 +1193,75 @@ WHERE
     assert!(literal_re.is_match(&sql));
 }
 
+/// Regression test for smoke test "select __user and literal grouped under wrapper".
+/// Inner CTE has unaliased DATE_TRUNC expressions; outer query references those columns
+/// through the SubqueryAlias qualifier (`cube_scan_subq`). The CTE-level Remapper must
+/// publish a mapping under the SubqueryAlias qualifier — otherwise the outer projection
+/// cannot remap `cube_scan_subq.datetrunc(Utf8("day"),...)` to the short alias, and the
+/// DataFusion-internal expression name leaks into the generated SQL.
+#[tokio::test]
+async fn test_single_cube_grouped_wrapper_with_join_field() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH
+cube_scan_subq AS (
+    SELECT
+        customer_gender AS my_gender,
+        DATE_TRUNC('month', order_date) AS my_order_month,
+        __user AS my_user,
+        1 AS my_literal,
+        id,
+        DATE_TRUNC('day', order_date),
+        __cubeJoinField,
+        2
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1,2,3,4,5,6,7,8
+),
+filter_subq AS (
+    SELECT
+        customer_gender gender_filter
+    FROM KibanaSampleDataEcommerce
+    GROUP BY
+        gender_filter
+)
+SELECT
+    my_order_month,
+    my_gender,
+    my_user,
+    my_literal
+FROM cube_scan_subq
+WHERE
+    my_gender IN (
+        SELECT
+            gender_filter
+        FROM filter_subq
+    )
+GROUP BY 1,2,3,4
+ORDER BY 1,2,3,4
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        !sql.contains("datetrunc(Utf8"),
+        "wrapped SQL leaked DataFusion-rendered expr name (e.g. datetrunc(Utf8(\"day\"),...)):\n{}",
+        sql
+    );
+}
+
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
 #[tokio::test]
 async fn test_wrapper_limit_zero() {

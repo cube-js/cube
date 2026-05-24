@@ -51,6 +51,11 @@ export class DruidDriver extends BaseDriver {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -69,14 +74,15 @@ export class DruidDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    let url = config.url || getEnv('dbUrl', { dataSource });
+    let url = config.url || getEnv('dbUrl', { dataSource, preAggregations });
 
     if (!url) {
-      const host = getEnv('dbHost', { dataSource });
-      const port = getEnv('dbPort', { dataSource });
+      const host = getEnv('dbHost', { dataSource, preAggregations });
+      const port = getEnv('dbPort', { dataSource, preAggregations });
       if (host && port) {
-        const protocol = getEnv('dbSsl', { dataSource })
+        const protocol = getEnv('dbSsl', { dataSource, preAggregations })
           ? 'https'
           : 'http';
         url = `${protocol}://${host}:${port}`;
@@ -88,13 +94,13 @@ export class DruidDriver extends BaseDriver {
       url,
       user:
         config.user ||
-        getEnv('dbUser', { dataSource }),
+        getEnv('dbUser', { dataSource, preAggregations }),
       password:
         config.password ||
-        getEnv('dbPass', { dataSource }),
+        getEnv('dbPass', { dataSource, preAggregations }),
       database:
         config.database ||
-        getEnv('dbName', { dataSource }) ||
+        getEnv('dbName', { dataSource, preAggregations }) ||
         'default',
       ...config,
     };

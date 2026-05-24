@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT oid, COUNT(*) OVER() AS c FROM pg_class WHERE oid < 0 GROUP BY 1\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----+---+
+| oid | c |
++-----+---+
++-----+---+

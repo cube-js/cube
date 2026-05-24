@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/bucketing.rs
+expression: result
+---
+orders__two_dims_concat | orders__created_at_year | orders__revenue | orders__revenue_year_ago
+------------------------+-------------------------+-----------------+-------------------------
+Down-Top                | 2024-01-01 00:00:00     | 20400           | 22800                   
+Down-Top                | 2025-01-01 00:00:00     | 17800           | 20400                   
+Grow-Low                | 2024-01-01 00:00:00     | 2700            | 2100                    
+Grow-Top                | 2024-01-01 00:00:00     | 9000            | 7300                    
+Grow-Top                | 2025-01-01 00:00:00     | 14100           | 11700

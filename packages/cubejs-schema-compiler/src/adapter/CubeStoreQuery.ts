@@ -355,6 +355,7 @@ export class CubeStoreQuery extends BaseQuery {
     'select to_timestamp(\'{{ time_item[0] }}\') date_from, to_timestamp(\'{{ time_item[1] }}\') date_to \n' +
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}';
+    templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     return templates;
   }
 }

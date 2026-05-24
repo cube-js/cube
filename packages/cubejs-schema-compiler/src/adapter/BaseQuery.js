@@ -253,6 +253,14 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
+    this.maskedMembers = new Set();
+    this.memberMaskFilters = {};
+    for (const item of this.options.maskedMembers || []) {
+      this.maskedMembers.add(item.member);
+      if (item.filter) {
+        this.memberMaskFilters[item.member] = item.filter;
+      }
+    }
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -284,6 +292,7 @@ export class BaseQuery {
       multiStageTimeDimensions: this.options.multiStageTimeDimensions,
       subqueryJoins: this.options.subqueryJoins,
       joinHints: this.options.joinHints,
+      maskedMembers: this.options.maskedMembers,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -949,16 +958,17 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
+      convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
+      maskedMembers: this.options.maskedMembers,
+      memberToAlias: this.options.memberToAlias,
     };
 
     try {
       const buildResult = nativeBuildSqlAndParams(queryParams);
 
-      const [query, params, preAggregation] = buildResult;
+      const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
-      if (preAggregation) {
-        this.preAggregations.preAggregationForQuery = preAggregation;
-      }
+      this.applyNativePreAggResult(preAggResult);
       return [query, paramsArray];
     } catch (e) {
       if (e.name === 'TesseractUserError') {
@@ -1004,8 +1014,21 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    const [, , preAggregation] = buildResult;
-    return preAggregation;
+    const [, , preAggResult] = buildResult;
+    this.applyNativePreAggResult(preAggResult);
+    return this.preAggregations.preAggregationForQuery;
+  }
+
+  applyNativePreAggResult(preAggResult) {
+    if (!preAggResult) return;
+    if (Array.isArray(preAggResult)) {
+      this.preAggregations.preAggregationUsageInfos = preAggResult;
+      const first = preAggResult[0];
+      this.preAggregations.preAggregationForQuery =
+        this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    } else {
+      this.preAggregations.preAggregationForQuery = preAggResult;
+    }
   }
 
   allCubeMembers(path) {
@@ -2841,14 +2864,19 @@ export class BaseQuery {
     return R.pipe(
       R.map(f => f.getMembers()),
       R.flatten,
-      R.map(s => (
-        (cache || this.compilerCache).cache(
+      R.map(s => {
+        const memberPath = s.path() ? s.path().join('.') : null;
+        const hasSqlMask = memberPath &&
+          this.maskedMembers && this.maskedMembers.size > 0 &&
+          this.maskedMembers.has(memberPath) &&
+          s.definition()?.mask && typeof s.definition().mask === 'object' && s.definition().mask.sql;
+        return (cache || (hasSqlMask ? this.queryCache : this.compilerCache)).cache(
           ['collectFrom'].concat(methodCacheKey).concat(
-            s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
+            memberPath ? [memberPath] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
-        )
-      )),
+        );
+      }),
       R.unnest,
       R.uniq,
       R.filter(R.identity)
@@ -3278,6 +3306,22 @@ export class BaseQuery {
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
+      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
+          !this.safeEvaluateSymbolContext().skipMasking) {
+        // In ungrouped queries, only apply static masks to measures.
+        // SQL masks (mask.sql) reference columns that don't apply per-row.
+        const isMeasure = type === 'measure';
+        const isUngrouped = this.options.ungrouped;
+        const hasSqlMask = symbol.mask && typeof symbol.mask === 'object' && symbol.mask.sql;
+        if (!isMeasure || !isUngrouped || !hasSqlMask) {
+          const maskFilter = this.memberMaskFilters && this.memberMaskFilters[memberPath];
+          if (maskFilter) {
+            return this.conditionalMemberMaskSql(cubeName, name, symbol, maskFilter);
+          }
+          return this.memberMaskSql(cubeName, name, symbol);
+        }
+      }
+
       if (type === 'measure') {
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
@@ -3304,13 +3348,28 @@ export class BaseQuery {
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
         const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
         let sql;
+        let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
-          sql = symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+          const evaluateSql = () => symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
             primaryKeys.length && (
               primaryKeys.length > 1 ?
                 this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
                 : this.primaryKeySql(primaryKeys[0], cubeName)
             ) || '*';
+          // For patched view measures (aggType is set), the view's sql resolves to
+          // already-aggregated SQL (e.g. SUM(col)). Filters must be applied inside
+          // that aggregation, not outside. We pre-evaluate the filter SQL at the
+          // view level, push it down via context, and skip filters at this level.
+          const isPatchedViewMeasure = symbol.aggType && symbol.patchedFrom && symbol.filters?.length;
+          if (isPatchedViewMeasure) {
+            const pushDownFilterSql = this.evaluateFiltersArray(symbol.filters, cubeName);
+            sql = this.evaluateSymbolSqlWithContext(evaluateSql, {
+              patchMeasurePushDownFilterSql: pushDownFilterSql,
+            });
+            patchedSymbol = { ...symbol, filters: [] };
+          } else {
+            sql = evaluateSql();
+          }
         }
         const result = this.renderSqlMeasure(
           name,
@@ -3320,7 +3379,7 @@ export class BaseQuery {
               sql,
               isMemberExpr,
             ),
-            symbol,
+            patchedSymbol,
             cubeName
           ),
           symbol,
@@ -3417,6 +3476,81 @@ export class BaseQuery {
     } finally {
       this.safeEvaluateSymbolContext().currentMember = parentMember;
     }
+  }
+
+  memberMaskSql(cubeName, name, symbol) {
+    const { mask } = symbol;
+    if (mask !== undefined && mask !== null) {
+      if (typeof mask === 'object' && mask.sql) {
+        const sqlCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        return this.autoPrefixAndEvaluateSql(sqlCubeName, mask.sql);
+      }
+      if (typeof mask === 'number') {
+        return `${mask}`;
+      }
+      if (typeof mask === 'boolean') {
+        return mask ? 'TRUE' : 'FALSE';
+      }
+      if (typeof mask === 'string') {
+        return this.paramAllocator.allocateParam(mask);
+      }
+    }
+    return this.defaultMaskSql(symbol.type);
+  }
+
+  conditionalMemberMaskSql(cubeName, name, symbol, maskFilter) {
+    const maskedSql = this.memberMaskSql(cubeName, name, symbol);
+    const result = this.evaluateSymbolSqlWithContext(
+      () => {
+        const filterSql = this.maskFilterToSql(maskFilter);
+        if (!filterSql) {
+          return maskedSql;
+        }
+        const originalSql = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+        return this.caseWhenStatement([{ sql: filterSql, label: originalSql }], maskedSql);
+      },
+      { skipMasking: true, currentMember: null }
+    );
+    return result;
+  }
+
+  maskFilterToSql(filter) {
+    if (!filter) return null;
+    const filterItems = this.extractFiltersAsTree([filter]);
+    if (!filterItems.length) return null;
+    const initialized = filterItems.map(this.initFilter.bind(this));
+    if (initialized.length === 1) {
+      return initialized[0].filterToWhere();
+    }
+    const groupFilter = this.newGroupFilter({
+      operator: 'and',
+      values: initialized,
+    });
+    return groupFilter.filterToWhere();
+  }
+
+  defaultMaskSql(memberType) {
+    const envMasks = {
+      string: getEnv('accessPolicyMaskString'),
+      time: getEnv('accessPolicyMaskTime'),
+      boolean: getEnv('accessPolicyMaskBoolean'),
+      number: getEnv('accessPolicyMaskNumber'),
+    };
+    const envMask = envMasks[memberType];
+    if (envMask !== undefined && envMask !== null) {
+      if (memberType === 'number') {
+        return `${envMask}`;
+      }
+      if (memberType === 'boolean') {
+        return envMask.toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+      }
+      return this.paramAllocator.allocateParam(envMask);
+    }
+    return 'NULL';
+  }
+
+  escapeStringLiteral(str) {
+    return `'${str.replace(/'/g, '\'\'')}'`;
   }
 
   autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {
@@ -3777,11 +3911,21 @@ export class BaseQuery {
   }
 
   applyMeasureFilters(evaluateSql, symbol, cubeName) {
-    if (!symbol.filters || !symbol.filters.length) {
+    const pushDownFilterSql = this.safeEvaluateSymbolContext().patchMeasurePushDownFilterSql;
+    const hasOwnFilters = symbol.filters && symbol.filters.length;
+
+    if (!hasOwnFilters && !pushDownFilterSql) {
       return evaluateSql;
     }
 
-    const where = this.evaluateMeasureFilters(symbol, cubeName);
+    const parts = [];
+    if (hasOwnFilters) {
+      parts.push(this.evaluateMeasureFilters(symbol, cubeName));
+    }
+    if (pushDownFilterSql) {
+      parts.push(pushDownFilterSql);
+    }
+    const where = parts.join(' AND ');
 
     return `CASE WHEN ${where} THEN ${evaluateSql === '*' ? '1' : evaluateSql} END`;
   }
@@ -4129,6 +4273,17 @@ export class BaseQuery {
           this.cubeEvaluator.isSegment(path)
         )
       ) {
+        if (path.length === 3 && this.cubeEvaluator.isDimension(path.slice(0, 2))) {
+          const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
+          if (dimensionDef.type === 'time' &&
+            this.cubeEvaluator.resolveGranularity([path[0], path[1], 'granularities', path[2]])) {
+            const td = this.newTimeDimension({
+              dimension: `${path[0]}.${path[1]}`,
+              granularity: path[2],
+            });
+            return td.unescapedAliasName();
+          }
+        }
         return this.aliasName(column);
       } else {
         return column;
@@ -4160,8 +4315,14 @@ export class BaseQuery {
             cube,
             preAggregation
           );
+          const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
           return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
-            () => originalSqlPreAggregationQuery.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
+            () => {
+              if (cubeFromPath.sqlTable) {
+                return `SELECT * FROM ${originalSqlPreAggregationQuery.cubeSql(cube)}`;
+              }
+              return originalSqlPreAggregationQuery.evaluateSql(cube, cubeFromPath.sql);
+            },
             { preAggregationQuery: true, collectOriginalSqlPreAggregations }
           ));
         }
@@ -4328,6 +4489,7 @@ export class BaseQuery {
           ') AS {{ from_alias }}{% elif from_prepared %}\n' +
           'FROM {{ from_prepared }}' +
           '{% endif %}' +
+          '{% for join in joins %}\n{{ join }}{% endfor %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if having %}\nHAVING {{ having }}{% endif %}' +

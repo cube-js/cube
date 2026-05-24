@@ -1,5 +1,5 @@
 import { Layout, Navbar } from 'nextra-theme-docs'
-import { Head } from 'nextra/components'
+import { Banner, Head } from 'nextra/components'
 import { getPageMap } from 'nextra/page-map'
 import localFont from 'next/font/local'
 import 'nextra-theme-docs/style.css'
@@ -79,6 +79,14 @@ const navbar = (
 
 const footer = <Footer />
 
+const banner = (
+  <Banner storageKey="legacy-docs-2026">
+    <a href="https://docs.cube.dev" target="_blank" rel="noreferrer">
+      You're looking at the old Cube documentation. Visit the new docs →
+    </a>
+  </Banner>
+)
+
 export default async function RootLayout({ children }) {
   return (
     <html
@@ -114,6 +122,7 @@ export default async function RootLayout({ children }) {
           <PurpleBannerWrapper />
           <AnalyticsProvider>
             <Layout
+              banner={banner}
               navbar={navbar}
               pageMap={await getPageMap()}
               docsRepositoryBase="https://github.com/cube-js/cube/tree/master/docs"

@@ -2,6 +2,9 @@ export default {
   "workbooks": "Workbooks",
   "explore": "Explore",
   "analytics-chat": "Analytics Chat",
-  "playground": "Playground",
+  "playground": {
+    title: "Playground",
+    display: "hidden"
+  },
 }
 

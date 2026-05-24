@@ -4,7 +4,7 @@
  * @fileoverview The `SnowflakeDriver` and related types declaration.
  */
 
-import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, RowStatement } from 'snowflake-sdk';
 import {
   BaseDriver,
@@ -20,81 +20,18 @@ import {
   TableStructure,
   UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import { formatToTimeZone } from 'date-fns-timezone';
 import fs from 'fs/promises';
 import crypto from 'crypto';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
+import { hydrators } from './type-parsers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
-
-type HydrationConfiguration = {
-  types: string[], toValue: (column: Column) => ((value: any) => any) | null
-};
 
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
   rows_unloaded: string
 };
-
-// It's not possible to declare own map converters by passing config to snowflake-sdk
-const hydrators: HydrationConfiguration[] = [
-  {
-    types: ['fixed', 'real'],
-    toValue: (column) => {
-      if (column.isNullable()) {
-        return (value) => {
-          // We use numbers as strings by fetchAsString
-          if (value === 'NULL') {
-            return null;
-          }
-
-          return value;
-        };
-      }
-
-      // Nothing to fix, let's skip this field
-      return null;
-    },
-  },
-  {
-    // The TIMESTAMP_* variation associated with TIMESTAMP, default to TIMESTAMP_NTZ
-    types: [
-      'date',
-      // TIMESTAMP_LTZ internally stores UTC time with a specified precision.
-      'timestamp_ltz',
-      // TIMESTAMP_NTZ internally stores “wallclock” time with a specified precision.
-      // All operations are performed without taking any time zone into account.
-      'timestamp_ntz',
-      // TIMESTAMP_TZ internally stores UTC time together with an associated time zone offset.
-      // When a time zone is not provided, the session time zone offset is used.
-      'timestamp_tz'
-    ],
-    toValue: () => (value) => {
-      if (!value) {
-        return null;
-      }
-
-      return formatToTimeZone(
-        value,
-        'YYYY-MM-DDTHH:mm:ss.SSS',
-        {
-          timeZone: 'UTC'
-        }
-      );
-    },
-  },
-  {
-    types: ['object'], // Workaround for HLL_SNOWFLAKE
-    toValue: () => (value) => {
-      if (!value) {
-        return null;
-      }
-
-      return JSON.stringify(value);
-    },
-  }
-];
 
 const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // It's a limitation for now, because anyway we don't work with JSON objects in Cube Store.
@@ -233,6 +170,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -251,14 +193,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    let privateKey = getEnv('snowflakePrivateKey', { dataSource });
+    let privateKey = getEnv('snowflakePrivateKey', { dataSource, preAggregations });
 
     if (privateKey) {
       // If the private key is encrypted - we need to decrypt it before passing to
       // snowflake sdk.
       if (privateKey.includes('BEGIN ENCRYPTED PRIVATE KEY')) {
-        const keyPasswd = getEnv('snowflakePrivateKeyPass', { dataSource });
+        const keyPasswd = getEnv('snowflakePrivateKeyPass', { dataSource, preAggregations });
 
         if (!keyPasswd) {
           throw new Error(
@@ -283,26 +226,26 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: false,
-      host: getEnv('snowflakeHost', { dataSource }),
-      account: getEnv('snowflakeAccount', { dataSource }),
-      region: getEnv('snowflakeRegion', { dataSource }),
-      warehouse: getEnv('snowflakeWarehouse', { dataSource }),
-      role: getEnv('snowflakeRole', { dataSource }),
-      clientSessionKeepAlive: getEnv('snowflakeSessionKeepAlive', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      username: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
-      oauthToken: getEnv('snowflakeOAuthToken', { dataSource }),
-      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
-      privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
-      privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
+      host: getEnv('snowflakeHost', { dataSource, preAggregations }),
+      account: getEnv('snowflakeAccount', { dataSource, preAggregations }),
+      region: getEnv('snowflakeRegion', { dataSource, preAggregations }),
+      warehouse: getEnv('snowflakeWarehouse', { dataSource, preAggregations }),
+      role: getEnv('snowflakeRole', { dataSource, preAggregations }),
+      clientSessionKeepAlive: getEnv('snowflakeSessionKeepAlive', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      username: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      authenticator: getEnv('snowflakeAuthenticator', { dataSource, preAggregations }),
+      oauthToken: getEnv('snowflakeOAuthToken', { dataSource, preAggregations }),
+      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource, preAggregations }),
+      privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource, preAggregations }),
+      privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource, preAggregations }),
       ...(privateKey ? { privateKey } : {}),
-      exportBucket: this.getExportBucket(dataSource),
+      exportBucket: this.getExportBucket(dataSource, preAggregations),
       resultPrefetch: 1,
-      executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
-      identIgnoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource }),
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      executionTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
+      identIgnoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource, preAggregations }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       application: 'CubeDev_Cube',
       ...config
     };
@@ -328,18 +271,19 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   protected createExportBucket(
     dataSource: string,
     bucketType: string,
+    preAggregations?: boolean,
   ): SnowflakeDriverExportBucket {
     if (bucketType === 's3') {
       // integrationName is optional for s3
-      const integrationName = getEnv('dbExportIntegration', { dataSource });
+      const integrationName = getEnv('dbExportIntegration', { dataSource, preAggregations });
       // keyId and secretKey are optional for s3 if IAM role is used
-      const keyId = getEnv('dbExportBucketAwsKey', { dataSource });
-      const secretKey = getEnv('dbExportBucketAwsSecret', { dataSource });
+      const keyId = getEnv('dbExportBucketAwsKey', { dataSource, preAggregations });
+      const secretKey = getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations });
 
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket', { dataSource }),
-        region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+        bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
+        region: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
         ...(integrationName !== undefined && { integrationName }),
         ...(keyId !== undefined && { keyId }),
         ...(secretKey !== undefined && { secretKey }),
@@ -350,17 +294,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       // integrationName is required for gcs as the only possible way in snowflake
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket', { dataSource }),
-        integrationName: getEnv('dbExportIntegration', { dataSource }),
-        credentials: getEnv('dbExportGCSCredentials', { dataSource }),
+        bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
+        integrationName: getEnv('dbExportIntegration', { dataSource, preAggregations }),
+        credentials: getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
       };
     }
 
     if (bucketType === 'azure') {
       // integrationName is optional for azure
-      const integrationName = getEnv('dbExportIntegration', { dataSource });
+      const integrationName = getEnv('dbExportIntegration', { dataSource, preAggregations });
       // sasToken is optional for azure if storage integration is used
-      const sasToken = getEnv('dbExportAzureSasToken', { dataSource });
+      const sasToken = getEnv('dbExportAzureSasToken', { dataSource, preAggregations });
 
       if (!integrationName && !sasToken) {
         throw new Error(
@@ -369,17 +313,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       }
 
       // azureKey is optional if DefaultAzureCredential() is used
-      const azureKey = getEnv('dbExportBucketAzureKey', { dataSource });
+      const azureKey = getEnv('dbExportBucketAzureKey', { dataSource, preAggregations });
 
       // These 3 options make sense in case you want to authorize to Azure from
       // application running in the k8s environment.
-      const clientId = getEnv('dbExportBucketAzureClientId', { dataSource });
-      const tenantId = getEnv('dbExportBucketAzureTenantId', { dataSource });
-      const tokenFilePath = getEnv('dbExportBucketAzureTokenFilePAth', { dataSource });
+      const clientId = getEnv('dbExportBucketAzureClientId', { dataSource, preAggregations });
+      const tenantId = getEnv('dbExportBucketAzureTenantId', { dataSource, preAggregations });
+      const tokenFilePath = getEnv('dbExportBucketAzureTokenFilePAth', { dataSource, preAggregations });
 
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket', { dataSource }),
+        bucketName: getEnv('dbExportBucket', { dataSource, preAggregations }),
         ...(integrationName !== undefined && { integrationName }),
         ...(sasToken !== undefined && { sasToken }),
         ...(azureKey !== undefined && { azureKey }),
@@ -410,15 +354,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected getExportBucket(
     dataSource: string,
+    preAggregations?: boolean,
   ): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       dataSource,
+      preAggregations,
       supported: SUPPORTED_BUCKET_TYPES,
     });
     if (bucketType) {
       const exportBucket = this.createExportBucket(
         dataSource,
         bucketType,
+        preAggregations,
       );
 
       const emptyKeys = Object.keys(exportBucket)
@@ -653,7 +600,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: `${sql} LIMIT 0`,
       binds: <string[] | undefined>params,
-      fetchAsString: ['Number'],
+      fetchAsString: [
+        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
+        'Number',
+        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
+        'JSON'
+      ],
       complete: (err, stmt) => {
         if (err) {
           reject(err);
@@ -866,13 +818,19 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
       binds: <string[] | undefined>values,
-      fetchAsString: ['Number'],
+      fetchAsString: [
+        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
+        'Number',
+        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
+        'JSON'
+      ],
       complete: (err, stmt, rows) => {
         if (err) {
           reject(err);
           return;
         }
-        const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+
+        const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
         const types: {name: string, type: string}[] =
           this.getTypes(stmt);
         if (rows?.length && Object.keys(hydrationMap).length) {
@@ -903,7 +861,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       sqlText: query,
       binds: <string[] | undefined>values,
       fetchAsString: [
-        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube.js
+        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
         'Number',
         // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
         'JSON'
@@ -920,7 +878,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }));
     const types: {name: string, type: string}[] =
       this.getTypes(stmt);
-    const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+    const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
     if (Object.keys(hydrationMap).length) {
       const rowStream = new HydrationStream(hydrationMap);
       stmt.streamRows().pipe(rowStream);
@@ -942,7 +900,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private getTypes(stmt: RowStatement) {
-    return stmt.getColumns().map((column) => {
+    return (stmt.getColumns() ?? []).map((column) => {
       const type = {
         name: column.getName().toLowerCase(),
         type: '',
@@ -973,6 +931,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           if (fnOrNull) {
             hydrationMap[column.getName()] = fnOrNull;
           }
+
+          break;
         }
       }
     }
@@ -989,7 +949,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
       binds: <string[] | undefined>values,
-      fetchAsString: ['Number'],
+      fetchAsString: [
+        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
+        'Number',
+        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
+        'JSON'
+      ],
       complete: (err, stmt, rows) => {
         if (err) {
           reject(err);
@@ -997,7 +962,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         }
 
         if (rehydrate && rows?.length) {
-          const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+          const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
           if (Object.keys(hydrationMap).length) {
             for (const row of rows) {
               for (const [field, toValue] of Object.entries(hydrationMap)) {

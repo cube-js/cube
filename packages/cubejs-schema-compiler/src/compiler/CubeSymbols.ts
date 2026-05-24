@@ -35,6 +35,7 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  currency?: string;
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
@@ -136,9 +137,25 @@ export type AccessPolicyDefinition = {
     includesMembers?: string[];
     excludesMembers?: string[];
   };
+  memberMasking?: {
+    includes?: string | string[];
+    excludes?: string | string[];
+    includesMembers?: string[];
+    excludesMembers?: string[];
+  };
   conditions?: {
     if: Function;
   }[]
+};
+
+export type ViewDefaultValueFilter = {
+  member: (...args: Array<unknown>) => ToString;
+  memberReference?: string;
+  operator: string;
+  values?: (...args: Array<unknown>) => Array<unknown>;
+  valuesReferences?: Array<unknown>;
+  unless?: (...args: Array<unknown>) => Array<ToString>;
+  unlessReferences?: string[];
 };
 
 export type ViewIncludedMember = {
@@ -207,6 +224,9 @@ export interface CubeDefinition {
   excludes?: any;
   cubes?: any;
   isView?: boolean;
+  viewGroup?: string | ((...args: any[]) => any);
+  viewGroups?: string[] | ((...args: any[]) => any);
+  defaultFilters?: ViewDefaultValueFilter[];
   calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: ViewIncludedMember[];
@@ -828,12 +848,13 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
           memberSets.resolvedMembers.add(name);
 
-          const override = (include.title || include.description || include.format || include.meta)
+          const override = (include.title || include.description || include.format || include.meta || include.currency)
             ? {
               title: include.title,
               description: include.description,
               format: include.format,
               meta: include.meta,
+              currency: include.currency,
             }
             : undefined;
 
@@ -963,6 +984,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       // eslint-disable-next-line no-new-func
       const sql = new Function(path[0], `return \`\${${memberRef.member}}\`;`);
       let memberDefinition;
+      const propagatedCurrency = memberRef.override?.currency || resolvedMember.currency;
       if (type === 'measures') {
         memberDefinition = {
           sql,
@@ -972,11 +994,13 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           title: memberRef.override?.title || resolvedMember.title,
           description: memberRef.override?.description || resolvedMember.description,
           format: memberRef.override?.format || resolvedMember.format,
+          ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
+          ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
@@ -986,9 +1010,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           title: memberRef.override?.title || resolvedMember.title,
           description: memberRef.override?.description || resolvedMember.description,
           format: memberRef.override?.format || resolvedMember.format,
+          ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
+          ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
         };
       } else if (type === 'segments') {
         memberDefinition = {
@@ -1471,35 +1497,91 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {
+    const methods = (paramValue) => ({
+      filter: (column) => {
+        if (paramValue) {
+          if (Array.isArray(paramValue)) {
+            // An empty array means the user passed a filter value but
+            // nothing matches (e.g. `groups: []`). Emitting
+            // `col IN ()` produces invalid SQL in Postgres and other
+            // dialects, so fall back to `1 = 0` (or the function callback
+            // variant) to make the filter match nothing explicitly.
+            if (paramValue.length === 0) {
+              if (typeof column === 'function') {
+                return column([]);
+              } else {
+                return '1 = 0';
+              }
+            }
+            const values = paramValue.map(allocateParam);
+            if (typeof column === 'function') {
+              return column(values);
+            } else {
+              return `${column} IN (${values.join(', ')})`;
+            }
+          } else {
+            const value = allocateParam(paramValue);
+            if (typeof column === 'function') {
+              return column(value);
+            } else {
+              return `${column} = ${value}`;
+            }
+          }
+        } else {
+          return '1 = 1';
+        }
+      },
+      requiredFilter: (column) => {
+        if (!paramValue) {
+          throw new UserError(`Filter for ${column} is required`);
+        }
+        return methods(paramValue).filter(column);
+      },
+      unsafeValue: () => paramValue,
+      toString: () => {
+        if (paramValue !== undefined && paramValue !== null) {
+          return Array.isArray(paramValue)
+            ? paramValue.map(allocateParam).join(',')
+            : String(allocateParam(paramValue));
+        }
+        return '';
+      },
+      [Symbol.toPrimitive]: () => {
+        if (paramValue !== undefined && paramValue !== null) {
+          return Array.isArray(paramValue)
+            ? paramValue.map(allocateParam).join(',')
+            : String(allocateParam(paramValue));
+        }
+        return '';
+      }
+    });
+
+    // Chainable proxy for undefined/null values: supports both method calls
+    // (filter, unsafeValue, etc.) and further property chaining for deeply
+    // nested paths like SECURITY_CONTEXT.cubeCloud.tenantId.filter(...)
+    // when the security context is empty during compilation/dep resolution.
+    const undefinedChainableHandler: ProxyHandler<any> = {
+      get: (target, name) => {
+        if (name in target || typeof name === 'symbol') return target[name];
+        return new Proxy(methods(undefined), undefinedChainableHandler);
+      }
+    };
+
     return new Proxy(symbols, {
       get: (target, name) => {
         const propValue = target[name];
-        const methods = (paramValue) => ({
-          filter: (column) => {
-            if (paramValue) {
-              const value = Array.isArray(paramValue) ?
-                paramValue.map(allocateParam) :
-                allocateParam(paramValue);
-              if (typeof column === 'function') {
-                return column(value);
-              } else {
-                return `${column} = ${value}`;
-              }
-            } else {
-              return '1 = 1';
-            }
-          },
-          requiredFilter: (column) => {
-            if (!paramValue) {
-              throw new UserError(`Filter for ${column} is required`);
-            }
-            return methods(paramValue).filter(column);
-          },
-          unsafeValue: () => paramValue
-        });
-        return methods(target)[name] ||
-          typeof propValue === 'object' && propValue !== null && CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam) ||
-          methods(propValue);
+        const methodOnTarget = methods(target)[name];
+        if (methodOnTarget) return methodOnTarget;
+
+        if (typeof propValue === 'object' && propValue !== null) {
+          return CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam);
+        }
+
+        if (propValue !== undefined && propValue !== null) {
+          return methods(propValue);
+        }
+
+        return new Proxy(methods(undefined), undefinedChainableHandler);
       }
     });
   }

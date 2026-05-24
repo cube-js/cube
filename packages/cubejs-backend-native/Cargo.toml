@@ -16,9 +16,9 @@ opt-level = 1
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-cubesqlplanner = { path = "../../rust/cubesqlplanner/cubesqlplanner" }
-cubeorchestrator = { path = "../../rust/cubeorchestrator" }
-cubenativeutils = { path = "../../rust/cubenativeutils" }
+cubesqlplanner = { path = "../../rust/cube/cubesqlplanner/cubesqlplanner" }
+cubeorchestrator = { path = "../../rust/cube/cubeorchestrator" }
+cubenativeutils = { path = "../../rust/cube/cubenativeutils" }
 cubesql = { path = "../../rust/cubesql/cubesql" }
 anyhow = "1.0"
 async-channel = { version = "2" }
@@ -57,3 +57,9 @@ neon-debug = []
 neon-entrypoint = []
 python = ["pyo3", "pyo3-asyncio"]
 async-log = ["log_nonblock"]
+# Exposes `__testBridge_*` endpoints used by the bridge regression test
+# harness. Off by default — never enable in production builds.
+bridge-test-harness = []
+
+[lints.clippy]
+too_many_arguments = "allow"

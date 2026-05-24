@@ -10,7 +10,7 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "03e683e5967b9fe60eece7e7d469d87621e25439", default-features = false, features = [
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "9f49caadcd0d023b2e68ded973ff725ddc5809a5", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
@@ -85,6 +85,10 @@ harness = false
 
 [[bench]]
 name = "large_model"
+harness = false
+
+[[bench]]
+name = "transform_response"
 harness = false
 
 # Code in cubesql workspace is not ready for full-blown clippy

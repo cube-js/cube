@@ -4,18 +4,19 @@
  * @fileoverview Test signal parameter in CubeApi
  */
 
-/* globals describe,test,expect,jest,beforeEach */
 /* eslint-disable import/first */
+import { vi } from 'vitest';
 
-import { CubeApi as CubeApiOriginal, Query } from '../src';
-import HttpTransport from '../src/HttpTransport';
+import { CubeApi as CubeApiOriginal, Query } from '../src/index.js';
+import HttpTransport from '../src/HttpTransport.js';
+import RequestError from '../src/RequestError.js';
 import {
   DescriptiveQueryRequest,
   DescriptiveQueryRequestCompact,
   DescriptiveQueryResponse,
   NumericCastedData
-} from './helpers';
-import ResultSet from '../src/ResultSet';
+} from './helpers.js';
+import ResultSet from '../src/ResultSet.js';
 
 class CubeApi extends CubeApiOriginal {
   public getTransport(): any {
@@ -40,13 +41,13 @@ describe('CubeApi Constructor', () => {
 
 describe('CubeApi Load', () => {
   afterEach(() => {
-    jest.clearAllMocks();
-    jest.restoreAllMocks();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   test('simple query, no options', async () => {
     // Create a spy on the request method
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
@@ -66,7 +67,7 @@ describe('CubeApi Load', () => {
 
   test('simple query + { mutexKey, castNumerics }', async () => {
     // Create a spy on the request method
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
@@ -86,7 +87,7 @@ describe('CubeApi Load', () => {
 
   test('simple query + compact response format', async () => {
     // Create a spy on the request method
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
@@ -106,7 +107,7 @@ describe('CubeApi Load', () => {
 
   test('2 queries', async () => {
     // Create a spy on the request method
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
@@ -124,9 +125,49 @@ describe('CubeApi Load', () => {
     expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
   });
 
+  test('simple query + { cache: "no-cache" }', async () => {
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { cache: 'no-cache' });
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.cache).toBe('no-cache');
+  });
+
+  test('simple query + { cache: "must-revalidate" }', async () => {
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { cache: 'must-revalidate' });
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.cache).toBe('must-revalidate');
+  });
+
   test('2 queries + compact response format', async () => {
     // Create a spy on the request method
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
@@ -147,8 +188,8 @@ describe('CubeApi Load', () => {
 
 describe('CubeApi with Abort Signal', () => {
   afterEach(() => {
-    jest.clearAllMocks();
-    jest.restoreAllMocks();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   test('should pass signal from constructor to request', async () => {
@@ -156,7 +197,7 @@ describe('CubeApi with Abort Signal', () => {
     const { signal } = controller;
 
     // Create a spy on the request method
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
@@ -171,7 +212,7 @@ describe('CubeApi with Abort Signal', () => {
     });
 
     // Create a second spy on the load method to verify signal is passed to HttpTransport
-    jest.spyOn(cubeApi, 'load');
+    vi.spyOn(cubeApi, 'load');
     await cubeApi.load({
       measures: ['Orders.count']
     });
@@ -195,7 +236,7 @@ describe('CubeApi with Abort Signal', () => {
     const { signal } = controller;
 
     // Mock for this specific test
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
@@ -222,7 +263,7 @@ describe('CubeApi with Abort Signal', () => {
     const optionsController = new AbortController();
 
     // Mock for this specific test
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
@@ -251,7 +292,7 @@ describe('CubeApi with Abort Signal', () => {
     const { signal } = controller;
 
     // Mock for meta with proper format - include dimensions, segments, and measures with required properties
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify({
@@ -309,7 +350,7 @@ describe('CubeApi with Abort Signal', () => {
     const { signal } = controller;
 
     // Mock for SQL response
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"sql":{"sql":"SELECT * FROM orders"}}'),
@@ -336,7 +377,7 @@ describe('CubeApi with Abort Signal', () => {
     const { signal } = controller;
 
     // Mock for dryRun response
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"queryType":"regular"}'),
@@ -361,8 +402,8 @@ describe('CubeApi with Abort Signal', () => {
 
 describe('CubeApi cubeSql', () => {
   afterEach(() => {
-    jest.clearAllMocks();
-    jest.restoreAllMocks();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   const cubeSqlResponseBody = [
@@ -387,7 +428,7 @@ describe('CubeApi cubeSql', () => {
   ].join('\n');
 
   test('should parse lastRefreshTime from response', async () => {
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBody })),
@@ -413,7 +454,7 @@ describe('CubeApi cubeSql', () => {
   });
 
   test('should omit lastRefreshTime when not present in response', async () => {
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
@@ -434,14 +475,14 @@ describe('CubeApi cubeSql', () => {
 
 describe('CubeApi with baseRequestId', () => {
   afterEach(() => {
-    jest.clearAllMocks();
-    jest.restoreAllMocks();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   test('should pass baseRequestId from options to request', async () => {
     const baseRequestId = 'custom-request-id-123';
 
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
@@ -464,7 +505,7 @@ describe('CubeApi with baseRequestId', () => {
   });
 
   test('should generate baseRequestId if not provided', async () => {
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
@@ -490,7 +531,7 @@ describe('CubeApi with baseRequestId', () => {
   test('should pass baseRequestId to sql request', async () => {
     const baseRequestId = 'sql-request-id-456';
 
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"sql":{"sql":"SELECT * FROM orders"}}'),
@@ -515,7 +556,7 @@ describe('CubeApi with baseRequestId', () => {
   test('should pass baseRequestId to dryRun request', async () => {
     const baseRequestId = 'dryrun-request-id-789';
 
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"queryType":"regular"}'),
@@ -540,7 +581,7 @@ describe('CubeApi with baseRequestId', () => {
   test('should pass baseRequestId to subscribe request', async () => {
     const baseRequestId = 'subscribe-request-id-abc';
 
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
@@ -572,7 +613,7 @@ describe('CubeApi with baseRequestId', () => {
   test('should pass baseRequestId with multiple queries', async () => {
     const baseRequestId = 'multi-query-request-id';
 
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
@@ -600,7 +641,7 @@ describe('CubeApi with baseRequestId', () => {
   test('should pass baseRequestId to meta request', async () => {
     const baseRequestId = 'meta-request-id-def';
 
-    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify({
@@ -651,5 +692,85 @@ describe('CubeApi with baseRequestId', () => {
 
     expect(requestSpy).toHaveBeenCalled();
     expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+});
+
+describe('CubeApi Mutex Cancellation', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  test('should return null for cancelled query when a newer query invalidates it', async () => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const mutexObj: Record<string, number> = {};
+    const query = DescriptiveQueryRequest as Query;
+
+    // Fire two concurrent loads with the same mutexObj and mutexKey.
+    // The second call overwrites mutexObj['key'] before either resolves,
+    // so the first call's checkMutex() detects a mismatch and gets cancelled.
+    const [first, second] = await Promise.all([
+      cubeApi.load(query, { mutexObj, mutexKey: 'key' }),
+      cubeApi.load(query, { mutexObj, mutexKey: 'key' }),
+    ]);
+
+    expect(first).toBeNull();
+    expect(second).toBeInstanceOf(ResultSet);
+  });
+
+  test('should return ResultSet when no mutex cancellation occurs', async () => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const mutexObj: Record<string, number> = {};
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { mutexObj, mutexKey: 'key' });
+
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+
+  test('should propagate non-mutex errors', async () => {
+    const errorBody = { error: 'Internal Server Error' };
+
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 500,
+        text: () => Promise.resolve(JSON.stringify(errorBody)),
+        json: () => Promise.resolve(errorBody)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const mutexObj: Record<string, number> = {};
+
+    await expect(
+      cubeApi.load(DescriptiveQueryRequest as Query, { mutexObj, mutexKey: 'key' })
+    ).rejects.toThrow(RequestError);
   });
 });

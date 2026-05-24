@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/combinations.rs
+expression: result
+---
+customers__name | orders__count | returns__count
+----------------+---------------+---------------
+Alice           | 2             | 1             
+Diana           | 1             | 0

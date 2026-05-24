@@ -8,15 +8,16 @@ import { getEnv, assertDataSource, Pool, type PoolUserOptions } from '@cubejs-ba
 import { types, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
-import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
+import { ConnectionError, PostgresError } from './errors';
+import { dateTypeParser, timestampTypeParser, timestampTzTypeParser } from './type-parsers';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
@@ -41,15 +42,6 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   hll: 'HLL_POSTGRES',
 };
 
-const timestampDataTypes = [
-  // @link TypeId.DATE
-  1082,
-  // @link TypeId.TIMESTAMP
-  1114,
-  // @link TypeId.TIMESTAMPTZ
-  1184
-];
-const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
   val.slice(2),
@@ -98,6 +90,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -121,19 +118,21 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const poolConfig: PgClientConfig = {
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
       ...config
     };
 
-    this.pool = new Pool<PgClient>('postgres', {
-      create: async () => this.createConnection(poolConfig),
+    const poolName = createPoolName('postgres', dataSource, preAggregations);
+    this.pool = new Pool<PgClient>(poolName, {
+      create: async () => this.createConnection(poolConfig, poolName),
       validate: async (client) => {
         if (client.isEnding() || client.isEnded()) {
           return false;
@@ -147,12 +146,12 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }, {
       min: config.minPoolSize ||
         config.min ||
-        getEnv('dbMinPoolSize', { dataSource }) ||
+        getEnv('dbMinPoolSize', { dataSource, preAggregations }) ||
         0,
       max:
         config.maxPoolSize ||
         config.max ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: config.evictionRunIntervalMillis || 10000,
       softIdleTimeoutMillis: config.softIdleTimeoutMillis || 30000,
@@ -166,18 +165,23 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.pool.on('factoryDestroyError', (err) => this.databasePoolError(err));
 
     this.config = <Partial<Config>>{
-      ...this.getInitialConfiguration(dataSource),
-      executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      ...this.getInitialConfiguration(dataSource, preAggregations),
+      executionTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       ...config,
     };
     this.enabled = true;
   }
 
-  protected async createConnection(poolConfig: PgClientConfig): Promise<PgClient> {
+  protected async createConnection(poolConfig: PgClientConfig, poolName: string): Promise<PgClient> {
     const client = new PgClient(poolConfig);
     client.on('error', (err) => this.databasePoolError(err));
-    await client.connect();
+
+    try {
+      await client.connect();
+    } catch (e: unknown) {
+      throw new ConnectionError(e as Error, poolName);
+    }
 
     return client;
   }
@@ -219,8 +223,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * you cannot call method in RedshiftDriver.constructor before super.
    */
   protected getInitialConfiguration(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    dataSource: string,
+    _dataSource: string,
+    _preAggregations?: boolean,
   ): Partial<PostgresDriverConfiguration> {
     return {
       readOnly: true,
@@ -228,9 +232,19 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected getTypeParser = (dataTypeID: TypeId, format: TypeFormat | undefined) => {
-    const isTimestamp = timestampDataTypes.includes(dataTypeID);
-    if (isTimestamp) {
+    // @link TypeId.DATE
+    if (dataTypeID === 1082) {
+      return dateTypeParser;
+    }
+
+    // @link TypeId.TIMESTAMP
+    if (dataTypeID === 1114) {
       return timestampTypeParser;
+    }
+
+    // @link TypeId.TIMESTAMPTZ
+    if (dataTypeID === 1184) {
+      return timestampTzTypeParser;
     }
 
     const typeName = this.getPostgresTypeForField(dataTypeID);
@@ -239,8 +253,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       return hllTypeParser;
     }
 
-    const parser = types.getTypeParser(dataTypeID, format);
-    return (val: any) => parser(val);
+    return types.getTypeParser(dataTypeID, format);
   };
 
   /**
@@ -269,7 +282,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       await conn.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
       if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
-        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
+        throw new PostgresError(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`, { cause: e as Error });
       }
 
       throw e;
@@ -322,7 +335,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return fields.map((f) => {
       const postgresType = this.getPostgresTypeForField(f.dataTypeID);
       if (!postgresType) {
-        throw new Error(
+        throw new PostgresError(
           `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`
         );
       }
@@ -378,7 +391,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/buffer-writer.ts#L32-L37
     const length = (values?.length ?? 0);
     if (length >= 65536) {
-      throw new Error(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
+      throw new PostgresError(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
     }
   }
 
@@ -411,7 +424,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     if (quotedTableName.length > 63) {
-      throw new Error('PostgreSQL can not work with table names longer than 63 symbols. ' +
+      throw new PostgresError('PostgreSQL can not work with table names longer than 63 symbols. ' +
         `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
     }
     return super.createTable(quotedTableName, columns);
@@ -454,7 +467,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     indexesSql: IndexesSQL
   ) {
     if (!tableData.rows) {
-      throw new Error(`${this.constructor} driver supports only rows upload`);
+      throw new PostgresError(`${this.constructor} driver supports only rows upload`);
     }
 
     await this.createTable(table, columns);

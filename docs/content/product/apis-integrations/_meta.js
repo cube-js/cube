@@ -1,6 +1,7 @@
 export default {
   "embed-apis": "Embed APIs",
   "core-data-apis": "Core Data APIs",
+  "control-plane-api": "Control Plane API",
   "orchestration-api": "Orchestration API",
   "mcp-server": "MCP server",
   "microsoft-excel": "Cube Cloud for Excel",

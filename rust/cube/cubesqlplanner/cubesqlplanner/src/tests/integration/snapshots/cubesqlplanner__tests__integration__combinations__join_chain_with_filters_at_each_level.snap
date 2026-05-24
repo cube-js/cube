@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/combinations.rs
+expression: result
+---
+products__name | order_items__count | order_items__total_quantity
+---------------+--------------------+----------------------------
+Laptop         | 2                  | 4                          
+Phone          | 1                  | 2

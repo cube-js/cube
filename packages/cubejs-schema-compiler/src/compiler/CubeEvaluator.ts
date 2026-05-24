@@ -13,6 +13,7 @@ import {
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
   type ToString,
+  ViewDefaultValueFilter,
   ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -60,6 +61,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string;
+  aggType?: string,
   sql(): string;
   ownedByCube: boolean;
   rollingWindow?: any
@@ -146,6 +148,7 @@ export type EvaluatedCube = {
   accessPolicy?: AccessPolicyDefinition[];
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
+  defaultFilters?: ViewDefaultValueFilter[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -206,8 +209,85 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareFolders(cube, errorReporter);
 
     this.prepareAccessPolicy(cube, errorReporter);
+    this.prepareViewFilters(cube, errorReporter);
 
     return cube;
+  }
+
+  private prepareViewFilters(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.defaultFilters) {
+      return;
+    }
+
+    const included = (cube.includedMembers as ViewIncludedMember[] | undefined) || [];
+
+    // Always returns view-scoped path `<view>.<member>` to match
+    // MemberSymbol::full_name on the Rust side, which is what `unless` and
+    // filter dispatch compare against.
+    const resolveViewMember = (memberType: string, reference: string): string | null => {
+      let lookupName = reference;
+      let lookupPath: string | null = null;
+
+      if (reference.indexOf('.') !== -1) {
+        const parts = reference.split('.');
+        if (parts[0] === cube.name) {
+          lookupName = parts.slice(1).join('.');
+        } else {
+          lookupPath = reference;
+        }
+      }
+
+      const match = lookupPath
+        ? included.find((m) => m.memberPath === lookupPath)
+        : included.find((m) => m.name === lookupName);
+
+      if (!match) {
+        errorReporter.error(
+          `Member '${reference}' used as ${memberType} in default value filter is not included in view '${cube.name}'`
+        );
+        return null;
+      }
+      return `${cube.name}.${match.name}`;
+    };
+
+    for (const filter of cube.defaultFilters as ViewDefaultValueFilter[]) {
+      const rawMember = this.evaluateReferences(cube.name, filter.member);
+      const resolved = resolveViewMember('member', rawMember);
+      if (resolved !== null) {
+        filter.memberReference = resolved;
+      }
+
+      if (filter.values) {
+        const evaluated = filter.values();
+        if (!Array.isArray(evaluated)) {
+          errorReporter.error(
+            `'values' in default value filter for view '${cube.name}' must evaluate to an array, got: ${typeof evaluated}`
+          );
+        } else {
+          // Coerce to strings to match the FilterItem.values contract used by
+          // regular query filters (Option<Vec<Option<String>>> on the Rust side).
+          filter.valuesReferences = evaluated.map(
+            (v) => (v === null || v === undefined ? null : String(v))
+          );
+        }
+      }
+
+      if (filter.unless) {
+        const rawUnless = this.evaluateReferences(
+          cube.name,
+          filter.unless,
+          { originalSorting: true }
+        );
+        const resolvedUnless: string[] = [];
+        for (const ref of rawUnless) {
+          const r = resolveViewMember('unless', ref);
+          if (r !== null) {
+            resolvedUnless.push(r);
+          }
+        }
+        filter.unlessReferences = resolvedUnless;
+      }
+    }
   }
 
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {
@@ -266,6 +346,22 @@ export class CubeEvaluator extends CubeSymbols {
           cube,
           policy.memberLevel.excludes || []
         ).map(memberMapper('an excludes member'));
+      }
+
+      if (policy.memberMasking) {
+        if (!policy.memberLevel) {
+          errorReporter.error(
+            `accessPolicy for ${cube.name} defines memberMasking without memberLevel. memberLevel is required when memberMasking is used`
+          );
+        }
+        policy.memberMasking.includesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.includes || '*'
+        ).map(memberMapper('a masking includes member'));
+        policy.memberMasking.excludesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.excludes || []
+        ).map(memberMapper('a masking excludes member'));
       }
     }
   }
@@ -651,6 +747,34 @@ export class CubeEvaluator extends CubeSymbols {
       if (aliasMember) {
         members[memberName].aliasMember = aliasMember;
       }
+
+      // Expose maskSql getter for the Tesseract bridge. It normalizes both
+      // SQL masks (mask.sql) and static masks into a callable function.
+      // Non-enumerable so it doesn't pollute serialization.
+      const memberMask = members[memberName].mask;
+      if (memberMask !== undefined && memberMask !== null) {
+        if (typeof memberMask === 'object' && memberMask.sql) {
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => memberMask.sql,
+            enumerable: false,
+          });
+        } else {
+          let maskLiteral: string;
+          if (typeof memberMask === 'number') {
+            maskLiteral = `(${memberMask})`;
+          } else if (typeof memberMask === 'boolean') {
+            maskLiteral = memberMask ? '(TRUE)' : '(FALSE)';
+          } else {
+            maskLiteral = `'${String(memberMask).replace(/'/g, "''")}'`;
+          }
+          // eslint-disable-next-line no-new-func
+          const maskFn = new Function(`return \`${maskLiteral}\`;`);
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => maskFn,
+            enumerable: false,
+          });
+        }
+      }
     }
   }
 
@@ -787,15 +911,15 @@ export class CubeEvaluator extends CubeSymbols {
     return this.isInstanceOfType('segments', path);
   }
 
-  public measureByPath(measurePath: string): MeasureDefinition {
+  public measureByPath(measurePath: string | string[]): MeasureDefinition {
     return this.byPath('measures', measurePath) as MeasureDefinition;
   }
 
-  public dimensionByPath(dimensionPath: string): DimensionDefinition {
+  public dimensionByPath(dimensionPath: string | string[]): DimensionDefinition {
     return this.byPath('dimensions', dimensionPath) as DimensionDefinition;
   }
 
-  public segmentByPath(segmentPath: string): SegmentDefinition {
+  public segmentByPath(segmentPath: string | string[]): SegmentDefinition {
     return this.byPath('segments', segmentPath) as SegmentDefinition;
   }
 

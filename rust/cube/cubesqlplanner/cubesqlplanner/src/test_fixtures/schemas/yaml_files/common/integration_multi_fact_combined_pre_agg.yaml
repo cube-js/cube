@@ -1,0 +1,92 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers.id} = {orders.customer_id}"
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers.id} = {returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          # Rollup that covers the whole multi-fact query: measures from two
+          # joined cubes (orders + returns) aggregated by a shared dimension.
+          - name: multi_fact_combined
+            type: rollup
+            measures:
+                - orders.count
+                - orders.total_amount
+                - returns.count
+                - returns.total_refund
+            dimensions:
+                - city
+          - name: multi_fact_combined_with_name
+            type: rollup
+            measures:
+                - orders.count
+                - orders.total_amount
+                - returns.count
+                - returns.total_refund
+            dimensions:
+                - city
+                - name
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: reason
+            type: string
+            sql: reason
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
