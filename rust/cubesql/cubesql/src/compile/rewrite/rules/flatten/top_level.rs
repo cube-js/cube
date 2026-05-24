@@ -168,10 +168,7 @@ impl FlattenRules {
                 "AggregateSplit:false",
             ),
             vec![
-                (
-                    "?filter_node",
-                    filter("?filter_expr", "?inner_projection"),
-                ),
+                ("?filter_node", filter("?filter_expr", "?inner_projection")),
                 (
                     "?inner_projection",
                     projection(
@@ -271,18 +268,10 @@ impl FlattenRules {
             Self::list_pushdown_rules("flatten-projection-expr", "ProjectionExpr", rules);
             Self::list_pushdown_rules("flatten-aggregate-expr", "AggregateAggrExpr", rules);
             Self::list_pushdown_rules("flatten-group-expr", "AggregateGroupExpr", rules);
-            Self::list_pushdown_rules(
-                "flatten-scalar-fun-args",
-                "ScalarFunctionExprArgs",
-                rules,
-            );
+            Self::list_pushdown_rules("flatten-scalar-fun-args", "ScalarFunctionExprArgs", rules);
         }
         Self::list_pushdown_rules("flatten-udf-fun-args", "ScalarUDFExprArgs", rules);
-        Self::list_pushdown_rules(
-            "flatten-agg-fun-args",
-            "AggregateFunctionExprArgs",
-            rules,
-        );
+        Self::list_pushdown_rules("flatten-agg-fun-args", "AggregateFunctionExprArgs", rules);
         Self::list_pushdown_rules("flatten-udaf-fun-args", "AggregateUDFExprArgs", rules);
     }
 

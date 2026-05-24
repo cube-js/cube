@@ -422,10 +422,7 @@ impl RewriteRules for DateRules {
                                     binary_expr(
                                         self.fun_expr(
                                             "DatePart",
-                                            vec![
-                                                literal_string("year"),
-                                                column_expr("?column"),
-                                            ],
+                                            vec![literal_string("year"), column_expr("?column")],
                                         ),
                                         "||",
                                         literal_string("-"),
@@ -433,10 +430,7 @@ impl RewriteRules for DateRules {
                                     "||",
                                     self.fun_expr(
                                         "DatePart",
-                                        vec![
-                                            literal_string("month"),
-                                            column_expr("?column"),
-                                        ],
+                                        vec![literal_string("month"), column_expr("?column")],
                                     ),
                                 ),
                                 "||",
@@ -446,11 +440,7 @@ impl RewriteRules for DateRules {
                         ),
                         "+",
                         binary_expr(
-                            binary_expr(
-                                "?mod_part",
-                                "*",
-                                "?neg_one",
-                            ),
+                            binary_expr("?mod_part", "*", "?neg_one"),
                             "*",
                             "?interval_val",
                         ),

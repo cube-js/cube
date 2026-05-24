@@ -14520,21 +14520,17 @@ ORDER BY "source"."str0" ASC
         assert_eq!(
             request,
             V1LoadRequestQuery {
-                measures: Some(vec![
-                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
-                ]),
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: Some(vec![
-                    V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some("quarter".to_string()),
-                        date_range: None,
-                    },
-                ]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None,
+                },]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
                 ..Default::default()
