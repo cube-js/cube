@@ -43,10 +43,7 @@ same pattern applies to any of the use cases above.
   The rollup on the right side of the join is also bounded by the number of
   physical Cube Store partitions it can have, which depends on your Cube
   Store compute tier. Note that these are Cube Store physical partitions —
-  not Cube logical partitions — and each one is roughly 50 MB in size and
-  contains up to ~1M rows. The exact per-tier limits are still being
-  finalized, but expect on the order of 5, 10, and 20 physical partitions
-  for S, M, and L tiers respectively.
+  not Cube logical partitions.
 </Warning>
 
 ## Data modeling
