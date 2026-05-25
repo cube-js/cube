@@ -1469,6 +1469,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn convert_transport_response_threads_pre_agg_flag_into_schema_metadata() {
+        // End-to-end coverage of the row-format `convert_transport_response`
+        // path: a V1LoadResponse with `servedFromPreAggregation: true` and a
+        // stale `lastRefreshTime` should produce a RecordBatch whose schema
+        // metadata has the override applied and the marker set.
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": [{"c": 1}],
+                    "lastRefreshTime": "2000-01-01T00:00:00.000Z",
+                    "servedFromPreAggregation": true
+                }]
+            }
+        "#;
+        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let schema = build_schema();
+        let member_fields = vec![MemberField::regular("c".to_string())];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+        let metadata = batches[0].schema().metadata().clone();
+
+        assert_eq!(
+            metadata.get("servedFromPreAggregation"),
+            Some(&"true".to_string())
+        );
+        let last_refresh = metadata.get("lastRefreshTime").expect("override emitted");
+        assert_ne!(last_refresh, "2000-01-01T00:00:00.000Z");
+    }
+
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
             protocol.get_name().to_string(),
