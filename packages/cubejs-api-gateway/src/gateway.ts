@@ -1873,12 +1873,6 @@ class ApiGateway {
     const resObj = {
       query: normalizedQuery,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
-      // Always expose a boolean indicator so SQL/HTTP consumers can tell
-      // whether the result was served from a pre-aggregation without leaking
-      // pre-aggregation names. The full `usedPreAggregations` object remains
-      // dev/playground-only below.
-      servedFromPreAggregation:
-        Object.keys(response.usedPreAggregations || {}).length > 0,
       ...(
         getEnv('devMode') ||
           context.signedWithPlaygroundAuthSecret

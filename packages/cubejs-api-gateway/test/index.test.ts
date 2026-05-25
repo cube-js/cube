@@ -1449,11 +1449,15 @@ describe('API Gateway', () => {
     });
   });
 
-  describe('servedFromPreAggregation indicator', () => {
+  describe('external pre-aggregation indicator', () => {
     // Helper mock that lets a test pretend the query orchestrator served
-    // the result from a pre-aggregation (or didn't).
-    class AdapterApiMockWithUsedPreAggregations extends AdapterApiMock {
-      public constructor(private readonly usedPreAggregations: any) {
+    // the result from an external (CubeStore) pre-aggregation, optionally
+    // with the dev-only `usedPreAggregations` object as well.
+    class AdapterApiMockWithFlags extends AdapterApiMock {
+      public constructor(
+        private readonly external: boolean | undefined,
+        private readonly usedPreAggregations?: any,
+      ) {
         super();
       }
 
@@ -1461,41 +1465,28 @@ describe('API Gateway', () => {
         const base = await super.executeQuery(query);
         return {
           ...base,
+          external: this.external,
           usedPreAggregations: this.usedPreAggregations,
         };
       }
     }
 
-    test('false when no pre-aggregation was used', async () => {
-      const { app } = await createApiGateway();
+    test('external=false when query was not served from CubeStore', async () => {
+      const { app } = await createApiGateway(new AdapterApiMockWithFlags(false));
 
       const res = await request(app)
         .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
 
-      expect(res.body.servedFromPreAggregation).toBe(false);
-      // Full object stays dev/playground-only.
+      expect(res.body.external).toBe(false);
+      // Full pre-agg object stays dev/playground-only.
       expect(res.body.usedPreAggregations).toBeUndefined();
     });
 
-    test('false when usedPreAggregations is an empty object', async () => {
+    test('external=true when query was served from an external pre-aggregation (no leak of names)', async () => {
       const { app } = await createApiGateway(
-        new AdapterApiMockWithUsedPreAggregations({}),
-      );
-
-      const res = await request(app)
-        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
-        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
-        .expect(200);
-
-      expect(res.body.servedFromPreAggregation).toBe(false);
-      expect(res.body.usedPreAggregations).toBeUndefined();
-    });
-
-    test('true when a pre-aggregation served the query (no leak of names)', async () => {
-      const { app } = await createApiGateway(
-        new AdapterApiMockWithUsedPreAggregations({
+        new AdapterApiMockWithFlags(true, {
           'Foo.fooMain': {
             targetTableName: 'stb_pre_aggs.foo_foo_main',
             type: 'rollup',
@@ -1508,13 +1499,13 @@ describe('API Gateway', () => {
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
 
-      expect(res.body.servedFromPreAggregation).toBe(true);
+      expect(res.body.external).toBe(true);
       // Pre-aggregation names / table names must NOT be exposed to ordinary
       // API consumers — only the boolean flag is safe.
       expect(res.body.usedPreAggregations).toBeUndefined();
     });
 
-    test('usedPreAggregations is exposed under playground auth alongside the boolean', async () => {
+    test('usedPreAggregations is exposed under playground auth alongside external', async () => {
       const usedPreAggregations = {
         'Foo.fooMain': {
           targetTableName: 'stb_pre_aggs.foo_foo_main',
@@ -1522,7 +1513,7 @@ describe('API Gateway', () => {
         },
       };
       const { app } = await createApiGateway(
-        new AdapterApiMockWithUsedPreAggregations(usedPreAggregations),
+        new AdapterApiMockWithFlags(true, usedPreAggregations),
         new DataSourceStorageMock(),
         {
           checkAuth: (req: Request) => {
@@ -1538,7 +1529,7 @@ describe('API Gateway', () => {
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
 
-      expect(res.body.servedFromPreAggregation).toBe(true);
+      expect(res.body.external).toBe(true);
       expect(res.body.usedPreAggregations).toEqual(usedPreAggregations);
     });
   });
