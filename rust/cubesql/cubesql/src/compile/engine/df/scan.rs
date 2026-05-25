@@ -10,7 +10,7 @@ use crate::{
     CubeError,
 };
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate, SecondsFormat, Utc};
+use chrono::{Datelike, NaiveDate};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadResponse, V1LoadResult, V1LoadResultDataColumnar,
 };
@@ -1281,31 +1281,22 @@ pub fn transform_columnar_response<C: ColumnarValueObject>(
     transform_response_body!(columnar, response, schema, member_fields)
 }
 
-/// Builds a schema with `lastRefreshTime` / `servedFromPreAggregation` metadata.
-///
-/// When the query was served from a pre-aggregation we override
-/// `lastRefreshTime` to "now": for a pre-agg hit the data the client just
-/// received is current as of this response, regardless of when the pre-agg
-/// itself was last refreshed. We also surface a `servedFromPreAggregation`
-/// entry so downstream code can distinguish the two cases without leaking
-/// pre-aggregation names.
+/// Builds a schema with `lastRefreshTime` / `servedFromPreAggregation`
+/// metadata. `lastRefreshTime` is passed through unchanged; the
+/// `servedFromPreAggregation` marker is added when the flag is set so
+/// downstream code can distinguish a pre-agg hit from a raw-source result
+/// without leaking pre-aggregation names.
 pub fn build_response_schema(
     schema: &SchemaRef,
     last_refresh_time: Option<String>,
     served_from_pre_aggregation: bool,
 ) -> SchemaRef {
-    let effective_last_refresh_time = if served_from_pre_aggregation {
-        Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true))
-    } else {
-        last_refresh_time
-    };
-
-    if effective_last_refresh_time.is_none() && !served_from_pre_aggregation {
+    if last_refresh_time.is_none() && !served_from_pre_aggregation {
         return schema.clone();
     }
 
     let mut metadata = schema.metadata().clone();
-    if let Some(t) = effective_last_refresh_time {
+    if let Some(t) = last_refresh_time {
         metadata.insert("lastRefreshTime".to_string(), t);
     }
     if served_from_pre_aggregation {
@@ -1425,31 +1416,14 @@ mod tests {
     }
 
     #[test]
-    fn build_response_schema_overrides_last_refresh_time_for_pre_agg() {
+    fn build_response_schema_passes_through_last_refresh_time_for_pre_agg() {
+        // Pre-agg flag must NOT alter `lastRefreshTime` — it's passed
+        // through unchanged. The marker reports the pre-agg hit.
         let schema = build_schema();
         let stale = "2000-01-01T00:00:00.000Z".to_string();
-
-        let before = Utc::now();
         let updated = build_response_schema(&schema, Some(stale.clone()), true);
-        let after = Utc::now();
 
-        let last_refresh = updated.metadata().get("lastRefreshTime").unwrap();
-        assert_ne!(
-            last_refresh, &stale,
-            "pre-agg refresh time should be overridden"
-        );
-        let parsed: chrono::DateTime<Utc> = chrono::DateTime::parse_from_rfc3339(last_refresh)
-            .expect("lastRefreshTime should be RFC3339")
-            .with_timezone(&Utc);
-        assert!(
-            parsed >= before - chrono::Duration::seconds(1)
-                && parsed <= after + chrono::Duration::seconds(1),
-            "lastRefreshTime ({}) should be ~now (between {} and {})",
-            parsed,
-            before,
-            after,
-        );
-
+        assert_eq!(updated.metadata().get("lastRefreshTime"), Some(&stale));
         assert_eq!(
             updated.metadata().get("servedFromPreAggregation"),
             Some(&"true".to_string())
@@ -1459,10 +1433,10 @@ mod tests {
     #[test]
     fn build_response_schema_sets_only_marker_when_no_last_refresh_time() {
         let schema = build_schema();
-        // No incoming last_refresh_time but pre-agg flag is set — should
-        // still emit the override (now) and the marker.
+        // No incoming last_refresh_time, but pre-agg flag is set — emit only
+        // the marker; do NOT synthesize a `lastRefreshTime`.
         let updated = build_response_schema(&schema, None, true);
-        assert!(updated.metadata().get("lastRefreshTime").is_some());
+        assert!(updated.metadata().get("lastRefreshTime").is_none());
         assert_eq!(
             updated.metadata().get("servedFromPreAggregation"),
             Some(&"true".to_string())
@@ -1473,8 +1447,9 @@ mod tests {
     fn convert_transport_response_threads_pre_agg_flag_into_schema_metadata() {
         // End-to-end coverage of the row-format `convert_transport_response`
         // path: a V1LoadResponse with `servedFromPreAggregation: true` and a
-        // stale `lastRefreshTime` should produce a RecordBatch whose schema
-        // metadata has the override applied and the marker set.
+        // `lastRefreshTime` should produce a RecordBatch whose schema
+        // metadata has the marker set and `lastRefreshTime` passed through
+        // unchanged.
         let raw = r#"
             {
                 "results": [{
@@ -1500,8 +1475,10 @@ mod tests {
             metadata.get("servedFromPreAggregation"),
             Some(&"true".to_string())
         );
-        let last_refresh = metadata.get("lastRefreshTime").expect("override emitted");
-        assert_ne!(last_refresh, "2000-01-01T00:00:00.000Z");
+        assert_eq!(
+            metadata.get("lastRefreshTime"),
+            Some(&"2000-01-01T00:00:00.000Z".to_string())
+        );
     }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
