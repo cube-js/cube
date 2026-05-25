@@ -1449,7 +1449,10 @@ describe('API Gateway', () => {
     });
   });
 
-  describe('external pre-aggregation indicator', () => {
+  // The public /v1/load response field is `external` (legacy contract);
+  // cubesql surfaces the same signal as `servedFromCubeStore` internally.
+  // These tests pin the public JSON API behavior.
+  describe('external flag in /v1/load response (servedFromCubeStore in cubesql)', () => {
     // Helper mock that lets a test pretend the query orchestrator served
     // the result from an external (CubeStore) pre-aggregation, optionally
     // with the dev-only `usedPreAggregations` object as well.
