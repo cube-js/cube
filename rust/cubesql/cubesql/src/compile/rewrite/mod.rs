@@ -906,6 +906,9 @@ pub enum ListType {
     AggregateGroupExpr,
     AggregateAggrExpr,
     ScalarFunctionExprArgs,
+    ScalarUDFExprArgs,
+    AggregateFunctionExprArgs,
+    AggregateUDFExprArgs,
     GroupingSetExprMembers,
     WrappedSelectProjectionExpr,
     WrappedSelectGroupExpr,
@@ -923,6 +926,11 @@ impl ListType {
             Self::AggregateAggrExpr => aggr_aggr_expr_empty_tail(),
             Self::GroupingSetExprMembers => grouping_set_expr_members_empty_tail(),
             Self::ScalarFunctionExprArgs => scalar_fun_expr_args_empty_tail(),
+            Self::ScalarUDFExprArgs => udf_fun_expr_args_empty_tail(),
+            Self::AggregateFunctionExprArgs => {
+                list_expr("AggregateFunctionExprArgs", Vec::<String>::new())
+            }
+            Self::AggregateUDFExprArgs => udaf_fun_expr_args_empty_tail(),
             Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty_tail(),
             Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty_tail(),
             Self::WrappedSelectAggrExpr => wrapped_select_aggr_expr_empty_tail(),
@@ -986,6 +994,15 @@ impl ListNodeSearcher {
             }
             ListType::ScalarFunctionExprArgs => {
                 matches!(node, LogicalPlanLanguage::ScalarFunctionExprArgs(_))
+            }
+            ListType::ScalarUDFExprArgs => {
+                matches!(node, LogicalPlanLanguage::ScalarUDFExprArgs(_))
+            }
+            ListType::AggregateFunctionExprArgs => {
+                matches!(node, LogicalPlanLanguage::AggregateFunctionExprArgs(_))
+            }
+            ListType::AggregateUDFExprArgs => {
+                matches!(node, LogicalPlanLanguage::AggregateUDFExprArgs(_))
             }
             ListType::WrappedSelectProjectionExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectProjectionExpr(_))
@@ -1154,6 +1171,11 @@ impl ListNodeApplierList {
             ListType::AggregateGroupExpr => LogicalPlanLanguage::AggregateGroupExpr(list),
             ListType::AggregateAggrExpr => LogicalPlanLanguage::AggregateAggrExpr(list),
             ListType::ScalarFunctionExprArgs => LogicalPlanLanguage::ScalarFunctionExprArgs(list),
+            ListType::ScalarUDFExprArgs => LogicalPlanLanguage::ScalarUDFExprArgs(list),
+            ListType::AggregateFunctionExprArgs => {
+                LogicalPlanLanguage::AggregateFunctionExprArgs(list)
+            }
+            ListType::AggregateUDFExprArgs => LogicalPlanLanguage::AggregateUDFExprArgs(list),
             ListType::WrappedSelectProjectionExpr => {
                 LogicalPlanLanguage::WrappedSelectProjectionExpr(list)
             }

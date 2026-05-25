@@ -264,15 +264,30 @@ impl FlattenRules {
                 ListType::ScalarFunctionExprArgs,
                 rules,
             );
+            Self::flat_list_pushdown_rules(
+                "flatten-udf-fun-args",
+                ListType::ScalarUDFExprArgs,
+                rules,
+            );
+            Self::flat_list_pushdown_rules(
+                "flatten-agg-fun-args",
+                ListType::AggregateFunctionExprArgs,
+                rules,
+            );
+            Self::flat_list_pushdown_rules(
+                "flatten-udaf-fun-args",
+                ListType::AggregateUDFExprArgs,
+                rules,
+            );
         } else {
             Self::list_pushdown_rules("flatten-projection-expr", "ProjectionExpr", rules);
             Self::list_pushdown_rules("flatten-aggregate-expr", "AggregateAggrExpr", rules);
             Self::list_pushdown_rules("flatten-group-expr", "AggregateGroupExpr", rules);
             Self::list_pushdown_rules("flatten-scalar-fun-args", "ScalarFunctionExprArgs", rules);
+            Self::list_pushdown_rules("flatten-udf-fun-args", "ScalarUDFExprArgs", rules);
+            Self::list_pushdown_rules("flatten-agg-fun-args", "AggregateFunctionExprArgs", rules);
+            Self::list_pushdown_rules("flatten-udaf-fun-args", "AggregateUDFExprArgs", rules);
         }
-        Self::list_pushdown_rules("flatten-udf-fun-args", "ScalarUDFExprArgs", rules);
-        Self::list_pushdown_rules("flatten-agg-fun-args", "AggregateFunctionExprArgs", rules);
-        Self::list_pushdown_rules("flatten-udaf-fun-args", "AggregateUDFExprArgs", rules);
     }
 
     pub fn flatten_projection(

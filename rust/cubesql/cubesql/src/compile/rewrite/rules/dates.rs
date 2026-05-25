@@ -412,7 +412,7 @@ impl RewriteRules for DateRules {
             // ThoughtSpot's PostgreSQL quarter start calculation uses INTERVAL arithmetic
             // that is incompatible with non-PostgreSQL dialects. Recognize the pattern and
             // replace with DATE_TRUNC('quarter', col) which all dialects support.
-            rewrite(
+            transforming_rewrite(
                 "thoughtspot-pg-quarter-start-to-date-trunc",
                 alias_expr(
                     binary_expr(
@@ -454,6 +454,7 @@ impl RewriteRules for DateRules {
                     ),
                     "?alias",
                 ),
+                Self::transform_quarter_interval_check("?neg_one", "?interval_val"),
             ),
             // AGE function seems to be a popular choice for this date arithmetic,
             // but it is not supported in SQL push down by most dialects.
@@ -578,6 +579,40 @@ impl DateRules {
             }
 
             false
+        }
+    }
+
+    fn transform_quarter_interval_check(
+        neg_one_var: &'static str,
+        interval_val_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let neg_one_var = var!(neg_one_var);
+        let interval_val_var = var!(interval_val_var);
+        move |egraph, subst| {
+            let neg_one_ok = match &egraph[subst[neg_one_var]].data.constant {
+                Some(ConstantFolding::Scalar(v)) => match v {
+                    ScalarValue::Int64(Some(-1))
+                    | ScalarValue::Int32(Some(-1))
+                    | ScalarValue::Decimal128(Some(-1), _, _) => true,
+                    _ => false,
+                },
+                _ => false,
+            };
+            if !neg_one_ok {
+                return false;
+            }
+            match &egraph[subst[interval_val_var]].data.constant {
+                Some(ConstantFolding::Scalar(v)) => match v {
+                    ScalarValue::IntervalYearMonth(Some(1)) => true,
+                    ScalarValue::IntervalMonthDayNano(Some(iv)) => {
+                        let months = (*iv >> 96) as i32;
+                        let days = ((*iv >> 64) & 0xFFFF_FFFF) as i32;
+                        months == 1 && days == 0
+                    }
+                    _ => false,
+                },
+                _ => false,
+            }
         }
     }
 
