@@ -1281,37 +1281,26 @@ pub fn transform_columnar_response<C: ColumnarValueObject>(
     transform_response_body!(columnar, response, schema, member_fields)
 }
 
-/// Returns true when `used_pre_aggregations` is a non-empty object — i.e. the
-/// query was served (at least in part) from a pre-aggregation.
-pub fn served_from_pre_aggregation(used_pre_aggregations: &Option<Value>) -> bool {
-    match used_pre_aggregations {
-        Some(Value::Object(map)) => !map.is_empty(),
-        _ => false,
-    }
-}
-
-/// Builds a schema with `lastRefreshTime` / `usedPreAggregations` metadata.
+/// Builds a schema with `lastRefreshTime` / `servedFromPreAggregation` metadata.
 ///
 /// When the query was served from a pre-aggregation we override
 /// `lastRefreshTime` to "now": for a pre-agg hit the data the client just
 /// received is current as of this response, regardless of when the pre-agg
-/// itself was last refreshed. We also surface a `usedPreAggregations` entry
-/// so downstream code can distinguish the two cases.
+/// itself was last refreshed. We also surface a `servedFromPreAggregation`
+/// entry so downstream code can distinguish the two cases without leaking
+/// pre-aggregation names.
 pub fn build_response_schema(
     schema: &SchemaRef,
     last_refresh_time: Option<String>,
-    used_pre_aggregations: Option<Value>,
+    served_from_pre_aggregation: bool,
 ) -> SchemaRef {
-    let served_from_pre_agg = served_from_pre_aggregation(&used_pre_aggregations);
-    let effective_last_refresh_time = if served_from_pre_agg {
+    let effective_last_refresh_time = if served_from_pre_aggregation {
         Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true))
     } else {
         last_refresh_time
     };
 
-    if effective_last_refresh_time.is_none() {
-        // No `served_from_pre_agg` case to handle here: the branch above sets
-        // `effective_last_refresh_time` to `Some(_)` whenever it is `true`.
+    if effective_last_refresh_time.is_none() && !served_from_pre_aggregation {
         return schema.clone();
     }
 
@@ -1319,11 +1308,8 @@ pub fn build_response_schema(
     if let Some(t) = effective_last_refresh_time {
         metadata.insert("lastRefreshTime".to_string(), t);
     }
-    // `served_from_pre_aggregation` guarantees `used_pre_aggregations` is
-    // `Some(Value::Object(non_empty_map))` here, so `to_string()` is always
-    // well-defined JSON.
-    if let Some(used) = used_pre_aggregations.filter(|_| served_from_pre_agg) {
-        metadata.insert("usedPreAggregations".to_string(), used.to_string());
+    if served_from_pre_aggregation {
+        metadata.insert("servedFromPreAggregation".to_string(), "true".to_string());
     }
 
     Arc::new(Schema::new_with_metadata(
@@ -1344,13 +1330,16 @@ pub fn convert_transport_response(
             let V1LoadResult {
                 data,
                 last_refresh_time,
-                used_pre_aggregations,
+                served_from_pre_aggregation,
                 ..
             } = result;
 
             let mut response = JsonValueObject::new(data);
-            let updated_schema =
-                build_response_schema(&schema, last_refresh_time, used_pre_aggregations);
+            let updated_schema = build_response_schema(
+                &schema,
+                last_refresh_time,
+                served_from_pre_aggregation.unwrap_or(false),
+            );
 
             transform_response(&mut response, updated_schema, &member_fields)
         })
@@ -1369,14 +1358,17 @@ pub fn convert_transport_response_columnar(
             let V1LoadResult {
                 data,
                 last_refresh_time,
-                used_pre_aggregations,
+                served_from_pre_aggregation,
                 ..
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
             let mut response = JsonColumnarValueObject::new(members, columns);
-            let updated_schema =
-                build_response_schema(&schema, last_refresh_time, used_pre_aggregations);
+            let updated_schema = build_response_schema(
+                &schema,
+                last_refresh_time,
+                served_from_pre_aggregation.unwrap_or(false),
+            );
 
             transform_columnar_response(&mut response, updated_schema, &member_fields)
         })
@@ -1414,31 +1406,9 @@ mod tests {
     }
 
     #[test]
-    fn served_from_pre_aggregation_cases() {
-        // None → false
-        assert!(!served_from_pre_aggregation(&None));
-
-        // Empty object → false (matches the JS-side `Object.keys(...).length` check)
-        assert!(!served_from_pre_aggregation(&Some(serde_json::json!({}))));
-
-        // Non-empty object → true
-        assert!(served_from_pre_aggregation(&Some(serde_json::json!({
-            "preAggName": { "targetTableName": "stb_pre_aggs.x" }
-        }))));
-
-        // Non-object values (defensive) → false
-        assert!(!served_from_pre_aggregation(&Some(serde_json::json!([]))));
-        assert!(!served_from_pre_aggregation(&Some(serde_json::json!("x"))));
-        assert!(!served_from_pre_aggregation(&Some(serde_json::Value::Null)));
-    }
-
-    #[test]
     fn build_response_schema_no_metadata_when_nothing_to_add() {
         let schema = build_schema();
-        let updated = build_response_schema(&schema, None, None);
-        assert!(updated.metadata().is_empty());
-        // Empty object is "not served from pre-agg", so no override either.
-        let updated = build_response_schema(&schema, None, Some(serde_json::json!({})));
+        let updated = build_response_schema(&schema, None, false);
         assert!(updated.metadata().is_empty());
     }
 
@@ -1446,24 +1416,21 @@ mod tests {
     fn build_response_schema_passes_through_last_refresh_time() {
         let schema = build_schema();
         let updated =
-            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), None);
+            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), false);
         assert_eq!(
             updated.metadata().get("lastRefreshTime"),
             Some(&"2024-01-01T00:00:00.000Z".to_string())
         );
-        assert!(updated.metadata().get("usedPreAggregations").is_none());
+        assert!(updated.metadata().get("servedFromPreAggregation").is_none());
     }
 
     #[test]
     fn build_response_schema_overrides_last_refresh_time_for_pre_agg() {
         let schema = build_schema();
         let stale = "2000-01-01T00:00:00.000Z".to_string();
-        let used = serde_json::json!({
-            "preAggName": { "targetTableName": "stb_pre_aggs.x" }
-        });
 
         let before = Utc::now();
-        let updated = build_response_schema(&schema, Some(stale.clone()), Some(used.clone()));
+        let updated = build_response_schema(&schema, Some(stale.clone()), true);
         let after = Utc::now();
 
         let last_refresh = updated.metadata().get("lastRefreshTime").unwrap();
@@ -1483,26 +1450,23 @@ mod tests {
             after,
         );
 
-        let used_meta = updated.metadata().get("usedPreAggregations").unwrap();
-        let parsed_meta: serde_json::Value = serde_json::from_str(used_meta).unwrap();
-        assert_eq!(parsed_meta, used);
+        assert_eq!(
+            updated.metadata().get("servedFromPreAggregation"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
-    fn build_response_schema_ignores_non_object_used_pre_aggregations() {
+    fn build_response_schema_sets_only_marker_when_no_last_refresh_time() {
         let schema = build_schema();
-        // A bogus shape should be treated like "no pre-agg" — pass through the
-        // original lastRefreshTime and skip the usedPreAggregations metadata.
-        let updated = build_response_schema(
-            &schema,
-            Some("2024-01-01T00:00:00.000Z".to_string()),
-            Some(serde_json::json!([])),
-        );
+        // No incoming last_refresh_time but pre-agg flag is set — should
+        // still emit the override (now) and the marker.
+        let updated = build_response_schema(&schema, None, true);
+        assert!(updated.metadata().get("lastRefreshTime").is_some());
         assert_eq!(
-            updated.metadata().get("lastRefreshTime"),
-            Some(&"2024-01-01T00:00:00.000Z".to_string())
+            updated.metadata().get("servedFromPreAggregation"),
+            Some(&"true".to_string())
         );
-        assert!(updated.metadata().get("usedPreAggregations").is_none());
     }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {

@@ -443,7 +443,8 @@ impl TransportService for NodeBridgeTransport {
                                 .map_cube_err("Can't deserialize RequestResultData from getRootResultObject")?;
 
                             wrapper.last_refresh_time = result_data.last_refresh_time;
-                            wrapper.used_pre_aggregations = result_data.used_pre_aggregations;
+                            wrapper.served_from_pre_aggregation =
+                                result_data.served_from_pre_aggregation.unwrap_or(false);
 
                             native_wrapped_results.push(wrapper);
                         }
@@ -540,7 +541,7 @@ impl TransportService for NodeBridgeTransport {
                             let updated_schema = build_response_schema(
                                 &schema,
                                 wrapper.last_refresh_time.clone(),
-                                wrapper.used_pre_aggregations.clone(),
+                                wrapper.served_from_pre_aggregation,
                             );
 
                             transform_columnar_response(

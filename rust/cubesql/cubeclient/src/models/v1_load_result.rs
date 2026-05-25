@@ -30,11 +30,14 @@ pub struct V1LoadResult<D = models::V1LoadResultDataRow> {
     pub refresh_key_values: Option<Vec<serde_json::Value>>,
     #[serde(rename = "lastRefreshTime", skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
+    /// `true` when the result was served (at least in part) from a
+    /// pre-aggregation. Always present in API responses; the full
+    /// `usedPreAggregations` object remains dev/playground-only.
     #[serde(
-        rename = "usedPreAggregations",
+        rename = "servedFromPreAggregation",
         skip_serializing_if = "Option::is_none"
     )]
-    pub used_pre_aggregations: Option<serde_json::Value>,
+    pub served_from_pre_aggregation: Option<bool>,
 }
 
 impl<D: Default> Default for V1LoadResult<D> {
@@ -45,7 +48,7 @@ impl<D: Default> Default for V1LoadResult<D> {
             data: D::default(),
             refresh_key_values: None,
             last_refresh_time: None,
-            used_pre_aggregations: None,
+            served_from_pre_aggregation: None,
         }
     }
 }
@@ -58,7 +61,7 @@ impl<D> V1LoadResult<D> {
             data,
             refresh_key_values: None,
             last_refresh_time: None,
-            used_pre_aggregations: None,
+            served_from_pre_aggregation: None,
         }
     }
 }

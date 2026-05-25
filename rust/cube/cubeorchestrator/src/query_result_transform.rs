@@ -1111,6 +1111,12 @@ pub struct RequestResultData {
     pub refresh_key_values: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub used_pre_aggregations: Option<Value>,
+    /// Always-present boolean indicator that a pre-aggregation served the
+    /// query (computed from `used_pre_aggregations` on the JS side). Safe to
+    /// expose in API responses; the full `used_pre_aggregations` object
+    /// remains dev/playground-only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub served_from_pre_aggregation: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transformed_query: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
