@@ -31,6 +31,7 @@ use std::sync::Arc;
 
 use cubesql::telemetry::LocalReporter;
 use cubesql::{telemetry::ReportingLogger, CubeError};
+use log::warn;
 #[cfg(feature = "async-log")]
 use log_nonblock::NonBlockingLoggerBuilder;
 use neon::prelude::*;
@@ -383,7 +384,13 @@ async fn handle_sql_query(
                 stream.schema().metadata().get("usedPreAggregations")
             {
                 let parsed = serde_json::from_str::<serde_json::Value>(used_pre_aggregations)
-                    .unwrap_or_else(|_| serde_json::Value::String(used_pre_aggregations.clone()));
+                    .unwrap_or_else(|e| {
+                        warn!(
+                            "Failed to parse usedPreAggregations metadata as JSON: {}",
+                            e
+                        );
+                        serde_json::Value::String(used_pre_aggregations.clone())
+                    });
                 schema_response.insert("usedPreAggregations".into(), parsed);
             }
 

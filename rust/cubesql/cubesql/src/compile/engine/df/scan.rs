@@ -1309,7 +1309,9 @@ pub fn build_response_schema(
         last_refresh_time
     };
 
-    if effective_last_refresh_time.is_none() && !served_from_pre_agg {
+    if effective_last_refresh_time.is_none() {
+        // No `served_from_pre_agg` case to handle here: the branch above sets
+        // `effective_last_refresh_time` to `Some(_)` whenever it is `true`.
         return schema.clone();
     }
 
@@ -1317,14 +1319,11 @@ pub fn build_response_schema(
     if let Some(t) = effective_last_refresh_time {
         metadata.insert("lastRefreshTime".to_string(), t);
     }
-    if served_from_pre_agg {
-        metadata.insert(
-            "usedPreAggregations".to_string(),
-            used_pre_aggregations
-                .as_ref()
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "{}".to_string()),
-        );
+    // `served_from_pre_aggregation` guarantees `used_pre_aggregations` is
+    // `Some(Value::Object(non_empty_map))` here, so `to_string()` is always
+    // well-defined JSON.
+    if let Some(used) = used_pre_aggregations.filter(|_| served_from_pre_agg) {
+        metadata.insert("usedPreAggregations".to_string(), used.to_string());
     }
 
     Arc::new(Schema::new_with_metadata(
@@ -1409,6 +1408,102 @@ mod tests {
         scalar::ScalarValue,
     };
     use std::{collections::HashMap, result::Result};
+
+    fn build_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new("c", DataType::Int64, true)]))
+    }
+
+    #[test]
+    fn served_from_pre_aggregation_cases() {
+        // None → false
+        assert!(!served_from_pre_aggregation(&None));
+
+        // Empty object → false (matches the JS-side `Object.keys(...).length` check)
+        assert!(!served_from_pre_aggregation(&Some(serde_json::json!({}))));
+
+        // Non-empty object → true
+        assert!(served_from_pre_aggregation(&Some(serde_json::json!({
+            "preAggName": { "targetTableName": "stb_pre_aggs.x" }
+        }))));
+
+        // Non-object values (defensive) → false
+        assert!(!served_from_pre_aggregation(&Some(serde_json::json!([]))));
+        assert!(!served_from_pre_aggregation(&Some(serde_json::json!("x"))));
+        assert!(!served_from_pre_aggregation(&Some(serde_json::Value::Null)));
+    }
+
+    #[test]
+    fn build_response_schema_no_metadata_when_nothing_to_add() {
+        let schema = build_schema();
+        let updated = build_response_schema(&schema, None, None);
+        assert!(updated.metadata().is_empty());
+        // Empty object is "not served from pre-agg", so no override either.
+        let updated = build_response_schema(&schema, None, Some(serde_json::json!({})));
+        assert!(updated.metadata().is_empty());
+    }
+
+    #[test]
+    fn build_response_schema_passes_through_last_refresh_time() {
+        let schema = build_schema();
+        let updated =
+            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), None);
+        assert_eq!(
+            updated.metadata().get("lastRefreshTime"),
+            Some(&"2024-01-01T00:00:00.000Z".to_string())
+        );
+        assert!(updated.metadata().get("usedPreAggregations").is_none());
+    }
+
+    #[test]
+    fn build_response_schema_overrides_last_refresh_time_for_pre_agg() {
+        let schema = build_schema();
+        let stale = "2000-01-01T00:00:00.000Z".to_string();
+        let used = serde_json::json!({
+            "preAggName": { "targetTableName": "stb_pre_aggs.x" }
+        });
+
+        let before = Utc::now();
+        let updated = build_response_schema(&schema, Some(stale.clone()), Some(used.clone()));
+        let after = Utc::now();
+
+        let last_refresh = updated.metadata().get("lastRefreshTime").unwrap();
+        assert_ne!(
+            last_refresh, &stale,
+            "pre-agg refresh time should be overridden"
+        );
+        let parsed: chrono::DateTime<Utc> = chrono::DateTime::parse_from_rfc3339(last_refresh)
+            .expect("lastRefreshTime should be RFC3339")
+            .with_timezone(&Utc);
+        assert!(
+            parsed >= before - chrono::Duration::seconds(1)
+                && parsed <= after + chrono::Duration::seconds(1),
+            "lastRefreshTime ({}) should be ~now (between {} and {})",
+            parsed,
+            before,
+            after,
+        );
+
+        let used_meta = updated.metadata().get("usedPreAggregations").unwrap();
+        let parsed_meta: serde_json::Value = serde_json::from_str(used_meta).unwrap();
+        assert_eq!(parsed_meta, used);
+    }
+
+    #[test]
+    fn build_response_schema_ignores_non_object_used_pre_aggregations() {
+        let schema = build_schema();
+        // A bogus shape should be treated like "no pre-agg" — pass through the
+        // original lastRefreshTime and skip the usedPreAggregations metadata.
+        let updated = build_response_schema(
+            &schema,
+            Some("2024-01-01T00:00:00.000Z".to_string()),
+            Some(serde_json::json!([])),
+        );
+        assert_eq!(
+            updated.metadata().get("lastRefreshTime"),
+            Some(&"2024-01-01T00:00:00.000Z".to_string())
+        );
+        assert!(updated.metadata().get("usedPreAggregations").is_none());
+    }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
