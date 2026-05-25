@@ -423,4 +423,147 @@ describe('SQLInterface', () => {
 
     await native.shutdownInterface(instance, 'fast');
   });
+
+  test('servedFromCubeStore flag is surfaced in /cubesql JSONL schema header when external is true', async () => {
+    // End-to-end coverage of the cubesql -> backend-native -> JSONL path:
+    // the non-streaming `load` returns a V1LoadResponseColumnar JSON string
+    // with `external: true`, which cubesql deserializes into
+    // `V1LoadResult.served_from_cube_store`, propagates into the Arrow
+    // schema metadata as `servedFromCubeStore = "true"`, and node_export.rs
+    // emits it as a top-level `servedFromCubeStore: true` field on the
+    // JSONL schema header consumed by the /v1/cubesql HTTP endpoint.
+    //
+    // sqlApiLoad returning a JSON string drives the
+    // `ValueFromJs::String` branch in transport.rs (which goes through
+    // `convert_transport_response_columnar`), avoiding the ResultWrapper
+    // construction overhead that the production gateway uses.
+    const methods = {
+      ...interfaceMethods(),
+      sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+        if (streaming) {
+          return { stream: new FakeRowStream(query) };
+        }
+        // Plain object — wrapNativeFunctionWithStream JSON.stringifies the
+        // response itself before handing it to the Rust side.
+        return {
+          results: [
+            {
+              annotation: {
+                measures: {},
+                dimensions: {},
+                segments: {},
+                timeDimensions: {},
+              },
+              data: {
+                members: ['KibanaSampleDataEcommerce.order_date'],
+                columns: [['2024-01-01T00:00:00.000']],
+              },
+              lastRefreshTime: '2024-01-01T00:00:00.000Z',
+              external: true,
+            },
+          ],
+        };
+      }),
+    };
+
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload: any) => true,
+    });
+
+    let buf = '';
+    const lines: any[] = [];
+    const write = jest.fn((chunk, _enc, callback) => {
+      const raw = (buf + chunk.toString('utf-8')).split('\n');
+      buf = raw.pop() || '';
+      for (const l of raw) {
+        if (l.trim().length) {
+          lines.push(JSON.parse(l));
+        }
+      }
+      callback();
+    });
+    const cubeSqlStream = new Writable({ write });
+
+    try {
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 1;',
+        cubeSqlStream
+      );
+
+      const schemaLine = lines.find((o) => o.schema);
+      expect(schemaLine).toBeDefined();
+      expect(schemaLine.servedFromCubeStore).toBe(true);
+      // lastRefreshTime should also be passed through unchanged.
+      expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
+  test('servedFromCubeStore is absent from /cubesql JSONL header when external is false', async () => {
+    const methods = {
+      ...interfaceMethods(),
+      sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+        if (streaming) {
+          return { stream: new FakeRowStream(query) };
+        }
+        return {
+          results: [
+            {
+              annotation: {
+                measures: {},
+                dimensions: {},
+                segments: {},
+                timeDimensions: {},
+              },
+              data: {
+                members: ['KibanaSampleDataEcommerce.order_date'],
+                columns: [['2024-01-01T00:00:00.000']],
+              },
+              lastRefreshTime: '2024-01-01T00:00:00.000Z',
+              external: false,
+            },
+          ],
+        };
+      }),
+    };
+
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload: any) => true,
+    });
+
+    let buf = '';
+    const lines: any[] = [];
+    const write = jest.fn((chunk, _enc, callback) => {
+      const raw = (buf + chunk.toString('utf-8')).split('\n');
+      buf = raw.pop() || '';
+      for (const l of raw) {
+        if (l.trim().length) {
+          lines.push(JSON.parse(l));
+        }
+      }
+      callback();
+    });
+    const cubeSqlStream = new Writable({ write });
+
+    try {
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 1;',
+        cubeSqlStream
+      );
+
+      const schemaLine = lines.find((o) => o.schema);
+      expect(schemaLine).toBeDefined();
+      // Boolean flag must be omitted (rather than `false`) when not served
+      // from CubeStore, so the JSONL header stays compact.
+      expect(schemaLine.servedFromCubeStore).toBeUndefined();
+      expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
 });
