@@ -53,7 +53,7 @@ views:
     cubes:
       - join_path: orders
         includes: "*"
-    filters:
+    default_filters:
       - member: country
         operator: equals
         values:
@@ -63,7 +63,7 @@ views:
     cubes:
       - join_path: orders
         includes: "*"
-    filters:
+    default_filters:
       - member: country
         operator: equals
         values:
@@ -75,7 +75,7 @@ views:
     cubes:
       - join_path: orders
         includes: "*"
-    filters:
+    default_filters:
       - member: currency
         operator: equals
         values:
@@ -85,7 +85,7 @@ views:
     cubes:
       - join_path: orders
         includes: "*"
-    filters:
+    default_filters:
       - member: currency
         operator: equals
         values:

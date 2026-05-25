@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.50](https://github.com/cube-js/cube/compare/v1.6.49...v1.6.50) (2026-05-22)
+
+### Bug Fixes
+
+- **schema-compiler:** Throw error for duplicate cube and view names in JS models ([#10909](https://github.com/cube-js/cube/issues/10909)) ([06c16b4](https://github.com/cube-js/cube/commit/06c16b47d18f6bd31a240aba6a7b268e90d4763b))
+
 ## [1.6.49](https://github.com/cube-js/cube/compare/v1.6.48...v1.6.49) (2026-05-21)
 
 ### Bug Fixes

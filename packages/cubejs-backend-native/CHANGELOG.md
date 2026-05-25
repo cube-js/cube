@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.50](https://github.com/cube-js/cube/compare/v1.6.49...v1.6.50) (2026-05-22)
+
+### Features
+
+- Enable native orchestrator for all cases (don't allow to disable it) ([#10919](https://github.com/cube-js/cube/issues/10919)) ([9268376](https://github.com/cube-js/cube/commit/9268376f1aed7c280e15dea7d52449792270d350))
+
 ## [1.6.49](https://github.com/cube-js/cube/compare/v1.6.48...v1.6.49) (2026-05-21)
 
 ### Features

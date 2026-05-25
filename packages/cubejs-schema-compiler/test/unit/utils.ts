@@ -409,7 +409,7 @@ export function createViewSchemaWithDefaultValueFilter(): string {
         join_path: orders,
         includes: '*',
       }],
-      filters: [
+      defaultFilters: [
         {
           member: \`currency\`,
           operator: 'equals',

@@ -641,7 +641,7 @@ impl MockViewBuilder {
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
-            .filters(self.default_filters)
+            .default_filters(self.default_filters)
             .build();
 
         let view_cube = MockCube {

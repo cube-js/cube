@@ -19,8 +19,8 @@ parameters and configuration options.
 ## Defining a view group
 
 A view group is a top-level entity, defined alongside views. At minimum it
-needs a `name`; `title` and `description` make it easier to navigate in
-downstream tools.
+needs a `name`; adding a `title` makes it easier to navigate in downstream
+tools.
 
 <CodeGroup>
 
@@ -28,13 +28,11 @@ downstream tools.
 view_groups:
   - name: sales
     title: Sales
-    description: Revenue and order views for the sales team
 ```
 
 ```javascript title="JavaScript"
 view_group(`sales`, {
-  title: `Sales`,
-  description: `Revenue and order views for the sales team`
+  title: `Sales`
 })
 ```
 

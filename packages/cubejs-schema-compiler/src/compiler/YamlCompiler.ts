@@ -193,8 +193,8 @@ export class YamlCompiler {
           // `includedMembers` are not resolvable at transpile time, so
           // running them through the Python parser would treat the name
           // as an undefined identifier.
-          const isViewFilterMember = /^filters\.\d+\.member$/.test(fullPath);
-          const isViewFilterUnless = /^filters\.\d+\.unless$/.test(fullPath);
+          const isViewFilterMember = /^defaultFilters\.\d+\.member$/.test(fullPath);
+          const isViewFilterUnless = /^defaultFilters\.\d+\.unless$/.test(fullPath);
           if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
             return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
           } else if (typeof obj === 'string' && isViewFilterMember) {

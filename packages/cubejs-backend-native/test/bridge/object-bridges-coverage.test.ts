@@ -88,7 +88,7 @@ const BRIDGES: BridgeSpec[] = [
   {
     name: 'cubeDefinition',
     expected: [
-      'filters',
+      'default_filters',
       'is_calendar',
       'is_view',
       'join_map',
