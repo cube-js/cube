@@ -443,11 +443,7 @@ impl TransportService for NodeBridgeTransport {
                                 .map_cube_err("Can't deserialize RequestResultData from getRootResultObject")?;
 
                             wrapper.last_refresh_time = result_data.last_refresh_time;
-                            // RequestResultData still uses the `external` field name (the
-                            // existing JSON API contract); cubesql surfaces it as
-                            // `servedFromCubeStore`.
-                            wrapper.served_from_cube_store =
-                                result_data.external.unwrap_or(false);
+                            wrapper.external = result_data.external.unwrap_or(false);
 
                             native_wrapped_results.push(wrapper);
                         }
@@ -544,7 +540,7 @@ impl TransportService for NodeBridgeTransport {
                             let updated_schema = build_response_schema(
                                 &schema,
                                 wrapper.last_refresh_time.clone(),
-                                wrapper.served_from_cube_store,
+                                wrapper.external,
                             );
 
                             transform_columnar_response(

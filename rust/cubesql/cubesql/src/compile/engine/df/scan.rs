@@ -1281,20 +1281,20 @@ pub fn transform_columnar_response<C: ColumnarValueObject>(
     transform_response_body!(columnar, response, schema, member_fields)
 }
 
-/// Builds a schema with `lastRefreshTime` / `servedFromCubeStore` metadata.
+/// Builds a schema with `lastRefreshTime` / `external` metadata.
 ///
-/// `lastRefreshTime` is passed through unchanged. The `servedFromCubeStore`
-/// marker is added when the flag is set so downstream code can tell that
-/// the result was served from CubeStore (an external pre-aggregation) —
-/// the case where cubesql's own cache-freshness decisions actually need to
-/// look at the pre-agg refresh, as internal pre-aggregations hit the source
-/// DB and rely on its own caching.
+/// `lastRefreshTime` is passed through unchanged. The `external` marker is
+/// added when the flag is set so downstream code can tell that the result
+/// was served from an external (CubeStore) pre-aggregation — the case
+/// where cubesql's own cache-freshness decisions actually need to look at
+/// the pre-agg refresh, as internal pre-aggregations hit the source DB
+/// and rely on its own caching.
 pub fn build_response_schema(
     schema: &SchemaRef,
     last_refresh_time: Option<String>,
-    served_from_cube_store: bool,
+    external: bool,
 ) -> SchemaRef {
-    if last_refresh_time.is_none() && !served_from_cube_store {
+    if last_refresh_time.is_none() && !external {
         return schema.clone();
     }
 
@@ -1302,8 +1302,8 @@ pub fn build_response_schema(
     if let Some(t) = last_refresh_time {
         metadata.insert("lastRefreshTime".to_string(), t);
     }
-    if served_from_cube_store {
-        metadata.insert("servedFromCubeStore".to_string(), "true".to_string());
+    if external {
+        metadata.insert("external".to_string(), "true".to_string());
     }
 
     Arc::new(Schema::new_with_metadata(
@@ -1324,16 +1324,13 @@ pub fn convert_transport_response(
             let V1LoadResult {
                 data,
                 last_refresh_time,
-                served_from_cube_store,
+                external,
                 ..
             } = result;
 
             let mut response = JsonValueObject::new(data);
-            let updated_schema = build_response_schema(
-                &schema,
-                last_refresh_time,
-                served_from_cube_store.unwrap_or(false),
-            );
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
             transform_response(&mut response, updated_schema, &member_fields)
         })
@@ -1352,17 +1349,14 @@ pub fn convert_transport_response_columnar(
             let V1LoadResult {
                 data,
                 last_refresh_time,
-                served_from_cube_store,
+                external,
                 ..
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
             let mut response = JsonColumnarValueObject::new(members, columns);
-            let updated_schema = build_response_schema(
-                &schema,
-                last_refresh_time,
-                served_from_cube_store.unwrap_or(false),
-            );
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
             transform_columnar_response(&mut response, updated_schema, &member_fields)
         })
@@ -1415,20 +1409,20 @@ mod tests {
             updated.metadata().get("lastRefreshTime"),
             Some(&"2024-01-01T00:00:00.000Z".to_string())
         );
-        assert!(updated.metadata().get("servedFromCubeStore").is_none());
+        assert!(updated.metadata().get("external").is_none());
     }
 
     #[test]
-    fn build_response_schema_passes_through_last_refresh_time_for_cube_store() {
-        // CubeStore flag must NOT alter `lastRefreshTime` — it's passed
-        // through unchanged. The marker reports the CubeStore hit.
+    fn build_response_schema_passes_through_last_refresh_time_for_external() {
+        // External (CubeStore) flag must NOT alter `lastRefreshTime` — it's
+        // passed through unchanged. The marker reports the external hit.
         let schema = build_schema();
         let stale = "2000-01-01T00:00:00.000Z".to_string();
         let updated = build_response_schema(&schema, Some(stale.clone()), true);
 
         assert_eq!(updated.metadata().get("lastRefreshTime"), Some(&stale));
         assert_eq!(
-            updated.metadata().get("servedFromCubeStore"),
+            updated.metadata().get("external"),
             Some(&"true".to_string())
         );
     }
@@ -1436,24 +1430,23 @@ mod tests {
     #[test]
     fn build_response_schema_sets_only_marker_when_no_last_refresh_time() {
         let schema = build_schema();
-        // No incoming last_refresh_time, but CubeStore flag is set — emit
+        // No incoming last_refresh_time, but external flag is set — emit
         // only the marker; do NOT synthesize a `lastRefreshTime`.
         let updated = build_response_schema(&schema, None, true);
         assert!(updated.metadata().get("lastRefreshTime").is_none());
         assert_eq!(
-            updated.metadata().get("servedFromCubeStore"),
+            updated.metadata().get("external"),
             Some(&"true".to_string())
         );
     }
 
     #[test]
-    fn convert_transport_response_threads_cube_store_flag_into_schema_metadata() {
+    fn convert_transport_response_threads_external_flag_into_schema_metadata() {
         // End-to-end coverage of the row-format `convert_transport_response`
-        // path: a V1LoadResponse with the JSON field `external: true` (which
-        // V1LoadResult deserializes into `served_from_cube_store`) and a
+        // path: a V1LoadResponse with `external: true` and a
         // `lastRefreshTime` should produce a RecordBatch whose schema
-        // metadata has the `servedFromCubeStore` marker set and
-        // `lastRefreshTime` passed through unchanged.
+        // metadata has the `external` marker set and `lastRefreshTime`
+        // passed through unchanged.
         let raw = r#"
             {
                 "results": [{
@@ -1475,10 +1468,7 @@ mod tests {
         let batches = convert_transport_response(response, schema, member_fields).unwrap();
         let metadata = batches[0].schema().metadata().clone();
 
-        assert_eq!(
-            metadata.get("servedFromCubeStore"),
-            Some(&"true".to_string())
-        );
+        assert_eq!(metadata.get("external"), Some(&"true".to_string()));
         assert_eq!(
             metadata.get("lastRefreshTime"),
             Some(&"2000-01-01T00:00:00.000Z".to_string())

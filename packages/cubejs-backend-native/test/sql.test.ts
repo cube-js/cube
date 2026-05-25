@@ -424,19 +424,21 @@ describe('SQLInterface', () => {
     await native.shutdownInterface(instance, 'fast');
   });
 
-  test('servedFromCubeStore flag is surfaced in /cubesql JSONL schema header when external is true', async () => {
+  test('external flag is surfaced in /cubesql JSONL schema header when set to true', async () => {
     // End-to-end coverage of the cubesql -> backend-native -> JSONL path:
-    // the non-streaming `load` returns a V1LoadResponseColumnar JSON string
-    // with `external: true`, which cubesql deserializes into
-    // `V1LoadResult.served_from_cube_store`, propagates into the Arrow
-    // schema metadata as `servedFromCubeStore = "true"`, and node_export.rs
-    // emits it as a top-level `servedFromCubeStore: true` field on the
-    // JSONL schema header consumed by the /v1/cubesql HTTP endpoint.
+    // the non-streaming `load` returns a V1LoadResponseColumnar with
+    // `external: true`, which cubesql deserializes into
+    // `V1LoadResult.external`, propagates into the Arrow schema metadata
+    // as `external = "true"`, and node_export.rs emits it as a top-level
+    // `external: true` field on the JSONL schema header consumed by the
+    // /v1/cubesql HTTP endpoint.
     //
-    // sqlApiLoad returning a JSON string drives the
-    // `ValueFromJs::String` branch in transport.rs (which goes through
-    // `convert_transport_response_columnar`), avoiding the ResultWrapper
-    // construction overhead that the production gateway uses.
+    // sqlApiLoad returning a plain object drives the
+    // `ValueFromJs::String` branch in transport.rs (via
+    // `wrapNativeFunctionWithStream`, which JSON.stringifies the response
+    // for us) and exercises `convert_transport_response_columnar`,
+    // avoiding the ResultWrapper construction overhead the production
+    // gateway uses.
     const methods = {
       ...interfaceMethods(),
       sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
@@ -494,7 +496,7 @@ describe('SQLInterface', () => {
 
       const schemaLine = lines.find((o) => o.schema);
       expect(schemaLine).toBeDefined();
-      expect(schemaLine.servedFromCubeStore).toBe(true);
+      expect(schemaLine.external).toBe(true);
       // lastRefreshTime should also be passed through unchanged.
       expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
     } finally {
@@ -502,7 +504,7 @@ describe('SQLInterface', () => {
     }
   });
 
-  test('servedFromCubeStore is absent from /cubesql JSONL header when external is false', async () => {
+  test('external flag is absent from /cubesql JSONL header when set to false', async () => {
     const methods = {
       ...interfaceMethods(),
       sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
@@ -558,9 +560,9 @@ describe('SQLInterface', () => {
 
       const schemaLine = lines.find((o) => o.schema);
       expect(schemaLine).toBeDefined();
-      // Boolean flag must be omitted (rather than `false`) when not served
-      // from CubeStore, so the JSONL header stays compact.
-      expect(schemaLine.servedFromCubeStore).toBeUndefined();
+      // Boolean flag must be omitted (rather than emitted as `false`) when
+      // not served from CubeStore, so the JSONL header stays compact.
+      expect(schemaLine.external).toBeUndefined();
       expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
     } finally {
       await native.shutdownInterface(instance, 'fast');
