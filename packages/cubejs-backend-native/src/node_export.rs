@@ -382,11 +382,11 @@ async fn handle_sql_query(
             if stream
                 .schema()
                 .metadata()
-                .get("external")
+                .get("servedFromCubeStore")
                 .map(|v| v == "true")
                 .unwrap_or(false)
             {
-                schema_response.insert("external".into(), serde_json::Value::Bool(true));
+                schema_response.insert("servedFromCubeStore".into(), serde_json::Value::Bool(true));
             }
 
             write_jsonl_message(
