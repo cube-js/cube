@@ -30,6 +30,8 @@ pub struct V1LoadResult<D = models::V1LoadResultDataRow> {
     pub refresh_key_values: Option<Vec<serde_json::Value>>,
     #[serde(rename = "lastRefreshTime", skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
+    #[serde(rename = "usedPreAggregations", skip_serializing_if = "Option::is_none")]
+    pub used_pre_aggregations: Option<serde_json::Value>,
 }
 
 impl<D: Default> Default for V1LoadResult<D> {
@@ -40,6 +42,7 @@ impl<D: Default> Default for V1LoadResult<D> {
             data: D::default(),
             refresh_key_values: None,
             last_refresh_time: None,
+            used_pre_aggregations: None,
         }
     }
 }
@@ -52,6 +55,7 @@ impl<D> V1LoadResult<D> {
             data,
             refresh_key_values: None,
             last_refresh_time: None,
+            used_pre_aggregations: None,
         }
     }
 }

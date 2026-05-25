@@ -1873,12 +1873,12 @@ class ApiGateway {
     const resObj = {
       query: normalizedQuery,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      usedPreAggregations: response.usedPreAggregations,
       ...(
         getEnv('devMode') ||
           context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
             requestId: context.requestId,
           }

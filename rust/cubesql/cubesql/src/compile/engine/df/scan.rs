@@ -10,7 +10,7 @@ use crate::{
     CubeError,
 };
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, NaiveDate, SecondsFormat, Utc};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadResponse, V1LoadResult, V1LoadResultDataColumnar,
 };
@@ -1281,6 +1281,58 @@ pub fn transform_columnar_response<C: ColumnarValueObject>(
     transform_response_body!(columnar, response, schema, member_fields)
 }
 
+/// Returns true when `used_pre_aggregations` is a non-empty object — i.e. the
+/// query was served (at least in part) from a pre-aggregation.
+pub fn served_from_pre_aggregation(used_pre_aggregations: &Option<Value>) -> bool {
+    match used_pre_aggregations {
+        Some(Value::Object(map)) => !map.is_empty(),
+        _ => false,
+    }
+}
+
+/// Builds a schema with `lastRefreshTime` / `usedPreAggregations` metadata.
+///
+/// When the query was served from a pre-aggregation we override
+/// `lastRefreshTime` to "now": for a pre-agg hit the data the client just
+/// received is current as of this response, regardless of when the pre-agg
+/// itself was last refreshed. We also surface a `usedPreAggregations` entry
+/// so downstream code can distinguish the two cases.
+pub fn build_response_schema(
+    schema: &SchemaRef,
+    last_refresh_time: Option<String>,
+    used_pre_aggregations: Option<Value>,
+) -> SchemaRef {
+    let served_from_pre_agg = served_from_pre_aggregation(&used_pre_aggregations);
+    let effective_last_refresh_time = if served_from_pre_agg {
+        Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true))
+    } else {
+        last_refresh_time
+    };
+
+    if effective_last_refresh_time.is_none() && !served_from_pre_agg {
+        return schema.clone();
+    }
+
+    let mut metadata = schema.metadata().clone();
+    if let Some(t) = effective_last_refresh_time {
+        metadata.insert("lastRefreshTime".to_string(), t);
+    }
+    if served_from_pre_agg {
+        metadata.insert(
+            "usedPreAggregations".to_string(),
+            used_pre_aggregations
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "{}".to_string()),
+        );
+    }
+
+    Arc::new(Schema::new_with_metadata(
+        schema.fields().to_vec(),
+        metadata,
+    ))
+}
+
 pub fn convert_transport_response(
     response: V1LoadResponse,
     schema: SchemaRef,
@@ -1293,20 +1345,13 @@ pub fn convert_transport_response(
             let V1LoadResult {
                 data,
                 last_refresh_time,
+                used_pre_aggregations,
                 ..
             } = result;
 
             let mut response = JsonValueObject::new(data);
-            let updated_schema = if let Some(last_refresh_time) = last_refresh_time {
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                Arc::new(Schema::new_with_metadata(
-                    schema.fields().to_vec(),
-                    metadata,
-                ))
-            } else {
-                schema.clone()
-            };
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, used_pre_aggregations);
 
             transform_response(&mut response, updated_schema, &member_fields)
         })
@@ -1325,21 +1370,14 @@ pub fn convert_transport_response_columnar(
             let V1LoadResult {
                 data,
                 last_refresh_time,
+                used_pre_aggregations,
                 ..
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
             let mut response = JsonColumnarValueObject::new(members, columns);
-            let updated_schema = if let Some(last_refresh_time) = last_refresh_time {
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                Arc::new(Schema::new_with_metadata(
-                    schema.fields().to_vec(),
-                    metadata,
-                ))
-            } else {
-                schema.clone()
-            };
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, used_pre_aggregations);
 
             transform_columnar_response(&mut response, updated_schema, &member_fields)
         })
