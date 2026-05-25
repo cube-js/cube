@@ -3,8 +3,8 @@ use crate::{
         aggregate, cube_scan, filter, flatten_pushdown_replacer, projection,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::{flatten::FlattenRules, replacer_flat_push_down_node, replacer_push_down_node},
-        transforming_chain_rewrite_with_root,
-        FlattenPushdownReplacerInnerAlias, ListType, LogicalPlanLanguage, ProjectionAlias,
+        transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias, ListType,
+        LogicalPlanLanguage, ProjectionAlias,
     },
     var, var_iter,
 };
