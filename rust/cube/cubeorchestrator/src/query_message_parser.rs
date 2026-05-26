@@ -76,10 +76,10 @@ impl std::error::Error for ParseError {}
 
 #[derive(Debug, Clone)]
 pub struct QueryResult {
-    pub members: Vec<String>,
-    pub columns_pos: IndexMap<String, usize>,
-    pub row_count: usize,
-    pub data: Vec<ColumnarArray>,
+    pub(crate) members: Vec<String>,
+    pub(crate) columns_pos: IndexMap<String, usize>,
+    pub(crate) row_count: usize,
+    pub(crate) data: Vec<ColumnarArray>,
 }
 
 impl Finalize for QueryResult {}
@@ -125,6 +125,11 @@ impl QueryResult {
     #[inline]
     pub fn row_count(&self) -> usize {
         self.row_count
+    }
+
+    #[inline]
+    pub fn members(&self) -> &[String] {
+        &self.members
     }
 
     #[inline]
