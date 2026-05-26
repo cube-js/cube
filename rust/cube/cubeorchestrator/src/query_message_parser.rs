@@ -196,8 +196,8 @@ impl QueryResult {
                             data[col_idx].push(cell);
                         }
                         // Pad short rows with Null to keep all columns aligned.
-                        for col_idx in values.len()..n_cols {
-                            data[col_idx].push(DBResponsePrimitive::Null);
+                        for col in data.iter_mut().take(n_cols).skip(values.len()) {
+                            col.push(DBResponsePrimitive::Null);
                         }
                     }
 
