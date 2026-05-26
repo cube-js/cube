@@ -3,38 +3,23 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use cubeorchestrator::query_message_parser::QueryResult;
-use cubeorchestrator::query_result_transform::{DBResponsePrimitive, TransformedData};
+use cubeorchestrator::query_result_transform::TransformedData;
 use cubeorchestrator::transport::{
-    ConfigItem, JsRawColumnarData, MemberOrMemberExpression, NormalizedQuery, QueryType,
-    ResultType, TransformDataRequest,
+    ConfigItem, MemberOrMemberExpression, NormalizedQuery, QueryType, ResultType,
+    TransformDataRequest,
 };
 
-const ROW_COUNTS: &[usize] = &[1_000, 10_000, 50_000, 100_000];
-const COLUMN_COUNTS: &[usize] = &[8, 16, 32, 64];
+#[path = "common/mod.rs"]
+mod common;
+use common::{
+    build_dataset, make_member_aliases, split_dim_measure, TimeColumn, COLUMN_COUNTS, ROW_COUNTS,
+};
 
 /// Total columns and row count used by `bench_transform_time_scenarios`.
 /// Held fixed so the cells/sec figures are directly comparable to the
 /// 16-col / 100k-row entries from `bench_transform`.
 const SCENARIO_COL_COUNT: usize = 16;
 const SCENARIO_ROW_COUNT: usize = 100_000;
-
-/// Split a target column count into ~60% dimensions and ~40% measures.
-fn split_dim_measure(col_count: usize) -> (usize, usize) {
-    let dim_count = (col_count * 6) / 10;
-    let measure_count = col_count - dim_count;
-    (dim_count, measure_count)
-}
-
-fn make_member_aliases(prefix: &str, count: usize) -> Vec<(String, String)> {
-    (0..count)
-        .map(|i| {
-            (
-                format!("Sales.{}{}", prefix, i),
-                format!("sales__{}{}", prefix, i),
-            )
-        })
-        .collect()
-}
 
 fn config_item(member_type: &str) -> ConfigItem {
     ConfigItem {
@@ -50,12 +35,6 @@ fn config_item(member_type: &str) -> ConfigItem {
         granularities: None,
         granularity: None,
     }
-}
-
-#[derive(Clone)]
-struct TimeColumn {
-    member: String,
-    alias: String,
 }
 
 #[derive(Clone, Copy)]
@@ -165,55 +144,6 @@ fn build_request(
     }
 }
 
-fn build_dataset(
-    row_count: usize,
-    dimensions: &[(String, String)],
-    measures: &[(String, String)],
-    time_dims: &[TimeColumn],
-) -> JsRawColumnarData {
-    let total_cols = dimensions.len() + measures.len() + time_dims.len();
-    let mut members = Vec::with_capacity(total_cols);
-    let mut columns: Vec<Vec<DBResponsePrimitive>> = Vec::with_capacity(total_cols);
-
-    for (j, (_, alias)) in dimensions.iter().enumerate() {
-        members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            col.push(DBResponsePrimitive::String(format!(
-                "dim_{}_{}",
-                j,
-                i % 1000
-            )));
-        }
-        columns.push(col);
-    }
-    for (j, (_, alias)) in measures.iter().enumerate() {
-        members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            col.push(DBResponsePrimitive::Number(((i * (j + 1)) as f64) * 0.5));
-        }
-        columns.push(col);
-    }
-    for (j, td) in time_dims.iter().enumerate() {
-        members.push(td.alias.clone());
-        let mut col = Vec::with_capacity(row_count);
-        for i in 0..row_count {
-            // Format mirrors typical CubeStore output: ISO-8601 with millisecond
-            // fractional and no timezone.
-            let month = ((i + j) % 12) + 1;
-            let day = ((i / 12) % 28) + 1;
-            col.push(DBResponsePrimitive::String(format!(
-                "2024-{:02}-{:02}T00:00:00.000",
-                month, day
-            )));
-        }
-        columns.push(col);
-    }
-
-    JsRawColumnarData { members, columns }
-}
-
 fn bench_transform(c: &mut Criterion) {
     let mut group = c.benchmark_group("TransformedData::transform");
 
@@ -312,64 +242,5 @@ fn bench_transform_time_scenarios(c: &mut Criterion) {
     group.finish();
 }
 
-/// Bench the JS→Rust raw-data ingest path: `serde_json::from_slice` then
-/// `QueryResult::from_js_raw_data`. This is the part of the pipeline that the
-/// columnar wire format change actually touches; `bench_transform` above
-/// consumes an already-built `QueryResult` and is unaffected.
-fn bench_from_js_raw_data(c: &mut Criterion) {
-    let mut group = c.benchmark_group("QueryResult::from_js_raw_data");
-
-    let combos: &[(usize, usize)] = &[(8, 10_000), (16, 10_000), (16, 100_000), (32, 100_000)];
-
-    for &(col_count, row_count) in combos {
-        let (dim_count, measure_count) = split_dim_measure(col_count);
-        let dimensions = make_member_aliases("dim", dim_count);
-        let measures = make_member_aliases("measure", measure_count);
-
-        let dataset = build_dataset(row_count, &dimensions, &measures, &[]);
-        let payload = serde_json::to_vec(&dataset).expect("to_vec");
-        let payload_len = payload.len();
-
-        eprintln!(
-            "from_js_raw_data: c{:02}_r{} payload_bytes={}",
-            col_count, row_count, payload_len
-        );
-
-        group.throughput(Throughput::Elements((row_count * col_count) as u64));
-
-        let id_param = format!("c{:02}_r{}", col_count, row_count);
-
-        // Parse only: serde_json::from_slice into the wire type.
-        group.bench_with_input(BenchmarkId::new("parse_only", &id_param), &(), |b, _| {
-            b.iter(|| {
-                let parsed: JsRawColumnarData =
-                    serde_json::from_slice(black_box(&payload)).expect("from_slice");
-                black_box(parsed);
-            });
-        });
-
-        // End-to-end: parse + transpose into QueryResult — what the Neon bridge does.
-        group.bench_with_input(
-            BenchmarkId::new("parse_plus_build", &id_param),
-            &(),
-            |b, _| {
-                b.iter(|| {
-                    let parsed: JsRawColumnarData =
-                        serde_json::from_slice(black_box(&payload)).expect("from_slice");
-                    let built = QueryResult::from_js_raw_data(parsed).expect("from_js_raw_data");
-                    black_box(built);
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
-criterion_group!(
-    benches,
-    bench_transform,
-    bench_transform_time_scenarios,
-    bench_from_js_raw_data
-);
+criterion_group!(benches, bench_transform, bench_transform_time_scenarios);
 criterion_main!(benches);

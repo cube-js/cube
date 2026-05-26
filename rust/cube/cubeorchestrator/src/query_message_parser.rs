@@ -1,4 +1,7 @@
-use crate::{query_result_transform::DBResponsePrimitive, transport::JsRawColumnarData};
+use crate::{
+    query_result_transform::{ColumnarArray, DBResponsePrimitive},
+    transport::JsRawColumnarData,
+};
 use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
 use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
@@ -10,6 +13,20 @@ pub enum ParseError {
     EmptyResultSet,
     NullRow,
     ColumnNameNotDefined,
+    ColumnIndexOutOfRange {
+        idx: usize,
+        data_len: usize,
+    },
+    InconsistentColumnLength {
+        idx: usize,
+        name: Option<String>,
+        col_len: usize,
+        expected: usize,
+    },
+    MembersColumnsMismatch {
+        members_len: usize,
+        data_len: usize,
+    },
     FlatBufferError(String),
     ErrorMessage(String),
 }
@@ -21,6 +38,37 @@ impl std::fmt::Display for ParseError {
             ParseError::EmptyResultSet => write!(f, "Empty resultSet"),
             ParseError::NullRow => write!(f, "Null row"),
             ParseError::ColumnNameNotDefined => write!(f, "Column name is not defined"),
+            ParseError::ColumnIndexOutOfRange { idx, data_len } => write!(
+                f,
+                "QueryResult.data missing column at index {} (data.len() = {})",
+                idx, data_len
+            ),
+            ParseError::InconsistentColumnLength {
+                idx,
+                name,
+                col_len,
+                expected,
+            } => {
+                write!(f, "QueryResult.data column")?;
+
+                if let Some(n) = name {
+                    write!(f, " {:?}", n)?;
+                }
+
+                write!(
+                    f,
+                    " at index {} has {} rows, expected {}",
+                    idx, col_len, expected
+                )
+            }
+            ParseError::MembersColumnsMismatch {
+                members_len,
+                data_len,
+            } => write!(
+                f,
+                "QueryResult has {} members but {} data columns",
+                members_len, data_len
+            ),
             ParseError::FlatBufferError(msg) => write!(f, "FlatBuffer parsing error: {}", msg),
             ParseError::ErrorMessage(msg) => write!(f, "Error: {}", msg),
         }
@@ -31,21 +79,78 @@ impl std::error::Error for ParseError {}
 
 #[derive(Debug, Clone)]
 pub struct QueryResult {
-    pub members: Vec<String>,
-    pub rows: Vec<Vec<DBResponsePrimitive>>,
-    pub columns_pos: IndexMap<String, usize>,
+    pub(crate) members: Vec<String>,
+    pub(crate) columns_pos: IndexMap<String, usize>,
+    pub(crate) row_count: usize,
+    pub(crate) data: Vec<ColumnarArray>,
 }
 
 impl Finalize for QueryResult {}
 
 impl QueryResult {
-    pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
-        let mut result = QueryResult {
+    pub fn empty() -> Self {
+        QueryResult {
             members: vec![],
-            rows: vec![],
             columns_pos: IndexMap::new(),
-        };
+            row_count: 0,
+            data: vec![],
+        }
+    }
 
+    pub fn try_new(members: Vec<String>, data: Vec<ColumnarArray>) -> Result<Self, ParseError> {
+        if members.len() != data.len() {
+            return Err(ParseError::MembersColumnsMismatch {
+                members_len: members.len(),
+                data_len: data.len(),
+            });
+        }
+
+        let row_count = data.first().map(|c| c.len()).unwrap_or(0);
+
+        for (idx, col) in data.iter().enumerate() {
+            if col.len() != row_count {
+                return Err(ParseError::InconsistentColumnLength {
+                    idx,
+                    name: members.get(idx).cloned(),
+                    col_len: col.len(),
+                    expected: row_count,
+                });
+            }
+        }
+
+        let columns_pos: IndexMap<String, usize> = members
+            .iter()
+            .enumerate()
+            .map(|(index, member)| (member.clone(), index))
+            .collect();
+
+        Ok(QueryResult {
+            members,
+            columns_pos,
+            row_count,
+            data,
+        })
+    }
+
+    #[inline]
+    pub fn row_count(&self) -> usize {
+        self.row_count
+    }
+
+    #[inline]
+    pub fn members(&self) -> &[String] {
+        &self.members
+    }
+
+    #[inline]
+    pub fn column(&self, idx: usize) -> Result<&ColumnarArray, ParseError> {
+        self.data.get(idx).ok_or(ParseError::ColumnIndexOutOfRange {
+            idx,
+            data_len: self.data.len(),
+        })
+    }
+
+    pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
         let opts = VerifierOptions {
             max_tables: 10_000_000,     // Support up to 10M tables
             max_apparent_size: 1 << 31, // 2GB limit for large datasets
@@ -68,41 +173,48 @@ impl QueryResult {
                     .command_as_http_result_set()
                     .ok_or(ParseError::EmptyResultSet)?;
 
-                if let Some(result_set_columns) = result_set.columns() {
-                    if result_set_columns.iter().any(|c| c.is_empty()) {
-                        return Err(ParseError::ColumnNameNotDefined);
+                let members: Vec<String> = match result_set.columns() {
+                    Some(result_set_columns) => {
+                        if result_set_columns.iter().any(|c| c.is_empty()) {
+                            return Err(ParseError::ColumnNameNotDefined);
+                        }
+                        result_set_columns.iter().map(|c| c.to_owned()).collect()
                     }
+                    None => Vec::new(),
+                };
 
-                    let (members, columns_pos): (Vec<_>, IndexMap<_, _>) = result_set_columns
-                        .iter()
-                        .enumerate()
-                        .map(|(index, column_name)| {
-                            (column_name.to_owned(), (column_name.to_owned(), index))
-                        })
-                        .unzip();
-
-                    result.members = members;
-                    result.columns_pos = columns_pos;
-                }
-
-                if let Some(result_set_rows) = result_set.rows() {
-                    result.rows = Vec::with_capacity(result_set_rows.len());
+                let n_cols = members.len();
+                let data: Vec<ColumnarArray> = if let Some(result_set_rows) = result_set.rows() {
+                    let row_count = result_set_rows.len();
+                    let mut data: Vec<ColumnarArray> = (0..n_cols)
+                        .map(|_| ColumnarArray::with_capacity(row_count))
+                        .collect();
 
                     for row in result_set_rows.iter() {
                         let values = row.values().ok_or(ParseError::NullRow)?;
-                        let row_obj: Vec<_> = values
-                            .iter()
-                            .map(|val| match val.string_value() {
+                        for (col_idx, val) in values.iter().enumerate() {
+                            if col_idx >= n_cols {
+                                break;
+                            }
+                            let cell = match val.string_value() {
                                 Some(s) => DBResponsePrimitive::String(s.to_owned()),
                                 None => DBResponsePrimitive::Null,
-                            })
-                            .collect();
+                            };
+                            data[col_idx].push(cell);
+                        }
 
-                        result.rows.push(row_obj);
+                        // Pad short rows with Null to keep all columns aligned.
+                        for col in data.iter_mut().take(n_cols).skip(values.len()) {
+                            col.push(DBResponsePrimitive::Null);
+                        }
                     }
-                }
 
-                Ok(result)
+                    data
+                } else {
+                    (0..n_cols).map(|_| ColumnarArray::new()).collect()
+                };
+
+                QueryResult::try_new(members, data)
             }
             _ => Err(ParseError::UnsupportedCommand),
         }
@@ -110,42 +222,7 @@ impl QueryResult {
 
     pub fn from_js_raw_data(js_raw_data: JsRawColumnarData) -> Result<Self, ParseError> {
         let JsRawColumnarData { members, columns } = js_raw_data;
-
-        if members.is_empty() {
-            return Ok(QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            });
-        }
-
-        let columns_pos: IndexMap<String, usize> = members
-            .iter()
-            .enumerate()
-            .map(|(index, member)| (member.clone(), index))
-            .collect();
-
-        let row_count = columns.first().map(|c| c.len()).unwrap_or(0);
-        // Transpose column-major input into the row-major shape `QueryResult`
-        // expects. Rows are pre-allocated, then we drain each column into the
-        // matching slot to avoid per-cell clones.
-        let mut rows: Vec<Vec<DBResponsePrimitive>> = (0..row_count)
-            .map(|_| Vec::with_capacity(members.len()))
-            .collect();
-
-        for column in columns.into_iter() {
-            for (row_idx, value) in column.into_iter().enumerate() {
-                if let Some(row) = rows.get_mut(row_idx) {
-                    row.push(value);
-                }
-            }
-        }
-
-        Ok(QueryResult {
-            members,
-            rows,
-            columns_pos,
-        })
+        QueryResult::try_new(members, columns)
     }
 }
 
@@ -230,7 +307,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 5);
-        assert_eq!(query_result.rows.len(), 10);
+        assert_eq!(query_result.row_count, 10);
+        assert_eq!(query_result.data.len(), 5);
+        assert!(query_result.data.iter().all(|c| c.len() == 10));
     }
 
     #[test]
@@ -242,7 +321,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 20);
-        assert_eq!(query_result.rows.len(), 1000);
+        assert_eq!(query_result.row_count, 1000);
+        assert_eq!(query_result.data.len(), 20);
+        assert!(query_result.data.iter().all(|c| c.len() == 1000));
     }
 
     #[test]
@@ -255,7 +336,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 30);
-        assert_eq!(query_result.rows.len(), 10_000);
+        assert_eq!(query_result.row_count, 10_000);
+        assert_eq!(query_result.data.len(), 30);
+        assert!(query_result.data.iter().all(|c| c.len() == 10_000));
     }
 
     #[test]
@@ -267,7 +350,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 40);
-        assert_eq!(query_result.rows.len(), 33_000);
+        assert_eq!(query_result.row_count, 33_000);
+        assert_eq!(query_result.data.len(), 40);
+        assert!(query_result.data.iter().all(|c| c.len() == 33_000));
     }
 
     #[test]
@@ -279,7 +364,9 @@ mod tests {
 
         let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 100);
-        assert_eq!(query_result.rows.len(), 50_000);
+        assert_eq!(query_result.row_count, 50_000);
+        assert_eq!(query_result.data.len(), 100);
+        assert!(query_result.data.iter().all(|c| c.len() == 50_000));
     }
 
     #[test]
