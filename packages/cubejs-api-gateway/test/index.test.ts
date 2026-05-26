@@ -1448,4 +1448,89 @@ describe('API Gateway', () => {
       expect(requestId).toMatch(/^[0-9a-f-]+-span-1$/);
     });
   });
+
+  describe('external pre-aggregation indicator', () => {
+    // Helper mock that lets a test pretend the query orchestrator served
+    // the result from an external (CubeStore) pre-aggregation, optionally
+    // with the dev-only `usedPreAggregations` object as well.
+    class AdapterApiMockWithFlags extends AdapterApiMock {
+      public constructor(
+        private readonly external: boolean | undefined,
+        private readonly usedPreAggregations?: any,
+      ) {
+        super();
+      }
+
+      public async executeQuery(query: any) {
+        const base = await super.executeQuery(query);
+        return {
+          ...base,
+          external: this.external,
+          usedPreAggregations: this.usedPreAggregations,
+        };
+      }
+    }
+
+    test('external=false when query was not served from CubeStore', async () => {
+      const { app } = await createApiGateway(new AdapterApiMockWithFlags(false));
+
+      const res = await request(app)
+        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body.external).toBe(false);
+      // Full pre-agg object stays dev/playground-only.
+      expect(res.body.usedPreAggregations).toBeUndefined();
+    });
+
+    test('external=true when query was served from an external pre-aggregation (no leak of names)', async () => {
+      const { app } = await createApiGateway(
+        new AdapterApiMockWithFlags(true, {
+          'Foo.fooMain': {
+            targetTableName: 'stb_pre_aggs.foo_foo_main',
+            type: 'rollup',
+          },
+        }),
+      );
+
+      const res = await request(app)
+        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body.external).toBe(true);
+      // Pre-aggregation names / table names must NOT be exposed to ordinary
+      // API consumers — only the boolean flag is safe.
+      expect(res.body.usedPreAggregations).toBeUndefined();
+    });
+
+    test('usedPreAggregations is exposed under playground auth alongside external', async () => {
+      const usedPreAggregations = {
+        'Foo.fooMain': {
+          targetTableName: 'stb_pre_aggs.foo_foo_main',
+          type: 'rollup',
+        },
+      };
+      const { app } = await createApiGateway(
+        new AdapterApiMockWithFlags(true, usedPreAggregations),
+        new DataSourceStorageMock(),
+        {
+          checkAuth: (req: Request) => {
+            req.signedWithPlaygroundAuthSecret = true;
+            req.securityContext = {};
+            req.authInfo = {};
+          },
+        },
+      );
+
+      const res = await request(app)
+        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body.external).toBe(true);
+      expect(res.body.usedPreAggregations).toEqual(usedPreAggregations);
+    });
+  });
 });

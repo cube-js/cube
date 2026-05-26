@@ -379,6 +379,16 @@ async fn handle_sql_query(
                 );
             }
 
+            if stream
+                .schema()
+                .metadata()
+                .get("external")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
+                schema_response.insert("external".into(), serde_json::Value::Bool(true));
+            }
+
             write_jsonl_message(
                 channel.clone(),
                 stream_methods.write.clone(),

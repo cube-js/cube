@@ -14,10 +14,9 @@ use crate::{
 };
 use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
-use cubesql::compile::arrow::datatypes::Schema;
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response_columnar, transform_columnar_response, CacheMode, MemberField,
-    RecordBatch, SchemaRef,
+    build_response_schema, convert_transport_response_columnar, transform_columnar_response,
+    CacheMode, MemberField, RecordBatch, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -444,6 +443,7 @@ impl TransportService for NodeBridgeTransport {
                                 .map_cube_err("Can't deserialize RequestResultData from getRootResultObject")?;
 
                             wrapper.last_refresh_time = result_data.last_refresh_time;
+                            wrapper.external = result_data.external.unwrap_or(false);
 
                             native_wrapped_results.push(wrapper);
                         }
@@ -537,18 +537,11 @@ impl TransportService for NodeBridgeTransport {
                     break result_wrappers
                         .into_iter()
                         .map(|mut wrapper| {
-                            let updated_schema = if let Some(last_refresh_time) =
-                                wrapper.last_refresh_time.clone()
-                            {
-                                let mut metadata = schema.metadata().clone();
-                                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                                Arc::new(Schema::new_with_metadata(
-                                    schema.fields().to_vec(),
-                                    metadata,
-                                ))
-                            } else {
-                                schema.clone()
-                            };
+                            let updated_schema = build_response_schema(
+                                &schema,
+                                wrapper.last_refresh_time.clone(),
+                                wrapper.external,
+                            );
 
                             transform_columnar_response(
                                 &mut wrapper,
