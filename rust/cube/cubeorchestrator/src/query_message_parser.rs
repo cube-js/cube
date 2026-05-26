@@ -15,7 +15,6 @@ pub enum ParseError {
     ColumnNameNotDefined,
     ColumnIndexOutOfRange {
         idx: usize,
-        name: Option<String>,
         data_len: usize,
     },
     InconsistentColumnLength {
@@ -39,19 +38,11 @@ impl std::fmt::Display for ParseError {
             ParseError::EmptyResultSet => write!(f, "Empty resultSet"),
             ParseError::NullRow => write!(f, "Null row"),
             ParseError::ColumnNameNotDefined => write!(f, "Column name is not defined"),
-            ParseError::ColumnIndexOutOfRange {
-                idx,
-                name,
-                data_len,
-            } => {
-                write!(f, "QueryResult.data missing column")?;
-
-                if let Some(n) = name {
-                    write!(f, " {:?}", n)?;
-                }
-
-                write!(f, " at index {} (data.len() = {})", idx, data_len)
-            }
+            ParseError::ColumnIndexOutOfRange { idx, data_len } => write!(
+                f,
+                "QueryResult.data missing column at index {} (data.len() = {})",
+                idx, data_len
+            ),
             ParseError::InconsistentColumnLength {
                 idx,
                 name,
@@ -153,13 +144,10 @@ impl QueryResult {
 
     #[inline]
     pub fn column(&self, idx: usize) -> Result<&ColumnarArray, ParseError> {
-        self.data
-            .get(idx)
-            .ok_or_else(|| ParseError::ColumnIndexOutOfRange {
-                idx,
-                name: self.members.get(idx).cloned(),
-                data_len: self.data.len(),
-            })
+        self.data.get(idx).ok_or(ParseError::ColumnIndexOutOfRange {
+            idx,
+            data_len: self.data.len(),
+        })
     }
 
     pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
