@@ -24,6 +24,10 @@ pub enum ParseError {
         col_len: usize,
         expected: usize,
     },
+    MembersColumnsMismatch {
+        members_len: usize,
+        data_len: usize,
+    },
     FlatBufferError(String),
     ErrorMessage(String),
 }
@@ -66,6 +70,14 @@ impl std::fmt::Display for ParseError {
                     idx, col_len, expected
                 )
             }
+            ParseError::MembersColumnsMismatch {
+                members_len,
+                data_len,
+            } => write!(
+                f,
+                "QueryResult has {} members but {} data columns",
+                members_len, data_len
+            ),
             ParseError::FlatBufferError(msg) => write!(f, "FlatBuffer parsing error: {}", msg),
             ParseError::ErrorMessage(msg) => write!(f, "Error: {}", msg),
         }
@@ -95,6 +107,13 @@ impl QueryResult {
     }
 
     pub fn try_new(members: Vec<String>, data: Vec<ColumnarArray>) -> Result<Self, ParseError> {
+        if members.len() != data.len() {
+            return Err(ParseError::MembersColumnsMismatch {
+                members_len: members.len(),
+                data_len: data.len(),
+            });
+        }
+
         let row_count = data.first().map(|c| c.len()).unwrap_or(0);
 
         for (idx, col) in data.iter().enumerate() {
@@ -195,6 +214,7 @@ impl QueryResult {
                             };
                             data[col_idx].push(cell);
                         }
+
                         // Pad short rows with Null to keep all columns aligned.
                         for col in data.iter_mut().take(n_cols).skip(values.len()) {
                             col.push(DBResponsePrimitive::Null);

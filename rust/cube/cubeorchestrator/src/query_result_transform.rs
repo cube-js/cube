@@ -487,14 +487,9 @@ pub(crate) fn build_compact_plan<'a>(
         if let Some(annotation_item) = annotation.get(m) {
             if let Some(alias) = members_to_alias_map.get(m) {
                 if let Some(&column_index) = cube_store_result.columns_pos.get(alias) {
-                    let member_type = annotation_item.member_type.as_deref().unwrap_or("");
-                    let column = cube_store_result
-                        .column(column_index)
-                        .with_context(|| format!("for member {:?}", m))?
-                        .as_slice();
                     entries.push(CompactPlanEntry::Cell {
-                        column,
-                        member_type,
+                        column: cube_store_result.data[column_index].as_slice(),
+                        member_type: annotation_item.member_type.as_deref().unwrap_or(""),
                     });
                 }
             }
@@ -517,10 +512,7 @@ pub(crate) fn build_compact_plan<'a>(
                     let member_type = annotation
                         .get(alias)
                         .map_or("", |a| a.member_type.as_deref().unwrap_or(""));
-                    let column = cube_store_result
-                        .column(column_index)
-                        .with_context(|| format!("for blending alias {:?}", alias))?
-                        .as_slice();
+                    let column = cube_store_result.data[column_index].as_slice();
                     entries.push(CompactPlanEntry::Cell {
                         column,
                         member_type,
@@ -641,10 +633,7 @@ pub fn build_vanilla_plan<'a>(
                 .push((track.level, Arc::clone(&key)));
         }
 
-        let column = cube_store_result
-            .column(index)
-            .with_context(|| format!("for alias {:?}", alias))?
-            .as_slice();
+        let column = cube_store_result.data[index].as_slice();
 
         columns.push(VanillaColumnPlan {
             column,
@@ -823,12 +812,8 @@ fn build_columnar_columns(
         let out = &mut columns[col_idx];
         match &plan_entry.source {
             ColumnarColumnSource::DbColumn { index } => {
-                if let Some(src_col) = db_data.data.get(*index) {
-                    for cell in src_col.iter() {
-                        out.push(transform_value(cell.clone(), plan_entry.member_type));
-                    }
-                } else {
-                    out.resize(row_count, DBResponsePrimitive::Null);
+                for cell in db_data.data[*index].iter() {
+                    out.push(transform_value(cell.clone(), plan_entry.member_type));
                 }
             }
             ColumnarColumnSource::Constant(v) => {
