@@ -827,9 +827,6 @@ fn build_columnar_columns(
                     for cell in src_col.iter() {
                         out.push(transform_value(cell.clone(), plan_entry.member_type));
                     }
-                    if src_col.len() < row_count {
-                        out.resize(row_count, DBResponsePrimitive::Null);
-                    }
                 } else {
                     out.resize(row_count, DBResponsePrimitive::Null);
                 }

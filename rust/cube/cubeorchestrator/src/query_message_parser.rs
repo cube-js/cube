@@ -138,11 +138,6 @@ impl QueryResult {
             })
     }
 
-    #[inline]
-    pub fn cell(&self, row: usize, col: usize) -> &DBResponsePrimitive {
-        &self.data[col][row]
-    }
-
     pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
         let opts = VerifierOptions {
             max_tables: 10_000_000,     // Support up to 10M tables
