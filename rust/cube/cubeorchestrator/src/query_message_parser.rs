@@ -1,4 +1,7 @@
-use crate::{query_result_transform::DBResponsePrimitive, transport::JsRawColumnarData};
+use crate::{
+    query_result_transform::{ColumnarArray, DBResponsePrimitive},
+    transport::JsRawColumnarData,
+};
 use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
 use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
@@ -34,7 +37,7 @@ pub struct QueryResult {
     pub members: Vec<String>,
     pub columns_pos: IndexMap<String, usize>,
     pub row_count: usize,
-    pub data: Vec<Vec<DBResponsePrimitive>>,
+    pub data: Vec<ColumnarArray>,
 }
 
 impl Finalize for QueryResult {}
@@ -55,7 +58,7 @@ impl QueryResult {
     }
 
     #[inline]
-    pub fn column(&self, idx: usize) -> &[DBResponsePrimitive] {
+    pub fn column(&self, idx: usize) -> &ColumnarArray {
         &self.data[idx]
     }
 
@@ -111,7 +114,9 @@ impl QueryResult {
                 if let Some(result_set_rows) = result_set.rows() {
                     let row_count = result_set_rows.len();
                     result.row_count = row_count;
-                    result.data = (0..n_cols).map(|_| Vec::with_capacity(row_count)).collect();
+                    result.data = (0..n_cols)
+                        .map(|_| ColumnarArray::with_capacity(row_count))
+                        .collect();
 
                     for row in result_set_rows.iter() {
                         let values = row.values().ok_or(ParseError::NullRow)?;
@@ -131,7 +136,7 @@ impl QueryResult {
                         }
                     }
                 } else {
-                    result.data = (0..n_cols).map(|_| Vec::new()).collect();
+                    result.data = (0..n_cols).map(|_| ColumnarArray::new()).collect();
                 }
 
                 Ok(result)
@@ -154,7 +159,7 @@ impl QueryResult {
             .collect();
 
         let row_count = columns.first().map(|c| c.len()).unwrap_or(0);
-        let data: Vec<Vec<DBResponsePrimitive>> = columns;
+        let data = columns;
 
         Ok(QueryResult {
             members,

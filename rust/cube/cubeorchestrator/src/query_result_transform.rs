@@ -792,10 +792,12 @@ fn build_columnar_plan<'a>(
 fn build_columnar_columns(
     plan: &[ColumnarColumnPlan<'_>],
     db_data: &QueryResult,
-) -> Vec<Vec<DBResponsePrimitive>> {
+) -> Vec<ColumnarArray> {
     let row_count = db_data.row_count;
-    let mut columns: Vec<Vec<DBResponsePrimitive>> =
-        plan.iter().map(|_| Vec::with_capacity(row_count)).collect();
+    let mut columns: Vec<ColumnarArray> = plan
+        .iter()
+        .map(|_| ColumnarArray::with_capacity(row_count))
+        .collect();
 
     for (col_idx, plan_entry) in plan.iter().enumerate() {
         let out = &mut columns[col_idx];
@@ -997,7 +999,7 @@ pub enum TransformedData {
     },
     Columnar {
         members: Vec<String>,
-        columns: Vec<Vec<DBResponsePrimitive>>,
+        columns: Vec<ColumnarArray>,
     },
     Vanilla(Vec<VanillaRow>),
 }
@@ -1264,6 +1266,56 @@ impl Display for DBResponsePrimitive {
             }
         };
         write!(f, "{}", str)
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(transparent)]
+pub struct ColumnarArray(pub Vec<DBResponsePrimitive>);
+
+impl ColumnarArray {
+    #[inline]
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    #[inline]
+    pub fn with_capacity(cap: usize) -> Self {
+        Self(Vec::with_capacity(cap))
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[DBResponsePrimitive] {
+        &self.0
+    }
+}
+
+impl From<Vec<DBResponsePrimitive>> for ColumnarArray {
+    #[inline]
+    fn from(v: Vec<DBResponsePrimitive>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<ColumnarArray> for Vec<DBResponsePrimitive> {
+    #[inline]
+    fn from(c: ColumnarArray) -> Self {
+        c.0
+    }
+}
+
+impl std::ops::Deref for ColumnarArray {
+    type Target = Vec<DBResponsePrimitive>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for ColumnarArray {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -3570,8 +3622,12 @@ mod tests {
             columns_pos: columns_pos.clone(),
             row_count: 1,
             data: vec![
-                vec![DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string())],
-                vec![DBResponsePrimitive::String("Missouri City".to_string())],
+                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                    "2024-06-01T00:00:00.000".to_string(),
+                )]),
+                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                    "Missouri City".to_string(),
+                )]),
             ],
         };
         let res = get_vanilla_row(&plan, &raw_data, 0)?;
@@ -3630,8 +3686,12 @@ mod tests {
             columns_pos: columns_pos.clone(),
             row_count: 1,
             data: vec![
-                vec![DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string())],
-                vec![DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string())],
+                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                    "2024-06-15T00:00:00.000".to_string(),
+                )]),
+                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                    "2024-06-01T00:00:00.000".to_string(),
+                )]),
             ],
         };
         let res = get_vanilla_row(&plan, &raw_data, 0)?;

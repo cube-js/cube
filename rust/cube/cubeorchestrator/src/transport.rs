@@ -1,4 +1,4 @@
-use crate::query_result_transform::DBResponsePrimitive;
+use crate::query_result_transform::{ColumnarArray, DBResponsePrimitive};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -334,7 +334,7 @@ pub struct TransformDataRequest {
 #[serde(rename_all = "camelCase")]
 pub struct JsRawColumnarData {
     pub members: Vec<String>,
-    pub columns: Vec<Vec<DBResponsePrimitive>>,
+    pub columns: Vec<ColumnarArray>,
 }
 
 #[cfg(test)]

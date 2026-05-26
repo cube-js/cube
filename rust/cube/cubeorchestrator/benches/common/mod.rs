@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use cubeorchestrator::query_result_transform::DBResponsePrimitive;
+use cubeorchestrator::query_result_transform::{ColumnarArray, DBResponsePrimitive};
 use cubeorchestrator::transport::JsRawColumnarData;
 
 pub const ROW_COUNTS: &[usize] = &[1_000, 10_000, 50_000, 100_000];
@@ -38,11 +38,11 @@ pub fn build_dataset(
 ) -> JsRawColumnarData {
     let total_cols = dimensions.len() + measures.len() + time_dims.len();
     let mut members = Vec::with_capacity(total_cols);
-    let mut columns: Vec<Vec<DBResponsePrimitive>> = Vec::with_capacity(total_cols);
+    let mut columns: Vec<ColumnarArray> = Vec::with_capacity(total_cols);
 
     for (j, (_, alias)) in dimensions.iter().enumerate() {
         members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
+        let mut col = ColumnarArray::with_capacity(row_count);
         for i in 0..row_count {
             col.push(DBResponsePrimitive::String(format!(
                 "dim_{}_{}",
@@ -54,7 +54,7 @@ pub fn build_dataset(
     }
     for (j, (_, alias)) in measures.iter().enumerate() {
         members.push(alias.clone());
-        let mut col = Vec::with_capacity(row_count);
+        let mut col = ColumnarArray::with_capacity(row_count);
         for i in 0..row_count {
             col.push(DBResponsePrimitive::Number(((i * (j + 1)) as f64) * 0.5));
         }
@@ -62,7 +62,7 @@ pub fn build_dataset(
     }
     for (j, td) in time_dims.iter().enumerate() {
         members.push(td.alias.clone());
-        let mut col = Vec::with_capacity(row_count);
+        let mut col = ColumnarArray::with_capacity(row_count);
         for i in 0..row_count {
             // Format mirrors typical CubeStore output: ISO-8601 with millisecond
             // fractional and no timezone.
