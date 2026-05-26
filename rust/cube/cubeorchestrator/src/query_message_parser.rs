@@ -18,6 +18,12 @@ pub enum ParseError {
         name: Option<String>,
         data_len: usize,
     },
+    InconsistentColumnLength {
+        idx: usize,
+        name: Option<String>,
+        col_len: usize,
+        expected: usize,
+    },
     FlatBufferError(String),
     ErrorMessage(String),
 }
@@ -33,18 +39,33 @@ impl std::fmt::Display for ParseError {
                 idx,
                 name,
                 data_len,
-            } => match name {
-                Some(name) => write!(
+            } => {
+                write!(f, "QueryResult.data missing column")?;
+
+                if let Some(n) = name {
+                    write!(f, " {:?}", n)?;
+                }
+
+                write!(f, " at index {} (data.len() = {})", idx, data_len)
+            }
+            ParseError::InconsistentColumnLength {
+                idx,
+                name,
+                col_len,
+                expected,
+            } => {
+                write!(f, "QueryResult.data column")?;
+
+                if let Some(n) = name {
+                    write!(f, " {:?}", n)?;
+                }
+
+                write!(
                     f,
-                    "QueryResult.data missing column {:?} at index {} (data.len() = {})",
-                    name, idx, data_len
-                ),
-                None => write!(
-                    f,
-                    "QueryResult.data missing column at index {} (data.len() = {})",
-                    idx, data_len
-                ),
-            },
+                    " at index {} has {} rows, expected {}",
+                    idx, col_len, expected
+                )
+            }
             ParseError::FlatBufferError(msg) => write!(f, "FlatBuffer parsing error: {}", msg),
             ParseError::ErrorMessage(msg) => write!(f, "Error: {}", msg),
         }
@@ -71,6 +92,34 @@ impl QueryResult {
             row_count: 0,
             data: vec![],
         }
+    }
+
+    pub fn try_new(members: Vec<String>, data: Vec<ColumnarArray>) -> Result<Self, ParseError> {
+        let row_count = data.first().map(|c| c.len()).unwrap_or(0);
+
+        for (idx, col) in data.iter().enumerate() {
+            if col.len() != row_count {
+                return Err(ParseError::InconsistentColumnLength {
+                    idx,
+                    name: members.get(idx).cloned(),
+                    col_len: col.len(),
+                    expected: row_count,
+                });
+            }
+        }
+
+        let columns_pos: IndexMap<String, usize> = members
+            .iter()
+            .enumerate()
+            .map(|(index, member)| (member.clone(), index))
+            .collect();
+
+        Ok(QueryResult {
+            members,
+            columns_pos,
+            row_count,
+            data,
+        })
     }
 
     #[inline]
@@ -117,31 +166,20 @@ impl QueryResult {
                     .command_as_http_result_set()
                     .ok_or(ParseError::EmptyResultSet)?;
 
-                let mut result = QueryResult::empty();
-
-                if let Some(result_set_columns) = result_set.columns() {
-                    if result_set_columns.iter().any(|c| c.is_empty()) {
-                        return Err(ParseError::ColumnNameNotDefined);
+                let members: Vec<String> = match result_set.columns() {
+                    Some(result_set_columns) => {
+                        if result_set_columns.iter().any(|c| c.is_empty()) {
+                            return Err(ParseError::ColumnNameNotDefined);
+                        }
+                        result_set_columns.iter().map(|c| c.to_owned()).collect()
                     }
+                    None => Vec::new(),
+                };
 
-                    let (members, columns_pos): (Vec<_>, IndexMap<_, _>) = result_set_columns
-                        .iter()
-                        .enumerate()
-                        .map(|(index, column_name)| {
-                            (column_name.to_owned(), (column_name.to_owned(), index))
-                        })
-                        .unzip();
-
-                    result.members = members;
-                    result.columns_pos = columns_pos;
-                }
-
-                let n_cols = result.members.len();
-
-                if let Some(result_set_rows) = result_set.rows() {
+                let n_cols = members.len();
+                let data: Vec<ColumnarArray> = if let Some(result_set_rows) = result_set.rows() {
                     let row_count = result_set_rows.len();
-                    result.row_count = row_count;
-                    result.data = (0..n_cols)
+                    let mut data: Vec<ColumnarArray> = (0..n_cols)
                         .map(|_| ColumnarArray::with_capacity(row_count))
                         .collect();
 
@@ -155,18 +193,20 @@ impl QueryResult {
                                 Some(s) => DBResponsePrimitive::String(s.to_owned()),
                                 None => DBResponsePrimitive::Null,
                             };
-                            result.data[col_idx].push(cell);
+                            data[col_idx].push(cell);
                         }
                         // Pad short rows with Null to keep all columns aligned.
                         for col_idx in values.len()..n_cols {
-                            result.data[col_idx].push(DBResponsePrimitive::Null);
+                            data[col_idx].push(DBResponsePrimitive::Null);
                         }
                     }
-                } else {
-                    result.data = (0..n_cols).map(|_| ColumnarArray::new()).collect();
-                }
 
-                Ok(result)
+                    data
+                } else {
+                    (0..n_cols).map(|_| ColumnarArray::new()).collect()
+                };
+
+                QueryResult::try_new(members, data)
             }
             _ => Err(ParseError::UnsupportedCommand),
         }
@@ -174,26 +214,7 @@ impl QueryResult {
 
     pub fn from_js_raw_data(js_raw_data: JsRawColumnarData) -> Result<Self, ParseError> {
         let JsRawColumnarData { members, columns } = js_raw_data;
-
-        if members.is_empty() {
-            return Ok(QueryResult::empty());
-        }
-
-        let columns_pos: IndexMap<String, usize> = members
-            .iter()
-            .enumerate()
-            .map(|(index, member)| (member.clone(), index))
-            .collect();
-
-        let row_count = columns.first().map(|c| c.len()).unwrap_or(0);
-        let data = columns;
-
-        Ok(QueryResult {
-            members,
-            columns_pos,
-            row_count,
-            data,
-        })
+        QueryResult::try_new(members, columns)
     }
 }
 

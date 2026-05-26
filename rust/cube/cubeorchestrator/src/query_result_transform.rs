@@ -546,9 +546,7 @@ pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponse
                 column,
                 member_type,
             } => {
-                if let Some(value) = column.get(row_idx) {
-                    row.push(transform_value(value.clone(), member_type));
-                }
+                row.push(transform_value(column[row_idx].clone(), member_type));
             }
             CompactPlanEntry::Constant(v) => {
                 row.push(v.clone());
@@ -862,10 +860,8 @@ pub fn get_vanilla_row(plan: &VanillaPlan<'_>, row_idx: usize) -> Result<Vanilla
     );
 
     for column in &plan.columns {
-        if let Some(value) = column.column.get(row_idx) {
-            let transformed_value = transform_value(value.clone(), column.member_type);
-            row.insert(Arc::clone(&column.key), transformed_value);
-        }
+        let transformed_value = transform_value(column.column[row_idx].clone(), column.member_type);
+        row.insert(Arc::clone(&column.key), transformed_value);
     }
 
     // Handle deprecated time dimensions without granularity. The candidate
@@ -3603,86 +3599,9 @@ mod tests {
         }
     }
 
-    /// Two granularity columns share the same base time dim. When the finer
-    /// candidate's value is missing from the row, the bare `{cube}.{dim}` key
-    /// must fall back to the coarser candidate — same behavior as the previous
-    /// per-row HashMap, which only considered columns whose value was present.
-    #[test]
-    fn test_get_vanilla_row_minimal_granularity_falls_back_when_finer_missing() -> Result<()> {
-        let mut columns_pos: IndexMap<String, usize> = IndexMap::new();
-        columns_pos.insert("t_day".to_string(), 2); // out of range in the row below
-        columns_pos.insert("t_month".to_string(), 0);
-        columns_pos.insert("city".to_string(), 1);
-
-        let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
-        alias_to_member_name_map.insert("t_day".to_string(), "Cube.t.day".to_string());
-        alias_to_member_name_map.insert("t_month".to_string(), "Cube.t.month".to_string());
-        alias_to_member_name_map.insert("city".to_string(), "Cube.city".to_string());
-
-        let mut annotation: HashMap<String, ConfigItem> = HashMap::new();
-        annotation.insert("Cube.t.day".to_string(), make_config_item("time"));
-        annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
-        annotation.insert("Cube.city".to_string(), make_config_item("string"));
-
-        let query = make_query_with_dims(None);
-        // `data` carries an empty buffer at index 2 (t_day) so the column is
-        // present in the plan but `column.get(row_idx)` yields None — same
-        // observable as "missing column" from the row's point of view.
-        let raw_data = QueryResult {
-            members: vec![],
-            columns_pos: columns_pos.clone(),
-            row_count: 1,
-            data: vec![
-                ColumnarArray::from(vec![DBResponsePrimitive::String(
-                    "2024-06-01T00:00:00.000".to_string(),
-                )]),
-                ColumnarArray::from(vec![DBResponsePrimitive::String(
-                    "Missouri City".to_string(),
-                )]),
-                ColumnarArray::new(),
-            ],
-        };
-        let plan = build_vanilla_plan(
-            &raw_data,
-            &alias_to_member_name_map,
-            &annotation,
-            &query,
-            &QueryType::RegularQuery,
-        )?;
-        let res = get_vanilla_row(&plan, 0)?;
-
-        let month_transformed = transform_value(
-            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
-            "time",
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.t.month")),
-            Some(&month_transformed)
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.t.day")),
-            None,
-            "missing column stays absent"
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.city")),
-            Some(&DBResponsePrimitive::String("Missouri City".to_string()))
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.t")),
-            Some(&month_transformed),
-            "bare base key must fall back to the coarser present candidate"
-        );
-        Ok(())
-    }
-
     /// When all candidates are present, the bare key picks the finest level.
     #[test]
     fn test_get_vanilla_row_minimal_granularity_picks_finest_when_all_present() -> Result<()> {
-        let mut columns_pos: IndexMap<String, usize> = IndexMap::new();
-        columns_pos.insert("t_day".to_string(), 0);
-        columns_pos.insert("t_month".to_string(), 1);
-
         let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
         alias_to_member_name_map.insert("t_day".to_string(), "Cube.t.day".to_string());
         alias_to_member_name_map.insert("t_month".to_string(), "Cube.t.month".to_string());
@@ -3692,11 +3611,9 @@ mod tests {
         annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
 
         let query = make_query_with_dims(None);
-        let raw_data = QueryResult {
-            members: vec![],
-            columns_pos: columns_pos.clone(),
-            row_count: 1,
-            data: vec![
+        let raw_data = QueryResult::try_new(
+            vec!["t_day".to_string(), "t_month".to_string()],
+            vec![
                 ColumnarArray::from(vec![DBResponsePrimitive::String(
                     "2024-06-15T00:00:00.000".to_string(),
                 )]),
@@ -3704,7 +3621,7 @@ mod tests {
                     "2024-06-01T00:00:00.000".to_string(),
                 )]),
             ],
-        };
+        )?;
         let plan = build_vanilla_plan(
             &raw_data,
             &alias_to_member_name_map,
