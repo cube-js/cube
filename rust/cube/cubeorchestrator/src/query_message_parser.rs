@@ -13,6 +13,11 @@ pub enum ParseError {
     EmptyResultSet,
     NullRow,
     ColumnNameNotDefined,
+    ColumnIndexOutOfRange {
+        idx: usize,
+        name: Option<String>,
+        data_len: usize,
+    },
     FlatBufferError(String),
     ErrorMessage(String),
 }
@@ -24,6 +29,22 @@ impl std::fmt::Display for ParseError {
             ParseError::EmptyResultSet => write!(f, "Empty resultSet"),
             ParseError::NullRow => write!(f, "Null row"),
             ParseError::ColumnNameNotDefined => write!(f, "Column name is not defined"),
+            ParseError::ColumnIndexOutOfRange {
+                idx,
+                name,
+                data_len,
+            } => match name {
+                Some(name) => write!(
+                    f,
+                    "QueryResult.data missing column {:?} at index {} (data.len() = {})",
+                    name, idx, data_len
+                ),
+                None => write!(
+                    f,
+                    "QueryResult.data missing column at index {} (data.len() = {})",
+                    idx, data_len
+                ),
+            },
             ParseError::FlatBufferError(msg) => write!(f, "FlatBuffer parsing error: {}", msg),
             ParseError::ErrorMessage(msg) => write!(f, "Error: {}", msg),
         }
@@ -58,8 +79,14 @@ impl QueryResult {
     }
 
     #[inline]
-    pub fn column(&self, idx: usize) -> &ColumnarArray {
-        &self.data[idx]
+    pub fn column(&self, idx: usize) -> Result<&ColumnarArray, ParseError> {
+        self.data
+            .get(idx)
+            .ok_or_else(|| ParseError::ColumnIndexOutOfRange {
+                idx,
+                name: self.members.get(idx).cloned(),
+                data_len: self.data.len(),
+            })
     }
 
     #[inline]
