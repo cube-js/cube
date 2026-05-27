@@ -129,6 +129,11 @@ cubes:
             reduce_by:
                 - orders.category
 
+          - name: amount_plus_customers_reduce_category
+            type: number
+            sql: "{CUBE.amount_reduce_category} + {CUBE.unique_customers_reduce_category}"
+            multi_stage: true
+
           - name: max_amount
             type: max
             sql: amount

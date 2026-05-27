@@ -40,14 +40,13 @@ impl PrettyPrint for MultiStageSubqueryRef {
 }
 
 /// Dim-grid source for the JOIN-based assembly: a set of CTE refs that
-/// supply the keys grid plus the explicit list of dim symbols to use as
-/// JOIN-keys against the measure-side `multi_stage_subquery_refs`.
+/// supply the keys grid. Each ref's own logical schema declares the
+/// output (leaf) grain; the FKA strategy derives JOIN-keys against
+/// `multi_stage_subquery_refs` from the intersection of schemas.
 #[derive(Clone, TypedBuilder)]
 pub struct FullKeyAggregateKeysInput {
     #[builder(default)]
     refs: Vec<Rc<MultiStageSubqueryRef>>,
-    #[builder(default)]
-    keys: Vec<Rc<MemberSymbol>>,
 }
 
 impl FullKeyAggregateKeysInput {
@@ -55,12 +54,8 @@ impl FullKeyAggregateKeysInput {
         &self.refs
     }
 
-    pub fn keys(&self) -> &Vec<Rc<MemberSymbol>> {
-        &self.keys
-    }
-
     pub fn is_empty(&self) -> bool {
-        self.refs.is_empty() && self.keys.is_empty()
+        self.refs.is_empty()
     }
 }
 
@@ -74,9 +69,6 @@ impl PrettyPrint for FullKeyAggregateKeysInput {
             for r in self.refs.iter() {
                 r.pretty_print(result, &details);
             }
-        }
-        if !self.keys.is_empty() {
-            result.println(&format!("keys: {}", print_symbols(&self.keys)), &inner);
         }
     }
 }

@@ -516,16 +516,14 @@ impl MultiStageQueryPlanner {
             // already on the parent's `state`, this Aggregate inode shrinks
             // the parent grain. The existing full-grain inputs become the
             // keys-side; a fresh round of make_childs at partition grain
-            // becomes the measure-side. Otherwise (`add_group_by` only, or
-            // no modifiers) we leave `input` as-is.
+            // becomes the measure-side. Otherwise we leave `input` as-is.
             //
-            // For now restricted to the case where new_state has the same
-            // dim shape as `state` (i.e. no add_group_by / case-switch dim
-            // extension on this level). The combo `add_group_by + reduce_by`
-            // needs a three-tier structure (leaf → outer agg → keys) which
-            // this two-tier `keys ⊕ measure` model can't express in one
-            // CTE step yet, so we fall back to the legacy window path for
-            // that case.
+            // Restricted to the case where new_state has the same dim shape
+            // as `state` (no add_group_by / case-switch dim extension on this
+            // level). The combo `add_group_by + reduce_by` needs a three-tier
+            // structure (leaf → outer agg → keys) which the current two-tier
+            // `keys ⊕ measure` model can't express, so for combo we fall back
+            // to the legacy window path.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
             let leaf_matches_state = dimensions_to_add.is_empty();
             if leaf_matches_state {

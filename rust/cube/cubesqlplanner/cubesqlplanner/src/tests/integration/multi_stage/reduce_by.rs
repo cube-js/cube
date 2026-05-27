@@ -113,6 +113,35 @@ async fn test_reduce_by_max_of_sum() {
     }
 }
 
+// Calculated multi-stage measure summing two reduce_by Aggregate children.
+// Each child renders through the JOIN-model path independently; the parent
+// Calculate inode then stitches both via FullKeyAggregate on the query grain.
+// Expected per status (broadcast across categories):
+//   amount_reduce_category:           200 / 1400 / 650
+//   unique_customers_reduce_category:   3 /    3 /   3
+//   sum:                              203 / 1403 / 653
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_calculated_over_two() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_plus_customers_reduce_category
+        dimensions:
+          - orders.status
+          - orders.category
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_single_dim() {
     let ctx = create_context();

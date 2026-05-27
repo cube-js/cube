@@ -286,19 +286,8 @@ impl MultiStageMemberQueryPlanner {
                 })
                 .unique_by(|r| r.name().clone())
                 .collect_vec();
-            let keys = self
-                .description
-                .state()
-                .dimensions()
-                .iter()
-                .cloned()
-                .chain(self.description.state().time_dimensions().iter().cloned())
-                .collect_vec();
             Some(Rc::new(
-                FullKeyAggregateKeysInput::builder()
-                    .refs(refs)
-                    .keys(keys)
-                    .build(),
+                FullKeyAggregateKeysInput::builder().refs(refs).build(),
             ))
         };
 
