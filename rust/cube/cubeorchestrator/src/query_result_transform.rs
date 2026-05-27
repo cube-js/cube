@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context, Result};
+use chrono::format::{Fixed, Item, Numeric, Pad};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::{Equivalent, IndexMap};
 use itertools::multizip;
@@ -180,7 +181,7 @@ pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePri
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f").map(|dt| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f").map(|dt| {
                         Utc.from_utc_datetime(&dt)
                             .format("%Y-%m-%dT%H:%M:%S%.3f")
                             .to_string()
@@ -201,14 +202,14 @@ pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePri
                     })
                 })
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %Z").map(|dt| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f %Z").map(|dt| {
                         Utc.from_utc_datetime(&dt)
                             .format("%Y-%m-%dT%H:%M:%S%.3f")
                             .to_string()
                     })
                 })
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %:z").map(|dt| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f %:z").map(|dt| {
                         Utc.from_utc_datetime(&dt)
                             .format("%Y-%m-%dT%H:%M:%S%.3f")
                             .to_string()
@@ -1152,14 +1153,52 @@ pub struct RequestResultArray {
     pub results: Vec<RequestResultData>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DBResponsePrimitive {
     Null,
     Boolean(bool),
-    Number(f64),
+    Int64(i64),
+    UInt64(u64),
+    Float64(f64),
     String(String),
+    Timestamp(NaiveDateTime),
     Uncommon(Value),
+}
+
+/// `%Y-%m-%dT%H:%M:%S%.3f`
+const TIMESTAMP_ITEMS: &[Item<'static>] = &[
+    Item::Numeric(Numeric::Year, Pad::Zero),
+    Item::Literal("-"),
+    Item::Numeric(Numeric::Month, Pad::Zero),
+    Item::Literal("-"),
+    Item::Numeric(Numeric::Day, Pad::Zero),
+    Item::Literal("T"),
+    Item::Numeric(Numeric::Hour, Pad::Zero),
+    Item::Literal(":"),
+    Item::Numeric(Numeric::Minute, Pad::Zero),
+    Item::Literal(":"),
+    Item::Numeric(Numeric::Second, Pad::Zero),
+    // `%.3f`: leading dot followed by 3 fractional-second digits.
+    Item::Fixed(Fixed::Nanosecond3),
+];
+
+// Hand-written `Serialize` mirroring serde's untagged behavior for the JSON-native
+// variants, plus a string rendering for `Timestamp`.
+impl Serialize for DBResponsePrimitive {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            DBResponsePrimitive::Null => serializer.serialize_none(),
+            DBResponsePrimitive::Boolean(b) => serializer.serialize_bool(*b),
+            DBResponsePrimitive::Int64(n) => serializer.serialize_i64(*n),
+            DBResponsePrimitive::UInt64(n) => serializer.serialize_u64(*n),
+            DBResponsePrimitive::Float64(n) => serializer.serialize_f64(*n),
+            DBResponsePrimitive::String(s) => serializer.serialize_str(s),
+            DBResponsePrimitive::Timestamp(dt) => {
+                serializer.collect_str(&dt.format_with_items(TIMESTAMP_ITEMS.iter()))
+            }
+            DBResponsePrimitive::Uncommon(v) => v.serialize(serializer),
+        }
+    }
 }
 
 // Hand-written `Deserialize` that avoids serde's untagged-enum buffering.
@@ -1182,23 +1221,35 @@ impl<'de> Deserialize<'de> for DBResponsePrimitive {
             }
 
             fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::Int64(v))
             }
 
             fn visit_i128<E: de::Error>(self, v: i128) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                if let Ok(n) = i64::try_from(v) {
+                    Ok(DBResponsePrimitive::Int64(n))
+                } else if let Ok(n) = u64::try_from(v) {
+                    Ok(DBResponsePrimitive::UInt64(n))
+                } else {
+                    Err(E::custom(format!("integer {v} out of range for i64/u64")))
+                }
             }
 
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::UInt64(v))
             }
 
             fn visit_u128<E: de::Error>(self, v: u128) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                if let Ok(n) = i64::try_from(v) {
+                    Ok(DBResponsePrimitive::Int64(n))
+                } else if let Ok(n) = u64::try_from(v) {
+                    Ok(DBResponsePrimitive::UInt64(n))
+                } else {
+                    Err(E::custom(format!("integer {v} out of range for i64/u64")))
+                }
             }
 
             fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v))
+                Ok(DBResponsePrimitive::Float64(v))
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
@@ -1254,12 +1305,18 @@ impl Display for DBResponsePrimitive {
         let str = match self {
             DBResponsePrimitive::Null => "null".to_string(),
             DBResponsePrimitive::Boolean(b) => b.to_string(),
-            DBResponsePrimitive::Number(n) => n.to_string(),
+            DBResponsePrimitive::Int64(n) => n.to_string(),
+            DBResponsePrimitive::UInt64(n) => n.to_string(),
+            DBResponsePrimitive::Float64(n) => n.to_string(),
             DBResponsePrimitive::String(s) => s.clone(),
+            DBResponsePrimitive::Timestamp(dt) => {
+                dt.format_with_items(TIMESTAMP_ITEMS.iter()).to_string()
+            }
             DBResponsePrimitive::Uncommon(v) => {
                 serde_json::to_string(&v).unwrap_or_else(|_| v.to_string())
             }
         };
+
         write!(f, "{}", str)
     }
 }
@@ -1321,6 +1378,15 @@ mod tests {
     use anyhow::Result;
     use serde_json::from_str;
     use std::{fmt, sync::LazyLock};
+
+    /// Guards the in-memory size of the per-cell primitive. It is materialized
+    /// once per cell across every parse/transform path, so an accidental growth
+    /// (e.g. a fat new variant) would regress memory and throughput for large
+    /// result sets. Bump this deliberately if the layout must change.
+    #[test]
+    fn test_db_response_primitive_size() {
+        assert_eq!(std::mem::size_of::<DBResponsePrimitive>(), 32);
+    }
 
     type TestSuiteData = HashMap<String, TestData>;
 
@@ -2281,6 +2347,25 @@ mod tests {
             result,
             DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
         );
+    }
+
+    #[test]
+    fn test_transform_value_string_variable_frac_digits_to_time() {
+        // A time string may carry any number of fractional-second digits.
+        for (input, expected) in [
+            ("2020-04-01 00:00:00.0", "2020-04-01T00:00:00.000"),
+            ("2020-04-01 00:00:00.12", "2020-04-01T00:00:00.120"),
+            ("2020-04-01 00:00:00.123456", "2020-04-01T00:00:00.123"),
+            ("2020-04-01 00:00:00.0 UTC", "2020-04-01T00:00:00.000"),
+            ("2020-04-01 00:00:00.0 +00:00", "2020-04-01T00:00:00.000"),
+        ] {
+            let result = transform_value(DBResponsePrimitive::String(input.to_string()), "time");
+            assert_eq!(
+                result,
+                DBResponsePrimitive::String(expected.to_string()),
+                "input: {input}"
+            );
+        }
     }
 
     #[test]
