@@ -1,6 +1,7 @@
 mod full_join_aggregate_strategy;
 mod inner_join_aggregate_strategy;
 mod keys_aggregate_strategy;
+mod keys_input_aggregate_strategy;
 
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::FullKeyAggregate;
@@ -10,6 +11,7 @@ use cubenativeutils::CubeError;
 use full_join_aggregate_strategy::FullJoinFullKeyAggregateStrategy;
 use inner_join_aggregate_strategy::InnerJoinFullKeyAggregateStrategy;
 use keys_aggregate_strategy::KeysFullKeyAggregateStrategy;
+use keys_input_aggregate_strategy::KeysInputFullKeyAggregateStrategy;
 use std::rc::Rc;
 
 trait FullKeyAggregateStrategy {
@@ -36,7 +38,9 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let strategy: Rc<dyn FullKeyAggregateStrategy> =
-            if !full_key_aggregate.schema().has_dimensions() {
+            if full_key_aggregate.keys_input().is_some() {
+                KeysInputFullKeyAggregateStrategy::new(self.builder)
+            } else if !full_key_aggregate.schema().has_dimensions() {
                 InnerJoinFullKeyAggregateStrategy::new(self.builder)
             } else if self.builder.templates().supports_full_join() {
                 FullJoinFullKeyAggregateStrategy::new(self.builder)

@@ -39,12 +39,9 @@ async fn test_reduce_by_add_group_by_combo() {
     }
 }
 
-// Inner base = max (idempotent), outer multi-stage = sum. Numerically the
-// current window path lands on the right number — sum on single-row leaf
-// buckets is identity — but the shape (`sum(sum(...))` instead of
-// semantically-correct `sum(max(...))`) and the broader JOIN-semantics for
-// non-additive cases will only converge once we move off the window path.
-#[ignore]
+// Inner base = max (idempotent), outer multi-stage = sum. JOIN-model
+// computes overall max(amount) per status, broadcast across categories
+// (100 / 400 / 250 on this seed).
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_sum_of_max() {
     let ctx = create_context();
@@ -91,11 +88,9 @@ async fn test_reduce_by_sum_of_count() {
     }
 }
 
-// Inner additive (sum), outer idempotent (max). Snapshot pins the JOIN-semantic
-// result (max amount per status, reduced over category). Current window path
-// returns a different number (max of category-sums per status); re-enable once
-// reduce_by for non-additive / inner-≠-outer cases moves onto the JOIN model.
-#[ignore]
+// Inner additive (sum), outer idempotent (max). JOIN-model computes overall
+// sum(amount) per status broadcast across categories
+// (200 / 1400 / 650 on this seed).
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_max_of_sum() {
     let ctx = create_context();
@@ -204,20 +199,9 @@ async fn test_reduce_by_dim_not_in_query() {
     }
 }
 
-// TODO: planner currently produces avg-of-avg via window for multi-stage avg
-// with reduce_by. avg is non-additive, so the result is "mean of per-bucket
-// means" instead of the actual mean over the partition — silently wrong on
-// data with uneven bucket sizes. Re-enable after switching reduce_by for
-// non-additive measures to the JOIN-based model.
-//
-// Honest avg(amount) per status (with category reduced):
-//   cancelled — orders 4, 9, 14 → values 50, 50, 100 → (200 / 3)  ≈ 66.67
-//   completed — 100, 200, 300, 200, 400, 200          → (1400 / 6) ≈ 233.33
-//   pending   — 120, 30, 150, 50, 250, 50             → (650 / 6)  ≈ 108.33
-//
-// avg-of-avg via window yields different numbers for completed/pending because
-// per-(status, category) bucket sizes differ.
-#[ignore]
+// avg with reduce_by — JOIN-model computes overall avg(amount) per status
+// (= 66.67 / 233.33 / 108.33 on this seed) instead of the window-path
+// avg-of-bucket-avgs which would have diverged on uneven bucket sizes.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_avg() {
     let ctx = create_context();

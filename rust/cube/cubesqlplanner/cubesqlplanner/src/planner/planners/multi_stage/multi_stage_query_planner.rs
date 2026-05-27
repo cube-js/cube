@@ -514,26 +514,46 @@ impl MultiStageQueryPlanner {
 
             // JOIN-model: when partition_new_state misses any dim that was
             // already on the parent's `state`, this Aggregate inode shrinks
-            // the parent grain and we need a separate keys-side branch.
-            // add_group_by alone never triggers this — extending leaf below
-            // the current grain doesn't drop anything from the parent.
+            // the parent grain. The existing full-grain inputs become the
+            // keys-side; a fresh round of make_childs at partition grain
+            // becomes the measure-side. Otherwise (`add_group_by` only, or
+            // no modifiers) we leave `input` as-is.
+            //
+            // For now restricted to the case where new_state has the same
+            // dim shape as `state` (i.e. no add_group_by / case-switch dim
+            // extension on this level). The combo `add_group_by + reduce_by`
+            // needs a three-tier structure (leaf → outer agg → keys) which
+            // this two-tier `keys ⊕ measure` model can't express in one
+            // CTE step yet, so we fall back to the legacy window path for
+            // that case.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
-            if let Some(partition_state) = partition_new_state.as_ref() {
-                let parent_dim_in_partition = |sym: &Rc<MemberSymbol>| {
-                    let sym_name = sym.clone().resolve_reference_chain().full_name();
-                    partition_state
+            let leaf_matches_state = dimensions_to_add.is_empty();
+            if leaf_matches_state {
+                if let Some(partition_state) = partition_new_state.as_ref() {
+                    let parent_dim_in_partition = |sym: &Rc<MemberSymbol>| {
+                        let sym_name = sym.clone().resolve_reference_chain().full_name();
+                        partition_state
+                            .dimensions()
+                            .iter()
+                            .chain(partition_state.time_dimensions().iter())
+                            .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
+                    };
+                    let any_missing = state
                         .dimensions()
                         .iter()
-                        .chain(partition_state.time_dimensions().iter())
-                        .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
-                };
-                let any_missing = state
-                    .dimensions()
-                    .iter()
-                    .chain(state.time_dimensions().iter())
-                    .any(|d| !parent_dim_in_partition(d));
-                if any_missing {
-                    keys_input = input.clone();
+                        .chain(state.time_dimensions().iter())
+                        .any(|d| !parent_dim_in_partition(d));
+                    if any_missing {
+                        keys_input = std::mem::take(&mut input);
+                        self.make_childs(
+                            member.clone(),
+                            partition_state.clone(),
+                            &mut input,
+                            descriptions,
+                            resolved_multi_stage_dimensions,
+                            cte_state,
+                        )?;
+                    }
                 }
             }
 

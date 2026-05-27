@@ -1,16 +1,16 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/reduce_by.rs
-assertion_line: 32
+assertion_line: 117
 expression: result
 ---
 orders__status | orders__category | orders__max_total_amount_reduce_category
 ---------------+------------------+-----------------------------------------
-cancelled      | books            | 200.00
-cancelled      | clothing         | 200.00
-cancelled      | electronics      | 200.00
-completed      | books            | 1400.00
-completed      | clothing         | 1400.00
-completed      | electronics      | 1400.00
-pending        | books            | 650.00
-pending        | clothing         | 650.00
+cancelled      | books            | 200.00                                  
+cancelled      | clothing         | 200.00                                  
+cancelled      | electronics      | 200.00                                  
+completed      | books            | 1400.00                                 
+completed      | clothing         | 1400.00                                 
+completed      | electronics      | 1400.00                                 
+pending        | books            | 650.00                                  
+pending        | clothing         | 650.00                                  
 pending        | electronics      | 650.00
