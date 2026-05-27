@@ -27,6 +27,30 @@ In Creator Mode, `groups` and `userAttributes` resolve against the embed tenant'
 
 See [Generate Session → Creator mode bootstrap][ref-bootstrap] for the input shape, value types, and the immutable-`type` rule on attribute definitions.
 
+## Default dashboards
+
+You can pre-populate every embed user's workspace with ready-made content so they see useful dashboards the first time they open the embedded app, instead of an empty workspace. This is a good way to ship templates or starter reports that your users can explore and build on.
+
+Default dashboards are shared from your **main workspace** with the **All embed users** (`all_embed_users`) group — a system group that Cube creates automatically once Creator Mode is enabled. Sharing is read-only: embed users can open and explore the shared content but can't edit it.
+
+To set up default dashboards:
+
+1. Build the workbooks, dashboards, folders, and reports you want everyone to see in your main workspace.
+2. Open the share dialog for a workbook or folder and share it with **All embed users**. The only available access level is **Can view**.
+3. Embed users in Creator Mode now see the shared items at the root of their workspace as soon as they open the app.
+
+<Note>
+  **All embed users** is a system group: it can't be renamed or deleted, and it can only be granted read-only (**Can view**) access. It appears automatically in **Admin → User Groups** and in the share dialog once Creator Mode is enabled for your workspace.
+</Note>
+
+Keep the following behavior in mind:
+
+- **Sharing a folder** shares everything inside it — all nested folders, workbooks, and reports become available to embed users.
+- **Sharing a single workbook or report** exposes that item plus the folders above it (so users can navigate to it), but not the other contents of those folders.
+- All embed users see the **same** default dashboards, regardless of their [groups](/admin/users-and-permissions/user-groups) or user attributes. The shared set applies across every embed tenant that belongs to your account.
+- Embed users can't edit content shared from the main workspace. Opening a shared workbook shows its published dashboard, so a workbook must have a published dashboard for users to open it.
+- Removing the share from the **All embed users** group removes those items from embed users' workspaces immediately.
+
 ## Example
 
 ```javascript
