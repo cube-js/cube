@@ -52,8 +52,9 @@ pub struct MultiStageFilter {
     pub include_measure: Vec<FilterItem>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum MultiStageGrainMode {
+    #[default]
     Relative,
     Fixed,
 }
@@ -80,7 +81,7 @@ impl MultiStageGrainMode {
 /// Sourced from the `grain:` directive when present; otherwise mapped from
 /// `add_group_by` / `reduce_by` / `group_by` (→ `include` / `exclude` /
 /// `keep_only`) with `mode: Relative`.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct MultiStageGrain {
     pub mode: MultiStageGrainMode,
     pub exclude: Option<Vec<Rc<MemberSymbol>>>,
@@ -137,10 +138,8 @@ impl MultiStageProperties {
 
         Ok(Some(Self {
             grain: MultiStageGrain {
-                mode: MultiStageGrainMode::Relative,
-                exclude: None,
-                keep_only: None,
                 include,
+                ..Default::default()
             },
             filter,
             time_shift: None,

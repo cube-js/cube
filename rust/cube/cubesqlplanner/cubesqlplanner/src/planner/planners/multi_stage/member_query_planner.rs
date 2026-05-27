@@ -7,6 +7,7 @@ use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, Sim
 use crate::planner::query_tools::QueryTools;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
+use crate::planner::MultiStageGrain;
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -203,10 +204,7 @@ impl MultiStageMemberQueryPlanner {
         &self,
         multi_stage_member: &MultiStageInodeMember,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let partition_by = self.member_partition_by_logical(
-            &multi_stage_member.reduce_by_symbols(),
-            &multi_stage_member.group_by_symbols(),
-        );
+        let partition_by = self.member_partition_by_logical(multi_stage_member.grain());
 
         // Rank always uses a window function. Aggregate inodes are
         // routed through `FullKeyAggregate` by default; only the narrow
@@ -520,24 +518,20 @@ impl MultiStageMemberQueryPlanner {
             .collect_vec()
     }
 
-    fn member_partition_by_logical(
-        &self,
-        reduce_by: &Vec<Rc<MemberSymbol>>,
-        group_by: &Option<Vec<Rc<MemberSymbol>>>,
-    ) -> Vec<Rc<MemberSymbol>> {
+    fn member_partition_by_logical(&self, grain: &MultiStageGrain) -> Vec<Rc<MemberSymbol>> {
         let dimensions = self.all_dimensions();
-        let dimensions = if !reduce_by.is_empty() {
+        let dimensions = if let Some(exclude) = &grain.exclude {
             dimensions
                 .into_iter()
-                .filter(|d| !reduce_by.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect_vec()
         } else {
             dimensions
         };
-        let dimensions = if let Some(group_by) = group_by {
+        let dimensions = if let Some(keep_only) = &grain.keep_only {
             dimensions
                 .into_iter()
-                .filter(|d| group_by.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect_vec()
         } else {
             dimensions

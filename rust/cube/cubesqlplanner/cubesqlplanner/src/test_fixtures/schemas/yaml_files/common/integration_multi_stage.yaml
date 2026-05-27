@@ -221,6 +221,17 @@ cubes:
                 - orders.status
                 - orders.created_at.month
 
+          # Same partition shape as `amount_group_by_status`, expressed via
+          # `grain.keep_only`.
+          - name: amount_grain_keep_only_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                mode: relative
+                keep_only:
+                    - orders.status
+
           - name: amount_prev_month
             type: number
             sql: "{CUBE.total_amount}"

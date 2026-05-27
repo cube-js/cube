@@ -22,6 +22,7 @@ use crate::planner::MeasureKind;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
+use crate::planner::MultiStageGrain;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
@@ -141,10 +142,9 @@ impl MultiStageQueryPlanner {
 
     /// Classifies `base_member` into a `MultiStageInodeMember` — picks
     /// the inode kind (Rank / Aggregate / Calculate for a measure,
-    /// Dimension for a dimension) and pulls the partition-shaping
-    /// flags (`reduce_by`, `add_group_by`, `group_by`, `time_shift`)
-    /// out of the data-model definition. Returns the inode together
-    /// with the leaf's `is_ungrupped` flag.
+    /// Dimension for a dimension) and carries over the partition-shaping
+    /// `grain` and optional `time_shift` from the data-model definition.
+    /// Returns the inode together with the leaf's `is_ungrupped` flag.
     fn create_multi_stage_inode_member(
         &self,
         base_member: Rc<MemberSymbol>,
@@ -164,39 +164,35 @@ impl MultiStageQueryPlanner {
                 _ => self.query_properties.ungrouped(),
             };
 
-            let reduce_by = measure.reduce_by().cloned().unwrap_or_default();
-            let add_group_by = measure.add_group_by().cloned().unwrap_or_default();
-            let group_by = measure.group_by().cloned();
+            let grain = measure
+                .multi_stage()
+                .map(|ms| ms.grain.clone())
+                .unwrap_or_default();
+            // Window-path eligibility intentionally checks only `include`:
+            // `exclude` and `keep_only` are realised through the window's
+            // PARTITION BY at render time, so they don't disqualify the
+            // path. `include` extends the leaf grain, which the JOIN-model
+            // is required for. Revisit if window-path expands to cases
+            // where exclude/keep_only affect render correctness.
+            let has_include = grain.include.as_ref().is_some_and(|v| !v.is_empty());
             let use_window_path = matches!(member_type, MultiStageInodeMemberType::Aggregate)
-                && add_group_by.is_empty()
+                && !has_include
                 && Self::is_window_path_eligible(&base_member);
             (
-                MultiStageInodeMember::new(
-                    member_type,
-                    reduce_by,
-                    add_group_by,
-                    group_by,
-                    time_shift,
-                )
-                .with_use_window_path(use_window_path),
+                MultiStageInodeMember::new(member_type, grain, time_shift)
+                    .with_use_window_path(use_window_path),
                 is_ungrupped,
             )
         } else {
-            let add_group_by = if let Ok(dimension) = base_member.as_dimension() {
-                dimension.add_group_by().cloned().unwrap_or_default()
-            } else {
-                vec![]
-            };
+            let grain = base_member
+                .as_dimension()
+                .ok()
+                .and_then(|d| d.multi_stage().map(|ms| ms.grain.clone()))
+                .unwrap_or_default();
             resolved_multi_stage_dimensions
                 .insert(base_member.clone().resolve_reference_chain().full_name());
             (
-                MultiStageInodeMember::new(
-                    MultiStageInodeMemberType::Dimension,
-                    vec![],
-                    add_group_by,
-                    None,
-                    None,
-                ),
+                MultiStageInodeMember::new(MultiStageInodeMemberType::Dimension, grain, None),
                 false,
             )
         };
@@ -285,24 +281,23 @@ impl MultiStageQueryPlanner {
     /// grain.
     ///
     /// FIXME: merge with `MultiStageMemberQueryPlanner::member_partition_by_logical`
-    /// — both apply the same reduce_by/group_by reshape on different inputs;
-    /// keeping two copies invites silent drift when only one is updated.
+    /// — both apply the same grain (exclude / keep_only) reshape on different
+    /// inputs; keeping two copies invites silent drift when only one is updated.
     fn partition_filter(
         dims: &Vec<Rc<MemberSymbol>>,
-        reduce_by: &Vec<Rc<MemberSymbol>>,
-        group_by: &Option<Vec<Rc<MemberSymbol>>>,
+        grain: &MultiStageGrain,
     ) -> Vec<Rc<MemberSymbol>> {
-        let dims: Vec<Rc<MemberSymbol>> = if !reduce_by.is_empty() {
+        let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &grain.exclude {
             dims.iter()
-                .filter(|d| !reduce_by.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .cloned()
                 .collect()
         } else {
             dims.clone()
         };
-        if let Some(group_by) = group_by {
+        if let Some(keep_only) = &grain.keep_only {
             dims.into_iter()
-                .filter(|d| group_by.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect()
         } else {
             dims
@@ -511,7 +506,11 @@ impl MultiStageQueryPlanner {
             let (multi_stage_member, is_ungrupped) = self
                 .create_multi_stage_inode_member(member.clone(), resolved_multi_stage_dimensions)?;
 
-            let mut dimensions_to_add = multi_stage_member.add_group_by_symbols().clone();
+            let mut dimensions_to_add = multi_stage_member
+                .grain()
+                .include
+                .clone()
+                .unwrap_or_default();
 
             if let Some(case) = member.case() {
                 if let Some(switch_dim) = case.case_switch_dimension() {
@@ -553,12 +552,9 @@ impl MultiStageQueryPlanner {
                         MultiStageInodeMemberType::Aggregate
                     )
                 {
-                    let reduce_by = multi_stage_member.reduce_by_symbols().clone();
-                    let group_by = multi_stage_member.group_by_symbols().clone();
-                    let dims =
-                        Self::partition_filter(new_state.dimensions(), &reduce_by, &group_by);
-                    let time_dims =
-                        Self::partition_filter(new_state.time_dimensions(), &reduce_by, &group_by);
+                    let grain = multi_stage_member.grain();
+                    let dims = Self::partition_filter(new_state.dimensions(), grain);
+                    let time_dims = Self::partition_filter(new_state.time_dimensions(), grain);
                     new_state.set_dimensions(dims);
                     new_state.set_time_dimensions(time_dims);
                 }
@@ -788,9 +784,7 @@ impl MultiStageQueryPlanner {
 
                 let inode_member = MultiStageInodeMember::new(
                     MultiStageInodeMemberType::RollingWindow(rolling_window_descr),
-                    vec![],
-                    vec![],
-                    None,
+                    MultiStageGrain::default(),
                     None,
                 );
 

@@ -98,3 +98,25 @@ async fn test_group_by_equals_query_dims() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Smoke test: `grain.keep_only: [status]` yields the same partition as
+// `group_by: [status]`. Snapshot must match `test_group_by_override`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_keep_only_matches_group_by_override() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_keep_only_status
+        dimensions:
+          - orders.category
+        order:
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
