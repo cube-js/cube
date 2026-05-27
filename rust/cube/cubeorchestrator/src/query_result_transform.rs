@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context, Result};
+use chrono::format::{Fixed, Item, Numeric, Pad};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::{Equivalent, IndexMap};
 use itertools::multizip;
@@ -1164,7 +1165,22 @@ pub enum DBResponsePrimitive {
     Uncommon(Value),
 }
 
-const TIMESTAMP_FORMAT: &str = "%Y-%m-%dT%H:%M:%S%.3f";
+/// `%Y-%m-%dT%H:%M:%S%.3f`
+const TIMESTAMP_ITEMS: &[Item<'static>] = &[
+    Item::Numeric(Numeric::Year, Pad::Zero),
+    Item::Literal("-"),
+    Item::Numeric(Numeric::Month, Pad::Zero),
+    Item::Literal("-"),
+    Item::Numeric(Numeric::Day, Pad::Zero),
+    Item::Literal("T"),
+    Item::Numeric(Numeric::Hour, Pad::Zero),
+    Item::Literal(":"),
+    Item::Numeric(Numeric::Minute, Pad::Zero),
+    Item::Literal(":"),
+    Item::Numeric(Numeric::Second, Pad::Zero),
+    // `%.3f`: leading dot followed by 3 fractional-second digits.
+    Item::Fixed(Fixed::Nanosecond3),
+];
 
 // Hand-written `Serialize` mirroring serde's untagged behavior for the JSON-native
 // variants, plus a string rendering for `Timestamp`.
@@ -1178,7 +1194,7 @@ impl Serialize for DBResponsePrimitive {
             DBResponsePrimitive::Float64(n) => serializer.serialize_f64(*n),
             DBResponsePrimitive::String(s) => serializer.serialize_str(s),
             DBResponsePrimitive::Timestamp(dt) => {
-                serializer.serialize_str(&dt.format(TIMESTAMP_FORMAT).to_string())
+                serializer.collect_str(&dt.format_with_items(TIMESTAMP_ITEMS.iter()))
             }
             DBResponsePrimitive::Uncommon(v) => v.serialize(serializer),
         }
@@ -1293,7 +1309,9 @@ impl Display for DBResponsePrimitive {
             DBResponsePrimitive::UInt64(n) => n.to_string(),
             DBResponsePrimitive::Float64(n) => n.to_string(),
             DBResponsePrimitive::String(s) => s.clone(),
-            DBResponsePrimitive::Timestamp(dt) => dt.format(TIMESTAMP_FORMAT).to_string(),
+            DBResponsePrimitive::Timestamp(dt) => {
+                dt.format_with_items(TIMESTAMP_ITEMS.iter()).to_string()
+            }
             DBResponsePrimitive::Uncommon(v) => {
                 serde_json::to_string(&v).unwrap_or_else(|_| v.to_string())
             }
