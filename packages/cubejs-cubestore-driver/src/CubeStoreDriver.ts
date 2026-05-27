@@ -1,26 +1,31 @@
 import { pipeline, Writable } from 'stream';
 import { createGzip } from 'zlib';
-import { createWriteStream, createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
 import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
+  CreateTableIndex,
   DownloadTableCSVData,
+  DownloadTableMemoryData,
+  DriverInterface,
   ExternalCreateTableOptions,
-  DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
-  StreamTableData,
-  StreamingSourceTableData,
+  ExternalDriverCompatibilities,
+  IndexesSQL,
   QueryOptions,
-  ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
+  StreamingSourceTableData,
+  StreamTableData,
+  TableColumnQueryResult,
+  TableStructure,
 } from '@cubejs-backend/base-driver';
 import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
-import { format as formatSql, escape } from 'sqlstring';
+import { escape, format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
 
-import { ConnectionConfig } from './types';
-import { WebSocketConnection } from './WebSocketConnection';
-import { QueryResultFormat } from '../codegen';
+import {ConnectionConfig} from './types';
+import {WebSocketConnection} from './WebSocketConnection';
+import {QueryResultFormat} from '../codegen';
 
 const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
@@ -62,6 +67,7 @@ type CreateTableOptions = {
 
 type CubeStoreQueryOptions = QueryOptions & {
   sendParameters?: boolean,
+  responseFormat?: QueryResultFormat,
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -88,17 +94,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
 
-  private static toResponseFormat(format: string): QueryResultFormat {
-    switch (format) {
-      case 'arrow':
-        return QueryResultFormat.Arrow;
-      case 'legacy':
-        return QueryResultFormat.Legacy;
-      default:
-        throw new Error(`Unsupported CubeStore response format: ${format}. Expected 'arrow' or 'legacy'.`);
-    }
-  }
-
   public async hasCapability(capability: CubeStoreCapability): Promise<boolean> {
     const minVersion = CubeStoreCapabilityMinVersion[capability];
 
@@ -110,7 +105,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = any>(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<R[]> {
-    const { inlineTables, sendParameters, ...queryTracingObj } = options ?? {};
+    const { inlineTables, sendParameters, responseFormat, ...queryTracingObj } = options ?? {};
 
     if (!sendParameters) {
       query = formatSql(query, values || []);
@@ -121,7 +116,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return this.connection.query(query, sendParameters ? values : [], {
       inlineTables: inlineTables ?? [],
       queryTracingObj: tracingObj,
-      responseFormat: CubeStoreDriver.toResponseFormat(this.config.responseFormat),
+      // Arrow is a default format for Cube Store, but
+      // an old Cube Store will ignore this option and will continue to serve results in Legacy format
+      responseFormat: responseFormat || QueryResultFormat.Arrow,
     });
   }
 

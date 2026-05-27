@@ -33,7 +33,7 @@ export type QueryParameter = null | boolean | number | string | Buffer;
 export type WebSocketQueryOptions = {
   inlineTables?: InlineTable[];
   queryTracingObj?: any;
-  responseFormat?: QueryResultFormat;
+  responseFormat: QueryResultFormat;
 };
 
 interface CubeStoreWebSocket extends WebSocket {
@@ -291,14 +291,8 @@ export class WebSocketConnection {
     }
   }
 
-  public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions = {}): Promise<any[]> {
-    const {
-      inlineTables,
-      queryTracingObj,
-      // Why, it's not a breaking change:
-      // An old Cube Store will ignore this option and will continue to serve results in Legacy format
-      responseFormat = QueryResultFormat.Arrow
-    } = options;
+  public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions): Promise<any[]> {
+    const { inlineTables, queryTracingObj, responseFormat } = options;
 
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
