@@ -11,7 +11,7 @@ use arrow::array::{
 };
 use arrow::datatypes::{DataType, TimeUnit};
 use arrow::ipc::reader::StreamReader;
-use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
+use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand, HttpResultSet};
 use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
 use neon::prelude::Finalize;
@@ -166,6 +166,11 @@ impl QueryResult {
         })
     }
 
+    pub fn from_js_raw_data(js_raw_data: JsRawColumnarData) -> Result<Self, ParseError> {
+        let JsRawColumnarData { members, columns } = js_raw_data;
+        QueryResult::try_new(members, columns)
+    }
+
     pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
         let opts = VerifierOptions {
             max_tables: 10_000_000,     // Support up to 10M tables
@@ -189,48 +194,7 @@ impl QueryResult {
                     .command_as_http_result_set()
                     .ok_or(ParseError::EmptyResultSet)?;
 
-                let members: Vec<String> = match result_set.columns() {
-                    Some(result_set_columns) => {
-                        if result_set_columns.iter().any(|c| c.is_empty()) {
-                            return Err(ParseError::ColumnNameNotDefined);
-                        }
-                        result_set_columns.iter().map(|c| c.to_owned()).collect()
-                    }
-                    None => Vec::new(),
-                };
-
-                let n_cols = members.len();
-                let data: Vec<ColumnarArray> = if let Some(result_set_rows) = result_set.rows() {
-                    let row_count = result_set_rows.len();
-                    let mut data: Vec<ColumnarArray> = (0..n_cols)
-                        .map(|_| ColumnarArray::with_capacity(row_count))
-                        .collect();
-
-                    for row in result_set_rows.iter() {
-                        let values = row.values().ok_or(ParseError::NullRow)?;
-                        for (col_idx, val) in values.iter().enumerate() {
-                            if col_idx >= n_cols {
-                                break;
-                            }
-                            let cell = match val.string_value() {
-                                Some(s) => DBResponsePrimitive::String(s.to_owned()),
-                                None => DBResponsePrimitive::Null,
-                            };
-                            data[col_idx].push(cell);
-                        }
-
-                        // Pad short rows with Null to keep all columns aligned.
-                        for col in data.iter_mut().take(n_cols).skip(values.len()) {
-                            col.push(DBResponsePrimitive::Null);
-                        }
-                    }
-
-                    data
-                } else {
-                    (0..n_cols).map(|_| ColumnarArray::new()).collect()
-                };
-
-                QueryResult::try_new(members, data)
+                Self::parse_legacy(result_set)
             }
             HttpCommand::HttpQueryResult => {
                 let query_result = http_message
@@ -250,18 +214,52 @@ impl QueryResult {
         }
     }
 
-    pub fn from_js_raw_data(js_raw_data: JsRawColumnarData) -> Result<Self, ParseError> {
-        let JsRawColumnarData { members, columns } = js_raw_data;
-        QueryResult::try_new(members, columns)
+    fn parse_legacy(result_set: HttpResultSet<'_>) -> Result<Self, ParseError> {
+        let members: Vec<String> = match result_set.columns() {
+            Some(result_set_columns) => {
+                if result_set_columns.iter().any(|c| c.is_empty()) {
+                    return Err(ParseError::ColumnNameNotDefined);
+                }
+                result_set_columns.iter().map(|c| c.to_owned()).collect()
+            }
+            None => Vec::new(),
+        };
+
+        let n_cols = members.len();
+        let data: Vec<ColumnarArray> = if let Some(result_set_rows) = result_set.rows() {
+            let row_count = result_set_rows.len();
+            let mut data: Vec<ColumnarArray> = (0..n_cols)
+                .map(|_| ColumnarArray::with_capacity(row_count))
+                .collect();
+
+            for row in result_set_rows.iter() {
+                let values = row.values().ok_or(ParseError::NullRow)?;
+                for (col_idx, val) in values.iter().enumerate() {
+                    if col_idx >= n_cols {
+                        break;
+                    }
+                    let cell = match val.string_value() {
+                        Some(s) => DBResponsePrimitive::String(s.to_owned()),
+                        None => DBResponsePrimitive::Null,
+                    };
+                    data[col_idx].push(cell);
+                }
+
+                // Pad short rows with Null to keep all columns aligned.
+                for col in data.iter_mut().take(n_cols).skip(values.len()) {
+                    col.push(DBResponsePrimitive::Null);
+                }
+            }
+
+            data
+        } else {
+            (0..n_cols).map(|_| ColumnarArray::new()).collect()
+        };
+
+        QueryResult::try_new(members, data)
     }
 
-    /// Parse an Arrow IPC **stream** payload into the columnar [`QueryResult`].
-    ///
-    /// Member names come from the schema field names; each Arrow column is
-    /// converted element-wise into [`DBResponsePrimitive`] (see
-    /// [`append_arrow_array`]). Multiple record batches are concatenated so a
-    /// streamed result with several batches yields one column per field.
-    pub fn from_arrow(bytes: &[u8]) -> Result<Self, ParseError> {
+    fn from_arrow(bytes: &[u8]) -> Result<Self, ParseError> {
         let reader = StreamReader::try_new(Cursor::new(bytes), None)
             .map_err(|err| ParseError::ArrowError(err.to_string()))?;
 
