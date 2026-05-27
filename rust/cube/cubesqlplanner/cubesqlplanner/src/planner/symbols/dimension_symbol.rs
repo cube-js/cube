@@ -176,12 +176,6 @@ impl DimensionSymbol {
         &self.mask_sql
     }
 
-    pub fn add_group_by(&self) -> Option<&Vec<Rc<MemberSymbol>>> {
-        self.multi_stage
-            .as_ref()
-            .and_then(|m| m.grain.include.as_ref())
-    }
-
     pub fn dimension_type(&self) -> &str {
         self.kind.dimension_type_str()
     }

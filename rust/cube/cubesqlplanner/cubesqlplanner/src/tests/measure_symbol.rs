@@ -559,8 +559,6 @@ mod multi_stage {
 
         assert!(!measure.is_multi_stage());
         assert!(measure.multi_stage().is_none());
-        assert!(measure.reduce_by().is_none());
-        assert!(measure.add_group_by().is_none());
     }
 
     #[test]
@@ -588,13 +586,6 @@ mod multi_stage {
         let exclude = ms.grain.exclude.as_ref().expect("exclude");
         assert_eq!(exclude[0].full_name(), "orders.status");
         assert!(ms.grain.keep_only.is_none());
-
-        // Proxies on `MeasureSymbol` must mirror the resolved grain.
-        let proxy_add = measure.add_group_by().expect("add_group_by proxy");
-        let proxy_reduce = measure.reduce_by().expect("reduce_by proxy");
-        assert_eq!(proxy_add[0].full_name(), "orders.city");
-        assert_eq!(proxy_reduce[0].full_name(), "orders.status");
-        assert!(measure.group_by().is_none());
     }
 
     #[test]
@@ -612,16 +603,11 @@ mod multi_stage {
 
         let include = ms.grain.include.as_ref().expect("include");
         assert_eq!(include.len(), 1);
-        // Comes from `grain.include: [city]`, NOT from `add_group_by: [status]`.
+        // Comes from `grain.include: [city]`, not from the sibling
+        // `add_group_by: [status]` — the directive wins when both are set.
         assert_eq!(include[0].full_name(), "orders.city");
 
         assert!(ms.grain.keep_only.is_none());
-
-        // Proxy methods reflect the grain — old add_group_by is shadowed.
-        let proxy_add = measure.add_group_by().expect("add_group_by proxy");
-        assert_eq!(proxy_add[0].full_name(), "orders.city");
-        let proxy_reduce = measure.reduce_by().expect("reduce_by proxy");
-        assert_eq!(proxy_reduce[0].full_name(), "orders.status");
     }
 
     #[test]

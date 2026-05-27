@@ -460,24 +460,6 @@ impl MeasureSymbol {
         &self.measure_order_by
     }
 
-    pub fn reduce_by(&self) -> Option<&Vec<Rc<MemberSymbol>>> {
-        self.multi_stage
-            .as_ref()
-            .and_then(|m| m.grain.exclude.as_ref())
-    }
-
-    pub fn add_group_by(&self) -> Option<&Vec<Rc<MemberSymbol>>> {
-        self.multi_stage
-            .as_ref()
-            .and_then(|m| m.grain.include.as_ref())
-    }
-
-    pub fn group_by(&self) -> Option<&Vec<Rc<MemberSymbol>>> {
-        self.multi_stage
-            .as_ref()
-            .and_then(|m| m.grain.keep_only.as_ref())
-    }
-
     pub fn multi_stage(&self) -> Option<&MultiStageProperties> {
         self.multi_stage.as_ref()
     }
