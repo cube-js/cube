@@ -4,7 +4,7 @@ import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract
 
 export class MysqlDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_MYSQL_VERSION || options.version || '5.7';
+    const version = process.env.TEST_MYSQL_VERSION || options.version || '8.0';
 
     const container = new GenericContainer(`mysql:${version}`)
       .withEnvironment({
@@ -19,14 +19,6 @@ export class MysqlDBRunner extends DbRunnerAbstract {
       })
       .withWaitStrategy(Wait.forHealthCheck())
       .withExposedPorts(3306);
-
-    if (version.split('.')[0] === '8') {
-      /**
-       * workaround for MySQL 8 and unsupported auth in mysql package
-       * @link https://github.com/mysqljs/mysql/pull/2233
-       */
-      container.withCommand(['--default-authentication-plugin=mysql_native_password']);
-    }
 
     if (options.volumes) {
       const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));

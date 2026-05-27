@@ -9,7 +9,7 @@ import {
   assertDataSource,
   Pool,
 } from '@cubejs-backend/shared';
-import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
+import mysql, { ConnectionOptions, QueryOptions } from 'mysql2';
 import { promisify } from 'util';
 import {
   BaseDriver,
@@ -45,9 +45,9 @@ const MySqlNativeToMySqlType = {
   [mysql.Types.INT24]: 'mediumint',
   [mysql.Types.LONGLONG]: 'bigint',
   [mysql.Types.NEWDATE]: 'datetime',
-  [mysql.Types.TIMESTAMP2]: 'timestamp',
-  [mysql.Types.DATETIME2]: 'datetime',
-  [mysql.Types.TIME2]: 'time',
+  [mysql.Types.TIMESTAMP]: 'timestamp',
+  [mysql.Types.DATETIME]: 'datetime',
+  [mysql.Types.TIME]: 'time',
   [mysql.Types.TINY_BLOB]: 'tinytext',
   [mysql.Types.MEDIUM_BLOB]: 'mediumtext',
   [mysql.Types.LONG_BLOB]: 'longtext',
@@ -69,15 +69,20 @@ const MySqlToGenericType: Record<string, GenericDataBaseType> = {
   'tinyint unsigned': 'int',
 };
 
-export interface MySqlDriverConfiguration extends ConnectionConfig {
+export interface MySqlDriverConfiguration extends ConnectionOptions {
   readOnly?: boolean,
   loadPreAggregationWithoutMetaLock?: boolean,
   storeTimezone?: string,
   pool?: any,
 }
 
-interface MySQLConnection extends Connection {
-  execute: (options: string | QueryOptions, values?: any) => Promise<any>
+interface MySQLConnection {
+  execute: (sql: string | QueryOptions, values?: any) => Promise<any>;
+  query: any;
+  end: any;
+  connect: any;
+  on: any;
+  destroy: any;
 }
 
 /**
@@ -131,7 +136,8 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
 
-    const { pool, ...restConfig } = config;
+    const { pool, readOnly, ...restConfig } = config;
+    const sslOptions = this.getSslOptions(dataSource, preAggregations);
     this.config = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
       database: getEnv('dbName', { dataSource, preAggregations }),
@@ -140,16 +146,19 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       password: getEnv('dbPass', { dataSource, preAggregations }),
       socketPath: getEnv('dbSocketPath', { dataSource, preAggregations }),
       timezone: 'Z',
-      ssl: this.getSslOptions(dataSource, preAggregations),
+      ssl: sslOptions as any,
       dateStrings: true,
-      readOnly: true,
+      decimalNumbers: true,
+      readOnly: readOnly !== undefined ? readOnly : true,
       ...restConfig,
     };
 
     const poolName = createPoolName('mysql', dataSource, preAggregations);
     this.pool = new Pool(poolName, {
       create: async () => {
-        const conn: any = mysql.createConnection(this.config);
+        // Extract driver-specific options that mysql2 doesn't recognize
+        const { readOnly: _, loadPreAggregationWithoutMetaLock: __, storeTimezone: ___, ...connectionConfig } = this.config;
+        const conn: any = mysql.createConnection(connectionConfig);
         const connect = promisify(conn.connect.bind(conn));
 
         if (conn.on) {
@@ -328,13 +337,13 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       await this.setTimeZone(conn);
 
       const [rowStream, fields] = await (
-        new Promise<[any, mysql.FieldInfo[]]>((resolve, reject) => {
+        new Promise<[any, mysql.FieldPacket[]]>((resolve, reject) => {
           const stream = conn.query(query, values).stream({ highWaterMark });
 
-          stream.on('fields', (f) => {
+          stream.on('fields', (f: mysql.FieldPacket[]) => {
             resolve([stream, f]);
           });
-          stream.on('error', (e) => {
+          stream.on('error', (e: Error) => {
             reject(e);
           });
         })
@@ -356,12 +365,17 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  protected mapFieldsToGenericTypes(fields: mysql.FieldInfo[]) {
-    return fields.map((field) => {
-      // @ts-ignore
-      let dbType = mysql.Types[field.type];
+  protected mapFieldsToGenericTypes(fields: mysql.FieldPacket[] | mysql.FieldPacket[][]) {
+    // mysql2 returns FieldPacket[] in callbacks
+    const fieldArray = Array.isArray(fields) && fields.length > 0 && Array.isArray(fields[0])
+      ? fields[0] as mysql.FieldPacket[]
+      : fields as mysql.FieldPacket[];
 
-      if (field.type in MySqlNativeToMySqlType) {
+    return fieldArray.map((field) => {
+      // @ts-ignore
+      let dbType = mysql.Types[field.type || 0];
+
+      if (field.type && field.type in MySqlNativeToMySqlType) {
         // @ts-ignore
         dbType = MySqlNativeToMySqlType[field.type];
       }
@@ -382,13 +396,13 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       await this.setTimeZone(conn);
 
       return new Promise((resolve, reject) => {
-        conn.query(query, values, (err, rows, fields) => {
+        conn.query(query, values, (err: any, rows: any, fields: any) => {
           if (err) {
             reject(err);
           } else {
             resolve({
               rows,
-              types: this.mapFieldsToGenericTypes(<FieldInfo[]>fields),
+              types: this.mapFieldsToGenericTypes(fields as mysql.FieldPacket[]),
             });
           }
         });
