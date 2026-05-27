@@ -90,6 +90,63 @@ cubes:
             type: avg
             sql: amount
 
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+
+          - name: unique_customers_reduce_category
+            type: sum
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: avg_amount_reduce_category
+            type: avg
+            sql: "{CUBE.avg_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: count_reduce_category
+            type: sum
+            sql: "{CUBE.count}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: max_total_amount_reduce_category
+            type: max
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: amount_plus_customers_reduce_category
+            type: number
+            sql: "{CUBE.amount_reduce_category} + {CUBE.unique_customers_reduce_category}"
+            multi_stage: true
+
+          - name: max_amount
+            type: max
+            sql: amount
+
+          - name: max_sum_reduce_category
+            type: sum
+            sql: "{CUBE.max_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: total_by_customer_reduce_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.customer_id
+            reduce_by:
+                - orders.category
+
           - name: amount_by_id
             type: number
             sql: "{CUBE.total_amount}"

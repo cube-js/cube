@@ -195,11 +195,10 @@ impl MultiStageMemberQueryPlanner {
     }
 
     /// Builds a measure-calculation CTE (Rank / Aggregate /
-    /// Calculate). Picks the partition-by from the inode's
-    /// `reduce_by` / `group_by` settings, chooses a window-function
-    /// flavour (Rank, Window, or None) when the partition is
-    /// narrower than the full dimension set, and wires the input
-    /// CTEs into a `FullKeyAggregate` source.
+    /// Calculate). Wires the input CTEs into a `FullKeyAggregate`
+    /// source; for the JOIN-based path (when the description carries
+    /// `keys_input`) also wires keys-side refs through
+    /// `FullKeyAggregateKeysInput`.
     fn plan_for_cte_query(
         &self,
         multi_stage_member: &MultiStageInodeMember,
@@ -209,14 +208,19 @@ impl MultiStageMemberQueryPlanner {
             &multi_stage_member.group_by_symbols(),
         );
 
+        // Rank always uses a window function. Aggregate inodes are
+        // routed through `FullKeyAggregate` by default; only the narrow
+        // optimisation-eligible subset (planner sets `use_window_path`)
+        // is emitted as a Window expression and additionally requires
+        // partition_by to be a strict subset of all dimensions —
+        // otherwise the window collapses into a plain group-by.
         let window_function_to_use = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
-            MultiStageInodeMemberType::Aggregate => {
-                if partition_by.len() != self.all_dimensions().len() {
-                    MultiStageCalculationWindowFunction::Window
-                } else {
-                    MultiStageCalculationWindowFunction::None
-                }
+            MultiStageInodeMemberType::Aggregate
+                if multi_stage_member.use_window_path()
+                    && partition_by.len() != self.all_dimensions().len() =>
+            {
+                MultiStageCalculationWindowFunction::Window
             }
             _ => MultiStageCalculationWindowFunction::None,
         };
@@ -257,6 +261,34 @@ impl MultiStageMemberQueryPlanner {
             })
             .collect_vec();
 
+        let keys_input = if self.description.keys_input().is_empty() {
+            None
+        } else {
+            let refs = self
+                .description
+                .keys_input()
+                .iter()
+                .map(|d| {
+                    let schema = LogicalSchema::default()
+                        .set_time_dimensions(d.state().time_dimensions().clone())
+                        .set_dimensions(d.state().dimensions().clone())
+                        .set_measures(vec![d.member_node().clone()])
+                        .into_rc();
+                    Rc::new(
+                        MultiStageSubqueryRef::builder()
+                            .name(d.alias().clone())
+                            .symbols(vec![d.member_node().clone()])
+                            .schema(schema)
+                            .build(),
+                    )
+                })
+                .unique_by(|r| r.name().clone())
+                .collect_vec();
+            Some(Rc::new(
+                FullKeyAggregateKeysInput::builder().refs(refs).build(),
+            ))
+        };
+
         let full_key_aggregate_schema = self.input_schema();
         let result = MultiStageMeasureCalculation::builder()
             .schema(schema)
@@ -270,6 +302,7 @@ impl MultiStageMemberQueryPlanner {
                     .schema(full_key_aggregate_schema)
                     .use_full_join_and_coalesce(true)
                     .multi_stage_subquery_refs(input_sources)
+                    .keys_input(keys_input)
                     .build(),
             ))
             .build();

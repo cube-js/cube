@@ -25,7 +25,7 @@ static CLEANUP_CONTAINER_ID: OnceLock<String> = OnceLock::new();
 extern "C" fn cleanup_container() {
     if let Some(id) = CLEANUP_CONTAINER_ID.get() {
         let _ = std::process::Command::new("docker")
-            .args(["rm", "-f", id])
+            .args(["rm", "-f", "-v", id])
             .output();
     }
 }
