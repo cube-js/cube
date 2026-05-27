@@ -260,6 +260,10 @@ impl MultiStageQueryPlanner {
     /// dims explicitly listed. Used at planning time to decide whether
     /// reduce_by / group_by actually shrinks the partition vs the leaf
     /// grain.
+    ///
+    /// FIXME: merge with `MultiStageMemberQueryPlanner::member_partition_by_logical`
+    /// — both apply the same reduce_by/group_by reshape on different inputs;
+    /// keeping two copies invites silent drift when only one is updated.
     fn partition_filter(
         dims: &Vec<Rc<MemberSymbol>>,
         reduce_by: &Vec<Rc<MemberSymbol>>,

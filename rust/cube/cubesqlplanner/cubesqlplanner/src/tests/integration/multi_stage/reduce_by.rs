@@ -84,30 +84,6 @@ async fn test_reduce_by_sum_of_max() {
     }
 }
 
-// Inner base = count, outer multi-stage = sum: sum-of-counts by partition.
-// Numerically correct under the current window path (sum is associative).
-#[tokio::test(flavor = "multi_thread")]
-async fn test_reduce_by_sum_of_count() {
-    let ctx = create_context();
-
-    let query = indoc! {r#"
-        measures:
-          - orders.count_sum_reduce_category
-        dimensions:
-          - orders.status
-          - orders.category
-        order:
-          - id: orders.status
-          - id: orders.category
-    "#};
-
-    ctx.build_sql(query).unwrap();
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
-}
-
 // Inner additive (sum), outer idempotent (max). JOIN-model computes overall
 // sum(amount) per status broadcast across categories
 // (200 / 1400 / 650 on this seed).

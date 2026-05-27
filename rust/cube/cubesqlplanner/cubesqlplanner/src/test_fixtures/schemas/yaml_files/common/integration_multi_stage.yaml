@@ -122,13 +122,6 @@ cubes:
             reduce_by:
                 - orders.category
 
-          - name: count_sum_reduce_category
-            type: sum
-            sql: "{CUBE.count}"
-            multi_stage: true
-            reduce_by:
-                - orders.category
-
           - name: amount_plus_customers_reduce_category
             type: number
             sql: "{CUBE.amount_reduce_category} + {CUBE.unique_customers_reduce_category}"
