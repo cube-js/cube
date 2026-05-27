@@ -313,7 +313,7 @@ impl QueryRouter {
         let flags = StatusFlags::SERVER_STATE_CHANGED;
         let username = role_name.as_ref().map(|role_name| role_name.value.clone());
         let Some(to_user) = username.clone().or_else(|| self.state.original_user()) else {
-            return Err(CompilationError::user(
+            return Err(CompilationError::internal(
                 "Cannot reset role when original role has not been set".to_string(),
             ));
         };
@@ -471,7 +471,7 @@ impl QueryRouter {
     async fn change_user(&self, username: String) -> Result<(), CompilationError> {
         self.reauthenticate_if_needed().await?;
 
-        let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+        let auth_context = self.state.auth_context().ok_or(CompilationError::internal(
             "No auth context set but tried to set current user".to_string(),
         ))?;
 
@@ -637,8 +637,7 @@ impl QueryRouter {
         let temp_tables = self.state.temp_tables();
         tokio::task::spawn_blocking(move || temp_tables.remove(&table_name_lower))
             .await
-            .map_err(|err| CompilationError::internal(err.to_string()))?
-            .map_err(|err| CompilationError::internal(err.to_string()))?;
+            .map_err(|err| CompilationError::internal(err.to_string()))??;
         let flags = StatusFlags::empty();
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::DropTable))
     }

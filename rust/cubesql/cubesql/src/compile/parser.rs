@@ -195,7 +195,7 @@ pub fn parse_sql_to_statements(
     };
 
     parse_result.map_err(|err| {
-        CompilationError::user(format!("Unable to parse: {:?}", err)).with_meta(Some(
+        CompilationError::sql_parser(format!("Unable to parse: {:?}", err)).with_meta(Some(
             HashMap::from([("query".to_string(), original_query.to_string())]),
         ))
     })

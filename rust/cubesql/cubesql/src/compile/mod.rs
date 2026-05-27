@@ -1752,9 +1752,11 @@ GROUP BY
             get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         ).await;
 
+        let err = create_query.err().unwrap();
+        assert!(matches!(err, CompilationError::Rewrite(..)));
         assert_eq!(
-            create_query.err().unwrap().message(),
-            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information.",
+            err.message(),
+            "Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead",
         );
     }
 

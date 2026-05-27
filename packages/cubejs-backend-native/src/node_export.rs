@@ -305,12 +305,7 @@ async fn handle_sql_query(
 
         let execute = || async move {
             // todo: can we use compiler_cache?
-            let meta_context = transport_service
-                .meta(native_auth_ctx)
-                .await
-                .map_err(|err| {
-                    CubeError::internal(format!("Failed to get meta context: {}", err))
-                })?;
+            let meta_context = transport_service.meta(native_auth_ctx).await?;
 
             let stmt =
                 parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;

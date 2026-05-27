@@ -233,8 +233,8 @@ Object {
 exports[`SQL API Cube SQL over HTTP sql4sql regular query with missing column 1`] = `
 Object {
   "body": Object {
-    "error": "Error: SQLCompilationError: Internal: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.approxOrderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.avgAmount, Orders.minAmount, Orders.maxAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
-    "stack": "Error: SQLCompilationError: Internal: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.approxOrderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.avgAmount, Orders.minAmount, Orders.maxAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
+    "error": "Error: Planning Error: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.approxOrderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.avgAmount, Orders.minAmount, Orders.maxAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
+    "stack": "Error: Planning Error: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.approxOrderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.avgAmount, Orders.minAmount, Orders.maxAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
   },
   "headers": Headers {
     Symbol(map): Object {
@@ -245,7 +245,7 @@ Object {
         "keep-alive",
       ],
       "content-length": Array [
-        "1589",
+        "1559",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
@@ -320,8 +320,8 @@ Object {
 exports[`SQL API Cube SQL over HTTP sql4sql set variable 1`] = `
 Object {
   "body": Object {
-    "error": "Error: This query doesnt have a plan, because it already has values for response",
-    "stack": "Error: This query doesnt have a plan, because it already has values for response",
+    "error": "Error: Internal Error: This query doesnt have a plan, because it already has values for response",
+    "stack": "Error: Internal Error: This query doesnt have a plan, because it already has values for response",
   },
   "headers": Headers {
     Symbol(map): Object {
@@ -332,7 +332,7 @@ Object {
         "keep-alive",
       ],
       "content-length": Array [
-        "241",
+        "273",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
