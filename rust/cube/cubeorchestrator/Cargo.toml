@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arrow = { version = "58", default-features = false, features = ["ipc"] }
 chrono = { version = "0.4.31", features = ["serde"] }
 cubeshared = { path = "../cubeshared" }
 serde = { version = "1.0.217", features = ["derive", "rc"] }

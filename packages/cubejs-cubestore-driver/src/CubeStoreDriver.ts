@@ -20,6 +20,7 @@ import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+import { QueryResultFormat } from '../codegen';
 
 const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
@@ -87,6 +88,17 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
 
+  private static toResponseFormat(format: string): QueryResultFormat {
+    switch (format) {
+      case 'arrow':
+        return QueryResultFormat.Arrow;
+      case 'legacy':
+        return QueryResultFormat.Legacy;
+      default:
+        throw new Error(`Unsupported CubeStore response format: ${format}. Expected 'arrow' or 'legacy'.`);
+    }
+  }
+
   public async hasCapability(capability: CubeStoreCapability): Promise<boolean> {
     const minVersion = CubeStoreCapabilityMinVersion[capability];
 
@@ -106,7 +118,11 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
 
-    return this.connection.query(query, inlineTables ?? [], tracingObj, sendParameters ? values : undefined);
+    return this.connection.query(query, sendParameters ? values : [], {
+      inlineTables: inlineTables ?? [],
+      queryTracingObj: tracingObj,
+      responseFormat: CubeStoreDriver.toResponseFormat(this.config.responseFormat),
+    });
   }
 
   public async release() {

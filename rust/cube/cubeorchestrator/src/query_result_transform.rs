@@ -1152,14 +1152,33 @@ pub struct RequestResultArray {
     pub results: Vec<RequestResultData>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DBResponsePrimitive {
     Null,
     Boolean(bool),
     Number(f64),
     String(String),
+    Timestamp(NaiveDateTime),
     Uncommon(Value),
+}
+
+const TIMESTAMP_FORMAT: &str = "%Y-%m-%dT%H:%M:%S%.3f";
+
+// Hand-written `Serialize` mirroring serde's untagged behavior for the JSON-native
+// variants, plus a string rendering for `Timestamp`.
+impl Serialize for DBResponsePrimitive {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            DBResponsePrimitive::Null => serializer.serialize_none(),
+            DBResponsePrimitive::Boolean(b) => serializer.serialize_bool(*b),
+            DBResponsePrimitive::Number(n) => serializer.serialize_f64(*n),
+            DBResponsePrimitive::String(s) => serializer.serialize_str(s),
+            DBResponsePrimitive::Timestamp(dt) => {
+                serializer.serialize_str(&dt.format(TIMESTAMP_FORMAT).to_string())
+            }
+            DBResponsePrimitive::Uncommon(v) => v.serialize(serializer),
+        }
+    }
 }
 
 // Hand-written `Deserialize` that avoids serde's untagged-enum buffering.
@@ -1256,6 +1275,7 @@ impl Display for DBResponsePrimitive {
             DBResponsePrimitive::Boolean(b) => b.to_string(),
             DBResponsePrimitive::Number(n) => n.to_string(),
             DBResponsePrimitive::String(s) => s.clone(),
+            DBResponsePrimitive::Timestamp(dt) => dt.format(TIMESTAMP_FORMAT).to_string(),
             DBResponsePrimitive::Uncommon(v) => {
                 serde_json::to_string(&v).unwrap_or_else(|_| v.to_string())
             }
@@ -1321,6 +1341,15 @@ mod tests {
     use anyhow::Result;
     use serde_json::from_str;
     use std::{fmt, sync::LazyLock};
+
+    /// Guards the in-memory size of the per-cell primitive. It is materialized
+    /// once per cell across every parse/transform path, so an accidental growth
+    /// (e.g. a fat new variant) would regress memory and throughput for large
+    /// result sets. Bump this deliberately if the layout must change.
+    #[test]
+    fn test_db_response_primitive_size() {
+        assert_eq!(std::mem::size_of::<DBResponsePrimitive>(), 32);
+    }
 
     type TestSuiteData = HashMap<String, TestData>;
 

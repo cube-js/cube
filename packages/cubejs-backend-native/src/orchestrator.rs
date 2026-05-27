@@ -137,6 +137,7 @@ fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
         DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
             serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
         )),
+        DBResponsePrimitive::Timestamp(_) => FieldValue::String(Cow::Owned(value.to_string())),
         DBResponsePrimitive::Null => FieldValue::Null,
     }
 }

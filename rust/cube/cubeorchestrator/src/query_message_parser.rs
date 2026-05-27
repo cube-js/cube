@@ -2,10 +2,20 @@ use crate::{
     query_result_transform::{ColumnarArray, DBResponsePrimitive},
     transport::JsRawColumnarData,
 };
+use arrow::array::{
+    Array, BooleanArray, Date32Array, Date64Array, Decimal128Array, Decimal256Array, Float16Array,
+    Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeStringArray,
+    StringArray, StringViewArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+    TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
+    UInt8Array,
+};
+use arrow::datatypes::{DataType, TimeUnit};
+use arrow::ipc::reader::StreamReader;
 use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand};
 use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
 use neon::prelude::Finalize;
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -28,6 +38,8 @@ pub enum ParseError {
         data_len: usize,
     },
     FlatBufferError(String),
+    ArrowError(String),
+    UnsupportedArrowType(String),
     ErrorMessage(String),
 }
 
@@ -70,6 +82,10 @@ impl std::fmt::Display for ParseError {
                 members_len, data_len
             ),
             ParseError::FlatBufferError(msg) => write!(f, "FlatBuffer parsing error: {}", msg),
+            ParseError::ArrowError(msg) => write!(f, "Arrow parsing error: {}", msg),
+            ParseError::UnsupportedArrowType(ty) => {
+                write!(f, "Unsupported Arrow data type: {}", ty)
+            }
             ParseError::ErrorMessage(msg) => write!(f, "Error: {}", msg),
         }
     }
@@ -216,6 +232,20 @@ impl QueryResult {
 
                 QueryResult::try_new(members, data)
             }
+            HttpCommand::HttpQueryResult => {
+                let query_result = http_message
+                    .command_as_http_query_result()
+                    .ok_or(ParseError::EmptyResultSet)?;
+                let arrow = query_result
+                    .data_as_http_query_result_arrow()
+                    .ok_or_else(|| {
+                        ParseError::FlatBufferError(
+                            "HttpQueryResult.data is not HttpQueryResultArrow".to_string(),
+                        )
+                    })?;
+
+                Self::from_arrow(arrow.data().bytes())
+            }
             _ => Err(ParseError::UnsupportedCommand),
         }
     }
@@ -224,6 +254,155 @@ impl QueryResult {
         let JsRawColumnarData { members, columns } = js_raw_data;
         QueryResult::try_new(members, columns)
     }
+
+    /// Parse an Arrow IPC **stream** payload into the columnar [`QueryResult`].
+    ///
+    /// Member names come from the schema field names; each Arrow column is
+    /// converted element-wise into [`DBResponsePrimitive`] (see
+    /// [`append_arrow_array`]). Multiple record batches are concatenated so a
+    /// streamed result with several batches yields one column per field.
+    pub fn from_arrow(bytes: &[u8]) -> Result<Self, ParseError> {
+        let reader = StreamReader::try_new(Cursor::new(bytes), None)
+            .map_err(|err| ParseError::ArrowError(err.to_string()))?;
+
+        let schema = reader.schema();
+        let members: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+        let n_cols = members.len();
+
+        let mut columns: Vec<Vec<DBResponsePrimitive>> = (0..n_cols).map(|_| Vec::new()).collect();
+
+        for batch in reader {
+            let batch = batch.map_err(|err| ParseError::ArrowError(err.to_string()))?;
+            for (idx, col) in columns.iter_mut().enumerate() {
+                append_arrow_array(col, batch.column(idx).as_ref())?;
+            }
+        }
+
+        let data: Vec<ColumnarArray> = columns.into_iter().map(ColumnarArray::from).collect();
+        QueryResult::try_new(members, data)
+    }
+}
+
+/// Append every element of an Arrow `array` to a column accumulator, converting
+/// each value to [`DBResponsePrimitive`]. Temporal types become
+/// [`DBResponsePrimitive::Timestamp`]; integers/floats/decimals become `Number`.
+fn append_arrow_array(
+    col: &mut Vec<DBResponsePrimitive>,
+    array: &dyn Array,
+) -> Result<(), ParseError> {
+    let len = array.len();
+    col.reserve(len);
+
+    macro_rules! push_numeric {
+        ($ty:ty) => {{
+            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::Number(a.value(i) as f64));
+                }
+            }
+        }};
+    }
+
+    macro_rules! push_str {
+        ($ty:ty) => {{
+            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::String(a.value(i).to_owned()));
+                }
+            }
+        }};
+    }
+
+    macro_rules! push_datetime {
+        ($ty:ty) => {{
+            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    match a.value_as_datetime(i) {
+                        Some(dt) => col.push(DBResponsePrimitive::Timestamp(dt)),
+                        None => col.push(DBResponsePrimitive::Null),
+                    }
+                }
+            }
+        }};
+    }
+
+    macro_rules! push_decimal {
+        ($ty:ty) => {{
+            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    let s = a.value_as_string(i);
+                    match s.parse::<f64>() {
+                        Ok(n) => col.push(DBResponsePrimitive::Number(n)),
+                        Err(_) => col.push(DBResponsePrimitive::String(s)),
+                    }
+                }
+            }
+        }};
+    }
+
+    match array.data_type() {
+        DataType::Null => {
+            for _ in 0..len {
+                col.push(DBResponsePrimitive::Null);
+            }
+        }
+        DataType::Boolean => {
+            let a = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::Boolean(a.value(i)));
+                }
+            }
+        }
+        DataType::Int8 => push_numeric!(Int8Array),
+        DataType::Int16 => push_numeric!(Int16Array),
+        DataType::Int32 => push_numeric!(Int32Array),
+        DataType::Int64 => push_numeric!(Int64Array),
+        DataType::UInt8 => push_numeric!(UInt8Array),
+        DataType::UInt16 => push_numeric!(UInt16Array),
+        DataType::UInt32 => push_numeric!(UInt32Array),
+        DataType::UInt64 => push_numeric!(UInt64Array),
+        DataType::Float32 => push_numeric!(Float32Array),
+        DataType::Float64 => push_numeric!(Float64Array),
+        DataType::Float16 => {
+            let a = array.as_any().downcast_ref::<Float16Array>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::Number(a.value(i).to_f64()));
+                }
+            }
+        }
+        DataType::Utf8 => push_str!(StringArray),
+        DataType::LargeUtf8 => push_str!(LargeStringArray),
+        DataType::Utf8View => push_str!(StringViewArray),
+        DataType::Date32 => push_datetime!(Date32Array),
+        DataType::Date64 => push_datetime!(Date64Array),
+        DataType::Timestamp(TimeUnit::Second, _) => push_datetime!(TimestampSecondArray),
+        DataType::Timestamp(TimeUnit::Millisecond, _) => push_datetime!(TimestampMillisecondArray),
+        DataType::Timestamp(TimeUnit::Microsecond, _) => push_datetime!(TimestampMicrosecondArray),
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => push_datetime!(TimestampNanosecondArray),
+        DataType::Decimal128(_, _) => push_decimal!(Decimal128Array),
+        DataType::Decimal256(_, _) => push_decimal!(Decimal256Array),
+        other => return Err(ParseError::UnsupportedArrowType(format!("{other:?}"))),
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -400,6 +579,178 @@ mod tests {
 
         assert!(checked_result.is_ok());
         assert!(unchecked_result.is_ok());
+    }
+
+    fn arrow_ipc_bytes(batch: &arrow::record_batch::RecordBatch) -> Vec<u8> {
+        use arrow::ipc::writer::StreamWriter;
+        let mut buf = Vec::new();
+        {
+            let schema = batch.schema();
+            let mut writer = StreamWriter::try_new(&mut buf, schema.as_ref()).unwrap();
+            writer.write(batch).unwrap();
+            writer.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn test_from_arrow_basic_types() {
+        use arrow::array::{Float64Array, StringArray, TimestampMillisecondArray};
+        use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+        use arrow::record_batch::RecordBatch;
+        use std::sync::Arc;
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("city", DataType::Utf8, true),
+            Field::new("amount", DataType::Float64, true),
+            Field::new(
+                "created_at",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                true,
+            ),
+        ]));
+
+        let cities = StringArray::from(vec![Some("Berlin"), None, Some("Lisbon")]);
+        let amounts = Float64Array::from(vec![Some(1.5), Some(2.0), None]);
+        // 0 -> 1970-01-01T00:00:00.000, 1_000 -> 1970-01-01T00:00:01.000
+        let created = TimestampMillisecondArray::from(vec![Some(0i64), None, Some(1_000)]);
+
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(cities), Arc::new(amounts), Arc::new(created)],
+        )
+        .unwrap();
+
+        let bytes = arrow_ipc_bytes(&batch);
+        let result = QueryResult::from_arrow(&bytes).expect("from_arrow");
+
+        assert_eq!(result.members, vec!["city", "amount", "created_at"]);
+        assert_eq!(result.row_count, 3);
+        assert_eq!(result.data.len(), 3);
+
+        assert_eq!(
+            result.data[0].as_slice(),
+            &[
+                DBResponsePrimitive::String("Berlin".to_string()),
+                DBResponsePrimitive::Null,
+                DBResponsePrimitive::String("Lisbon".to_string()),
+            ]
+        );
+        assert_eq!(
+            result.data[1].as_slice(),
+            &[
+                DBResponsePrimitive::Number(1.5),
+                DBResponsePrimitive::Number(2.0),
+                DBResponsePrimitive::Null,
+            ]
+        );
+
+        // Timestamps land in the dedicated variant and serialize to the ISO format.
+        match &result.data[2].as_slice()[0] {
+            DBResponsePrimitive::Timestamp(_) => {}
+            other => panic!("expected Timestamp, got {other:?}"),
+        }
+        assert_eq!(result.data[2].as_slice()[1], DBResponsePrimitive::Null);
+        let json = serde_json::to_value(result.data[2].as_slice()).unwrap();
+        assert_eq!(json[0], "1970-01-01T00:00:00.000");
+        assert_eq!(json[1], serde_json::Value::Null);
+        assert_eq!(json[2], "1970-01-01T00:00:01.000");
+    }
+
+    #[test]
+    fn test_from_arrow_unsupported_type() {
+        use arrow::array::BinaryArray;
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::record_batch::RecordBatch;
+        use std::sync::Arc;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "blob",
+            DataType::Binary,
+            false,
+        )]));
+        let blobs = BinaryArray::from_vec(vec![b"a".as_ref(), b"b".as_ref()]);
+        let batch = RecordBatch::try_new(schema, vec![Arc::new(blobs)]).unwrap();
+
+        let bytes = arrow_ipc_bytes(&batch);
+        let err = QueryResult::from_arrow(&bytes).expect_err("should reject Binary");
+        assert!(matches!(err, ParseError::UnsupportedArrowType(_)));
+    }
+
+    #[test]
+    fn test_from_cubestore_fb_arrow_query_result() {
+        use arrow::array::{Float64Array, StringArray};
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::record_batch::RecordBatch;
+        use cubeshared::codegen::{
+            HttpMessage, HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs,
+            HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultData,
+        };
+        use cubeshared::flatbuffers::FlatBufferBuilder;
+        use std::sync::Arc;
+
+        // Arrow IPC stream payload, as CubeStore would emit it.
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("city", DataType::Utf8, false),
+            Field::new("amount", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec!["Berlin", "Lisbon"])),
+                Arc::new(Float64Array::from(vec![1.5, 2.0])),
+            ],
+        )
+        .unwrap();
+        let ipc = arrow_ipc_bytes(&batch);
+
+        // Wrap it in a FlatBuffer HttpMessage with the HttpQueryResult command.
+        let mut builder = FlatBufferBuilder::new();
+        let data_vec = builder.create_vector(&ipc);
+        let arrow = HttpQueryResultArrow::create(
+            &mut builder,
+            &HttpQueryResultArrowArgs {
+                data: Some(data_vec),
+                is_last: true,
+            },
+        );
+        let query_result = HttpQueryResult::create(
+            &mut builder,
+            &HttpQueryResultArgs {
+                data_type: HttpQueryResultData::HttpQueryResultArrow,
+                data: Some(arrow.as_union_value()),
+            },
+        );
+        let connection_id = builder.create_string("test_connection");
+        let message = HttpMessage::create(
+            &mut builder,
+            &HttpMessageArgs {
+                message_id: 1,
+                command_type: HttpCommand::HttpQueryResult,
+                command: Some(query_result.as_union_value()),
+                connection_id: Some(connection_id),
+            },
+        );
+        builder.finish(message, None);
+        let msg_data = builder.finished_data().to_vec();
+
+        let result = QueryResult::from_cubestore_fb(&msg_data).expect("from_cubestore_fb arrow");
+        assert_eq!(result.members, vec!["city", "amount"]);
+        assert_eq!(result.row_count, 2);
+        assert_eq!(
+            result.data[0].as_slice(),
+            &[
+                DBResponsePrimitive::String("Berlin".to_string()),
+                DBResponsePrimitive::String("Lisbon".to_string()),
+            ]
+        );
+        assert_eq!(
+            result.data[1].as_slice(),
+            &[
+                DBResponsePrimitive::Number(1.5),
+                DBResponsePrimitive::Number(2.0),
+            ]
+        );
     }
 
     #[test]

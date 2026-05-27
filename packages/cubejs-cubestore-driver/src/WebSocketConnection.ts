@@ -18,6 +18,7 @@ import {
   HttpTable,
   Int64Value,
   NullValue,
+  QueryResultFormat,
   StringValue,
 } from '../codegen';
 
@@ -26,6 +27,14 @@ interface SentMessage {
   reject: (reason?: any) => void;
   buffer: Uint8Array;
 }
+
+export type QueryParameter = null | boolean | number | string | Buffer;
+
+export type WebSocketQueryOptions = {
+  inlineTables?: InlineTable[];
+  queryTracingObj?: any;
+  responseFormat?: QueryResultFormat;
+};
 
 interface CubeStoreWebSocket extends WebSocket {
   readyPromise: Promise<CubeStoreWebSocket>;
@@ -282,7 +291,15 @@ export class WebSocketConnection {
     }
   }
 
-  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any, parameters?: any): Promise<any[]> {
+  public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions = {}): Promise<any[]> {
+    const {
+      inlineTables,
+      queryTracingObj,
+      // Why, it's not a breaking change:
+      // An old Cube Store will ignore this option and will continue to serve results in Legacy format
+      responseFormat = QueryResultFormat.Arrow
+    } = options;
+
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
 
@@ -321,7 +338,7 @@ export class WebSocketConnection {
     }
 
     let parametersOffset: flatbuffers.Offset | null = null;
-    if (parameters) {
+    if (parameters.length > 0) {
       const httpParameterValues: flatbuffers.Offset[] = [];
 
       for (const parameter of parameters) {
@@ -348,6 +365,8 @@ export class WebSocketConnection {
     if (parametersOffset) {
       HttpQuery.addParameters(builder, parametersOffset);
     }
+
+    HttpQuery.addResponseFormat(builder, responseFormat);
 
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;
