@@ -54,6 +54,17 @@ export type MultiStageFilterDirective = {
   keepOnlyReferences?: string[];
 };
 
+export type MultiStageGrainDirective = {
+  mode?: 'relative' | 'fixed';
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: (...args: Array<unknown>) => Array<ToString>;
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+  includeReferences?: string[];
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -98,6 +109,7 @@ export type MeasureDefinition = {
   groupBy?: (...args: Array<unknown>) => Array<ToString>;
   reduceBy?: (...args: Array<unknown>) => Array<ToString>;
   addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  grain?: MultiStageGrainDirective;
   timeShift?: TimeShiftDefinition[];
   groupByReferences?: string[];
   reduceByReferences?: string[];
@@ -624,6 +636,17 @@ export class CubeEvaluator extends CubeSymbols {
           }
           if (typeof member.filter.keepOnly === 'function') {
             member.filter.keepOnlyReferences = this.evaluateReferences(cubeName, member.filter.keepOnly);
+          }
+        }
+        if (member.grain) {
+          if (typeof member.grain.exclude === 'function') {
+            member.grain.excludeReferences = this.evaluateReferences(cubeName, member.grain.exclude);
+          }
+          if (typeof member.grain.keepOnly === 'function') {
+            member.grain.keepOnlyReferences = this.evaluateReferences(cubeName, member.grain.keepOnly);
+          }
+          if (typeof member.grain.include === 'function') {
+            member.grain.includeReferences = this.evaluateReferences(cubeName, member.grain.include);
           }
         }
       }
