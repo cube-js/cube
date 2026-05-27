@@ -115,6 +115,40 @@ cubes:
             reduce_by:
                 - orders.category
 
+          - name: max_total_amount_reduce_category
+            type: max
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: count_sum_reduce_category
+            type: sum
+            sql: "{CUBE.count}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: max_amount
+            type: max
+            sql: amount
+
+          - name: max_sum_reduce_category
+            type: sum
+            sql: "{CUBE.max_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: total_by_customer_reduce_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.customer_id
+            reduce_by:
+                - orders.category
+
           - name: amount_by_id
             type: number
             sql: "{CUBE.total_amount}"

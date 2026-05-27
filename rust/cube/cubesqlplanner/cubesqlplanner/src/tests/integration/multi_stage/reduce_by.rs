@@ -9,6 +9,115 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 
+// add_group_by + reduce_by together: leaf grain extends with customer_id
+// while partition grain shrinks by removing category. Three distinct grains:
+//   leaf       = (status, category, customer_id)  ← per-customer sum(amount)
+//   query      = (status, category)
+//   partition  = (status,)                        ← reduce_by removes category
+// Expected per JOIN-semantic (outer sum collapses add_group_by + reduce_by
+// down to partition, broadcast to query grid): total sum(amount) per status.
+//   cancelled = 200, completed = 1400, pending = 650.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_add_group_by_combo() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_by_customer_reduce_category
+        dimensions:
+          - orders.status
+          - orders.category
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Inner base = max (idempotent), outer multi-stage = sum. Numerically the
+// current window path lands on the right number — sum on single-row leaf
+// buckets is identity — but the shape (`sum(sum(...))` instead of
+// semantically-correct `sum(max(...))`) and the broader JOIN-semantics for
+// non-additive cases will only converge once we move off the window path.
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_sum_of_max() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.max_sum_reduce_category
+        dimensions:
+          - orders.status
+          - orders.category
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Inner base = count, outer multi-stage = sum: sum-of-counts by partition.
+// Numerically correct under the current window path (sum is associative).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_sum_of_count() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.count_sum_reduce_category
+        dimensions:
+          - orders.status
+          - orders.category
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Inner additive (sum), outer idempotent (max). Snapshot pins the JOIN-semantic
+// result (max amount per status, reduced over category). Current window path
+// returns a different number (max of category-sums per status); re-enable once
+// reduce_by for non-additive / inner-≠-outer cases moves onto the JOIN model.
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_max_of_sum() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.max_total_amount_reduce_category
+        dimensions:
+          - orders.status
+          - orders.category
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_single_dim() {
     let ctx = create_context();
