@@ -3,8 +3,6 @@ title: Orchestration API
 description: "Trigger pre-aggregation refreshes from Airflow, Dagster, or Prefect instead of relying on Cube's scheduled refresh."
 ---
 
- Orchestration API
-
 Orchestration API enables Cube to work with data orchestration tools and let
 them _push_ changes from upstream data sources to Cube, as opposed to letting
 Cube _pull_ changes from upstream data sources via the
@@ -30,12 +28,15 @@ Orchestration API has integration packages to work with popular data
 orchestration tools. Check the following guides to get tool-specific
 instructions:
 
-<CardGroup cols={2}>
-  <Card title="Apache Airflow" img="https://static.cube.dev/icons/airflow.svg" href="/reference/orchestration-api/airflow">
+<CardGroup cols={3}>
+  <Card title="Apache Airflow" href="/reference/orchestration-api/airflow">
+    Trigger pre-aggregation builds from Apache Airflow DAGs.
   </Card>
-  <Card title="Dagster" img="https://static.cube.dev/icons/dagster.svg" href="/reference/orchestration-api/dagster">
+  <Card title="Dagster" href="/reference/orchestration-api/dagster">
+    Trigger pre-aggregation builds from Dagster assets and jobs.
   </Card>
-  <Card title="Prefect" img="https://static.cube.dev/icons/prefect.svg" href="/reference/orchestration-api/prefect">
+  <Card title="Prefect" href="/reference/orchestration-api/prefect">
+    Trigger pre-aggregation builds from Prefect flows.
   </Card>
 </CardGroup>
 
@@ -69,7 +70,7 @@ data from a particular date range.
 [cube-issbi]: https://cube.dev/use-cases/semantic-layer
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
 [ref-lambda-pre-aggs]: /docs/pre-aggregations/lambda-pre-aggregations
-[ref-rest-api]: /reference/rest-api
-[ref-api-scopes]: /reference/rest-api#configuration-api-scopes
-[ref-ref-jobs-endpoint]: /reference/rest-api/reference#base_pathv1pre-aggregationsjobs
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-api-scopes]: /reference/core-data-apis/rest-api#configuration-api-scopes
+[ref-ref-jobs-endpoint]: /reference/core-data-apis/rest-api/reference#base_pathv1pre-aggregationsjobs
 [ref-pre-agg-partitions]: /docs/pre-aggregations/using-pre-aggregations#partitioning
