@@ -120,3 +120,73 @@ async fn test_grain_keep_only_matches_group_by_override() {
         insta::assert_snapshot!(result);
     }
 }
+
+// `grain.mode: fixed` (no keep_only/include) → grand total. The measure
+// value is the SUM across all rows, replicated per query category.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_fixed_grand_total() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_fixed_grand_total
+        dimensions:
+          - orders.category
+        order:
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// `grain.mode: fixed, keep_only: [status]` with status absent from the
+// query → effective grain is empty (grand total), since the FIXED base is
+// the original query context, not the parent state.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_fixed_keep_only_dim_not_in_query() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_fixed_keep_only_status
+        dimensions:
+          - orders.category
+        order:
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// `grain.mode: fixed, keep_only: [status]` with status in the query →
+// effective grain is [status], matching the RELATIVE behavior at top
+// level (parent context == query). Smoke test that both modes coexist.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_fixed_keep_only_dim_in_query() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_fixed_keep_only_status
+        dimensions:
+          - orders.status
+          - orders.category
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
