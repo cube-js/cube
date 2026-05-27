@@ -14,6 +14,12 @@ pub struct MultiStageQueryDescription {
     member: Rc<MultiStageMember>,
     state: Rc<QueryProperties>,
     input: Vec<Rc<MultiStageQueryDescription>>,
+    /// Dim-grid sources for the JOIN-based assembly. Empty for the
+    /// legacy window-based path. Populated by `make_queries_descriptions`
+    /// when reduce_by / group_by actually shrinks the partition grain
+    /// vs the leaf grain — in that case `input` is rebuilt at partition
+    /// grain and the original full-grain inputs move here as keys.
+    keys_input: Vec<Rc<MultiStageQueryDescription>>,
     alias: String,
 }
 
@@ -22,12 +28,14 @@ impl MultiStageQueryDescription {
         member: Rc<MultiStageMember>,
         state: Rc<QueryProperties>,
         input: Vec<Rc<MultiStageQueryDescription>>,
+        keys_input: Vec<Rc<MultiStageQueryDescription>>,
         alias: String,
     ) -> Rc<Self> {
         Rc::new(Self {
             member,
             state,
             input,
+            keys_input,
             alias,
         })
     }
@@ -66,6 +74,10 @@ impl MultiStageQueryDescription {
 
     pub fn input(&self) -> &Vec<Rc<MultiStageQueryDescription>> {
         &self.input
+    }
+
+    pub fn keys_input(&self) -> &Vec<Rc<MultiStageQueryDescription>> {
+        &self.keys_input
     }
 
     pub fn is_leaf(&self) -> bool {

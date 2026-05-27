@@ -39,6 +39,48 @@ impl PrettyPrint for MultiStageSubqueryRef {
     }
 }
 
+/// Dim-grid source for the JOIN-based assembly: a set of CTE refs that
+/// supply the keys grid plus the explicit list of dim symbols to use as
+/// JOIN-keys against the measure-side `multi_stage_subquery_refs`.
+#[derive(Clone, TypedBuilder)]
+pub struct FullKeyAggregateKeysInput {
+    #[builder(default)]
+    refs: Vec<Rc<MultiStageSubqueryRef>>,
+    #[builder(default)]
+    keys: Vec<Rc<MemberSymbol>>,
+}
+
+impl FullKeyAggregateKeysInput {
+    pub fn refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
+        &self.refs
+    }
+
+    pub fn keys(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.keys
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.refs.is_empty() && self.keys.is_empty()
+    }
+}
+
+impl PrettyPrint for FullKeyAggregateKeysInput {
+    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+        result.println("FullKeyAggregateKeysInput:", state);
+        let inner = state.new_level();
+        if !self.refs.is_empty() {
+            result.println("refs:", &inner);
+            let details = inner.new_level();
+            for r in self.refs.iter() {
+                r.pretty_print(result, &details);
+            }
+        }
+        if !self.keys.is_empty() {
+            result.println(&format!("keys: {}", print_symbols(&self.keys)), &inner);
+        }
+    }
+}
+
 /// Top-level aggregating source that stitches together several
 /// multi-stage / multi-fact CTEs into one keyed result. The
 /// physical builder picks a join strategy from `multi_stage_subquery_refs`
@@ -49,6 +91,11 @@ pub struct FullKeyAggregate {
     use_full_join_and_coalesce: bool,
     #[builder(default)]
     multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
+    /// Optional dim-grid input to LEFT JOIN measure-side refs against.
+    /// `None` for the legacy window-based assembly; populated for the
+    /// JOIN-based path (non-additive measures with reduce_by/group_by).
+    #[builder(default)]
+    keys_input: Option<Rc<FullKeyAggregateKeysInput>>,
 }
 
 impl FullKeyAggregate {
@@ -65,6 +112,10 @@ impl FullKeyAggregate {
 
     pub fn multi_stage_subquery_refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
         &self.multi_stage_subquery_refs
+    }
+
+    pub fn keys_input(&self) -> Option<&Rc<FullKeyAggregateKeysInput>> {
+        self.keys_input.as_ref()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -89,6 +140,7 @@ impl LogicalNode for FullKeyAggregate {
                 .schema(self.schema().clone())
                 .use_full_join_and_coalesce(self.use_full_join_and_coalesce())
                 .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
+                .keys_input(self.keys_input.clone())
                 .build(),
         ))
     }
@@ -124,6 +176,10 @@ impl PrettyPrint for FullKeyAggregate {
             for subquery_ref in self.multi_stage_subquery_refs().iter() {
                 subquery_ref.pretty_print(result, &details_state);
             }
+        }
+        if let Some(keys_input) = self.keys_input() {
+            result.println("keys_input:", &state);
+            keys_input.pretty_print(result, &details_state);
         }
     }
 }
