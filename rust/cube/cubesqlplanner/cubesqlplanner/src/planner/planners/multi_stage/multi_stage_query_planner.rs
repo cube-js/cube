@@ -457,11 +457,31 @@ impl MultiStageQueryPlanner {
                 }
             }
 
-            let new_state = if !dimensions_to_add.is_empty()
-                || multi_stage_member.time_shift().is_some()
-                || state.has_filters_for_member(&member_name)
-            {
+            // new_state is the leaf grain on which children are computed.
+            // Modifiers are applied in this order:
+            //   1. reduce_by / group_by — shrink parent grain to the
+            //      partition grain implied by directives.
+            //   2. add_group_by — extend the result with extra leaf dims.
+            //   3. time_shift / filter cleanup.
+            // Step 1 before step 2 is essential: `add_group_by` must
+            // survive `group_by`'s keep-only filter (otherwise extra dims
+            // would be silently dropped — see multi-stage count_distinct
+            // sum-by-quarter case).
+            let new_state = {
                 let mut new_state = state.as_ref().clone();
+                if matches!(
+                    multi_stage_member.inode_type(),
+                    MultiStageInodeMemberType::Aggregate
+                ) {
+                    let reduce_by = multi_stage_member.reduce_by_symbols().clone();
+                    let group_by = multi_stage_member.group_by_symbols().clone();
+                    let dims =
+                        Self::partition_filter(new_state.dimensions(), &reduce_by, &group_by);
+                    let time_dims =
+                        Self::partition_filter(new_state.time_dimensions(), &reduce_by, &group_by);
+                    new_state.set_dimensions(dims);
+                    new_state.set_time_dimensions(time_dims);
+                }
                 if !dimensions_to_add.is_empty() {
                     new_state.add_dimensions(dimensions_to_add.clone());
                 }
@@ -472,34 +492,6 @@ impl MultiStageQueryPlanner {
                     new_state.remove_filter_for_member(&member_name);
                 }
                 Rc::new(new_state)
-            } else {
-                state.clone()
-            };
-
-            // Parallel partition-grain state for the JOIN-model check —
-            // applies reduce_by / group_by on top of new_state. Not fed to
-            // make_childs yet (renderer isn't ready); only used to decide
-            // whether the current Aggregate inode shrinks parent's grain.
-            let partition_new_state = if matches!(
-                multi_stage_member.inode_type(),
-                MultiStageInodeMemberType::Aggregate
-            ) {
-                let reduce_by = multi_stage_member.reduce_by_symbols().clone();
-                let group_by = multi_stage_member.group_by_symbols().clone();
-                let mut partition_state = (*new_state).clone();
-                partition_state.set_dimensions(Self::partition_filter(
-                    new_state.dimensions(),
-                    &reduce_by,
-                    &group_by,
-                ));
-                partition_state.set_time_dimensions(Self::partition_filter(
-                    new_state.time_dimensions(),
-                    &reduce_by,
-                    &group_by,
-                ));
-                Some(Rc::new(partition_state))
-            } else {
-                None
             };
 
             let mut input = vec![];
@@ -512,47 +504,34 @@ impl MultiStageQueryPlanner {
                 cte_state,
             )?;
 
-            // JOIN-model: when partition_new_state misses any dim that was
-            // already on the parent's `state`, this Aggregate inode shrinks
-            // the parent grain. The existing full-grain inputs become the
-            // keys-side; a fresh round of make_childs at partition grain
-            // becomes the measure-side. Otherwise we leave `input` as-is.
-            //
-            // Restricted to the case where new_state has the same dim shape
-            // as `state` (no add_group_by / case-switch dim extension on this
-            // level). The combo `add_group_by + reduce_by` needs a three-tier
-            // structure (leaf → outer agg → keys) which the current two-tier
-            // `keys ⊕ measure` model can't express, so for combo we fall back
-            // to the legacy window path.
+            // JOIN-model: when new_state misses any dim that was on the
+            // parent's `state`, this inode shrinks the parent grain. We
+            // build keys-side descriptions per child on the parent state
+            // so the FullKeyAggregate can broadcast measure values back
+            // to the full query grain.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
-            let leaf_matches_state = dimensions_to_add.is_empty();
-            if leaf_matches_state {
-                if let Some(partition_state) = partition_new_state.as_ref() {
-                    let parent_dim_in_partition = |sym: &Rc<MemberSymbol>| {
-                        let sym_name = sym.clone().resolve_reference_chain().full_name();
-                        partition_state
-                            .dimensions()
-                            .iter()
-                            .chain(partition_state.time_dimensions().iter())
-                            .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
-                    };
-                    let any_missing = state
-                        .dimensions()
-                        .iter()
-                        .chain(state.time_dimensions().iter())
-                        .any(|d| !parent_dim_in_partition(d));
-                    if any_missing {
-                        keys_input = std::mem::take(&mut input);
-                        self.make_childs(
-                            member.clone(),
-                            partition_state.clone(),
-                            &mut input,
-                            descriptions,
-                            resolved_multi_stage_dimensions,
-                            cte_state,
-                        )?;
-                    }
-                }
+            let new_state_has = |sym: &Rc<MemberSymbol>| {
+                let sym_name = sym.clone().resolve_reference_chain().full_name();
+                new_state
+                    .dimensions()
+                    .iter()
+                    .chain(new_state.time_dimensions().iter())
+                    .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
+            };
+            let any_missing = state
+                .dimensions()
+                .iter()
+                .chain(state.time_dimensions().iter())
+                .any(|d| !new_state_has(d));
+            if any_missing {
+                self.make_childs(
+                    member.clone(),
+                    state.clone(),
+                    &mut keys_input,
+                    descriptions,
+                    resolved_multi_stage_dimensions,
+                    cte_state,
+                )?;
             }
 
             let alias = cte_state.next_cte_name();

@@ -208,24 +208,26 @@ impl MultiStageMemberQueryPlanner {
             &multi_stage_member.group_by_symbols(),
         );
 
-        // Rank always uses a window function. Aggregate inodes route
-        // through `FullKeyAggregate` whenever the planner populated
-        // `keys_input` (JOIN-model); otherwise we fall back to the legacy
-        // Window path (e.g. when `add_group_by + reduce_by` combo isn't yet
-        // expressible as two-tier keys ⊕ measure).
+        // Rank always uses a window function. Aggregate inodes now always
+        // route through `FullKeyAggregate` — `partition_by` may still be
+        // computed below for inspection, but the Window expression path
+        // is intentionally not wired in. The dead branch is kept as a
+        // reminder of the legacy fallback we may want to revisit.
         let window_function_to_use = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
-            MultiStageInodeMemberType::Aggregate => {
-                if self.description.keys_input().is_empty()
-                    && partition_by.len() != self.all_dimensions().len()
-                {
-                    MultiStageCalculationWindowFunction::Window
-                } else {
-                    MultiStageCalculationWindowFunction::None
-                }
-            }
             _ => MultiStageCalculationWindowFunction::None,
         };
+        // let window_function_to_use = match multi_stage_member.inode_type() {
+        //     MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
+        //     MultiStageInodeMemberType::Aggregate => {
+        //         if partition_by.len() != self.all_dimensions().len() {
+        //             MultiStageCalculationWindowFunction::Window
+        //         } else {
+        //             MultiStageCalculationWindowFunction::None
+        //         }
+        //     }
+        //     _ => MultiStageCalculationWindowFunction::None,
+        // };
 
         let measures = if self.description.member().evaluation_node().is_measure() {
             vec![self.description.member().evaluation_node().clone()]
