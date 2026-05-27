@@ -226,6 +226,20 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
         await delay(OP_DELAY);
       }
+
+      // Exercise pre-aggregation build with a custom granularity against the
+      // export bucket. The granularity name `build_only_half_year` is unique
+      // to this rollup — no query test references it, so the rollup cannot
+      // match any test query and only the build path is exercised.
+      if (type === 'athena') {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        await delay(OP_DELAY);
+      }
     });
 
     execute('must not fetch a hidden cube', async () => {
