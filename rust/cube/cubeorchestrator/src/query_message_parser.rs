@@ -290,9 +290,20 @@ fn append_arrow_array(
     let len = array.len();
     col.reserve(len);
 
+    macro_rules! downcast_array_ref {
+        ($ty:ty) => {
+            array.as_any().downcast_ref::<$ty>().ok_or_else(|| {
+                ParseError::ArrowError(format!(
+                    "Failed to downcast Arrow array to {}",
+                    stringify!($ty)
+                ))
+            })?
+        };
+    }
+
     macro_rules! push_int {
         ($ty:ty) => {{
-            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            let a = downcast_array_ref!($ty);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -305,7 +316,7 @@ fn append_arrow_array(
 
     macro_rules! push_uint {
         ($ty:ty) => {{
-            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            let a = downcast_array_ref!($ty);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -318,7 +329,7 @@ fn append_arrow_array(
 
     macro_rules! push_float {
         ($ty:ty) => {{
-            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            let a = downcast_array_ref!($ty);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -331,7 +342,7 @@ fn append_arrow_array(
 
     macro_rules! push_str {
         ($ty:ty) => {{
-            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            let a = downcast_array_ref!($ty);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -344,7 +355,7 @@ fn append_arrow_array(
 
     macro_rules! push_datetime {
         ($ty:ty) => {{
-            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            let a = downcast_array_ref!($ty);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -360,7 +371,7 @@ fn append_arrow_array(
 
     macro_rules! push_decimal {
         ($ty:ty) => {{
-            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            let a = downcast_array_ref!($ty);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -382,7 +393,7 @@ fn append_arrow_array(
             }
         }
         DataType::Boolean => {
-            let a = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+            let a = downcast_array_ref!(BooleanArray);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
@@ -402,7 +413,7 @@ fn append_arrow_array(
         DataType::Float32 => push_float!(Float32Array),
         DataType::Float64 => push_float!(Float64Array),
         DataType::Float16 => {
-            let a = array.as_any().downcast_ref::<Float16Array>().unwrap();
+            let a = downcast_array_ref!(Float16Array);
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
