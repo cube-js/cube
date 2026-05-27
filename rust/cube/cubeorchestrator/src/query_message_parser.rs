@@ -282,8 +282,7 @@ impl QueryResult {
 }
 
 /// Append every element of an Arrow `array` to a column accumulator, converting
-/// each value to [`DBResponsePrimitive`]. Temporal types become
-/// [`DBResponsePrimitive::Timestamp`]; integers/floats/decimals become `Number`.
+/// each value to [`DBResponsePrimitive`].
 fn append_arrow_array(
     col: &mut Vec<DBResponsePrimitive>,
     array: &dyn Array,
@@ -291,14 +290,40 @@ fn append_arrow_array(
     let len = array.len();
     col.reserve(len);
 
-    macro_rules! push_numeric {
+    macro_rules! push_int {
         ($ty:ty) => {{
             let a = array.as_any().downcast_ref::<$ty>().unwrap();
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
                 } else {
-                    col.push(DBResponsePrimitive::Number(a.value(i) as f64));
+                    col.push(DBResponsePrimitive::Int64(a.value(i) as i64));
+                }
+            }
+        }};
+    }
+
+    macro_rules! push_uint {
+        ($ty:ty) => {{
+            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::UInt64(a.value(i) as u64));
+                }
+            }
+        }};
+    }
+
+    macro_rules! push_float {
+        ($ty:ty) => {{
+            let a = array.as_any().downcast_ref::<$ty>().unwrap();
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::Float64(a.value(i) as f64));
                 }
             }
         }};
@@ -342,7 +367,7 @@ fn append_arrow_array(
                 } else {
                     let s = a.value_as_string(i);
                     match s.parse::<f64>() {
-                        Ok(n) => col.push(DBResponsePrimitive::Number(n)),
+                        Ok(n) => col.push(DBResponsePrimitive::Float64(n)),
                         Err(_) => col.push(DBResponsePrimitive::String(s)),
                     }
                 }
@@ -366,23 +391,23 @@ fn append_arrow_array(
                 }
             }
         }
-        DataType::Int8 => push_numeric!(Int8Array),
-        DataType::Int16 => push_numeric!(Int16Array),
-        DataType::Int32 => push_numeric!(Int32Array),
-        DataType::Int64 => push_numeric!(Int64Array),
-        DataType::UInt8 => push_numeric!(UInt8Array),
-        DataType::UInt16 => push_numeric!(UInt16Array),
-        DataType::UInt32 => push_numeric!(UInt32Array),
-        DataType::UInt64 => push_numeric!(UInt64Array),
-        DataType::Float32 => push_numeric!(Float32Array),
-        DataType::Float64 => push_numeric!(Float64Array),
+        DataType::Int8 => push_int!(Int8Array),
+        DataType::Int16 => push_int!(Int16Array),
+        DataType::Int32 => push_int!(Int32Array),
+        DataType::Int64 => push_int!(Int64Array),
+        DataType::UInt8 => push_uint!(UInt8Array),
+        DataType::UInt16 => push_uint!(UInt16Array),
+        DataType::UInt32 => push_uint!(UInt32Array),
+        DataType::UInt64 => push_uint!(UInt64Array),
+        DataType::Float32 => push_float!(Float32Array),
+        DataType::Float64 => push_float!(Float64Array),
         DataType::Float16 => {
             let a = array.as_any().downcast_ref::<Float16Array>().unwrap();
             for i in 0..len {
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
                 } else {
-                    col.push(DBResponsePrimitive::Number(a.value(i).to_f64()));
+                    col.push(DBResponsePrimitive::Float64(a.value(i).to_f64()));
                 }
             }
         }
@@ -416,13 +441,12 @@ mod tests {
     fn create_test_message(num_rows: usize, num_columns: usize) -> Vec<u8> {
         let mut builder = FlatBufferBuilder::new();
 
-        // Create column names
         let column_names: Vec<_> = (0..num_columns)
             .map(|i| builder.create_string(&format!("column_{}", i)))
             .collect();
 
-        // Create rows with values
         let mut rows_vec = Vec::with_capacity(num_rows);
+
         for row_idx in 0..num_rows {
             // Create column values for this row
             let mut values_vec = Vec::with_capacity(num_columns);
@@ -459,7 +483,6 @@ mod tests {
             },
         );
 
-        // Create the message
         let connection_id = builder.create_string("test_connection");
         let message = HttpMessage::create(
             &mut builder,
@@ -477,7 +500,6 @@ mod tests {
 
     #[test]
     fn test_parse_small_result_set() {
-        // Small result set should work fine
         let msg_data = create_test_message(10, 5);
         let result = QueryResult::from_cubestore_fb(&msg_data);
         assert!(result.is_ok());
@@ -637,8 +659,8 @@ mod tests {
         assert_eq!(
             result.data[1].as_slice(),
             &[
-                DBResponsePrimitive::Number(1.5),
-                DBResponsePrimitive::Number(2.0),
+                DBResponsePrimitive::Float64(1.5),
+                DBResponsePrimitive::Float64(2.0),
                 DBResponsePrimitive::Null,
             ]
         );
@@ -745,8 +767,8 @@ mod tests {
         assert_eq!(
             result.data[1].as_slice(),
             &[
-                DBResponsePrimitive::Number(1.5),
-                DBResponsePrimitive::Number(2.0),
+                DBResponsePrimitive::Float64(1.5),
+                DBResponsePrimitive::Float64(2.0),
             ]
         );
     }

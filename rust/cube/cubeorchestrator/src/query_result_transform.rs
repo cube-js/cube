@@ -1156,7 +1156,9 @@ pub struct RequestResultArray {
 pub enum DBResponsePrimitive {
     Null,
     Boolean(bool),
-    Number(f64),
+    Int64(i64),
+    UInt64(u64),
+    Float64(f64),
     String(String),
     Timestamp(NaiveDateTime),
     Uncommon(Value),
@@ -1171,7 +1173,9 @@ impl Serialize for DBResponsePrimitive {
         match self {
             DBResponsePrimitive::Null => serializer.serialize_none(),
             DBResponsePrimitive::Boolean(b) => serializer.serialize_bool(*b),
-            DBResponsePrimitive::Number(n) => serializer.serialize_f64(*n),
+            DBResponsePrimitive::Int64(n) => serializer.serialize_i64(*n),
+            DBResponsePrimitive::UInt64(n) => serializer.serialize_u64(*n),
+            DBResponsePrimitive::Float64(n) => serializer.serialize_f64(*n),
             DBResponsePrimitive::String(s) => serializer.serialize_str(s),
             DBResponsePrimitive::Timestamp(dt) => {
                 serializer.serialize_str(&dt.format(TIMESTAMP_FORMAT).to_string())
@@ -1201,23 +1205,35 @@ impl<'de> Deserialize<'de> for DBResponsePrimitive {
             }
 
             fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::Int64(v))
             }
 
             fn visit_i128<E: de::Error>(self, v: i128) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                if let Ok(n) = i64::try_from(v) {
+                    Ok(DBResponsePrimitive::Int64(n))
+                } else if let Ok(n) = u64::try_from(v) {
+                    Ok(DBResponsePrimitive::UInt64(n))
+                } else {
+                    Err(E::custom(format!("integer {v} out of range for i64/u64")))
+                }
             }
 
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::UInt64(v))
             }
 
             fn visit_u128<E: de::Error>(self, v: u128) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                if let Ok(n) = i64::try_from(v) {
+                    Ok(DBResponsePrimitive::Int64(n))
+                } else if let Ok(n) = u64::try_from(v) {
+                    Ok(DBResponsePrimitive::UInt64(n))
+                } else {
+                    Err(E::custom(format!("integer {v} out of range for i64/u64")))
+                }
             }
 
             fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v))
+                Ok(DBResponsePrimitive::Float64(v))
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
@@ -1273,13 +1289,16 @@ impl Display for DBResponsePrimitive {
         let str = match self {
             DBResponsePrimitive::Null => "null".to_string(),
             DBResponsePrimitive::Boolean(b) => b.to_string(),
-            DBResponsePrimitive::Number(n) => n.to_string(),
+            DBResponsePrimitive::Int64(n) => n.to_string(),
+            DBResponsePrimitive::UInt64(n) => n.to_string(),
+            DBResponsePrimitive::Float64(n) => n.to_string(),
             DBResponsePrimitive::String(s) => s.clone(),
             DBResponsePrimitive::Timestamp(dt) => dt.format(TIMESTAMP_FORMAT).to_string(),
             DBResponsePrimitive::Uncommon(v) => {
                 serde_json::to_string(&v).unwrap_or_else(|_| v.to_string())
             }
         };
+
         write!(f, "{}", str)
     }
 }

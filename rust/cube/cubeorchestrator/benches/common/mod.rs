@@ -56,7 +56,7 @@ pub fn build_dataset(
         members.push(alias.clone());
         let mut col = ColumnarArray::with_capacity(row_count);
         for i in 0..row_count {
-            col.push(DBResponsePrimitive::Number(((i * (j + 1)) as f64) * 0.5));
+            col.push(DBResponsePrimitive::Float64(((i * (j + 1)) as f64) * 0.5));
         }
         columns.push(col);
     }
