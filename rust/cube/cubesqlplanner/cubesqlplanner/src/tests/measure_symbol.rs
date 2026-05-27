@@ -474,7 +474,7 @@ fn new_patched_appends_to_existing_filters() {
 
 mod multi_stage {
     use super::*;
-    use crate::planner::MultiStageFilterMode;
+    use crate::planner::{MultiStageFilterMode, MultiStageGrainMode};
 
     fn ctx() -> TestContext {
         let schema = MockSchema::from_yaml_file("common/multi_stage_filter.yaml");
@@ -490,13 +490,16 @@ mod multi_stage {
         assert!(measure.is_multi_stage());
         let ms = measure.multi_stage().expect("multi_stage present");
 
-        let reduce_by = ms.reduce_by.as_ref().expect("reduce_by");
-        assert_eq!(reduce_by.len(), 1);
-        assert_eq!(reduce_by[0].full_name(), "orders.status");
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
 
-        let add_group_by = ms.add_group_by.as_ref().expect("add_group_by");
-        assert_eq!(add_group_by.len(), 1);
-        assert_eq!(add_group_by[0].full_name(), "orders.city");
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.city");
+
+        assert_eq!(ms.grain.mode, MultiStageGrainMode::Relative);
+        assert!(ms.grain.keep_only.is_none());
     }
 
     #[test]
@@ -531,9 +534,9 @@ mod multi_stage {
         assert!(dim.is_multi_stage());
         let ms = dim.multi_stage().expect("multi_stage present");
 
-        let add_group_by = ms.add_group_by.as_ref().expect("add_group_by");
-        assert_eq!(add_group_by.len(), 1);
-        assert_eq!(add_group_by[0].full_name(), "orders.status");
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.status");
 
         let filter = ms.filter.as_ref().expect("filter present");
         assert_eq!(filter.mode, MultiStageFilterMode::Relative);
@@ -544,8 +547,8 @@ mod multi_stage {
         assert_eq!(filter.include_dimension.len(), 1);
         assert!(filter.include_measure.is_empty());
         assert!(filter.include_time_dimension.is_empty());
-        assert!(ms.reduce_by.is_none());
-        assert!(ms.group_by.is_none());
+        assert!(ms.grain.exclude.is_none());
+        assert!(ms.grain.keep_only.is_none());
     }
 
     #[test]
@@ -569,6 +572,56 @@ mod multi_stage {
         let filter = ms.filter.as_ref().expect("filter present");
 
         assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+    }
+
+    #[test]
+    fn legacy_fields_populate_grain_with_relative_mode() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        assert_eq!(ms.grain.mode, MultiStageGrainMode::Relative);
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include[0].full_name(), "orders.city");
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude[0].full_name(), "orders.status");
+        assert!(ms.grain.keep_only.is_none());
+
+        // Proxies on `MeasureSymbol` must mirror the resolved grain.
+        let proxy_add = measure.add_group_by().expect("add_group_by proxy");
+        let proxy_reduce = measure.reduce_by().expect("reduce_by proxy");
+        assert_eq!(proxy_add[0].full_name(), "orders.city");
+        assert_eq!(proxy_reduce[0].full_name(), "orders.status");
+        assert!(measure.group_by().is_none());
+    }
+
+    #[test]
+    fn grain_directive_overrides_legacy_fields() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_with_grain").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        assert_eq!(ms.grain.mode, MultiStageGrainMode::Fixed);
+
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        // Comes from `grain.include: [city]`, NOT from `add_group_by: [status]`.
+        assert_eq!(include[0].full_name(), "orders.city");
+
+        assert!(ms.grain.keep_only.is_none());
+
+        // Proxy methods reflect the grain — old add_group_by is shadowed.
+        let proxy_add = measure.add_group_by().expect("add_group_by proxy");
+        assert_eq!(proxy_add[0].full_name(), "orders.city");
+        let proxy_reduce = measure.reduce_by().expect("reduce_by proxy");
+        assert_eq!(proxy_reduce[0].full_name(), "orders.status");
     }
 
     #[test]
