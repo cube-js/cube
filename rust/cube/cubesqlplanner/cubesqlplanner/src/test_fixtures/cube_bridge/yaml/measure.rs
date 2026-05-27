@@ -5,7 +5,7 @@ use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
 use crate::test_fixtures::cube_bridge::{
     MockMeasureDefinition, MockMemberOrderBy, MockMultiStageFilterReferences,
-    MockStructWithSqlMember,
+    MockMultiStageGrainReferences, MockStructWithSqlMember,
 };
 use serde::Deserialize;
 use std::rc::Rc;
@@ -28,6 +28,8 @@ pub struct YamlMeasureDefinition {
     rolling_window: Option<RollingWindow>,
     #[serde(default)]
     filter: Option<YamlMultiStageFilter>,
+    #[serde(default)]
+    grain: Option<YamlMultiStageGrain>,
     #[serde(default)]
     sql: Option<String>,
     #[serde(default)]
@@ -123,6 +125,31 @@ impl YamlMultiStageFilter {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct YamlMultiStageGrain {
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    exclude: Option<Vec<String>>,
+    #[serde(default)]
+    keep_only: Option<Vec<String>>,
+    #[serde(default)]
+    include: Option<Vec<String>>,
+}
+
+impl YamlMultiStageGrain {
+    pub(super) fn build(self, cube_name: Option<&str>) -> Rc<MockMultiStageGrainReferences> {
+        Rc::new(
+            MockMultiStageGrainReferences::builder()
+                .mode(self.mode)
+                .exclude(qualify_references(self.exclude, cube_name))
+                .keep_only(qualify_references(self.keep_only, cube_name))
+                .include(qualify_references(self.include, cube_name))
+                .build(),
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
 struct YamlFilter {
     sql: String,
 }
@@ -197,6 +224,7 @@ impl YamlMeasureDefinition {
         };
 
         let filter = self.filter.map(|f| f.build(cube_name));
+        let grain = self.grain.map(|g| g.build(cube_name));
 
         Rc::new(
             MockMeasureDefinition::builder()
@@ -215,6 +243,7 @@ impl YamlMeasureDefinition {
                 .filters(filters)
                 .drill_filters(drill_filters)
                 .filter(filter)
+                .grain(grain)
                 .order_by(order_by)
                 .resolved_mask_sql_opt(self.mask.map(|m| m.to_sql_string()))
                 .build(),

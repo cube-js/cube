@@ -5,11 +5,13 @@ use crate::cube_bridge::measure_definition::{
 use crate::cube_bridge::member_order_by::MemberOrderBy;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences;
+use crate::cube_bridge::multi_stage_grain::MultiStageGrainReferences;
 use crate::cube_bridge::struct_with_sql_member::StructWithSqlMember;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::measure::YamlMeasureDefinition;
 use crate::test_fixtures::cube_bridge::{
-    MockMemberOrderBy, MockMemberSql, MockMultiStageFilterReferences, MockStructWithSqlMember,
+    MockMemberOrderBy, MockMemberSql, MockMultiStageFilterReferences,
+    MockMultiStageGrainReferences, MockStructWithSqlMember,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -44,6 +46,8 @@ pub struct MockMeasureDefinition {
     drill_filters: Option<Vec<Rc<MockStructWithSqlMember>>>,
     #[builder(default)]
     filter: Option<Rc<MockMultiStageFilterReferences>>,
+    #[builder(default)]
+    grain: Option<Rc<MockMultiStageGrainReferences>>,
     #[builder(default)]
     order_by: Option<Vec<Rc<MockMemberOrderBy>>>,
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
@@ -139,6 +143,17 @@ impl MeasureDefinition for MockMeasureDefinition {
             .filter
             .as_ref()
             .map(|f| f.clone() as Rc<dyn MultiStageFilterReferences>))
+    }
+
+    fn has_grain(&self) -> Result<bool, CubeError> {
+        Ok(self.grain.is_some())
+    }
+
+    fn grain(&self) -> Result<Option<Rc<dyn MultiStageGrainReferences>>, CubeError> {
+        Ok(self
+            .grain
+            .as_ref()
+            .map(|g| g.clone() as Rc<dyn MultiStageGrainReferences>))
     }
 
     fn has_order_by(&self) -> Result<bool, CubeError> {
@@ -338,6 +353,79 @@ mod tests {
             filter.static_data().exclude,
             Some(vec![
                 "orders.status".to_string(),
+                "other_cube.dim".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn test_from_yaml_with_grain() {
+        let yaml = indoc! {"
+            type: sum
+            sql: \"{CUBE.amount}\"
+            multi_stage: true
+            grain:
+              mode: fixed
+              include:
+                - region
+                - category
+        "};
+
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+
+        assert!(measure.has_grain().unwrap());
+        let grain = measure.grain().unwrap().expect("grain present");
+        let static_data = grain.static_data();
+        assert_eq!(static_data.mode.as_deref(), Some("fixed"));
+        assert_eq!(
+            static_data.include,
+            Some(vec!["region".to_string(), "category".to_string()])
+        );
+        assert_eq!(static_data.exclude, None);
+        assert_eq!(static_data.keep_only, None);
+    }
+
+    #[test]
+    fn test_from_yaml_with_grain_partial() {
+        let yaml = indoc! {"
+            type: sum
+            sql: \"{CUBE.amount}\"
+            multi_stage: true
+            grain:
+              exclude:
+                - region
+        "};
+
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+        let grain = measure.grain().unwrap().expect("grain present");
+        let static_data = grain.static_data();
+
+        assert_eq!(static_data.mode, None);
+        assert_eq!(static_data.exclude, Some(vec!["region".to_string()]));
+        assert_eq!(static_data.keep_only, None);
+        assert_eq!(static_data.include, None);
+    }
+
+    #[test]
+    fn test_from_yaml_with_grain_qualifies_references() {
+        let yaml = indoc! {"
+            type: sum
+            sql: \"{CUBE.amount}\"
+            multi_stage: true
+            grain:
+              include:
+                - region
+                - other_cube.dim
+        "};
+
+        let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml).unwrap();
+        let measure = yaml_def.build_with_cube_name(Some("orders"));
+        let grain = measure.grain().unwrap().expect("grain present");
+
+        assert_eq!(
+            grain.static_data().include,
+            Some(vec![
+                "orders.region".to_string(),
                 "other_cube.dim".to_string()
             ])
         );

@@ -181,6 +181,7 @@ const BRIDGES: BridgeSpec[] = [
       'drill_filters',
       'filter',
       'filters',
+      'grain',
       'group_by_references',
       'mask_sql',
       'measure_type',
@@ -201,6 +202,10 @@ const BRIDGES: BridgeSpec[] = [
   { name: 'memberOrderBy', expected: ['dir', 'sql'] },
   {
     name: 'multiStageFilter',
+    expected: ['exclude', 'include', 'keep_only', 'mode'],
+  },
+  {
+    name: 'multiStageGrain',
     expected: ['exclude', 'include', 'keep_only', 'mode'],
   },
   {
