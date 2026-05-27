@@ -95,7 +95,7 @@ cubes:
             sql: customer_id
 
           - name: unique_customers_reduce_category
-            type: count_distinct
+            type: sum
             sql: "{CUBE.unique_customers}"
             multi_stage: true
             reduce_by:
@@ -109,7 +109,7 @@ cubes:
                 - orders.category
 
           - name: count_reduce_category
-            type: count
+            type: sum
             sql: "{CUBE.count}"
             multi_stage: true
             reduce_by:

@@ -224,20 +224,9 @@ async fn test_reduce_by_avg() {
     }
 }
 
-// TODO: planner emits count(count(x)) OVER for multi-stage count with reduce_by.
-// On per-bucket single-row groups, inner count(x) collapses to 1, and outer
-// count(1) OVER (...) becomes the number of (full_grain) buckets in the partition
-// — not the count of source rows in the partition. Re-enable after moving
-// reduce_by for non-additive outer aggregations to the JOIN-based model.
-//
-// Honest count(*) per status (with category reduced):
-//   cancelled — orders 4, 9, 14                       → 3
-//   completed — orders 1, 2, 6, 7, 11, 12             → 6
-//   pending   — orders 3, 5, 8, 10, 13, 15            → 6
-//
-// Window count-of-count returns the number of distinct categories per status,
-// which on this seed is 3 for every status.
-#[ignore]
+// Multi-stage measure has outer `type: sum` over base `count` — this is the
+// correct user-level shape for "total count per partition" (count rolls up as
+// sum). JOIN-model picks the partition-grain leaf and broadcasts to query.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_count() {
     let ctx = create_context();
@@ -260,11 +249,11 @@ async fn test_reduce_by_count() {
     }
 }
 
-// TODO: planner currently emits invalid SQL for multi-stage count_distinct
-// with reduce_by (non-additive inner aggregated again via window). Re-enable
-// when reduce_by/group_by for non-additive measures is reworked off the window
-// path onto the JOIN-based model.
-#[ignore]
+// Multi-stage measure has outer `type: sum` over base `count_distinct` —
+// the correct shape for "rolled-up distinct count per partition". On this
+// seed customers don't overlap across statuses, so sum of per-status
+// count_distinct equals the true distinct count (3/3/3); when partitions
+// overlap callers should use an HLL-based path instead.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reduce_by_count_distinct() {
     let ctx = create_context();
