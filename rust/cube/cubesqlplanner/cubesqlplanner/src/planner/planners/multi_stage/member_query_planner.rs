@@ -213,7 +213,7 @@ impl MultiStageMemberQueryPlanner {
         // optimisation-eligible subset (planner sets `use_window_path`)
         // is emitted as a Window expression and additionally requires
         // partition_by to be a strict subset of all dimensions —
-        // otherwise the window degenerates into a plain group-by.
+        // otherwise the window collapses into a plain group-by.
         let window_function_to_use = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
             MultiStageInodeMemberType::Aggregate
