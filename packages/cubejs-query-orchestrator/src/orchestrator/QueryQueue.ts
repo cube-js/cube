@@ -776,7 +776,7 @@ export class QueryQueue {
 
         let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
-          () => {
+          async () => {
             if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
               this.logger('Query processing heartbeat', {
                 queueId,
@@ -786,43 +786,38 @@ export class QueryQueue {
               queryProcessHeartbeat = Date.now();
             }
 
-            const heartBeatPromise = queueConnection.updateHeartBeat(queryKeyHashed, queueId);
+            await queueConnection.updateHeartBeat(queryKeyHashed, queueId);
 
             if (!queryExecutionFinished && localCancelHandler !== null) {
-              return heartBeatPromise.then(async () => {
-                if (queryExecutionFinished) return;
-                try {
-                  const currentDef = await queueConnection.getQueryDef(queryKeyHashed, queueId);
-                  if (!currentDef && !queryExecutionFinished) {
-                    this.logger('Cancelling query due to external cancellation', {
-                      queueId,
-                      queryKey: query.queryKey,
-                      queuePrefix: this.redisQueuePrefix,
-                      requestId: query.requestId,
-                      metadata: query.query?.metadata,
-                      preAggregationId: query.query?.preAggregation?.preAggregationId,
-                      newVersionEntry: query.query?.newVersionEntry,
-                      preAggregation: query.query?.preAggregation,
-                      addedToQueueTime: query.addedToQueueTime,
-                    });
-                    const cancelQuery = { ...query, cancelHandler: localCancelHandler };
-                    if (this.cancelHandlers[query.queryHandler]) {
-                      await this.cancelHandlers[query.queryHandler](cancelQuery);
-                    }
-                  }
-                } catch (e: any) {
-                  this.logger('Error checking for external cancellation', {
+              try {
+                const currentDef = await queueConnection.getQueryDef(queryKeyHashed, queueId);
+                if (!currentDef && !queryExecutionFinished) {
+                  this.logger('Cancelling query due to external cancellation', {
                     queueId,
                     queryKey: query.queryKey,
-                    error: e.stack || e,
                     queuePrefix: this.redisQueuePrefix,
                     requestId: query.requestId,
+                    metadata: query.query?.metadata,
+                    preAggregationId: query.query?.preAggregation?.preAggregationId,
+                    newVersionEntry: query.query?.newVersionEntry,
+                    preAggregation: query.query?.preAggregation,
+                    addedToQueueTime: query.addedToQueueTime,
                   });
+                  const cancelQuery = { ...query, cancelHandler: localCancelHandler };
+                  if (this.cancelHandlers[query.queryHandler]) {
+                    await this.cancelHandlers[query.queryHandler](cancelQuery);
+                  }
                 }
-              });
+              } catch (e: any) {
+                this.logger('Error checking for external cancellation', {
+                  queueId,
+                  queryKey: query.queryKey,
+                  error: e.stack || e,
+                  queuePrefix: this.redisQueuePrefix,
+                  requestId: query.requestId,
+                });
+              }
             }
-
-            return heartBeatPromise;
           },
           this.heartBeatInterval * 1000
         );
