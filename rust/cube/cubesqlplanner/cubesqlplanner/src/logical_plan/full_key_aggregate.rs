@@ -84,8 +84,9 @@ pub struct FullKeyAggregate {
     #[builder(default)]
     multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
     /// Optional dim-grid input to LEFT JOIN measure-side refs against.
-    /// `None` for the legacy window-based assembly; populated for the
-    /// JOIN-based path (non-additive measures with reduce_by/group_by).
+    /// `None` when keys-side can be derived from the measure refs;
+    /// populated for the JOIN-based path (measure refs sit at partition
+    /// grain, dim grid lives at leaf grain).
     #[builder(default)]
     keys_input: Option<Rc<FullKeyAggregateKeysInput>>,
 }

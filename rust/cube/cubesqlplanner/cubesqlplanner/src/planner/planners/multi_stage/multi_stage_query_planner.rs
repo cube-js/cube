@@ -13,6 +13,7 @@ use crate::planner::filter::BaseFilter;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOperator;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::symbols::AggregationType;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
@@ -143,6 +144,9 @@ impl MultiStageQueryPlanner {
             let reduce_by = measure.reduce_by().clone().unwrap_or_default();
             let add_group_by = measure.add_group_by().clone().unwrap_or_default();
             let group_by = measure.group_by().clone();
+            let use_window_path = matches!(member_type, MultiStageInodeMemberType::Aggregate)
+                && add_group_by.is_empty()
+                && Self::is_window_path_eligible(&base_member);
             (
                 MultiStageInodeMember::new(
                     member_type,
@@ -150,7 +154,8 @@ impl MultiStageQueryPlanner {
                     add_group_by,
                     group_by,
                     time_shift,
-                ),
+                )
+                .with_use_window_path(use_window_path),
                 is_ungrupped,
             )
         } else {
@@ -217,6 +222,36 @@ impl MultiStageQueryPlanner {
             has_multi_stage_members(member, false)
         } else {
             Ok(false)
+        }
+    }
+
+    /// Aggregate inode is window-path eligible when it has exactly one
+    /// measure dep, the outer aggregation is `sum`, and the inner
+    /// aggregation rolls up as a sum (i.e. inner ∈ {sum, count}). This
+    /// is the narrow subset where `sum(sum(x)) OVER (...)` is a faithful
+    /// rollup — sum is associative and count rolls up as sum.
+    fn is_window_path_eligible(base_member: &Rc<MemberSymbol>) -> bool {
+        let Ok(outer) = base_member.as_measure() else {
+            return false;
+        };
+        let outer_is_sum = matches!(
+            outer.kind(),
+            MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
+        );
+        if !outer_is_sum {
+            return false;
+        }
+        let deps = base_member.get_dependencies();
+        let [dep] = deps.as_slice() else {
+            return false;
+        };
+        let Ok(inner) = dep.clone().resolve_reference_chain().as_measure() else {
+            return false;
+        };
+        match inner.kind() {
+            MeasureKind::Count(_) => true,
+            MeasureKind::Aggregated(a) => a.agg_type() == AggregationType::Sum,
+            _ => false,
         }
     }
 
@@ -458,21 +493,26 @@ impl MultiStageQueryPlanner {
             }
 
             // new_state is the leaf grain on which children are computed.
-            // Modifiers are applied in this order:
+            // For JOIN-model Aggregate inodes modifiers apply in this order:
             //   1. reduce_by / group_by — shrink parent grain to the
             //      partition grain implied by directives.
             //   2. add_group_by — extend the result with extra leaf dims.
             //   3. time_shift / filter cleanup.
-            // Step 1 before step 2 is essential: `add_group_by` must
-            // survive `group_by`'s keep-only filter (otherwise extra dims
-            // would be silently dropped — see multi-stage count_distinct
-            // sum-by-quarter case).
+            // Step 1 must precede step 2: `group_by` is a keep-only filter
+            // and would silently drop dims that step 2 needs to introduce.
+            //
+            // The window-path Aggregate inode skips step 1: the leaf stays
+            // at the parent state plus any add_group_by extension, and the
+            // window function does the reduce_by collapse at outer level.
+            let use_window_path = multi_stage_member.use_window_path();
             let new_state = {
                 let mut new_state = state.as_ref().clone();
-                if matches!(
-                    multi_stage_member.inode_type(),
-                    MultiStageInodeMemberType::Aggregate
-                ) {
+                if !use_window_path
+                    && matches!(
+                        multi_stage_member.inode_type(),
+                        MultiStageInodeMemberType::Aggregate
+                    )
+                {
                     let reduce_by = multi_stage_member.reduce_by_symbols().clone();
                     let group_by = multi_stage_member.group_by_symbols().clone();
                     let dims =
@@ -508,30 +548,35 @@ impl MultiStageQueryPlanner {
             // parent's `state`, this inode shrinks the parent grain. We
             // build keys-side descriptions per child on the parent state
             // so the FullKeyAggregate can broadcast measure values back
-            // to the full query grain.
+            // to the full query grain. Window-path Aggregate inodes
+            // (sum-of-sum / sum-of-count without add_group_by) handle
+            // broadcast via the window expression instead and don't need
+            // keys_input.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
-            let new_state_has = |sym: &Rc<MemberSymbol>| {
-                let sym_name = sym.clone().resolve_reference_chain().full_name();
-                new_state
+            if !use_window_path {
+                let new_state_has = |sym: &Rc<MemberSymbol>| {
+                    let sym_name = sym.clone().resolve_reference_chain().full_name();
+                    new_state
+                        .dimensions()
+                        .iter()
+                        .chain(new_state.time_dimensions().iter())
+                        .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
+                };
+                let any_missing = state
                     .dimensions()
                     .iter()
-                    .chain(new_state.time_dimensions().iter())
-                    .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
-            };
-            let any_missing = state
-                .dimensions()
-                .iter()
-                .chain(state.time_dimensions().iter())
-                .any(|d| !new_state_has(d));
-            if any_missing {
-                self.make_childs(
-                    member.clone(),
-                    state.clone(),
-                    &mut keys_input,
-                    descriptions,
-                    resolved_multi_stage_dimensions,
-                    cte_state,
-                )?;
+                    .chain(state.time_dimensions().iter())
+                    .any(|d| !new_state_has(d));
+                if any_missing {
+                    self.make_childs(
+                        member.clone(),
+                        state.clone(),
+                        &mut keys_input,
+                        descriptions,
+                        resolved_multi_stage_dimensions,
+                        cte_state,
+                    )?;
+                }
             }
 
             let alias = cte_state.next_cte_name();

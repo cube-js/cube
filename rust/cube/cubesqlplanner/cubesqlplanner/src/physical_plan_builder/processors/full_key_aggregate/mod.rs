@@ -37,9 +37,9 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
     ) -> Result<Self::PhysycalNode, CubeError> {
         let strategy: Rc<dyn FullKeyAggregateStrategy> =
             if full_key_aggregate.keys_input().is_some() {
-                // JOIN-model: keys side comes from the logical plan; reuse
-                // the unified keys-based strategy which now handles both
-                // explicit-keys and derived-keys cases.
+                // JOIN-model: keys side comes from the logical plan.
+                // `KeysFullKeyAggregateStrategy` handles both the explicit
+                // `keys_input` shape and the derived-from-measure-refs shape.
                 KeysFullKeyAggregateStrategy::new(self.builder)
             } else if !full_key_aggregate.schema().has_dimensions() {
                 InnerJoinFullKeyAggregateStrategy::new(self.builder)

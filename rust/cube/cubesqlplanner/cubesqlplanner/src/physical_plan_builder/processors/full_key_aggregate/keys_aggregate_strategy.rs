@@ -17,8 +17,8 @@ use std::rc::Rc;
 /// schema actually carries. Two modes:
 ///   - keys-side comes from an explicit `keys_input` (JOIN-model: measure
 ///     refs live at partition grain, keys refs at leaf grain);
-///   - keys-side derived from the measure refs themselves (legacy fallback
-///     used when the dialect lacks FULL JOIN).
+///   - keys-side derived from the measure refs themselves (chosen when the
+///     dialect lacks FULL JOIN and the logical plan carries no `keys_input`).
 pub(super) struct KeysFullKeyAggregateStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
@@ -49,7 +49,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
 
         // Decide the source for keys-side. Either an explicit set of refs
         // from the logical plan (JOIN-model), or derive from measure refs
-        // themselves (legacy keys path).
+        // themselves (no `keys_input` in the plan).
         let (keys_refs, has_explicit_keys): (Vec<Rc<MultiStageSubqueryRef>>, bool) =
             if let Some(keys_input) = full_key_aggregate.keys_input() {
                 (keys_input.refs().clone(), true)
@@ -175,10 +175,10 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Keep `true` for the legacy code path that this strategy used
-            // to share with the FULL JOIN strategy — null-safe dimension
-            // join. The JOIN-model path doesn't need it (one-to-one), but
-            // it stays correct.
+            // Null-safe dimension join when keys are derived from the
+            // measure refs (FULL JOIN-equivalent shape). For the JOIN-model
+            // path (explicit keys) it's a one-to-one match — null-safety is
+            // unnecessary but stays correct.
             join_builder.left_join_subselect(
                 query,
                 query_alias,

@@ -123,6 +123,12 @@ pub struct MultiStageInodeMember {
     add_group_by: Vec<Rc<MemberSymbol>>,
     group_by: Option<Vec<Rc<MemberSymbol>>>,
     time_shift: Option<MeasureTimeShifts>,
+    /// Optimisation flag: this Aggregate inode is a safe candidate for
+    /// the `window`-based render — single measure dep, additive identity
+    /// rollup, no leaf-extending modifiers. When `true`, assembly skips
+    /// the JOIN-model and `member_query_planner` emits a window function.
+    /// Default `false`.
+    use_window_path: bool,
 }
 
 impl MultiStageInodeMember {
@@ -139,7 +145,17 @@ impl MultiStageInodeMember {
             add_group_by,
             group_by,
             time_shift,
+            use_window_path: false,
         }
+    }
+
+    pub fn with_use_window_path(mut self, value: bool) -> Self {
+        self.use_window_path = value;
+        self
+    }
+
+    pub fn use_window_path(&self) -> bool {
+        self.use_window_path
     }
 
     pub fn inode_type(&self) -> &MultiStageInodeMemberType {

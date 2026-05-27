@@ -9,6 +9,24 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 
+fn assert_uses_window(sql: &str) {
+    assert!(
+        sql.contains("OVER (PARTITION BY"),
+        "expected SQL to use a window function (`... OVER (PARTITION BY ...)`),\n\
+         got:\n{}",
+        sql,
+    );
+}
+
+fn assert_no_window(sql: &str) {
+    assert!(
+        !sql.contains("OVER (PARTITION BY"),
+        "expected SQL to assemble via JOIN-model (no window function),\n\
+         got:\n{}",
+        sql,
+    );
+}
+
 // add_group_by + reduce_by together: leaf grain extends with customer_id
 // while partition grain shrinks by removing category. Three distinct grains:
 //   leaf       = (status, category, customer_id)  ← per-customer sum(amount)
@@ -32,7 +50,8 @@ async fn test_reduce_by_add_group_by_combo() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -57,7 +76,8 @@ async fn test_reduce_by_sum_of_max() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -106,7 +126,8 @@ async fn test_reduce_by_max_of_sum() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -135,7 +156,11 @@ async fn test_reduce_by_calculated_over_two() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    // Mixed: the sum-of-sum child renders through window-path, the
+    // count_distinct child through JOIN-model, and the parent Calculate
+    // stitches both via FullKeyAggregate. SQL contains at least one window.
+    let sql = ctx.build_sql(query).unwrap();
+    assert_uses_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -157,7 +182,8 @@ async fn test_reduce_by_single_dim() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_uses_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -179,7 +205,8 @@ async fn test_reduce_by_other_dim() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_uses_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -201,7 +228,10 @@ async fn test_reduce_by_multiple_dims() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    // reduce_by drops every query dim → partition equals nothing; window-path
+    // is skipped as redundant and we fall back to plain group-by.
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -221,7 +251,10 @@ async fn test_reduce_by_dim_not_in_query() {
           - id: orders.status
     "#};
 
-    ctx.build_sql(query).unwrap();
+    // reduce_by targets a dim absent from the query → partition equals
+    // the query grain, window is redundant, falls back to plain group-by.
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -246,7 +279,8 @@ async fn test_reduce_by_avg() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -271,7 +305,8 @@ async fn test_reduce_by_count() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_uses_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -298,7 +333,8 @@ async fn test_reduce_by_count_distinct() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_no_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -324,7 +360,8 @@ async fn test_reduce_by_with_time() {
           - id: orders.category
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_uses_window(&sql);
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
