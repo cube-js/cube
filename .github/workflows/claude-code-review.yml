@@ -69,7 +69,7 @@ jobs:
 
             For each thread where ALL of the following hold:
               - `isResolved` is false
-              - the first comment's `author.login` is `github-actions[bot]`
+              - the first comment's `author.login` is `claude`
               - the concern is no longer applicable in the current diff (file/line gone,
                 code rewritten, issue addressed)
 
