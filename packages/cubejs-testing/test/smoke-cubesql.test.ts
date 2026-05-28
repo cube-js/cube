@@ -1129,7 +1129,6 @@ filter_subq AS (
 
       // The original query should resolve (with error or continue-wait)
       await queryPromise;
-    }, 30000);
+    });
   });
-
 });
