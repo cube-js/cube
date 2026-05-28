@@ -63,3 +63,22 @@ jobs:
     with:
       pr_number: ${{ github.event.issue.number }}
     secrets: inherit
+
+  # `/bot-deep-review` — same review, but with max reasoning effort (xhigh).
+  # Costs more tokens; use sparingly on complex / high-stakes PRs.
+  bot-deep-review:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/bot-deep-review') &&
+      github.event.sender.type == 'User' &&
+      contains(fromJSON('["OWNER", "MEMBER"]'), github.event.comment.author_association)
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ./.github/workflows/claude-code-review.yml
+    with:
+      pr_number: ${{ github.event.issue.number }}
+      effort: xhigh
+    secrets: inherit
