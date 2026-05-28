@@ -664,7 +664,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
                 sql,
                 type: 'string',
                 synthetic: true,
-                public: true,
+                public: dimDef.public !== false,
               };
             }
           }

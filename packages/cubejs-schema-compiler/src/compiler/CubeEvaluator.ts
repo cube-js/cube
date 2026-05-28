@@ -350,7 +350,11 @@ export class CubeEvaluator extends CubeSymbols {
           const linkName = typeof link.name === 'function' ? link.name() : link.name;
           const syntheticName = `${dimName}___link_${linkName}_url`;
 
-          if (cube.dimensions[syntheticName] && !(link.params && Array.isArray(link.params) && link.params.length > 0)) return;
+          // CubeSymbols.generateSyntheticLinkDimensions already created a basic
+          // version for view-include resolution. Only upgrade here if params need
+          // to be baked into the SQL (requires buildLinkSqlWithParams).
+          const hasParams = link.params && Array.isArray(link.params) && link.params.length > 0;
+          if (cube.dimensions[syntheticName] && !hasParams) return;
 
           let baseSql;
           if (link.url) {
@@ -373,7 +377,7 @@ export class CubeEvaluator extends CubeSymbols {
               type: 'string',
               synthetic: true,
               ownedByCube: true,
-              public: true,
+              public: dimDef.public !== false,
             };
           }
         });

@@ -315,16 +315,26 @@ const LinkItemSchema = Joi.object().keys({
   name: identifier.required(),
   label: Joi.string().required(),
   url: Joi.func(),
-  dashboard: Joi.string(),
+  dashboard: Joi.string().regex(/^[_a-zA-Z0-9-]+$/, 'dashboard identifier'),
   icon: Joi.string(),
   target: Joi.string().valid('blank', 'self'),
   params: Joi.array().items(Joi.object().keys({
-    key: Joi.string().required(),
+    key: identifier.required(),
     value: Joi.func().required(),
   })),
 }).oxor('url', 'dashboard');
 
-const LinksSchema = Joi.array().items(LinkItemSchema);
+const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
+  const names = value.map((link: any) => typeof link.name === 'function' ? link.name() : link.name);
+  const seen = new Set<string>();
+  for (const name of names) {
+    if (seen.has(name)) {
+      return helpers.error('any.custom', { message: `Duplicate link name '${name}'` });
+    }
+    seen.add(name);
+  }
+  return value;
+});
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
