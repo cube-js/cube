@@ -18,7 +18,8 @@ use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
-use crate::stream::OnDrainHandler;
+use crate::stream::{OnDrainHandler, OnCloseHandler};
+use tokio::sync::oneshot;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
@@ -303,6 +304,14 @@ async fn handle_sql_query(
         let session_clone = Arc::clone(&session);
         let span_id_clone = span_id.clone();
 
+        let (close_tx, close_rx) = oneshot::channel::<()>();
+        let close_handler = OnCloseHandler::new(
+            channel.clone(),
+            stream_methods.stream.clone(),
+            close_tx,
+        );
+        close_handler.handle(stream_methods.on.clone()).await?;
+
         let execute = || async move {
             // todo: can we use compiler_cache?
             let meta_context = transport_service.meta(native_auth_ctx).await?;
@@ -432,7 +441,12 @@ async fn handle_sql_query(
             Ok::<(), CubeError>(())
         };
 
-        let result = execute().await;
+        let result = tokio::select! {
+            _ = close_rx => {
+                Err(CubeError::internal("Client disconnected".to_string()))
+            }
+            res = execute() => res
+        };
 
         match &result {
             Ok(_) => {
