@@ -769,6 +769,8 @@ export class QueryQueue {
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         let queryExecutionFinished = false;
+        // Set by the query handler's setCancelHandler callback once execution begins.
+        // Not available on the original query def from retrieveForProcessing.
         let localCancelHandler: unknown = null;
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
