@@ -259,7 +259,7 @@ impl QueryResult {
         QueryResult::try_new(members, data)
     }
 
-    fn from_arrow(bytes: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn from_arrow(bytes: &[u8]) -> Result<Self, ParseError> {
         let reader = StreamReader::try_new(Cursor::new(bytes), None)
             .map_err(|err| ParseError::ArrowError(err.to_string()))?;
 
