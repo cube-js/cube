@@ -518,11 +518,17 @@ export class QueryQueue {
   }
 
   public async cancelQueryByRequestId(requestId: string): Promise<QueryDef[]> {
+    const extractUUID = (id: string) => {
+      const idx = id.lastIndexOf('-span-');
+      return idx !== -1 ? id.substring(0, idx) : id;
+    };
+
+    const targetUUID = extractUUID(requestId);
     const queries: any[] = await this.getQueries();
     const cancelled: QueryDef[] = [];
 
     for (const query of queries) {
-      if (query.requestId === requestId) {
+      if (query.requestId && extractUUID(query.requestId) === targetUUID) {
         await this.cancelQuery(query.queryKey, null);
         cancelled.push(query);
       }
