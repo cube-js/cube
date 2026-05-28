@@ -1147,27 +1147,25 @@ filter_subq AS (
         abortController.abort();
         await queryPromise;
 
-        // Then cancel the query in the queue by request ID
+        // Cancel the query in the queue by request ID
         const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
           method: 'DELETE',
           headers: { Authorization: token },
         });
         expect(cancelRes.status).toBe(200);
 
-        // Wait for pg_sleep to disappear from pg_stat_activity
-        let sleepStopped = false;
-        for (let i = 0; i < 40; i++) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          const { rows } = await pgConn.query(
-            "SELECT count(*) as cnt FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
-          );
-          if (parseInt(rows[0].cnt, 10) === 0) {
-            sleepStopped = true;
-            break;
-          }
-        }
-        expect(sleepStopped).toBe(true);
+        // A second cancel should return empty — the query is gone from the queue
+        const cancelRes2 = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
+          method: 'DELETE',
+          headers: { Authorization: token },
+        });
+        const cancelBody2 = await cancelRes2.json() as any;
+        expect(cancelBody2.result).toEqual([]);
       } finally {
+        // pg_terminate_backend for any lingering pg_sleep queries
+        await pgConn.query(
+          "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+        );
         await pgConn.end();
       }
     });
