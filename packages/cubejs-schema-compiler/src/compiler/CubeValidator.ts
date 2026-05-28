@@ -325,7 +325,7 @@ const LinkItemSchema = Joi.object().keys({
 }).oxor('url', 'dashboard');
 
 const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
-  const names = value.map((link: any) => typeof link.name === 'function' ? link.name() : link.name);
+  const names = value.map((link: any) => (typeof link.name === 'function' ? link.name() : link.name));
   const seen = new Set<string>();
   for (const name of names) {
     if (seen.has(name)) {
