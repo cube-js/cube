@@ -447,9 +447,8 @@ impl MultiStageQueryPlanner {
     /// already-built descriptions, tries a rolling-window path
     /// (`try_plan_rolling_window`), and otherwise returns either a
     /// leaf `Measure` or an inode description whose children come
-    /// from `make_childs`. Adjusts the state for inodes with any
-    /// `add_group_by`, time-shift or per-member filter changes the
-    /// inode demands.
+    /// from `make_childs`. Adjusts the state for any grain reshape,
+    /// time-shift or per-member filter changes the inode demands.
     fn make_queries_descriptions(
         &self,
         member: Rc<MemberSymbol>,
@@ -524,16 +523,16 @@ impl MultiStageQueryPlanner {
             //   1. filter directive — pick `state` (Relative/None) or
             //      `root_state` (Fixed) as the base and apply exclude /
             //      keep_only / include against it.
-            //   2. reduce_by / group_by — shrink parent grain to the
-            //      partition grain implied by directives.
-            //   3. add_group_by — extend the result with extra leaf dims.
+            //   2. grain.exclude / grain.keep_only — shrink parent grain to
+            //      the partition grain implied by the directive.
+            //   3. grain.include — extend the result with extra leaf dims.
             //   4. time_shift / filter cleanup.
-            // Step 2 must precede step 3: `group_by` is a keep-only filter
-            // and would silently drop dims that step 3 needs to introduce.
+            // Step 2 must precede step 3: `keep_only` is an intersection and
+            // would silently drop dims that step 3 needs to introduce.
             //
             // The window-path Aggregate inode skips step 2: the leaf stays
-            // at the parent state plus any add_group_by extension, and the
-            // window function does the reduce_by collapse at outer level.
+            // at the parent state plus any `include` extension, and the
+            // window function does the `exclude` collapse at outer level.
             let use_window_path = multi_stage_member.use_window_path();
             let new_state = {
                 let mut new_state = match directive_filter.as_ref().map(|f| &f.mode) {
@@ -584,9 +583,9 @@ impl MultiStageQueryPlanner {
             // build keys-side descriptions per child on the parent state
             // so the FullKeyAggregate can broadcast measure values back
             // to the full query grain. Window-path Aggregate inodes
-            // (sum-of-sum / sum-of-count without add_group_by) handle
-            // broadcast via the window expression instead and don't need
-            // keys_input.
+            // (sum-of-sum / sum-of-count with no leaf-extending `include`)
+            // handle broadcast via the window expression instead and don't
+            // need keys_input.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
             if !use_window_path {
                 let new_state_has = |sym: &Rc<MemberSymbol>| {
