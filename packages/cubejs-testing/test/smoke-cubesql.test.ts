@@ -1100,9 +1100,9 @@ filter_subq AS (
       const token = jwt.sign({ user: 'admin' }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
 
       // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
-      // via the HTTP load API so we control the request ID.
+      // via the REST SQL API so we control the request ID.
       // Don't await — we want it running in the background.
-      const queryPromise = fetch(`${birdbox.configuration.apiUrl}/load`, {
+      const queryPromise = fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1110,11 +1110,9 @@ filter_subq AS (
           'x-request-id': `${requestId}-span-1`,
         },
         body: JSON.stringify({
-          query: {
-            measures: ['SlowQuery.count'],
-          },
+          query: 'SELECT count FROM SlowQuery',
         }),
-      }).then(r => r.json()).catch(e => e);
+      }).then(r => r.text()).catch(e => e);
 
       // Give the query time to enter the queue and start executing
       await new Promise(resolve => setTimeout(resolve, 2000));
