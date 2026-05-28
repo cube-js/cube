@@ -7,6 +7,10 @@ on:
       pr_number:
         required: true
         type: number
+      effort:
+        required: false
+        type: string
+        default: medium
 
 concurrency:
   # PR number lives in different fields depending on entry point — coalesce so
@@ -162,7 +166,8 @@ jobs:
           # Tools for comprehensive PR review
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)"
-            --model "claude-opus-4-6"
+            --model "claude-opus-4-7"
+            --effort-level ${{ inputs.effort || 'medium' }}
 
       - name: Write run summary
         if: always() && steps.review.outputs.execution_file != ''
