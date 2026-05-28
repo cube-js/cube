@@ -20,6 +20,13 @@ Run the query to the REST (JSON) API and get the results.
 | `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` | ❌ No |
 | `cache`     | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
+### Headers
+
+| Header | Description | Required |
+| --- | --- | --- |
+| `Authorization` | API token for authentication | ✅ Yes |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+
 Response
 
 - `query` - The query passed via params. It can be an array of queries and in
