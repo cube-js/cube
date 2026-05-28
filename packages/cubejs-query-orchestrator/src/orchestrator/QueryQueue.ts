@@ -800,7 +800,17 @@ export class QueryQueue {
               queryProcessHeartbeat = Date.now();
             }
 
-            await queueConnection.updateHeartBeat(queryKeyHashed, queueId);
+            try {
+              await queueConnection.updateHeartBeat(queryKeyHashed, queueId);
+            } catch (e: any) {
+              this.logger('Error updating heartbeat', {
+                queueId,
+                queryKey: query.queryKey,
+                error: e.stack || e,
+                queuePrefix: this.redisQueuePrefix,
+                requestId: query.requestId,
+              });
+            }
 
             if (!queryExecutionFinished && localCancelHandler !== null) {
               try {

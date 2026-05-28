@@ -281,7 +281,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       const types = <TableStructure><unknown>((await iter.next()).value);
       const rows: Row[] = [];
       for await (const row of iter) {
-        if (cancelled) break;
+        if (cancelled) throw new Error('Query was cancelled');
         rows.push(<Row>row);
       }
       return { types, rows };
@@ -363,7 +363,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       await this.waitForSuccess(qid, () => cancelled);
       const rows: R[] = [];
       for await (const row of this.lazyRowIterator<R>(qid, query)) {
-        if (cancelled) break;
+        if (cancelled) throw new Error('Query was cancelled');
         rows.push(row);
       }
       return rows;
@@ -440,14 +440,13 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     loadSql: string,
     params: any,
   ): MaybeCancelablePromise<any> {
-    if (this.config.S3OutputLocation === undefined) {
-      throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
-    }
-
     let qid: AthenaQueryId | null = null;
     let cancelled = false;
 
     const promise: any = (async () => {
+      if (this.config.S3OutputLocation === undefined) {
+        throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
+      }
       qid = await this.startQuery(loadSql, params);
       if (cancelled) {
         await this.stopQuery(qid);
