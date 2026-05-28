@@ -84,6 +84,8 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
+          # Allow PRs opened by coding-agent bots (e.g. cursor) to trigger reviews.
+          allowed_bots: "cursor[bot]"
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ steps.pr.outputs.number }}
