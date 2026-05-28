@@ -118,7 +118,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       queryTracingObj: tracingObj,
       // Arrow is a default format for Cube Store, but
       // an old Cube Store will ignore this option and will continue to serve results in Legacy format
-      responseFormat: responseFormat || QueryResultFormat.Arrow,
+      responseFormat: responseFormat ?? QueryResultFormat.Arrow,
     });
   }
 
