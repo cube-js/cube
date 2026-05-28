@@ -1,5 +1,5 @@
 cube(`SlowQuery`, {
-  sql: `SELECT pg_sleep(30), 1 as id`,
+  sql: `SELECT pg_sleep(90), 1 as id`,
 
   measures: {
     count: {
