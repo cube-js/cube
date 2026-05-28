@@ -3990,6 +3990,17 @@ export class BaseQuery {
   }
 
   /**
+   * URL-encode a SQL expression. Override in dialect-specific query classes
+   * for native URL encoding support. Default implementation uses REPLACE
+   * chains for the most common characters.
+   * @param {string} sql
+   * @return {string}
+   */
+  urlEncode(sql) {
+    return `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(CAST(${sql} as TEXT), '%', '%25'), '&', '%26'), '=', '%3D'), '+', '%2B'), ' ', '%20')`;
+  }
+
+  /**
    * @param {string} granularity
    * @param {string} dimension
    * @return {string}
@@ -5007,7 +5018,8 @@ export class BaseQuery {
         filterParams: this.filtersProxy(),
         filterGroup: this.filterGroupFunction(),
         sqlUtils: {
-          convertTz: this.convertTz.bind(this)
+          convertTz: this.convertTz.bind(this),
+          urlEncode: this.urlEncode.bind(this)
         }
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
@@ -5023,6 +5035,7 @@ export class BaseQuery {
       filterGroup: () => '1 = 1',
       sqlUtils: {
         convertTz: (field) => field,
+        urlEncode: (sql) => sql,
       },
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
     };
@@ -5034,7 +5047,8 @@ export class BaseQuery {
 
   sqlUtilsForRust() {
     return {
-      convertTz: this.convertTz.bind(this)
+      convertTz: this.convertTz.bind(this),
+      urlEncode: this.urlEncode.bind(this)
     };
   }
 

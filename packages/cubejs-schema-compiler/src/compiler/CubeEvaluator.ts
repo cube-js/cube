@@ -64,6 +64,17 @@ export type MultiStageGrainDirective = {
   includeReferences?: string[];
 };
 
+export type LinkDefinition = {
+  name: string;
+  label: string;
+  url?: (...args: any[]) => string;
+  dashboard?: string;
+  icon?: string;
+  target?: 'blank' | 'self';
+  params?: Array<{ key: string; value: (...args: any[]) => string }>;
+};
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -78,6 +89,7 @@ export type DimensionDefinition = {
   addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
   addGroupByReferences?: string[];
   filter?: MultiStageFilterDirective;
+  links?: LinkDefinition[];
 };
 
 export type TimeShiftDefinition = {
@@ -236,6 +248,7 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
+    this.prepareSyntheticLinkDimensions(cube);
     this.prepareMembers(cube.dimensions, cube, errorReporter);
     this.prepareMembers(cube.segments, cube, errorReporter);
 
@@ -325,6 +338,68 @@ export class CubeEvaluator extends CubeSymbols {
         filter.unlessReferences = resolvedUnless;
       }
     }
+  }
+
+  protected prepareSyntheticLinkDimensions(cube: any) {
+    if (!cube.dimensions) return;
+    if (cube.isView) return;
+
+    for (const [dimName, dimDef] of Object.entries<any>(cube.dimensions)) {
+      if (dimDef.links && Array.isArray(dimDef.links)) {
+        dimDef.links.forEach((link: any) => {
+          const linkName = typeof link.name === 'function' ? link.name() : link.name;
+          const syntheticName = `${dimName}___link_${linkName}_url`;
+
+          if (cube.dimensions[syntheticName] && !(link.params && Array.isArray(link.params) && link.params.length > 0)) return;
+
+          let baseSql;
+          if (link.url) {
+            baseSql = link.url;
+          } else if (link.dashboard) {
+            const dashboardId = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
+            // eslint-disable-next-line no-new-func
+            baseSql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
+          }
+
+          if (baseSql) {
+            let sql;
+            if (link.params && Array.isArray(link.params) && link.params.length > 0) {
+              sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params);
+            } else {
+              sql = baseSql;
+            }
+            cube.dimensions[syntheticName] = {
+              sql,
+              type: 'string',
+              synthetic: true,
+              ownedByCube: true,
+              public: true,
+            };
+          }
+        });
+      }
+    }
+  }
+
+  private buildLinkSqlWithParams(cubeName: string, baseSql: any, params: Array<any>) {
+    if (params.length === 0) {
+      return baseSql;
+    }
+
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(cubeName, 'SQL_UTILS', `
+      var baseResult = (${baseSql.toString()})(${cubeName});
+      var result = baseResult;
+      ${params.map((param, idx) => {
+    const separator = idx === 0 ? '?' : '&';
+    const key = typeof param.key === 'function' ? param.key() : param.key;
+    const valueFnStr = typeof param.value === 'function' ? param.value.toString() : `function() { return '${param.value}'; }`;
+    return `result = result + " || '${separator}${key}=' || " + SQL_UTILS.urlEncode((${valueFnStr})(${cubeName}));`;
+  }).join('\n      ')}
+      return result;
+    `);
+    Object.defineProperty(fn, 'length', { value: baseSql.length });
+    return fn;
   }
 
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {
@@ -795,7 +870,7 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
 
-      if (ownedByCube && cube.isView) {
+      if (ownedByCube && cube.isView && !members[memberName].synthetic) {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
 

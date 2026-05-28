@@ -199,4 +199,8 @@ export class PrestodbQuery extends BaseQuery {
   public castToString(sql: any): string {
     return `CAST(${sql} as VARCHAR)`;
   }
+
+  public urlEncode(sql: string): string {
+    return `url_encode(CAST(${sql} as VARCHAR))`;
+  }
 }

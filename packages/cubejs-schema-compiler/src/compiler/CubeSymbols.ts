@@ -565,6 +565,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       this.transformPreAggregations(cube.preAggregations);
     }
 
+    if (this.evaluateViews && !cube.isView) {
+      this.generateSyntheticLinkDimensions(cube);
+    }
+
     if (this.evaluateViews) {
       this.prepareIncludes(cube, errorReporter, splitViews);
     }
@@ -629,6 +633,40 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             );
           } else {
             dimension.keyReference = keyReference;
+          }
+        }
+      }
+    }
+  }
+
+  protected generateSyntheticLinkDimensions(cube: any) {
+    if (!cube.dimensions) return;
+
+    const dims = cube.dimensions;
+    for (const dimName of Object.keys(dims)) {
+      const dimDef = dims[dimName];
+      if (dimDef.links && Array.isArray(dimDef.links)) {
+        for (const link of dimDef.links) {
+          const linkName = typeof link.name === 'function' ? link.name() : link.name;
+          if (!linkName) return;
+          const syntheticName = `${dimName}___link_${linkName}_url`;
+          if (!dims[syntheticName]) {
+            let sql;
+            if (link.url) {
+              sql = link.url;
+            } else if (link.dashboard) {
+              const dashboardId = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
+              // eslint-disable-next-line no-new-func
+              sql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
+            }
+            if (sql) {
+              dims[syntheticName] = {
+                sql,
+                type: 'string',
+                synthetic: true,
+                public: true,
+              };
+            }
           }
         }
       }
@@ -723,9 +761,25 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           .map((path) => path.split('.')[1])
           .filter(memberName => !(it.includes as (string | ViewCubeIncludeMember)[]).find((include) => ((typeof include === 'object' ? include.name : include)) === memberName));
 
+        // Auto-include synthetic link dimensions for included dimensions that have links
+        const syntheticLinkMembers: string[] = [];
+        const membersObj = this.symbols[cubeRef]?.cubeObj()?.dimensions || {};
+        for (const include of (it.includes as (string | ViewCubeIncludeMember)[])) {
+          const memberName = typeof include === 'object' ? include.name : include;
+          if (membersObj[memberName] && (membersObj[memberName] as any).links) {
+            for (const key of Object.keys(membersObj)) {
+              if (key.startsWith(`${memberName}___link_`) && key.endsWith('_url')) {
+                if (!(it.includes as (string | ViewCubeIncludeMember)[]).find((inc) => ((typeof inc === 'object' ? inc.name : inc)) === key)) {
+                  syntheticLinkMembers.push(key);
+                }
+              }
+            }
+          }
+        }
+
         return {
           ...it,
-          includes: (it.includes as (string | ViewCubeIncludeMember)[]).concat(currentCubeAutoIncludeMembers),
+          includes: (it.includes as (string | ViewCubeIncludeMember)[]).concat(currentCubeAutoIncludeMembers).concat(syntheticLinkMembers),
         };
       }) : includedCubes;
 
@@ -1015,6 +1069,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
+          ...(resolvedMember.links ? { links: resolvedMember.links } : {}),
+          ...(resolvedMember.synthetic ? { synthetic: true } : {}),
         };
       } else if (type === 'segments') {
         memberDefinition = {

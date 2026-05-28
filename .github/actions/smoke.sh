@@ -75,3 +75,7 @@ echo "::endgroup::"
 echo "::group::RBAC GraphQL"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac-graphql
 echo "::endgroup::"
+
+echo "::group::Links"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:links
+echo "::endgroup::"

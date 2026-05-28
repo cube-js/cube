@@ -426,9 +426,107 @@ Using it with other dimension types will result in a validation error.
 
 </Info>
 
+### `links`
+
+The `links` parameter allows you to define links associated with a dimension.
+They can be rendered as HTML links by supporting tools, e.g., [Workbooks][ref-workbooks].
+
+Links are useful to let users navigate to related external resources (e.g., Google
+search), internal tools (e.g., Salesforce), or other pages in a BI tool.
+
+Each link must have a `name` and a `label`. The `name` is used as an identifier
+in the [synthetic dimension](#synthetic) name.
+
+A link must specify either a `url` or a `dashboard`:
+- `url` is a SQL expression that constructs the link URL. It can [reference][ref-references]
+  column and dimension values, just like the [`sql` parameter](#sql) or [`mask` parameter](#mask).
+- `dashboard` is a dashboard identifier. When set, the link URL is generated as
+  `/dashboard/<dashboard_id>`. The `params` object is still appended as a query string.
+
+Optionally, a link might use the `icon` parameter to reference an icon from a [supported
+icon set][link-tabler] to be displayed alongside the link label.
+
+Optionally, a link might use the `target` parameter to specify [where to open it][link-target]:
+`blank` (default) to open in a new tab/window or `self` to open in the same tab/window.
+
+```yaml
+cubes:
+  - name: users
+
+    dimensions:
+      # Definitions of dimensions such as `email`, etc.
+
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - name: google_search
+            label: Search on Google
+            url: "CONCAT('https://www.google.com/search?q=', {CUBE}.full_name)"
+            icon: brand-google
+            target: blank
+          
+          - name: salesforce_search
+            label: Search in Salesforce
+            url: "CONCAT('https://your-company.salesforce.com/search/results/?q=', {email})"
+            target: blank
+
+          - name: send_email
+            label: Write an email
+            url: "CONCAT('mailto:', {email})"
+            icon: send
+```
+
+#### `params`
+
+The optional `params` parameter can be used to add additional query parameters to the
+URL. It accepts a map of key-value pairs, where keys are parameter names and values are
+SQL expressions (just like `url`).
+
+Values in `params` can [reference][ref-references] columns and dimension values.
+All parameter values will be [URL-encoded][link-encode-uri-component] in the generated SQL
+using a database-specific encoding function.
+
+```yaml
+cubes:
+  - name: users
+
+    dimensions:
+      # Definitions of dimensions such as `id`, `country`, etc.
+
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - name: performance
+            label: Check performance dashboard
+            dashboard: KSqDYdUz6Ble
+            params:
+              - key: filter_user_id
+                value: "{id}"
+              - key: filter_country
+                value: "{country}"
+```
+
+#### Dimensions
+
+Each link will be rendered as an additional [synthetic](#synthetic) dimension in the
+result set, with the following naming convention:
+
+- `<dimension_name>___link_<link_name>_url`
+
+<Info>
+
+All references in link URLs and parameters must resolve to a single value for a given
+value of the dimension on which the link is defined. Otherwise, it will result in
+duplicate rows in the result set.
+
+</Info>
+
 ### `meta`
 
-Custom metadata. Can be used to pass any information to the frontend.
+The `meta` parameter allows you to attach arbitrary information to a dimension.
+It can be consumed and interpreted by supporting tools.
 
 You can also use the `ai_context` key to provide context to the
 [AI agent][ref-ai-context] without exposing it in the user interface.
@@ -902,6 +1000,13 @@ cube(`orders`, {
 
 </CodeGroup>
 
+### `synthetic`
+
+The `synthetic` parameter can't be set by a user directly. It is used to mark dimensions
+that are automatically created by Cube, e.g., for [links](#links).
+
+You can check if a dimension is synthetic via the [`/v1/meta` API endpoint][ref-meta-api].
+
 ### `granularities`
 
 By default, the following granularities are available for time dimensions:
@@ -1223,3 +1328,10 @@ cube(`fiscal_calendar`, {
 [ref-case-measures]: /reference/data-modeling/measures#case
 [ref-meta-api]: /reference/rest-api/reference#base_pathv1meta
 [ref-string-time-dims]: /recipes/data-modeling/string-time-dimensions
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[link-target]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a#target
+[link-tabler]: https://tabler.io/icons
+[ref-references]: /docs/data-modeling/syntax#references
+[ref-filter-params]: /reference/data-modeling/context-variables#filter_params
+[link-encode-uri-component]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
+[ref-rest-filters]: /reference/rest-api/query-format#query-properties

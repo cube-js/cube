@@ -311,6 +311,21 @@ const MaskSchema = Joi.alternatives([
   Joi.string(),
 ]);
 
+const LinkItemSchema = Joi.object().keys({
+  name: identifier.required(),
+  label: Joi.string().required(),
+  url: Joi.func(),
+  dashboard: Joi.string(),
+  icon: Joi.string(),
+  target: Joi.string().valid('blank', 'self'),
+  params: Joi.array().items(Joi.object().keys({
+    key: Joi.string().required(),
+    value: Joi.func().required(),
+  })),
+}).oxor('url', 'dashboard');
+
+const LinksSchema = Joi.array().items(LinkItemSchema);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -323,6 +338,7 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
+  links: LinksSchema,
   mask: MaskSchema,
   format: Joi.when('type', {
     switch: [

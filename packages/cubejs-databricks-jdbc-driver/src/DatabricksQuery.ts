@@ -216,4 +216,8 @@ export class DatabricksQuery extends BaseQuery {
     delete templates.types.interval;
     return templates;
   }
+
+  public urlEncode(sql: string): string {
+    return `url_encode(CAST(${sql} as STRING))`;
+  }
 }

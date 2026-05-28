@@ -1,0 +1,32 @@
+cubes:
+  - name: users
+    sql: >
+      SELECT 1 as id, 'John' as first_name, 'Doe' as last_name, 'New York' as city
+      UNION ALL
+      SELECT 2, 'Jane', 'Smith', 'London'
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: full_name
+        sql: "first_name || ' ' || last_name"
+        type: string
+        links:
+          - name: google_search
+            label: Search on Google
+            url: "{full_name}"
+            icon: brand-google
+          - name: profile
+            label: View profile
+            dashboard: user_profile_123
+
+      - name: city
+        sql: city
+        type: string
+
+    measures:
+      - name: count
+        type: count

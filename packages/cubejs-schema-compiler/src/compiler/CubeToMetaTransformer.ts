@@ -51,6 +51,16 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   aggType?: string;
   keyReference?: string;
   currency?: string;
+  links?: Array<{
+    name: string;
+    label: string;
+    url?: (...args: any[]) => string;
+    dashboard?: string;
+    icon?: string;
+    target?: 'blank' | 'self';
+    params?: Array<{ key: string; value: (...args: any[]) => string }>;
+  }>;
+  synthetic?: boolean;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -97,6 +107,14 @@ export type MeasureConfig = {
   public: boolean;
 };
 
+export type LinkConfig = {
+  name: string;
+  label: string;
+  dashboard?: string;
+  icon?: string;
+  target: 'blank' | 'self';
+};
+
 export type DimensionConfig = {
   name: string;
   title: string;
@@ -115,6 +133,8 @@ export type DimensionConfig = {
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
   key?: string;
+  links?: LinkConfig[];
+  synthetic?: boolean;
 };
 
 export type SegmentConfig = {
@@ -314,6 +334,14 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 : undefined,
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
+            ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
+              name: link.name,
+              label: link.label,
+              ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
+              icon: link.icon,
+              target: link.target || 'blank',
+            })) } : {}),
+            ...(extendedDimDef.synthetic ? { synthetic: true } : {}),
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {
