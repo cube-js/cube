@@ -396,8 +396,9 @@ export class CubeEvaluator extends CubeSymbols {
       var result = baseResult;
       ${params.map((param, idx) => {
     const separator = idx === 0 ? '?' : '&';
-    const key = typeof param.key === 'function' ? param.key() : param.key;
-    const valueFnStr = typeof param.value === 'function' ? param.value.toString() : `function() { return '${param.value}'; }`;
+    const rawKey = typeof param.key === 'function' ? param.key() : param.key;
+    const key = rawKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const valueFnStr = typeof param.value === 'function' ? param.value.toString() : `function() { return '${String(param.value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'; }`;
     return `result = result + " || '${separator}${key}=' || " + SQL_UTILS.urlEncode((${valueFnStr})(${cubeName}));`;
   }).join('\n      ')}
       return result;

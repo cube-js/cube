@@ -319,7 +319,7 @@ const LinkItemSchema = Joi.object().keys({
   icon: Joi.string(),
   target: Joi.string().valid('blank', 'self'),
   params: Joi.array().items(Joi.object().keys({
-    key: identifier.required(),
+    key: Joi.string().required(),
     value: Joi.func().required(),
   })),
 }).oxor('url', 'dashboard');
