@@ -133,7 +133,11 @@
         "dimensions": ["CUBE.productName"],
         "measures": [
           "CUBE.totalQuantity"
-        ]
+        ],
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       }
     ],
     "BigECommerce": [
