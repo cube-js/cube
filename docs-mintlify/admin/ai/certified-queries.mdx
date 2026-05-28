@@ -73,6 +73,10 @@ certified_queries:
 
 Inline certified queries accept the same properties as Markdown ones — `name`, `description`, `user_request` (required), and `sql_query` (required).
 
+<Note>
+Certified queries inlined at the root of `agents/config.yml` are attached to the implicit `auto` space and applied to the default agent in a [single-agent setup](/admin/ai). In a [multi-agent setup](/admin/ai/multi-agent), attach certified queries to a specific space by inlining them under that space's `certified_queries` key (or by placing Markdown files under `agents/certified_queries/<space-name>/`).
+</Note>
+
 ## Writing effective certified queries
 
 - **Phrase `user_request` like a real user question.** This is what the agent matches against incoming requests.
