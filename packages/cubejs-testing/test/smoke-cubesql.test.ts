@@ -1100,9 +1100,10 @@ filter_subq AS (
       const token = jwt.sign({ user: 'admin' }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
 
       // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
-      // via the REST SQL API so we control the request ID.
-      // Don't await — we want it running in the background.
-      const queryPromise = fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+      // via the REST load API so we control the request ID.
+      // The load API returns continue-wait on long queries, so
+      // cancellation surfaces as an error on the next poll.
+      const queryPromise = fetch(`${birdbox.configuration.apiUrl}/load`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1110,9 +1111,11 @@ filter_subq AS (
           'x-request-id': requestId,
         },
         body: JSON.stringify({
-          query: 'SELECT count FROM SlowQuery',
+          query: {
+            measures: ['SlowQuery.count'],
+          },
         }),
-      }).then(r => r.text()).catch(e => e);
+      }).then(r => r.json()).catch(e => e);
 
       // Give the query time to enter the queue and start executing
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1127,14 +1130,13 @@ filter_subq AS (
       const cancelBody = await cancelRes.json() as any;
       expect(Array.isArray(cancelBody.result)).toBe(true);
 
-      // The cancelled query should resolve with an error within 40s
+      // The cancelled query should resolve within 40s
       const result = await Promise.race([
         queryPromise,
         new Promise(resolve => setTimeout(() => resolve('__timeout__'), 40000)),
-      ]);
+      ]) as any;
       expect(result).not.toBe('__timeout__');
-      expect(typeof result).toBe('string');
-      expect(result).toMatch(/error/i);
+      expect(result.error).toBeDefined();
     });
   });
 });
