@@ -65,10 +65,12 @@ jobs:
             "working…" spinner, intermediate status updates — keep everything visible so the
             reader can watch progress without expanding anything.
 
-            On the final update, hide the entire review body inside a single collapsed
-            `<details>` block. Only a short one-line headline with the verdict and issue
-            counts (e.g. "1 high, 2 medium, 5 low") stays visible — the reader expands when
-            they want details.
+            On the final update, hide EVERYTHING — including the todo checklist itself —
+            inside a single collapsed `<details>` block. The completed checklist is just
+            stale progress signal at that point; it belongs behind the spoiler alongside the
+            rest of the review. Only a short one-line headline with the verdict and issue
+            counts (e.g. "1 high, 2 medium, 5 low") stays visible outside the spoiler — the
+            reader expands when they want details.
 
             Leave a blank line after `<summary>` and before `</details>`, otherwise GitHub
             won't render the markdown inside (tables and lists especially).
