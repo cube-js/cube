@@ -3,8 +3,17 @@ on:
   pull_request:
     types: [opened, ready_for_review, reopened, synchronize]
 
+concurrency:
+  group: claude-code-review-${{ github.event.pull_request.number }}-${{ github.event.action }}
+  cancel-in-progress: true
+
 jobs:
   review-with-tracking:
+    # Skip draft PRs — they get noisy synchronize pushes while WIP, and
+    # running a full Claude review on every intermediate commit gets expensive
+    # fast. The ready_for_review event will pick up the review the moment the
+    # PR exits draft.
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
