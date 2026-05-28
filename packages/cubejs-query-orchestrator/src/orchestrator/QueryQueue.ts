@@ -517,6 +517,20 @@ export class QueryQueue {
     }
   }
 
+  public async cancelQueryByRequestId(requestId: string): Promise<QueryDef[]> {
+    const queries: any[] = await this.getQueries();
+    const cancelled: QueryDef[] = [];
+
+    for (const query of queries) {
+      if (query.requestId === requestId) {
+        await this.cancelQuery(query.queryKey, null);
+        cancelled.push(query);
+      }
+    }
+
+    return cancelled;
+  }
+
   /**
    * Reconciliation logic: cancel stalled and orphaned queries from the queue
    * and pick some planned to be processed queries to process.
