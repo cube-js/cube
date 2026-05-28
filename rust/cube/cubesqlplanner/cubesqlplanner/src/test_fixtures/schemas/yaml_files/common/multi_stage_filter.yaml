@@ -1,0 +1,68 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: "{CUBE}.status"
+          - name: city
+            type: string
+            sql: "{CUBE}.city"
+          - name: created_at
+            type: time
+            sql: "{CUBE}.created_at"
+          - name: status_normalized
+            type: string
+            sql: "{CUBE.status}"
+            multi_stage: true
+            add_group_by:
+              - orders.status
+            filter:
+              mode: relative
+              keep_only:
+                - orders.city
+              include:
+                - member: orders.status
+                  operator: notEquals
+                  values: [archived]
+      measures:
+          - name: revenue
+            type: sum
+            sql: amount
+          - name: revenue_filtered
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+              - status
+            add_group_by:
+              - city
+            filter:
+              mode: relative
+              exclude:
+                - status
+              include:
+                - member: revenue
+                  operator: gt
+                  values: ["0"]
+                - or:
+                    - member: city
+                      operator: equals
+                      values: [NYC]
+                    - member: city
+                      operator: equals
+                      values: [SF]
+          # Mode omitted — must default to relative.
+          - name: revenue_default_mode
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            filter:
+              include:
+                - member: orders.status
+                  operator: equals
+                  values: [completed]

@@ -85,12 +85,16 @@ impl QueryTools {
             join_graph,
             templates_render,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
-            evaluator_compiler,
+            evaluator_compiler: evaluator_compiler.clone(),
             timezone,
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
             member_mask_filters: RefCell::new(HashMap::new()),
         });
+
+        evaluator_compiler
+            .borrow_mut()
+            .set_query_tools(Rc::downgrade(&result));
 
         // Phase 2: compile mask filters once now that Rc<QueryTools> exists.
         // After this, member_mask_filters is treated as immutable for the

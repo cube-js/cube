@@ -527,6 +527,241 @@ describe('Cube Validation', () => {
 
       expect(validationResult.error).toBeFalsy();
     });
+
+    it('multi-stage filter — full directive accepted', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_filter: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: {
+              mode: 'relative',
+              exclude: () => [],
+              include: [
+                { member: 'cube.dim', operator: 'equals', values: ['x'] },
+                { or: [
+                  { member: 'cube.dim', operator: 'equals', values: ['y'] },
+                  { member: 'cube.other', operator: 'set' },
+                ] },
+              ],
+            }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('multi-stage filter — partial directives accepted', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          only_exclude: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: { mode: 'fixed', exclude: () => [] }
+          },
+          only_include: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: {
+              include: [{ member: 'cube.dim', operator: 'equals', values: ['x'] }]
+            }
+          },
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('multi-stage filter — invalid mode rejected', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          bad_mode: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: { mode: 'RELATIVE' }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('measures.bad_mode.filter.mode');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('multi-stage filter — include item without member/operator rejected', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          bad_include: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: { include: [{}] }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('measures.bad_include.filter.include[0]');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('multi-stage filter — include with bad operator rejected', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          bad_op: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: {
+              include: [
+                { member: 'cube.dim', operator: 'totallyNotAnOperator', values: ['x'] }
+              ]
+            }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('measures.bad_op.filter.include[0]');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('multi-stage filter — exclude and keepOnly are mutually exclusive', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          both_set: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: {
+              exclude: () => [],
+              keepOnly: () => [],
+            }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('exclude');
+          expect(message).toContain('keepOnly');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('multi-stage filter — exclude must be a function', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          bad_exclude: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            filter: { exclude: ['some_dim'] }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('measures.bad_exclude.filter.exclude');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('multi-stage filter — accepted on multi-stage dimension', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        dimensions: {
+          dim_with_filter: {
+            multiStage: true,
+            type: 'string',
+            sql: () => '',
+            filter: {
+              mode: 'fixed',
+              keepOnly: () => [],
+              include: [{ member: 'cube.dim', operator: 'equals', values: ['x'] }],
+            }
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
   });
 
   it('OriginalSqlSchema', async () => {

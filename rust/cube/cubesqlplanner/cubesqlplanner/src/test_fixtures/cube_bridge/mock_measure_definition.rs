@@ -4,11 +4,12 @@ use crate::cube_bridge::measure_definition::{
 };
 use crate::cube_bridge::member_order_by::MemberOrderBy;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences;
 use crate::cube_bridge::struct_with_sql_member::StructWithSqlMember;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::measure::YamlMeasureDefinition;
 use crate::test_fixtures::cube_bridge::{
-    MockMemberOrderBy, MockMemberSql, MockStructWithSqlMember,
+    MockMemberOrderBy, MockMemberSql, MockMultiStageFilterReferences, MockStructWithSqlMember,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -41,6 +42,8 @@ pub struct MockMeasureDefinition {
     filters: Option<Vec<Rc<MockStructWithSqlMember>>>,
     #[builder(default)]
     drill_filters: Option<Vec<Rc<MockStructWithSqlMember>>>,
+    #[builder(default)]
+    filter: Option<Rc<MockMultiStageFilterReferences>>,
     #[builder(default)]
     order_by: Option<Vec<Rc<MockMemberOrderBy>>>,
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
@@ -125,6 +128,17 @@ impl MeasureDefinition for MockMeasureDefinition {
             }
             None => Ok(None),
         }
+    }
+
+    fn has_filter(&self) -> Result<bool, CubeError> {
+        Ok(self.filter.is_some())
+    }
+
+    fn filter(&self) -> Result<Option<Rc<dyn MultiStageFilterReferences>>, CubeError> {
+        Ok(self
+            .filter
+            .as_ref()
+            .map(|f| f.clone() as Rc<dyn MultiStageFilterReferences>))
     }
 
     fn has_order_by(&self) -> Result<bool, CubeError> {
@@ -244,6 +258,88 @@ mod tests {
         assert_eq!(
             static_data.group_by_references,
             Some(vec!["category".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_from_yaml_with_filter() {
+        // exclude+keep_only would fail at planner-level (mutually exclusive),
+        // but the mock YAML stage only validates the carry-over shape — it is
+        // exercised by symbol-level tests that go through `build_filter`.
+        let yaml = indoc! {"
+            type: number
+            sql: \"{CUBE.amount}\"
+            multi_stage: true
+            filter:
+              mode: relative
+              exclude:
+                - status
+              include:
+                - member: amount
+                  operator: gt
+                  values: [\"0\"]
+                - member: created_at
+                  operator: afterDate
+                  values: [\"2024-01-01\"]
+        "};
+
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+
+        assert!(measure.has_filter().unwrap());
+        let filter = measure.filter().unwrap().expect("filter present");
+        let static_data = filter.static_data();
+        assert_eq!(static_data.mode.as_deref(), Some("relative"));
+        assert_eq!(static_data.exclude, Some(vec!["status".to_string()]));
+
+        let include = static_data.include.as_ref().expect("include present");
+        assert_eq!(include.len(), 2);
+        assert_eq!(include[0].member.as_deref(), Some("amount"));
+        assert_eq!(include[0].operator.as_deref(), Some("gt"));
+    }
+
+    #[test]
+    fn test_from_yaml_with_filter_partial() {
+        let yaml = indoc! {"
+            type: number
+            sql: \"{CUBE.amount}\"
+            multi_stage: true
+            filter:
+              exclude:
+                - status
+        "};
+
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+        let filter = measure.filter().unwrap().expect("filter present");
+        let static_data = filter.static_data();
+
+        assert_eq!(static_data.mode, None);
+        assert_eq!(static_data.exclude, Some(vec!["status".to_string()]));
+        assert_eq!(static_data.keep_only, None);
+        assert!(static_data.include.is_none());
+    }
+
+    #[test]
+    fn test_from_yaml_with_filter_qualifies_references() {
+        let yaml = indoc! {"
+            type: number
+            sql: \"{CUBE.amount}\"
+            multi_stage: true
+            filter:
+              exclude:
+                - status
+                - other_cube.dim
+        "};
+
+        let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml).unwrap();
+        let measure = yaml_def.build_with_cube_name(Some("orders"));
+        let filter = measure.filter().unwrap().expect("filter present");
+
+        assert_eq!(
+            filter.static_data().exclude,
+            Some(vec![
+                "orders.status".to_string(),
+                "other_cube.dim".to_string()
+            ])
         );
     }
 

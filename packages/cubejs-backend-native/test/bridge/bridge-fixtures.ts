@@ -72,6 +72,17 @@ export const memberOrderByFixture = (): unknown => ({
   dir: 'asc',
 });
 
+// MultiStageFilterReferences has no trait methods — every field is a
+// serde-static on `MultiStageFilterReferencesStatic`. `exclude` and
+// `keep_only` are mutually exclusive at planner level, so the fixture only
+// populates one of them. All fields are optional, so a `{}` literal would
+// also parse — populating real values exercises serde more usefully.
+export const multiStageFilterFixture = (): unknown => ({
+  mode: 'relative',
+  excludeReferences: ['orders.status'],
+  include: [{ member: 'orders.amount', operator: 'gt', values: ['0'] }],
+});
+
 export const memberDefinitionFixture = (): unknown => ({
   type: 'dimension',
   // sql is optional
@@ -272,6 +283,7 @@ export const FIXTURES: Record<string, BridgeFixtureFactory> = {
   memberDefinition: memberDefinitionFixture,
   memberExpressionDefinition: memberExpressionDefinitionFixture,
   memberOrderBy: memberOrderByFixture,
+  multiStageFilter: multiStageFilterFixture,
   preAggregationDescription: preAggregationDescriptionFixture,
   preAggregationObj: preAggregationObjFixture,
   preAggregationTimeDimension: preAggregationTimeDimensionFixture,

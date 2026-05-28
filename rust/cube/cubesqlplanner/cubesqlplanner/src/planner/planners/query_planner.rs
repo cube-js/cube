@@ -40,7 +40,7 @@ impl QueryPlanner {
             let mut cte_state = CteState::new();
 
             let multi_stage_query_planner =
-                MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
+                MultiStageQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
             if self.request.allow_multi_stage() {
                 multi_stage_query_planner.plan_queries(&mut cte_state)?;
             }
