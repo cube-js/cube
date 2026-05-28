@@ -58,6 +58,21 @@ jobs:
             Provide detailed feedback using inline comments for specific issues.
             Use top-level comments for general observations or praise.
 
+            **Tracking comment formatting:**
+
+            Applies only to the FINAL update of the tracking comment (the one that contains
+            the completed review). While work is still in progress — todos partially checked,
+            "working…" spinner, intermediate status updates — keep everything visible so the
+            reader can watch progress without expanding anything.
+
+            On the final update, hide the entire review body inside a single collapsed
+            `<details>` block. Only a short one-line headline with the verdict and issue
+            counts (e.g. "1 high, 2 medium, 5 low") stays visible — the reader expands when
+            they want details.
+
+            Leave a blank line after `<summary>` and before `</details>`, otherwise GitHub
+            won't render the markdown inside (tables and lists especially).
+
             **Resolving your own stale review threads:**
 
             Before posting new comments, list existing review threads on this PR using the
