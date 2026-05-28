@@ -16,6 +16,11 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Configure gh aliases for review-thread operations
+        run: |
+          gh alias set --shell list-review-threads 'gh api graphql -f query="query(\$owner:String!,\$repo:String!,\$pr:Int!){repository(owner:\$owner,name:\$repo){pullRequest(number:\$pr){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:1){nodes{author{login} body path line}}}}}}}" -F owner="$1" -F repo="$2" -F pr="$3"'
+          gh alias set --shell resolve-thread 'gh api graphql -f query="mutation(\$id:ID!){resolveReviewThread(input:{threadId:\$id}){thread{isResolved}}}" -F id="$1"'
+
       - name: Review
         uses: anthropics/claude-code-action@v1
         with:
@@ -55,7 +60,28 @@ jobs:
             Provide detailed feedback using inline comments for specific issues.
             Use top-level comments for general observations or praise.
 
+            **Resolving your own stale review threads:**
+
+            Before posting new comments, list existing review threads on this PR using the
+            preconfigured alias:
+
+              gh list-review-threads ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
+
+            For each thread where ALL of the following hold:
+              - `isResolved` is false
+              - the first comment's `author.login` is `github-actions[bot]`
+              - the concern is no longer applicable in the current diff (file/line gone,
+                code rewritten, issue addressed)
+
+            resolve it with:
+
+              gh resolve-thread <thread-id>
+
+            Do not resolve threads from human reviewers under any circumstance, even if the
+            concern looks addressed — leave that decision to the reviewer. Only the two
+            aliases above are available; raw `gh api graphql` is not permitted.
+
           # Tools for comprehensive PR review
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)"
             --model "claude-opus-4-6"
