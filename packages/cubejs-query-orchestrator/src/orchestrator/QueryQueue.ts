@@ -769,7 +769,6 @@ export class QueryQueue {
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         let queryExecutionFinished = false;
-        let localCancelHandler: unknown = null;
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
         this.logger('Performing query', {
@@ -812,7 +811,7 @@ export class QueryQueue {
               });
             }
 
-            if (!queryExecutionFinished && localCancelHandler !== null) {
+            if (!queryExecutionFinished) {
               try {
                 const currentDef = await queueConnection.getQueryDef(queryKeyHashed, queueId);
                 if (!currentDef && !queryExecutionFinished) {
@@ -827,8 +826,7 @@ export class QueryQueue {
                     preAggregation: query.query?.preAggregation,
                     addedToQueueTime: query.addedToQueueTime,
                   });
-                  const cancelQuery = { ...query, cancelHandler: localCancelHandler };
-                  await this.processCancel(cancelQuery, queueId);
+                  await this.processCancel(query, queueId);
                 }
               } catch (e: any) {
                 this.logger('Error checking for external cancellation', {
@@ -868,7 +866,6 @@ export class QueryQueue {
                   this.queryHandlers[handler](
                     query.query,
                     async (cancelHandler) => {
-                      localCancelHandler = cancelHandler;
                       try {
                         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
                       } catch (e: any) {
