@@ -1127,8 +1127,14 @@ filter_subq AS (
       const cancelBody = await cancelRes.json() as any;
       expect(Array.isArray(cancelBody.result)).toBe(true);
 
-      // The original query should resolve (with error or continue-wait)
-      await queryPromise;
+      // The cancelled query should resolve with an error within 40s
+      const result = await Promise.race([
+        queryPromise,
+        new Promise(resolve => setTimeout(() => resolve('__timeout__'), 40000)),
+      ]);
+      expect(result).not.toBe('__timeout__');
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/error/i);
     });
   });
 });
