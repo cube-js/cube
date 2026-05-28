@@ -1099,44 +1099,77 @@ filter_subq AS (
       const requestId = 'cancel-test-request-id-12345';
       const token = jwt.sign({ user: 'admin' }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
 
-      // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
-      // via the REST load API so we control the request ID.
-      // The load API returns continue-wait on long queries, so
-      // cancellation surfaces as an error on the next poll.
-      const queryPromise = fetch(`${birdbox.configuration.apiUrl}/load`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token,
-          'x-request-id': requestId,
-        },
-        body: JSON.stringify({
-          query: {
-            measures: ['SlowQuery.count'],
-          },
-        }),
-      }).then(r => r.json()).catch(e => e);
-
-      // Give the query time to enter the queue and start executing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Cancel the running query by request ID
-      const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
-        method: 'DELETE',
-        headers: { Authorization: token },
+      // Connect directly to the underlying Postgres to check pg_stat_activity
+      const pgConn = new PgClient({
+        host: db.getHost(),
+        port: db.getMappedPort(5432),
+        database: 'test',
+        user: 'test',
+        password: 'test',
+        ssl: false,
       });
+      await pgConn.connect();
 
-      expect(cancelRes.status).toBe(200);
-      const cancelBody = await cancelRes.json() as any;
-      expect(Array.isArray(cancelBody.result)).toBe(true);
+      try {
+        // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
+        // via the REST SQL API. Use AbortController so we can close the
+        // connection to trigger the Rust-side close detection.
+        const abortController = new AbortController();
+        const queryPromise = fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+            'x-request-id': requestId,
+          },
+          body: JSON.stringify({
+            query: 'SELECT count FROM SlowQuery',
+          }),
+          signal: abortController.signal,
+        }).then(r => r.text()).catch(e => e);
 
-      // The cancelled query should resolve within 40s
-      const result = await Promise.race([
-        queryPromise,
-        new Promise(resolve => setTimeout(() => resolve('__timeout__'), 40000)),
-      ]) as any;
-      expect(result).not.toBe('__timeout__');
-      expect(result.error).toBeDefined();
+        // Wait for pg_sleep to appear in pg_stat_activity
+        let sleepRunning = false;
+        for (let i = 0; i < 20; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { rows } = await pgConn.query(
+            "SELECT count(*) as cnt FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+          );
+          if (parseInt(rows[0].cnt, 10) > 0) {
+            sleepRunning = true;
+            break;
+          }
+        }
+        expect(sleepRunning).toBe(true);
+
+        // Close the HTTP connection — this triggers the Rust-side
+        // OnCloseHandler which drops the execute future via tokio::select!
+        abortController.abort();
+        await queryPromise;
+
+        // Then cancel the query in the queue by request ID
+        const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
+          method: 'DELETE',
+          headers: { Authorization: token },
+        });
+        expect(cancelRes.status).toBe(200);
+
+        // Wait for pg_sleep to disappear from pg_stat_activity
+        let sleepStopped = false;
+        for (let i = 0; i < 40; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { rows } = await pgConn.query(
+            "SELECT count(*) as cnt FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+          );
+          if (parseInt(rows[0].cnt, 10) === 0) {
+            sleepStopped = true;
+            break;
+          }
+        }
+        expect(sleepStopped).toBe(true);
+      } finally {
+        await pgConn.end();
+      }
     });
   });
 });
