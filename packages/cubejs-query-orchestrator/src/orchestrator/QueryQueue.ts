@@ -804,9 +804,7 @@ export class QueryQueue {
                     addedToQueueTime: query.addedToQueueTime,
                   });
                   const cancelQuery = { ...query, cancelHandler: localCancelHandler };
-                  if (this.cancelHandlers[query.queryHandler]) {
-                    await this.cancelHandlers[query.queryHandler](cancelQuery);
-                  }
+                  await this.processCancel(cancelQuery, queueId);
                 }
               } catch (e: any) {
                 this.logger('Error checking for external cancellation', {
