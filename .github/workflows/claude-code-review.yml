@@ -33,13 +33,20 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
+          # Pull all event-controlled inputs through env vars instead of
+          # interpolating directly into the script — branch names are
+          # attacker-controlled and could carry shell metacharacters.
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER_FROM_EVENT: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF_FROM_EVENT: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
         run: |
-          if [ -n "${{ inputs.pr_number }}" ]; then
-            number="${{ inputs.pr_number }}"
-            ref=$(gh pr view "$number" --repo "${{ github.repository }}" --json headRefName --jq .headRefName)
+          if [ -n "$INPUT_PR_NUMBER" ]; then
+            number="$INPUT_PR_NUMBER"
+            ref=$(gh pr view "$number" --repo "$REPO" --json headRefName --jq .headRefName)
           else
-            number="${{ github.event.pull_request.number }}"
-            ref="${{ github.event.pull_request.head.ref }}"
+            number="$PR_NUMBER_FROM_EVENT"
+            ref="$PR_HEAD_REF_FROM_EVENT"
           fi
           echo "number=$number" >> "$GITHUB_OUTPUT"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
