@@ -680,6 +680,10 @@
   "navbar": {
     "links": [
       {
+        "label": "Changelog",
+        "href": "https://cube.dev/changelog"
+      },
+      {
         "label": "Community",
         "href": "https://slack.cube.dev"
       }
