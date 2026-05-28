@@ -17,12 +17,7 @@ jobs:
           fetch-depth: 1
 
       - name: Configure gh aliases for review-thread operations
-        # Single-quoted alias bodies are intentional: $owner/$repo/$pr/$id must reach
-        # gh's alias engine as literals (they're GraphQL variables, not shell vars).
-        # shellcheck disable=SC2016
-        run: |
-          gh alias set --shell list-review-threads 'gh api graphql -f query="query(\$owner:String!,\$repo:String!,\$pr:Int!){repository(owner:\$owner,name:\$repo){pullRequest(number:\$pr){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:1){nodes{author{login} body path line}}}}}}}" -F owner="$1" -F repo="$2" -F pr="$3"'
-          gh alias set --shell resolve-thread 'gh api graphql -f query="mutation(\$id:ID!){resolveReviewThread(input:{threadId:\$id}){thread{isResolved}}}" -F id="$1"'
+        run: bash .github/actions/setup-claude-code-review.sh
 
       - name: Review
         uses: anthropics/claude-code-action@v1
