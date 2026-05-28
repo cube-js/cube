@@ -1107,7 +1107,7 @@ filter_subq AS (
         headers: {
           'Content-Type': 'application/json',
           Authorization: token,
-          'x-request-id': `${requestId}-span-1`,
+          'x-request-id': requestId,
         },
         body: JSON.stringify({
           query: 'SELECT count FROM SlowQuery',
@@ -1118,7 +1118,7 @@ filter_subq AS (
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Cancel the running query by request ID
-      const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}-span-1`, {
+      const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
         method: 'DELETE',
         headers: { Authorization: token },
       });
