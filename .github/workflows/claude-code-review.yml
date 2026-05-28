@@ -20,6 +20,7 @@ jobs:
         run: bash .github/actions/setup-claude-code-review.sh
 
       - name: Review
+        id: review
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -121,3 +122,30 @@ jobs:
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)"
             --model "claude-opus-4-6"
+
+      - name: Write run summary
+        if: always() && steps.review.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          jq -r '
+            [.[] | select(.type == "result")] | last as $r |
+            ([.[] | select(.type == "assistant")] | length) as $turns |
+            ([.[] | select(.type == "assistant") | .message.usage.input_tokens // 0] | add) as $in_tok |
+            ([.[] | select(.type == "assistant") | .message.usage.output_tokens // 0] | add) as $out_tok |
+            ([.[] | select(.type == "assistant") | .message.usage.cache_read_input_tokens // 0] | add) as $cache_tok |
+            ([.[] | select(.type == "assistant") | .message.model] | last) as $model |
+            if $r then
+              "### Claude Code review run",
+              "| Metric | Value |",
+              "|---|---|",
+              "| Model | `\($model // "?")` |",
+              "| Cost | $\($r.total_cost_usd) |",
+              "| Wall time | \(($r.duration_ms / 1000) | floor)s |",
+              "| API time | \((($r.duration_api_ms // 0) / 1000) | floor)s |",
+              "| Turns | \($turns) |",
+              "| Input tokens | \($in_tok) |",
+              "| Output tokens | \($out_tok) |",
+              "| Cache read tokens | \($cache_tok) |"
+            else empty end
+          ' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
