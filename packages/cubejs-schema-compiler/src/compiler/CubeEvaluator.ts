@@ -55,7 +55,6 @@ export type MultiStageFilterDirective = {
 };
 
 export type MultiStageGrainDirective = {
-  mode?: 'relative' | 'fixed';
   exclude?: (...args: Array<unknown>) => Array<ToString>;
   keepOnly?: (...args: Array<unknown>) => Array<ToString>;
   include?: (...args: Array<unknown>) => Array<ToString>;

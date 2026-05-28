@@ -228,32 +228,6 @@ cubes:
             sql: "{CUBE.total_amount}"
             multi_stage: true
             grain:
-                mode: relative
-                keep_only:
-                    - orders.status
-
-          # ── grain mode: fixed ──────────────────────────────────────
-          # `mode: fixed` with no keep_only/include → grand total. The
-          # inner CTE has no GROUP BY; the scalar replicates across the
-          # outer query's rows.
-          - name: amount_grain_fixed_grand_total
-            type: sum
-            sql: "{CUBE.total_amount}"
-            multi_stage: true
-            grain:
-                mode: fixed
-
-          # `mode: fixed` + keep_only intersects with the original query
-          # context (not with whatever an ancestor narrowed it to). At
-          # top-level the parent context equals the query, so this is
-          # observable via "keep_only dim missing from the query" — the
-          # measure collapses to a grand total in that case.
-          - name: amount_grain_fixed_keep_only_status
-            type: sum
-            sql: "{CUBE.total_amount}"
-            multi_stage: true
-            grain:
-                mode: fixed
                 keep_only:
                     - orders.status
 

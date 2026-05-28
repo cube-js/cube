@@ -365,7 +365,6 @@ mod tests {
             sql: \"{CUBE.amount}\"
             multi_stage: true
             grain:
-              mode: fixed
               include:
                 - region
                 - category
@@ -376,7 +375,6 @@ mod tests {
         assert!(measure.has_grain().unwrap());
         let grain = measure.grain().unwrap().expect("grain present");
         let static_data = grain.static_data();
-        assert_eq!(static_data.mode.as_deref(), Some("fixed"));
         assert_eq!(
             static_data.include,
             Some(vec!["region".to_string(), "category".to_string()])
@@ -400,7 +398,6 @@ mod tests {
         let grain = measure.grain().unwrap().expect("grain present");
         let static_data = grain.static_data();
 
-        assert_eq!(static_data.mode, None);
         assert_eq!(static_data.exclude, Some(vec!["region".to_string()]));
         assert_eq!(static_data.keep_only, None);
         assert_eq!(static_data.include, None);

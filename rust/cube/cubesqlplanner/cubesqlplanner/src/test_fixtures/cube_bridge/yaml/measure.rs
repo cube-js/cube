@@ -127,8 +127,6 @@ impl YamlMultiStageFilter {
 #[derive(Debug, Deserialize)]
 pub struct YamlMultiStageGrain {
     #[serde(default)]
-    mode: Option<String>,
-    #[serde(default)]
     exclude: Option<Vec<String>>,
     #[serde(default)]
     keep_only: Option<Vec<String>>,
@@ -140,7 +138,6 @@ impl YamlMultiStageGrain {
     pub(super) fn build(self, cube_name: Option<&str>) -> Rc<MockMultiStageGrainReferences> {
         Rc::new(
             MockMultiStageGrainReferences::builder()
-                .mode(self.mode)
                 .exclude(qualify_references(self.exclude, cube_name))
                 .keep_only(qualify_references(self.keep_only, cube_name))
                 .include(qualify_references(self.include, cube_name))

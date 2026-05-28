@@ -8,7 +8,6 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, Clone, nativebridge::NativeBridgeStatic)]
 pub struct MultiStageGrainReferencesStatic {
-    pub mode: Option<String>,
     #[serde(rename = "excludeReferences")]
     pub exclude: Option<Vec<String>>,
     #[serde(rename = "keepOnlyReferences")]

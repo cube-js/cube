@@ -90,7 +90,6 @@ export const multiStageFilterFixture = (): unknown => ({
 // schema contract. `include` is a plain reference list, not the structured
 // filter items the filter bridge uses.
 export const multiStageGrainFixture = (): unknown => ({
-  mode: 'fixed',
   excludeReferences: ['orders.region'],
   includeReferences: ['orders.category'],
 });

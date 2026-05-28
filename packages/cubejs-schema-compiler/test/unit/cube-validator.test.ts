@@ -775,7 +775,6 @@ describe('Cube Validation', () => {
             type: 'sum',
             sql: () => '',
             grain: {
-              mode: 'relative',
               exclude: () => [],
               include: () => [],
             }
@@ -809,7 +808,7 @@ describe('Cube Validation', () => {
             multiStage: true,
             type: 'sum',
             sql: () => '',
-            grain: { mode: 'fixed', keepOnly: () => [] }
+            grain: { keepOnly: () => [] }
           },
           only_include: {
             multiStage: true,
@@ -853,32 +852,6 @@ describe('Cube Validation', () => {
           console.log(message);
           expect(message).toContain('exclude');
           expect(message).toContain('keepOnly');
-        }
-      } as any);
-
-      expect(validationResult.error).toBeTruthy();
-    });
-
-    it('multi-stage grain — invalid mode rejected', async () => {
-      const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'name',
-        sql: () => '',
-        fileName: 'fileName',
-        measures: {
-          bad_mode: {
-            multiStage: true,
-            type: 'sum',
-            sql: () => '',
-            grain: { mode: 'RELATIVE' }
-          }
-        }
-      };
-
-      const validationResult = cubeValidator.validate(cube, {
-        error: (message: any, _e: any) => {
-          console.log(message);
-          expect(message).toContain('measures.bad_mode.grain.mode');
         }
       } as any);
 

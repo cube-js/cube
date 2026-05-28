@@ -474,7 +474,7 @@ fn new_patched_appends_to_existing_filters() {
 
 mod multi_stage {
     use super::*;
-    use crate::planner::{MultiStageFilterMode, MultiStageGrainMode};
+    use crate::planner::MultiStageFilterMode;
 
     fn ctx() -> TestContext {
         let schema = MockSchema::from_yaml_file("common/multi_stage_filter.yaml");
@@ -498,7 +498,6 @@ mod multi_stage {
         assert_eq!(include.len(), 1);
         assert_eq!(include[0].full_name(), "orders.city");
 
-        assert_eq!(ms.grain.mode, MultiStageGrainMode::Relative);
         assert!(ms.grain.keep_only.is_none());
     }
 
@@ -573,13 +572,11 @@ mod multi_stage {
     }
 
     #[test]
-    fn legacy_fields_populate_grain_with_relative_mode() {
+    fn legacy_fields_populate_grain() {
         let ctx = ctx();
         let m = ctx.create_measure("orders.revenue_filtered").unwrap();
         let measure = m.as_measure().unwrap();
         let ms = measure.multi_stage().expect("multi_stage present");
-
-        assert_eq!(ms.grain.mode, MultiStageGrainMode::Relative);
 
         let include = ms.grain.include.as_ref().expect("include");
         assert_eq!(include[0].full_name(), "orders.city");
@@ -594,8 +591,6 @@ mod multi_stage {
         let m = ctx.create_measure("orders.revenue_with_grain").unwrap();
         let measure = m.as_measure().unwrap();
         let ms = measure.multi_stage().expect("multi_stage present");
-
-        assert_eq!(ms.grain.mode, MultiStageGrainMode::Fixed);
 
         let exclude = ms.grain.exclude.as_ref().expect("exclude");
         assert_eq!(exclude.len(), 1);

@@ -73,7 +73,6 @@ cubes:
             add_group_by:
               - status
             grain:
-              mode: fixed
               exclude:
                 - status
               include:

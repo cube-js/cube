@@ -9,8 +9,6 @@ use typed_builder::TypedBuilder;
 #[derive(TypedBuilder)]
 pub struct MockMultiStageGrainReferences {
     #[builder(default)]
-    mode: Option<String>,
-    #[builder(default)]
     exclude: Option<Vec<String>>,
     #[builder(default)]
     keep_only: Option<Vec<String>>,
@@ -21,7 +19,6 @@ pub struct MockMultiStageGrainReferences {
 impl_static_data!(
     MockMultiStageGrainReferences,
     MultiStageGrainReferencesStatic,
-    mode,
     exclude,
     keep_only,
     include

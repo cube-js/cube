@@ -206,7 +206,7 @@ const BRIDGES: BridgeSpec[] = [
   },
   {
     name: 'multiStageGrain',
-    expected: ['exclude', 'include', 'keep_only', 'mode'],
+    expected: ['exclude', 'include', 'keep_only'],
   },
   {
     name: 'preAggregationDescription',

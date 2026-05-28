@@ -869,7 +869,6 @@ const MultiStageFilter = Joi.object().keys({
 }).nand('exclude', 'keepOnly');
 
 const MultiStageGrain = Joi.object().keys({
-  mode: Joi.string().valid('relative', 'fixed'),
   exclude: Joi.func(),
   keepOnly: Joi.func(),
   include: Joi.func(),

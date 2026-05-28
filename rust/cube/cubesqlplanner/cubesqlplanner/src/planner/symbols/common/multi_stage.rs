@@ -52,38 +52,16 @@ pub struct MultiStageFilter {
     pub include_measure: Vec<FilterItem>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub enum MultiStageGrainMode {
-    #[default]
-    Relative,
-    Fixed,
-}
-
-impl MultiStageGrainMode {
-    fn from_str(s: &str) -> Result<Self, CubeError> {
-        match s {
-            "relative" => Ok(Self::Relative),
-            "fixed" => Ok(Self::Fixed),
-            other => Err(CubeError::user(format!(
-                "Unknown multi-stage grain mode '{}', expected 'relative' or 'fixed'",
-                other
-            ))),
-        }
-    }
-}
-
 /// Set operation on the inherited grain context of a multi-stage member.
 ///
-/// `mode` chooses the base context (parent grain for `Relative`, empty for
-/// `Fixed`); the three lists then mutate that base — `exclude` removes,
-/// `keep_only` intersects with the parent, `include` adds.
+/// The three lists mutate the parent grain — `exclude` removes,
+/// `keep_only` intersects, `include` adds.
 ///
 /// Sourced from the `grain:` directive when present; otherwise mapped from
 /// `add_group_by` / `reduce_by` / `group_by` (→ `include` / `exclude` /
-/// `keep_only`) with `mode: Relative`.
+/// `keep_only`).
 #[derive(Clone, Default)]
 pub struct MultiStageGrain {
-    pub mode: MultiStageGrainMode,
     pub exclude: Option<Vec<Rc<MemberSymbol>>>,
     pub keep_only: Option<Vec<Rc<MemberSymbol>>>,
     pub include: Option<Vec<Rc<MemberSymbol>>>,
@@ -173,7 +151,6 @@ impl MultiStageProperties {
         };
 
         let grain = MultiStageGrain {
-            mode: self.grain.mode.clone(),
             exclude: map_refs(&self.grain.exclude)?,
             keep_only: map_refs(&self.grain.keep_only)?,
             include: map_refs(&self.grain.include)?,
@@ -213,12 +190,7 @@ fn build_grain_from_directive(
             "Multi-stage grain cannot specify both `exclude` and `keep_only` — they are mutually exclusive ways of restricting the inherited context.".to_string(),
         ));
     }
-    let mode = match &static_data.mode {
-        Some(s) => MultiStageGrainMode::from_str(s)?,
-        None => MultiStageGrainMode::Relative,
-    };
     Ok(MultiStageGrain {
-        mode,
         exclude: resolve_reference_paths(&static_data.exclude, compiler)?,
         keep_only: resolve_reference_paths(&static_data.keep_only, compiler)?,
         include: resolve_reference_paths(&static_data.include, compiler)?,
@@ -230,7 +202,6 @@ fn build_grain_from_legacy(
     compiler: &mut Compiler,
 ) -> Result<MultiStageGrain, CubeError> {
     Ok(MultiStageGrain {
-        mode: MultiStageGrainMode::Relative,
         exclude: resolve_reference_paths(&static_data.reduce_by_references, compiler)?,
         keep_only: resolve_reference_paths(&static_data.group_by_references, compiler)?,
         include: resolve_reference_paths(&static_data.add_group_by_references, compiler)?,

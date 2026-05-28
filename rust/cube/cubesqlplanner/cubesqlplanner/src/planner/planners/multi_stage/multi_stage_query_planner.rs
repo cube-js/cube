@@ -23,7 +23,6 @@ use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
 use crate::planner::MultiStageGrain;
-use crate::planner::MultiStageGrainMode;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
@@ -281,53 +280,32 @@ impl MultiStageQueryPlanner {
     /// reduce_by / group_by actually shrinks the partition vs the leaf
     /// grain.
     ///
-    /// Applies the partition-shaping part of `grain` to a dimension list.
-    /// `dims` is the parent state's slice (used by `Relative`); `root_dims`
-    /// is the query-root slice (used by `Fixed`, which discards inherited
-    /// narrowing). `include` is not handled here — it is appended to the
-    /// resulting state via `add_dimensions` outside this helper.
+    /// Applies the partition-shaping part of `grain` to a parent-state
+    /// dimension list: `exclude` removes matching dims, then `keep_only`
+    /// intersects what's left. `include` is appended outside this helper
+    /// via `add_dimensions`.
     ///
     /// FIXME: merge with `MultiStageMemberQueryPlanner::member_partition_by_logical`
     /// — both apply the same grain reshape on different inputs; keeping two
     /// copies invites silent drift when only one is updated.
     fn partition_filter(
         dims: &Vec<Rc<MemberSymbol>>,
-        root_dims: &Vec<Rc<MemberSymbol>>,
         grain: &MultiStageGrain,
     ) -> Vec<Rc<MemberSymbol>> {
-        match grain.mode {
-            MultiStageGrainMode::Relative => {
-                let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &grain.exclude {
-                    dims.iter()
-                        .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
-                        .cloned()
-                        .collect()
-                } else {
-                    dims.clone()
-                };
-                if let Some(keep_only) = &grain.keep_only {
-                    dims.into_iter()
-                        .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
-                        .collect()
-                } else {
-                    dims
-                }
-            }
-            MultiStageGrainMode::Fixed => {
-                // Discard the parent state. `exclude` is undefined here per
-                // the spec; the validator forbids `exclude` + `keep_only`
-                // together so the only relevant operator left is `keep_only`,
-                // which intersects with the original query context.
-                if let Some(keep_only) = &grain.keep_only {
-                    root_dims
-                        .iter()
-                        .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
-                        .cloned()
-                        .collect()
-                } else {
-                    Vec::new()
-                }
-            }
+        let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &grain.exclude {
+            dims.iter()
+                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .cloned()
+                .collect()
+        } else {
+            dims.clone()
+        };
+        if let Some(keep_only) = &grain.keep_only {
+            dims.into_iter()
+                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .collect()
+        } else {
+            dims
         }
     }
 
@@ -580,17 +558,8 @@ impl MultiStageQueryPlanner {
                     )
                 {
                     let grain = multi_stage_member.grain();
-                    let root_state = self.root_state();
-                    let dims = Self::partition_filter(
-                        new_state.dimensions(),
-                        root_state.dimensions(),
-                        grain,
-                    );
-                    let time_dims = Self::partition_filter(
-                        new_state.time_dimensions(),
-                        root_state.time_dimensions(),
-                        grain,
-                    );
+                    let dims = Self::partition_filter(new_state.dimensions(), grain);
+                    let time_dims = Self::partition_filter(new_state.time_dimensions(), grain);
                     new_state.set_dimensions(dims);
                     new_state.set_time_dimensions(time_dims);
                 }
