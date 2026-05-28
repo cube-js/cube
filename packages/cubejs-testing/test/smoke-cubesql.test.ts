@@ -1093,4 +1093,45 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot();
     });
   });
+
+  describe('Query cancellation by request ID', () => {
+    test('cancel a running query via REST API', async () => {
+      const requestId = 'cancel-test-request-id-12345';
+      const token = jwt.sign({ user: 'admin' }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
+
+      // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
+      // via the HTTP load API so we control the request ID.
+      // Don't await — we want it running in the background.
+      const queryPromise = fetch(`${birdbox.configuration.apiUrl}/load`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+          'x-request-id': `${requestId}-span-1`,
+        },
+        body: JSON.stringify({
+          query: {
+            measures: ['SlowQuery.count'],
+          },
+        }),
+      }).then(r => r.json()).catch(e => e);
+
+      // Give the query time to enter the queue and start executing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Cancel the running query by request ID
+      const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}-span-1`, {
+        method: 'DELETE',
+        headers: { Authorization: token },
+      });
+
+      expect(cancelRes.status).toBe(200);
+      const cancelBody = await cancelRes.json() as any;
+      expect(Array.isArray(cancelBody.result)).toBe(true);
+
+      // The original query should resolve (with error or continue-wait)
+      await queryPromise;
+    }, 30000);
+  });
+
 });
