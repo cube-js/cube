@@ -274,12 +274,6 @@ impl MultiStageQueryPlanner {
         }
     }
 
-    /// Mirror of `MultiStageMemberQueryPlanner::member_partition_by_logical`:
-    /// drops `reduce_by` dims and (when `group_by` is set) keeps only the
-    /// dims explicitly listed. Used at planning time to decide whether
-    /// reduce_by / group_by actually shrinks the partition vs the leaf
-    /// grain.
-    ///
     /// Applies the partition-shaping part of `grain` to a parent-state
     /// dimension list: `exclude` removes matching dims, then `keep_only`
     /// intersects what's left. `include` is appended outside this helper

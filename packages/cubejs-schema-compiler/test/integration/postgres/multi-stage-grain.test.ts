@@ -7,8 +7,9 @@ import { dbRunner } from './PostgresDBRunner';
 // The Rust planner has the exhaustive coverage; this file just confirms the
 // JS pipeline accepts each grain shape and produces correct results.
 //
-// Inline data (6 rows — id=6 added so (completed, books) has two rows,
-// which lets the 2-element keep_only test distinguish from total_amount):
+// Inline data (6 rows; (completed, books) spans two rows so that
+// `keep_only: [status, category]` resolves to a value distinct from
+// `total_amount`):
 //   id status     category    amount  created_at
 //   1  completed  books       100     2024-01-10
 //   2  completed  electronics 200     2024-01-15
@@ -121,9 +122,8 @@ cubes:
       # ── keep_only + include combination ──────────────────────────
       # keep_only shrinks the inherited partition to [status]; include
       # then extends the leaf grain with [id]. Outer re-aggregates over
-      # id back to the query grain — equivalent to "per-status total
-      # broadcast across categories" (the Rust planner pattern
-      # mirrored from total_by_customer_reduce_category).
+      # id back to the query grain — per-status total broadcast across
+      # categories.
       - name: amount_grain_keep_status_include_id
         sql: "{CUBE.total_amount}"
         type: sum

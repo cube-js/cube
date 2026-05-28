@@ -99,10 +99,11 @@ async fn test_group_by_equals_query_dims() {
     }
 }
 
-// Smoke test: `grain.keep_only: [status]` yields the same partition as
-// `group_by: [status]`. Snapshot must match `test_group_by_override`.
+// `grain.keep_only: [status]` narrows the partition to `[status]`; the
+// query has only `category`, so the measure value is the per-status total
+// broadcast across categories.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_grain_keep_only_matches_group_by_override() {
+async fn test_grain_keep_only_status_top_level() {
     let ctx = create_context();
 
     let query = indoc! {r#"

@@ -56,10 +56,6 @@ pub struct MultiStageFilter {
 ///
 /// The three lists mutate the parent grain — `exclude` removes,
 /// `keep_only` intersects, `include` adds.
-///
-/// Sourced from the `grain:` directive when present; otherwise mapped from
-/// `add_group_by` / `reduce_by` / `group_by` (→ `include` / `exclude` /
-/// `keep_only`).
 #[derive(Clone, Default)]
 pub struct MultiStageGrain {
     pub exclude: Option<Vec<Rc<MemberSymbol>>>,
@@ -108,8 +104,6 @@ impl MultiStageProperties {
             return Ok(None);
         }
 
-        // Dimensions only expose `add_group_by` today — the `grain:` directive
-        // is currently scoped to measures.
         let include =
             resolve_reference_paths(&definition.static_data().add_group_by_references, compiler)?;
         let filter = build_filter(cube_name, definition.filter()?, compiler)?;

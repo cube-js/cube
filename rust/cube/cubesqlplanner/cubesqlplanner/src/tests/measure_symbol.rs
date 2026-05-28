@@ -598,8 +598,6 @@ mod multi_stage {
 
         let include = ms.grain.include.as_ref().expect("include");
         assert_eq!(include.len(), 1);
-        // Comes from `grain.include: [city]`, not from the sibling
-        // `add_group_by: [status]` — the directive wins when both are set.
         assert_eq!(include[0].full_name(), "orders.city");
 
         assert!(ms.grain.keep_only.is_none());
