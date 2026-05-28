@@ -23,9 +23,9 @@ import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
 import { escape, format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
 
-import {ConnectionConfig} from './types';
-import {WebSocketConnection} from './WebSocketConnection';
-import {QueryResultFormat} from '../codegen';
+import { ConnectionConfig } from './types';
+import { WebSocketConnection } from './WebSocketConnection';
+import { QueryResultFormat } from '../codegen';
 
 const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
