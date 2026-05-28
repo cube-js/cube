@@ -43,6 +43,8 @@ export class SQLServer {
 
   protected readonly gatewayPort: number | undefined;
 
+  private closedRequests: Set<string> = new Set();
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     options: SQLServerConstructorOptions,
@@ -78,6 +80,21 @@ export class SQLServer {
 
   public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode, timezone?: string, throwContinueWait?: boolean, requestId?: string) {
     await execSql(this.getSqlInterfaceInstance(), sqlQuery, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId);
+  }
+
+  private static extractUUID(requestId: string): string {
+    const idx = requestId.lastIndexOf('-span-');
+    return idx !== -1 ? requestId.substring(0, idx) : requestId;
+  }
+
+  public markRequestClosed(requestId: string): void {
+    const uuid = SQLServer.extractUUID(requestId);
+    this.closedRequests.add(uuid);
+    setTimeout(() => this.closedRequests.delete(uuid), 5 * 60 * 1000);
+  }
+
+  public isRequestClosed(requestId: string): boolean {
+    return this.closedRequests.has(SQLServer.extractUUID(requestId));
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
@@ -195,6 +212,10 @@ export class SQLServer {
         });
       },
       sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming, cacheMode }) => {
+        if (this.isRequestClosed(request.id)) {
+          throw new Error('Client disconnected');
+        }
+
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor

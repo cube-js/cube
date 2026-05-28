@@ -475,6 +475,12 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
+          if (req.context?.requestId) {
+            res.on('close', () => {
+              this.sqlServer.markRequestClosed(req.context.requestId);
+            });
+          }
+
           await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
