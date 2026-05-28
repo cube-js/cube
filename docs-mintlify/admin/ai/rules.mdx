@@ -70,6 +70,10 @@ rules:
 
 Inline rules accept the same properties as Markdown rules — `name`, `description`, `prompt` (required), and `type` (required).
 
+<Note>
+Rules inlined at the root of `agents/config.yml` are attached to the implicit `auto` space and applied to the default agent in a [single-agent setup](/admin/ai). In a [multi-agent setup](/admin/ai/multi-agent), attach rules to a specific space by inlining them under that space's `rules` key (or by placing Markdown files under `agents/rules/<space-name>/`).
+</Note>
+
 ## Writing effective rules
 
 Good rules are specific, actionable, and encode context the agent wouldn't otherwise know about your business.
