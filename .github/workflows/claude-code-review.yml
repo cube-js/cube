@@ -55,6 +55,20 @@ jobs:
           echo "number=$number" >> "$GITHUB_OUTPUT"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
+      - name: React to trigger comment
+        # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
+        # the bot picked up the command — actual review takes a few minutes.
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api --method POST \
+            "repos/$REPO/issues/comments/$COMMENT_ID/reactions" \
+            -f content=eyes \
+            --silent
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
@@ -167,7 +181,7 @@ jobs:
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)"
             --model "claude-opus-4-7"
-            --effort-level ${{ inputs.effort || 'medium' }}
+            --effort ${{ inputs.effort || 'medium' }}
 
       - name: Write run summary
         if: always() && steps.review.outputs.execution_file != ''
@@ -195,3 +209,21 @@ jobs:
               "| Cache read tokens | \($cache_tok) |"
             else empty end
           ' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: React to trigger comment (completion)
+        if: always() && github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+        run: |
+          if [ "$REVIEW_OUTCOME" = "success" ]; then
+            reaction=rocket
+          else
+            reaction=confused
+          fi
+          gh api --method POST \
+            "repos/$REPO/issues/comments/$COMMENT_ID/reactions" \
+            -f "content=$reaction" \
+            --silent
