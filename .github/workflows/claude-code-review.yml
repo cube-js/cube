@@ -79,6 +79,27 @@ jobs:
             concern looks addressed — leave that decision to the reviewer. Only the two
             aliases above are available; raw `gh api graphql` is not permitted.
 
+            **Avoiding duplicate inline comments:**
+
+            Use the same `gh list-review-threads` output (from the resolve step above) to
+            deduplicate against your own prior comments. Before calling
+            `mcp__github_inline_comment__create_inline_comment` for a new issue, check whether
+            an existing thread already covers it. Skip creating a new inline comment when ALL
+            of the following hold for any thread in the list:
+              - `isResolved` is false
+              - the first comment's `author.login` is `claude`
+              - the thread is on the same `path` and `line` as the new issue you would post
+              - the existing comment's body raises substantively the same concern (same root
+                cause, same fix direction — wording does not need to match)
+
+            When you skip, briefly note it in your top-level summary (e.g. "Re-affirmed N
+            prior threads still apply") so the reader knows you considered the issue. Do not
+            post a "still applies" reply on the thread — silence is fine; the unresolved
+            state already communicates that.
+
+            If the issue is on a different line or the fix direction has shifted (different
+            root cause), post a new inline comment as usual.
+
           # Tools for comprehensive PR review
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)"
