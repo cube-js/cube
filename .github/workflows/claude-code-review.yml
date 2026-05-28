@@ -2,27 +2,52 @@ name: Claude Code PR Review
 on:
   pull_request:
     types: [opened, ready_for_review, reopened, synchronize]
+  workflow_call:
+    inputs:
+      pr_number:
+        required: true
+        type: number
 
 concurrency:
-  group: claude-code-review-${{ github.event.pull_request.number }}-${{ github.event.action }}
+  # PR number lives in different fields depending on entry point — coalesce so
+  # the same PR shares a group regardless of whether we got here via push or
+  # via the /bot-review proxy.
+  group: claude-code-review-${{ inputs.pr_number || github.event.pull_request.number }}-${{ github.event.action || 'manual' }}
   cancel-in-progress: true
 
 jobs:
   review-with-tracking:
-    # Skip draft PRs — they get noisy synchronize pushes while WIP, and
-    # running a full Claude review on every intermediate commit gets expensive
-    # fast. The ready_for_review event will pick up the review the moment the
-    # PR exits draft.
-    if: github.event.pull_request.draft == false
+    # On `pull_request`, skip draft PRs — they get noisy synchronize pushes
+    # while WIP, and running a full Claude review on every intermediate commit
+    # gets expensive fast. ready_for_review picks it up on draft exit.
+    # On `workflow_call`, trust the caller; the proxy workflow handles its own
+    # auth gates.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     steps:
+      - name: Resolve PR ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ inputs.pr_number }}" ]; then
+            number="${{ inputs.pr_number }}"
+            ref=$(gh pr view "$number" --repo "${{ github.repository }}" --json headRefName --jq .headRefName)
+          else
+            number="${{ github.event.pull_request.number }}"
+            ref="${{ github.event.pull_request.head.ref }}"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ steps.pr.outputs.ref }}
           fetch-depth: 1
 
       - name: Configure gh aliases for review-thread operations
@@ -36,7 +61,7 @@ jobs:
           track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR NUMBER: ${{ steps.pr.outputs.number }}
 
             Perform a comprehensive code review with the following focus areas:
 
@@ -90,7 +115,7 @@ jobs:
             Before posting new comments, list existing review threads on this PR using the
             preconfigured alias:
 
-              gh list-review-threads ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
+              gh list-review-threads ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ steps.pr.outputs.number }}
 
             For each thread where ALL of the following hold:
               - `isResolved` is false
