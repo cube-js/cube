@@ -69,6 +69,9 @@ use cubesqlplanner::cube_bridge::{
     multi_stage_filter::{
         multi_stage_filter_references_bridge_fields_meta, NativeMultiStageFilterReferences,
     },
+    multi_stage_grain::{
+        multi_stage_grain_references_bridge_fields_meta, NativeMultiStageGrainReferences,
+    },
     pre_aggregation_description::{
         pre_aggregation_description_bridge_fields_meta, NativePreAggregationDescription,
         PreAggregationDescription,
@@ -450,6 +453,7 @@ bridge_registry! {
     "memberExpressionDefinition"  => NativeMemberExpressionDefinition,  member_expression_definition_bridge_fields_meta, invoke_member_expression_definition;
     "memberOrderBy"               => NativeMemberOrderBy,               member_order_by_bridge_fields_meta,              invoke_member_order_by;
     "multiStageFilter"            => NativeMultiStageFilterReferences,  multi_stage_filter_references_bridge_fields_meta, invoke_multi_stage_filter;
+    "multiStageGrain"             => NativeMultiStageGrainReferences,   multi_stage_grain_references_bridge_fields_meta,  invoke_multi_stage_grain;
     "preAggregationDescription"   => NativePreAggregationDescription,   pre_aggregation_description_bridge_fields_meta,  invoke_pre_aggregation_description;
     "preAggregationObj"           => NativePreAggregationObj,           pre_aggregation_obj_bridge_fields_meta,          invoke_pre_aggregation_obj;
     "preAggregationTimeDimension" => NativePreAggregationTimeDimension, pre_aggregation_time_dimension_bridge_fields_meta, invoke_pre_aggregation_time_dimension;
@@ -748,6 +752,7 @@ fn invoke_measure_definition<IT: InnerTypes>(b: &NativeMeasureDefinition<IT>) ->
     r.record("case", b.case());
     r.record("filters", b.filters());
     r.record("filter", b.filter());
+    r.record("grain", b.grain());
     r.record("drill_filters", b.drill_filters());
     r.record("order_by", b.order_by());
     r.record("mask_sql", b.mask_sql());
@@ -761,6 +766,13 @@ fn invoke_multi_stage_filter<IT: InnerTypes>(
     // methods), so there is nothing to round-trip here beyond what `try_new`
     // already validates. Returning an empty `InvokeResult` matches the
     // pattern used by other static-only bridges (e.g. filterGroup).
+    InvokeResult::new()
+}
+
+fn invoke_multi_stage_grain<IT: InnerTypes>(
+    _b: &NativeMultiStageGrainReferences<IT>,
+) -> InvokeResult {
+    // Static-only bridge — same shape as `invoke_multi_stage_filter`.
     InvokeResult::new()
 }
 

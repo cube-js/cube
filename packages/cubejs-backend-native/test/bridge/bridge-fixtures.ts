@@ -83,6 +83,17 @@ export const multiStageFilterFixture = (): unknown => ({
   include: [{ member: 'orders.amount', operator: 'gt', values: ['0'] }],
 });
 
+// MultiStageGrainReferences mirrors the filter bridge — static-only. The
+// bridge is structurally permissive (both `excludeReferences` and
+// `keepOnlyReferences` could deserialize at once); the `.nand` lives on the
+// JS Joi validator. The fixture populates only one of them to match the
+// schema contract. `include` is a plain reference list, not the structured
+// filter items the filter bridge uses.
+export const multiStageGrainFixture = (): unknown => ({
+  excludeReferences: ['orders.region'],
+  includeReferences: ['orders.category'],
+});
+
 export const memberDefinitionFixture = (): unknown => ({
   type: 'dimension',
   // sql is optional
@@ -284,6 +295,7 @@ export const FIXTURES: Record<string, BridgeFixtureFactory> = {
   memberExpressionDefinition: memberExpressionDefinitionFixture,
   memberOrderBy: memberOrderByFixture,
   multiStageFilter: multiStageFilterFixture,
+  multiStageGrain: multiStageGrainFixture,
   preAggregationDescription: preAggregationDescriptionFixture,
   preAggregationObj: preAggregationObjFixture,
   preAggregationTimeDimension: preAggregationTimeDimensionFixture,

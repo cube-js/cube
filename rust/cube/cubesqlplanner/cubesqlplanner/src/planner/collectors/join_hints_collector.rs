@@ -28,8 +28,8 @@ impl TraversalVisitor for JoinHintsCollector {
     ) -> Result<Option<Self::State>, CubeError> {
         if node.is_multi_stage() {
             if let Ok(dim) = node.as_dimension() {
-                if let Some(add_group_by) = dim.add_group_by() {
-                    for item in add_group_by.iter() {
+                if let Some(include) = dim.multi_stage().and_then(|m| m.grain.include.as_ref()) {
+                    for item in include.iter() {
                         self.apply(item, &())?;
                     }
                 }

@@ -16,7 +16,7 @@ pub struct MultiStageQueryDescription {
     input: Vec<Rc<MultiStageQueryDescription>>,
     /// Dim-grid sources for the JOIN-based assembly. Empty for the
     /// window-based path. Populated by `make_queries_descriptions` when
-    /// reduce_by / group_by actually shrinks the partition grain vs the
+    /// the grain reshape actually shrinks the partition grain vs the
     /// leaf grain — in that case `input` is rebuilt at partition grain
     /// and the original full-grain inputs move here as keys.
     keys_input: Vec<Rc<MultiStageQueryDescription>>,

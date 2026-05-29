@@ -98,3 +98,26 @@ async fn test_group_by_equals_query_dims() {
         insta::assert_snapshot!(result);
     }
 }
+
+// `grain.keep_only: [status]` narrows the partition to `[status]`; the
+// query has only `category`, so the measure value is the per-status total
+// broadcast across categories.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_keep_only_status_top_level() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_keep_only_status
+        dimensions:
+          - orders.category
+        order:
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

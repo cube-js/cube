@@ -868,6 +868,12 @@ const MultiStageFilter = Joi.object().keys({
   ),
 }).nand('exclude', 'keepOnly');
 
+const MultiStageGrain = Joi.object().keys({
+  exclude: Joi.func(),
+  keepOnly: Joi.func(),
+  include: Joi.func(),
+}).nand('exclude', 'keepOnly');
+
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
     sql: Joi.func().required(),
@@ -916,6 +922,7 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
       filter: MultiStageFilter,
+      grain: MultiStageGrain,
       timeShift: Joi.alternatives().conditional(Joi.array().length(1), {
         then: Joi.array().items(timeShiftItemOptional),
         otherwise: Joi.array().items(timeShiftItemRequired)

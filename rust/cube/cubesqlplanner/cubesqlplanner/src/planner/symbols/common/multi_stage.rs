@@ -1,7 +1,8 @@
 use super::super::measure_symbol::MeasureTimeShifts;
 use super::super::MemberSymbol;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
-use crate::cube_bridge::measure_definition::MeasureDefinition;
+use crate::cube_bridge::measure_definition::{MeasureDefinition, MeasureDefinitionStatic};
+use crate::cube_bridge::multi_stage_grain::MultiStageGrainReferences;
 use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::filter::FilterItem;
 use crate::planner::Compiler;
@@ -51,12 +52,21 @@ pub struct MultiStageFilter {
     pub include_measure: Vec<FilterItem>,
 }
 
+/// Set operation on the inherited grain context of a multi-stage member.
+///
+/// The three lists mutate the parent grain — `exclude` removes,
+/// `keep_only` intersects, `include` adds.
+#[derive(Clone, Default)]
+pub struct MultiStageGrain {
+    pub exclude: Option<Vec<Rc<MemberSymbol>>>,
+    pub keep_only: Option<Vec<Rc<MemberSymbol>>>,
+    pub include: Option<Vec<Rc<MemberSymbol>>>,
+}
+
 #[derive(Clone)]
 pub struct MultiStageProperties {
-    pub add_group_by: Option<Vec<Rc<MemberSymbol>>>,
+    pub grain: MultiStageGrain,
     pub filter: Option<MultiStageFilter>,
-    pub reduce_by: Option<Vec<Rc<MemberSymbol>>>,
-    pub group_by: Option<Vec<Rc<MemberSymbol>>>,
     pub time_shift: Option<MeasureTimeShifts>,
 }
 
@@ -71,17 +81,16 @@ impl MultiStageProperties {
             return Ok(None);
         }
 
-        let static_data = definition.static_data();
-        let reduce_by = resolve_reference_paths(&static_data.reduce_by_references, compiler)?;
-        let add_group_by = resolve_reference_paths(&static_data.add_group_by_references, compiler)?;
-        let group_by = resolve_reference_paths(&static_data.group_by_references, compiler)?;
+        let grain = match definition.grain()? {
+            Some(g) => build_grain_from_directive(g, compiler)?,
+            None => build_grain_from_legacy(&definition.static_data(), compiler)?,
+        };
+
         let filter = build_filter(cube_name, definition.filter()?, compiler)?;
 
         Ok(Some(Self {
-            add_group_by,
+            grain,
             filter,
-            reduce_by,
-            group_by,
             time_shift,
         }))
     }
@@ -95,15 +104,16 @@ impl MultiStageProperties {
             return Ok(None);
         }
 
-        let add_group_by =
+        let include =
             resolve_reference_paths(&definition.static_data().add_group_by_references, compiler)?;
         let filter = build_filter(cube_name, definition.filter()?, compiler)?;
 
         Ok(Some(Self {
-            add_group_by,
+            grain: MultiStageGrain {
+                include,
+                ..Default::default()
+            },
             filter,
-            reduce_by: None,
-            group_by: None,
             time_shift: None,
         }))
     }
@@ -134,11 +144,15 @@ impl MultiStageProperties {
             None => None,
         };
 
+        let grain = MultiStageGrain {
+            exclude: map_refs(&self.grain.exclude)?,
+            keep_only: map_refs(&self.grain.keep_only)?,
+            include: map_refs(&self.grain.include)?,
+        };
+
         Ok(Self {
-            add_group_by: map_refs(&self.add_group_by)?,
+            grain,
             filter,
-            reduce_by: map_refs(&self.reduce_by)?,
-            group_by: map_refs(&self.group_by)?,
             time_shift: self.time_shift.clone(),
         })
     }
@@ -158,6 +172,34 @@ fn resolve_reference_paths(
         }
         None => Ok(None),
     }
+}
+
+fn build_grain_from_directive(
+    grain: Rc<dyn MultiStageGrainReferences>,
+    compiler: &mut Compiler,
+) -> Result<MultiStageGrain, CubeError> {
+    let static_data = grain.static_data();
+    if static_data.exclude.is_some() && static_data.keep_only.is_some() {
+        return Err(CubeError::user(
+            "Multi-stage grain cannot specify both `exclude` and `keep_only` — they are mutually exclusive ways of restricting the inherited context.".to_string(),
+        ));
+    }
+    Ok(MultiStageGrain {
+        exclude: resolve_reference_paths(&static_data.exclude, compiler)?,
+        keep_only: resolve_reference_paths(&static_data.keep_only, compiler)?,
+        include: resolve_reference_paths(&static_data.include, compiler)?,
+    })
+}
+
+fn build_grain_from_legacy(
+    static_data: &MeasureDefinitionStatic,
+    compiler: &mut Compiler,
+) -> Result<MultiStageGrain, CubeError> {
+    Ok(MultiStageGrain {
+        exclude: resolve_reference_paths(&static_data.reduce_by_references, compiler)?,
+        keep_only: resolve_reference_paths(&static_data.group_by_references, compiler)?,
+        include: resolve_reference_paths(&static_data.add_group_by_references, compiler)?,
+    })
 }
 
 fn build_filter(

@@ -490,13 +490,15 @@ mod multi_stage {
         assert!(measure.is_multi_stage());
         let ms = measure.multi_stage().expect("multi_stage present");
 
-        let reduce_by = ms.reduce_by.as_ref().expect("reduce_by");
-        assert_eq!(reduce_by.len(), 1);
-        assert_eq!(reduce_by[0].full_name(), "orders.status");
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
 
-        let add_group_by = ms.add_group_by.as_ref().expect("add_group_by");
-        assert_eq!(add_group_by.len(), 1);
-        assert_eq!(add_group_by[0].full_name(), "orders.city");
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.city");
+
+        assert!(ms.grain.keep_only.is_none());
     }
 
     #[test]
@@ -531,9 +533,9 @@ mod multi_stage {
         assert!(dim.is_multi_stage());
         let ms = dim.multi_stage().expect("multi_stage present");
 
-        let add_group_by = ms.add_group_by.as_ref().expect("add_group_by");
-        assert_eq!(add_group_by.len(), 1);
-        assert_eq!(add_group_by[0].full_name(), "orders.status");
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.status");
 
         let filter = ms.filter.as_ref().expect("filter present");
         assert_eq!(filter.mode, MultiStageFilterMode::Relative);
@@ -544,8 +546,8 @@ mod multi_stage {
         assert_eq!(filter.include_dimension.len(), 1);
         assert!(filter.include_measure.is_empty());
         assert!(filter.include_time_dimension.is_empty());
-        assert!(ms.reduce_by.is_none());
-        assert!(ms.group_by.is_none());
+        assert!(ms.grain.exclude.is_none());
+        assert!(ms.grain.keep_only.is_none());
     }
 
     #[test]
@@ -556,8 +558,6 @@ mod multi_stage {
 
         assert!(!measure.is_multi_stage());
         assert!(measure.multi_stage().is_none());
-        assert!(measure.reduce_by().is_none());
-        assert!(measure.add_group_by().is_none());
     }
 
     #[test]
@@ -569,6 +569,38 @@ mod multi_stage {
         let filter = ms.filter.as_ref().expect("filter present");
 
         assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+    }
+
+    #[test]
+    fn legacy_fields_populate_grain() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include[0].full_name(), "orders.city");
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude[0].full_name(), "orders.status");
+        assert!(ms.grain.keep_only.is_none());
+    }
+
+    #[test]
+    fn grain_directive_overrides_legacy_fields() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_with_grain").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.city");
+
+        assert!(ms.grain.keep_only.is_none());
     }
 
     #[test]

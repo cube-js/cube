@@ -221,6 +221,14 @@ cubes:
                 - orders.status
                 - orders.created_at.month
 
+          - name: amount_grain_keep_only_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                keep_only:
+                    - orders.status
+
           - name: amount_prev_month
             type: number
             sql: "{CUBE.total_amount}"

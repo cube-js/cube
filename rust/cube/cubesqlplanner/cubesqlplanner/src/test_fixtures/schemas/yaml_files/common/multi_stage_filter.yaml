@@ -66,3 +66,14 @@ cubes:
                 - member: orders.status
                   operator: equals
                   values: [completed]
+          - name: revenue_with_grain
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            add_group_by:
+              - status
+            grain:
+              exclude:
+                - status
+              include:
+                - city
