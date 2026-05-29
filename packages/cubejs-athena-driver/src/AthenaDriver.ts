@@ -10,6 +10,7 @@ import {
   checkNonNullable,
   pausePromise,
   Required,
+  MaybeCancelablePromise,
 } from '@cubejs-backend/shared';
 import {
   Athena,
@@ -243,12 +244,13 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Executes a query and returns either query result memory data or
    * query result stream, depending on options.
+   * Returns a cancelable promise that will stop the Athena query on cancel.
    */
-  public async downloadQueryResults(
+  public downloadQueryResults(
     query: string,
     values: unknown[],
     options: DownloadQueryResultsOptions,
-  ): Promise<DownloadQueryResultsResult> {
+  ): MaybeCancelablePromise<DownloadQueryResultsResult> {
     if (!options.streamImport) {
       return this.memory(query, values);
     } else {
@@ -259,59 +261,122 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Executes query and returns table memory data that includes rows
    * and queried fields types.
+   * Returns a cancelable promise that will stop the Athena query on cancel.
    */
-  public async memory(
+  public memory(
     query: string,
     values: unknown[],
-  ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const iter = this.lazyRowIterator(qid, query, true);
-    const types = <TableStructure><unknown>((await iter.next()).value);
-    const rows: Row[] = [];
-    for await (const row of iter) {
-      rows.push(<Row>row);
-    }
-    return { types, rows };
+  ): MaybeCancelablePromise<DownloadTableMemoryData & { types: TableStructure }> {
+    let qid: AthenaQueryId | null = null;
+    let cancelled = false;
+
+    const promise: any = (async () => {
+      qid = await this.startQuery(query, values);
+      if (cancelled) {
+        await this.stopQuery(qid);
+        throw new Error('Query was cancelled');
+      }
+      await this.waitForSuccess(qid, () => cancelled);
+      const iter = this.lazyRowIterator(qid, query, true);
+      const types = <TableStructure><unknown>((await iter.next()).value);
+      const rows: Row[] = [];
+      for await (const row of iter) {
+        if (cancelled) throw new Error('Query was cancelled');
+        rows.push(<Row>row);
+      }
+      return { types, rows };
+    })();
+
+    promise.cancel = async () => {
+      cancelled = true;
+      if (qid) {
+        await this.stopQuery(qid);
+      }
+    };
+
+    return promise;
   }
 
   /**
    * Returns stream table object that includes query result stream and
    * queried fields types.
+   * Returns a cancelable promise that will stop the Athena query on cancel.
    */
-  public async stream(
+  public stream(
     query: string,
     values: unknown[],
     options: StreamOptions,
-  ): Promise<StreamTableDataWithTypes> {
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const iter = this.lazyRowIterator(qid, query, true);
-    const types = <TableStructure><unknown>((await iter.next()).value);
-    return {
-      rowStream: stream.Readable.from(iter, {
-        highWaterMark: options.highWaterMark,
-      }),
-      types,
-      release: async () => { /* canceling is missed in the iter */ },
+  ): MaybeCancelablePromise<StreamTableDataWithTypes> {
+    let qid: AthenaQueryId | null = null;
+    let cancelled = false;
+
+    const promise: any = (async () => {
+      qid = await this.startQuery(query, values);
+      if (cancelled) {
+        await this.stopQuery(qid);
+        throw new Error('Query was cancelled');
+      }
+      await this.waitForSuccess(qid, () => cancelled);
+      const iter = this.lazyRowIterator(qid, query, true);
+      const types = <TableStructure><unknown>((await iter.next()).value);
+      return {
+        rowStream: stream.Readable.from(iter, {
+          highWaterMark: options.highWaterMark,
+        }),
+        types,
+        release: async () => {
+          if (qid) {
+            await this.stopQuery(qid);
+          }
+        },
+      };
+    })();
+
+    promise.cancel = async () => {
+      cancelled = true;
+      if (qid) {
+        await this.stopQuery(qid);
+      }
     };
+
+    return promise;
   }
 
   /**
-   * Executes query and rerutns queried rows.
+   * Executes query and returns queried rows.
+   * Returns a cancelable promise that will stop the Athena query on cancel.
    */
-  public async query<R = unknown>(
+  public query<R = unknown>(
     query: string,
     values: unknown[],
     _options?: QueryOptions,
-  ): Promise<R[]> {
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const rows: R[] = [];
-    for await (const row of this.lazyRowIterator<R>(qid, query)) {
-      rows.push(row);
-    }
-    return rows;
+  ): MaybeCancelablePromise<R[]> {
+    let qid: AthenaQueryId | null = null;
+    let cancelled = false;
+
+    const promise: any = (async () => {
+      qid = await this.startQuery(query, values);
+      if (cancelled) {
+        await this.stopQuery(qid);
+        throw new Error('Query was cancelled');
+      }
+      await this.waitForSuccess(qid, () => cancelled);
+      const rows: R[] = [];
+      for await (const row of this.lazyRowIterator<R>(qid, query)) {
+        if (cancelled) throw new Error('Query was cancelled');
+        rows.push(row);
+      }
+      return rows;
+    })();
+
+    promise.cancel = async () => {
+      cancelled = true;
+      if (qid) {
+        await this.stopQuery(qid);
+      }
+    };
+
+    return promise;
   }
 
   /**
@@ -368,18 +433,36 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
   /**
    * Save pre-aggregation data into a temp table.
+   * Returns a cancelable promise that will stop the Athena query on cancel.
    */
-  public async loadPreAggregationIntoTable(
+  public loadPreAggregationIntoTable(
     preAggregationTableName: string,
     loadSql: string,
     params: any,
-  ): Promise<any> {
-    if (this.config.S3OutputLocation === undefined) {
-      throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
-    }
+  ): MaybeCancelablePromise<any> {
+    let qid: AthenaQueryId | null = null;
+    let cancelled = false;
 
-    const qid = await this.startQuery(loadSql, params);
-    await this.waitForSuccess(qid);
+    const promise: any = (async () => {
+      if (this.config.S3OutputLocation === undefined) {
+        throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
+      }
+      qid = await this.startQuery(loadSql, params);
+      if (cancelled) {
+        await this.stopQuery(qid);
+        throw new Error('Query was cancelled');
+      }
+      await this.waitForSuccess(qid, () => cancelled);
+    })();
+
+    promise.cancel = async () => {
+      cancelled = true;
+      if (qid) {
+        await this.stopQuery(qid);
+      }
+    };
+
+    return promise;
   }
 
   /**
@@ -543,9 +626,12 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return status === 'SUCCEEDED';
   }
 
-  protected async waitForSuccess(qid: AthenaQueryId): Promise<void> {
+  protected async waitForSuccess(qid: AthenaQueryId, isCancelled?: () => boolean): Promise<void> {
     const startedTime = Date.now();
     for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
+      if (isCancelled?.()) {
+        throw new Error('Query was cancelled');
+      }
       if (await this.checkStatus(qid)) {
         return;
       }
