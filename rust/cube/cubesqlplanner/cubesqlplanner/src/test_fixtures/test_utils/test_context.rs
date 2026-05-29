@@ -26,6 +26,13 @@ pub struct TestContext {
     schema: MockSchema,
     query_tools: Rc<QueryTools>,
     security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext>,
+    /// Custom SQL templates carried over through `for_options` so that
+    /// timezone-driven `MockBaseTools` rebuilds (e.g. when the caller
+    /// requests a non-UTC tz on a query) preserve the extra templates
+    /// the context was constructed with — most notably the
+    /// `statements/generated_time_series_select` templates injected by
+    /// `new_with_generated_time_series`.
+    custom_sql_templates: Option<crate::test_fixtures::cube_bridge::MockSqlTemplatesRender>,
 }
 
 impl TestContext {
@@ -59,6 +66,7 @@ impl TestContext {
             schema,
             query_tools,
             security_context,
+            custom_sql_templates: None,
         })
     }
 
@@ -66,9 +74,11 @@ impl TestContext {
     pub fn new_with_generated_time_series(schema: MockSchema) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSqlTemplatesRender};
         let sql_templates = MockSqlTemplatesRender::default_templates_with_generated_time_series();
-        let driver_tools = MockDriverTools::with_sql_templates(sql_templates);
+        let driver_tools = MockDriverTools::with_sql_templates(sql_templates.clone());
         let base_tools = schema.create_base_tools_with_driver(driver_tools)?;
-        Self::new_with_base_tools(schema, base_tools)
+        let mut ctx = Self::new_with_base_tools(schema, base_tools)?;
+        ctx.custom_sql_templates = Some(sql_templates);
+        Ok(ctx)
     }
 
     #[allow(dead_code)]
@@ -98,7 +108,7 @@ impl TestContext {
             .and_then(|tz| tz.parse::<Tz>().ok())
             .unwrap_or(Tz::UTC);
 
-        Self::new_with_options(
+        Self::new_with_options_internal(
             self.schema.clone(),
             timezone,
             static_data.masked_members.clone(),
@@ -107,6 +117,7 @@ impl TestContext {
             static_data
                 .convert_tz_for_raw_time_dimension
                 .unwrap_or(false),
+            self.custom_sql_templates.clone(),
         )
     }
 
@@ -118,7 +129,35 @@ impl TestContext {
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,
     ) -> Result<Self, CubeError> {
-        let base_tools = schema.create_base_tools_with_timezone(timezone.to_string())?;
+        Self::new_with_options_internal(
+            schema,
+            timezone,
+            masked_members,
+            member_to_alias,
+            export_annotated_sql,
+            convert_tz_for_raw_time_dimension,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_with_options_internal(
+        schema: MockSchema,
+        timezone: Tz,
+        masked_members: Option<Vec<MaskedMemberItem>>,
+        member_to_alias: Option<std::collections::HashMap<String, String>>,
+        export_annotated_sql: bool,
+        convert_tz_for_raw_time_dimension: bool,
+        custom_sql_templates: Option<crate::test_fixtures::cube_bridge::MockSqlTemplatesRender>,
+    ) -> Result<Self, CubeError> {
+        let base_tools = if let Some(templates) = custom_sql_templates.clone() {
+            use crate::test_fixtures::cube_bridge::MockDriverTools;
+            let driver_tools =
+                MockDriverTools::with_sql_templates_and_timezone(templates, timezone.to_string());
+            schema.create_base_tools_with_driver(driver_tools)?
+        } else {
+            schema.create_base_tools_with_timezone(timezone.to_string())?
+        };
         let join_graph = Rc::new(schema.create_join_graph()?);
         let evaluator = schema.clone().create_evaluator();
         let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =
@@ -140,6 +179,7 @@ impl TestContext {
             schema,
             query_tools,
             security_context,
+            custom_sql_templates,
         })
     }
 

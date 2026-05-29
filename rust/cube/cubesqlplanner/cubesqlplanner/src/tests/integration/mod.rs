@@ -1,6 +1,8 @@
 mod advanced_features;
 mod advanced_filters;
+mod calc_groups;
 mod calendar;
+mod chained_subquery;
 mod combinations;
 mod custom_granularities;
 mod filtered_measures;
@@ -16,6 +18,7 @@ mod propagate_subquery;
 mod rolling_window;
 mod single_cube;
 mod subquery_dimensions;
+mod subquery_in_join;
 mod time_dimensions;
 mod transitive_joins;
 mod view_default_filters;

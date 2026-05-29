@@ -525,18 +525,25 @@ impl MockSqlTemplatesRender {
     }
 
     pub fn default_templates_with_generated_time_series() -> Self {
+        // `granularity`, `start`, and `end` arrive pre-quoted (via
+        // `interval_string()` / `quote_string()`), so the templates
+        // embed them verbatim. Wrapping them in extra single quotes
+        // would produce e.g. `''1 day''` / `''2024-01-10''`, which
+        // Postgres rejects. `minimal_time_unit` and
+        // `granularity_offset` are bare (e.g. `day`) and keep their
+        // quotes.
         let mut render = Self::default_templates();
         render.templates.insert(
             "statements/generated_time_series_select".to_string(),
             concat!(
                 "SELECT gs::timestamp AS \"date_from\",\n",
-                "(gs + interval '{{ granularity }}'",
+                "(gs + interval {{ granularity }}",
                 "{% if granularity_offset %} - interval '{{ granularity_offset }}'{% endif %}",
-                " - interval '{{ minimal_time_unit }}')::timestamp AS \"date_to\"\n",
+                " - interval '1 {{ minimal_time_unit }}')::timestamp AS \"date_to\"\n",
                 "FROM generate_series(\n",
-                "  '{{ start }}'::timestamp,\n",
-                "  '{{ end }}'::timestamp,\n",
-                "  interval '{{ granularity }}'\n",
+                "  {{ start }}::timestamp,\n",
+                "  {{ end }}::timestamp,\n",
+                "  interval {{ granularity }}\n",
                 ") AS gs"
             )
             .to_string(),
@@ -545,11 +552,11 @@ impl MockSqlTemplatesRender {
             "statements/generated_time_series_with_cte_range_source".to_string(),
             concat!(
                 "SELECT gs::timestamp AS \"date_from\",\n",
-                "(gs + interval '{{ granularity }}' - interval '{{ minimal_time_unit }}')::timestamp AS \"date_to\"\n",
+                "(gs + interval {{ granularity }} - interval '1 {{ minimal_time_unit }}')::timestamp AS \"date_to\"\n",
                 "FROM generate_series(\n",
                 "  (SELECT {{ min_name }} FROM {{ range_source }}),\n",
                 "  (SELECT {{ max_name }} FROM {{ range_source }}),\n",
-                "  interval '{{ granularity }}'\n",
+                "  interval {{ granularity }}\n",
                 ") AS gs"
             ).to_string(),
         );

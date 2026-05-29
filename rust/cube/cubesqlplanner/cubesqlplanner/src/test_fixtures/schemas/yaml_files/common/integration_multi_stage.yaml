@@ -64,6 +64,9 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
+          - name: updated_at
+            type: time
+            sql: updated_at
 
           - name: customer_name
             type: string
@@ -89,63 +92,6 @@ cubes:
           - name: avg_amount
             type: avg
             sql: amount
-
-          - name: unique_customers
-            type: count_distinct
-            sql: customer_id
-
-          - name: unique_customers_reduce_category
-            type: sum
-            sql: "{CUBE.unique_customers}"
-            multi_stage: true
-            reduce_by:
-                - orders.category
-
-          - name: avg_amount_reduce_category
-            type: avg
-            sql: "{CUBE.avg_amount}"
-            multi_stage: true
-            reduce_by:
-                - orders.category
-
-          - name: count_reduce_category
-            type: sum
-            sql: "{CUBE.count}"
-            multi_stage: true
-            reduce_by:
-                - orders.category
-
-          - name: max_total_amount_reduce_category
-            type: max
-            sql: "{CUBE.total_amount}"
-            multi_stage: true
-            reduce_by:
-                - orders.category
-
-          - name: amount_plus_customers_reduce_category
-            type: number
-            sql: "{CUBE.amount_reduce_category} + {CUBE.unique_customers_reduce_category}"
-            multi_stage: true
-
-          - name: max_amount
-            type: max
-            sql: amount
-
-          - name: max_sum_reduce_category
-            type: sum
-            sql: "{CUBE.max_amount}"
-            multi_stage: true
-            reduce_by:
-                - orders.category
-
-          - name: total_by_customer_reduce_category
-            type: sum
-            sql: "{CUBE.total_amount}"
-            multi_stage: true
-            add_group_by:
-                - orders.customer_id
-            reduce_by:
-                - orders.category
 
           - name: amount_by_id
             type: number
@@ -286,6 +232,53 @@ cubes:
             order_by:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
+
+          # Rank by the raw time dimension itself (order_by is a
+          # dimension, not a measure) reduced by created_at — partition
+          # is "all outer dims except created_at". First link in the
+          # chain that reproduces the JS sql-generation scenario
+          # "multi stage complex graph with time dimension no
+          # granularity".
+          - name: date_rank
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{orders.created_at}"
+                  dir: asc
+
+          # Multi-stage formula that references date_rank both in its
+          # SQL and in a filter — top-3 ranks contribute, others are
+          # filtered out.
+          - name: adjusted_amount
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount} + 0.1 * {CUBE.date_rank}"
+          #  filters:
+          #      - sql: "{CUBE.date_rank} <= 3"
+
+          # Rank over the adjusted_amount measure — second-link rank
+          # that the outer sum filters by.
+          - name: adjusted_amount_rank
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{CUBE.adjusted_amount}"
+                  dir: asc
+
+          # Outer sum over adjusted_amount filtered by
+          # adjusted_amount_rank = 1, grouped by created_at.
+          - name: adjusted_amount_sum
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.adjusted_amount}"
+            filters:
+                - sql: "{CUBE.adjusted_amount_rank} = 1"
+            add_group_by:
+                - orders.created_at
 
           - name: status_weighted_amount
             type: sum

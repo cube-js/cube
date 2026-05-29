@@ -1,5 +1,6 @@
 ---
-source: cubesqlplanner/src/tests/integration/rolling_window/calculated_measures.rs
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/calculated_measures.rs
+assertion_line: 78
 expression: result
 ---
 orders__category | orders__created_at_day | orders__rolling_sum_ratio

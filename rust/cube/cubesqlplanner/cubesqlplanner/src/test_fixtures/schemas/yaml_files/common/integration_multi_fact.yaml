@@ -36,6 +36,9 @@ cubes:
           - name: city
             type: string
             sql: city
+          - name: lifetime_value
+            type: number
+            sql: lifetime_value
           - name: created_at
             type: time
             sql: created_at
@@ -84,6 +87,9 @@ cubes:
           - name: avg_amount_per_return
             type: number
             sql: "{orders.total_amount} / NULLIF({returns.count}, 0)"
+          - name: customer_lifetime_per_order
+            type: sum
+            sql: "{customers.lifetime_value}"
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
