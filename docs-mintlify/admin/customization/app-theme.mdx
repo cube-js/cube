@@ -1,0 +1,104 @@
+---
+title: App theme
+description: Brand Cube with your own colors, logo, and fonts — applied to embedded surfaces and, optionally, across the entire Cube Cloud console.
+---
+
+The **app theme** controls the brand appearance of Cube — the accent color, background and text colors, logo, and fonts. You pick a handful of colors per color scheme and Cube generates a complete, accessible light and dark palette from them.
+
+By default the app theme brands [embedded surfaces](/embedding/iframe/creator-mode) (Creator Mode, published dashboards, and embedded chat) so they match your product. You can also turn it on for the entire Cube Cloud console so everyone in your account sees your branding.
+
+## Requirements
+
+Configuring the app theme requires the **Admin** [role][ref-roles]. The theme is account-wide: there is a single app theme per account, and changes apply to every deployment in it.
+
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+
+<Note>
+  The app theme is distinct from two other kinds of customization:
+
+  - **[Dashboard themes](/admin/customization/dashboard-themes)** style individual dashboards (backgrounds, widget cards, borders).
+  - The session-scoped **`embedTheme`** passed to the [Generate Session API](/reference/embed-apis/generate-session) overrides the embedded app's appearance for a single embed session.
+
+  The app theme sets your account's overall brand; the other two are narrower overrides.
+</Note>
+
+## What you can customize
+
+The app theme is configured for two color schemes — **Light** and **Dark** — plus shared **Typography**.
+
+| Section        | What it controls                                                                 |
+| -------------- | -------------------------------------------------------------------------------- |
+| **Accent color** | Your primary brand color. Cube derives the full palette (buttons, links, active states, highlights) from its hue and saturation. |
+| **Background color** | The main surface and page background.                                        |
+| **Foreground color** | The primary text color.                                                      |
+| **Contrast**     | A 0–100 control (45 is neutral) for how strongly the generated palette separates surfaces and text. Higher values increase contrast. |
+| **Logo**         | The mark shown in the navigation header.                                         |
+| **Typography**   | The web fonts used for body and heading text (shared across both schemes).       |
+
+<Tip>
+  You only choose the accent, background, and foreground colors — Cube generates every other token (borders, muted text, success/danger states, hover and active variants) for both light and dark mode, keeping contrast accessible automatically.
+</Tip>
+
+## Configure the theme
+
+Go to **Admin → Customization → App Theme**. The page has a **Light theme** and a **Dark theme** editor on the left and a live preview on the right.
+
+<Steps>
+  <Step title="Set the colors">
+    For each scheme, pick the **Accent**, **Background**, and **Foreground** colors and adjust the **Contrast** slider. The preview updates as you edit.
+  </Step>
+  <Step title="Add your logo">
+    Paste an HTTPS URL to your logo image (see [Logo](#logo) below).
+  </Step>
+  <Step title="Configure fonts">
+    Add one or more web fonts and choose which to use for body and heading text (see [Fonts](#fonts) below).
+  </Step>
+  <Step title="Preview">
+    Use the **Light / Auto / Dark** toggle above the preview to check both schemes. **Auto** follows your current OS/app appearance.
+  </Step>
+  <Step title="Save">
+    Click **Save**. To start over, use **Restore defaults** (and **Revert** to undo a restore before saving).
+  </Step>
+</Steps>
+
+### Logo
+
+The logo is referenced by URL and must be served over **HTTPS**. Use a small, square mark (around **24×24**) in **PNG**, **SVG**, or **JPG** format — it renders in the navigation header. If you set a logo only for the light scheme, it is reused in dark mode unless you set a dark-mode logo as well.
+
+### Fonts
+
+Fonts are shared across the light and dark schemes. You register one or more fonts, then choose which font and weight to use for body and heading text.
+
+You can add a font in two ways:
+
+- **A direct font file** — an HTTPS URL ending in a font file: `woff2`, `woff`, `ttf` (TrueType), or `otf` (OpenType).
+- **A CSS stylesheet** — an HTTPS URL to a CSS file containing `@font-face` declarations (for example, a Google Fonts stylesheet link). A single stylesheet can register multiple font families at once.
+
+<Steps>
+  <Step title="Add a font">
+    In the **Typography** section, paste the font or stylesheet URL and add it. Cube validates the URL and reads the font's metadata; a stylesheet may register several families in one step.
+  </Step>
+  <Step title="Assign body and heading fonts">
+    Choose a font from your registry for **Body** and for **Heading** text, and set the **font weight** for each.
+  </Step>
+</Steps>
+
+<Warning>
+  Font URLs must be HTTPS and publicly reachable. Cube fetches the font to validate it; private, non-HTTPS, or oversized files are rejected.
+</Warning>
+
+## Where the theme is applied
+
+### Embedded surfaces
+
+When configured, the app theme automatically brands your [embedded](/embedding/iframe/customization) experiences — the [Creator Mode](/embedding/iframe/creator-mode) app, published dashboards, and embedded chat — including overlays such as dialogs and menus. No extra configuration is required beyond saving the theme.
+
+### Across Cube Cloud
+
+Turn on **Apply across Cube Cloud** (the switch at the top of the App Theme page) to apply the same theme to the **entire authenticated Cube Cloud console** — the sidebar, pages, and overlays — for every user in the account.
+
+- It takes effect immediately for all users on their next load.
+- It respects each user's light/dark preference, switching schemes accordingly.
+- Unauthenticated pages (such as sign-in) keep Cube's default appearance.
+
+Turn the switch off to return the console to Cube's default look while keeping your embedded surfaces branded.
