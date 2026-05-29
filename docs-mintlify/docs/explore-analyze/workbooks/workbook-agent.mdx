@@ -1,0 +1,64 @@
+---
+title: Workbook Agent
+description: Use the AI agent inside a workbook to build reports, create and edit dashboards, and run analysis with natural language.
+---
+
+Inside a [workbook][ref-workbooks], the AI agent is a full **authoring**
+assistant. Where the read-only [Dashboard Agent][ref-dashboard-agent] only
+answers questions about a published dashboard, the workbook agent can act on
+your behalf — it builds reports, and assembles and edits dashboards, all from
+plain-language requests.
+
+<Note>
+  **Workbook Agent vs. [Analytics Chat][ref-analytics-chat].** Analytics Chat is
+  a standalone, chat-first analytics experience for asking questions and saving
+  results into a workbook. The Workbook Agent lives **inside a workbook** and is
+  oriented around authoring the workbook's own reports and dashboards. Both run
+  read-only queries against your semantic model; the Workbook Agent additionally
+  creates and edits workbook content.
+</Note>
+
+## What the Workbook Agent can do
+
+In addition to everything the read-only [Dashboard Agent][ref-dashboard-agent]
+can do (answer questions, run read-only semantic-layer queries, explain metric
+and dimension definitions), the Workbook Agent can:
+
+- **Create and save reports** in the workbook from a natural-language request
+- **Search existing reports** to find and reuse work already in the workbook
+- **Build and edit dashboards** — add and configure chart, KPI, filter,
+  time-grain, and text widgets
+- **Publish dashboards**
+
+## How charts get added to a dashboard
+
+When the agent adds a chart to a dashboard, the chart widget references a
+**saved report**, not a one-off query. So to put a new chart on a dashboard, the
+agent first saves it as a report in the workbook, then adds a widget that points
+at that report. This keeps every dashboard chart backed by a reusable,
+governed report.
+
+## Getting help with Cube
+
+While working in a workbook, you can also ask the agent questions about Cube
+itself — it can answer using the Cube documentation, which is handy for
+"how do I…" questions without leaving your analysis.
+
+## Limitations
+
+- **Report search covers published reports only.** When the agent searches for
+  existing reports to reuse, it sees published reports.
+
+## Learn more
+
+- [Dashboard Agent][ref-dashboard-agent] — the read-only Q&A assistant on
+  published and embedded dashboards
+- [Querying data in workbooks][ref-querying-data] — point-and-click, AI agent,
+  and Semantic SQL
+- [Analytics Chat][ref-analytics-chat] — the standalone conversational
+  analytics experience
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
+[ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-querying-data]: /docs/explore-analyze/workbooks/querying-data

@@ -1,0 +1,115 @@
+---
+title: Dashboard Agent
+description: Ask questions about a dashboard and its charts using a conversational AI assistant docked alongside the dashboard.
+---
+
+The Dashboard Agent is a conversational assistant docked as a panel on a
+[published or embedded dashboard][ref-dashboards]. Ask it questions in plain
+language about what's on the dashboard — and it answers using **live queries
+against your semantic model**, not just the numbers already rendered on screen.
+
+Because it queries the model directly, the agent can go beyond what a chart
+shows. It can drill into a single chart, re-aggregate a metric, break a number
+down by a dimension, pull a longer time range than the chart displays, and
+summarize trends across the dashboard.
+
+<Frame>
+  <img
+    src="https://lgo0ecceic.ucarecd.net/a50f87dd-126d-44ad-87e9-6c9a0af81c1a/"
+    alt="Dashboard Agent panel docked alongside a published dashboard"
+  />
+</Frame>
+
+<Note>
+  There are **two different agent surfaces** with different capabilities:
+
+  - **Dashboard Agent** (this page) — read-only Q&A for viewers of a published
+    or embedded dashboard.
+  - **[Workbook Agent][ref-workbook-agent]** — full authoring inside a
+    [workbook][ref-workbooks]: creating reports, building and editing
+    dashboards, and running analysis.
+
+  Most of this page describes the read-only Dashboard Agent. Keep the
+  distinction in mind — the published agent intentionally cannot author or
+  change anything.
+</Note>
+
+## Opening the agent
+
+Open a published dashboard and toggle the agent panel from the dashboard header
+to start a conversation. Use **New Chat** to start a fresh thread.
+
+The panel is docked to the right side of the dashboard and is **resizable** —
+drag its edge to give the conversation more or less room. On narrow screens it
+switches to a **compact mode** so it stays usable next to the dashboard.
+
+## Focusing on a specific chart
+
+<Note>
+  Chart-level follow-ups and attached-chart chips are **rolling out**. If you
+  don't see the **Ask a follow up question** action on a chart's menu yet, it
+  hasn't reached your deployment.
+</Note>
+
+To ask about one chart in particular, open that chart tile's menu (`⋮`) and
+choose **Ask a follow up question**. This opens the agent with that chart
+**attached as context**, so your question is scoped to that chart's data.
+
+Attached charts appear as **removable chips** in the chat input. To drop a
+chart's focus, remove its chip. You can attach more than one chart to ask about
+them together.
+
+When a chart is attached, the agent receives a read-only snapshot of it — the
+underlying SQL, the data, and the chart spec — along with the dashboard's
+**current filter and time-grain state**. It uses this as context; it does not
+modify any of it.
+
+## What the Dashboard Agent can and can't do
+
+The published Dashboard Agent is **read-only by design**.
+
+**It can:**
+
+- Answer questions about what's on the dashboard from the dashboard's own data
+- Run **read-only queries** against the semantic model to go deeper — drill
+  down, break a metric down by a dimension, or pull a longer time range than a
+  chart shows
+- Explain how a metric or dimension is defined
+- Look up the values available for a dimension
+- Read the contents of [attachments](#attachments) you add to the chat
+
+**It can't:**
+
+- Edit the dashboard, or add/remove widgets
+- Change filters or the time grain (see [Limitations](#limitations))
+- Create reports or workbooks
+- Change the data model
+
+If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
+
+## Attachments
+
+You can attach uploaded files to the conversation, and the agent can read their
+contents — text, PDF, ZIP, and image files are supported.
+
+<Note>
+  Pasting an image directly from your clipboard into the chat may also be
+  supported. Confirm this in your deployment before relying on it.
+</Note>
+
+## Limitations
+
+- **Filters are read-only.** The agent can tell you which filters and time grain
+  are currently applied and reason about them, but it **cannot change them** for
+  you yet. This is the most common expectation gap — if you ask the agent to
+  "filter the dashboard to last quarter," it will explain the current state
+  rather than apply the change. This is actively being worked on.
+- **No authoring on published dashboards.** The published Dashboard Agent
+  cannot create reports or build dashboards. Those live in the
+  [Workbook Agent][ref-workbook-agent].
+- **Report search covers published reports only.** When the agent searches for
+  existing reports, it sees published reports.
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent

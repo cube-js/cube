@@ -51,7 +51,8 @@
                 "pages": [
                   "docs/explore-analyze/workbooks/querying-data",
                   "docs/explore-analyze/workbooks/calculated-fields",
-                  "docs/explore-analyze/workbooks/source-sql-tabs"
+                  "docs/explore-analyze/workbooks/source-sql-tabs",
+                  "docs/explore-analyze/workbooks/workbook-agent"
                 ]
               },
               "docs/explore-analyze/explore",
@@ -111,7 +112,8 @@
                       "docs/explore-analyze/dashboards/widgets/ai-summary"
                     ]
                   },
-                  "docs/explore-analyze/dashboards/styling"
+                  "docs/explore-analyze/dashboards/styling",
+                  "docs/explore-analyze/dashboards/dashboard-agent"
                 ]
               },
               "docs/explore-analyze/scheduled-refreshes",
