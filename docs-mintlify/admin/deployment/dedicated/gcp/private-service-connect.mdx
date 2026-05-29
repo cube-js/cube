@@ -24,6 +24,23 @@ connection between Cube's Dedicated Infrastructure and your own VPC, you'll
 need to publish a Service Attachment, share its details with the Cube team,
 and approve the incoming connection request.
 
+<Note>
+
+**Dedicated Infrastructure vs. Bring Your Own Cloud.** The flow described on
+this page — sharing service details with the Cube team and letting Cube create
+the PSC endpoint and DNS overrides — applies to
+[Dedicated Infrastructure][cube-region] operated by Cube.
+
+In a [Bring Your Own Cloud (BYOC)][gcp-byoc] deployment, the Cube VPC lives in
+**your own GCP project**, so you own the networking. The service account
+granted to the Cube Operator does not include Cloud DNS admin permissions,
+which means Cube cannot create the PSC endpoint or the private DNS zone needed
+for the hostname override on your behalf. In BYOC, create the PSC endpoint in
+the Cube VPC against the provider's Service Attachment yourself, then create a
+Cloud DNS private zone for the TLS hostname and attach it to the Cube VPC.
+
+</Note>
+
 ## Preparing the Service Attachment
 
 There are two common scenarios for preparing the Service Attachment:
@@ -122,5 +139,6 @@ Dedicated Infrastructure can be provisioned. GCP regions in mainland China
 [gcp-docs-publish-service]: https://cloud.google.com/vpc/docs/configure-private-service-connect-producer
 [gcp-docs-internal-lb]: https://cloud.google.com/load-balancing/docs/internal
 [cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[gcp-byoc]: /admin/deployment/dedicated/gcp/byoc
 [aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
 [backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

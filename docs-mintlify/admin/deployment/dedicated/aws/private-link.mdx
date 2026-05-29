@@ -23,6 +23,35 @@ To set up a PrivateLink connection between Cube's Dedicated Infrastructure
 and your own VPC, you'll need to prepare an Endpoint Service, share service
 details with the Cube team, and accept the incoming connection request.
 
+<Note>
+
+**Dedicated Infrastructure vs. Bring Your Own Cloud.** The flow described on
+this page — sharing service details with the Cube team and letting Cube create
+the VPC endpoint and DNS overrides — applies to
+[Dedicated Infrastructure][cube-region] operated by Cube.
+
+In a [Bring Your Own Cloud (BYOC)][aws-byoc] deployment, the Cube VPC lives in
+**your own AWS account**, so you own the networking. The IAM role granted to
+the Cube Operator intentionally does not include `route53:*` permissions,
+which means Cube cannot create the VPC interface endpoint or the Route 53
+private hosted zone needed for the DNS override on your behalf.
+
+For BYOC, set up PrivateLink yourself inside the Cube VPC:
+
+1. Create the VPC interface endpoint in the Cube VPC against the provider's
+   Endpoint Service Name.
+2. Create a Route 53 private hosted zone for the TLS hostname and associate
+   it with the Cube VPC, with an `A` ALIAS record pointing at the interface
+   endpoint.
+3. Confirm the security groups on both ends allow the required ports.
+
+If you'd prefer Cube to do this for you in BYOC, you can grant the Cube
+Operator role `route53:*` (and the matching `ec2:*VpcEndpoint*` permissions)
+on the BYOC role — but most customers keep this networking in their own
+hands.
+
+</Note>
+
 ## Preparing the Endpoint Service
 
 There are two common scenarios for preparing the Endpoint Service:
@@ -107,4 +136,5 @@ and AWS GovCloud (`us-gov-east-1`, `us-gov-west-1`) are not supported.
 [aws-docs-endpoint-service]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html
 [cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
 [aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[aws-byoc]: /admin/deployment/dedicated/aws/byoc
 [backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity
