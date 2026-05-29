@@ -1154,6 +1154,8 @@ filter_subq AS (
         });
         expect(cancelRes.status).toBe(200);
 
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
         // A second cancel should return empty — the query is gone from the queue
         const cancelRes2 = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
           method: 'DELETE',
