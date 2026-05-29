@@ -1,6 +1,7 @@
 mod partition_range;
 mod to_sql;
 mod to_sql_timezone;
+mod tree_ops;
 mod use_raw_values;
 
 use crate::test_fixtures::cube_bridge::MockSchema;

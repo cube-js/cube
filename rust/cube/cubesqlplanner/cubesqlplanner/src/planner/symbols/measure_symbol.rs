@@ -1,4 +1,4 @@
-use super::common::{AggregationType, Case, CompiledMemberPath};
+use super::common::{AggregationType, Case, CompiledMemberPath, MultiStageProperties};
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -85,17 +85,14 @@ pub struct MeasureSymbol {
     compiled_path: CompiledMemberPath,
     kind: MeasureKind,
     rolling_window: Option<RollingWindow>,
-    is_multi_stage: bool,
+    multi_stage: Option<MultiStageProperties>,
     is_reference: bool,
     is_view: bool,
     case: Option<Case>,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
-    time_shift: Option<MeasureTimeShifts>,
     measure_order_by: Vec<MeasureOrderBy>,
-    reduce_by: Option<Vec<Rc<MemberSymbol>>>,
-    add_group_by: Option<Vec<Rc<MemberSymbol>>>,
-    group_by: Option<Vec<Rc<MemberSymbol>>>,
+    is_splitted_source: bool,
     mask_sql: Option<Rc<SqlCall>>,
 }
 
@@ -107,14 +104,10 @@ impl MeasureSymbol {
         case: Option<Case>,
         kind: MeasureKind,
         rolling_window: Option<RollingWindow>,
-        is_multi_stage: bool,
+        multi_stage: Option<MultiStageProperties>,
         measure_filters: Vec<Rc<SqlCall>>,
         measure_drill_filters: Vec<Rc<SqlCall>>,
-        time_shift: Option<MeasureTimeShifts>,
         measure_order_by: Vec<MeasureOrderBy>,
-        reduce_by: Option<Vec<Rc<MemberSymbol>>>,
-        add_group_by: Option<Vec<Rc<MemberSymbol>>>,
-        group_by: Option<Vec<Rc<MemberSymbol>>>,
         mask_sql: Option<Rc<SqlCall>>,
     ) -> Rc<Self> {
         Rc::new(Self {
@@ -127,11 +120,8 @@ impl MeasureSymbol {
             measure_filters,
             measure_drill_filters,
             measure_order_by,
-            is_multi_stage,
-            time_shift,
-            reduce_by,
-            add_group_by,
-            group_by,
+            multi_stage,
+            is_splitted_source: false,
             mask_sql,
         })
     }
@@ -144,7 +134,7 @@ impl MeasureSymbol {
     /// function machinery.
     pub fn new_unrolling(&self) -> Rc<Self> {
         if self.is_rolling_window() {
-            let kind = if self.is_multi_stage {
+            let kind = if self.is_multi_stage() {
                 if let Some(sql) = self.kind.member_sql() {
                     MeasureKind::Calculated(CalculatedMeasure::new(
                         CalculatedMeasureType::Number,
@@ -162,17 +152,14 @@ impl MeasureSymbol {
                 compiled_path: self.compiled_path.clone(),
                 kind,
                 rolling_window: None,
-                is_multi_stage: false,
+                multi_stage: None,
                 is_reference: false,
                 is_view: self.is_view,
                 case: self.case.clone(),
                 measure_filters: self.measure_filters.clone(),
                 measure_drill_filters: self.measure_drill_filters.clone(),
-                time_shift: self.time_shift.clone(),
                 measure_order_by: self.measure_order_by.clone(),
-                reduce_by: self.reduce_by.clone(),
-                add_group_by: self.add_group_by.clone(),
-                group_by: self.group_by.clone(),
+                is_splitted_source: self.is_splitted_source,
                 mask_sql: self.mask_sql.clone(),
             })
         } else {
@@ -217,17 +204,14 @@ impl MeasureSymbol {
             compiled_path: self.compiled_path.clone(),
             kind: result_kind,
             rolling_window: self.rolling_window.clone(),
-            is_multi_stage: self.is_multi_stage,
+            multi_stage: self.multi_stage.clone(),
             is_reference: self.is_reference,
             is_view: self.is_view,
             case: self.case.clone(),
             measure_filters,
             measure_drill_filters: self.measure_drill_filters.clone(),
-            time_shift: self.time_shift.clone(),
             measure_order_by: self.measure_order_by.clone(),
-            reduce_by: self.reduce_by.clone(),
-            add_group_by: self.add_group_by.clone(),
-            group_by: self.group_by.clone(),
+            is_splitted_source: self.is_splitted_source,
             mask_sql: self.mask_sql.clone(),
         }))
     }
@@ -260,8 +244,14 @@ impl MeasureSymbol {
         self.compiled_path.alias().clone()
     }
 
-    pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {
-        &self.time_shift
+    pub fn is_splitted_source(&self) -> bool {
+        self.is_splitted_source
+    }
+
+    pub fn time_shift(&self) -> Option<&MeasureTimeShifts> {
+        self.multi_stage
+            .as_ref()
+            .and_then(|m| m.time_shift.as_ref())
     }
 
     pub fn is_calculated(&self) -> bool {
@@ -314,6 +304,10 @@ impl MeasureSymbol {
 
         if let Some(mask) = &self.mask_sql {
             result.mask_sql = Some(mask.apply_recursive(f)?);
+        }
+
+        if let Some(ms) = &self.multi_stage {
+            result.multi_stage = Some(ms.apply_to_deps(f)?);
         }
 
         Ok(MemberSymbol::new_measure(Rc::new(result)))
@@ -391,7 +385,7 @@ impl MeasureSymbol {
     /// measures are never owned by a cube; otherwise ownership is the
     /// union of the kind, the measure filters and the `case` body.
     pub fn owned_by_cube(&self) -> bool {
-        if self.is_multi_stage {
+        if self.is_multi_stage() {
             return false;
         }
         let mut owned = self.kind.is_owned_by_cube();
@@ -466,20 +460,12 @@ impl MeasureSymbol {
         &self.measure_order_by
     }
 
-    pub fn reduce_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
-        &self.reduce_by
-    }
-
-    pub fn add_group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
-        &self.add_group_by
-    }
-
-    pub fn group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
-        &self.group_by
+    pub fn multi_stage(&self) -> Option<&MultiStageProperties> {
+        self.multi_stage.as_ref()
     }
 
     pub fn is_multi_stage(&self) -> bool {
-        self.is_multi_stage
+        self.multi_stage.is_some()
     }
 
     pub fn cube_name(&self) -> String {
@@ -704,40 +690,16 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let reduce_by = if let Some(reduce_by) = &definition.static_data().reduce_by_references {
-            let symbols = reduce_by
-                .iter()
-                .map(|reduce_by| compiler.add_dimension_evaluator(reduce_by.clone()))
-                .collect::<Result<Vec<_>, _>>()?;
-            Some(symbols)
-        } else {
-            None
-        };
-
-        let add_group_by =
-            if let Some(add_group_by) = &definition.static_data().add_group_by_references {
-                let symbols = add_group_by
-                    .iter()
-                    .map(|add_group_by| compiler.add_dimension_evaluator(add_group_by.clone()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Some(symbols)
-            } else {
-                None
-            };
-
-        let group_by = if let Some(group_by) = &definition.static_data().group_by_references {
-            let symbols = group_by
-                .iter()
-                .map(|group_by| compiler.add_dimension_evaluator(group_by.clone()))
-                .collect::<Result<Vec<_>, _>>()?;
-            Some(symbols)
-        } else {
-            None
-        };
+        let multi_stage = MultiStageProperties::from_measure_definition(
+            path.cube_name(),
+            &definition,
+            time_shifts,
+            compiler,
+        )?;
 
         let measure_type_str = &definition.static_data().measure_type;
         let rolling_window = definition.static_data().rolling_window.clone();
-        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        let is_multi_stage = multi_stage.is_some();
 
         let kind = MeasureKind::from_type_str(measure_type_str, sql, pk_sqls)?;
         let is_calculated = kind.is_calculated() && !is_multi_stage;
@@ -779,11 +741,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && case.is_none()
                 && measure_filters.is_empty()
                 && measure_drill_filters.is_empty()
-                && time_shifts.is_none()
-                && measure_order_by.is_empty()
-                && reduce_by.is_none()
-                && add_group_by.is_none()
-                && group_by.is_none());
+                && measure_order_by.is_empty());
 
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
 
@@ -802,14 +760,10 @@ impl SymbolFactory for MeasureSymbolFactory {
             case,
             kind,
             rolling_window,
-            is_multi_stage,
+            multi_stage,
             measure_filters,
             measure_drill_filters,
-            time_shifts,
             measure_order_by,
-            reduce_by,
-            add_group_by,
-            group_by,
             mask_sql,
         )))
     }

@@ -7,7 +7,7 @@ use crate::{
     config::ConfigObj,
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
@@ -370,7 +370,7 @@ impl ValueObject for JsonValueObject {
         field_name: &str,
     ) -> std::result::Result<FieldValue<'_>, CubeError> {
         let Some(as_object) = self.rows[index].as_object() else {
-            return Err(CubeError::user(format!(
+            return Err(CubeError::internal(format!(
                 "Unexpected response from Cube, row is not an object: {:?}",
                 self.rows[index]
             )));
@@ -417,7 +417,7 @@ impl ColumnarValueObject for JsonColumnarValueObject {
         };
 
         let Some(column) = self.columns.get(idx) else {
-            return Err(CubeError::user(format!(
+            return Err(CubeError::internal(format!(
                 "Unexpected response from Cube, missing column for '{}'",
                 field_name
             )));
@@ -465,7 +465,7 @@ macro_rules! build_column_custom_builder {
                         $($builder_block)*
                         #[allow(unreachable_patterns)]
                         (v, _) => {
-                            return Err(CubeError::user(format!(
+                            return Err(CubeError::internal(format!(
                                 "Unable to map value {:?} to {:?}",
                                 v,
                                 $data_type
@@ -479,7 +479,7 @@ macro_rules! build_column_custom_builder {
                     match (value, &mut $builder) {
                         $($scalar_block)*
                         (v, _) => {
-                            return Err(CubeError::user(format!(
+                            return Err(CubeError::internal(format!(
                                 "Unable to map value {:?} to {:?}",
                                 v,
                                 $data_type
@@ -826,9 +826,13 @@ async fn load_data(
                 } else {
                     err.message
                 };
-                if !err.message.eq_ignore_ascii_case("continue wait") {
-                    err.message = format!("Database Execution Error: {}", err.message);
+
+                if err.message.eq_ignore_ascii_case("continue wait") {
+                    err.cause = CubeErrorCauseType::ContinueWait;
+                } else {
+                    err.cause = CubeErrorCauseType::DatabaseExecution(err.cause.meta().cloned());
                 }
+
                 ArrowError::ExternalError(Box::new(err))
             })?;
 
@@ -1251,7 +1255,7 @@ macro_rules! transform_response_body {
                     Arc::new(array)
                 }
                 t => {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Type {} is not supported in response transformation from Cube",
                         t,
                     )))
@@ -1281,6 +1285,37 @@ pub fn transform_columnar_response<C: ColumnarValueObject>(
     transform_response_body!(columnar, response, schema, member_fields)
 }
 
+/// Builds a schema with `lastRefreshTime` / `external` metadata.
+///
+/// `lastRefreshTime` is passed through unchanged. The `external` marker is
+/// added when the flag is set so downstream code can tell that the result
+/// was served from an external (CubeStore) pre-aggregation — the case
+/// where cubesql's own cache-freshness decisions actually need to look at
+/// the pre-agg refresh, as internal pre-aggregations hit the source DB
+/// and rely on its own caching.
+pub fn build_response_schema(
+    schema: &SchemaRef,
+    last_refresh_time: Option<String>,
+    external: bool,
+) -> SchemaRef {
+    if last_refresh_time.is_none() && !external {
+        return schema.clone();
+    }
+
+    let mut metadata = schema.metadata().clone();
+    if let Some(t) = last_refresh_time {
+        metadata.insert("lastRefreshTime".to_string(), t);
+    }
+    if external {
+        metadata.insert("external".to_string(), "true".to_string());
+    }
+
+    Arc::new(Schema::new_with_metadata(
+        schema.fields().to_vec(),
+        metadata,
+    ))
+}
+
 pub fn convert_transport_response(
     response: V1LoadResponse,
     schema: SchemaRef,
@@ -1293,20 +1328,13 @@ pub fn convert_transport_response(
             let V1LoadResult {
                 data,
                 last_refresh_time,
+                external,
                 ..
             } = result;
 
             let mut response = JsonValueObject::new(data);
-            let updated_schema = if let Some(last_refresh_time) = last_refresh_time {
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                Arc::new(Schema::new_with_metadata(
-                    schema.fields().to_vec(),
-                    metadata,
-                ))
-            } else {
-                schema.clone()
-            };
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
             transform_response(&mut response, updated_schema, &member_fields)
         })
@@ -1325,21 +1353,14 @@ pub fn convert_transport_response_columnar(
             let V1LoadResult {
                 data,
                 last_refresh_time,
+                external,
                 ..
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
             let mut response = JsonColumnarValueObject::new(members, columns);
-            let updated_schema = if let Some(last_refresh_time) = last_refresh_time {
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                Arc::new(Schema::new_with_metadata(
-                    schema.fields().to_vec(),
-                    metadata,
-                ))
-            } else {
-                schema.clone()
-            };
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
             transform_columnar_response(&mut response, updated_schema, &member_fields)
         })
@@ -1371,6 +1392,92 @@ mod tests {
         scalar::ScalarValue,
     };
     use std::{collections::HashMap, result::Result};
+
+    fn build_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new("c", DataType::Int64, true)]))
+    }
+
+    #[test]
+    fn build_response_schema_no_metadata_when_nothing_to_add() {
+        let schema = build_schema();
+        let updated = build_response_schema(&schema, None, false);
+        assert!(updated.metadata().is_empty());
+    }
+
+    #[test]
+    fn build_response_schema_passes_through_last_refresh_time() {
+        let schema = build_schema();
+        let updated =
+            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), false);
+        assert_eq!(
+            updated.metadata().get("lastRefreshTime"),
+            Some(&"2024-01-01T00:00:00.000Z".to_string())
+        );
+        assert!(updated.metadata().get("external").is_none());
+    }
+
+    #[test]
+    fn build_response_schema_passes_through_last_refresh_time_for_external() {
+        // External (CubeStore) flag must NOT alter `lastRefreshTime` — it's
+        // passed through unchanged. The marker reports the external hit.
+        let schema = build_schema();
+        let stale = "2000-01-01T00:00:00.000Z".to_string();
+        let updated = build_response_schema(&schema, Some(stale.clone()), true);
+
+        assert_eq!(updated.metadata().get("lastRefreshTime"), Some(&stale));
+        assert_eq!(
+            updated.metadata().get("external"),
+            Some(&"true".to_string())
+        );
+    }
+
+    #[test]
+    fn build_response_schema_sets_only_marker_when_no_last_refresh_time() {
+        let schema = build_schema();
+        // No incoming last_refresh_time, but external flag is set — emit
+        // only the marker; do NOT synthesize a `lastRefreshTime`.
+        let updated = build_response_schema(&schema, None, true);
+        assert!(updated.metadata().get("lastRefreshTime").is_none());
+        assert_eq!(
+            updated.metadata().get("external"),
+            Some(&"true".to_string())
+        );
+    }
+
+    #[test]
+    fn convert_transport_response_threads_external_flag_into_schema_metadata() {
+        // End-to-end coverage of the row-format `convert_transport_response`
+        // path: a V1LoadResponse with `external: true` and a
+        // `lastRefreshTime` should produce a RecordBatch whose schema
+        // metadata has the `external` marker set and `lastRefreshTime`
+        // passed through unchanged.
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": [{"c": 1}],
+                    "lastRefreshTime": "2000-01-01T00:00:00.000Z",
+                    "external": true
+                }]
+            }
+        "#;
+        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let schema = build_schema();
+        let member_fields = vec![MemberField::regular("c".to_string())];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+        let metadata = batches[0].schema().metadata().clone();
+
+        assert_eq!(metadata.get("external"), Some(&"true".to_string()));
+        assert_eq!(
+            metadata.get("lastRefreshTime"),
+            Some(&"2000-01-01T00:00:00.000Z".to_string())
+        );
+    }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
@@ -1438,7 +1545,6 @@ mod tests {
 
                 let result: V1LoadResponse = serde_json::from_str(response).unwrap();
                 convert_transport_response(result, schema.clone(), member_fields)
-                    .map_err(|err| CubeError::user(err.to_string()))
             }
 
             async fn load_stream(

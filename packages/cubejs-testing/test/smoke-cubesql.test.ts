@@ -1093,4 +1093,83 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot();
     });
   });
+
+  describe('Query cancellation by request ID', () => {
+    test('cancel a running query via REST API', async () => {
+      const requestId = 'cancel-test-request-id-12345';
+      const token = jwt.sign({ user: 'admin' }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
+
+      // Connect directly to the underlying Postgres to check pg_stat_activity
+      const pgConn = new PgClient({
+        host: db.getHost(),
+        port: db.getMappedPort(5432),
+        database: 'test',
+        user: 'test',
+        password: 'test',
+        ssl: false,
+      });
+      await pgConn.connect();
+
+      try {
+        // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
+        // via the REST SQL API. Use AbortController so we can close the
+        // connection to trigger the Rust-side close detection.
+        const abortController = new AbortController();
+        const queryPromise = fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+            'x-request-id': requestId,
+          },
+          body: JSON.stringify({
+            query: 'SELECT count FROM SlowQuery',
+          }),
+          signal: abortController.signal,
+        }).then(r => r.text()).catch(e => e);
+
+        // Wait for pg_sleep to appear in pg_stat_activity
+        let sleepRunning = false;
+        for (let i = 0; i < 20; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { rows } = await pgConn.query(
+            "SELECT count(*) as cnt FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+          );
+          if (parseInt(rows[0].cnt, 10) > 0) {
+            sleepRunning = true;
+            break;
+          }
+        }
+        expect(sleepRunning).toBe(true);
+
+        // Close the HTTP connection — this triggers the Rust-side
+        // OnCloseHandler which drops the execute future via tokio::select!
+        abortController.abort();
+        await queryPromise;
+
+        // Cancel the query in the queue by request ID
+        const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
+          method: 'DELETE',
+          headers: { Authorization: token },
+        });
+        expect(cancelRes.status).toBe(200);
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // A second cancel should return empty — the query is gone from the queue
+        const cancelRes2 = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
+          method: 'DELETE',
+          headers: { Authorization: token },
+        });
+        const cancelBody2 = await cancelRes2.json() as any;
+        expect(cancelBody2.result).toEqual([]);
+      } finally {
+        // pg_terminate_backend for any lingering pg_sleep queries
+        await pgConn.query(
+          "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+        );
+        await pgConn.end();
+      }
+    });
+  });
 });

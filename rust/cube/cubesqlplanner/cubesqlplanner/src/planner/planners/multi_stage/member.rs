@@ -1,4 +1,4 @@
-use crate::planner::{MeasureTimeShifts, MemberSymbol};
+use crate::planner::{MeasureTimeShifts, MemberSymbol, MultiStageGrain};
 use std::rc::Rc;
 
 /// Description of the time-series CTE driving a rolling-window
@@ -113,63 +113,50 @@ pub enum MultiStageInodeMemberType {
 
 /// Non-leaf node in a multi-stage tree. Bundles the semantic
 /// `inode_type` (Rank / Aggregate / Calculate / Dimension /
-/// RollingWindow) with the partition-shaping flags driven by the
-/// measure's data-model directives: `reduce_by`, `add_group_by`,
-/// `group_by`, `time_shift`.
+/// RollingWindow) with the partition-shaping `grain` carried over from
+/// the measure's data-model directives and an optional `time_shift`.
 #[derive(Clone)]
 pub struct MultiStageInodeMember {
     inode_type: MultiStageInodeMemberType,
-    reduce_by: Vec<Rc<MemberSymbol>>,
-    add_group_by: Vec<Rc<MemberSymbol>>,
-    group_by: Option<Vec<Rc<MemberSymbol>>>,
+    grain: MultiStageGrain,
     time_shift: Option<MeasureTimeShifts>,
+    /// Optimisation flag: this Aggregate inode is a safe candidate for
+    /// the `window`-based render — single measure dep, additive identity
+    /// rollup, no leaf-extending modifiers. When `true`, assembly skips
+    /// the JOIN-model and `member_query_planner` emits a window function.
+    /// Default `false`.
+    use_window_path: bool,
 }
 
 impl MultiStageInodeMember {
     pub fn new(
         inode_type: MultiStageInodeMemberType,
-        reduce_by: Vec<Rc<MemberSymbol>>,
-        add_group_by: Vec<Rc<MemberSymbol>>,
-        group_by: Option<Vec<Rc<MemberSymbol>>>,
+        grain: MultiStageGrain,
         time_shift: Option<MeasureTimeShifts>,
     ) -> Self {
         Self {
             inode_type,
-            reduce_by,
-            add_group_by,
-            group_by,
+            grain,
             time_shift,
+            use_window_path: false,
         }
+    }
+
+    pub fn with_use_window_path(mut self, value: bool) -> Self {
+        self.use_window_path = value;
+        self
+    }
+
+    pub fn use_window_path(&self) -> bool {
+        self.use_window_path
     }
 
     pub fn inode_type(&self) -> &MultiStageInodeMemberType {
         &self.inode_type
     }
 
-    pub fn reduce_by(&self) -> Vec<String> {
-        self.reduce_by.iter().map(|s| s.full_name()).collect()
-    }
-
-    pub fn add_group_by(&self) -> Vec<String> {
-        self.add_group_by.iter().map(|s| s.full_name()).collect()
-    }
-
-    pub fn reduce_by_symbols(&self) -> &Vec<Rc<MemberSymbol>> {
-        &self.reduce_by
-    }
-
-    pub fn add_group_by_symbols(&self) -> &Vec<Rc<MemberSymbol>> {
-        &self.add_group_by
-    }
-
-    pub fn group_by(&self) -> Option<Vec<String>> {
-        self.group_by
-            .as_ref()
-            .map(|g| g.iter().map(|s| s.full_name()).collect())
-    }
-
-    pub fn group_by_symbols(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
-        &self.group_by
+    pub fn grain(&self) -> &MultiStageGrain {
+        &self.grain
     }
 
     pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {

@@ -1,6 +1,8 @@
 use super::case_variant::CaseVariant;
 use super::member_order_by::{MemberOrderBy, NativeMemberOrderBy};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::multi_stage_filter::{MultiStageFilterReferences, NativeMultiStageFilterReferences};
+use super::multi_stage_grain::{MultiStageGrainReferences, NativeMultiStageGrainReferences};
 use super::struct_with_sql_member::{NativeStructWithSqlMember, StructWithSqlMember};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -63,6 +65,12 @@ pub trait MeasureDefinition {
 
     #[nbridge(field, optional, vec)]
     fn filters(&self) -> Result<Option<Vec<Rc<dyn StructWithSqlMember>>>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn filter(&self) -> Result<Option<Rc<dyn MultiStageFilterReferences>>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn grain(&self) -> Result<Option<Rc<dyn MultiStageGrainReferences>>, CubeError>;
 
     #[nbridge(field, optional, vec)]
     fn drill_filters(&self) -> Result<Option<Vec<Rc<dyn StructWithSqlMember>>>, CubeError>;

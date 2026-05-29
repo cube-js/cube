@@ -16,7 +16,7 @@ use crate::{
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
         SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
     },
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMetaType;
@@ -1173,10 +1173,11 @@ impl TestContext {
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            let query = self
-                .convert_sql_to_cube_query(&query)
-                .await
-                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            let query = self.convert_sql_to_cube_query(&query).await.map_err(|e| {
+                let mut error = CubeError::from(e);
+                error.cause = CubeErrorCauseType::Planning(error.cause.meta().cloned());
+                error
+            })?;
             match query {
                 QueryPlan::DataFusionSelect(plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);

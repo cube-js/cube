@@ -32,6 +32,38 @@ export type SegmentDefinition = {
   multiStage?: boolean;
 };
 
+export type MultiStageFilterIncludeMember = {
+  member: string;
+  operator: string;
+  values?: string[];
+};
+
+export type MultiStageFilterIncludeItem =
+  | MultiStageFilterIncludeMember
+  | { and: MultiStageFilterIncludeItem[] }
+  | { or: MultiStageFilterIncludeItem[] };
+
+export type MultiStageFilterDirective = {
+  mode?: 'relative' | 'fixed';
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: MultiStageFilterIncludeItem[];
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  // The native bridge reads these (not the function forms above).
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+};
+
+export type MultiStageGrainDirective = {
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: (...args: Array<unknown>) => Array<ToString>;
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+  includeReferences?: string[];
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -43,6 +75,9 @@ export type DimensionDefinition = {
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
+  addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  addGroupByReferences?: string[];
+  filter?: MultiStageFilterDirective;
 };
 
 export type TimeShiftDefinition = {
@@ -66,12 +101,14 @@ export type MeasureDefinition = {
   ownedByCube: boolean;
   rollingWindow?: any
   filters?: any
+  filter?: MultiStageFilterDirective;
   primaryKey?: true;
   drillFilters?: any;
   multiStage?: boolean;
   groupBy?: (...args: Array<unknown>) => Array<ToString>;
   reduceBy?: (...args: Array<unknown>) => Array<ToString>;
   addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  grain?: MultiStageGrainDirective;
   timeShift?: TimeShiftDefinition[];
   groupByReferences?: string[];
   reduceByReferences?: string[];
@@ -591,6 +628,25 @@ export class CubeEvaluator extends CubeSymbols {
               ? { timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }
               : {}),
           }));
+        }
+        if (member.filter) {
+          if (typeof member.filter.exclude === 'function') {
+            member.filter.excludeReferences = this.evaluateReferences(cubeName, member.filter.exclude);
+          }
+          if (typeof member.filter.keepOnly === 'function') {
+            member.filter.keepOnlyReferences = this.evaluateReferences(cubeName, member.filter.keepOnly);
+          }
+        }
+        if (member.grain) {
+          if (typeof member.grain.exclude === 'function') {
+            member.grain.excludeReferences = this.evaluateReferences(cubeName, member.grain.exclude);
+          }
+          if (typeof member.grain.keepOnly === 'function') {
+            member.grain.keepOnlyReferences = this.evaluateReferences(cubeName, member.grain.keepOnly);
+          }
+          if (typeof member.grain.include === 'function') {
+            member.grain.includeReferences = this.evaluateReferences(cubeName, member.grain.include);
+          }
         }
       }
     }

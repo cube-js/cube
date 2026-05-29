@@ -1752,9 +1752,11 @@ GROUP BY
             get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         ).await;
 
+        let err = create_query.err().unwrap();
+        assert!(matches!(err, CompilationError::Rewrite(..)));
         assert_eq!(
-            create_query.err().unwrap().message(),
-            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information.",
+            err.message(),
+            "Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead",
         );
     }
 
@@ -14452,6 +14454,90 @@ ORDER BY "source"."str0" ASC
                 ..Default::default()
             }
         )
+    }
+
+    /// ThoughtSpot-style day-of-quarter expression split across inner/outer query
+    /// with MEASURE() and CASE WHEN filter on the measure column.
+    ///
+    /// The inner query projects two parts of the quarter calculation as separate
+    /// columns plus a CASE WHEN filtered amount, with no GROUP BY.
+    /// The outer query computes day_of_quarter from those columns, wraps the
+    /// filtered amount in MEASURE(), and groups.
+    ///
+    /// This exercises the E-graph's ability to:
+    /// 1. Flatten the subquery so the quarter expression becomes a single tree
+    /// 2. Atomically rewrite the quarter expression to DATE_TRUNC('quarter', ...)
+    ///    before sub-expression simplification rules break the pattern
+    /// 3. Expand MEASURE() at the correct aggregation level
+    /// 4. Avoid emitting INTERVAL '1 month' * expr (invalid on Snowflake)
+    #[tokio::test]
+    async fn test_thoughtspot_pg_day_of_quarter_split_with_measure() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CAST("inner_query"."order_date" AS date)
+                    - CAST("inner_query"."quarter_start" AS date)
+                    + 1 AS "day_of_quarter",
+                MEASURE("inner_query"."sumPrice") AS "revenue"
+            FROM (
+                SELECT
+                    "ta_1"."order_date" AS "order_date",
+                    CAST(
+                        EXTRACT(YEAR FROM "ta_1"."order_date") || '-'
+                        || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01'
+                    AS DATE)
+                    + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1)
+                          AS numeric), 3) + 1) - 1) * -1)
+                      * INTERVAL '1 month'
+                    AS "quarter_start",
+                    CASE WHEN "ta_1"."customer_gender" = 'female'
+                         THEN "ta_1"."sumPrice" END AS "sumPrice"
+                FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            ) "inner_query"
+            WHERE
+                CAST("inner_query"."order_date" AS date)
+                    - CAST("inner_query"."quarter_start" AS date)
+                    + 1 <= 45
+            GROUP BY 1
+            ORDER BY 1
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        let request = logical_plan.find_cube_scan().request;
+
+        // The rewriter should recognize the complex quarter expression and
+        // simplify it to DATE_TRUNC('quarter', col) via the
+        // thoughtspot-pg-quarter-start-to-date-trunc rule, which then gets
+        // recognized as a quarter time dimension.
+        assert_eq!(
+            request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None,
+                },]),
+                order: Some(vec![]),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
+        );
     }
 
     #[tokio::test]

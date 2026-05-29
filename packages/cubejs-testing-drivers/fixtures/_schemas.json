@@ -110,6 +110,11 @@
               "name": "three_months_by_march",
               "interval": "3 month 3 days 3 hours",
               "origin": "2020-03-15"
+            },
+            {
+              "name": "build_only_half_year",
+              "interval": "6 months",
+              "origin": "2024-01-01"
             }
           ]
         },

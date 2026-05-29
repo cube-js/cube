@@ -9,12 +9,13 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::security_context::SecurityContext;
+use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call_builder::SqlCallBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 /// Compilation context for the planner. Resolves data-model
 /// declarations into `MemberSymbol`s, caches them by `SymbolPath`,
@@ -30,6 +31,12 @@ pub struct Compiler {
     members: HashMap<SymbolPath, Rc<MemberSymbol>>,
     cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
     cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
+    /// Back-reference to the owning `QueryTools`. Set by `set_query_tools`
+    /// at the end of `QueryTools::try_new`, after the `Rc<QueryTools>` is
+    /// available. Held as `Weak` to avoid an `Rc` cycle: `QueryTools` owns
+    /// `Rc<RefCell<Compiler>>` strongly, so Compiler cannot also hold a
+    /// strong handle back without leaking.
+    query_tools: Weak<QueryTools>,
 }
 
 impl Compiler {
@@ -49,7 +56,27 @@ impl Compiler {
             members: HashMap::new(),
             cube_names: HashMap::new(),
             cube_tables: HashMap::new(),
+            query_tools: Weak::new(),
         }
+    }
+
+    /// Wire the owning `QueryTools` into this compiler. Called once by
+    /// `QueryTools::try_new` after the `Rc<QueryTools>` is materialized;
+    /// callers outside that constructor have no reason to call this.
+    pub(crate) fn set_query_tools(&mut self, query_tools: Weak<QueryTools>) {
+        self.query_tools = query_tools;
+    }
+
+    /// Return the owning `QueryTools`. Errors only if the back-reference
+    /// is detached — by construction this should never happen because
+    /// `QueryTools` strongly owns this `Compiler`, but the result keeps
+    /// callers honest about the invariant.
+    pub fn query_tools(&self) -> Result<Rc<QueryTools>, CubeError> {
+        self.query_tools.upgrade().ok_or_else(|| {
+            CubeError::internal(
+                "Compiler is detached from QueryTools (Weak ref upgrade failed)".to_string(),
+            )
+        })
     }
 
     /// Parses `name` as a `SymbolPath` and resolves it as the

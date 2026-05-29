@@ -1,30 +1,94 @@
 name: Claude Code PR Review
 on:
   pull_request:
-    # synchronize is disabled for now
-    types: [opened, ready_for_review, reopened]
+    types: [opened, ready_for_review, reopened, synchronize]
+  workflow_call:
+    inputs:
+      pr_number:
+        required: true
+        type: number
+      effort:
+        required: false
+        type: string
+        default: medium
+
+concurrency:
+  # PR number lives in different fields depending on entry point — coalesce so
+  # the same PR shares a group regardless of whether we got here via push or
+  # via the /bot-review proxy.
+  group: claude-code-review-${{ inputs.pr_number || github.event.pull_request.number }}-${{ github.event.action || 'manual' }}
+  cancel-in-progress: true
 
 jobs:
   review-with-tracking:
+    # On `pull_request`, skip draft PRs — they get noisy synchronize pushes
+    # while WIP, and running a full Claude review on every intermediate commit
+    # gets expensive fast. ready_for_review picks it up on draft exit.
+    # On `workflow_call`, trust the caller; the proxy workflow handles its own
+    # auth gates.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     steps:
+      - name: Resolve PR ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Pull all event-controlled inputs through env vars instead of
+          # interpolating directly into the script — branch names are
+          # attacker-controlled and could carry shell metacharacters.
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER_FROM_EVENT: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF_FROM_EVENT: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -n "$INPUT_PR_NUMBER" ]; then
+            number="$INPUT_PR_NUMBER"
+            ref=$(gh pr view "$number" --repo "$REPO" --json headRefName --jq .headRefName)
+          else
+            number="$PR_NUMBER_FROM_EVENT"
+            ref="$PR_HEAD_REF_FROM_EVENT"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: React to trigger comment
+        # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
+        # the bot picked up the command — actual review takes a few minutes.
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api --method POST \
+            "repos/$REPO/issues/comments/$COMMENT_ID/reactions" \
+            -f content=eyes \
+            --silent
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ steps.pr.outputs.ref }}
           fetch-depth: 1
 
+      - name: Configure gh aliases for review-thread operations
+        run: bash .github/actions/setup-claude-code-review.sh
+
       - name: Review
+        id: review
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
+          # Allow PRs opened by coding-agent bots (e.g. cursor) to trigger reviews.
+          allowed_bots: "cursor[bot]"
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR NUMBER: ${{ steps.pr.outputs.number }}
 
             Perform a comprehensive code review with the following focus areas:
 
@@ -56,7 +120,112 @@ jobs:
             Provide detailed feedback using inline comments for specific issues.
             Use top-level comments for general observations or praise.
 
+            **Tracking comment formatting:**
+
+            Applies only to the FINAL update of the tracking comment (the one that contains
+            the completed review). While work is still in progress — todos partially checked,
+            "working…" spinner, intermediate status updates — keep everything visible so the
+            reader can watch progress without expanding anything.
+
+            On the final update, hide EVERYTHING — including the todo checklist itself —
+            inside a single collapsed `<details>` block. The completed checklist is just
+            stale progress signal at that point; it belongs behind the spoiler alongside the
+            rest of the review. Only a short one-line headline with the verdict and issue
+            counts (e.g. "1 high, 2 medium, 5 low") stays visible outside the spoiler — the
+            reader expands when they want details.
+
+            Leave a blank line after `<summary>` and before `</details>`, otherwise GitHub
+            won't render the markdown inside (tables and lists especially).
+
+            **Resolving your own stale review threads:**
+
+            Before posting new comments, list existing review threads on this PR using the
+            preconfigured alias:
+
+              gh list-review-threads ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ steps.pr.outputs.number }}
+
+            For each thread where ALL of the following hold:
+              - `isResolved` is false
+              - the first comment's `author.login` is `claude`
+              - the concern is no longer applicable in the current diff (file/line gone,
+                code rewritten, issue addressed)
+
+            resolve it with:
+
+              gh resolve-thread <thread-id>
+
+            Do not resolve threads from human reviewers under any circumstance, even if the
+            concern looks addressed — leave that decision to the reviewer. Only the two
+            aliases above are available; raw `gh api graphql` is not permitted.
+
+            **Avoiding duplicate inline comments:**
+
+            Use the same `gh list-review-threads` output (from the resolve step above) to
+            deduplicate against your own prior comments. Before calling
+            `mcp__github_inline_comment__create_inline_comment` for a new issue, check whether
+            an existing thread already covers it. Skip creating a new inline comment when ALL
+            of the following hold for any thread in the list:
+              - `isResolved` is false
+              - the first comment's `author.login` is `claude`
+              - the thread is on the same `path` and `line` as the new issue you would post
+              - the existing comment's body raises substantively the same concern (same root
+                cause, same fix direction — wording does not need to match)
+
+            When you skip, briefly note it in your top-level summary (e.g. "Re-affirmed N
+            prior threads still apply") so the reader knows you considered the issue. Do not
+            post a "still applies" reply on the thread — silence is fine; the unresolved
+            state already communicates that.
+
+            If the issue is on a different line or the fix direction has shifted (different
+            root cause), post a new inline comment as usual.
+
           # Tools for comprehensive PR review
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
-            --model "claude-opus-4-6"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)"
+            --model "claude-opus-4-7"
+            --effort ${{ inputs.effort || 'medium' }}
+
+      - name: Write run summary
+        if: always() && steps.review.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          jq -r '
+            [.[] | select(.type == "result")] | last as $r |
+            ([.[] | select(.type == "assistant")] | length) as $turns |
+            ([.[] | select(.type == "assistant") | .message.usage.input_tokens // 0] | add) as $in_tok |
+            ([.[] | select(.type == "assistant") | .message.usage.output_tokens // 0] | add) as $out_tok |
+            ([.[] | select(.type == "assistant") | .message.usage.cache_read_input_tokens // 0] | add) as $cache_tok |
+            ([.[] | select(.type == "assistant") | .message.model] | last) as $model |
+            if $r then
+              "### Claude Code review run",
+              "| Metric | Value |",
+              "|---|---|",
+              "| Model | `\($model // "?")` |",
+              "| Cost | $\($r.total_cost_usd) |",
+              "| Wall time | \(($r.duration_ms / 1000) | floor)s |",
+              "| API time | \((($r.duration_api_ms // 0) / 1000) | floor)s |",
+              "| Turns | \($turns) |",
+              "| Input tokens | \($in_tok) |",
+              "| Output tokens | \($out_tok) |",
+              "| Cache read tokens | \($cache_tok) |"
+            else empty end
+          ' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: React to trigger comment (completion)
+        if: always() && github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+        run: |
+          if [ "$REVIEW_OUTCOME" = "success" ]; then
+            reaction=rocket
+          else
+            reaction=confused
+          fi
+          gh api --method POST \
+            "repos/$REPO/issues/comments/$COMMENT_ID/reactions" \
+            -f "content=$reaction" \
+            --silent

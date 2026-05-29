@@ -303,7 +303,7 @@ impl TransportService for HttpTransport {
         _throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
-            return Err(CubeError::internal(
+            return Err(CubeError::user(
                 "Changing security context (__user) is not supported in the standalone mode"
                     .to_string(),
             ));
@@ -555,14 +555,13 @@ impl SqlTemplates {
     }
 
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
-        let quote = self
-            .templates
-            .get("quotes/identifiers")
-            .ok_or_else(|| CubeError::user("quotes/identifiers template not found".to_string()))?;
+        let quote = self.templates.get("quotes/identifiers").ok_or_else(|| {
+            CubeError::internal("quotes/identifiers template not found".to_string())
+        })?;
         let escape = self
             .templates
             .get("quotes/escape")
-            .ok_or_else(|| CubeError::user("quotes/escape template not found".to_string()))?;
+            .ok_or_else(|| CubeError::internal("quotes/escape template not found".to_string()))?;
         Ok(format!(
             "{}{}{}",
             quote,
@@ -802,7 +801,7 @@ impl SqlTemplates {
         } else if self.contains_template(INTERVAL_SINGLE_TEMPLATE) {
             self.interval_single_expr(num, date_part)
         } else {
-            Err(CubeError::internal(
+            Err(CubeError::unsupported(
                 "Interval template generation is not supported".to_string(),
             ))
         }
@@ -916,7 +915,7 @@ impl SqlTemplates {
             LikeType::Like => "like",
             LikeType::ILike => "ilike",
             _ => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::unsupported(format!(
                     "Error rendering template: like type {} is not supported",
                     like_type
                 )))
@@ -990,7 +989,7 @@ impl SqlTemplates {
             DataType::Duration(_) | DataType::Interval(_) => "interval",
             DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
             dt => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::unsupported(format!(
                     "Can't generate SQL for type {:?}: not supported",
                     dt
                 )))

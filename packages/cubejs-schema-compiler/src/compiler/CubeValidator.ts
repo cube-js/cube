@@ -811,6 +811,69 @@ const timeShiftItemOptional = Joi.object({
   .xor('name', 'interval')
   .and('interval', 'type');
 
+// Top-level predicate inside `filter.include`: same shape as a query-time
+// filter. `member` and `values` are plain string/array only — neither
+// `filter.include[*].member` nor `filter.include[*].values` is covered by
+// `CubePropContextTranspiler.transpiledFieldsPatterns`, so a function form
+// here would never receive the `CUBE`/`SECURITY_CONTEXT` arguments and would
+// fail at runtime. Use the existing `accessPolicy.rowLevel.filters` if you
+// need dynamic predicates resolved against the security context.
+const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
+  member: Joi.string().required(),
+  operator: Joi.any().valid(
+    'equals',
+    'notEquals',
+    'contains',
+    'notContains',
+    'startsWith',
+    'notStartsWith',
+    'endsWith',
+    'notEndsWith',
+    'in',
+    'notIn',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'set',
+    'notSet',
+    'inDateRange',
+    'notInDateRange',
+    'onTheDate',
+    'beforeDate',
+    'beforeOrOnDate',
+    'afterDate',
+    'afterOrOnDate',
+    'measureFilter',
+  ).required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.array().optional(),
+    otherwise: Joi.array().required()
+  })
+});
+
+const MultiStageIncludeConditionSchema = Joi.object().keys({
+  or: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+  and: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+}).xor('or', 'and');
+
+const MultiStageFilter = Joi.object().keys({
+  mode: Joi.string().valid('relative', 'fixed'),
+  exclude: Joi.func(),
+  keepOnly: Joi.func(),
+  include: Joi.array().items(
+    MultiStageIncludeMemberFilterSchema,
+    MultiStageIncludeConditionSchema
+  ),
+}).nand('exclude', 'keepOnly');
+
+const MultiStageGrain = Joi.object().keys({
+  exclude: Joi.func(),
+  keepOnly: Joi.func(),
+  include: Joi.func(),
+}).nand('exclude', 'keepOnly');
+
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
     sql: Joi.func().required(),
@@ -858,6 +921,8 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
+      filter: MultiStageFilter,
+      grain: MultiStageGrain,
       timeShift: Joi.alternatives().conditional(Joi.array().length(1), {
         then: Joi.array().items(timeShiftItemOptional),
         otherwise: Joi.array().items(timeShiftItemRequired)
@@ -940,6 +1005,7 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
       multiStage: Joi.boolean().valid(true),
       sql: Joi.func().required(),
       addGroupBy: Joi.func(),
+      filter: MultiStageFilter,
     }),
     // TODO should be valid only for calendar cubes, but this requires significant refactoring
     // of all schemas. Left for the future when we'll switch to zod.

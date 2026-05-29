@@ -59,7 +59,10 @@ export class PrestodbQuery extends BaseQuery {
   /**
    * Returns sql for source expression floored to timestamps aligned with
    * intervals relative to origin timestamp point.
-   * Athena doesn't support INTERVALs directly — using date_diff/date_add
+   * Athena doesn't support INTERVALs directly — using date_diff/date_add.
+   * Origin is wrapped in `CAST(... AS TIMESTAMP)` so that `date_add` returns
+   * a plain TIMESTAMP rather than `timestamp with time zone` — Hive cannot
+   * write the TZ-aware type into an export bucket.
    */
   public dateBin(interval: string, source: string, origin: string): string {
     const intervalParsed = parseSqlInterval(interval);
@@ -70,7 +73,7 @@ export class PrestodbQuery extends BaseQuery {
     }
 
     const [unit, count] = intervalParts[0];
-    const originExpr = this.timeStampCast(`'${origin}'`);
+    const originExpr = `CAST(${this.timeStampCast(`'${origin}'`)} AS TIMESTAMP)`;
 
     return `date_add('${unit}',
       floor(

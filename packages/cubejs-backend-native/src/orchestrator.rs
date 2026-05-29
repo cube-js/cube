@@ -38,6 +38,7 @@ pub struct ResultWrapper {
     data: Arc<QueryResult>,
     transformed_data: Option<TransformedData>,
     pub last_refresh_time: Option<String>,
+    pub external: bool,
 }
 
 impl ResultWrapper {
@@ -114,6 +115,7 @@ impl ResultWrapper {
             data: query_result,
             transformed_data: None,
             last_refresh_time: None,
+            external: false,
         })
     }
 
@@ -170,7 +172,7 @@ impl ValueObject for ResultWrapper {
         let value = match data {
             TransformedData::Compact { members, dataset } => {
                 let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Unexpected response from Cube, can't get {} row",
                         index
                     )));
@@ -190,7 +192,7 @@ impl ValueObject for ResultWrapper {
                 };
 
                 let Some(column) = columns.get(member_index) else {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Unexpected response from Cube, missing column for '{}'",
                         field_name
                     )));
@@ -207,7 +209,7 @@ impl ValueObject for ResultWrapper {
             }
             TransformedData::Vanilla(dataset) => {
                 let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
+                    return Err(CubeError::internal(format!(
                         "Unexpected response from Cube, can't get {} row",
                         index
                     )));
@@ -332,15 +334,22 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     let result = cx.argument::<JsBox<Arc<QueryResult>>>(0)?;
 
     let js_array = cx.execute_scoped(|mut cx| {
-        let js_keys: Vec<Handle<JsString>> = result.members.iter().map(|k| cx.string(k)).collect();
+        let js_keys: Vec<Handle<JsString>> =
+            result.members().iter().map(|k| cx.string(k)).collect();
 
-        let js_array = JsArray::new(&mut cx, result.rows.len());
+        let row_count = result.row_count();
+        let columns: Vec<_> = (0..js_keys.len())
+            .map(|i| result.column(i))
+            .collect::<Result<_, _>>()
+            .or_else(|err| cx.throw_error(err.to_string()))?;
+        let js_array = JsArray::new(&mut cx, row_count);
 
-        for (i, row) in result.rows.iter().enumerate() {
+        for row_idx in 0..row_count {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
 
-                for (js_key, value) in js_keys.iter().zip(row.iter()) {
+                for (col_idx, js_key) in js_keys.iter().enumerate() {
+                    let value = &columns[col_idx][row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
                         DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings
@@ -353,7 +362,7 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
                 Ok(js_row)
             })?;
 
-            js_array.set(&mut cx, i as u32, js_row)?;
+            js_array.set(&mut cx, row_idx as u32, js_row)?;
         }
 
         Ok(js_array)

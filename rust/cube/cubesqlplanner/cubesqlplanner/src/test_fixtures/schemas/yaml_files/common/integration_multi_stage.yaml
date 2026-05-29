@@ -90,6 +90,63 @@ cubes:
             type: avg
             sql: amount
 
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+
+          - name: unique_customers_reduce_category
+            type: sum
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: avg_amount_reduce_category
+            type: avg
+            sql: "{CUBE.avg_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: count_reduce_category
+            type: sum
+            sql: "{CUBE.count}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: max_total_amount_reduce_category
+            type: max
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: amount_plus_customers_reduce_category
+            type: number
+            sql: "{CUBE.amount_reduce_category} + {CUBE.unique_customers_reduce_category}"
+            multi_stage: true
+
+          - name: max_amount
+            type: max
+            sql: amount
+
+          - name: max_sum_reduce_category
+            type: sum
+            sql: "{CUBE.max_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: total_by_customer_reduce_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.customer_id
+            reduce_by:
+                - orders.category
+
           - name: amount_by_id
             type: number
             sql: "{CUBE.total_amount}"
@@ -163,6 +220,14 @@ cubes:
             group_by:
                 - orders.status
                 - orders.created_at.month
+
+          - name: amount_grain_keep_only_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                keep_only:
+                    - orders.status
 
           - name: amount_prev_month
             type: number
@@ -241,6 +306,145 @@ cubes:
             rolling_window:
                 trailing: 7 day
                 offset: start
+
+          # ── filter: directive variants ────────────────────────────────────
+          - name: amount_exclude_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+
+          - name: amount_keep_only_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                keep_only:
+                    - orders.status
+
+          - name: amount_only_completed
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          - name: amount_or_completed_pending
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                include:
+                    - or:
+                          - member: orders.status
+                            operator: equals
+                            values: [completed]
+                          - member: orders.status
+                            operator: equals
+                            values: [pending]
+
+          - name: amount_after_feb
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.created_at
+                      operator: afterDate
+                      values: ["2024-01-31"]
+
+          - name: amount_replace_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [cancelled]
+
+          - name: amount_fixed_completed
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                mode: fixed
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          # ── chain test: fixed vs relative when wrapped by another multi-stage ──
+          # Inner X measures: same content (include category=books), only mode differs.
+          - name: x_books_relative
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                mode: relative
+                include:
+                    - member: orders.category
+                      operator: equals
+                      values: [books]
+
+          - name: x_books_fixed
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                mode: fixed
+                include:
+                    - member: orders.category
+                      operator: equals
+                      values: [books]
+
+          # Wrapper T measures: filter include status=completed, reference inner X.
+          # When X is computed as a dep of T, X's state inherits T's [status=completed].
+          # X relative → state = [status=completed, category=books] → only completed×books.
+          # X fixed    → state resets to applied_state → [category=books] → all statuses×books.
+          - name: t_chain_relative
+            type: number
+            sql: "{CUBE.x_books_relative}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          - name: t_chain_fixed
+            type: number
+            sql: "{CUBE.x_books_fixed}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          # ── filter on segments ────────────────────────────────────────────
+          - name: amount_exclude_segment
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.completed_orders
+
+          - name: amount_keep_only_segment
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                keep_only:
+                    - orders.completed_orders
 
       segments:
           - name: completed_orders

@@ -32,6 +32,10 @@ impl<'a> FilterCompiler<'a> {
         }
     }
 
+    // TODO classify time-dimension filters into `time_dimension_filters` so
+    // callers like the multi-stage `filter:` directive can route them to
+    // `QueryProperties::time_dimensions_filters` instead of treating every
+    // include as a plain dimension filter.
     pub fn add_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
         if let Some(item_type) = self.get_item_type(item, &None)? {
             let compiled_item = self.compile_item(item, &item_type)?;

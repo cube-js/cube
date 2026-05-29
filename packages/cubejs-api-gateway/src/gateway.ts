@@ -428,6 +428,14 @@ class ApiGateway {
       });
     }));
 
+    app.delete(`${this.basePath}/v1/running-query/:requestId`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.cancelQuery({
+        requestId: req.params.requestId,
+        context: req.context,
+        res: this.resToResultFn(res),
+      });
+    }));
+
     /** **************************************************************
      * meta scope                                                    *
      *************************************************************** */
@@ -1253,6 +1261,23 @@ class ApiGateway {
       const orchestratorApi = await this.getAdapterApi(context);
       await res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
+      });
+    } catch (e: any) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async cancelQuery(
+    { requestId, context, res }: { requestId: string, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const orchestratorApi = await this.getAdapterApi(context);
+      const cancelled = await orchestratorApi.cancelQueryByRequestId(requestId);
+      await res({
+        result: cancelled
       });
     } catch (e: any) {
       this.handleError({

@@ -1,0 +1,16 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/reduce_by.rs
+assertion_line: 248
+expression: result
+---
+orders__status | orders__category | orders__count_reduce_category
+---------------+------------------+------------------------------
+cancelled      | books            | 3                            
+cancelled      | clothing         | 3                            
+cancelled      | electronics      | 3                            
+completed      | books            | 6                            
+completed      | clothing         | 6                            
+completed      | electronics      | 6                            
+pending        | books            | 6                            
+pending        | clothing         | 6                            
+pending        | electronics      | 6

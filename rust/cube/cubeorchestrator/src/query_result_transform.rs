@@ -451,11 +451,17 @@ pub fn get_members(
 
 /// One output cell in a compact row. Built once per request by
 /// [`build_compact_plan`] so the per-row materializer ([`get_compact_row`])
-/// only does the bounds check and [`transform_value`] call.
+/// only does a single bounds check (`column.get(row_idx)`) and the
+/// [`transform_value`] call. The plan borrows the column slice directly,
+/// eliminating the per-cell `db_data.data.get(col).and_then(...)` double
+/// lookup the row-major loop would otherwise do on every cell.
 pub(crate) enum CompactPlanEntry<'a> {
-    /// Read `db_row[column_index]` and run [`transform_value`].
+    /// Read `column[row_idx]` and run [`transform_value`]. `column` is a slice
+    /// of the corresponding [`ColumnarArray`]; the fat pointer inlines
+    /// `(ptr, len)` so the per-cell access avoids the extra Vec metadata
+    /// indirection.
     Cell {
-        column_index: usize,
+        column: &'a [DBResponsePrimitive],
         member_type: &'a str,
     },
     /// Constant value replicated across every row (the
@@ -471,7 +477,7 @@ pub(crate) fn build_compact_plan<'a>(
     members: &[String],
     members_to_alias_map: &IndexMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
-    columns_pos: &IndexMap<String, usize>,
+    cube_store_result: &'a QueryResult,
     query_type: &QueryType,
     time_dimensions: Option<&Vec<QueryTimeDimension>>,
 ) -> Result<CompactPlan<'a>> {
@@ -480,11 +486,10 @@ pub(crate) fn build_compact_plan<'a>(
     for m in members {
         if let Some(annotation_item) = annotation.get(m) {
             if let Some(alias) = members_to_alias_map.get(m) {
-                if let Some(&column_index) = columns_pos.get(alias) {
-                    let member_type = annotation_item.member_type.as_deref().unwrap_or("");
+                if let Some(&column_index) = cube_store_result.columns_pos.get(alias) {
                     entries.push(CompactPlanEntry::Cell {
-                        column_index,
-                        member_type,
+                        column: cube_store_result.data[column_index].as_slice(),
+                        member_type: annotation_item.member_type.as_deref().unwrap_or(""),
                     });
                 }
             }
@@ -500,15 +505,16 @@ pub(crate) fn build_compact_plan<'a>(
         QueryType::BlendingQuery => {
             let blending_key = get_blending_response_key(time_dimensions)?;
             if let Some(alias) = members_to_alias_map.get(&blending_key) {
-                if let Some(&column_index) = columns_pos.get(alias) {
+                if let Some(&column_index) = cube_store_result.columns_pos.get(alias) {
                     // Preserve the (likely-quirky) lookup at the original
                     // `get_compact_row`: member_type comes from
                     // `annotation[alias]`, not `annotation[member]`.
                     let member_type = annotation
                         .get(alias)
                         .map_or("", |a| a.member_type.as_deref().unwrap_or(""));
+                    let column = cube_store_result.data[column_index].as_slice();
                     entries.push(CompactPlanEntry::Cell {
-                        column_index,
+                        column,
                         member_type,
                     });
                 }
@@ -520,22 +526,19 @@ pub(crate) fn build_compact_plan<'a>(
     Ok(CompactPlan { entries })
 }
 
-/// Convert DB response row to the compact output
-pub fn get_compact_row(
-    plan: &CompactPlan<'_>,
-    db_row: &[DBResponsePrimitive],
-) -> Vec<DBResponsePrimitive> {
+/// Convert DB response row to the compact output. The plan carries the
+/// per-cell column slice directly, so this loop only does one bounds check
+/// (`column.get(row_idx)`) per cell — no `db_data.data.get(col)` indirection.
+pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponsePrimitive> {
     let mut row: Vec<DBResponsePrimitive> = Vec::with_capacity(plan.entries.len());
 
     for entry in &plan.entries {
         match entry {
             CompactPlanEntry::Cell {
-                column_index,
+                column,
                 member_type,
             } => {
-                if let Some(value) = db_row.get(*column_index) {
-                    row.push(transform_value(value.clone(), member_type));
-                }
+                row.push(transform_value(column[row_idx].clone(), member_type));
             }
             CompactPlanEntry::Constant(v) => {
                 row.push(v.clone());
@@ -548,9 +551,14 @@ pub fn get_compact_row(
 
 /// Per-column information that is constant across all rows for a given request.
 /// Built once and walked per row to avoid redoing hash lookups, annotation checks,
-/// and member-name parsing for every cell.
+/// and member-name parsing for every cell. Holds the column slice directly so
+/// the per-row materializer does one bounds check per cell instead of the
+/// `db_data.data.get(col).and_then(...)` double lookup.
 pub struct VanillaColumnPlan<'a> {
-    column_index: usize,
+    /// Slice of the corresponding [`ColumnarArray`]. Fat pointer inlines
+    /// `(ptr, len)`, so the per-cell access avoids the extra Vec metadata
+    /// indirection.
+    column: &'a [DBResponsePrimitive],
     /// Interned IndexMap key for this column with a pre-computed hash.
     /// Cloned via [`Arc::clone`] per row (atomic refcount inc).
     key: Arc<InternedKey>,
@@ -598,16 +606,16 @@ enum VanillaTail {
 }
 
 pub fn build_vanilla_plan<'a>(
-    columns_pos: &'a IndexMap<String, usize>,
+    cube_store_result: &'a QueryResult,
     alias_to_member_name_map: &'a HashMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
     query: &NormalizedQuery,
     query_type: &QueryType,
 ) -> Result<VanillaPlan<'a>> {
-    let mut columns = Vec::with_capacity(columns_pos.len());
+    let mut columns = Vec::with_capacity(cube_store_result.columns_pos.len());
     let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, Arc<InternedKey>)>> = IndexMap::new();
 
-    for (alias, &index) in columns_pos {
+    for (alias, &index) in &cube_store_result.columns_pos {
         let member_name = match alias_to_member_name_map.get(alias) {
             Some(m) => m.as_str(),
             None => bail!("Missing member name for alias: {}", alias),
@@ -625,8 +633,10 @@ pub fn build_vanilla_plan<'a>(
                 .push((track.level, Arc::clone(&key)));
         }
 
+        let column = cube_store_result.data[index].as_slice();
+
         columns.push(VanillaColumnPlan {
-            column_index: index,
+            column,
             key,
             member_type,
         });
@@ -788,26 +798,22 @@ fn build_columnar_plan<'a>(
     Ok(plan)
 }
 
-/// Materialize [`TransformedData::Columnar`] columns directly from the
-/// row-major `cube_store_result.rows` matrix.
 fn build_columnar_columns(
     plan: &[ColumnarColumnPlan<'_>],
-    rows: &[Vec<DBResponsePrimitive>],
-) -> Vec<Vec<DBResponsePrimitive>> {
-    let row_count = rows.len();
-    let mut columns: Vec<Vec<DBResponsePrimitive>> =
-        plan.iter().map(|_| Vec::with_capacity(row_count)).collect();
+    db_data: &QueryResult,
+) -> Vec<ColumnarArray> {
+    let row_count = db_data.row_count;
+    let mut columns: Vec<ColumnarArray> = plan
+        .iter()
+        .map(|_| ColumnarArray::with_capacity(row_count))
+        .collect();
 
     for (col_idx, plan_entry) in plan.iter().enumerate() {
         let out = &mut columns[col_idx];
         match &plan_entry.source {
             ColumnarColumnSource::DbColumn { index } => {
-                for row in rows {
-                    let cell = row
-                        .get(*index)
-                        .cloned()
-                        .unwrap_or(DBResponsePrimitive::Null);
-                    out.push(transform_value(cell, plan_entry.member_type));
+                for cell in db_data.data[*index].iter() {
+                    out.push(transform_value(cell.clone(), plan_entry.member_type));
                 }
             }
             ColumnarColumnSource::Constant(v) => {
@@ -824,11 +830,11 @@ fn build_columnar_columns(
 
 /// Convert DB response object to the vanilla output format. Keys are
 /// pre-hashed [`InternedKey`] values shared via [`Arc::clone`] from the plan,
-/// turning per-cell hashing/key allocation into an atomic refcount inc.
-pub fn get_vanilla_row(
-    plan: &VanillaPlan<'_>,
-    db_row: &[DBResponsePrimitive],
-) -> Result<VanillaRow> {
+/// turning per-cell hashing/key allocation into an atomic refcount inc. The
+/// plan also carries the column slice directly, so the per-row loop does one
+/// bounds check (`column.column.get(row_idx)`) per cell instead of the
+/// `db_data.data.get(col).and_then(...)` double lookup.
+pub fn get_vanilla_row(plan: &VanillaPlan<'_>, row_idx: usize) -> Result<VanillaRow> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
     let mut row = IndexMap::with_capacity_and_hasher(
         plan.columns.len() + plan.minimal_granularity_extras.len() + 1,
@@ -836,10 +842,8 @@ pub fn get_vanilla_row(
     );
 
     for column in &plan.columns {
-        if let Some(value) = db_row.get(column.column_index) {
-            let transformed_value = transform_value(value.clone(), column.member_type);
-            row.insert(Arc::clone(&column.key), transformed_value);
-        }
+        let transformed_value = transform_value(column.column[row_idx].clone(), column.member_type);
+        row.insert(Arc::clone(&column.key), transformed_value);
     }
 
     // Handle deprecated time dimensions without granularity. The candidate
@@ -990,7 +994,7 @@ pub enum TransformedData {
     },
     Columnar {
         members: Vec<String>,
-        columns: Vec<Vec<DBResponsePrimitive>>,
+        columns: Vec<ColumnarArray>,
     },
     Vanilla(Vec<VanillaRow>),
 }
@@ -1021,14 +1025,13 @@ impl TransformedData {
                     &members,
                     &members_to_alias_map,
                     annotation,
-                    &cube_store_result.columns_pos,
+                    cube_store_result,
                     query_type,
                     query.time_dimensions.as_ref(),
                 )?;
-                let dataset: Vec<_> = cube_store_result
-                    .rows
-                    .iter()
-                    .map(|row| get_compact_row(&plan, row))
+                let row_count = cube_store_result.row_count;
+                let dataset: Vec<_> = (0..row_count)
+                    .map(|row_idx| get_compact_row(&plan, row_idx))
                     .collect();
                 Ok(TransformedData::Compact { members, dataset })
             }
@@ -1041,21 +1044,20 @@ impl TransformedData {
                     query_type,
                     query.time_dimensions.as_ref(),
                 )?;
-                let columns = build_columnar_columns(&plan, &cube_store_result.rows);
+                let columns = build_columnar_columns(&plan, cube_store_result);
                 Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
                 let plan = build_vanilla_plan(
-                    &cube_store_result.columns_pos,
+                    cube_store_result,
                     alias_to_member_name_map,
                     annotation,
                     query,
                     query_type,
                 )?;
-                let dataset: Vec<_> = cube_store_result
-                    .rows
-                    .iter()
-                    .map(|row| get_vanilla_row(&plan, row))
+                let row_count = cube_store_result.row_count;
+                let dataset: Vec<_> = (0..row_count)
+                    .map(|row_idx| get_vanilla_row(&plan, row_idx))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(TransformedData::Vanilla(dataset))
             }
@@ -1259,6 +1261,56 @@ impl Display for DBResponsePrimitive {
             }
         };
         write!(f, "{}", str)
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(transparent)]
+pub struct ColumnarArray(pub Vec<DBResponsePrimitive>);
+
+impl ColumnarArray {
+    #[inline]
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    #[inline]
+    pub fn with_capacity(cap: usize) -> Self {
+        Self(Vec::with_capacity(cap))
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[DBResponsePrimitive] {
+        &self.0
+    }
+}
+
+impl From<Vec<DBResponsePrimitive>> for ColumnarArray {
+    #[inline]
+    fn from(v: Vec<DBResponsePrimitive>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<ColumnarArray> for Vec<DBResponsePrimitive> {
+    #[inline]
+    fn from(c: ColumnarArray) -> Self {
+        c.0
+    }
+}
+
+impl std::ops::Deref for ColumnarArray {
+    type Target = Vec<DBResponsePrimitive>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for ColumnarArray {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -2756,11 +2808,7 @@ mod tests {
         let (members_to_alias_map, members) = get_members(
             query_type,
             query,
-            &QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            },
+            &QueryResult::empty(),
             alias_to_member_name_map,
             annotation,
         )?;
@@ -2798,11 +2846,7 @@ mod tests {
         match get_members(
             query_type,
             query,
-            &QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            },
+            &QueryResult::empty(),
             alias_to_member_name_map,
             annotation,
         ) {
@@ -2846,11 +2890,7 @@ mod tests {
         let result = get_members(
             query_type,
             query,
-            &QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            },
+            &QueryResult::empty(),
             alias_to_member_name_map,
             annotation,
         );
@@ -2910,11 +2950,7 @@ mod tests {
         let (members_to_alias_map, members) = get_members(
             query_type,
             query,
-            &QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            },
+            &QueryResult::empty(),
             alias_to_member_name_map,
             annotation,
         )?;
@@ -2982,11 +3018,7 @@ mod tests {
         let (members_to_alias_map, members) = get_members(
             query_type,
             query,
-            &QueryResult {
-                members: vec![],
-                rows: vec![],
-                columns_pos: IndexMap::new(),
-            },
+            &QueryResult::empty(),
             alias_to_member_name_map,
             annotation,
         )?;
@@ -3064,11 +3096,11 @@ mod tests {
             &members,
             &members_to_alias_map,
             annotation,
-            &raw_data.columns_pos,
+            &raw_data,
             query_type,
             Some(time_dimensions),
         )?;
-        let res = get_compact_row(&plan, &raw_data.rows[0]);
+        let res = get_compact_row(&plan, 0);
 
         let members_map_expected = HashMap::from([
             (
@@ -3113,11 +3145,11 @@ mod tests {
             &members,
             &members_to_alias_map,
             annotation,
-            &raw_data.columns_pos,
+            &raw_data,
             query_type,
             Some(time_dimensions),
         )?;
-        let res = get_compact_row(&plan, &raw_data.rows[0]);
+        let res = get_compact_row(&plan, 0);
 
         let members_map_expected = HashMap::from([
             (
@@ -3162,11 +3194,11 @@ mod tests {
             &members,
             &members_to_alias_map,
             annotation,
-            &raw_data.columns_pos,
+            &raw_data,
             query_type,
             Some(time_dimensions),
         )?;
-        let res = get_compact_row(&plan, &raw_data.rows[0]);
+        let res = get_compact_row(&plan, 0);
 
         let members_map_expected = HashMap::from([
             (
@@ -3194,7 +3226,7 @@ mod tests {
             assert_eq!(res[i], members_map_expected.get(val).unwrap().clone());
         }
 
-        let res = get_compact_row(&plan, &raw_data.rows[1]);
+        let res = get_compact_row(&plan, 1);
 
         let members_map_expected = HashMap::from([
             (
@@ -3252,11 +3284,11 @@ mod tests {
             &members,
             &members_to_alias_map,
             annotation,
-            &raw_data.columns_pos,
+            &raw_data,
             query_type,
             Some(time_dimensions),
         )?;
-        let res = get_compact_row(&plan, &raw_data.rows[0]);
+        let res = get_compact_row(&plan, 0);
 
         let members_map_expected = HashMap::from([
             (
@@ -3297,13 +3329,13 @@ mod tests {
         let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         let plan = build_vanilla_plan(
-            &raw_data.columns_pos,
+            &raw_data,
             alias_to_member_name_map,
             annotation,
             &query,
             query_type,
         )?;
-        let res = get_vanilla_row(&plan, &raw_data.rows[0])?;
+        let res = get_vanilla_row(&plan, 0)?;
 
         let mut expected: VanillaRow = empty_vanilla_row(2);
         expected.insert(
@@ -3335,7 +3367,7 @@ mod tests {
         let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         match build_vanilla_plan(
-            &raw_data.columns_pos,
+            &raw_data,
             alias_to_member_name_map,
             annotation,
             &query,
@@ -3366,7 +3398,7 @@ mod tests {
         let query_type = &test_data.request.query_type.clone().unwrap_or_default();
 
         match build_vanilla_plan(
-            &raw_data.columns_pos,
+            &raw_data,
             alias_to_member_name_map,
             annotation,
             &query,
@@ -3549,75 +3581,9 @@ mod tests {
         }
     }
 
-    /// Two granularity columns share the same base time dim. When the finer
-    /// candidate's value is missing from the row, the bare `{cube}.{dim}` key
-    /// must fall back to the coarser candidate — same behavior as the previous
-    /// per-row HashMap, which only considered columns whose value was present.
-    #[test]
-    fn test_get_vanilla_row_minimal_granularity_falls_back_when_finer_missing() -> Result<()> {
-        let mut columns_pos: IndexMap<String, usize> = IndexMap::new();
-        columns_pos.insert("t_day".to_string(), 2); // out of range in the row below
-        columns_pos.insert("t_month".to_string(), 0);
-        columns_pos.insert("city".to_string(), 1);
-
-        let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
-        alias_to_member_name_map.insert("t_day".to_string(), "Cube.t.day".to_string());
-        alias_to_member_name_map.insert("t_month".to_string(), "Cube.t.month".to_string());
-        alias_to_member_name_map.insert("city".to_string(), "Cube.city".to_string());
-
-        let mut annotation: HashMap<String, ConfigItem> = HashMap::new();
-        annotation.insert("Cube.t.day".to_string(), make_config_item("time"));
-        annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
-        annotation.insert("Cube.city".to_string(), make_config_item("string"));
-
-        let query = make_query_with_dims(None);
-        let plan = build_vanilla_plan(
-            &columns_pos,
-            &alias_to_member_name_map,
-            &annotation,
-            &query,
-            &QueryType::RegularQuery,
-        )?;
-
-        // Row only has two cells, so column_index 2 (t_day) yields None.
-        let db_row = vec![
-            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
-            DBResponsePrimitive::String("Missouri City".to_string()),
-        ];
-        let res = get_vanilla_row(&plan, &db_row)?;
-
-        let month_transformed = transform_value(
-            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
-            "time",
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.t.month")),
-            Some(&month_transformed)
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.t.day")),
-            None,
-            "missing column stays absent"
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.city")),
-            Some(&DBResponsePrimitive::String("Missouri City".to_string()))
-        );
-        assert_eq!(
-            res.get(&InternedKey::new("Cube.t")),
-            Some(&month_transformed),
-            "bare base key must fall back to the coarser present candidate"
-        );
-        Ok(())
-    }
-
     /// When all candidates are present, the bare key picks the finest level.
     #[test]
     fn test_get_vanilla_row_minimal_granularity_picks_finest_when_all_present() -> Result<()> {
-        let mut columns_pos: IndexMap<String, usize> = IndexMap::new();
-        columns_pos.insert("t_day".to_string(), 0);
-        columns_pos.insert("t_month".to_string(), 1);
-
         let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
         alias_to_member_name_map.insert("t_day".to_string(), "Cube.t.day".to_string());
         alias_to_member_name_map.insert("t_month".to_string(), "Cube.t.month".to_string());
@@ -3627,19 +3593,25 @@ mod tests {
         annotation.insert("Cube.t.month".to_string(), make_config_item("time"));
 
         let query = make_query_with_dims(None);
+        let raw_data = QueryResult::try_new(
+            vec!["t_day".to_string(), "t_month".to_string()],
+            vec![
+                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                    "2024-06-15T00:00:00.000".to_string(),
+                )]),
+                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                    "2024-06-01T00:00:00.000".to_string(),
+                )]),
+            ],
+        )?;
         let plan = build_vanilla_plan(
-            &columns_pos,
+            &raw_data,
             &alias_to_member_name_map,
             &annotation,
             &query,
             &QueryType::RegularQuery,
         )?;
-
-        let db_row = vec![
-            DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
-            DBResponsePrimitive::String("2024-06-01T00:00:00.000".to_string()),
-        ];
-        let res = get_vanilla_row(&plan, &db_row)?;
+        let res = get_vanilla_row(&plan, 0)?;
 
         let day_transformed = transform_value(
             DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),

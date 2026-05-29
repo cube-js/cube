@@ -10,6 +10,7 @@ use super::query_tools::QueryTools;
 use super::MemberSymbol;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
+use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
@@ -746,6 +747,40 @@ impl QueryProperties {
             Self::extract_filters_exclude_member(member_name, &self.dimensions_filters);
         self.measures_filters =
             Self::extract_filters_exclude_member(member_name, &self.measures_filters);
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn remove_filters_for_members(&mut self, member_names: &[String]) {
+        self.time_dimensions_filters =
+            tree_ops::exclude_members(member_names, &self.time_dimensions_filters);
+        self.dimensions_filters = tree_ops::exclude_members(member_names, &self.dimensions_filters);
+        self.measures_filters = tree_ops::exclude_members(member_names, &self.measures_filters);
+        self.segments = tree_ops::exclude_members(member_names, &self.segments);
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn keep_only_filters_for_members(&mut self, member_names: &[String]) {
+        self.time_dimensions_filters =
+            tree_ops::keep_only_members(member_names, &self.time_dimensions_filters);
+        self.dimensions_filters =
+            tree_ops::keep_only_members(member_names, &self.dimensions_filters);
+        self.measures_filters = tree_ops::keep_only_members(member_names, &self.measures_filters);
+        self.segments = tree_ops::keep_only_members(member_names, &self.segments);
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn add_dimension_filters(&mut self, items: Vec<FilterItem>) {
+        self.dimensions_filters.extend(items);
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn add_time_dimension_filters(&mut self, items: Vec<FilterItem>) {
+        self.time_dimensions_filters.extend(items);
+        self.invalidate_join_groups_cache();
+    }
+
+    pub fn add_measure_filters(&mut self, items: Vec<FilterItem>) {
+        self.measures_filters.extend(items);
         self.invalidate_join_groups_cache();
     }
 

@@ -123,6 +123,7 @@ const BRIDGES: BridgeSpec[] = [
       'add_group_by_references',
       'case',
       'dimension_type',
+      'filter',
       'latitude',
       'longitude',
       'mask_sql',
@@ -178,7 +179,9 @@ const BRIDGES: BridgeSpec[] = [
       'add_group_by_references',
       'case',
       'drill_filters',
+      'filter',
       'filters',
+      'grain',
       'group_by_references',
       'mask_sql',
       'measure_type',
@@ -197,6 +200,14 @@ const BRIDGES: BridgeSpec[] = [
     expected: ['cube_name', 'definition', 'expression', 'expression_name', 'name'],
   },
   { name: 'memberOrderBy', expected: ['dir', 'sql'] },
+  {
+    name: 'multiStageFilter',
+    expected: ['exclude', 'include', 'keep_only', 'mode'],
+  },
+  {
+    name: 'multiStageGrain',
+    expected: ['exclude', 'include', 'keep_only'],
+  },
   {
     name: 'preAggregationDescription',
     expected: [
