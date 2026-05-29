@@ -1558,7 +1558,7 @@ dependencies = [
 
 [[package]]
 name = "cubestore"
-version = "1.6.51"
+version = "1.6.52"
 dependencies = [
  "actix-rt",
  "anyhow",
