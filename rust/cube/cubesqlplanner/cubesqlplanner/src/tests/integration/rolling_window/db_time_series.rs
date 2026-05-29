@@ -92,6 +92,7 @@ async fn test_db_ts_rolling_with_dimension() {
               - "2024-01-20"
         order:
           - id: orders.category
+          - id: orders.created_at
     "#};
 
     ctx.build_sql(query).unwrap();

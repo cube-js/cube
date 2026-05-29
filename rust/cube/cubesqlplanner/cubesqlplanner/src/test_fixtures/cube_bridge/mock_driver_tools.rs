@@ -50,7 +50,6 @@ impl MockDriverTools {
         }
     }
 
-    #[allow(dead_code)]
     pub fn with_sql_templates_and_timezone(
         sql_templates: MockSqlTemplatesRender,
         timezone: String,
