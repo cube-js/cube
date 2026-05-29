@@ -24,6 +24,23 @@ Cube's Dedicated Infrastructure and your own VNet, you'll need to prepare a
 Private Link Service, share service details with the Cube team, and approve
 the incoming connection request.
 
+<Note>
+
+**Dedicated Infrastructure vs. Bring Your Own Cloud.** The flow described on
+this page — sharing service details with the Cube team and letting Cube create
+the private endpoint and DNS overrides — applies to
+[Dedicated Infrastructure][cube-region] operated by Cube.
+
+In a [Bring Your Own Cloud (BYOC)][azure-byoc] deployment, the Cube VNet lives
+in **your own Azure subscription**, so you own the networking. The role granted
+to the Cube Operator does not include permissions to manage Private DNS Zones,
+which means Cube cannot create the private endpoint or the DNS override on
+your behalf. In BYOC, create the private endpoint in the Cube VNet against the
+provider's Private Link Service Resource ID yourself, then create a Private DNS
+Zone for the TLS hostname and link it to the Cube VNet.
+
+</Note>
+
 ## Preparing the Private Link Service
 
 There are two common scenarios for preparing the Private Link Service:
@@ -132,5 +149,6 @@ Dedicated Infrastructure can be provisioned. Azure operated by 21Vianet
 [azure-docs-private-link]: https://docs.microsoft.com/azure/private-link/
 [azure-docs-private-link-service]: https://docs.microsoft.com/azure/private-link/create-private-link-service-portal
 [cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[azure-byoc]: /admin/deployment/dedicated/azure/byoc
 [aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
 [backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity
