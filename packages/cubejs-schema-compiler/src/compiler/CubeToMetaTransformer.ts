@@ -113,6 +113,7 @@ export type LinkConfig = {
   dashboard?: string;
   icon?: string;
   target: 'blank' | 'self';
+  params?: string[];
 };
 
 export type DimensionConfig = {
@@ -340,6 +341,9 @@ export class CubeToMetaTransformer implements CompilerInterface {
               ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
               icon: link.icon,
               target: link.target || 'blank',
+              ...(link.params && Array.isArray(link.params) && link.params.length > 0
+                ? { params: link.params.map((p: any) => (typeof p.key === 'function' ? p.key() : p.key)) }
+                : {}),
             })) } : {}),
             ...(extendedDimDef.synthetic ? { synthetic: true } : {}),
           };

@@ -138,6 +138,58 @@ cubes:
     }
   });
 
+  it('should reject duplicate link names on same dimension', async () => {
+    const schema = `
+cubes:
+  - name: users
+    sql_table: users
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - name: dup
+            label: First
+            url: "{full_name}"
+          - name: dup
+            label: Second
+            url: "{full_name}"
+`;
+    const compilers = prepareYamlCompiler(schema);
+    try {
+      await compilers.compiler.compile();
+      fail('Should have thrown for duplicate link name');
+    } catch (e: any) {
+      expect(e.message || e.toString()).toMatch(/[Dd]uplicate.*dup/);
+    }
+  });
+
+  it('should reject link that collides with user-defined dimension', async () => {
+    const schema = `
+cubes:
+  - name: users
+    sql_table: users
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - name: custom
+            label: Link
+            url: "{full_name}"
+      - name: full_name___link_custom_url
+        sql: "'manual'"
+        type: string
+`;
+    const compilers = prepareYamlCompiler(schema);
+    try {
+      await compilers.compiler.compile();
+      fail('Should have thrown for collision');
+    } catch (e: any) {
+      expect(e.message || e.toString()).toMatch(/conflict|collision|already/i);
+    }
+  });
+
   describe('dashboard links', () => {
     const schemaWithDashboardLink = `
 cubes:

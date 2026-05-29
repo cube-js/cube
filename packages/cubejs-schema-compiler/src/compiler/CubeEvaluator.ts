@@ -378,6 +378,8 @@ export class CubeEvaluator extends CubeSymbols {
               synthetic: true,
               ownedByCube: true,
               public: dimDef.public !== false,
+              shown: dimDef.shown,
+              meta: dimDef.meta,
             };
           }
         });
@@ -397,8 +399,9 @@ export class CubeEvaluator extends CubeSymbols {
       ${params.map((param, idx) => {
     const separator = idx === 0 ? '?' : '&';
     const rawKey = typeof param.key === 'function' ? param.key() : param.key;
-    const key = rawKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const valueFnStr = typeof param.value === 'function' ? param.value.toString() : `function() { return '${String(param.value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'; }`;
+    // Escape for SQL string literal ('' for single-quote) then for JS string context (\\ for backslash)
+    const key = rawKey.replace(/'/g, "''").replace(/\\/g, '\\\\');
+    const valueFnStr = typeof param.value === 'function' ? param.value.toString() : `function() { return '${String(param.value).replace(/'/g, "''").replace(/\\/g, '\\\\')}'; }`;
     return `result = result + " || '${separator}${key}=' || " + SQL_UTILS.urlEncode((${valueFnStr})(${cubeName}));`;
   }).join('\n      ')}
       return result;

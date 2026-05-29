@@ -650,6 +650,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           const linkName = typeof link.name === 'function' ? link.name() : link.name;
           if (!linkName) return;
           const syntheticName = `${dimName}___link_${linkName}_url`;
+          if (dims[syntheticName] && !dims[syntheticName].synthetic) {
+            throw new Error(`Link '${linkName}' on dimension '${dimName}' conflicts with existing dimension '${syntheticName}'`);
+          }
           if (!dims[syntheticName]) {
             let sql;
             if (link.url) {
@@ -665,6 +668,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
                 type: 'string',
                 synthetic: true,
                 public: dimDef.public !== false,
+                shown: dimDef.shown,
+                meta: dimDef.meta,
               };
             }
           }
