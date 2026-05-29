@@ -24,7 +24,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash } from './utils';
+import { getCacheHash, extractRequestUUID } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -408,9 +408,7 @@ export class QueryCache {
   }
 
   public static extractRequestUUID(requestId: string): string {
-    const idx = requestId.lastIndexOf('-span-');
-
-    return idx !== -1 ? requestId.substring(0, idx) : requestId;
+    return extractRequestUUID(requestId);
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
