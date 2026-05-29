@@ -389,6 +389,7 @@
               {
                 "group": "Customization",
                 "pages": [
+                  "admin/customization/app-theme",
                   "admin/customization/chart-palettes",
                   "admin/customization/dashboard-themes"
                 ]
