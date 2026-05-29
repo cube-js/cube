@@ -24,8 +24,11 @@ static CLEANUP_CONTAINER_ID: OnceLock<String> = OnceLock::new();
 
 extern "C" fn cleanup_container() {
     if let Some(id) = CLEANUP_CONTAINER_ID.get() {
+        // `-v` removes the container's anonymous volumes. Without it the
+        // Postgres data dir accumulates as dangling volumes on every run
+        // and eventually fills the Docker disk.
         let _ = std::process::Command::new("docker")
-            .args(["rm", "-f", "-v", id])
+            .args(["rm", "-fv", id])
             .output();
     }
 }

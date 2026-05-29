@@ -1,5 +1,6 @@
 ---
-source: cubesqlplanner/src/tests/integration/rolling_window/db_time_series.rs
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/db_time_series.rs
+assertion_line: 101
 expression: result
 ---
 orders__category | orders__created_at_day | orders__rolling_sum_trailing_7d

@@ -88,6 +88,26 @@ async fn test_many_to_one_view_one_sum() {
     }
 }
 
+// JS member-expressions-on-views.test.ts "many_to_one_view › one_sum":
+// shares (root.dim, child.dim) across several root rows so the child
+// measure feels the row multiplication. With proper dedup,
+// (foo, foo).child_val_avg = (100 + 300) / 2 = 200; without dedup the
+// many_to_one join injects child #1 twice and yields 166.66.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_many_to_one_view_one_sum_multiplied() {
+    let ctx = create_test_context();
+    let expr = make_member_expression("one_sum", "many_to_one_view", "SUM(1)");
+    let options = build_options_with_member_expression(&ctx, expr);
+    ctx.build_sql_from_options(options.clone()).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg_from_options(options, "many_to_one_multiplied_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_many_to_one_view_root_val_sum() {
     let ctx = create_test_context();

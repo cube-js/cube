@@ -64,6 +64,9 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
+          - name: updated_at
+            type: time
+            sql: updated_at
 
           - name: customer_name
             type: string
@@ -286,6 +289,49 @@ cubes:
             order_by:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
+
+          # Rank by the raw time dimension itself (order_by is a
+          # dimension, not a measure) reduced by created_at — partition
+          # is "all outer dims except created_at". First link in the
+          # chain that reproduces the JS sql-generation scenario
+          # "multi stage complex graph with time dimension no
+          # granularity".
+          - name: date_rank
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{orders.created_at}"
+                  dir: asc
+
+          # Multi-stage formula that references date_rank in its SQL.
+          - name: adjusted_amount
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount} + 0.1 * {CUBE.date_rank}"
+
+          # Rank over the adjusted_amount measure — second-link rank
+          # that the outer sum filters by.
+          - name: adjusted_amount_rank
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{CUBE.adjusted_amount}"
+                  dir: asc
+
+          # Outer sum over adjusted_amount filtered by
+          # adjusted_amount_rank = 1, grouped by created_at.
+          - name: adjusted_amount_sum
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.adjusted_amount}"
+            filters:
+                - sql: "{CUBE.adjusted_amount_rank} = 1"
+            add_group_by:
+                - orders.created_at
 
           - name: status_weighted_amount
             type: sum

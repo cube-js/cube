@@ -142,3 +142,36 @@ async fn test_expr_measure_sum() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Multiplied dim-only ME: a measure expression evaluating to a
+// dimension expression (MAX over `customers.city`) used together
+// with an `orders` dimension. `orders→customers` is many_to_one, so
+// customers measures get multiplied — and the dim-only ME fast-path
+// in the classifier feeds the AggregateMultipliedBuilder with a
+// derived owning cube `customers` (not the symbol's own cube). This
+// test exists to lock that path in for the upcoming
+// `MeasureGroup { join, measures }` unification.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_dim_only_me_measure() {
+    let ctx = create_context();
+    let expr = make_measure_expression("city_max", "customers", "MAX({customers.city})");
+    let mut measures = members_from_strings(vec!["orders.count"]);
+    measures.push(expr);
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(measures))
+            .dimensions(Some(members_from_strings(vec!["orders.status"])))
+            .build(),
+    );
+
+    ctx.build_sql_from_options(options.clone()).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
