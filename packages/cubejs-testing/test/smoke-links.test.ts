@@ -157,4 +157,26 @@ describe('links through views', () => {
     expect(johnUrl).toContain('user_id=');
     expect(johnUrl).toContain('1');
   });
+
+  test('REST SQL API can query link synthetic dimensions', async () => {
+    const response = await fetch(
+      `${birdbox.configuration.apiUrl}/cubesql`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: DEFAULT_API_TOKEN,
+        },
+        body: JSON.stringify({
+          query: 'SELECT full_name, full_name___link_city_dashboard_url FROM users_all ORDER BY full_name ASC LIMIT 2',
+        }),
+      }
+    );
+    const text = await response.text();
+    const json = JSON.parse(text) as any;
+    expect(json.data).toBeDefined();
+    expect(json.data.length).toBe(2);
+    expect(json.data[0].full_name___link_city_dashboard_url).toContain('/dashboard/city_dash');
+    expect(json.data[0].full_name___link_city_dashboard_url).toContain('city=');
+  });
 });
