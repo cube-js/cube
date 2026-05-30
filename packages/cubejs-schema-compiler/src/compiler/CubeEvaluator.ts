@@ -876,7 +876,7 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
 
-      if (ownedByCube && cube.isView && !members[memberName].synthetic) {
+      if (ownedByCube && cube.isView) {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
 
