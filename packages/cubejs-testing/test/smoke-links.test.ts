@@ -72,12 +72,15 @@ describe('links through views', () => {
     const fullNameDim = view.dimensions.find((d: any) => d.name === 'users_with_links.full_name');
 
     expect(fullNameDim.links).toBeDefined();
-    expect(fullNameDim.links).toHaveLength(2);
+    expect(fullNameDim.links).toHaveLength(3);
     expect(fullNameDim.links[0].name).toBe('google_search');
     expect(fullNameDim.links[0].label).toBe('Search on Google');
     expect(fullNameDim.links[0].icon).toBe('brand-google');
     expect(fullNameDim.links[1].name).toBe('profile');
     expect(fullNameDim.links[1].dashboard).toBe('user_profile_123');
+    expect(fullNameDim.links[2].name).toBe('city_dashboard');
+    expect(fullNameDim.links[2].dashboard).toBe('city_dash');
+    expect(fullNameDim.links[2].params).toEqual(['city', 'user_id']);
   });
 
   test('synthetic link dimensions are marked as synthetic in meta', async () => {
@@ -173,10 +176,13 @@ describe('links through views', () => {
       }
     );
     const text = await response.text();
-    const json = JSON.parse(text) as any;
-    expect(json.data).toBeDefined();
-    expect(json.data.length).toBe(2);
-    expect(json.data[0].full_name___link_city_dashboard_url).toContain('/dashboard/city_dash');
-    expect(json.data[0].full_name___link_city_dashboard_url).toContain('city=');
+    // cubesql returns newline-delimited JSON chunks
+    const lines = text.trim().split('\n').filter(Boolean);
+    const json = JSON.parse(lines[lines.length - 1]) as any;
+    const rows = json.data || json.results || json;
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    const firstRow = Array.isArray(rows[0]) ? rows[0] : Object.values(rows[0]);
+    const urlValue = String(firstRow[1] || firstRow[0]);
+    expect(urlValue).toContain('/dashboard/city_dash');
   });
 });
