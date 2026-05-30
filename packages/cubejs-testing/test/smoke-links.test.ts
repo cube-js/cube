@@ -176,4 +176,34 @@ describe('links through views', () => {
     const urlValue = String(firstRow[1] || firstRow[0]);
     expect(urlValue).toContain('/dashboard/city_dash');
   });
+
+  test('param values are URL-encoded in query results', async () => {
+    // Query source cube directly to verify params with URL encoding
+    const response = await client.load({
+      dimensions: [
+        'users.full_name',
+        'users.full_name___link_city_dashboard_url',
+      ],
+      order: {
+        'users.full_name': 'asc',
+      },
+      limit: 2,
+    });
+    const data = response.rawData();
+    expect(data.length).toBe(2);
+
+    // Jane Smith, city=London (no encoding needed)
+    const janeUrl = data[0]['users.full_name___link_city_dashboard_url'];
+    expect(janeUrl).toContain('/dashboard/city_dash');
+    expect(janeUrl).toContain('city=');
+    expect(janeUrl).toContain('London');
+    expect(janeUrl).toContain('user_id=');
+
+    // John Doe, city=New York → space should be encoded as %20
+    const johnUrl = data[1]['users.full_name___link_city_dashboard_url'];
+    expect(johnUrl).toContain('/dashboard/city_dash');
+    expect(johnUrl).toContain('city=');
+    expect(johnUrl).toContain('New%20York');
+    expect(johnUrl).toContain('user_id=');
+  });
 });
