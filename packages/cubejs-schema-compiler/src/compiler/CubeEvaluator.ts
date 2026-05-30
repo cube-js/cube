@@ -367,7 +367,7 @@ export class CubeEvaluator extends CubeSymbols {
           if (baseSql) {
             let sql;
             if (link.params && Array.isArray(link.params) && link.params.length > 0) {
-              sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params);
+              sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params, cube.dimensions);
             } else {
               sql = baseSql;
             }
@@ -386,25 +386,41 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  private buildLinkSqlWithParams(cubeName: string, baseSql: any, params: Array<any>) {
+  private buildLinkSqlWithParams(cubeName: string, baseSql: any, params: Array<any>, dimensions: Record<string, any>) {
     if (params.length === 0) {
       return baseSql;
     }
 
+    const resolvedParams = params.map((param) => {
+      const rawKey = typeof param.key === 'function' ? param.key() : param.key;
+      const encodedKey = encodeURIComponent(rawKey).replace(/'/g, "''");
+      // The transpiler generates `dimName => dimName` for `{dimName}` references.
+      // Extract the dimension name and look up its sql directly.
+      const fnStr = typeof param.value === 'function' ? param.value.toString() : '';
+      const match = fnStr.match(/^(\w+)\s*=>\s*\1$/);
+      let valueSqlFn: any;
+      if (match && dimensions[match[1]]) {
+        valueSqlFn = dimensions[match[1]].sql;
+      } else {
+        valueSqlFn = param.value;
+      }
+      return { encodedKey, valueSqlFn };
+    });
+
+    // Pre-resolve each param value to its raw SQL column name, then build
+    // a simple function that returns the full SQL concatenation.
+    const paramSqlFragments = resolvedParams.map((p, idx) => {
+      const sep = idx === 0 ? '?' : '&';
+      const valSql = p.valueSqlFn(cubeName);
+      return ` || '${sep}${p.encodedKey}=' || REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(CAST((${valSql}) as TEXT), '%', '%25'), '&', '%26'), '=', '%3D'), '+', '%2B'), ' ', '%20')`;
+    }).join('');
+
+    // Escape for inclusion in a template literal
+    const escaped = paramSqlFragments.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
     // eslint-disable-next-line no-new-func
-    const fn = new Function(cubeName, 'SQL_UTILS', `
-      var baseResult = (${baseSql.toString()})(${cubeName});
-      var result = baseResult;
-      ${params.map((param, idx) => {
-    const separator = idx === 0 ? '?' : '&';
-    const rawKey = typeof param.key === 'function' ? param.key() : param.key;
-    const encodedKey = encodeURIComponent(rawKey).replace(/'/g, "''");
-    const valueFnStr = typeof param.value === 'function' ? param.value.toString() : `function() { return '${String(param.value).replace(/'/g, "''").replace(/\\/g, '\\\\')}'; }`;
-    return `result = result + " || '${separator}${encodedKey}=' || " + SQL_UTILS.urlEncode((${valueFnStr})(${cubeName}));`;
-  }).join('\n      ')}
-      return result;
-    `);
-    Object.defineProperty(fn, 'length', { value: baseSql.length });
+    const fn = new Function(cubeName, `return \`\${(${baseSql.toString()})(${cubeName})}${escaped}\``);
+    Object.defineProperty(fn, 'length', { value: 1 });
     return fn;
   }
 
