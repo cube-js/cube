@@ -323,6 +323,54 @@ cubes:
       expect(sql).toContain('name=');
       expect(sql).toContain('REPLACE');
     });
+
+    it('should url-encode param values with special characters', async () => {
+      const schemaWithSpecialChars = `
+cubes:
+  - name: items
+    sql: >
+      SELECT 'hello world & more' as name, 'a=b+c' as code
+
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+        links:
+          - name: search
+            label: Search
+            dashboard: dash1
+            params:
+              - key: q
+                value: "{name}"
+              - key: filter
+                value: "{code}"
+
+      - name: code
+        sql: code
+        type: string
+`;
+      const compilers = prepareYamlCompiler(schemaWithSpecialChars);
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [],
+        dimensions: ['items.name___link_search_url'],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const sql = queryAndParams[0];
+
+      // The SQL should wrap each param value in REPLACE chains for URL encoding
+      // Encoding: % -> %25, & -> %26, = -> %3D, + -> %2B, space -> %20
+      expect(sql).toContain("'%', '%25'");
+      expect(sql).toContain("'&', '%26'");
+      expect(sql).toContain("'=', '%3D'");
+      expect(sql).toContain("'+', '%2B'");
+      expect(sql).toContain("' ', '%20'");
+      // Should have REPLACE for both params (name and code)
+      const replaceCount = (sql.match(/REPLACE/g) || []).length;
+      expect(replaceCount).toBeGreaterThanOrEqual(10);
+    });
   });
 
   describe('access policy on view with links', () => {
