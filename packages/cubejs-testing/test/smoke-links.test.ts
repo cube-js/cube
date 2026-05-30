@@ -125,4 +125,36 @@ describe('links through views', () => {
     const url = data[0]['users_with_links.full_name___link_profile_url'];
     expect(url).toContain('/dashboard/user_profile_123');
   });
+
+  test('dashboard link with params renders dimension values in URL', async () => {
+    const response = await client.load({
+      dimensions: [
+        'users_with_links.full_name',
+        'users_with_links.city',
+        'users_with_links.full_name___link_city_dashboard_url',
+      ],
+      order: {
+        'users_with_links.full_name': 'asc',
+      },
+      limit: 2,
+    });
+    const data = response.rawData();
+    expect(data.length).toBe(2);
+
+    // First row: Jane Smith, London
+    const janeUrl = data[0]['users_with_links.full_name___link_city_dashboard_url'];
+    expect(janeUrl).toContain('/dashboard/city_dash');
+    expect(janeUrl).toContain('city=');
+    expect(janeUrl).toContain('London');
+    expect(janeUrl).toContain('user_id=');
+    expect(janeUrl).toContain('2');
+
+    // Second row: John Doe, New York (space should be encoded)
+    const johnUrl = data[1]['users_with_links.full_name___link_city_dashboard_url'];
+    expect(johnUrl).toContain('/dashboard/city_dash');
+    expect(johnUrl).toContain('city=');
+    expect(johnUrl).toMatch(/New(%20|\+| )York/);
+    expect(johnUrl).toContain('user_id=');
+    expect(johnUrl).toContain('1');
+  });
 });

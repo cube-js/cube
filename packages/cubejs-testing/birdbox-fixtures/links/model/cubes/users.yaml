@@ -22,6 +22,14 @@ cubes:
           - name: profile
             label: View profile
             dashboard: user_profile_123
+          - name: city_dashboard
+            label: City dashboard
+            dashboard: city_dash
+            params:
+              - key: city
+                value: "{city}"
+              - key: user_id
+                value: "{id}"
 
       - name: city
         sql: city
