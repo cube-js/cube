@@ -409,6 +409,9 @@ export class CubeEvaluator extends CubeSymbols {
 
     // Pre-resolve each param value to its raw SQL column name, then build
     // a simple function that returns the full SQL concatenation.
+    // Uses REPLACE chain for URL encoding (matches BaseQuery.urlEncode default).
+    // Database-specific adapters override urlEncode at query execution time
+    // through the SQL_UTILS context for url-type link dimensions without params.
     const paramSqlFragments = resolvedParams.map((p, idx) => {
       const sep = idx === 0 ? '?' : '&';
       const valSql = p.valueSqlFn(cubeName);
