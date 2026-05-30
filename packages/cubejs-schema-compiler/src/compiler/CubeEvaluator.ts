@@ -73,7 +73,6 @@ export type LinkDefinition = {
   target?: 'blank' | 'self';
   params?: Array<{ key: string; value: (...args: any[]) => string }>;
 };
-};
 
 export type DimensionDefinition = {
   type: string;
