@@ -402,16 +402,11 @@ export class CubeEvaluator extends CubeSymbols {
       return { encodedKey, valueFn: param.value };
     });
 
-    // Extract the argument name from each param value function.
-    // The transpiler generates functions like `city => city` or `(users) => \`${city}\``
-    // where the argument names are what resolveSymbolsCall uses for resolution.
+    // Extract the argument name from each param value function using the same
+    // regex-based extraction that resolveSymbolsCall uses (funcArguments).
     const paramArgNames = resolvedParams.map((p, idx) => {
-      const fnStr = p.valueFn.toString();
-      const match = fnStr.match(/^(\w+)\s*=>|^\s*function\s*\w*\s*\(([^)]*)\)/);
-      if (match) {
-        return (match[1] || match[2] || '').split(',')[0].trim();
-      }
-      return `__param${idx}`;
+      const args = this.funcArguments(p.valueFn);
+      return args[0] || `__param${idx}`;
     });
 
     // Build a function whose argument list includes the cube name, SQL_UTILS,
