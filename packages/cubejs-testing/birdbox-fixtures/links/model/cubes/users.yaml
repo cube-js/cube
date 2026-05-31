@@ -38,6 +38,8 @@ cubes:
                 value: "{full_name}"
               - key: city
                 value: "{city}"
+              - key: duplicate_city
+                value: "{city}"
 
       - name: city
         sql: city

@@ -402,23 +402,38 @@ export class CubeEvaluator extends CubeSymbols {
       return { encodedKey, valueFn: param.value };
     });
 
-    // Extract the argument name from each param value function using the same
+    // Extract ALL argument names from each param value function using the same
     // regex-based extraction that resolveSymbolsCall uses (funcArguments).
-    const paramArgNames = resolvedParams.map((p, idx) => {
+    // A param value can reference multiple members, e.g. CONCAT({first_name}, ' ', {last_name})
+    const paramArgSets = resolvedParams.map((p, idx) => {
       const args = this.funcArguments(p.valueFn);
-      return args[0] || `__param${idx}`;
+      return args.length > 0 ? args : [`__param${idx}`];
     });
 
-    // Build a function whose argument list includes the cube name, SQL_UTILS,
-    // and each param's reference symbol. resolveSymbolsCall extracts these arg
-    // names and resolves them: cube dims, cross-cube refs, FILTER_PARAMS, etc.
-    const allArgs = [cubeName, 'SQL_UTILS', ...paramArgNames];
+    // Collect all unique arg names across all params (deduped, preserving order)
+    const seenArgs = new Set([cubeName, 'SQL_UTILS']);
+    const extraArgs: string[] = [];
+    for (const argSet of paramArgSets) {
+      for (const arg of argSet) {
+        if (!seenArgs.has(arg)) {
+          seenArgs.add(arg);
+          extraArgs.push(arg);
+        }
+      }
+    }
 
+    // Build a function whose argument list includes the cube name, SQL_UTILS,
+    // and all referenced symbols. resolveSymbolsCall extracts these arg
+    // names and resolves them: cube dims, cross-cube refs, FILTER_PARAMS, etc.
+    const allArgs = [cubeName, 'SQL_UTILS', ...extraArgs];
+
+    // For each param, call its value function with the resolved args to get SQL
     const body = `
       var base = (${baseSql.toString()})(${cubeName});
       ${resolvedParams.map((p, idx) => {
     const sep = idx === 0 ? '?' : '&';
-    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode(${paramArgNames[idx]});`;
+    const paramArgs = paramArgSets[idx].join(', ');
+    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
   }).join('\n      ')}
       return base;
     `;

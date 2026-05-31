@@ -81,6 +81,8 @@ describe('links through views', () => {
     expect(fullNameDim.links[2].name).toBe('city_dashboard');
     expect(fullNameDim.links[2].dashboard).toBe('city_dash');
     expect(fullNameDim.links[2].params).toEqual(['city', 'user_id']);
+    expect(fullNameDim.links[3].name).toBe('crm_link');
+    expect(fullNameDim.links[3].params).toEqual(['full_name', 'city', 'duplicate_city']);
   });
 
   test('synthetic link dimensions are marked as synthetic in meta', async () => {
@@ -228,18 +230,20 @@ describe('links through views', () => {
     const data = response.rawData();
     expect(data.length).toBe(2);
 
-    // Jane Smith, city=London
+    // Jane Smith, city=London, duplicate_city=London (same ref deduped in args)
     const janeUrl = data[0]['users.full_name___link_crm_link_url'];
     expect(janeUrl).toContain('/dashboard/crm_contacts');
     expect(janeUrl).toContain('full_name=');
     expect(janeUrl).toContain('city=');
+    expect(janeUrl).toContain('duplicate_city=');
     expect(janeUrl).toContain('London');
 
-    // John Doe, city=New York (space encoded)
+    // John Doe, city=New York (space encoded in both city params)
     const johnUrl = data[1]['users.full_name___link_crm_link_url'];
     expect(johnUrl).toContain('/dashboard/crm_contacts');
     expect(johnUrl).toContain('full_name=');
     expect(johnUrl).toContain('city=');
+    expect(johnUrl).toContain('duplicate_city=');
     expect(johnUrl).toContain('New%20York');
   });
 });
