@@ -71,6 +71,7 @@ export type LinkDefinition = {
   dashboard?: string;
   icon?: string;
   target?: 'blank' | 'self';
+  primary?: boolean;
   params?: Array<{ key: string; value: (...args: any[]) => string }>;
 };
 

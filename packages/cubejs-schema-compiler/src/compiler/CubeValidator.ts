@@ -318,6 +318,7 @@ const LinkItemSchema = Joi.object().keys({
   dashboard: Joi.string().regex(/^[_a-zA-Z0-9-]+$/, 'dashboard identifier'),
   icon: Joi.string(),
   target: Joi.string().valid('blank', 'self'),
+  primary: Joi.boolean().strict(),
   params: Joi.array().items(Joi.object().keys({
     key: Joi.string().required(),
     value: Joi.func().required(),
@@ -332,6 +333,10 @@ const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) =>
       return helpers.error('any.custom', { message: `Duplicate link name '${name}'` });
     }
     seen.add(name);
+  }
+  const primaryCount = value.filter((link: any) => link.primary === true).length;
+  if (primaryCount > 1) {
+    return helpers.error('any.custom', { message: 'Only one link can be marked as primary' });
   }
   return value;
 });

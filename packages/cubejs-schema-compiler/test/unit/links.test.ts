@@ -190,6 +190,34 @@ cubes:
     }
   });
 
+  it('should reject multiple primary links on same dimension', async () => {
+    const schema = `
+cubes:
+  - name: users
+    sql_table: users
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        links:
+          - name: first
+            label: First
+            url: "{full_name}"
+            primary: true
+          - name: second
+            label: Second
+            url: "{full_name}"
+            primary: true
+`;
+    const compilers = prepareYamlCompiler(schema);
+    try {
+      await compilers.compiler.compile();
+      fail('Should have thrown for multiple primary links');
+    } catch (e: any) {
+      expect(e.message || e.toString()).toMatch(/primary/i);
+    }
+  });
+
   describe('dashboard links', () => {
     const schemaWithDashboardLink = `
 cubes:
