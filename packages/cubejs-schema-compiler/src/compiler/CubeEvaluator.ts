@@ -407,23 +407,23 @@ export class CubeEvaluator extends CubeSymbols {
       return { encodedKey, valueSqlFn };
     });
 
-    // Pre-resolve each param value to its raw SQL column name, then build
-    // a simple function that returns the full SQL concatenation.
-    // Uses REPLACE chain for URL encoding (matches BaseQuery.urlEncode default).
-    // Database-specific adapters override urlEncode at query execution time
-    // through the SQL_UTILS context for url-type link dimensions without params.
-    const paramSqlFragments = resolvedParams.map((p, idx) => {
+    // Pre-resolve each param value to its raw SQL column name.
+    // The function takes SQL_UTILS as a parameter so the compiler injects the
+    // sqlUtils context symbol (which provides database-specific urlEncode).
+    const paramParts = resolvedParams.map((p, idx) => {
       const sep = idx === 0 ? '?' : '&';
       const valSql = p.valueSqlFn(cubeName);
-      return ` || '${sep}${p.encodedKey}=' || REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(CAST((${valSql}) as TEXT), '%', '%25'), '&', '%26'), '=', '%3D'), '+', '%2B'), ' ', '%20')`;
-    }).join('');
-
-    // Escape for inclusion in a template literal
-    const escaped = paramSqlFragments.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      // valSql is a raw column reference like 'city' — escape quotes for JS string
+      const valSqlEscaped = valSql.replace(/'/g, "\\'");
+      return `result += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode('${valSqlEscaped}');`;
+    }).join('\n      ');
 
     // eslint-disable-next-line no-new-func
-    const fn = new Function(cubeName, `return \`\${(${baseSql.toString()})(${cubeName})}${escaped}\``);
-    Object.defineProperty(fn, 'length', { value: 1 });
+    const fn = new Function(cubeName, 'SQL_UTILS', `
+      var result = (${baseSql.toString()})(${cubeName});
+      ${paramParts}
+      return result;
+    `);
     return fn;
   }
 
