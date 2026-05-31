@@ -246,4 +246,33 @@ describe('links through views', () => {
     expect(johnUrl).toContain('duplicate_city=');
     expect(johnUrl).toContain('New%20York');
   });
+
+  test('cross-cube reference in params resolves joined dimension values', async () => {
+    const response = await client.load({
+      dimensions: [
+        'orders.status',
+        'orders.status___link_user_link_url',
+      ],
+      order: {
+        'orders.status': 'asc',
+      },
+      limit: 2,
+    });
+    const data = response.rawData();
+    expect(data.length).toBe(2);
+
+    // 'completed' order linked to user 1 (John Doe, New York)
+    const completedUrl = data[0]['orders.status___link_user_link_url'];
+    expect(completedUrl).toContain('/dashboard/user_detail');
+    expect(completedUrl).toContain('user_name=');
+    expect(completedUrl).toContain('user_city=');
+    expect(completedUrl).toContain('New%20York');
+
+    // 'pending' order linked to user 2 (Jane Smith, London)
+    const pendingUrl = data[1]['orders.status___link_user_link_url'];
+    expect(pendingUrl).toContain('/dashboard/user_detail');
+    expect(pendingUrl).toContain('user_name=');
+    expect(pendingUrl).toContain('user_city=');
+    expect(pendingUrl).toContain('London');
+  });
 });
