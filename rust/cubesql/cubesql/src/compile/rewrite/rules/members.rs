@@ -2803,15 +2803,114 @@ impl MemberRules {
         let left_join_hints_var = var!(left_join_hints_var);
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            let Some((left_cube, right_cube)) = is_proper_cube_join_condition(
+            // Resolves a join column to the name of the dimension member it
+            // references, but only for plain or time dimensions (measures,
+            // segments, etc. are not valid shared join keys).
+            fn dimension_member_name(
+                egraph: &mut CubeEGraph,
+                members_id: Id,
+                column: &Column,
+            ) -> Option<String> {
+                match egraph[members_id].data.find_member_by_column(column) {
+                    Some(((_, Member::Dimension { name, .. }, _), _))
+                    | Some(((_, Member::TimeDimension { name, .. }, _), _)) => Some(name.clone()),
+                    _ => None,
+                }
+            }
+
+            // Two ways to recognize a joinable pair of CubeScans:
+            //  1. The classic `left.__cubeJoinField = right.__cubeJoinField`
+            //     condition that comes from the data model join graph.
+            //  2. A join between two CubeScans (typically views) on a
+            //     dimension that resolves to the *same underlying cube member*
+            //     — e.g. `orders_view.city = customers_view.city` where both
+            //     `city` dimensions are aliases of the same `cube.dimension`.
+            //     Such a join is on the same shared key, so the two scans can
+            //     be merged into a single CubeScan exactly like any other
+            //     cube-to-cube join, letting the query planner treat the result
+            //     as a (multi-fact) query over the combined members.
+            let cubes = is_proper_cube_join_condition(
                 egraph,
                 subst,
                 left_members_var,
                 left_on_var,
                 right_members_var,
                 right_on_var,
-            ) else {
+            );
+            let cubes = match cubes {
+                Some(cubes) => Some(cubes),
+                None => {
+                    // A view dimension keeps the original `cube.dimension` path
+                    // in `alias_member`; for non-view members we fall back to
+                    // the member name itself.
+                    let resolve_underlying = |member_name: &str| -> String {
+                        meta_context
+                            .find_dimension_with_name(member_name)
+                            .and_then(|dim| dim.alias_member.clone())
+                            .unwrap_or_else(|| member_name.to_string())
+                    };
+
+                    let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    let right_join_ons = var_iter!(egraph[subst[right_on_var]], JoinRightOn)
+                        .cloned()
+                        .collect::<Vec<_>>();
+
+                    let mut found = None;
+                    'pairs: for left_on in left_join_ons.iter() {
+                        for right_on in right_join_ons.iter() {
+                            // Equi-join on a matching set of columns; every
+                            // column pair must resolve to the same underlying
+                            // cube member.
+                            if left_on.is_empty() || left_on.len() != right_on.len() {
+                                continue;
+                            }
+                            let mut left_cube_name: Option<String> = None;
+                            let mut right_cube_name: Option<String> = None;
+                            let mut all_match = true;
+                            for (left_column, right_column) in left_on.iter().zip(right_on.iter()) {
+                                let Some(left_name) = dimension_member_name(
+                                    egraph,
+                                    subst[left_members_var],
+                                    left_column,
+                                ) else {
+                                    all_match = false;
+                                    break;
+                                };
+                                let Some(right_name) = dimension_member_name(
+                                    egraph,
+                                    subst[right_members_var],
+                                    right_column,
+                                ) else {
+                                    all_match = false;
+                                    break;
+                                };
+                                if resolve_underlying(&left_name) != resolve_underlying(&right_name)
+                                {
+                                    all_match = false;
+                                    break;
+                                }
+                                left_cube_name = left_name.split('.').next().map(|s| s.to_string());
+                                right_cube_name =
+                                    right_name.split('.').next().map(|s| s.to_string());
+                            }
+                            if all_match {
+                                if let (Some(left_cube_name), Some(right_cube_name)) =
+                                    (left_cube_name, right_cube_name)
+                                {
+                                    found = Some((left_cube_name, right_cube_name));
+                                    break 'pairs;
+                                }
+                            }
+                        }
+                    }
+                    found
+                }
+            };
+            let Some((left_cube, right_cube)) = cubes else {
                 return false;
             };
 
