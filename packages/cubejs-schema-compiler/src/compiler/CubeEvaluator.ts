@@ -399,36 +399,37 @@ export class CubeEvaluator extends CubeSymbols {
     const resolvedParams = params.map((param) => {
       const rawKey = typeof param.key === 'function' ? param.key() : param.key;
       const encodedKey = encodeURIComponent(rawKey).replace(/'/g, "''");
-      // The transpiler generates `dimName => dimName` for `{dimName}` references.
-      // Extract the dimension name and look up its sql directly.
-      const fnStr = typeof param.value === 'function' ? param.value.toString() : '';
-      const match = fnStr.match(/^(\w+)\s*=>\s*\1$/);
-      let valueSqlFn: any;
-      if (match && dimensions[match[1]]) {
-        valueSqlFn = dimensions[match[1]].sql;
-      } else {
-        valueSqlFn = param.value;
-      }
-      return { encodedKey, valueSqlFn };
+      return { encodedKey, valueFn: param.value };
     });
 
-    // Pre-resolve each param value to its raw SQL column name.
-    // The function takes SQL_UTILS as a parameter so the compiler injects the
-    // sqlUtils context symbol (which provides database-specific urlEncode).
-    const paramParts = resolvedParams.map((p, idx) => {
-      const sep = idx === 0 ? '?' : '&';
-      const valSql = p.valueSqlFn(cubeName);
-      // valSql is a raw column reference like 'city' — escape for JS string literal
-      const valSqlEscaped = valSql.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      return `result += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode('${valSqlEscaped}');`;
-    }).join('\n      ');
+    // Extract the argument name from each param value function.
+    // The transpiler generates functions like `city => city` or `(users) => \`${city}\``
+    // where the argument names are what resolveSymbolsCall uses for resolution.
+    const paramArgNames = resolvedParams.map((p, idx) => {
+      const fnStr = p.valueFn.toString();
+      const match = fnStr.match(/^(\w+)\s*=>|^\s*function\s*\w*\s*\(([^)]*)\)/);
+      if (match) {
+        return (match[1] || match[2] || '').split(',')[0].trim();
+      }
+      return `__param${idx}`;
+    });
+
+    // Build a function whose argument list includes the cube name, SQL_UTILS,
+    // and each param's reference symbol. resolveSymbolsCall extracts these arg
+    // names and resolves them: cube dims, cross-cube refs, FILTER_PARAMS, etc.
+    const allArgs = [cubeName, 'SQL_UTILS', ...paramArgNames];
+
+    const body = `
+      var base = (${baseSql.toString()})(${cubeName});
+      ${resolvedParams.map((p, idx) => {
+    const sep = idx === 0 ? '?' : '&';
+    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode(${paramArgNames[idx]});`;
+  }).join('\n      ')}
+      return base;
+    `;
 
     // eslint-disable-next-line no-new-func
-    const fn = new Function(cubeName, 'SQL_UTILS', `
-      var result = (${baseSql.toString()})(${cubeName});
-      ${paramParts}
-      return result;
-    `);
+    const fn = new Function(...allArgs, body);
     return fn;
   }
 
