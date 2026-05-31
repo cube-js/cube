@@ -2848,6 +2848,8 @@ impl MemberRules {
                 right_members_var,
                 right_on_var,
             );
+            let mut shared_left_keys: Vec<String> = vec![];
+            let mut shared_right_keys: Vec<String> = vec![];
             let (cubes, shared_member_join) = match cubes {
                 Some(cubes) => (Some(cubes), false),
                 None => {
@@ -2879,6 +2881,8 @@ impl MemberRules {
                             }
                             let mut left_cube_name: Option<String> = None;
                             let mut right_cube_name: Option<String> = None;
+                            let mut left_keys: Vec<String> = vec![];
+                            let mut right_keys: Vec<String> = vec![];
                             let mut all_match = true;
                             for (left_column, right_column) in left_on.iter().zip(right_on.iter()) {
                                 let Some(left_name) = dimension_member_name(
@@ -2905,12 +2909,16 @@ impl MemberRules {
                                 left_cube_name = left_name.split('.').next().map(|s| s.to_string());
                                 right_cube_name =
                                     right_name.split('.').next().map(|s| s.to_string());
+                                left_keys.push(left_name);
+                                right_keys.push(right_name);
                             }
                             if all_match {
                                 if let (Some(left_cube_name), Some(right_cube_name)) =
                                     (left_cube_name, right_cube_name)
                                 {
                                     found = Some((left_cube_name, right_cube_name));
+                                    shared_left_keys = left_keys;
+                                    shared_right_keys = right_keys;
                                     break 'pairs;
                                 }
                             }
@@ -2926,24 +2934,9 @@ impl MemberRules {
             // For a join between two views on a shared cube member, Tesseract
             // renders the merged multi-fact scan as a FULL OUTER JOIN over the
             // shared key. Re-introduce the requested INNER/LEFT/RIGHT semantics
-            // by requiring a measure of each "must be present" side to be set
-            // (FULL adds nothing). Branch presence is detected via a measure
-            // because the shared grouping key is COALESCEd across sides
-            // downstream and so cannot distinguish which side a row came from.
+            // by requiring the join key of each "must be present" side to be
+            // set (FULL adds nothing).
             if shared_member_join {
-                fn side_measure(egraph: &CubeEGraph, members_id: Id) -> Option<String> {
-                    egraph[members_id]
-                        .data
-                        .member_name_to_expr
-                        .as_ref()
-                        .and_then(|m| {
-                            m.list.iter().find_map(|(_, member, _)| match member {
-                                Member::Measure { name, .. } => Some(name.clone()),
-                                _ => None,
-                            })
-                        })
-                }
-
                 let mut require_left = false;
                 let mut require_right = false;
                 if let Some(join_type) = var_list_iter!(egraph[subst[join_type_var]], JoinJoinType)
@@ -2961,16 +2954,12 @@ impl MemberRules {
                     }
                 }
 
-                let mut presence_members = vec![];
+                let mut presence_members: Vec<String> = vec![];
                 if require_left {
-                    if let Some(name) = side_measure(egraph, subst[left_members_var]) {
-                        presence_members.push(name);
-                    }
+                    presence_members.extend(shared_left_keys.iter().cloned());
                 }
                 if require_right {
-                    if let Some(name) = side_measure(egraph, subst[right_members_var]) {
-                        presence_members.push(name);
-                    }
+                    presence_members.extend(shared_right_keys.iter().cloned());
                 }
 
                 if !presence_members.is_empty() {

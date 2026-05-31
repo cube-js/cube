@@ -129,7 +129,7 @@ async fn test_join_two_views_on_shared_member() {
             ]),
             segments: Some(vec![]),
             order: Some(vec![]),
-            filters: Some(vec![set_filter("customers_view.avg_age")]),
+            filters: Some(vec![set_filter("customers_view.customer_city")]),
             ungrouped: Some(true),
             join_hints: Some(vec![vec![
                 "customers_view".to_string(),
@@ -175,7 +175,7 @@ async fn test_group_by_left_join_two_views_on_shared_member() {
             dimensions: Some(vec!["customers_view.customer_city".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
-            filters: Some(vec![set_filter("customers_view.avg_age")]),
+            filters: Some(vec![set_filter("customers_view.customer_city")]),
             join_hints: Some(vec![vec![
                 "customers_view".to_string(),
                 "orders_view".to_string(),
@@ -218,8 +218,8 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
             segments: Some(vec![]),
             order: Some(vec![]),
             filters: Some(vec![
-                set_filter("orders_view.revenue"),
-                set_filter("customers_view.avg_age"),
+                set_filter("orders_view.customer_city"),
+                set_filter("customers_view.customer_city"),
             ]),
             join_hints: Some(vec![vec![
                 "customers_view".to_string(),
