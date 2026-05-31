@@ -223,15 +223,15 @@ describe('links through views', () => {
 
     // Jane Smith, city=London
     const janeUrl = data[0]['users.full_name___link_crm_link_url'];
-    expect(janeUrl).toContain('https://crm.example.com/contacts');
-    expect(janeUrl).toContain('name=');
+    expect(janeUrl).toContain('/dashboard/crm_contacts');
+    expect(janeUrl).toContain('full_name=');
     expect(janeUrl).toContain('city=');
     expect(janeUrl).toContain('London');
 
-    // John Doe, city=New York (space encoded), name contains space
+    // John Doe, city=New York (space encoded)
     const johnUrl = data[1]['users.full_name___link_crm_link_url'];
-    expect(johnUrl).toContain('https://crm.example.com/contacts');
-    expect(johnUrl).toContain('name=');
+    expect(johnUrl).toContain('/dashboard/crm_contacts');
+    expect(johnUrl).toContain('full_name=');
     expect(johnUrl).toContain('city=');
     expect(johnUrl).toContain('New%20York');
   });

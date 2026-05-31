@@ -32,9 +32,9 @@ cubes:
                 value: "{id}"
           - name: crm_link
             label: View in CRM
-            url: "'https://crm.example.com/contacts'"
+            dashboard: crm_contacts
             params:
-              - key: name
+              - key: full_name
                 value: "{full_name}"
               - key: city
                 value: "{city}"
