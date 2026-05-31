@@ -1,17 +1,17 @@
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
+use cubeclient::models::{V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
 use pretty_assertions::assert_eq;
 
 use crate::{
     compile::{
         rewrite::rewriter::Rewriter,
         test::{
-            convert_select_to_query_plan_with_meta, init_testing_logger,
-            utils::LogicalPlanTestUtils,
+            convert_select_to_query_plan_with_meta, convert_sql_to_cube_query, get_test_session,
+            get_test_tenant_ctx_with_meta, init_testing_logger, utils::LogicalPlanTestUtils,
         },
+        CompilationError, DatabaseProtocol,
     },
     transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure},
 };
-use cubeclient::models::V1CubeMetaType;
 
 /// Two views that both expose the same underlying `customers.customer_city`
 /// dimension (via `aliasMember`). `orders_view` carries an `orders` measure
@@ -94,8 +94,8 @@ fn set_filter(member: &str) -> V1LoadRequestQueryFilterItem {
 /// underlying cube member (`customers.customer_city`) should be merged into a
 /// single CubeScan over the combined members, exactly like a regular
 /// cube-to-cube join. As a `LEFT JOIN`, the left ("must be present") side is
-/// guarded with a `set` filter so the downstream FULL OUTER multi-fact stitch
-/// keeps left-join semantics.
+/// guarded with a `set` filter on its join key so the downstream FULL OUTER
+/// multi-fact stitch keeps left-join semantics.
 #[tokio::test]
 async fn test_join_two_views_on_shared_member() {
     if !Rewriter::sql_push_down_enabled() {
@@ -143,7 +143,7 @@ async fn test_join_two_views_on_shared_member() {
 /// The motivating query: a grouped (multi-fact) `LEFT JOIN` selecting a
 /// dimension and measures from each view, joined on the shared `customer_city`.
 /// The two view scans are merged into a single grouped CubeScan, and the left
-/// side gets a `set` filter to recover LEFT-join semantics on top of the
+/// join key gets a `set` filter to recover LEFT-join semantics on top of the
 /// FULL OUTER multi-fact stitch.
 #[tokio::test]
 async fn test_group_by_left_join_two_views_on_shared_member() {
@@ -186,7 +186,7 @@ async fn test_group_by_left_join_two_views_on_shared_member() {
 }
 
 /// Same shape but `INNER JOIN`: both sides must be present, so the merged scan
-/// carries a `set` filter for a measure of each side.
+/// carries a `set` filter on the join key of each side.
 #[tokio::test]
 async fn test_group_by_inner_join_two_views_on_shared_member() {
     if !Rewriter::sql_push_down_enabled() {
@@ -228,4 +228,32 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
             ..Default::default()
         }
     )
+}
+
+/// The merge only fires when the join key is fully within dimensions. Joining
+/// the two views on a measure (`o.revenue = c.avg_age`) is not a shared-member
+/// dimension join, so the scans are not merged and the query is rejected the
+/// same way any other unsupported cube join is.
+#[tokio::test]
+async fn test_join_two_views_on_measure_is_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_meta(views_meta());
+    let query = convert_sql_to_cube_query(
+        &r#"
+            SELECT *
+            FROM customers_view c
+            LEFT JOIN orders_view o ON (o.revenue = c.avg_age)
+            "#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
 }

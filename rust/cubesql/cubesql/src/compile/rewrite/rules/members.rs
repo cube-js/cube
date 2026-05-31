@@ -2873,9 +2873,13 @@ impl MemberRules {
                     let mut found = None;
                     'pairs: for left_on in left_join_ons.iter() {
                         for right_on in right_join_ons.iter() {
-                            // Equi-join on a matching set of columns; every
-                            // column pair must resolve to the same underlying
-                            // cube member.
+                            // We can only merge when the *whole* join key is
+                            // fully within dimensions: every column pair must
+                            // resolve to a dimension (or time dimension) on both
+                            // sides and to the same underlying cube member. A
+                            // join key that touches a measure/segment/etc. (or
+                            // mixes underlying members) is rejected, leaving the
+                            // join to the normal (non-merged) handling.
                             if left_on.is_empty() || left_on.len() != right_on.len() {
                                 continue;
                             }
