@@ -315,7 +315,7 @@ const LinkItemSchema = Joi.object().keys({
   name: identifier.required(),
   label: Joi.string().required(),
   url: Joi.func(),
-  dashboard: Joi.string().regex(/^[_a-zA-Z0-9-]+$/, 'dashboard identifier'),
+  dashboard: Joi.string(),
   icon: Joi.string(),
   target: Joi.string().valid('blank', 'self'),
   primary: Joi.boolean().strict(),

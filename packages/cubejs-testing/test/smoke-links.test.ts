@@ -72,7 +72,7 @@ describe('links through views', () => {
     const fullNameDim = view.dimensions.find((d: any) => d.name === 'users_with_links.full_name');
 
     expect(fullNameDim.links).toBeDefined();
-    expect(fullNameDim.links).toHaveLength(4);
+    expect(fullNameDim.links).toHaveLength(5);
     expect(fullNameDim.links[0].name).toBe('google_search');
     expect(fullNameDim.links[0].label).toBe('Search on Google');
     expect(fullNameDim.links[0].icon).toBe('brand-google');
@@ -274,5 +274,30 @@ describe('links through views', () => {
     expect(pendingUrl).toContain('user_name=');
     expect(pendingUrl).toContain('user_city=');
     expect(pendingUrl).toContain('London');
+  });
+
+  test('dashboard referencing cube member produces dynamic dashboard path', async () => {
+    const response = await client.load({
+      dimensions: [
+        'users.full_name',
+        'users.full_name___link_dynamic_dashboard_url',
+      ],
+      order: {
+        'users.full_name': 'asc',
+      },
+      limit: 2,
+    });
+    const data = response.rawData();
+    expect(data.length).toBe(2);
+
+    // Jane Smith lives in London → /dashboard/London
+    const janeUrl = data[0]['users.full_name___link_dynamic_dashboard_url'];
+    expect(janeUrl).toContain('/dashboard/');
+    expect(janeUrl).toContain('London');
+
+    // John Doe lives in New York → /dashboard/New York
+    const johnUrl = data[1]['users.full_name___link_dynamic_dashboard_url'];
+    expect(johnUrl).toContain('/dashboard/');
+    expect(johnUrl).toContain('New York');
   });
 });
