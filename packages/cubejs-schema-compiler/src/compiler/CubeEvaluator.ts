@@ -405,10 +405,7 @@ export class CubeEvaluator extends CubeSymbols {
     // Extract ALL argument names from each param value function using the same
     // regex-based extraction that resolveSymbolsCall uses (funcArguments).
     // A param value can reference multiple members, e.g. CONCAT({first_name}, ' ', {last_name})
-    const paramArgSets = resolvedParams.map((p, idx) => {
-      const args = this.funcArguments(p.valueFn);
-      return args.length > 0 ? args : [`__param${idx}`];
-    });
+    const paramArgSets = resolvedParams.map((p) => this.funcArguments(p.valueFn));
 
     // Collect all unique arg names across all params (deduped, preserving order)
     const seenArgs = new Set([cubeName, 'SQL_UTILS']);
