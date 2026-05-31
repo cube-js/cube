@@ -144,12 +144,19 @@ describe('links through views', () => {
     const data = response.rawData();
     expect(data.length).toBe(2);
 
-    // Verify the dashboard link URL is present and contains the dashboard path
+    // Jane Smith, city=London
     const janeUrl = data[0]['users_with_links.full_name___link_city_dashboard_url'];
     expect(janeUrl).toContain('/dashboard/city_dash');
+    expect(janeUrl).toContain('city=');
+    expect(janeUrl).toContain('London');
+    expect(janeUrl).toContain('user_id=');
 
+    // John Doe, city=New York (space encoded)
     const johnUrl = data[1]['users_with_links.full_name___link_city_dashboard_url'];
     expect(johnUrl).toContain('/dashboard/city_dash');
+    expect(johnUrl).toContain('city=');
+    expect(johnUrl).toContain('New%20York');
+    expect(johnUrl).toContain('user_id=');
   });
 
   test('REST SQL API can query link synthetic dimensions', async () => {

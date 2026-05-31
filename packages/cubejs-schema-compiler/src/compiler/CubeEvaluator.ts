@@ -381,6 +381,10 @@ export class CubeEvaluator extends CubeSymbols {
               shown: dimDef.shown,
               meta: dimDef.meta,
             };
+            // Also update the symbols definition so view proxies resolve the upgraded version
+            if (this.symbols[cube.name]) {
+              this.symbols[cube.name][syntheticName] = cube.dimensions[syntheticName];
+            }
           }
         });
       }
