@@ -30,6 +30,14 @@ cubes:
                 value: "{city}"
               - key: user_id
                 value: "{id}"
+          - name: crm_link
+            label: View in CRM
+            url: "'https://crm.example.com/contacts'"
+            params:
+              - key: name
+                value: "{full_name}"
+              - key: city
+                value: "{city}"
 
       - name: city
         sql: city

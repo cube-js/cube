@@ -72,7 +72,7 @@ describe('links through views', () => {
     const fullNameDim = view.dimensions.find((d: any) => d.name === 'users_with_links.full_name');
 
     expect(fullNameDim.links).toBeDefined();
-    expect(fullNameDim.links).toHaveLength(3);
+    expect(fullNameDim.links).toHaveLength(4);
     expect(fullNameDim.links[0].name).toBe('google_search');
     expect(fullNameDim.links[0].label).toBe('Search on Google');
     expect(fullNameDim.links[0].icon).toBe('brand-google');
@@ -205,5 +205,34 @@ describe('links through views', () => {
     expect(johnUrl).toContain('city=');
     expect(johnUrl).toContain('New%20York');
     expect(johnUrl).toContain('user_id=');
+  });
+
+  test('url link with params combines base URL and encoded query string', async () => {
+    const response = await client.load({
+      dimensions: [
+        'users.full_name',
+        'users.full_name___link_crm_link_url',
+      ],
+      order: {
+        'users.full_name': 'asc',
+      },
+      limit: 2,
+    });
+    const data = response.rawData();
+    expect(data.length).toBe(2);
+
+    // Jane Smith, city=London
+    const janeUrl = data[0]['users.full_name___link_crm_link_url'];
+    expect(janeUrl).toContain('https://crm.example.com/contacts');
+    expect(janeUrl).toContain('name=');
+    expect(janeUrl).toContain('city=');
+    expect(janeUrl).toContain('London');
+
+    // John Doe, city=New York (space encoded), name contains space
+    const johnUrl = data[1]['users.full_name___link_crm_link_url'];
+    expect(johnUrl).toContain('https://crm.example.com/contacts');
+    expect(johnUrl).toContain('name=');
+    expect(johnUrl).toContain('city=');
+    expect(johnUrl).toContain('New%20York');
   });
 });
