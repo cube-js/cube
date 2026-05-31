@@ -1,4 +1,4 @@
-use cubeclient::models::V1LoadRequestQuery;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
 use pretty_assertions::assert_eq;
 
 use crate::{
@@ -80,10 +80,22 @@ fn views_meta() -> Vec<CubeMeta> {
     ]
 }
 
+fn set_filter(member: &str) -> V1LoadRequestQueryFilterItem {
+    V1LoadRequestQueryFilterItem {
+        member: Some(member.to_string()),
+        operator: Some("set".to_string()),
+        values: None,
+        or: None,
+        and: None,
+    }
+}
+
 /// A join between two views on a dimension that resolves to the same
 /// underlying cube member (`customers.customer_city`) should be merged into a
 /// single CubeScan over the combined members, exactly like a regular
-/// cube-to-cube join.
+/// cube-to-cube join. As a `LEFT JOIN`, the left ("must be present") side is
+/// guarded with a `set` filter so the downstream FULL OUTER multi-fact stitch
+/// keeps left-join semantics.
 #[tokio::test]
 async fn test_join_two_views_on_shared_member() {
     if !Rewriter::sql_push_down_enabled() {
@@ -117,6 +129,7 @@ async fn test_join_two_views_on_shared_member() {
             ]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            filters: Some(vec![set_filter("customers_view.avg_age")]),
             ungrouped: Some(true),
             join_hints: Some(vec![vec![
                 "customers_view".to_string(),
@@ -127,12 +140,13 @@ async fn test_join_two_views_on_shared_member() {
     )
 }
 
-/// The motivating query: a grouped (multi-fact) query selecting a dimension
-/// and measures from each view, joined on the shared `customer_city`. The two
-/// view scans are merged into a single grouped CubeScan over the combined
-/// members.
+/// The motivating query: a grouped (multi-fact) `LEFT JOIN` selecting a
+/// dimension and measures from each view, joined on the shared `customer_city`.
+/// The two view scans are merged into a single grouped CubeScan, and the left
+/// side gets a `set` filter to recover LEFT-join semantics on top of the
+/// FULL OUTER multi-fact stitch.
 #[tokio::test]
-async fn test_group_by_join_two_views_on_shared_member() {
+async fn test_group_by_left_join_two_views_on_shared_member() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
@@ -161,6 +175,52 @@ async fn test_group_by_join_two_views_on_shared_member() {
             dimensions: Some(vec!["customers_view.customer_city".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            filters: Some(vec![set_filter("customers_view.avg_age")]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
+
+/// Same shape but `INNER JOIN`: both sides must be present, so the merged scan
+/// carries a `set` filter for a measure of each side.
+#[tokio::test]
+async fn test_group_by_inner_join_two_views_on_shared_member() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan_with_meta(
+        r#"
+            SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
+            FROM customers_view c
+            INNER JOIN orders_view o ON o.customer_city = c.customer_city
+            GROUP BY 1
+            "#
+        .to_string(),
+        views_meta(),
+    )
+    .await
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "orders_view.revenue".to_string(),
+                "customers_view.avg_age".to_string(),
+            ]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("orders_view.revenue"),
+                set_filter("customers_view.avg_age"),
+            ]),
             join_hints: Some(vec![vec![
                 "customers_view".to_string(),
                 "orders_view".to_string(),
