@@ -248,7 +248,6 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
-    this.prepareSyntheticLinkDimensions(cube);
     this.prepareMembers(cube.dimensions, cube, errorReporter);
     this.prepareMembers(cube.segments, cube, errorReporter);
 
@@ -340,105 +339,6 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  protected prepareSyntheticLinkDimensions(cube: any) {
-    if (!cube.dimensions) return;
-    if (cube.isView) return;
-
-    for (const [dimName, dimDef] of Object.entries<any>(cube.dimensions)) {
-      if (dimDef.links && Array.isArray(dimDef.links)) {
-        dimDef.links.forEach((link: any) => {
-          const linkName = typeof link.name === 'function' ? link.name() : link.name;
-          const syntheticName = `${dimName}___link_${linkName}_url`;
-
-          // CubeSymbols.generateSyntheticLinkDimensions already created a basic
-          // version for view-include resolution. Only upgrade here if params need
-          // to be baked into the SQL (requires buildLinkSqlWithParams).
-          const hasParams = link.params && Array.isArray(link.params) && link.params.length > 0;
-          if (cube.dimensions[syntheticName] && !hasParams) return;
-
-          let baseSql;
-          if (link.url) {
-            baseSql = link.url;
-          } else if (link.dashboard) {
-            const dashboardId = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
-            // eslint-disable-next-line no-new-func
-            baseSql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
-          }
-
-          if (baseSql) {
-            let sql;
-            if (link.params && Array.isArray(link.params) && link.params.length > 0) {
-              sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params, cube.dimensions);
-            } else {
-              sql = baseSql;
-            }
-            cube.dimensions[syntheticName] = {
-              sql,
-              type: 'string',
-              synthetic: true,
-              ownedByCube: true,
-              public: dimDef.public !== false,
-              shown: dimDef.shown,
-              meta: dimDef.meta,
-            };
-            // Also update the symbols definition so view proxies resolve the upgraded version
-            if (this.symbols[cube.name]) {
-              this.symbols[cube.name][syntheticName] = cube.dimensions[syntheticName];
-            }
-          }
-        });
-      }
-    }
-  }
-
-  private buildLinkSqlWithParams(cubeName: string, baseSql: any, params: Array<any>, dimensions: Record<string, any>) {
-    if (params.length === 0) {
-      return baseSql;
-    }
-
-    const resolvedParams = params.map((param) => {
-      const rawKey = typeof param.key === 'function' ? param.key() : param.key;
-      const encodedKey = encodeURIComponent(rawKey).replace(/'/g, "''");
-      return { encodedKey, valueFn: param.value };
-    });
-
-    // Extract ALL argument names from each param value function using the same
-    // regex-based extraction that resolveSymbolsCall uses (funcArguments).
-    // A param value can reference multiple members, e.g. CONCAT({first_name}, ' ', {last_name})
-    const paramArgSets = resolvedParams.map((p) => this.funcArguments(p.valueFn));
-
-    // Collect all unique arg names across all params (deduped, preserving order)
-    const seenArgs = new Set([cubeName, 'SQL_UTILS']);
-    const extraArgs: string[] = [];
-    for (const argSet of paramArgSets) {
-      for (const arg of argSet) {
-        if (!seenArgs.has(arg)) {
-          seenArgs.add(arg);
-          extraArgs.push(arg);
-        }
-      }
-    }
-
-    // Build a function whose argument list includes the cube name, SQL_UTILS,
-    // and all referenced symbols. resolveSymbolsCall extracts these arg
-    // names and resolves them: cube dims, cross-cube refs, FILTER_PARAMS, etc.
-    const allArgs = [cubeName, 'SQL_UTILS', ...extraArgs];
-
-    // For each param, call its value function with the resolved args to get SQL
-    const body = `
-      var base = (${baseSql.toString()})(${cubeName});
-      ${resolvedParams.map((p, idx) => {
-    const sep = idx === 0 ? '?' : '&';
-    const paramArgs = paramArgSets[idx].join(', ');
-    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
-  }).join('\n      ')}
-      return base;
-    `;
-
-    // eslint-disable-next-line no-new-func
-    const fn = new Function(...allArgs, body);
-    return fn;
-  }
 
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {
     const types = ['measures', 'dimensions', 'segments'];

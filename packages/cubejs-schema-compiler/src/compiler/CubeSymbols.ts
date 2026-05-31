@@ -654,15 +654,21 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             throw new Error(`Link '${linkName}' on dimension '${dimName}' conflicts with existing dimension '${syntheticName}'`);
           }
           if (!dims[syntheticName]) {
-            let sql;
+            let baseSql;
             if (link.url) {
-              sql = link.url;
+              baseSql = link.url;
             } else if (link.dashboard) {
               const dashboardId = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
               // eslint-disable-next-line no-new-func
-              sql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
+              baseSql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
             }
-            if (sql) {
+            if (baseSql) {
+              let sql;
+              if (link.params && Array.isArray(link.params) && link.params.length > 0) {
+                sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params);
+              } else {
+                sql = baseSql;
+              }
               dims[syntheticName] = {
                 sql,
                 type: 'string',
@@ -676,6 +682,45 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
       }
     }
+  }
+
+  protected buildLinkSqlWithParams(cubeName: string, baseSql: any, params: Array<any>) {
+    const resolvedParams = params.map((param) => {
+      const rawKey = typeof param.key === 'function' ? param.key() : param.key;
+      const encodedKey = encodeURIComponent(rawKey).replace(/'/g, "''");
+      return { encodedKey, valueFn: param.value };
+    });
+
+    // Extract ALL argument names from each param value function using the same
+    // regex-based extraction that resolveSymbolsCall uses (funcArguments).
+    const paramArgSets = resolvedParams.map((p) => this.funcArguments(p.valueFn));
+
+    // Collect all unique arg names across all params (deduped, preserving order)
+    const seenArgs = new Set([cubeName, 'SQL_UTILS']);
+    const extraArgs: string[] = [];
+    for (const argSet of paramArgSets) {
+      for (const arg of argSet) {
+        if (!seenArgs.has(arg)) {
+          seenArgs.add(arg);
+          extraArgs.push(arg);
+        }
+      }
+    }
+
+    const allArgs = [cubeName, 'SQL_UTILS', ...extraArgs];
+
+    const body = `
+      var base = (${baseSql.toString()})(${cubeName});
+      ${resolvedParams.map((p, idx) => {
+    const sep = idx === 0 ? '?' : '&';
+    const paramArgs = paramArgSets[idx].join(', ');
+    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
+  }).join('\n      ')}
+      return base;
+    `;
+
+    // eslint-disable-next-line no-new-func
+    return new Function(...allArgs, body);
   }
 
   protected transformPreAggregations(preAggregations: Object) {
