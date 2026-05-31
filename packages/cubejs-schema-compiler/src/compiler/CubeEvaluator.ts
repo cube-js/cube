@@ -414,8 +414,8 @@ export class CubeEvaluator extends CubeSymbols {
     const paramParts = resolvedParams.map((p, idx) => {
       const sep = idx === 0 ? '?' : '&';
       const valSql = p.valueSqlFn(cubeName);
-      // valSql is a raw column reference like 'city' — escape quotes for JS string
-      const valSqlEscaped = valSql.replace(/'/g, "\\'");
+      // valSql is a raw column reference like 'city' — escape for JS string literal
+      const valSqlEscaped = valSql.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       return `result += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode('${valSqlEscaped}');`;
     }).join('\n      ');
 
