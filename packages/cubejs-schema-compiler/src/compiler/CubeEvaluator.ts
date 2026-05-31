@@ -339,7 +339,6 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {
     const types = ['measures', 'dimensions', 'segments'];
     if (specifier === '*') {
