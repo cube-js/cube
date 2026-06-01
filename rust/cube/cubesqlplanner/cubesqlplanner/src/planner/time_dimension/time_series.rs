@@ -636,4 +636,117 @@ mod tests {
         .unwrap_err();
         assert!(!err.message.is_empty());
     }
+
+    #[test]
+    fn custom_exceeding_buckets_errors() {
+        // One day at a 1-second interval is 86_400 buckets, over the 50k cap.
+        let err = QueryTimeSeries::generate_custom(
+            "1 second",
+            &dr("2024-01-10T00:00:00", "2024-01-11T00:00:00"),
+            "2024-01-10T00:00:00",
+            3,
+        )
+        .unwrap_err();
+        assert!(err.message.contains("exceeded"));
+    }
+
+    #[test]
+    fn custom_non_advancing_interval_errors() {
+        // Net-negative interval with origin == range start reaches the
+        // "did not advance" guard without spinning in alignment.
+        let err = QueryTimeSeries::generate_custom(
+            "-1 day",
+            &dr("2024-01-01", "2024-01-10"),
+            "2024-01-01",
+            3,
+        )
+        .unwrap_err();
+        assert!(err.message.contains("did not advance"));
+    }
+
+    #[test]
+    fn custom_month_plus_days_interval() {
+        // "1 month 15 days" from Jan 1: Feb 16, Mar 31, May 15. Mar 31 + 1 month
+        // clamps to Apr 30 before adding 15 days, exercising months+days.
+        let result = QueryTimeSeries::generate_custom(
+            "1 month 15 days",
+            &dr("2024-01-01", "2024-05-01"),
+            "2024-01-01",
+            3,
+        )
+        .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0][0], "2024-01-01T00:00:00.000");
+        assert_eq!(result[0][1], "2024-02-15T23:59:59.999");
+        assert_eq!(result[1][0], "2024-02-16T00:00:00.000");
+        assert_eq!(result[1][1], "2024-03-30T23:59:59.999");
+        assert_eq!(result[2][0], "2024-03-31T00:00:00.000");
+        assert_eq!(result[2][1], "2024-05-14T23:59:59.999");
+    }
+
+    #[test]
+    fn custom_sub_day_interval() {
+        // "2 days 6 hours" = 54h steps from Jan 1 00:00.
+        let result = QueryTimeSeries::generate_custom(
+            "2 days 6 hours",
+            &dr("2024-01-01T00:00:00", "2024-01-06T00:00:00"),
+            "2024-01-01T00:00:00",
+            3,
+        )
+        .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result[0],
+            vec!["2024-01-01T00:00:00.000", "2024-01-03T05:59:59.999"]
+        );
+        assert_eq!(result[1][0], "2024-01-03T06:00:00.000");
+        assert_eq!(result[2][0], "2024-01-05T12:00:00.000");
+    }
+
+    #[test]
+    fn custom_quarter_interval() {
+        let result = QueryTimeSeries::generate_custom(
+            "1 quarter",
+            &dr("2024-01-01", "2024-12-31"),
+            "2024-01-01",
+            3,
+        )
+        .unwrap();
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0][0], "2024-01-01T00:00:00.000");
+        assert_eq!(result[0][1], "2024-03-31T23:59:59.999");
+        assert_eq!(result[3][0], "2024-10-01T00:00:00.000");
+        assert_eq!(result[3][1], "2024-12-31T23:59:59.999");
+    }
+
+    #[test]
+    fn custom_year_interval() {
+        let result = QueryTimeSeries::generate_custom(
+            "1 year",
+            &dr("2022-01-01", "2024-06-01"),
+            "2022-01-01",
+            3,
+        )
+        .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0][1], "2022-12-31T23:59:59.999");
+        assert_eq!(result[2][0], "2024-01-01T00:00:00.000");
+        assert_eq!(result[2][1], "2024-12-31T23:59:59.999");
+    }
+
+    #[test]
+    fn custom_precision_six() {
+        let result = QueryTimeSeries::generate_custom(
+            "1 day",
+            &dr("2024-01-01", "2024-01-02"),
+            "2024-01-01",
+            6,
+        )
+        .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0],
+            vec!["2024-01-01T00:00:00.000000", "2024-01-01T23:59:59.999999"]
+        );
+    }
 }
