@@ -658,9 +658,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             if (link.url) {
               baseSql = link.url;
             } else if (link.dashboard) {
-              const dashboardId = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
+              const dashboardId = link.dashboard;
+              const escaped = dashboardId.replace(/'/g, "''");
               // eslint-disable-next-line no-new-func
-              baseSql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
+              baseSql = new Function(`return \`'/dashboard/${escaped}'\``);
             }
             if (baseSql) {
               const sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params || []);
