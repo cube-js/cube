@@ -1,7 +1,6 @@
 use super::access_policy::AccessPolicy;
 use super::dimension::Dimension;
 use super::expression::Expression;
-use super::hierarchy::Hierarchy;
 use super::join::Join;
 use super::measure::Measure;
 use super::path::CubeName;
@@ -29,7 +28,6 @@ pub struct Cube {
     pub dimensions: HashMap<String, Rc<Dimension>>,
     pub segments: HashMap<String, Rc<Segment>>,
     pub joins: Vec<Join>,
-    pub hierarchies: HashMap<String, Rc<Hierarchy>>,
     pub pre_aggregations: HashMap<String, Rc<PreAggregation>>,
     pub access_policies: Vec<AccessPolicy>,
 
@@ -51,9 +49,6 @@ impl Cube {
     }
     pub fn segment(&self, name: &str) -> Option<&Rc<Segment>> {
         self.segments.get(name)
-    }
-    pub fn hierarchy(&self, name: &str) -> Option<&Rc<Hierarchy>> {
-        self.hierarchies.get(name)
     }
     pub fn pre_aggregation(&self, name: &str) -> Option<&Rc<PreAggregation>> {
         self.pre_aggregations.get(name)

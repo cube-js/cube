@@ -89,7 +89,6 @@ const BRIDGES: BridgeSpec[] = [
       'access_policies',
       'default_filters',
       'dimensions',
-      'hierarchies',
       'included_members',
       'is_calendar',
       'is_view',

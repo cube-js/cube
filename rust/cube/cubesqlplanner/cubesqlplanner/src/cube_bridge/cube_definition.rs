@@ -1,7 +1,6 @@
 use super::access_policy_definition::{AccessPolicyDefinition, NativeAccessPolicyDefinition};
 use super::cube_join_definition::{CubeJoinDefinition, NativeCubeJoinDefinition};
 use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
-use super::hierarchy_definition::{HierarchyDefinition, NativeHierarchyDefinition};
 use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
 use super::pre_aggregation_description::{
@@ -58,8 +57,6 @@ pub trait CubeDefinition {
     fn dimensions(&self) -> Result<Vec<Rc<dyn DimensionDefinition>>, CubeError>;
     #[nbridge(field, vec)]
     fn segments(&self) -> Result<Vec<Rc<dyn SegmentDefinition>>, CubeError>;
-    #[nbridge(field, vec, optional, rename = "evaluatedHierarchies")]
-    fn hierarchies(&self) -> Result<Option<Vec<Rc<dyn HierarchyDefinition>>>, CubeError>;
     #[nbridge(field, vec, optional)]
     fn joins(&self) -> Result<Option<Vec<Rc<dyn CubeJoinDefinition>>>, CubeError>;
     #[nbridge(field, vec, optional, rename = "preAggregations")]

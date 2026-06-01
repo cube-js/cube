@@ -31,7 +31,6 @@ function makeCube(overrides: Partial<any> = {}): any {
     joins: [],
     preAggregations: [],
     accessPolicy: [],
-    evaluatedHierarchies: [],
     includedMembers: [],
     ...overrides,
   };

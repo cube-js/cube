@@ -8,8 +8,8 @@
 //!
 //! Scope (initial cut): we cover what the existing `cube_bridge`
 //! traits expose for cubes/measures/dimensions/segments/joins, plus
-//! hierarchies, access policies, pre-aggregations, and view
-//! resolution. Operational concerns from JS (file tracking,
+//! access policies, pre-aggregations, and view resolution.
+//! Operational concerns from JS (file tracking,
 //! split-view UI, folders, free-form `meta`, dev-server diagnostics)
 //! are intentionally out — they are not the planner's domain.
 //!
@@ -23,7 +23,6 @@ pub mod case;
 pub mod cube;
 pub mod dimension;
 pub mod expression;
-pub mod hierarchy;
 pub mod join;
 pub mod measure;
 pub mod model;
@@ -40,7 +39,6 @@ pub use case::{Case, CaseSwitch, CaseSwitchWhen, CaseVariant, CaseWhen};
 pub use cube::{Cube, SqlSource};
 pub use dimension::{Dimension, DimensionType, Granularity};
 pub use expression::Expression;
-pub use hierarchy::Hierarchy;
 pub use join::{Join, Relationship};
 pub use measure::{
     Measure, MeasureOrderBy, MeasureType, MultiStageKind, MultiStageSpec, OrderDirection,

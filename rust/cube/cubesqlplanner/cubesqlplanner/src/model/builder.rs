@@ -7,7 +7,6 @@ use super::case::{
 use super::cube::{Cube, SqlSource};
 use super::dimension::{Dimension, DimensionType, Granularity};
 use super::expression::Expression;
-use super::hierarchy::Hierarchy;
 use super::join::{Join, Relationship};
 use super::measure::{
     Measure, MeasureOrderBy, MeasureType, MultiStageKind, MultiStageSpec, OrderDirection,
@@ -26,7 +25,6 @@ use crate::cube_bridge::case_variant::CaseVariant as BridgeCaseVariant;
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::cube_join_definition::CubeJoinDefinition;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
-use crate::cube_bridge::hierarchy_definition::HierarchyDefinition;
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
@@ -45,8 +43,8 @@ use std::rc::Rc;
 /// segments with their basic fields (path, kind, sql, mask_sql,
 /// owned_by_cube, primary_key, multi_stage flag, sub_query, values,
 /// alias_member). Cases, multi-stage specs, rolling windows, time
-/// shifts, filters, order_by, hierarchies, joins, pre-aggregations,
-/// access policies, and view spec are populated in follow-up iterations.
+/// shifts, filters, order_by, joins, pre-aggregations, access policies,
+/// and view spec are populated in follow-up iterations.
 pub struct SchemaModelBuilder {
     source: Rc<dyn SchemaSource>,
 }
@@ -106,16 +104,6 @@ impl SchemaModelBuilder {
             })
             .collect::<Result<HashMap<_, _>, CubeError>>()?;
 
-        let hierarchies = definition
-            .hierarchies()?
-            .unwrap_or_default()
-            .into_iter()
-            .map(|h| {
-                let hierarchy = Self::build_hierarchy(h)?;
-                Ok((hierarchy.name.clone(), Rc::new(hierarchy)))
-            })
-            .collect::<Result<HashMap<_, _>, CubeError>>()?;
-
         let joins = definition
             .joins()?
             .unwrap_or_default()
@@ -142,7 +130,7 @@ impl SchemaModelBuilder {
 
         let is_view = static_data.is_view.unwrap_or(false);
         let view = if is_view {
-            Some(Self::build_view_spec(&definition, &hierarchies)?)
+            Some(Self::build_view_spec(&definition)?)
         } else {
             None
         };
@@ -156,7 +144,6 @@ impl SchemaModelBuilder {
             dimensions,
             segments,
             joins,
-            hierarchies,
             pre_aggregations,
             access_policies,
 
@@ -553,20 +540,6 @@ impl SchemaModelBuilder {
         })
     }
 
-    fn build_hierarchy(definition: Rc<dyn HierarchyDefinition>) -> Result<Hierarchy, CubeError> {
-        let static_data = definition.static_data();
-        let levels = static_data
-            .levels
-            .iter()
-            .map(|p| MemberPath::parse(p))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Hierarchy {
-            name: static_data.name.clone(),
-            levels,
-            alias_member: static_data.alias_member.clone(),
-        })
-    }
-
     fn build_join(
         cube: &CubeName,
         definition: Rc<dyn CubeJoinDefinition>,
@@ -683,17 +656,13 @@ impl SchemaModelBuilder {
         })
     }
 
-    fn build_view_spec(
-        definition: &Rc<dyn CubeDefinition>,
-        hierarchies: &HashMap<String, Rc<Hierarchy>>,
-    ) -> Result<ViewSpec, CubeError> {
+    fn build_view_spec(definition: &Rc<dyn CubeDefinition>) -> Result<ViewSpec, CubeError> {
         let included_members = definition
             .included_members()?
             .unwrap_or_default()
             .into_iter()
-            .map(Self::build_included_member)
+            .filter_map(|m| Self::build_included_member(m).transpose())
             .collect::<Result<Vec<_>, CubeError>>()?;
-        let evaluated_hierarchies = hierarchies.values().cloned().collect();
         let join_map = definition
             .static_data()
             .join_map
@@ -706,31 +675,32 @@ impl SchemaModelBuilder {
             .unwrap_or_default();
         Ok(ViewSpec {
             included_members,
-            evaluated_hierarchies,
             join_map,
         })
     }
 
     fn build_included_member(
         definition: Rc<dyn ViewIncludedMember>,
-    ) -> Result<IncludedMember, CubeError> {
+    ) -> Result<Option<IncludedMember>, CubeError> {
         let static_data = definition.static_data();
         let kind = match static_data.member_kind.as_str() {
             "measures" => IncludedMemberKind::Measure,
             "dimensions" => IncludedMemberKind::Dimension,
             "segments" => IncludedMemberKind::Segment,
-            "hierarchies" => IncludedMemberKind::Hierarchy,
+            // Hierarchies are presentation-only metadata and are not
+            // modeled — a view that includes one contributes no SQL member.
+            "hierarchies" => return Ok(None),
             other => {
                 return Err(CubeError::user(format!(
                     "Unknown included member kind: {other}"
                 )))
             }
         };
-        Ok(IncludedMember {
+        Ok(Some(IncludedMember {
             kind,
             source: MemberPath::parse(&static_data.member_path)?,
             name: static_data.name.clone(),
-        })
+        }))
     }
 
     fn build_pre_aggregation(

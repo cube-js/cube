@@ -27,7 +27,6 @@ pub mod filter_params;
 pub mod filter_params_callback;
 pub mod geo_item;
 pub mod granularity_definition;
-pub mod hierarchy_definition;
 pub mod join_definition;
 pub mod join_graph;
 pub mod join_hints;

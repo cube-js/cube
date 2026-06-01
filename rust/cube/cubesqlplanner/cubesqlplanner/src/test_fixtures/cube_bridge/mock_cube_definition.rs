@@ -2,7 +2,6 @@ use crate::cube_bridge::access_policy_definition::AccessPolicyDefinition;
 use crate::cube_bridge::cube_definition::{CubeDefinition, CubeDefinitionStatic};
 use crate::cube_bridge::cube_join_definition::CubeJoinDefinition;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
-use crate::cube_bridge::hierarchy_definition::HierarchyDefinition;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
@@ -105,14 +104,6 @@ impl CubeDefinition for MockCubeDefinition {
 
     fn segments(&self) -> Result<Vec<Rc<dyn SegmentDefinition>>, CubeError> {
         Ok(vec![])
-    }
-
-    fn has_hierarchies(&self) -> Result<bool, CubeError> {
-        Ok(false)
-    }
-
-    fn hierarchies(&self) -> Result<Option<Vec<Rc<dyn HierarchyDefinition>>>, CubeError> {
-        Ok(None)
     }
 
     fn has_joins(&self) -> Result<bool, CubeError> {

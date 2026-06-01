@@ -159,7 +159,6 @@ export interface ModelCubeView {
   measure_count: number;
   dimension_count: number;
   segment_count: number;
-  hierarchy_count: number;
   join_count: number;
   pre_aggregation_count: number;
   access_policy_count: number;
