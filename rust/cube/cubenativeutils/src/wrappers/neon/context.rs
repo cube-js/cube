@@ -3,13 +3,15 @@ use super::*;
 use super::{
     inner_types::NeonInnerTypes,
     object::{
-        base_types::*, neon_array::NeonArray, neon_function::NeonFunction, neon_struct::NeonStruct,
-        NeonObject,
+        base_types::*, neon_array::NeonArray, neon_function::NeonFunction,
+        neon_rust_box::NeonRustBox, neon_struct::NeonStruct,
+        object_root_holder::ObjectNeonTypeHolder, NeonObject,
     },
     ContextWrapper,
 };
 use crate::wrappers::neon::object::IntoNeonObject;
 use crate::wrappers::object::*;
+use crate::wrappers::rust_handle::NativeRustHandle;
 use crate::wrappers::serializer::NativeSerialize;
 use crate::wrappers::{
     context::NativeContext, functions_args_def::FunctionArgsDef, object::NativeObject,
@@ -144,6 +146,14 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
     fn empty_struct(&self) -> Result<NeonStruct<C>, CubeError> {
         let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.empty_object())?)?;
         obj.into_struct()
+    }
+    fn rust_box(&self, handle: NativeRustHandle) -> Result<NeonRustBox<C>, CubeError> {
+        let cached = handle.clone();
+        let obj_holder = self.with_context(|cx| {
+            let js_box = cx.boxed(handle);
+            ObjectNeonTypeHolder::new(self.clone(), js_box, cx)
+        })?;
+        Ok(NeonRustBox::new(obj_holder, cached))
     }
     fn to_string_fn(&self, result: String) -> Result<NeonFunction<C>, CubeError> {
         let obj = self

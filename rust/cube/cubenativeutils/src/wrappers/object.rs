@@ -1,4 +1,4 @@
-use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
+use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle, NativeRustHandle};
 use crate::CubeError;
 
 pub trait NativeObject<IT: InnerTypes>: Clone {
@@ -10,6 +10,7 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn into_number(self) -> Result<IT::Number, CubeError>;
     fn into_boolean(self) -> Result<IT::Boolean, CubeError>;
     fn into_function(self) -> Result<IT::Function, CubeError>;
+    fn into_rust_box(self) -> Result<IT::RustBox, CubeError>;
     fn is_null(&self) -> Result<bool, CubeError>;
     fn is_undefined(&self) -> Result<bool, CubeError>;
     fn clone_to_context(&self, context: &IT::Context) -> Self;
@@ -66,8 +67,8 @@ pub trait NativeBoolean<IT: InnerTypes>: NativeType<IT> {
     fn value(&self) -> Result<bool, CubeError>;
 }
 
-pub trait NativeBox<IT: InnerTypes, T: 'static>: NativeType<IT> {
-    fn deref_value(&self) -> &T;
+pub trait NativeRustBox<IT: InnerTypes>: NativeType<IT> {
+    fn handle(&self) -> &NativeRustHandle;
 }
 
 pub trait NativeProxy<IT: InnerTypes> {

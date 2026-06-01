@@ -11,7 +11,10 @@
 
 use cubenativeutils::wrappers::bridge_meta::{BridgeFieldKind, BridgeFieldMeta};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
-use cubenativeutils::wrappers::object::{NativeArray, NativeFunction, NativeStruct, NativeType};
+use cubenativeutils::wrappers::object::{
+    NativeArray, NativeFunction, NativeRustBox, NativeStruct, NativeType,
+};
+use cubenativeutils::wrappers::rust_handle::NativeRustHandle;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
@@ -906,6 +909,88 @@ fn invoke_cube_evaluator<IT: InnerTypes>(b: &NativeCubeEvaluator<IT>) -> InvokeR
     r
 }
 
+#[derive(Debug)]
+struct RustBoxProbe {
+    value: f64,
+    label: String,
+}
+
+/// Distinct probe used to exercise the type-mismatch branch of
+/// `NativeRustHandle::downcast`: callers create an `Alt` box and try to
+/// unwrap it as `RustBoxProbe`, which must fail with a message that names
+/// both the source and target types.
+#[derive(Debug)]
+struct RustBoxProbeAlt {
+    #[allow(dead_code)]
+    note: String,
+}
+
+#[derive(serde::Serialize)]
+struct RustBoxProbeView {
+    value: f64,
+    label: String,
+    type_name: String,
+}
+
+fn rust_box_create_inner<IT: InnerTypes>(
+    context: NativeContextHolder<IT>,
+    value: f64,
+    label: String,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let handle = NativeRustHandle::new(RustBoxProbe { value, label });
+    let rust_box = context.rust_box(handle)?;
+    Ok(NativeObjectHandle::new(rust_box.into_object()))
+}
+
+fn rust_box_create(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, value: f64, label: String| {
+            rust_box_create_inner(context_holder, value, label)
+        },
+    )
+}
+
+fn rust_box_create_alt_inner<IT: InnerTypes>(
+    context: NativeContextHolder<IT>,
+    note: String,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let handle = NativeRustHandle::new(RustBoxProbeAlt { note });
+    let rust_box = context.rust_box(handle)?;
+    Ok(NativeObjectHandle::new(rust_box.into_object()))
+}
+
+fn rust_box_create_alt(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, note: String| {
+            rust_box_create_alt_inner(context_holder, note)
+        },
+    )
+}
+
+fn rust_box_unwrap_inner<IT: InnerTypes>(
+    _context: NativeContextHolder<IT>,
+    obj: NativeObjectHandle<IT>,
+) -> Result<RustBoxProbeView, CubeError> {
+    let rust_box = obj.into_rust_box()?;
+    let probe = rust_box.handle().downcast::<RustBoxProbe>()?;
+    Ok(RustBoxProbeView {
+        value: probe.value,
+        label: probe.label.clone(),
+        type_name: rust_box.handle().type_name().to_string(),
+    })
+}
+
+fn rust_box_unwrap(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, obj: NativeObjectHandle<_>| {
+            rust_box_unwrap_inner(context_holder, obj)
+        },
+    )
+}
+
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeCompileMemberSql", compile_member_sql)?;
     cx.export_function("__testBridgeParseArgsNames", parse_args_names)?;
@@ -917,5 +1002,8 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeParse", parse_bridge)?;
     cx.export_function("__testBridgeInvoke", invoke_bridge)?;
     cx.export_function("__testBridgeListBridgeNames", list_bridge_names)?;
+    cx.export_function("__testBridgeRustBoxCreate", rust_box_create)?;
+    cx.export_function("__testBridgeRustBoxCreateAlt", rust_box_create_alt)?;
+    cx.export_function("__testBridgeRustBoxUnwrap", rust_box_unwrap)?;
     Ok(())
 }
