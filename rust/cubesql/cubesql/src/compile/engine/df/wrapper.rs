@@ -2613,6 +2613,7 @@ impl WrappedSelectNode {
             })?;
         Ok((resulting_sql, sql_query))
     }
+
     #[inline(never)]
     fn generate_sql_for_literal(
         mut sql_query: SqlQuery,
