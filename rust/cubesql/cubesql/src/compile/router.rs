@@ -336,11 +336,20 @@ impl QueryRouter {
             ast::Set::SingleAssignment {
                 variable, values, ..
             } => vec![(variable.to_string(), values.as_slice())],
-            ast::Set::ParenthesizedAssignments { variables, values } => variables
-                .iter()
-                .zip(values.iter())
-                .map(|(variable, value)| (variable.to_string(), std::slice::from_ref(value)))
-                .collect(),
+            ast::Set::ParenthesizedAssignments { variables, values } => {
+                if variables.len() != values.len() {
+                    return Err(CompilationError::user(
+                        "SET (...) = (...) requires matching number of variables and values"
+                            .to_string(),
+                    ));
+                }
+
+                variables
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(variable, value)| (variable.to_string(), std::slice::from_ref(value)))
+                    .collect()
+            }
             ast::Set::MultipleAssignments { assignments } => assignments
                 .iter()
                 .map(|assignment| {
