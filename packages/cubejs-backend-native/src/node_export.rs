@@ -22,9 +22,14 @@ use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
+use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
-use cubenativeutils::wrappers::NativeContextHolder;
+use cubenativeutils::wrappers::object::{NativeRustBox, NativeType};
+use cubenativeutils::wrappers::rust_handle::NativeRustHandle;
+use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
+use cubesqlplanner::cube_bridge::schema_source::{NativeSchemaSource, SchemaSource};
+use cubesqlplanner::model::{Model, SchemaModelBuilder};
 use cubesqlplanner::planner::base_query::BaseQuery;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -789,6 +794,48 @@ fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
+/// Build the Tesseract domain Model from a JS `SchemaSource` and
+/// return a `JsBox<NativeRustHandle>` that JS can keep across calls.
+///
+/// This is the entry point for the model-caching flow: JS calls
+/// `prepareModel(schemaSource)` once after schema compilation; later
+/// `buildSqlAndParams` calls go through `modelBuildSqlAndParams` with
+/// that handle.
+fn prepare_model_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    source: NativeSchemaSource<IT>,
+) -> Result<NativeObjectHandle<IT>, cubenativeutils::CubeError> {
+    let source: Rc<dyn SchemaSource> = Rc::new(source);
+    let model = SchemaModelBuilder::new(source).build()?;
+    let handle = NativeRustHandle::new(model);
+    let rust_box = context_holder.rust_box(handle)?;
+    Ok(NativeObjectHandle::new(rust_box.into_object()))
+}
+
+fn prepare_model(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(cx, prepare_model_inner)
+}
+
+/// Same signature as `buildSqlAndParams` but takes the model handle
+/// returned by `prepareModel` as the first argument. The handle is
+/// downcast back to `Model` so future planner code can read structure
+/// from it; for now we just validate the round-trip and delegate to
+/// the existing per-request `BaseQuery` flow.
+fn model_build_sql_and_params_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    model_handle: NativeObjectHandle<IT>,
+    options: NativeBaseQueryOptions<IT>,
+) -> Result<NativeObjectHandle<IT>, cubenativeutils::CubeError> {
+    let rust_box = model_handle.into_rust_box()?;
+    let _model = rust_box.handle().downcast::<Model>()?;
+    let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
+    base_query.build_sql_and_params()
+}
+
+fn model_build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(cx, model_build_sql_and_params_inner)
+}
+
 fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     let arg = cx.argument::<JsValue>(0)?;
     let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
@@ -811,6 +858,8 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
 
     //============ sql planner exports ===================
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
+    cx.export_function("prepareModel", prepare_model)?;
+    cx.export_function("modelBuildSqlAndParams", model_build_sql_and_params)?;
 
     //========= sql orchestrator exports =================
     crate::orchestrator::register_module(&mut cx)?;

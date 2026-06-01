@@ -13,6 +13,12 @@ use std::rc::Rc;
     Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, nativebridge::NativeBridgeStatic,
 )]
 pub struct GranularityDefinitionStatic {
+    /// Local name of the granularity on its time dimension. Stamped
+    /// in `SchemaSource.cubes()` so the bridge can return granularities
+    /// as an array (the field is otherwise the Record key only).
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
     pub interval: String,
     pub origin: Option<String>,
     pub offset: Option<String>,

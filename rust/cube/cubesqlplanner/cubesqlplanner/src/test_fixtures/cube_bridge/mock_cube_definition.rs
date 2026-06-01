@@ -1,6 +1,14 @@
+use crate::cube_bridge::access_policy_definition::AccessPolicyDefinition;
 use crate::cube_bridge::cube_definition::{CubeDefinition, CubeDefinitionStatic};
+use crate::cube_bridge::cube_join_definition::CubeJoinDefinition;
+use crate::cube_bridge::dimension_definition::DimensionDefinition;
+use crate::cube_bridge::hierarchy_definition::HierarchyDefinition;
+use crate::cube_bridge::measure_definition::MeasureDefinition;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
+use crate::cube_bridge::segment_definition::SegmentDefinition;
 use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
+use crate::cube_bridge::view_included_member::ViewIncludedMember;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::{
     MockJoinItemDefinition, MockMemberSql, MockViewFilterDefinition,
@@ -85,6 +93,60 @@ impl CubeDefinition for MockCubeDefinition {
                     .collect(),
             ))
         }
+    }
+
+    fn measures(&self) -> Result<Vec<Rc<dyn MeasureDefinition>>, CubeError> {
+        Ok(vec![])
+    }
+
+    fn dimensions(&self) -> Result<Vec<Rc<dyn DimensionDefinition>>, CubeError> {
+        Ok(vec![])
+    }
+
+    fn segments(&self) -> Result<Vec<Rc<dyn SegmentDefinition>>, CubeError> {
+        Ok(vec![])
+    }
+
+    fn has_hierarchies(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn hierarchies(&self) -> Result<Option<Vec<Rc<dyn HierarchyDefinition>>>, CubeError> {
+        Ok(None)
+    }
+
+    fn has_joins(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn joins(&self) -> Result<Option<Vec<Rc<dyn CubeJoinDefinition>>>, CubeError> {
+        Ok(None)
+    }
+
+    fn has_pre_aggregations(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn pre_aggregations(
+        &self,
+    ) -> Result<Option<Vec<Rc<dyn PreAggregationDescription>>>, CubeError> {
+        Ok(None)
+    }
+
+    fn has_access_policies(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn access_policies(&self) -> Result<Option<Vec<Rc<dyn AccessPolicyDefinition>>>, CubeError> {
+        Ok(None)
+    }
+
+    fn has_included_members(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn included_members(&self) -> Result<Option<Vec<Rc<dyn ViewIncludedMember>>>, CubeError> {
+        Ok(None)
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

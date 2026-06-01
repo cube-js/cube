@@ -11,6 +11,8 @@ use typed_builder::TypedBuilder;
 #[derive(TypedBuilder)]
 pub struct MockSegmentDefinition {
     #[builder(default)]
+    name: String,
+    #[builder(default)]
     segment_type: Option<String>,
     #[builder(default)]
     owned_by_cube: Option<bool>,
@@ -21,6 +23,7 @@ pub struct MockSegmentDefinition {
 impl_static_data!(
     MockSegmentDefinition,
     SegmentDefinitionStatic,
+    name,
     segment_type,
     owned_by_cube
 );

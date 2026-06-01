@@ -1,5 +1,6 @@
 use super::case_variant::CaseVariant;
 use super::geo_item::{GeoItem, NativeGeoItem};
+use super::granularity_definition::{GranularityDefinition, NativeGranularityDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
 use super::multi_stage_filter::{MultiStageFilterReferences, NativeMultiStageFilterReferences};
 use crate::cube_bridge::timeshift_definition::{NativeTimeShiftDefinition, TimeShiftDefinition};
@@ -16,6 +17,10 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct DimensionDefinitionStatic {
+    /// Local name of the dimension on its cube. Populated by
+    /// `prepareMembers` on the JS side.
+    #[serde(default)]
+    pub name: String,
     #[serde(rename = "type")]
     pub dimension_type: String,
     #[serde(rename = "ownedByCube")]
@@ -31,6 +36,8 @@ pub struct DimensionDefinitionStatic {
     pub values: Option<Vec<String>>,
     #[serde(rename = "primaryKey")]
     pub primary_key: Option<bool>,
+    #[serde(rename = "aliasMember")]
+    pub alias_member: Option<String>,
 }
 
 #[nativebridge::native_bridge(DimensionDefinitionStatic, with_static_meta)]
@@ -55,4 +62,7 @@ pub trait DimensionDefinition {
 
     #[nbridge(field, optional)]
     fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+
+    #[nbridge(field, vec, optional)]
+    fn granularities(&self) -> Result<Option<Vec<Rc<dyn GranularityDefinition>>>, CubeError>;
 }

@@ -133,7 +133,7 @@ impl YamlSchema {
             let mut cube_builder = builder.add_cube(cube.name).cube_def(cube_def);
 
             for dim_entry in cube.dimensions {
-                let result = dim_entry.definition.build();
+                let result = dim_entry.definition.build_with_name(dim_entry.name.clone());
                 cube_builder =
                     cube_builder.add_dimension(dim_entry.name.clone(), result.definition);
                 for (gran_name, gran_def) in result.granularities {
@@ -145,7 +145,7 @@ impl YamlSchema {
             for meas_entry in cube.measures {
                 let meas_rc = meas_entry
                     .definition
-                    .build_with_cube_name(Some(&cube_builder.cube_name()));
+                    .build_with_cube_name(Some(&cube_builder.cube_name()), meas_entry.name.clone());
                 let meas_def = Rc::try_unwrap(meas_rc)
                     .ok()
                     .expect("Rc should have single owner");
@@ -153,7 +153,7 @@ impl YamlSchema {
             }
 
             for seg_entry in cube.segments {
-                let seg_rc = seg_entry.definition.build();
+                let seg_rc = seg_entry.definition.build_with_name(seg_entry.name.clone());
                 let seg_def = Rc::try_unwrap(seg_rc)
                     .ok()
                     .expect("Rc should have single owner");

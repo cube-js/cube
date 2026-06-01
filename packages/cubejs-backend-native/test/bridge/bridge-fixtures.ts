@@ -167,6 +167,12 @@ export const cubeDefinitionFixture = (): unknown => ({
   // sqlAlias, isView, isCalendar, joinMap optional
   // sql_table, sql optional getters
   defaultFilters: [viewFilterDefinitionFixture()],
+  // measures/dimensions/segments are required vec fields
+  measures: [measureDefinitionFixture()],
+  dimensions: [dimensionDefinitionFixture()],
+  segments: [segmentDefinitionFixture()],
+  // evaluatedHierarchies/joins/preAggregations/accessPolicy/includedMembers
+  // are optional vec getters — omitted, the getters return None
 });
 
 export const dimensionDefinitionFixture = (): unknown => ({

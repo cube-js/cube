@@ -1,5 +1,15 @@
+use super::access_policy_definition::{AccessPolicyDefinition, NativeAccessPolicyDefinition};
+use super::cube_join_definition::{CubeJoinDefinition, NativeCubeJoinDefinition};
+use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
+use super::hierarchy_definition::{HierarchyDefinition, NativeHierarchyDefinition};
+use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::pre_aggregation_description::{
+    NativePreAggregationDescription, PreAggregationDescription,
+};
+use super::segment_definition::{NativeSegmentDefinition, SegmentDefinition};
 use super::view_filter_definition::{NativeViewFilterDefinition, ViewFilterDefinition};
+use super::view_included_member::{NativeViewIncludedMember, ViewIncludedMember};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -42,4 +52,21 @@ pub trait CubeDefinition {
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
     #[nbridge(field, optional, vec)]
     fn default_filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError>;
+    #[nbridge(field, vec)]
+    fn measures(&self) -> Result<Vec<Rc<dyn MeasureDefinition>>, CubeError>;
+    #[nbridge(field, vec)]
+    fn dimensions(&self) -> Result<Vec<Rc<dyn DimensionDefinition>>, CubeError>;
+    #[nbridge(field, vec)]
+    fn segments(&self) -> Result<Vec<Rc<dyn SegmentDefinition>>, CubeError>;
+    #[nbridge(field, vec, optional, rename = "evaluatedHierarchies")]
+    fn hierarchies(&self) -> Result<Option<Vec<Rc<dyn HierarchyDefinition>>>, CubeError>;
+    #[nbridge(field, vec, optional)]
+    fn joins(&self) -> Result<Option<Vec<Rc<dyn CubeJoinDefinition>>>, CubeError>;
+    #[nbridge(field, vec, optional, rename = "preAggregations")]
+    fn pre_aggregations(&self)
+        -> Result<Option<Vec<Rc<dyn PreAggregationDescription>>>, CubeError>;
+    #[nbridge(field, vec, optional, rename = "accessPolicy")]
+    fn access_policies(&self) -> Result<Option<Vec<Rc<dyn AccessPolicyDefinition>>>, CubeError>;
+    #[nbridge(field, vec, optional, rename = "includedMembers")]
+    fn included_members(&self) -> Result<Option<Vec<Rc<dyn ViewIncludedMember>>>, CubeError>;
 }

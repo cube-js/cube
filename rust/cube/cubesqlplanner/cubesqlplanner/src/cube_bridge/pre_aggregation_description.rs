@@ -1,7 +1,11 @@
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::pre_aggregation_index_definition::{
+    NativePreAggregationIndexDefinition, PreAggregationIndexDefinition,
+};
 use super::pre_aggregation_time_dimension::{
     NativePreAggregationTimeDimension, PreAggregationTimeDimension,
 };
+use super::refresh_key_definition::{NativeRefreshKeyDefinition, RefreshKeyDefinition};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -24,6 +28,14 @@ pub struct PreAggregationDescriptionStatic {
     pub external: Option<bool>,
     #[serde(rename = "allowNonStrictDateRangeMatch")]
     pub allow_non_strict_date_range_match: Option<bool>,
+    #[serde(rename = "scheduledRefresh")]
+    pub scheduled_refresh: Option<bool>,
+    #[serde(rename = "useOriginalSqlPreAggregations")]
+    pub use_original_sql_pre_aggregations: Option<bool>,
+    #[serde(rename = "partitionGranularity")]
+    pub partition_granularity: Option<String>,
+    #[serde(rename = "ownedByCube")]
+    pub owned_by_cube: Option<bool>,
 }
 
 #[nativebridge::native_bridge(PreAggregationDescriptionStatic, with_static_meta)]
@@ -47,4 +59,12 @@ pub trait PreAggregationDescription {
     fn time_dimension_references(
         &self,
     ) -> Result<Option<Vec<Rc<dyn PreAggregationTimeDimension>>>, CubeError>;
+    #[nbridge(field, optional, rename = "refreshRangeStart")]
+    fn build_range_start(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+    #[nbridge(field, optional, rename = "refreshRangeEnd")]
+    fn build_range_end(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+    #[nbridge(field, vec, optional)]
+    fn indexes(&self) -> Result<Option<Vec<Rc<dyn PreAggregationIndexDefinition>>>, CubeError>;
+    #[nbridge(field, optional, rename = "refreshKey")]
+    fn refresh_key(&self) -> Result<Option<Rc<dyn RefreshKeyDefinition>>, CubeError>;
 }

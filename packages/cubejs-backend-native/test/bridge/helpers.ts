@@ -152,3 +152,27 @@ export function createRustBoxProbeAlt(note: string): unknown {
 export function unwrapRustBoxProbe(handle: unknown): RustBoxProbeView {
   return native.__testBridgeRustBoxUnwrap(handle);
 }
+
+export interface ModelCubeView {
+  name: string;
+  is_view: boolean;
+  measure_count: number;
+  dimension_count: number;
+  segment_count: number;
+  hierarchy_count: number;
+  join_count: number;
+  pre_aggregation_count: number;
+  access_policy_count: number;
+}
+
+export interface ModelView {
+  cubes: ModelCubeView[];
+}
+
+export function prepareModelRaw(schemaSource: unknown): unknown {
+  return native.prepareModel(schemaSource);
+}
+
+export function describeModel(handle: unknown): ModelView {
+  return native.__testBridgeModelDescribe(handle);
+}

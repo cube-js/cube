@@ -719,6 +719,14 @@ fn invoke_cube_definition<IT: InnerTypes>(b: &NativeCubeDefinition<IT>) -> Invok
     r.record("sql_table", b.sql_table());
     r.record("sql", b.sql());
     r.record("default_filters", b.default_filters());
+    r.record("measures", b.measures());
+    r.record("dimensions", b.dimensions());
+    r.record("segments", b.segments());
+    r.record("hierarchies", b.hierarchies());
+    r.record("joins", b.joins());
+    r.record("pre_aggregations", b.pre_aggregations());
+    r.record("access_policies", b.access_policies());
+    r.record("included_members", b.included_members());
     r
 }
 
@@ -731,6 +739,7 @@ fn invoke_dimension_definition<IT: InnerTypes>(b: &NativeDimensionDefinition<IT>
     r.record("time_shift", b.time_shift());
     r.record("filter", b.filter());
     r.record("mask_sql", b.mask_sql());
+    r.record("granularities", b.granularities());
     r
 }
 
@@ -788,6 +797,10 @@ fn invoke_pre_aggregation_description<IT: InnerTypes>(
     r.record("segment_references", b.segment_references());
     r.record("rollup_references", b.rollup_references());
     r.record("time_dimension_references", b.time_dimension_references());
+    r.record("build_range_start", b.build_range_start());
+    r.record("build_range_end", b.build_range_end());
+    r.record("indexes", b.indexes());
+    r.record("refresh_key", b.refresh_key());
     r
 }
 
@@ -968,6 +981,64 @@ fn rust_box_unwrap(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
+/// Inspector used by the JS roundtrip test: opens a model handle
+/// returned by `prepareModel` and reports the cubes it contains.
+/// Production code reaches the model through downcast — this endpoint
+/// just makes the introspection visible to JS for tests.
+#[derive(serde::Serialize)]
+struct ModelView {
+    cubes: Vec<CubeView>,
+}
+
+#[derive(serde::Serialize)]
+struct CubeView {
+    name: String,
+    is_view: bool,
+    measure_count: usize,
+    dimension_count: usize,
+    segment_count: usize,
+    hierarchy_count: usize,
+    join_count: usize,
+    pre_aggregation_count: usize,
+    access_policy_count: usize,
+}
+
+fn model_describe_inner<IT: InnerTypes>(
+    _context: NativeContextHolder<IT>,
+    obj: NativeObjectHandle<IT>,
+) -> Result<ModelView, CubeError> {
+    let rust_box = obj.into_rust_box()?;
+    let model = rust_box
+        .handle()
+        .downcast::<cubesqlplanner::model::Model>()?;
+    let mut cubes = Vec::with_capacity(model.cubes.len());
+    for cube in model.cubes_iter() {
+        cubes.push(CubeView {
+            name: cube.name.to_string(),
+            is_view: cube.is_view,
+            measure_count: cube.measures.len(),
+            dimension_count: cube.dimensions.len(),
+            segment_count: cube.segments.len(),
+            hierarchy_count: cube.hierarchies.len(),
+            join_count: cube.joins.len(),
+            pre_aggregation_count: cube.pre_aggregations.len(),
+            access_policy_count: cube.access_policies.len(),
+        });
+    }
+    // Stable order so the JS test can match by index.
+    cubes.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(ModelView { cubes })
+}
+
+fn model_describe(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, obj: NativeObjectHandle<_>| {
+            model_describe_inner(context_holder, obj)
+        },
+    )
+}
+
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeCompileMemberSql", compile_member_sql)?;
     cx.export_function("__testBridgeParseArgsNames", parse_args_names)?;
@@ -982,5 +1053,6 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeRustBoxCreate", rust_box_create)?;
     cx.export_function("__testBridgeRustBoxCreateAlt", rust_box_create_alt)?;
     cx.export_function("__testBridgeRustBoxUnwrap", rust_box_unwrap)?;
+    cx.export_function("__testBridgeModelDescribe", model_describe)?;
     Ok(())
 }

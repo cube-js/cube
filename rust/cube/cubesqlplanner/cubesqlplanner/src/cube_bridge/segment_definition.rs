@@ -11,6 +11,10 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct SegmentDefinitionStatic {
+    /// Local name of the segment on its cube. Populated by
+    /// `prepareMembers` on the JS side.
+    #[serde(default)]
+    pub name: String,
     #[serde(rename = "type")]
     pub segment_type: Option<String>,
     #[serde(rename = "ownedByCube")]

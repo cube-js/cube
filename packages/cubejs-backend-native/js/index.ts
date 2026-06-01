@@ -463,6 +463,50 @@ export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
   return native.buildSqlAndParams(cubeEvaluator);
 };
 
+/**
+ * JS-side wrapper around the long-lived Tesseract model `JsBox`. The
+ * `handle` field is the opaque `JsBox<NativeRustHandle>` produced by
+ * the Rust side; it stays public for tests / debug introspection but
+ * production callers should go through the methods. Lifetime is
+ * managed by the JS GC — when no reference to a `TesseractModel`
+ * survives, the underlying Rust `Model` is finalized through
+ * `NativeRustHandle`'s Drop chain.
+ */
+export class TesseractModel {
+  /** @internal — opaque JsBox handle, do not interpret in JS. */
+  public readonly handle: unknown;
+
+  /** @internal — instances are produced by `prepareModel`. */
+  public constructor(handle: unknown) {
+    this.handle = handle;
+  }
+
+  /**
+   * Same shape as the standalone `buildSqlAndParams` but skips the
+   * per-request `cubeEvaluator` roundtrip for structural lookups —
+   * the planner reads the compiled model from this handle instead.
+   */
+  public buildSqlAndParams(queryParams: any): any[] {
+    const native = loadNative();
+    return native.modelBuildSqlAndParams(this.handle, queryParams);
+  }
+}
+
+/**
+ * Build the long-lived Tesseract model from a JS `SchemaSource`
+ * wrapper around `CubeEvaluator`. Returns a `TesseractModel` whose
+ * methods route per-request calls to the cached model handle. Returns
+ * `null` when the native module doesn't expose `prepareModel`
+ * (older build) so callers can detect the feature.
+ */
+export const prepareModel = (schemaSource: unknown): TesseractModel | null => {
+  const native = loadNative();
+  if (typeof native.prepareModel !== 'function') {
+    return null;
+  }
+  return new TesseractModel(native.prepareModel(schemaSource));
+};
+
 export type ResultRow = Record<string, string>;
 
 export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {

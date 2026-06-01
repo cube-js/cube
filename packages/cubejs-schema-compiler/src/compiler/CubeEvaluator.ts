@@ -16,7 +16,10 @@ import {
   ViewDefaultValueFilter,
   ViewIncludedMember
 } from './CubeSymbols';
+import { getEnv } from '@cubejs-backend/shared';
+import { prepareModel as nativePrepareModel, TesseractModel } from '@cubejs-backend/native';
 import { UserError } from './UserError';
+import { SchemaSource } from './SchemaSource';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
@@ -207,6 +210,18 @@ export class CubeEvaluator extends CubeSymbols {
 
   public byFileName: Record<string, CubeDefinitionExtended[]> = {};
 
+  /**
+   * Handle to the Rust-side Tesseract domain model built from this
+   * evaluator. Populated at the end of `compile()` only when
+   * `CUBEJS_TESSERACT_NATIVE_MODEL` is enabled; the planner is not yet
+   * routed through it. Lifetime is managed by the JS GC: when this
+   * `CubeEvaluator` is replaced (next schema reload), the old
+   * `TesseractModel` loses references and gets finalized — the
+   * underlying Rust `Model` and its `MemberSql` roots are then dropped
+   * via the standard `Finalize` path.
+   */
+  public tesseractModel: TesseractModel | null = null;
+
   private isRbacEnabledCache: boolean | null = null;
 
   public constructor(
@@ -242,6 +257,32 @@ export class CubeEvaluator extends CubeSymbols {
         return [v.name, primaryKeyNamesToSymbols];
       })
     );
+
+    this.tesseractModel = this.tryPrepareTesseractModel(errorReporter);
+  }
+
+  /**
+   * Build the Tesseract domain model wrapper. Gated behind
+   * `CUBEJS_TESSERACT_NATIVE_MODEL` (off by default). Returns `null`
+   * when the flag is off, when the native module doesn't expose
+   * `prepareModel` (older build), or when the build throws — schema
+   * compilation must not fail just because the caching layer can't
+   * initialise.
+   */
+  private tryPrepareTesseractModel(errorReporter: ErrorReporter): TesseractModel | null {
+    if (!getEnv('tesseractNativeModel')) {
+      return null;
+    }
+    try {
+      const source = new SchemaSource(this);
+      return nativePrepareModel(source);
+    } catch (e: any) {
+      errorReporter.warning({
+        message: `Tesseract domain model preparation skipped: ${e?.message ?? e}`,
+        loc: null,
+      });
+      return null;
+    }
   }
 
   protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
@@ -711,7 +752,10 @@ export class CubeEvaluator extends CubeSymbols {
   protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const preAggregation of Object.values(cube.preAggregations) as any) {
+      for (const [preAggName, preAggregation] of Object.entries(cube.preAggregations) as Array<[string, any]>) {
+        // Tesseract bridge consumes pre-aggregations as an array; stamp
+        // the name so it survives the Record → Array conversion.
+        preAggregation.name = preAggName;
         // preAggregation is actually (PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql)
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
@@ -811,7 +855,7 @@ export class CubeEvaluator extends CubeSymbols {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
 
-      members[memberName] = { ...members[memberName], ownedByCube };
+      members[memberName] = { ...members[memberName], ownedByCube, name: memberName };
       if (aliasMember) {
         members[memberName].aliasMember = aliasMember;
       }
