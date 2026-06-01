@@ -69,16 +69,28 @@ impl BaseTools for MockBaseTools {
         granularity: String,
         date_range: Vec<String>,
     ) -> Result<Vec<Vec<String>>, CubeError> {
-        super::time_series::generate_time_series(&granularity, &date_range)
+        if date_range.len() != 2 {
+            return Err(CubeError::internal(
+                "date_range must have exactly 2 elements".to_string(),
+            ));
+        }
+        let range = [date_range[0].clone(), date_range[1].clone()];
+        crate::planner::QueryTimeSeries::generate_predefined(&granularity, &range, 3)
     }
 
     fn generate_custom_time_series(
         &self,
-        _granularity: String,
-        _date_range: Vec<String>,
-        _origin: String,
+        granularity_interval: String,
+        date_range: Vec<String>,
+        origin: String,
     ) -> Result<Vec<Vec<String>>, CubeError> {
-        todo!("generate_custom_time_series not implemented in mock")
+        if date_range.len() != 2 {
+            return Err(CubeError::internal(
+                "date_range must have exactly 2 elements".to_string(),
+            ));
+        }
+        let range = [date_range[0].clone(), date_range[1].clone()];
+        crate::planner::QueryTimeSeries::generate_custom(&granularity_interval, &range, &origin, 3)
     }
 
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
