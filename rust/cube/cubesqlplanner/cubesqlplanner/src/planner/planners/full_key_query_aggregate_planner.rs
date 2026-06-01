@@ -45,16 +45,10 @@ impl FullKeyAggregateQueryPlanner {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
         let source = source.into();
 
-        let multiplied_measures = self
-            .query_properties
-            .full_key_aggregate_measures()?
-            .rendered_as_multiplied_measures
-            .clone();
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_measures(self.query_properties.measures().clone())
-            .set_multiplied_measures(multiplied_measures)
+            .set_measures(self.query_properties.measures_for_render()?)
             .into_rc();
 
         let logical_filter = Rc::new(LogicalFilter {

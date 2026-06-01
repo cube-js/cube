@@ -199,9 +199,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
 
-        context_factory
-            .set_rendered_as_multiplied_measures(logical_plan.schema().multiplied_measures.clone());
-
         if is_pre_aggregation {
             context_factory.clear_render_references();
         }

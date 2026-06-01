@@ -6,29 +6,20 @@ use crate::planner::symbols::AggregateWrap;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::any::Any;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Applies the final aggregation wrap to a measure (sum / avg /
 /// count_distinct / pass-through, etc.) using `MeasureKind::aggregate_wrap`.
-/// Tracks measures that were classified as multiplied so the wrap
-/// switches to a distinct-count form, and routes
-/// `count_distinct_approx` through an HLL state when requested.
+/// Routes `count_distinct_approx` through an HLL state when requested.
 pub struct FinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
-    rendered_as_multiplied_measures: HashSet<String>,
     count_approx_as_state: bool,
 }
 
 impl FinalMeasureSqlNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        rendered_as_multiplied_measures: HashSet<String>,
-        count_approx_as_state: bool,
-    ) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, count_approx_as_state: bool) -> Rc<Self> {
         Rc::new(Self {
             input,
-            rendered_as_multiplied_measures,
             count_approx_as_state,
         })
     }
@@ -69,10 +60,7 @@ impl SqlNode for FinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
-                let is_multiplied = self
-                    .rendered_as_multiplied_measures
-                    .contains(&ev.full_name());
-                let wrap = ev.kind().aggregate_wrap(is_multiplied);
+                let wrap = ev.kind().aggregate_wrap();
                 let child_visitor = match wrap {
                     AggregateWrap::PassThrough => visitor.clone(),
                     _ => visitor.with_arg_needs_paren_safe(false),

@@ -237,6 +237,14 @@ impl MultiFactJoinGroups {
         self.groups.len() > 1
     }
 
+    /// True when any grouped measure sits on a cube that the join tree
+    /// of its group multiplies (one-to-many join below the measure).
+    pub fn has_multiplied_measures(&self) -> bool {
+        self.groups
+            .iter()
+            .any(|(join, measures)| measures.iter().any(|m| join.is_multiplied(&m.cube_name())))
+    }
+
     pub fn groups(&self) -> &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)] {
         &self.groups
     }

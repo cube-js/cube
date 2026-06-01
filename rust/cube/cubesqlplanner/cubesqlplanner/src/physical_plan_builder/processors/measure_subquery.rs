@@ -30,14 +30,6 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from);
 
-        context_factory.set_rendered_as_multiplied_measures(
-            measure_subquery
-                .schema
-                .measures
-                .iter()
-                .map(|m| m.full_name())
-                .collect(),
-        );
         self.builder.resolve_subquery_dimensions_references(
             &measure_subquery.source.dimension_subqueries(),
             &references_builder,

@@ -21,7 +21,7 @@ use crate::planner::{
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -92,15 +92,14 @@ impl MultipliedMeasure {
 
 /// Measures classified by how the planner must compute them: directly
 /// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE. `rendered_as_multiplied`
-/// tracks symbols that were originally multiplied even after additivity
-/// reclassification flips them into `regular_measures`.
+/// subquery, or planned as a multi-stage CTE. Measures sitting under a
+/// row-multiplying join already carry their distinct render form
+/// (`MultipliedCount`), so no separate tracking is needed.
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<MemberSymbol>>,
     pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    pub rendered_as_multiplied_measures: HashSet<String>,
 }
 
 /// The full description of a query: selected members, filters, ordering,
@@ -480,30 +479,24 @@ impl QueryProperties {
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
                 for item in collect_multiplied_measures(m, &join)? {
-                    if item.multiplied {
-                        result
-                            .rendered_as_multiplied_measures
-                            .insert(item.measure.full_name());
-                    }
-                    let is_multiplied_measure = if item.multiplied {
-                        if let Ok(measure) = item.measure.as_measure() {
-                            if measure.is_additive_in_multiplied() {
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
-                            true
-                        }
-                    } else {
-                        false
-                    };
-                    if is_multiplied_measure {
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
-                    } else {
+                    if !item.multiplied {
                         result.regular_measures.push(item.measure.clone());
+                        continue;
+                    }
+                    let measure = item.measure.as_measure().ok();
+                    match measure
+                        .as_ref()
+                        .and_then(|m| m.convert_multiplied_to_regular())
+                    {
+                        Some(regular) => result.regular_measures.push(regular),
+                        None => {
+                            let rendered = measure
+                                .map(|m| m.into_multiplied())
+                                .unwrap_or_else(|| item.measure.clone());
+                            result
+                                .multiplied_measures
+                                .push(MultipliedMeasure::new(rendered, item.cube_name));
+                        }
                     }
                 }
             }
@@ -525,6 +518,33 @@ impl QueryProperties {
             .collect();
 
         Ok(result)
+    }
+
+    /// The query's selected measures in render form: each measure that
+    /// sits under a row-multiplying join is replaced by its distinct
+    /// `MultipliedCount` form, so it renders correctly without any
+    /// out-of-band "multiplied" flag. Multi-stage and composite measures
+    /// are returned unchanged — their parts are converted where they are
+    /// actually rendered.
+    pub fn measures_for_render(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let classified = self.full_key_aggregate_measures()?;
+        let mut render_form: HashMap<String, Rc<MemberSymbol>> = HashMap::new();
+        for m in classified.regular_measures.iter() {
+            render_form.insert(m.full_name(), m.clone());
+        }
+        for m in classified.multiplied_measures.iter() {
+            render_form.insert(m.measure().full_name(), m.measure().clone());
+        }
+        Ok(self
+            .measures
+            .iter()
+            .map(|m| {
+                render_form
+                    .get(&m.full_name())
+                    .cloned()
+                    .unwrap_or_else(|| m.clone())
+            })
+            .collect())
     }
 
     fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {

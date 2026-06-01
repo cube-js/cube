@@ -27,16 +27,10 @@ impl SimpleQueryPlanner {
     pub fn plan(&self) -> Result<Rc<Query>, CubeError> {
         let source = self.source_and_subquery_dimensions()?;
 
-        let multiplied_measures = self
-            .query_properties
-            .full_key_aggregate_measures()?
-            .rendered_as_multiplied_measures
-            .clone();
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
-            .set_measures(self.query_properties.measures().clone())
+            .set_measures(self.query_properties.measures_for_render()?)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_multiplied_measures(multiplied_measures)
             .into_rc();
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),

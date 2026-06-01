@@ -368,16 +368,28 @@ impl MeasureSymbol {
         refs
     }
 
-    /// True if the measure stays correct when joined into a context
-    /// that multiplies rows (one-to-many join). Distinct aggregations
-    /// are naturally immune; primary-key-based counts (`type: count`
-    /// without an explicit `sql`) are too.
-    pub fn is_additive_in_multiplied(&self) -> bool {
-        match &self.kind {
-            MeasureKind::Aggregated(agg) => agg.agg_type().is_distinct(),
-            MeasureKind::Count(count) => count.is_owned_by_cube(),
-            _ => false,
-        }
+    /// Render form of this measure when it sits under a row-multiplying
+    /// join: a `count` switches to a distinct `MultipliedCount`, every
+    /// other kind is returned unchanged.
+    pub fn into_multiplied(&self) -> Rc<MemberSymbol> {
+        self.with_kind(self.kind.into_multiplied())
+    }
+
+    /// `Some(render form)` when this measure, under a row-multiplying
+    /// join, can still be computed directly in the main query (it stays
+    /// additive there): a key-based count rolls up as a distinct
+    /// `MultipliedCount`, distinct aggregations are already immune.
+    /// `None` when it must be isolated in a multiplied subquery instead.
+    pub fn convert_multiplied_to_regular(&self) -> Option<Rc<MemberSymbol>> {
+        self.kind
+            .regular_in_multiplied()
+            .map(|kind| self.with_kind(kind))
+    }
+
+    fn with_kind(&self, kind: MeasureKind) -> Rc<MemberSymbol> {
+        let mut new = self.clone();
+        new.kind = kind;
+        MemberSymbol::new_measure(Rc::new(new))
     }
 
     /// True when the cube on the symbol's path is required in the

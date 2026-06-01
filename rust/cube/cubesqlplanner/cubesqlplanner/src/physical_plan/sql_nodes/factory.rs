@@ -27,7 +27,6 @@ pub struct SqlNodesFactory {
     render_references: RenderReferences,
     pre_aggregation_dimensions_references: RenderReferences,
     pre_aggregation_measures_references: RenderReferences,
-    rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: RenderReferences,
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
@@ -84,10 +83,6 @@ impl SqlNodesFactory {
 
     pub fn render_references_mut(&mut self) -> &mut RenderReferences {
         &mut self.render_references
-    }
-
-    pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
-        self.rendered_as_multiplied_measures = value;
     }
 
     pub fn add_pre_aggregation_dimension_reference<T: Into<RenderReferencesType>>(
@@ -243,11 +238,8 @@ impl SqlNodesFactory {
         } else if self.ungrouped {
             UngroupedQueryFinalMeasureSqlNode::new(input)
         } else {
-            let final_processor: Rc<dyn SqlNode> = FinalMeasureSqlNode::new(
-                input.clone(),
-                self.rendered_as_multiplied_measures.clone(),
-                self.count_approx_as_state,
-            );
+            let final_processor: Rc<dyn SqlNode> =
+                FinalMeasureSqlNode::new(input.clone(), self.count_approx_as_state);
             let final_processor = if !self.pre_aggregation_measures_references.is_empty() {
                 FinalPreAggregationMeasureSqlNode::new(
                     final_processor,
