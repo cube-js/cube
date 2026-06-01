@@ -189,21 +189,6 @@ impl BaseTools for StubBaseTools {
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError> {
         Err(stub_err("sql_utils_for_rust"))
     }
-    fn generate_time_series(
-        &self,
-        _granularity: String,
-        _date_range: Vec<String>,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        Err(stub_err("generate_time_series"))
-    }
-    fn generate_custom_time_series(
-        &self,
-        _granularity: String,
-        _date_range: Vec<String>,
-        _origin: String,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        Err(stub_err("generate_custom_time_series"))
-    }
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
         Err(stub_err("get_allocated_params"))
     }
@@ -821,14 +806,6 @@ fn invoke_base_tools<IT: InnerTypes>(b: &NativeBaseTools<IT>) -> InvokeResult {
     r.record("driver_tools", b.driver_tools(false));
     r.record("sql_templates", b.sql_templates());
     r.record("sql_utils_for_rust", b.sql_utils_for_rust());
-    r.record(
-        "generate_time_series",
-        b.generate_time_series("day".to_string(), vec![]),
-    );
-    r.record(
-        "generate_custom_time_series",
-        b.generate_custom_time_series("day".to_string(), vec![], "2024-01-01".to_string()),
-    );
     r.record("get_allocated_params", b.get_allocated_params());
     r.record("all_cube_members", b.all_cube_members("Orders".to_string()));
     r.record(

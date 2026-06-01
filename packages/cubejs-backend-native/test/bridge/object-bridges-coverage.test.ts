@@ -68,8 +68,6 @@ const BRIDGES: BridgeSpec[] = [
     expected: [
       'all_cube_members',
       'driver_tools',
-      'generate_custom_time_series',
-      'generate_time_series',
       'get_allocated_params',
       'get_pre_aggregation_by_name',
       'interval_and_minimal_time_unit',

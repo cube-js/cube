@@ -9,6 +9,11 @@ const PREDEFINED_GRANULARITIES: &[&str] = &[
     "second", "minute", "hour", "day", "week", "month", "quarter", "year",
 ];
 
+// Cap on emitted buckets. Guards against pathologically wide ranges or tiny
+// intervals running effectively unbounded; expressed as an iteration limit
+// since calendar units have no fixed length in seconds.
+const MAX_BUCKETS: usize = 50_000;
+
 pub fn is_predefined_granularity(name: &str) -> bool {
     PREDEFINED_GRANULARITIES.contains(&name)
 }
@@ -36,6 +41,12 @@ impl QueryTimeSeries {
         let mut current = range_start;
         let mut buckets = Vec::new();
         loop {
+            if buckets.len() >= MAX_BUCKETS {
+                return Err(CubeError::user(format!(
+                    "Time series exceeded {MAX_BUCKETS} buckets; \
+                     reduce date range or use a larger granularity"
+                )));
+            }
             let window = predefined_bucket(granularity, current, timestamp_precision)?;
             if window.bucket_start > range_end {
                 break;
@@ -67,9 +78,6 @@ impl QueryTimeSeries {
         let nines = "9".repeat(timestamp_precision as usize);
         let mut aligned = align_to_origin(range_start, &interval, origin)?;
         let mut buckets = Vec::new();
-        // Guard against pathologically tiny intervals, expressed as an
-        // iteration limit since calendar units have no fixed length in seconds.
-        const MAX_BUCKETS: usize = 50_000;
         while aligned < range_end {
             if buckets.len() >= MAX_BUCKETS {
                 return Err(CubeError::user(format!(
@@ -279,8 +287,13 @@ fn add_interval_to_dt(
     dt: NaiveDateTime,
     interval: &SqlInterval,
 ) -> Result<NaiveDateTime, CubeError> {
+    // Units are applied in a fixed order (months → days → sub-day) regardless
+    // of how they appear in the interval string. For non-canonical intervals
+    // (e.g. "5 days 1 month") month-end clamping could differ from applying
+    // units in their written order; in practice granularity intervals are
+    // canonical, so this stays a latent edge case.
     let mut date = dt.date();
-    let mut time = dt.time();
+    let time = dt.time();
     // Calendar parts first (year/quarter/month) — they're not fixed in seconds.
     let total_months = interval.year * 12 + interval.quarter * 3 + interval.month;
     date = apply_months(date, total_months)?;
@@ -295,13 +308,9 @@ fn add_interval_to_dt(
         + Duration::minutes(interval.minute as i64)
         + Duration::seconds(interval.second as i64);
     let combined = date.and_time(time);
-    let result = combined
+    combined
         .checked_add_signed(sub_day)
-        .ok_or_else(|| CubeError::user(format!("Date overflow adding sub-day to {dt}")))?;
-    // Re-extract time in case sub_day arithmetic rolled days.
-    date = result.date();
-    time = result.time();
-    Ok(date.and_time(time))
+        .ok_or_else(|| CubeError::user(format!("Date overflow adding sub-day to {dt}")))
 }
 
 fn sub_interval_from_dt(
@@ -528,6 +537,18 @@ mod tests {
         let err = QueryTimeSeries::generate_predefined("day", &dr("2024-01-10", "2024-01-11"), 4)
             .unwrap_err();
         assert!(err.message.contains("Unsupported timestamp precision"));
+    }
+
+    #[test]
+    fn predefined_exceeding_buckets_errors() {
+        // One day at second granularity is 86_400 buckets, over the 50k cap.
+        let err = QueryTimeSeries::generate_predefined(
+            "second",
+            &dr("2024-01-10T00:00:00", "2024-01-11T00:00:00"),
+            3,
+        )
+        .unwrap_err();
+        assert!(err.message.contains("exceeded"));
     }
 
     // ---- custom ----
