@@ -177,6 +177,8 @@ class ApiGateway {
 
   protected readonly playgroundAuthSecret?: string;
 
+  protected readonly apiSecrets?: string[];
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected readonly event: (name: string, props?: object) => void;
 
@@ -202,6 +204,9 @@ class ApiGateway {
     this.standalone = options.standalone;
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
+    this.apiSecrets = options.apiSecrets && options.apiSecrets.length > 0
+      ? options.apiSecrets
+      : undefined;
 
     this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
@@ -2519,17 +2524,49 @@ class ApiGateway {
       };
     }
 
-    const secret = options?.key || this.apiSecret;
+    // `options.key` wins (used by the playground/system path), then the
+    // rotation list, then the singular secret.
+    let candidateSecrets: string[];
+    if (options?.key) {
+      candidateSecrets = [options.key];
+    } else if (this.apiSecrets && this.apiSecrets.length > 0) {
+      candidateSecrets = this.apiSecrets;
+    } else if (this.apiSecret) {
+      candidateSecrets = [this.apiSecret];
+    } else {
+      candidateSecrets = [];
+    }
+
+    // JWK auth resolves the key by `kid`, so iterating the list is pointless.
+    const isJWK = Boolean(options?.jwkUrl);
 
     return async (req, auth) => {
       if (auth) {
-        try {
-          req.securityContext = await checkAuthFn(auth, secret);
-          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
-        } catch (e: any) {
-          if (this.enforceSecurityChecks) {
-            throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', e);
+        let verified = false;
+        let lastError: any;
+
+        for (const candidate of candidateSecrets) {
+          try {
+            req.securityContext = await checkAuthFn(auth, candidate);
+            req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
+            verified = true;
+            break;
+          } catch (e: any) {
+            lastError = e;
+            // Token-level failures (expiry, nbf, JWK lookup) reproduce for every
+            // candidate, so don't shadow them with a later "invalid signature".
+            if (
+              isJWK
+              || e?.name === 'TokenExpiredError'
+              || e?.name === 'NotBeforeError'
+            ) {
+              break;
+            }
           }
+        }
+
+        if (!verified && this.enforceSecurityChecks) {
+          throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', lastError);
         }
       } else if (this.enforceSecurityChecks) {
         // @todo Move it to 401 or 400

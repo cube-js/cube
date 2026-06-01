@@ -19,6 +19,23 @@ The secret key used to sign and verify JWTs. Generated on project scaffold with
 See also the [`check_auth` configuration
 option](/product/configuration/reference/config#check_auth).
 
+## `CUBEJS_API_SECRETS`
+
+A comma-separated list of secret keys accepted when verifying JWTs. Lets
+operators rotate the API secret without downtime: during a rotation window,
+include the previous, current, and incoming secrets together so in-flight
+tokens signed by any of them continue to verify.
+
+When `CUBEJS_API_SECRETS` is set, it takes precedence over
+[`CUBEJS_API_SECRET`](#cubejs-api-secret) — only the listed secrets are
+accepted. Whitespace around entries is trimmed and duplicates are dropped.
+Tokens are still signed with whichever single secret the issuer holds; this
+variable affects verification only.
+
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A comma-separated list of valid strings  | N/A                    | N/A                   |
+
 ## `CUBEJS_APP`
 
 An application ID used to uniquely identify the Cube deployment. Can be

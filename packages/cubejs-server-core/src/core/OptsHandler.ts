@@ -31,6 +31,7 @@ import {
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
 import optionsValidate from './optionsValidate';
+import { parseApiSecretsEnv } from './apiSecretsEnv';
 
 const { version } = require('../../../package.json');
 
@@ -468,6 +469,7 @@ export class OptsHandler {
       externalDriverFactory,
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
+      apiSecrets: parseApiSecretsEnv(process.env.CUBEJS_API_SECRETS),
       telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],
