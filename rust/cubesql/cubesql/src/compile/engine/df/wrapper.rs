@@ -1827,93 +1827,13 @@ impl WrappedSelectNode {
                 )?;
                 Ok((expr, sql_query))
             }
-            Expr::Column(ref c) => {
-                if let Some(subquery) = subqueries.get(&c.flat_name()) {
-                    Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .subquery_expr(subquery.clone())
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for subquery expr: {}",
-                                    e
-                                ))
-                            })?,
-                        sql_query,
-                    ))
-                } else if let Some(PushToCubeContext {
-                    ungrouped_scan_node,
-                    known_join_subqueries,
-                }) = push_to_cube_context
-                {
-                    if let Some(relation) = c.relation.as_ref() {
-                        if known_join_subqueries.contains(relation) {
-                            // SQL API passes fixed aliases to Cube.js for join subqueries
-                            // It means we don't need to use member expressions here, and can just use that fixed alias
-                            // So we can generate that as if it were regular column expression
-
-                            return Self::generate_sql_for_expr(
-                                sql_query,
-                                sql_generator.clone(),
-                                expr,
-                                None,
-                                subqueries,
-                            );
-                        }
-                    }
-
-                    let member = Self::find_member_in_ungrouped_scan(ungrouped_scan_node, c)?;
-
-                    match member {
-                        MemberField::Member(member) => {
-                            Ok((format!("${{{}}}", member.field_name), sql_query))
-                        }
-                        MemberField::Literal(value) => Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            Expr::Literal(value.clone()),
-                            push_to_cube_context,
-                            subqueries,
-                        ),
-                    }
-                } else {
-                    Ok((
-                        match c.relation.as_ref() {
-                            Some(r) => format!(
-                                "{}.{}",
-                                sql_generator
-                                    .get_sql_templates()
-                                    .quote_identifier(&r)
-                                    .map_err(|e| {
-                                        DataFusionError::Internal(format!(
-                                            "Can't generate SQL for column: {}",
-                                            e
-                                        ))
-                                    })?,
-                                sql_generator
-                                    .get_sql_templates()
-                                    .quote_identifier(&c.name)
-                                    .map_err(|e| {
-                                        DataFusionError::Internal(format!(
-                                            "Can't generate SQL for column: {}",
-                                            e
-                                        ))
-                                    })?
-                            ),
-                            None => sql_generator
-                                .get_sql_templates()
-                                .quote_identifier(&c.name)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for column: {}",
-                                        e
-                                    ))
-                                })?,
-                        },
-                        sql_query,
-                    ))
-                }
-            }
+            expr @ Expr::Column(_) => Self::generate_sql_for_column(
+                sql_query,
+                sql_generator,
+                expr,
+                push_to_cube_context,
+                subqueries,
+            ),
             // Expr::ScalarVariable(_, _) => {}
             Expr::BinaryExpr { left, op, right } => {
                 let (left, sql_query) = Self::generate_sql_for_expr(
@@ -2161,64 +2081,13 @@ impl WrappedSelectNode {
                     })?;
                 Ok((resulting_sql, sql_query))
             }
-            Expr::Case {
+            expr @ Expr::Case { .. } => Self::generate_sql_for_case(
+                sql_query,
+                sql_generator,
                 expr,
-                when_then_expr,
-                else_expr,
-            } => {
-                let expr = if let Some(expr) = expr {
-                    let (expr, sql_query_next) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = sql_query_next;
-                    Some(expr)
-                } else {
-                    None
-                };
-                let mut when_then_expr_sql = Vec::new();
-                for (when, then) in when_then_expr {
-                    let (when, sql_query_next) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *when,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    let (then, sql_query_next) = Self::generate_sql_for_expr(
-                        sql_query_next,
-                        sql_generator.clone(),
-                        *then,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = sql_query_next;
-                    when_then_expr_sql.push((when, then));
-                }
-                let else_expr = if let Some(else_expr) = else_expr {
-                    let (else_expr, sql_query_next) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *else_expr,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = sql_query_next;
-                    Some(else_expr)
-                } else {
-                    None
-                };
-                let resulting_sql = sql_generator
-                    .get_sql_templates()
-                    .case(expr, when_then_expr_sql, else_expr)
-                    .map_err(|e| {
-                        DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
-                    })?;
-                Ok((resulting_sql, sql_query))
-            }
+                push_to_cube_context,
+                subqueries,
+            ),
             Expr::Cast { expr, data_type } => {
                 let (expr, sql_query) = Self::generate_sql_for_expr(
                     sql_query,
@@ -2274,59 +2143,13 @@ impl WrappedSelectNode {
                 push_to_cube_context,
                 subqueries,
             ),
-            Expr::AggregateFunction {
-                fun,
-                args,
-                distinct,
-                within_group,
-            } => {
-                let mut sql_args = Vec::new();
-                let mut sql_within_group = Vec::new();
-                for arg in args {
-                    if let AggregateFunction::Count = fun {
-                        if !distinct {
-                            if let Expr::Literal(_) = arg {
-                                sql_args.push("*".to_string());
-                                break;
-                            }
-                        }
-                    }
-                    let (sql, query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        arg,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = query;
-                    sql_args.push(sql);
-                }
-                if let Some(within_group) = within_group {
-                    for expr in within_group {
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            expr,
-                            push_to_cube_context,
-                            subqueries,
-                        )?;
-                        sql_query = query;
-                        sql_within_group.push(sql);
-                    }
-                }
-                Ok((
-                    sql_generator
-                        .get_sql_templates()
-                        .aggregate_function(fun, sql_args, distinct, sql_within_group)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for aggregate function: {}",
-                                e
-                            ))
-                        })?,
-                    sql_query,
-                ))
-            }
+            expr @ Expr::AggregateFunction { .. } => Self::generate_sql_for_aggregate_function(
+                sql_query,
+                sql_generator,
+                expr,
+                push_to_cube_context,
+                subqueries,
+            ),
             Expr::GroupingSet(grouping_set) => match grouping_set {
                 datafusion::logical_plan::GroupingSet::Rollup(exprs) => {
                     let mut sql_exprs = Vec::new();
@@ -2387,66 +2210,13 @@ impl WrappedSelectNode {
                 }
             },
 
-            Expr::WindowFunction {
-                fun,
-                args,
-                partition_by,
-                order_by,
-                window_frame,
-            } => {
-                let mut sql_args = Vec::new();
-                for arg in args {
-                    let (sql, query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        arg,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = query;
-                    sql_args.push(sql);
-                }
-                let mut sql_partition_by = Vec::new();
-                for arg in partition_by {
-                    let (sql, query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        arg,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = query;
-                    sql_partition_by.push(sql);
-                }
-                let mut sql_order_by = Vec::new();
-                for arg in order_by {
-                    let (sql, query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        arg,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = query;
-                    sql_order_by.push(sql);
-                }
-                let resulting_sql = sql_generator
-                    .get_sql_templates()
-                    .window_function_expr(
-                        fun,
-                        sql_args,
-                        sql_partition_by,
-                        sql_order_by,
-                        window_frame,
-                    )
-                    .map_err(|e| {
-                        DataFusionError::Internal(format!(
-                            "Can't generate SQL for window function: {}",
-                            e
-                        ))
-                    })?;
-                Ok((resulting_sql, sql_query))
-            }
+            expr @ Expr::WindowFunction { .. } => Self::generate_sql_for_window_function(
+                sql_query,
+                sql_generator,
+                expr,
+                push_to_cube_context,
+                subqueries,
+            ),
             expr @ Expr::AggregateUDF { .. } => Self::generate_sql_for_aggregate_udf(
                 sql_query,
                 sql_generator,
@@ -2540,6 +2310,309 @@ impl WrappedSelectNode {
         }
     }
 
+    #[inline(never)]
+    fn generate_sql_for_column<'ctx>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::Column(ref c) = expr else {
+            return Err(DataFusionError::Internal(format!(
+                "generate_sql_for_column called with unexpected expr: {expr:?}"
+            )));
+        };
+        if let Some(subquery) = subqueries.get(&c.flat_name()) {
+            Ok((
+                sql_generator
+                    .get_sql_templates()
+                    .subquery_expr(subquery.clone())
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for subquery expr: {}",
+                            e
+                        ))
+                    })?,
+                sql_query,
+            ))
+        } else if let Some(PushToCubeContext {
+            ungrouped_scan_node,
+            known_join_subqueries,
+        }) = push_to_cube_context
+        {
+            if let Some(relation) = c.relation.as_ref() {
+                if known_join_subqueries.contains(relation) {
+                    // SQL API passes fixed aliases to Cube.js for join subqueries
+                    // It means we don't need to use member expressions here, and can just use that fixed alias
+                    // So we can generate that as if it were regular column expression
+
+                    return Self::generate_sql_for_expr(
+                        sql_query,
+                        sql_generator.clone(),
+                        expr,
+                        None,
+                        subqueries,
+                    );
+                }
+            }
+
+            let member = Self::find_member_in_ungrouped_scan(ungrouped_scan_node, c)?;
+
+            match member {
+                MemberField::Member(member) => {
+                    Ok((format!("${{{}}}", member.field_name), sql_query))
+                }
+                MemberField::Literal(value) => Self::generate_sql_for_expr(
+                    sql_query,
+                    sql_generator.clone(),
+                    Expr::Literal(value.clone()),
+                    push_to_cube_context,
+                    subqueries,
+                ),
+            }
+        } else {
+            Ok((
+                match c.relation.as_ref() {
+                    Some(r) => format!(
+                        "{}.{}",
+                        sql_generator
+                            .get_sql_templates()
+                            .quote_identifier(&r)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for column: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_generator
+                            .get_sql_templates()
+                            .quote_identifier(&c.name)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for column: {}",
+                                    e
+                                ))
+                            })?
+                    ),
+                    None => sql_generator
+                        .get_sql_templates()
+                        .quote_identifier(&c.name)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for column: {}",
+                                e
+                            ))
+                        })?,
+                },
+                sql_query,
+            ))
+        }
+    }
+
+    #[inline(never)]
+    fn generate_sql_for_case<'ctx>(
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::Case {
+            expr,
+            when_then_expr,
+            else_expr,
+        } = expr
+        else {
+            return Err(DataFusionError::Internal(format!(
+                "generate_sql_for_case called with unexpected expr: {expr:?}"
+            )));
+        };
+        let expr = if let Some(expr) = expr {
+            let (expr, sql_query_next) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                *expr,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = sql_query_next;
+            Some(expr)
+        } else {
+            None
+        };
+        let mut when_then_expr_sql = Vec::new();
+        for (when, then) in when_then_expr {
+            let (when, sql_query_next) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                *when,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let (then, sql_query_next) = Self::generate_sql_for_expr(
+                sql_query_next,
+                sql_generator.clone(),
+                *then,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = sql_query_next;
+            when_then_expr_sql.push((when, then));
+        }
+        let else_expr = if let Some(else_expr) = else_expr {
+            let (else_expr, sql_query_next) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                *else_expr,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = sql_query_next;
+            Some(else_expr)
+        } else {
+            None
+        };
+        let resulting_sql = sql_generator
+            .get_sql_templates()
+            .case(expr, when_then_expr_sql, else_expr)
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
+            })?;
+        Ok((resulting_sql, sql_query))
+    }
+
+    #[inline(never)]
+    fn generate_sql_for_aggregate_function<'ctx>(
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::AggregateFunction {
+            fun,
+            args,
+            distinct,
+            within_group,
+        } = expr
+        else {
+            return Err(DataFusionError::Internal(format!(
+                "generate_sql_for_aggregate_function called with unexpected expr: {expr:?}"
+            )));
+        };
+        let mut sql_args = Vec::new();
+        let mut sql_within_group = Vec::new();
+        for arg in args {
+            if let AggregateFunction::Count = fun {
+                if !distinct {
+                    if let Expr::Literal(_) = arg {
+                        sql_args.push("*".to_string());
+                        break;
+                    }
+                }
+            }
+            let (sql, query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                arg,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = query;
+            sql_args.push(sql);
+        }
+        if let Some(within_group) = within_group {
+            for expr in within_group {
+                let (sql, query) = Self::generate_sql_for_expr(
+                    sql_query,
+                    sql_generator.clone(),
+                    expr,
+                    push_to_cube_context,
+                    subqueries,
+                )?;
+                sql_query = query;
+                sql_within_group.push(sql);
+            }
+        }
+        Ok((
+            sql_generator
+                .get_sql_templates()
+                .aggregate_function(fun, sql_args, distinct, sql_within_group)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for aggregate function: {}",
+                        e
+                    ))
+                })?,
+            sql_query,
+        ))
+    }
+
+    #[inline(never)]
+    fn generate_sql_for_window_function<'ctx>(
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::WindowFunction {
+            fun,
+            args,
+            partition_by,
+            order_by,
+            window_frame,
+        } = expr
+        else {
+            return Err(DataFusionError::Internal(format!(
+                "generate_sql_for_window_function called with unexpected expr: {expr:?}"
+            )));
+        };
+        let mut sql_args = Vec::new();
+        for arg in args {
+            let (sql, query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                arg,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = query;
+            sql_args.push(sql);
+        }
+        let mut sql_partition_by = Vec::new();
+        for arg in partition_by {
+            let (sql, query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                arg,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = query;
+            sql_partition_by.push(sql);
+        }
+        let mut sql_order_by = Vec::new();
+        for arg in order_by {
+            let (sql, query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                arg,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = query;
+            sql_order_by.push(sql);
+        }
+        let resulting_sql = sql_generator
+            .get_sql_templates()
+            .window_function_expr(fun, sql_args, sql_partition_by, sql_order_by, window_frame)
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for window function: {}", e))
+            })?;
+        Ok((resulting_sql, sql_query))
+    }
     #[inline(never)]
     fn generate_sql_for_literal(
         mut sql_query: SqlQuery,
