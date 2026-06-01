@@ -186,31 +186,37 @@ impl MultiFactJoinGroups {
         hints: &MeasuresJoinHints,
     ) -> Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
+        let resolve = |join_hints: &JoinHints| -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
+            query_tools.join_tree_cache().get_or_build(join_hints, || {
+                let (key, join) = query_tools.join_for_hints(join_hints)?;
+                Ok((key, join_tree_builder.build(join)?))
+            })
+        };
+
         let measures_to_join = if hints.measure_hints.is_empty() {
             if hints.base_hints.is_empty() {
                 vec![]
             } else {
-                let (key, join) = query_tools.join_for_hints(&hints.base_hints)?;
-                vec![(Vec::new(), key, join)]
+                let (key, join_tree) = resolve(&hints.base_hints)?;
+                vec![(Vec::new(), key, join_tree)]
             }
         } else {
             hints
                 .measure_hints
                 .iter()
                 .map(|mh| -> Result<_, CubeError> {
-                    let (key, join) = query_tools.join_for_hints(&mh.hints)?;
-                    Ok((vec![mh.measure.clone()], key, join))
+                    let (key, join_tree) = resolve(&mh.hints)?;
+                    Ok((vec![mh.measure.clone()], key, join_tree))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
 
         let mut key_order: Vec<JoinKey> = Vec::new();
         let mut grouped: HashMap<JoinKey, (Rc<JoinTree>, Vec<Rc<MemberSymbol>>)> = HashMap::new();
-        for (measures, key, join) in measures_to_join {
+        for (measures, key, join_tree) in measures_to_join {
             if let Some(entry) = grouped.get_mut(&key) {
                 entry.1.extend(measures);
             } else {
-                let join_tree = join_tree_builder.build(join)?;
                 key_order.push(key.clone());
                 grouped.insert(key, (join_tree, measures));
             }
