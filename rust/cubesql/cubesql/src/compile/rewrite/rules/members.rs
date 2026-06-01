@@ -434,7 +434,6 @@ impl RewriteRules for MemberRules {
                     "?out_join_hints",
                     "?join_type",
                     "?left_filters",
-                    "?right_filters",
                 ),
             ),
         ];
@@ -2797,7 +2796,6 @@ impl MemberRules {
         out_join_hints_var: &'static str,
         join_type_var: &'static str,
         left_filters_var: &'static str,
-        right_filters_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
@@ -2811,7 +2809,6 @@ impl MemberRules {
         let out_join_hints_var = var!(out_join_hints_var);
         let join_type_var = var!(join_type_var);
         let left_filters_var = var!(left_filters_var);
-        let right_filters_var = var!(right_filters_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             // Resolves a join column to the name of the dimension member it
