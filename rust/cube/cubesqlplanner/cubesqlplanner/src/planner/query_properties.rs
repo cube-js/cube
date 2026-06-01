@@ -8,7 +8,6 @@
 
 use super::query_tools::QueryTools;
 use super::MemberSymbol;
-use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
@@ -17,7 +16,7 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::{
     apply_static_filter_to_filter_item, apply_static_filter_to_symbol, DimensionTimeShift,
-    MeasureTimeShifts,
+    JoinTree, MeasureTimeShifts,
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -266,7 +265,7 @@ impl QueryProperties {
         Ok(self.multi_fact_join_groups()?.is_multi_fact())
     }
 
-    pub fn simple_query_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
+    pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
         self.multi_fact_join_groups()?.single_join()
     }
 
@@ -480,7 +479,7 @@ impl QueryProperties {
                     .compute_join_multi_fact_groups_with_measures(std::slice::from_ref(m))?
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
-                for item in collect_multiplied_measures(m, join)? {
+                for item in collect_multiplied_measures(m, &join)? {
                     if item.multiplied {
                         result
                             .rendered_as_multiplied_measures

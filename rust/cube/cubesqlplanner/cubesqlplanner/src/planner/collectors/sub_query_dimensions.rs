@@ -1,6 +1,4 @@
-use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::planner::planners::JoinPlanner;
-use crate::planner::{DimensionSymbol, MemberSymbol, TraversalVisitor};
+use crate::planner::{DimensionSymbol, JoinTree, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -61,24 +59,21 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
 
 pub fn collect_sub_query_dimensions_from_members(
     members: &Vec<Rc<MemberSymbol>>,
-    join_planner: &JoinPlanner,
-    join: &Rc<dyn JoinDefinition>,
+    join: &JoinTree,
 ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-    collect_sub_query_dimensions_from_symbols(&members, join_planner, join)
+    collect_sub_query_dimensions_from_symbols(members, join)
 }
 
 pub fn collect_sub_query_dimensions_from_symbols(
     members: &Vec<Rc<MemberSymbol>>,
-    join_planner: &JoinPlanner,
-    join: &Rc<dyn JoinDefinition>,
+    join: &JoinTree,
 ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
     let mut visitor = SubQueryDimensionsCollector::new();
     for member in members.iter() {
-        visitor.apply(&member, &())?;
+        visitor.apply(member, &())?;
     }
-    for join_item in join.joins()? {
-        let condition = join_planner.compile_join_condition(join_item.clone())?;
-        for dep in condition.get_dependencies() {
+    for join_item in join.joins() {
+        for dep in join_item.on_sql().get_dependencies() {
             visitor.apply(&dep, &())?;
         }
     }

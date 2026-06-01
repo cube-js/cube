@@ -1,9 +1,10 @@
-use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::collectors::{collect_join_hints, has_multi_stage_members};
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
+use crate::planner::planners::JoinTreeBuilder;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -148,7 +149,7 @@ impl MeasuresJoinHints {
 pub struct MultiFactJoinGroups {
     query_tools: Rc<QueryTools>,
     measures_join_hints: MeasuresJoinHints,
-    groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>,
+    groups: Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>,
     /// cube_name → join path from root, computed from the first group (shared for dimensions).
     dimension_paths: HashMap<String, Vec<String>>,
     /// measure full_name → join path from root, computed per group.
@@ -163,7 +164,7 @@ impl MultiFactJoinGroups {
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
         let groups = Self::build_groups(&query_tools, &measures_join_hints)?;
-        let (dimension_paths, measure_paths) = Self::precompute_paths(&groups)?;
+        let (dimension_paths, measure_paths) = Self::precompute_paths(&groups);
         Ok(Self {
             query_tools,
             measures_join_hints,
@@ -183,34 +184,41 @@ impl MultiFactJoinGroups {
     fn build_groups(
         query_tools: &Rc<QueryTools>,
         hints: &MeasuresJoinHints,
-    ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>, CubeError> {
+    ) -> Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError> {
+        let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
+        let resolve = |join_hints: &JoinHints| -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
+            query_tools.join_tree_cache().get_or_build(join_hints, || {
+                let (key, join) = query_tools.join_for_hints(join_hints)?;
+                Ok((key, join_tree_builder.build(join)?))
+            })
+        };
+
         let measures_to_join = if hints.measure_hints.is_empty() {
             if hints.base_hints.is_empty() {
                 vec![]
             } else {
-                let (key, join) = query_tools.join_for_hints(&hints.base_hints)?;
-                vec![(Vec::new(), key, join)]
+                let (key, join_tree) = resolve(&hints.base_hints)?;
+                vec![(Vec::new(), key, join_tree)]
             }
         } else {
             hints
                 .measure_hints
                 .iter()
                 .map(|mh| -> Result<_, CubeError> {
-                    let (key, join) = query_tools.join_for_hints(&mh.hints)?;
-                    Ok((vec![mh.measure.clone()], key, join))
+                    let (key, join_tree) = resolve(&mh.hints)?;
+                    Ok((vec![mh.measure.clone()], key, join_tree))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
 
         let mut key_order: Vec<JoinKey> = Vec::new();
-        let mut grouped: HashMap<JoinKey, (Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)> =
-            HashMap::new();
-        for (measures, key, join) in measures_to_join {
+        let mut grouped: HashMap<JoinKey, (Rc<JoinTree>, Vec<Rc<MemberSymbol>>)> = HashMap::new();
+        for (measures, key, join_tree) in measures_to_join {
             if let Some(entry) = grouped.get_mut(&key) {
                 entry.1.extend(measures);
             } else {
                 key_order.push(key.clone());
-                grouped.insert(key, (join, measures));
+                grouped.insert(key, (join_tree, measures));
             }
         }
 
@@ -229,7 +237,7 @@ impl MultiFactJoinGroups {
         self.groups.len() > 1
     }
 
-    pub fn groups(&self) -> &[(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)] {
+    pub fn groups(&self) -> &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)] {
         &self.groups
     }
 
@@ -258,12 +266,12 @@ impl MultiFactJoinGroups {
     }
 
     fn precompute_paths(
-        groups: &[(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)],
-    ) -> Result<(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>), CubeError> {
+        groups: &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)],
+    ) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
         let dimension_paths = if groups.is_empty() {
             HashMap::new()
         } else {
-            Self::build_cube_paths(&*groups[0].0)?
+            Self::build_cube_paths(&groups[0].0)
         };
 
         let mut measure_paths = HashMap::new();
@@ -271,7 +279,7 @@ impl MultiFactJoinGroups {
             if measures.is_empty() {
                 continue;
             }
-            let cube_paths = Self::build_cube_paths(&**join)?;
+            let cube_paths = Self::build_cube_paths(join);
             for m in measures {
                 if let Some(path) = cube_paths.get(&m.cube_name()) {
                     measure_paths.insert(m.full_name(), path.clone());
@@ -279,34 +287,33 @@ impl MultiFactJoinGroups {
             }
         }
 
-        Ok((dimension_paths, measure_paths))
+        (dimension_paths, measure_paths)
     }
 
-    fn build_cube_paths(
-        join: &dyn JoinDefinition,
-    ) -> Result<HashMap<String, Vec<String>>, CubeError> {
-        let root = join.static_data().root.clone();
+    fn build_cube_paths(join: &JoinTree) -> HashMap<String, Vec<String>> {
+        let root = join.root().name().clone();
         let mut paths: HashMap<String, Vec<String>> = HashMap::new();
         paths.insert(root.clone(), vec![root]);
 
-        for join_item in join.joins()? {
-            let sd = join_item.static_data();
+        for join_item in join.joins() {
+            let original_from = join_item.original_from().to_string();
+            let original_to = join_item.cube().name().clone();
             let parent_path = paths
-                .get(&sd.original_from)
+                .get(&original_from)
                 .cloned()
-                .unwrap_or_else(|| vec![sd.original_from.clone()]);
+                .unwrap_or_else(|| vec![original_from]);
             let mut path = parent_path;
-            path.push(sd.original_to.clone());
-            paths.insert(sd.original_to.clone(), path);
+            path.push(original_to.clone());
+            paths.insert(original_to, path);
         }
 
-        Ok(paths)
+        paths
     }
 
     /// The only join when the query has exactly one group; errors if
     /// the query is multi-fact, and `Ok(None)` if it has no groups
     /// at all.
-    pub fn single_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
+    pub fn single_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
         if self.groups.is_empty() {
             return Ok(None);
         }
