@@ -25,6 +25,10 @@ impl JoinTreeCache {
         hints: &JoinHints,
         build: impl FnOnce() -> Result<(JoinKey, Rc<JoinTree>), CubeError>,
     ) -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
+        // The lookup borrow is dropped before `build` runs and re-acquired for
+        // the insert, so `build` may itself call back into the cache. Do not
+        // fold this into a single `entry()` call — that would hold the borrow
+        // across `build` and panic on any re-entrant access.
         if let Some(cached) = self.by_hints.borrow().get(hints) {
             return Ok(cached.clone());
         }
