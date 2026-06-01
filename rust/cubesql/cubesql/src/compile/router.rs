@@ -625,7 +625,11 @@ impl QueryRouter {
             ctx,
             table_name
                 .as_ident()
-                .map_or_else(|| table_name.to_string(), |ident| ident.value.to_string()),
+                .ok_or_else(|| {
+                    CompilationError::internal("table name is not a plain identifier".to_string())
+                })?
+                .value
+                .clone(),
             self.state.temp_tables(),
         ))
     }
@@ -673,7 +677,10 @@ impl QueryRouter {
         };
         let table_name_lower = table_name
             .as_ident()
-            .map_or_else(|| table_name.to_string(), |ident| ident.value.clone())
+            .ok_or_else(|| {
+                CompilationError::internal("table name is not a plain identifier".to_string())
+            })?
+            .value
             .to_ascii_lowercase();
         let temp_tables = self.state.temp_tables();
         tokio::task::spawn_blocking(move || temp_tables.remove(&table_name_lower))
