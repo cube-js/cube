@@ -48,6 +48,10 @@ impl QueryTimeSeries {
                 )));
             }
             let window = predefined_bucket(granularity, current, timestamp_precision)?;
+            // Inclusive upper bound: a bucket whose start lands exactly on
+            // range_end is kept. The custom path is exclusive (`aligned <
+            // range_end`); the asymmetry is intentional and matches the
+            // established predefined/custom semantics.
             if window.bucket_start > range_end {
                 break;
             }
@@ -287,11 +291,10 @@ fn add_interval_to_dt(
     dt: NaiveDateTime,
     interval: &SqlInterval,
 ) -> Result<NaiveDateTime, CubeError> {
-    // Units are applied in a fixed order (months → days → sub-day) regardless
-    // of how they appear in the interval string. For non-canonical intervals
-    // (e.g. "5 days 1 month") month-end clamping could differ from applying
-    // units in their written order; in practice granularity intervals are
-    // canonical, so this stays a latent edge case.
+    // `SqlInterval` is field-based, so the written order of the source string
+    // is already lost. Units are applied months → days → sub-day; month-end
+    // clamping (e.g. Mar 31 + 1 month → Apr 30) therefore happens before days
+    // are added.
     let mut date = dt.date();
     let time = dt.time();
     // Calendar parts first (year/quarter/month) — they're not fixed in seconds.
@@ -345,15 +348,20 @@ fn align_to_origin(
 ) -> Result<NaiveDateTime, CubeError> {
     let mut aligned = start;
     let mut offset = origin;
+    // Cap iterations: a net-negative (or net-zero) interval would otherwise
+    // step away from `start` forever instead of converging on it.
+    let mut steps = 0;
     if start < origin {
         // Pull origin back until it sits at or below start.
         while offset > start {
+            converge_guard(&mut steps)?;
             offset = sub_interval_from_dt(offset, interval)?;
         }
         aligned = offset;
     } else {
         // Push origin forward; remember the last step that didn't overshoot.
         while offset < start {
+            converge_guard(&mut steps)?;
             aligned = offset;
             offset = add_interval_to_dt(offset, interval)?;
         }
@@ -362,6 +370,16 @@ fn align_to_origin(
         }
     }
     Ok(aligned)
+}
+
+fn converge_guard(steps: &mut usize) -> Result<(), CubeError> {
+    *steps += 1;
+    if *steps > MAX_BUCKETS {
+        return Err(CubeError::user(
+            "Origin alignment did not converge; check the granularity interval".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn format_with_padding(dt: NaiveDateTime, sub_second: &str) -> String {
@@ -662,6 +680,20 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.message.contains("did not advance"));
+    }
+
+    #[test]
+    fn custom_alignment_non_convergent_errors() {
+        // start < origin with a net-negative interval would step away from
+        // start forever in align_to_origin; the cap turns it into an error.
+        let err = QueryTimeSeries::generate_custom(
+            "-1 day",
+            &dr("2024-01-05", "2024-01-10"),
+            "2024-01-10",
+            3,
+        )
+        .unwrap_err();
+        assert!(err.message.contains("did not converge"));
     }
 
     #[test]
