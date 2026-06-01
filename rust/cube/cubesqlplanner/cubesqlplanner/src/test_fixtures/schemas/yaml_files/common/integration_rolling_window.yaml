@@ -200,9 +200,28 @@ cubes:
             type: count
             rolling_window:
                 trailing: 3 day
+          # count_distinct_approx (HLL) base + rolling
+          - name: unique_customers_approx
+            type: count_distinct_approx
+            sql: customer_id
+          - name: rolling_unique_customers_approx_7d
+            type: count_distinct_approx
+            sql: customer_id
+            rolling_window:
+                trailing: 7 day
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
+      pre_aggregations:
+          # Mirrors the JS `partitionedRolling` pre-agg: stores the rolling
+          # measure itself, materialized as its base HLL state per hour.
+          - name: approx_rolling
+            measures:
+                - rolling_unique_customers_approx_7d
+            dimensions:
+                - category
+            time_dimension: created_at
+            granularity: hour
 
 views:
     - name: orders_rolling_view

@@ -987,6 +987,51 @@ fn test_rollup_join_calculated_measures_through_view() {
     );
 }
 
+// A rolling-window count_distinct_approx whose pre-aggregation stores the
+// rolling measure itself: the leaf reads the rollup's HLL state and must
+// keep it MERGED (state only), so the outer rolling-window stage can merge
+// across the window and finalize to a cardinality. This pins the state
+// branch — the read must NOT collapse the state to a cardinality too early.
+#[test]
+fn test_count_distinct_approx_rolling_pre_agg_keeps_state() {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/integration_rolling_window.yaml",
+    ))
+    .unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_unique_customers_approx_7d
+        dimensions:
+          - orders.category
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+            dateRange:
+              - "2024-01-10"
+              - "2024-01-25"
+        cubestoreSupportMultistage: true
+    "#};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "approx_rolling");
+
+    // Leaf reads the rollup column as a bare merged state (hll_merge).
+    assert!(
+        sql.contains("merge(\"orders__rolling_unique_customers_approx_7d\")"),
+        "Rolling leaf should keep the merged HLL state, got:\n{}",
+        sql
+    );
+    // The rolling-window stage finalizes the merged states to a cardinality.
+    assert!(
+        sql.contains("cardinality(merge("),
+        "Rolling window should finalize merged states to a cardinality, got:\n{}",
+        sql
+    );
+}
+
 // --- HLL count_distinct_approx through a pre-aggregation ---
 //
 // A count_distinct_approx measure materialized in a rollup keeps an HLL
