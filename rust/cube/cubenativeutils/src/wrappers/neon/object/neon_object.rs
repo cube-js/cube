@@ -38,7 +38,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
         Ok(Self { root_holder })
     }
 
-    pub fn form_root(root: RootHolder<C>) -> Self {
+    pub fn from_root(root: RootHolder<C>) -> Self {
         Self { root_holder: root }
     }
 
