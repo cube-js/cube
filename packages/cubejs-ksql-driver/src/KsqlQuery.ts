@@ -55,6 +55,23 @@ export class KsqlQuery extends BaseQuery {
     return `\`${name}\``;
   }
 
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // ksqlDB quotes identifiers with backticks, not double quotes.
+    templates.quotes = {
+      identifiers: '`',
+      escape: '``',
+    };
+    // ksqlDB has no `||` string operator — concatenation and LIKE-pattern
+    // wildcards must use CONCAT (mirrors concatStringsSql / KsqlFilter).
+    templates.expressions.concat_strings = 'CONCAT({{ strings | join(\', \') }})';
+    templates.filters.like_pattern =
+      '{% if start_wild or end_wild %}CONCAT(' +
+      '{% if start_wild %}\'%\', {% endif %}{{ value }}{% if end_wild %}, \'%\'{% endif %})' +
+      '{% else %}{{ value }}{% endif %}';
+    return templates;
+  }
+
   public castToString(sql: string) {
     return `CAST(${sql} as varchar(255))`;
   }
