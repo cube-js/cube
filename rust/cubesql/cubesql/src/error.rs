@@ -298,6 +298,9 @@ impl From<ParserError> for CubeError {
         match v {
             ParserError::ParserError(message) => CubeError::sql_parser(message),
             ParserError::TokenizerError(message) => CubeError::sql_parser(message),
+            ParserError::RecursionLimitExceeded => {
+                CubeError::sql_parser("recursion limit exceeded".to_string())
+            }
         }
     }
 }

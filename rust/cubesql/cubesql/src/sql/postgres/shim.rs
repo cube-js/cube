@@ -35,7 +35,7 @@ use pg_srv::{
     },
     PgType, PgTypeId, ProtocolError,
 };
-use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement};
+use sqlparser::ast::{self, CloseCursor, FetchDirection, SetExpr, Statement};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -1296,6 +1296,7 @@ impl AsyncPostgresShim {
                 name,
                 direction,
                 into,
+                ..
             } => {
                 if into.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1393,14 +1394,54 @@ impl AsyncPostgresShim {
                 self.write_portal(&mut portal, limit, cancel).await?;
                 self.portals.insert(name.value, portal);
             }
-            Statement::Declare {
-                name,
-                binary,
-                query,
-                scroll,
-                sensitive,
-                hold,
-            } => {
+            Statement::Declare { mut stmts } => {
+                if stmts.len() != 1 {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "Only a single cursor per DECLARE statement is supported".to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                }
+                let ast::Declare {
+                    names,
+                    binary,
+                    for_query: query,
+                    scroll,
+                    sensitive,
+                    hold,
+                    ..
+                } = stmts
+                    .pop()
+                    .expect("DECLARE must contain a single statement");
+
+                if names.len() > 1 {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "Only a single cursor name per DECLARE statement is supported"
+                                .to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                }
+
+                let Some(name) = names.into_iter().next() else {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "DECLARE statement must specify a cursor name".to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                };
+
+                let binary = binary.unwrap_or(false);
+
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1444,6 +1485,16 @@ impl AsyncPostgresShim {
                     ));
                 }
 
+                let Some(query) = query else {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "DECLARE statement must specify a query".to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                };
                 let select_stmt = Statement::Query(query);
                 // It's just a verification that we can compile that query.
                 let _ = convert_statement_to_cube_query(
@@ -1604,18 +1655,19 @@ impl AsyncPostgresShim {
             } => {
                 // Ensure the statement isn't wrapped in extra parens
                 let statement = match *statement.clone() {
-                    Statement::Query(outer_query) => match *outer_query {
-                        Query {
-                            with: None,
-                            body: SetExpr::Query(inner_query),
-                            order_by,
-                            limit: None,
-                            offset: None,
-                            fetch: None,
-                            lock: None,
-                        } if order_by.is_empty() => Statement::Query(inner_query),
-                        _ => *statement,
-                    },
+                    Statement::Query(outer_query)
+                        if outer_query.with.is_none()
+                            && outer_query.order_by.is_none()
+                            && outer_query.limit_clause.is_none()
+                            && outer_query.fetch.is_none()
+                            && outer_query.locks.is_empty()
+                            && matches!(*outer_query.body, SetExpr::Query(_)) =>
+                    {
+                        match *outer_query.body {
+                            SetExpr::Query(inner_query) => Statement::Query(inner_query),
+                            _ => unreachable!(),
+                        }
+                    }
                     _ => *statement,
                 };
 

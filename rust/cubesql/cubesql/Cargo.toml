@@ -10,14 +10,14 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "9f49caadcd0d023b2e68ded973ff725ddc5809a5", default-features = false, features = [
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1a75802e3ccaf7f4f3a518dd71e1043615e68e0c", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
 thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "1423a0c16ebba665bdbfdd0e2b8d36f417baa514" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "33cf41ae4ddd0c409f52fd72fb5101ae000aad53" }
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
@@ -51,7 +51,6 @@ paste = "1.0.6"
 tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 sha1_smol = "1.0.0"
-tera = { version = "1", default-features = false }
 minijinja = { version = "1", features = ["json", "loader"] }
 lru = "0.13.0"
 moka = { version = "0.12", features = ["future"] }
