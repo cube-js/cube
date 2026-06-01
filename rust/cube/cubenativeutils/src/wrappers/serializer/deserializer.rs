@@ -235,7 +235,8 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
 
         self.value_idx += 1;
         let de = NativeSerdeDeserializer::new(value);
-        let res = seed.deserialize(de)?;
-        Ok(res)
+        seed.deserialize(de).map_err(|err| {
+            NativeObjSerializerError::Message(format!("field `{prop_string}`: {err}"))
+        })
     }
 }

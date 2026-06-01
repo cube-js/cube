@@ -1,5 +1,6 @@
 use super::{ObjectNeonTypeHolder, PrimitiveNeonTypeHolder};
 use crate::wrappers::neon::context::ContextHolder;
+use crate::wrappers::rust_handle::NativeRustHandle;
 use crate::CubeError;
 use neon::prelude::*;
 pub trait Upcast<C: Context<'static> + 'static> {
@@ -57,6 +58,7 @@ impl_upcast!(
     ObjectNeonTypeHolder<C, JsArray> => Array,
     ObjectNeonTypeHolder<C, JsFunction> => Function,
     ObjectNeonTypeHolder<C, JsObject> => Struct,
+    ObjectNeonTypeHolder<C, JsBox<NativeRustHandle>> => RustBox,
 );
 
 pub enum RootHolder<C: Context<'static> + 'static> {
@@ -68,6 +70,7 @@ pub enum RootHolder<C: Context<'static> + 'static> {
     Array(ObjectNeonTypeHolder<C, JsArray>),
     Function(ObjectNeonTypeHolder<C, JsFunction>),
     Struct(ObjectNeonTypeHolder<C, JsObject>),
+    RustBox(ObjectNeonTypeHolder<C, JsBox<NativeRustHandle>>),
 }
 
 impl<C: Context<'static> + 'static> RootHolder<C> {
@@ -84,6 +87,7 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
                 String => JsString => PrimitiveNeonTypeHolder,
                 Array => JsArray => ObjectNeonTypeHolder,
                 Function => JsFunction => ObjectNeonTypeHolder,
+                RustBox => JsBox<NativeRustHandle> => ObjectNeonTypeHolder,
                 Struct => JsObject => ObjectNeonTypeHolder,
             });
 
@@ -107,6 +111,7 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
             Self::Array(v) => v.get_context(),
             Self::Function(v) => v.get_context(),
             Self::Struct(v) => v.get_context(),
+            Self::RustBox(v) => v.get_context(),
         }
     }
 
@@ -118,6 +123,7 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
     define_into_method!(into_array, Array, ObjectNeonTypeHolder<C, JsArray>, "Object is not the Array object");
     define_into_method!(into_function, Function, ObjectNeonTypeHolder<C, JsFunction>, "Object is not the Function object");
     define_into_method!(into_struct, Struct, ObjectNeonTypeHolder<C, JsObject>, "Object is not the Struct object");
+    define_into_method!(into_rust_box, RustBox, ObjectNeonTypeHolder<C, JsBox<NativeRustHandle>>, "Object is not a Rust box");
 
     pub fn clone_to_context<CC: Context<'static> + 'static>(
         &self,
@@ -132,6 +138,7 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
             Self::Array(v) => RootHolder::Array(v.clone_to_context(context)),
             Self::Function(v) => RootHolder::Function(v.clone_to_context(context)),
             Self::Struct(v) => RootHolder::Struct(v.clone_to_context(context)),
+            Self::RustBox(v) => RootHolder::RustBox(v.clone_to_context(context)),
         }
     }
 }
@@ -147,6 +154,7 @@ impl<C: Context<'static> + 'static> Clone for RootHolder<C> {
             Self::Array(v) => Self::Array(v.clone()),
             Self::Function(v) => Self::Function(v.clone()),
             Self::Struct(v) => Self::Struct(v.clone()),
+            Self::RustBox(v) => Self::RustBox(v.clone()),
         }
     }
 }

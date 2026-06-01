@@ -134,3 +134,21 @@ export function expectAllInvocationsOk(result: InvokeResult): void {
     );
   }
 }
+
+export interface RustBoxProbeView {
+  value: number;
+  label: string;
+  type_name: string;
+}
+
+export function createRustBoxProbe(value: number, label: string): unknown {
+  return native.__testBridgeRustBoxCreate(value, label);
+}
+
+export function createRustBoxProbeAlt(note: string): unknown {
+  return native.__testBridgeRustBoxCreateAlt(note);
+}
+
+export function unwrapRustBoxProbe(handle: unknown): RustBoxProbeView {
+  return native.__testBridgeRustBoxUnwrap(handle);
+}
