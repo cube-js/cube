@@ -117,6 +117,27 @@ describe('links through views', () => {
     expect(dimNames).toContain('users_all.full_name___link_profile_url');
   });
 
+  test('google_search link resolves full_name dimension value', async () => {
+    const response = await client.load({
+      dimensions: [
+        'users.full_name',
+        'users.full_name___link_google_search_url',
+      ],
+      order: {
+        'users.full_name': 'asc',
+      },
+      limit: 2,
+    });
+    const data = response.rawData();
+    expect(data.length).toBe(2);
+
+    expect(data[0]['users.full_name']).toBe('Jane Smith');
+    expect(data[0]['users.full_name___link_google_search_url']).toBe('Jane Smith');
+
+    expect(data[1]['users.full_name']).toBe('John Doe');
+    expect(data[1]['users.full_name___link_google_search_url']).toBe('John Doe');
+  });
+
   test('can query dashboard link synthetic dimension through view', async () => {
     const response = await client.load({
       dimensions: [
