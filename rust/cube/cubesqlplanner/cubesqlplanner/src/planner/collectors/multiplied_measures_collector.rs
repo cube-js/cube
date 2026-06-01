@@ -1,5 +1,4 @@
-use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::planner::{MemberSymbol, TraversalVisitor};
+use crate::planner::{JoinTree, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -67,11 +66,11 @@ pub struct MeasureResult {
 pub struct MultipliedMeasuresCollector {
     composite_measures: HashSet<String>,
     colllected_measures: Vec<MeasureResult>,
-    join: Rc<dyn JoinDefinition>,
+    join: Rc<JoinTree>,
 }
 
 impl MultipliedMeasuresCollector {
-    pub fn new(composite_measures: HashSet<String>, join: Rc<dyn JoinDefinition>) -> Self {
+    pub fn new(composite_measures: HashSet<String>, join: Rc<JoinTree>) -> Self {
         Self {
             composite_measures,
             join,
@@ -94,13 +93,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
         let res = match node.as_ref() {
             MemberSymbol::Measure(e) => {
                 let full_name = e.full_name();
-                let multiplied = self
-                    .join
-                    .static_data()
-                    .multiplication_factor
-                    .get(&e.cube_name())
-                    .unwrap_or(&false)
-                    .clone();
+                let multiplied = self.join.is_multiplied(&e.cube_name());
 
                 if !self.composite_measures.contains(&full_name) {
                     self.colllected_measures.push(MeasureResult {
@@ -126,7 +119,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
 
 pub fn collect_multiplied_measures(
     node: &Rc<MemberSymbol>,
-    join: Rc<dyn JoinDefinition>,
+    join: &Rc<JoinTree>,
 ) -> Result<Vec<MeasureResult>, CubeError> {
     if let Ok(member_expression) = node.as_member_expression() {
         if let Some(cube_names) = member_expression.cube_names_if_dimension_only_expression()? {
@@ -138,12 +131,7 @@ pub fn collect_multiplied_measures(
                 }]
             } else if cube_names.len() == 1 {
                 let cube_name = cube_names[0].clone();
-                let multiplied = join
-                    .static_data()
-                    .multiplication_factor
-                    .get(&cube_name)
-                    .unwrap_or(&false)
-                    .clone();
+                let multiplied = join.is_multiplied(&cube_name);
 
                 vec![MeasureResult {
                     measure: node.clone(),

@@ -67,8 +67,7 @@ impl SimpleQueryPlanner {
                 &self
                     .query_properties
                     .get_member_symbols(true, true, true, true, &vec![]),
-                &self.join_planner,
-                &join,
+                join,
             )?
         } else {
             vec![]
@@ -82,7 +81,7 @@ impl SimpleQueryPlanner {
             dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
         let source = if let Some(join) = &join {
             self.join_planner
-                .make_join_logical_plan(join.clone(), subquery_dimension_queries)?
+                .make_join_logical_plan(join, subquery_dimension_queries)
         } else {
             self.join_planner.make_empty_join_logical_plan()
         };
