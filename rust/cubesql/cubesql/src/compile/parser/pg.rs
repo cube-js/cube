@@ -1,11 +1,15 @@
 use std::{collections::HashMap, sync::LazyLock};
 
+use crate::compile::{qtrace::Qtrace, CompilationError, CompilationResult, DatabaseProtocol};
 use regex::Regex;
-use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
+use sqlparser::{
+    ast::Statement,
+    dialect::PostgreSqlDialect,
+    parser::{Parser, ParserError},
+    tokenizer::Tokenizer,
+};
 
-use super::{qtrace::Qtrace, CompilationError, DatabaseProtocol};
-
-use super::CompilationResult;
+use super::sql_snippet;
 
 static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
@@ -189,15 +193,66 @@ pub fn parse_sql_to_statements(
         qtrace.set_replaced_query(&query)
     }
 
-    let parse_result = match protocol {
-        DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
+    let dialect = match protocol {
+        DatabaseProtocol::PostgreSQL => PostgreSqlDialect {},
         DatabaseProtocol::Extension(_) => unimplemented!(),
     };
 
+    let tokens = match Tokenizer::new(&dialect, query.as_str()).tokenize_with_location() {
+        Ok(d) => d,
+        Err(err) => {
+            let mut message = format!("Unable to parse: {}", err);
+
+            let snippet = sql_snippet::snippet_for_tokenizer_error(query.as_str(), &err);
+            if let Some(snippet) = snippet {
+                message.push_str("\n\n");
+                message.push_str(&snippet);
+            }
+
+            return Err(CompilationError::SqlParser(
+                message,
+                Some(HashMap::from([(
+                    "query".to_string(),
+                    original_query.to_string(),
+                )])),
+            ));
+        }
+    };
+
+    let parse_result = Parser::new(&dialect)
+        .with_tokens_with_locations(tokens)
+        .parse_statements();
+
     parse_result.map_err(|err| {
-        CompilationError::sql_parser(format!("Unable to parse: {:?}", err)).with_meta(Some(
-            HashMap::from([("query".to_string(), original_query.to_string())]),
-        ))
+        // We don't need a prefix "sql parser error: "
+        let body = match &err {
+            ParserError::TokenizerError(message) | ParserError::ParserError(message) => {
+                message.as_str()
+            }
+            ParserError::RecursionLimitExceeded => &"Recursion limit exceeded",
+        };
+        let mut message = format!("Unable to parse: {}", body);
+
+        // The parser consumed the tokens above, so re-tokenize
+        let snippet = Tokenizer::new(&dialect, query.as_str())
+            .tokenize_with_location()
+            .ok()
+            .and_then(|tokens| {
+                sql_snippet::snippet_for_parser_error(query.as_str(), &tokens, &err.to_string())
+            });
+
+        if let Some(snippet) = snippet {
+            message.push_str("\n\n");
+            message.push_str(&snippet);
+        }
+
+        CompilationError::SqlParser(
+            message,
+            Some(HashMap::from([(
+                "query".to_string(),
+                original_query.to_string(),
+            )])),
+        )
     })
 }
 
@@ -251,6 +306,13 @@ mod tests {
         }
     }
 
+    fn parse_err(sql: &str) -> String {
+        match parse_sql_to_statement(&sql.to_string(), DatabaseProtocol::PostgreSQL, &mut None) {
+            Ok(_) => panic!("expected a parse error for: {}", sql),
+            Err(err) => err.to_string(),
+        }
+    }
+
     #[test]
     fn test_multiple_statements_postgres() {
         let result = parse_sql_to_statement(
@@ -268,9 +330,13 @@ mod tests {
 
     #[test]
     fn test_syntax_error_missing_comma_postgres() {
-        // Missing comma between the two projection items (`status` and `MEASURE(...)`)
-        let result = parse_sql_to_statement(
-            &"SELECT DISTINCT
+        // Missing comma between the two projection items (`status` and `MEASURE(...)`).
+        // The parser stops on the `(` (column 24) after parsing the un-separated
+        // `MEASURE` as an alias, but the snippet caret snaps back to the start of
+        // the offending `MEASURE` token.
+        assert_eq!(
+            parse_err(
+                "SELECT DISTINCT
                 orders_transactions.status
                 MEASURE(orders_transactions.count)
             FROM
@@ -279,43 +345,29 @@ mod tests {
                 1
             LIMIT
                 5000"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-            &mut None,
+            ),
+            "SQL Parser Error: Unable to parse: \
+Expected: end of statement, found: ( at Line: 3, Column: 24\n\
+\n\
+1 | SELECT DISTINCT\n\
+2 |                 orders_transactions.status\n\
+3 |                 MEASURE(orders_transactions.count)\n  \
+|                 ^"
         );
-        match result {
-            Ok(_) => panic!("This test should throw an error"),
-            Err(err) => {
-                let msg = err.to_string();
-                assert!(
-                    msg.contains("Unable to parse"),
-                    "expected a parser error, got: {}",
-                    msg
-                );
-                assert!(
-                    msg.contains("Expected"),
-                    "expected an \"Expected ...\" syntax error, got: {}",
-                    msg
-                );
-            }
-        }
     }
 
     #[test]
     fn test_syntax_error_dangling_from_postgres() {
-        let result = parse_sql_to_statement(
-            &"SELECT FROM".to_string(),
-            DatabaseProtocol::PostgreSQL,
-            &mut None,
+        // The parser reports no location for an unexpected EOF, so the caret is
+        // anchored at the end of the last token (`FROM`).
+        assert_eq!(
+            parse_err("SELECT FROM"),
+            "SQL Parser Error: Unable to parse: \
+Expected: identifier, found: EOF\n\
+\n\
+1 | SELECT FROM\n  \
+|           ^"
         );
-        match result {
-            Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert!(
-                err.to_string().contains("Unable to parse"),
-                "expected a parser error, got: {}",
-                err
-            ),
-        }
     }
 
     #[test]
@@ -338,5 +390,108 @@ mod tests {
             Ok(_) => {}
             Err(err) => panic!("{}", err),
         }
+    }
+
+    #[test]
+    fn test_syntax_error_trailing_comma() {
+        // Dangling comma in the projection list: caret points at the `FROM` that
+        // the parser found where it expected another expression.
+        assert_eq!(
+            parse_err("SELECT a, FROM t"),
+            "SQL Parser Error: Unable to parse: \
+Expected an expression, found: FROM at Line: 1, Column: 16\n\
+\n\
+1 | SELECT a, FROM t\n  \
+|                ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_double_comma() {
+        // The extra comma is the offending token; it is preceded by another
+        // comma (not a word), so the caret stays on it.
+        assert_eq!(
+            parse_err("SELECT a,, b FROM t"),
+            "SQL Parser Error: Unable to parse: \
+Expected: an expression, found: , at Line: 1, Column: 10\n\
+\n\
+1 | SELECT a,, b FROM t\n  \
+|          ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_misspelled_keyword() {
+        assert_eq!(
+            parse_err("SELET a FROM t"),
+            "SQL Parser Error: Unable to parse: \
+Expected: an SQL statement, found: SELET at Line: 1, Column: 1\n\
+\n\
+1 | SELET a FROM t\n  \
+| ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_unclosed_paren() {
+        assert_eq!(
+            parse_err("SELECT count(a FROM t"),
+            "SQL Parser Error: Unable to parse: \
+Expected: ), found: FROM at Line: 1, Column: 16\n\
+\n\
+1 | SELECT count(a FROM t\n  \
+|                ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_where_without_expr() {
+        // Trailing `WHERE` hits EOF; the caret is anchored at the end of `WHERE`.
+        assert_eq!(
+            parse_err("SELECT a FROM t WHERE"),
+            "SQL Parser Error: Unable to parse: \
+Expected: an expression, found: EOF\n\
+\n\
+1 | SELECT a FROM t WHERE\n  \
+|                     ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_unterminated_string() {
+        // The whole visible literal `'abc` is underlined, not just the quote.
+        assert_eq!(
+            parse_err("SELECT 'abc FROM t"),
+            "SQL Parser Error: Unable to parse: \
+Unterminated string literal at Line: 1, Column: 8\n\
+\n\
+1 | SELECT 'abc FROM t\n  \
+|        ^^^^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_dangling_from_semicolon() {
+        // `SELECT FROM;` stops on the `;`; the caret sits on the end of `FROM`.
+        assert_eq!(
+            parse_err("SELECT FROM;"),
+            "SQL Parser Error: Unable to parse: \
+Expected: identifier, found: ; at Line: 1, Column: 12\n\
+\n\
+1 | SELECT FROM;\n  \
+|           ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_group_by_without_expr() {
+        assert_eq!(
+            parse_err("SELECT a FROM t GROUP BY"),
+            "SQL Parser Error: Unable to parse: \
+Expected: an expression, found: EOF\n\
+\n\
+1 | SELECT a FROM t GROUP BY\n  \
+|                        ^"
+        );
     }
 }
