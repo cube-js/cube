@@ -937,9 +937,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
 
                     *data_type = ast::DataType::Timestamp(None, ast::TimezoneInfo::None);
                 }
-                // sqlparser 0.62 introduced dedicated built-in variants for several types that
-                // our DataFusion fork only understands under their canonical names. Normalize
-                // them here (previously these arrived as `Custom(..)` and were handled above).
                 ast::DataType::Bool => {
                     self.visit_expr(&mut *cast_expr)?;
 
@@ -959,6 +956,21 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     self.visit_expr(&mut *cast_expr)?;
 
                     *data_type = ast::DataType::BigInt(None);
+                }
+                ast::DataType::Int2Unsigned(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::SmallIntUnsigned(None);
+                }
+                ast::DataType::Int4Unsigned(_) | ast::DataType::IntegerUnsigned(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::IntUnsigned(None);
+                }
+                ast::DataType::Int8Unsigned(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::BigIntUnsigned(None);
                 }
                 ast::DataType::Float8 => {
                     self.visit_expr(&mut *cast_expr)?;
@@ -1370,6 +1382,22 @@ mod tests {
         run_cast_replacer(
             "SELECT CAST(1 + 1 as Regclass);",
             "SELECT __cube_regclass_cast(1 + 1)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INTEGER UNSIGNED)",
+            "SELECT CAST(1 AS INT UNSIGNED)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INT4 UNSIGNED)",
+            "SELECT CAST(1 AS INT UNSIGNED)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INT2 UNSIGNED)",
+            "SELECT CAST(1 AS SMALLINT UNSIGNED)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INT8 UNSIGNED)",
+            "SELECT CAST(1 AS BIGINT UNSIGNED)",
         )?;
 
         Ok(())
