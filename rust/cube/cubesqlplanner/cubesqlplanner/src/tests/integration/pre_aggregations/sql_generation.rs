@@ -991,9 +991,15 @@ fn test_rollup_join_calculated_measures_through_view() {
 //
 // A count_distinct_approx measure materialized in a rollup keeps an HLL
 // state per group. The build (load) SQL must serialize that state
-// (hll_init), and a query reading the rollup must merge the states
-// (hll_merge) rather than recompute an approximate distinct over the
-// state column.
+// (hll_init), and a query reading the rollup must merge the states and
+// take their cardinality (hll_cardinality_merge) rather than recompute
+// an approximate distinct over the state column (count_distinct_approx).
+//
+// The mock driver renders these as distinct, CubeStore-style forms:
+//   hll_init               -> hll_add_agg(hll_hash_any(x))
+//   hll_merge              -> merge(x)                       (state only)
+//   hll_cardinality_merge  -> cardinality(merge(x))
+//   count_distinct_approx  -> round(hll_cardinality(hll_add_agg(hll_hash_any(x))))
 
 #[test]
 fn test_count_distinct_approx_pre_agg_read_merges_state() {
@@ -1016,12 +1022,12 @@ fn test_count_distinct_approx_pre_agg_read_merges_state() {
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "approx_rollup");
 
-    // Reading the rollup must merge HLL states (hll_union_agg), not
-    // re-hash the state column as a fresh approximate distinct would
-    // (hll_add_agg).
+    // A top-level read merges the stored states and finalizes them to a
+    // cardinality. It must NOT re-hash the state column as a fresh
+    // approximate distinct would (hll_add_agg).
     assert!(
-        sql.contains("hll_union_agg"),
-        "Read query should merge HLL states, got:\n{}",
+        sql.contains("cardinality(merge("),
+        "Read query should merge HLL states and take cardinality, got:\n{}",
         sql
     );
     assert!(
@@ -1049,8 +1055,8 @@ fn test_count_distinct_approx_pre_agg_build_emits_state() {
 
     let sql = ctx.build_sql(query_yaml).unwrap();
 
-    // The build must serialize the HLL state (hll_init) without taking
-    // its cardinality — that happens only on read.
+    // The build must serialize the HLL state (hll_init) without merging
+    // or taking its cardinality — that happens only on read.
     assert!(
         sql.contains("hll_add_agg(hll_hash_any("),
         "Build SQL should emit HLL state, got:\n{}",
@@ -1059,6 +1065,42 @@ fn test_count_distinct_approx_pre_agg_build_emits_state() {
     assert!(
         !sql.contains("hll_cardinality"),
         "Build SQL should not compute cardinality, got:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("merge("),
+        "Build SQL should not merge states, got:\n{}",
+        sql
+    );
+}
+
+// A multi-stage measure that sums a count_distinct_approx must read the
+// rollup as a finalized cardinality, exactly as it would without the
+// pre-aggregation — the outer `sum` aggregates counts, not raw HLL states.
+// This pins that the pre-agg read does not leak a bare merged state here.
+#[test]
+fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() {
+    let schema = MockSchema::from_yaml_file("common/multi_stage_sum_by_quarter_test.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - coach.approx__sum_by_quarter
+        cubestoreSupportMultistage: true
+    "};
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "main_approx");
+
+    // Leaf finalizes the merged state to a cardinality so the outer sum
+    // aggregates numbers (same shape as the non-pre-agg rendering).
+    assert!(
+        sql.contains("cardinality(merge("),
+        "Multi-stage leaf should finalize HLL to cardinality, got:\n{}",
         sql
     );
 }
