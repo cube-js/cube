@@ -29,7 +29,6 @@ export const nonStringFields = new Set([
   'readOnly',
   'prefix',
   'mask',
-  'dashboard',
 ]);
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;

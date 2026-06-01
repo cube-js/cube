@@ -658,24 +658,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             if (link.url) {
               baseSql = link.url;
             } else if (link.dashboard) {
-              const dashboardStr = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
-              // Parse {dim} references from dashboard string and build a function
-              // that resolves them through the symbol resolver
-              const refs: string[] = [];
-              const sqlParts = dashboardStr.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, ref: string) => {
-                refs.push(ref);
-                return `\${${ref}}`;
-              });
-              if (refs.length > 0) {
-                // Dynamic dashboard with dimension references
-                // eslint-disable-next-line no-new-func
-                baseSql = new Function(...refs, `return \`${sqlParts}\``);
-              } else {
-                // Static dashboard ID — wrap as SQL string literal with /dashboard/ prefix
-                const escaped = dashboardStr.replace(/'/g, "''");
-                // eslint-disable-next-line no-new-func
-                baseSql = new Function(cube.name, `return \`'/dashboard/${escaped}'\``);
-              }
+              const dashboardId = typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard;
+              // eslint-disable-next-line no-new-func
+              baseSql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
             }
             if (baseSql) {
               const sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params || []);

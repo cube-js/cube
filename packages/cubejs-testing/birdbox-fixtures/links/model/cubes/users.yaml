@@ -40,9 +40,6 @@ cubes:
                 value: "{city}"
               - key: duplicate_city
                 value: "{city}"
-          - name: dynamic_dash
-            label: Dynamic dashboard
-            dashboard: "{city}"
 
       - name: city
         sql: city

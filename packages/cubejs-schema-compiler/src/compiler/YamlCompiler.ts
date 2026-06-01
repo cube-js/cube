@@ -235,11 +235,12 @@ export class YamlCompiler {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
       return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
     } else if (typeof obj === 'string') {
-      if (nonStringFields.has(propertyPath[propertyPath.length - 1])) {
-        return t.stringLiteral(obj);
+      let code = obj;
+
+      if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
+        code = `f"${this.escapeDoubleQuotes(obj)}"`;
       }
 
-      const code = `f"${this.escapeDoubleQuotes(obj)}"`;
       const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
       return this.extractProgramBodyIfNeeded(ast);
     } else if (typeof obj === 'boolean') {
