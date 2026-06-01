@@ -268,8 +268,7 @@ mod tests {
 
     #[test]
     fn test_syntax_error_missing_comma_postgres() {
-        // Missing comma between the two projection items (`status` and `MEASURE(...)`),
-        // as produced by the Cube Playground "Advanced Query" editor.
+        // Missing comma between the two projection items (`status` and `MEASURE(...)`)
         let result = parse_sql_to_statement(
             &"SELECT DISTINCT
                 orders_transactions.status
