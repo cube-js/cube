@@ -64,35 +64,6 @@ impl BaseTools for MockBaseTools {
         Ok(self.sql_utils.clone())
     }
 
-    fn generate_time_series(
-        &self,
-        granularity: String,
-        date_range: Vec<String>,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        if date_range.len() != 2 {
-            return Err(CubeError::internal(
-                "date_range must have exactly 2 elements".to_string(),
-            ));
-        }
-        let range = [date_range[0].clone(), date_range[1].clone()];
-        crate::planner::QueryTimeSeries::generate_predefined(&granularity, &range, 3)
-    }
-
-    fn generate_custom_time_series(
-        &self,
-        granularity_interval: String,
-        date_range: Vec<String>,
-        origin: String,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        if date_range.len() != 2 {
-            return Err(CubeError::internal(
-                "date_range must have exactly 2 elements".to_string(),
-            ));
-        }
-        let range = [date_range[0].clone(), date_range[1].clone()];
-        crate::planner::QueryTimeSeries::generate_custom(&granularity_interval, &range, &origin, 3)
-    }
-
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
         Ok(vec![])
     }

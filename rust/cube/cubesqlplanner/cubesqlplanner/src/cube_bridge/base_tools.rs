@@ -14,26 +14,14 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Dialect-independent callbacks to the JavaScript side, used
-/// during compilation and planning: SQL templates, time-series
-/// generation, allocated params, pre-aggregation lookup, join-tree
-/// resolution. Dialect-specific helpers live behind `DriverTools`,
-/// reachable via `driver_tools()`.
+/// during compilation and planning: SQL templates, allocated params,
+/// pre-aggregation lookup, join-tree resolution. Dialect-specific
+/// helpers live behind `DriverTools`, reachable via `driver_tools()`.
 #[nativebridge::native_bridge]
 pub trait BaseTools {
     fn driver_tools(&self, external: bool) -> Result<Rc<dyn DriverTools>, CubeError>;
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
-    fn generate_time_series(
-        &self,
-        granularity: String,
-        date_range: Vec<String>,
-    ) -> Result<Vec<Vec<String>>, CubeError>;
-    fn generate_custom_time_series(
-        &self,
-        granularity: String,
-        date_range: Vec<String>,
-        origin: String,
-    ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
     fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
