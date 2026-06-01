@@ -64,23 +64,6 @@ impl BaseTools for MockBaseTools {
         Ok(self.sql_utils.clone())
     }
 
-    fn generate_time_series(
-        &self,
-        granularity: String,
-        date_range: Vec<String>,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        super::time_series::generate_time_series(&granularity, &date_range)
-    }
-
-    fn generate_custom_time_series(
-        &self,
-        _granularity: String,
-        _date_range: Vec<String>,
-        _origin: String,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        todo!("generate_custom_time_series not implemented in mock")
-    }
-
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
         Ok(vec![])
     }

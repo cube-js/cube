@@ -60,12 +60,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
             }
         };
 
-        let time_series = TimeSeries::new(
-            query_tools.clone(),
-            &time_dimension,
-            ts_date_range,
-            granularity_obj,
-        );
+        let time_series = TimeSeries::new(&time_dimension, ts_date_range, granularity_obj);
         let query_plan = QueryPlan::TimeSeries(Rc::new(time_series));
         Ok(query_plan)
     }

@@ -242,8 +242,6 @@ export const baseToolsFixture = (): unknown => ({
   driverTools: () => driverToolsFixture(),
   sqlTemplates: () => ({}),
   sqlUtilsForRust: () => sqlUtilsFixture(),
-  generateTimeSeries: () => [],
-  generateCustomTimeSeries: () => [],
   getAllocatedParams: () => [],
   allCubeMembers: () => [],
   intervalAndMinimalTimeUnit: () => ['1', 'day'],

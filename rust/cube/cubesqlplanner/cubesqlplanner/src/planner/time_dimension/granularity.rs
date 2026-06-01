@@ -57,11 +57,18 @@ impl Granularity {
         let origin = if let Some(origin) = origin {
             QueryDateTime::from_date_str(timezone, &origin)?
         } else if let Some(offset) = &granularity_offset {
-            let origin = Self::default_origin(timezone)?;
+            // Week-based intervals expect the offset relative to the start of a week.
+            let origin = Self::fix_origin_for_weeks_if_needed(
+                Self::default_origin(timezone)?,
+                &granularity_interval,
+            );
             let interval = SqlInterval::from_str(offset)?;
             origin.add_interval(&interval)?
         } else {
-            Self::default_origin(timezone)?
+            Self::fix_origin_for_weeks_if_needed(
+                Self::default_origin(timezone)?,
+                &granularity_interval,
+            )
         };
 
         let is_natural_aligned = granularity_interval.is_trivial();
@@ -161,6 +168,17 @@ impl Granularity {
         Ok(QueryDateTime::now(timezone)?.start_of_year())
     }
 
+    fn fix_origin_for_weeks_if_needed(
+        origin: QueryDateTime,
+        interval: &SqlInterval,
+    ) -> QueryDateTime {
+        if interval.is_week_only() {
+            origin.start_of_iso_week()
+        } else {
+            origin
+        }
+    }
+
     pub fn apply_to_input_sql(
         &self,
         templates: &PlanSqlTemplates,
@@ -218,5 +236,59 @@ impl Granularity {
         }
 
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Datelike, NaiveDate, Weekday};
+
+    fn origin_date(g: &Granularity) -> NaiveDate {
+        NaiveDate::parse_from_str(&g.origin_local_formatted()[..10], "%Y-%m-%d").unwrap()
+    }
+
+    fn custom(interval: &str, origin: Option<&str>, offset: Option<&str>) -> Granularity {
+        Granularity::try_new_custom(
+            "UTC".parse::<Tz>().unwrap(),
+            "test_granularity".to_string(),
+            origin.map(str::to_string),
+            interval.to_string(),
+            offset.map(str::to_string),
+            None,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn week_only_default_origin_snaps_to_iso_monday() {
+        assert_eq!(
+            origin_date(&custom("2 weeks", None, None)).weekday(),
+            Weekday::Mon
+        );
+    }
+
+    #[test]
+    fn non_week_default_origin_stays_at_year_start() {
+        let d = origin_date(&custom("2 days", None, None));
+        assert_eq!((d.month(), d.day()), (1, 1));
+    }
+
+    #[test]
+    fn week_with_offset_aligns_to_monday_then_offsets() {
+        // Monday-of-year-start + 2 days => Wednesday.
+        assert_eq!(
+            origin_date(&custom("2 weeks", None, Some("2 days"))).weekday(),
+            Weekday::Wed
+        );
+    }
+
+    #[test]
+    fn explicit_origin_is_not_snapped_for_week_interval() {
+        // 2024-01-03 is a Wednesday; an explicit origin must be preserved verbatim.
+        assert_eq!(
+            origin_date(&custom("2 weeks", Some("2024-01-03"), None)),
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap()
+        );
     }
 }
