@@ -1654,8 +1654,6 @@ mod tests {
 
     #[test]
     fn test_placeholder_replacer() -> Result<(), CubeError> {
-        // NOTE: sqlparser 0.62's PostgreSqlDialect treats `?` as a geometric operator, so the
-        // Postgres-style `$N` placeholder is used here (the legacy MySQL `?` protocol is removed).
         assert_placeholder_replacer("SELECT $1", "SELECT 'replaced_placeholder'")?;
         assert_placeholder_replacer("SELECT 1 LIMIT $1", "SELECT 1 LIMIT 1")?;
         assert_placeholder_replacer("SELECT 1 OFFSET $1", "SELECT 1 OFFSET 1")?;
