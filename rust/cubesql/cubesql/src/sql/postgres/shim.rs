@@ -1416,6 +1416,19 @@ impl AsyncPostgresShim {
                 } = stmts
                     .pop()
                     .expect("DECLARE must contain a single statement");
+
+                if names.len() > 1 {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "Only a single cursor name per DECLARE statement is supported"
+                                .to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                }
+
                 let Some(name) = names.into_iter().next() else {
                     return Err(ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
@@ -1426,6 +1439,7 @@ impl AsyncPostgresShim {
                         span_id.clone(),
                     ));
                 };
+
                 let binary = binary.unwrap_or(false);
 
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
