@@ -267,6 +267,59 @@ mod tests {
     }
 
     #[test]
+    fn test_syntax_error_missing_comma_postgres() {
+        // Missing comma between the two projection items (`status` and `MEASURE(...)`),
+        // as produced by the Cube Playground "Advanced Query" editor.
+        let result = parse_sql_to_statement(
+            &"SELECT DISTINCT
+                orders_transactions.status
+                MEASURE(orders_transactions.count)
+            FROM
+                orders_transactions
+            GROUP BY
+                1
+            LIMIT
+                5000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            &mut None,
+        );
+        match result {
+            Ok(_) => panic!("This test should throw an error"),
+            Err(err) => {
+                let msg = err.to_string();
+                assert!(
+                    msg.contains("Unable to parse"),
+                    "expected a parser error, got: {}",
+                    msg
+                );
+                assert!(
+                    msg.contains("Expected"),
+                    "expected an \"Expected ...\" syntax error, got: {}",
+                    msg
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_syntax_error_dangling_from_postgres() {
+        let result = parse_sql_to_statement(
+            &"SELECT FROM".to_string(),
+            DatabaseProtocol::PostgreSQL,
+            &mut None,
+        );
+        match result {
+            Ok(_) => panic!("This test should throw an error"),
+            Err(err) => assert!(
+                err.to_string().contains("Unable to parse"),
+                "expected a parser error, got: {}",
+                err
+            ),
+        }
+    }
+
+    #[test]
     fn test_single_line_comments_postgres() {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba

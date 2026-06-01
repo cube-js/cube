@@ -4034,14 +4034,18 @@ limit
     #[tokio::test]
     async fn test_date_add_sub_postgres() {
         async fn check_fun(op: &str, t: &str, i: &str, expected: &str) {
+            // Box::pin keeps the large `execute_query` future off the caller's
+            // stack frame. Without it the future is embedded inline into every
+            // `check_adds_to`/`check_subs_to` await point, making a single frame
+            // ~2MB and overflowing the default test thread stack.
             assert_eq!(
-                execute_query(
+                Box::pin(execute_query(
                     format!(
                         "SELECT Str_to_date('{}', '%Y-%m-%d %H:%i:%s') {} INTERVAL '{}' as result",
                         t, op, i
                     ),
                     DatabaseProtocol::PostgreSQL
-                )
+                ))
                 .await
                 .unwrap(),
                 format!(
@@ -6002,7 +6006,7 @@ ORDER BY
             get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await,
         ).await;
         match create_query {
-            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
+            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INTEGER) ON COMMIT PRESERVE ROWS"),
             _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
         };
 
