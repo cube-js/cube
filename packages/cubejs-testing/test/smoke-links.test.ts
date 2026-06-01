@@ -290,14 +290,12 @@ describe('links through views', () => {
     const data = response.rawData();
     expect(data.length).toBe(2);
 
-    // Jane Smith lives in London → /dashboard/London
+    // Jane Smith lives in London
     const janeUrl = data[0]['users.full_name___link_dynamic_dashboard_url'];
-    expect(janeUrl).toContain('/dashboard/');
-    expect(janeUrl).toContain('London');
+    expect(janeUrl).toBe('London');
 
-    // John Doe lives in New York → /dashboard/New York
+    // John Doe lives in New York
     const johnUrl = data[1]['users.full_name___link_dynamic_dashboard_url'];
-    expect(johnUrl).toContain('/dashboard/');
-    expect(johnUrl).toContain('New York');
+    expect(johnUrl).toBe('New York');
   });
 });

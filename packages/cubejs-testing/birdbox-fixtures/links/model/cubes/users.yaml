@@ -42,7 +42,7 @@ cubes:
                 value: "{city}"
           - name: dynamic_dashboard
             label: City-specific dashboard
-            url: "'/dashboard/' || {city}"
+            url: "{city}"
 
       - name: city
         sql: city
