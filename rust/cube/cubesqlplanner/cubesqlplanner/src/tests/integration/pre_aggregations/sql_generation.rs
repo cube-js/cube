@@ -986,3 +986,79 @@ fn test_rollup_join_calculated_measures_through_view() {
         sql
     );
 }
+
+// --- HLL count_distinct_approx through a pre-aggregation ---
+//
+// A count_distinct_approx measure materialized in a rollup keeps an HLL
+// state per group. The build (load) SQL must serialize that state
+// (hll_init), and a query reading the rollup must merge the states
+// (hll_merge) rather than recompute an approximate distinct over the
+// state column.
+
+#[test]
+fn test_count_distinct_approx_pre_agg_read_merges_state() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["approx_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.approx_unique_count
+        dimensions:
+          - orders.status
+          - orders.city
+    "};
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "approx_rollup");
+
+    // Reading the rollup must merge HLL states (hll_union_agg), not
+    // re-hash the state column as a fresh approximate distinct would
+    // (hll_add_agg).
+    assert!(
+        sql.contains("hll_union_agg"),
+        "Read query should merge HLL states, got:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("hll_add_agg"),
+        "Read query should not re-init HLL from the state column, got:\n{}",
+        sql
+    );
+}
+
+#[test]
+fn test_count_distinct_approx_pre_agg_build_emits_state() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["approx_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    // pre_aggregation_query: true renders the rollup build (load) SQL.
+    let query_yaml = indoc! {"
+        measures:
+          - orders.approx_unique_count
+        dimensions:
+          - orders.status
+          - orders.city
+        pre_aggregation_query: true
+    "};
+
+    let sql = ctx.build_sql(query_yaml).unwrap();
+
+    // The build must serialize the HLL state (hll_init) without taking
+    // its cardinality — that happens only on read.
+    assert!(
+        sql.contains("hll_add_agg(hll_hash_any("),
+        "Build SQL should emit HLL state, got:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("hll_cardinality"),
+        "Build SQL should not compute cardinality, got:\n{}",
+        sql
+    );
+}

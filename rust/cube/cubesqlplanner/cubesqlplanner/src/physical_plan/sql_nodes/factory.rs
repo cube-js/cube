@@ -252,6 +252,7 @@ impl SqlNodesFactory {
                 FinalPreAggregationMeasureSqlNode::new(
                     final_processor,
                     self.pre_aggregation_measures_references.clone(),
+                    self.count_approx_as_state,
                 )
             } else {
                 final_processor
