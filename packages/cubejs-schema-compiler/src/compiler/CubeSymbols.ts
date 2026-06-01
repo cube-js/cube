@@ -691,11 +691,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return { encodedKey, valueFn: param.value };
     });
 
-    // Extract ALL argument names from each param value function using the same
-    // regex-based extraction that resolveSymbolsCall uses (funcArguments).
+    // Extract ALL argument names from each param value function
     const paramArgSets = resolvedParams.map((p) => this.funcArguments(p.valueFn));
 
-    // Collect all unique arg names across all params (deduped, preserving order)
+    // Collect all unique arg names (deduped, preserving order)
     const seenArgs = new Set([cubeName, 'SQL_UTILS']);
     const extraArgs: string[] = [];
     for (const argSet of paramArgSets) {
