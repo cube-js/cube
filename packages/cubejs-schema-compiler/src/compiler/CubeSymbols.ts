@@ -663,12 +663,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
               baseSql = new Function(cube.name, `return \`'/dashboard/${dashboardId}'\``);
             }
             if (baseSql) {
-              let sql;
-              if (link.params && Array.isArray(link.params) && link.params.length > 0) {
-                sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params);
-              } else {
-                sql = baseSql;
-              }
+              const sql = this.buildLinkSqlWithParams(cube.name, baseSql, link.params || []);
               dims[syntheticName] = {
                 sql,
                 type: 'string',
@@ -691,12 +686,19 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return { encodedKey, valueFn: param.value };
     });
 
-    // Extract ALL argument names from each param value function
+    // Extract argument names from baseSql and each param value function
+    const baseSqlArgs = this.funcArguments(baseSql);
     const paramArgSets = resolvedParams.map((p) => this.funcArguments(p.valueFn));
 
     // Collect all unique arg names (deduped, preserving order)
     const seenArgs = new Set([cubeName, 'SQL_UTILS']);
     const extraArgs: string[] = [];
+    for (const arg of baseSqlArgs) {
+      if (!seenArgs.has(arg)) {
+        seenArgs.add(arg);
+        extraArgs.push(arg);
+      }
+    }
     for (const argSet of paramArgSets) {
       for (const arg of argSet) {
         if (!seenArgs.has(arg)) {
@@ -709,7 +711,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const allArgs = [cubeName, 'SQL_UTILS', ...extraArgs];
 
     const body = `
-      var base = (${baseSql.toString()})(${cubeName});
+      var base = \`\${(${baseSql.toString()})(${baseSqlArgs.join(', ')})}\`;
       ${resolvedParams.map((p, idx) => {
     const sep = idx === 0 ? '?' : '&';
     const paramArgs = paramArgSets[idx].join(', ');
