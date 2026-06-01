@@ -2260,253 +2260,20 @@ impl WrappedSelectNode {
             Expr::Literal(literal) => {
                 Self::generate_sql_for_literal(sql_query, sql_generator, literal)
             }
-            Expr::ScalarUDF { fun, args } => {
-                let date_part_err = |dp| {
-                    DataFusionError::Internal(format!(
-                        "Can't generate SQL for scalar function: date part '{}' is not supported",
-                        dp
-                    ))
-                };
-                let date_part = match fun.name.as_str() {
-                    "datediff" | "dateadd" => match &args[0] {
-                        Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
-                            // Security check to prevent SQL injection
-                            if DATE_PART_REGEX.is_match(date_part) {
-                                Ok(Some(date_part.to_string()))
-                            } else {
-                                Err(date_part_err(date_part.to_string()))
-                            }
-                        }
-                        _ => Err(date_part_err(args[0].to_string())),
-                    },
-                    "date_add" => match &args[1] {
-                        Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
-                            let days = (*interval >> 32) as i32;
-                            let ms = (*interval & 0xFFFF_FFFF) as i32;
-
-                            if days != 0 && ms == 0 {
-                                Ok(Some("DAY".to_string()))
-                            } else if ms != 0 && days == 0 {
-                                Ok(Some("MILLISECOND".to_string()))
-                            } else {
-                                Err(DataFusionError::Internal(format!(
-                                    "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
-                                )))
-                            }
-                        }
-                        Expr::Literal(ScalarValue::IntervalYearMonth(Some(_months))) => {
-                            Ok(Some("MONTH".to_string()))
-                        }
-                        Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
-                            let months = (interval >> 96) as i32;
-                            let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
-                            let nanos = *interval as i64;
-
-                            if months != 0 && days == 0 && nanos == 0 {
-                                Ok(Some("MONTH".to_string()))
-                            } else if days != 0 && months == 0 && nanos == 0 {
-                                Ok(Some("DAY".to_string()))
-                            } else if nanos != 0 && months == 0 && days == 0 {
-                                Ok(Some("NANOSECOND".to_string()))
-                            } else {
-                                Err(DataFusionError::Internal(format!(
-                                    "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
-                                )))
-                            }
-                        }
-                        _ => Err(date_part_err(args[1].to_string())),
-                    },
-                    _ => Ok(None),
-                }?;
-                let interval = match fun.name.as_str() {
-                    "dateadd" => match &args[1] {
-                        Expr::Literal(ScalarValue::Int64(Some(interval))) => {
-                            Ok(Some(interval.to_string()))
-                        }
-                        _ => Err(DataFusionError::Internal(format!(
-                            "Can't generate SQL for scalar function: interval must be Int64"
-                        ))),
-                    },
-                    "date_add" => match &args[1] {
-                        Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
-                            let days = (*interval >> 32) as i32;
-                            let ms = (*interval & 0xFFFF_FFFF) as i32;
-
-                            if days != 0 && ms == 0 {
-                                Ok(Some(days.to_string()))
-                            } else if ms != 0 && days == 0 {
-                                Ok(Some(ms.to_string()))
-                            } else {
-                                Err(DataFusionError::Internal(format!(
-                                    "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
-                                )))
-                            }
-                        }
-                        Expr::Literal(ScalarValue::IntervalYearMonth(Some(months))) => {
-                            Ok(Some(months.to_string()))
-                        }
-                        Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
-                            let months = (interval >> 96) as i32;
-                            let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
-                            let nanos = *interval as i64;
-
-                            if months != 0 && days == 0 && nanos == 0 {
-                                Ok(Some(months.to_string()))
-                            } else if days != 0 && months == 0 && nanos == 0 {
-                                Ok(Some(days.to_string()))
-                            } else if nanos != 0 && months == 0 && days == 0 {
-                                Ok(Some(nanos.to_string()))
-                            } else {
-                                Err(DataFusionError::Internal(format!(
-                                    "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
-                                )))
-                            }
-                        }
-                        _ => Err(date_part_err(args[1].to_string())),
-                    },
-                    _ => Ok(None),
-                }?;
-                let mut sql_args = Vec::new();
-                for arg in args {
-                    let (sql, query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        arg,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = query;
-                    sql_args.push(sql);
-                }
-                Ok((
-                    sql_generator
-                        .get_sql_templates()
-                        .scalar_function(fun.name.to_string(), sql_args, date_part, interval)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for scalar function: {}",
-                                e
-                            ))
-                        })?,
-                    sql_query,
-                ))
-            }
-            Expr::ScalarFunction { fun, args } => {
-                if args.len() == 2 {
-                    if let (
-                        BuiltinScalarFunction::DateTrunc,
-                        Expr::Literal(ScalarValue::Utf8(Some(granularity))),
-                        Expr::Column(column),
-                        Some(PushToCubeContext {
-                            ungrouped_scan_node,
-                            known_join_subqueries,
-                        }),
-                    ) = (&fun, &args[0], &args[1], push_to_cube_context)
-                    {
-                        let granularity = granularity.to_ascii_lowercase();
-                        // Security check to prevent SQL injection
-                        if granularity_str_to_int_order(&granularity, Some(false)).is_some()
-                            && subqueries.get(&column.flat_name()).is_none()
-                            && !column
-                                .relation
-                                .as_ref()
-                                .map(|relation| known_join_subqueries.contains(relation))
-                                .unwrap_or(false)
-                        {
-                            if let Ok(MemberField::Member(regular_member)) =
-                                Self::find_member_in_ungrouped_scan(ungrouped_scan_node, column)
-                            {
-                                // TODO: check if member is a time dimension
-                                if let MemberField::Member(time_dimension_member) =
-                                    MemberField::time_dimension(
-                                        regular_member.member.clone(),
-                                        granularity,
-                                    )
-                                {
-                                    return Ok((
-                                        format!("${{{}}}", time_dimension_member.field_name),
-                                        sql_query,
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-                if let BuiltinScalarFunction::DatePart = &fun {
-                    if args.len() >= 2 {
-                        match &args[0] {
-                            Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
-                                // Security check to prevent SQL injection
-                                if !DATE_PART_REGEX.is_match(date_part) {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Can't generate SQL for scalar function: date part '{}' is not supported",
-                                        date_part
-                                    )));
-                                }
-                                let (arg_sql, query) = Self::generate_sql_for_expr(
-                                    sql_query,
-                                    sql_generator.clone(),
-                                    args[1].clone(),
-                                    push_to_cube_context,
-                                    subqueries,
-                                )?;
-                                return Ok((
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .extract_expr(date_part.to_string(), arg_sql)
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for scalar function: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    query,
-                                ));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                let date_part = if let BuiltinScalarFunction::DateTrunc = &fun {
-                    match &args[0] {
-                        Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
-                            // Security check to prevent SQL injection
-                            if DATE_PART_REGEX.is_match(date_part) {
-                                Some(date_part.to_string())
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
-                let mut sql_args = Vec::new();
-                for arg in args {
-                    let (sql, query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        arg,
-                        push_to_cube_context,
-                        subqueries,
-                    )?;
-                    sql_query = query;
-                    sql_args.push(sql);
-                }
-                Ok((
-                    sql_generator
-                        .get_sql_templates()
-                        .scalar_function(fun.to_string(), sql_args, date_part, None)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for scalar function: {}",
-                                e
-                            ))
-                        })?,
-                    sql_query,
-                ))
-            }
+            expr @ Expr::ScalarUDF { .. } => Self::generate_sql_for_scalar_udf(
+                sql_query,
+                sql_generator,
+                expr,
+                push_to_cube_context,
+                subqueries,
+            ),
+            expr @ Expr::ScalarFunction { .. } => Self::generate_sql_for_scalar_function(
+                sql_query,
+                sql_generator,
+                expr,
+                push_to_cube_context,
+                subqueries,
+            ),
             Expr::AggregateFunction {
                 fun,
                 args,
@@ -2680,87 +2447,13 @@ impl WrappedSelectNode {
                     })?;
                 Ok((resulting_sql, sql_query))
             }
-            Expr::AggregateUDF {
-                ref fun,
-                ref args,
-                distinct,
-            } => {
-                match fun.name.as_str() {
-                    // TODO allow this only in agg expr
-                    MEASURE_UDAF_NAME => {
-                        if distinct {
-                            return Err(DataFusionError::Internal(
-                                "MEASURE function with DISTINCT flag is not supported".to_string(),
-                            ));
-                        }
-
-                        let Some(PushToCubeContext {
-                            ungrouped_scan_node,
-                            ..
-                        }) = push_to_cube_context
-                        else {
-                            return Err(DataFusionError::Internal(format!(
-                                "Unexpected {} UDAF expression without push-to-Cube context: {expr}",
-                                fun.name,
-                            )));
-                        };
-
-                        let measure_column = match args.as_slice() {
-                            [Expr::Column(measure_column)] => measure_column,
-                            _ => {
-                                return Err(DataFusionError::Internal(format!(
-                                    "Unexpected arguments for {} UDAF: {expr}",
-                                    fun.name,
-                                )))
-                            }
-                        };
-
-                        let member = Self::find_member_in_ungrouped_scan(
-                            ungrouped_scan_node,
-                            measure_column,
-                        )?;
-
-                        let MemberField::Member(member) = member else {
-                            return Err(DataFusionError::Internal(format!(
-                                "First argument for {} UDAF should reference regular member, not literal: {expr}",
-                                fun.name,
-                            )));
-                        };
-
-                        Ok((format!("${{{}}}", member.field_name), sql_query))
-                    }
-                    PATCH_MEASURE_UDAF_NAME => Err(DataFusionError::Internal(format!(
-                        "{} UDAF should generate SQL via different path: {expr}",
-                        fun.name
-                    ))),
-                    _ => {
-                        let mut sql_args = Vec::new();
-                        for arg in args {
-                            let (sql, query) = Self::generate_sql_for_expr(
-                                sql_query,
-                                sql_generator.clone(),
-                                arg.clone(),
-                                push_to_cube_context,
-                                subqueries,
-                            )?;
-                            sql_query = query;
-                            sql_args.push(sql);
-                        }
-                        Ok((
-                            sql_generator
-                                .get_sql_templates()
-                                .udaf_function(&fun, sql_args, distinct)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for UDAF: {}",
-                                        e
-                                    ))
-                                })?,
-                            sql_query,
-                        ))
-                    }
-                }
-            }
+            expr @ Expr::AggregateUDF { .. } => Self::generate_sql_for_aggregate_udf(
+                sql_query,
+                sql_generator,
+                expr,
+                push_to_cube_context,
+                subqueries,
+            ),
             Expr::InList {
                 expr,
                 list,
@@ -3114,6 +2807,364 @@ impl WrappedSelectNode {
                 )));
             }
         })
+    }
+
+    #[inline(never)]
+    fn generate_sql_for_scalar_udf<'ctx>(
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::ScalarUDF { fun, args } = expr else {
+            return Err(DataFusionError::Internal(
+                "generate_sql_for_scalar_udf called with non-ScalarUDF expr".to_string(),
+            ));
+        };
+        let date_part_err = |dp| {
+            DataFusionError::Internal(format!(
+                "Can't generate SQL for scalar function: date part '{}' is not supported",
+                dp
+            ))
+        };
+        let date_part = match fun.name.as_str() {
+            "datediff" | "dateadd" => match &args[0] {
+                Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                    // Security check to prevent SQL injection
+                    if DATE_PART_REGEX.is_match(date_part) {
+                        Ok(Some(date_part.to_string()))
+                    } else {
+                        Err(date_part_err(date_part.to_string()))
+                    }
+                }
+                _ => Err(date_part_err(args[0].to_string())),
+            },
+            "date_add" => match &args[1] {
+                Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
+                    let days = (*interval >> 32) as i32;
+                    let ms = (*interval & 0xFFFF_FFFF) as i32;
+
+                    if days != 0 && ms == 0 {
+                        Ok(Some("DAY".to_string()))
+                    } else if ms != 0 && days == 0 {
+                        Ok(Some("MILLISECOND".to_string()))
+                    } else {
+                        Err(DataFusionError::Internal(format!(
+                            "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
+                        )))
+                    }
+                }
+                Expr::Literal(ScalarValue::IntervalYearMonth(Some(_months))) => {
+                    Ok(Some("MONTH".to_string()))
+                }
+                Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
+                    let months = (interval >> 96) as i32;
+                    let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
+                    let nanos = *interval as i64;
+
+                    if months != 0 && days == 0 && nanos == 0 {
+                        Ok(Some("MONTH".to_string()))
+                    } else if days != 0 && months == 0 && nanos == 0 {
+                        Ok(Some("DAY".to_string()))
+                    } else if nanos != 0 && months == 0 && days == 0 {
+                        Ok(Some("NANOSECOND".to_string()))
+                    } else {
+                        Err(DataFusionError::Internal(format!(
+                                    "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
+                                )))
+                    }
+                }
+                _ => Err(date_part_err(args[1].to_string())),
+            },
+            _ => Ok(None),
+        }?;
+        let interval = match fun.name.as_str() {
+            "dateadd" => match &args[1] {
+                Expr::Literal(ScalarValue::Int64(Some(interval))) => Ok(Some(interval.to_string())),
+                _ => Err(DataFusionError::Internal(format!(
+                    "Can't generate SQL for scalar function: interval must be Int64"
+                ))),
+            },
+            "date_add" => match &args[1] {
+                Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
+                    let days = (*interval >> 32) as i32;
+                    let ms = (*interval & 0xFFFF_FFFF) as i32;
+
+                    if days != 0 && ms == 0 {
+                        Ok(Some(days.to_string()))
+                    } else if ms != 0 && days == 0 {
+                        Ok(Some(ms.to_string()))
+                    } else {
+                        Err(DataFusionError::Internal(format!(
+                            "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
+                        )))
+                    }
+                }
+                Expr::Literal(ScalarValue::IntervalYearMonth(Some(months))) => {
+                    Ok(Some(months.to_string()))
+                }
+                Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
+                    let months = (interval >> 96) as i32;
+                    let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
+                    let nanos = *interval as i64;
+
+                    if months != 0 && days == 0 && nanos == 0 {
+                        Ok(Some(months.to_string()))
+                    } else if days != 0 && months == 0 && nanos == 0 {
+                        Ok(Some(days.to_string()))
+                    } else if nanos != 0 && months == 0 && days == 0 {
+                        Ok(Some(nanos.to_string()))
+                    } else {
+                        Err(DataFusionError::Internal(format!(
+                                    "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
+                                )))
+                    }
+                }
+                _ => Err(date_part_err(args[1].to_string())),
+            },
+            _ => Ok(None),
+        }?;
+        let mut sql_args = Vec::new();
+        for arg in args {
+            let (sql, query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                arg,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = query;
+            sql_args.push(sql);
+        }
+        Ok((
+            sql_generator
+                .get_sql_templates()
+                .scalar_function(fun.name.to_string(), sql_args, date_part, interval)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for scalar function: {}",
+                        e
+                    ))
+                })?,
+            sql_query,
+        ))
+    }
+
+    #[inline(never)]
+    fn generate_sql_for_scalar_function<'ctx>(
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::ScalarFunction { fun, args } = expr else {
+            return Err(DataFusionError::Internal(
+                "generate_sql_for_scalar_function called with non-ScalarFunction expr".to_string(),
+            ));
+        };
+        if args.len() == 2 {
+            if let (
+                BuiltinScalarFunction::DateTrunc,
+                Expr::Literal(ScalarValue::Utf8(Some(granularity))),
+                Expr::Column(column),
+                Some(PushToCubeContext {
+                    ungrouped_scan_node,
+                    known_join_subqueries,
+                }),
+            ) = (&fun, &args[0], &args[1], push_to_cube_context)
+            {
+                let granularity = granularity.to_ascii_lowercase();
+                // Security check to prevent SQL injection
+                if granularity_str_to_int_order(&granularity, Some(false)).is_some()
+                    && subqueries.get(&column.flat_name()).is_none()
+                    && !column
+                        .relation
+                        .as_ref()
+                        .map(|relation| known_join_subqueries.contains(relation))
+                        .unwrap_or(false)
+                {
+                    if let Ok(MemberField::Member(regular_member)) =
+                        Self::find_member_in_ungrouped_scan(ungrouped_scan_node, column)
+                    {
+                        // TODO: check if member is a time dimension
+                        if let MemberField::Member(time_dimension_member) =
+                            MemberField::time_dimension(regular_member.member.clone(), granularity)
+                        {
+                            return Ok((
+                                format!("${{{}}}", time_dimension_member.field_name),
+                                sql_query,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        if let BuiltinScalarFunction::DatePart = &fun {
+            if args.len() >= 2 {
+                match &args[0] {
+                    Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                        // Security check to prevent SQL injection
+                        if !DATE_PART_REGEX.is_match(date_part) {
+                            return Err(DataFusionError::Internal(format!(
+                                        "Can't generate SQL for scalar function: date part '{}' is not supported",
+                                        date_part
+                                    )));
+                        }
+                        let (arg_sql, query) = Self::generate_sql_for_expr(
+                            sql_query,
+                            sql_generator.clone(),
+                            args[1].clone(),
+                            push_to_cube_context,
+                            subqueries,
+                        )?;
+                        return Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .extract_expr(date_part.to_string(), arg_sql)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for scalar function: {}",
+                                        e
+                                    ))
+                                })?,
+                            query,
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let date_part = if let BuiltinScalarFunction::DateTrunc = &fun {
+            match &args[0] {
+                Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                    // Security check to prevent SQL injection
+                    if DATE_PART_REGEX.is_match(date_part) {
+                        Some(date_part.to_string())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let mut sql_args = Vec::new();
+        for arg in args {
+            let (sql, query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                arg,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            sql_query = query;
+            sql_args.push(sql);
+        }
+        Ok((
+            sql_generator
+                .get_sql_templates()
+                .scalar_function(fun.to_string(), sql_args, date_part, None)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for scalar function: {}",
+                        e
+                    ))
+                })?,
+            sql_query,
+        ))
+    }
+
+    #[inline(never)]
+    fn generate_sql_for_aggregate_udf<'ctx>(
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        let Expr::AggregateUDF {
+            ref fun,
+            ref args,
+            distinct,
+        } = expr
+        else {
+            return Err(DataFusionError::Internal(
+                "generate_sql_for_aggregate_udf called with non-AggregateUDF expr".to_string(),
+            ));
+        };
+        match fun.name.as_str() {
+            // TODO allow this only in agg expr
+            MEASURE_UDAF_NAME => {
+                if distinct {
+                    return Err(DataFusionError::Internal(
+                        "MEASURE function with DISTINCT flag is not supported".to_string(),
+                    ));
+                }
+
+                let Some(PushToCubeContext {
+                    ungrouped_scan_node,
+                    ..
+                }) = push_to_cube_context
+                else {
+                    return Err(DataFusionError::Internal(format!(
+                        "Unexpected {} UDAF expression without push-to-Cube context: {expr}",
+                        fun.name,
+                    )));
+                };
+
+                let measure_column = match args.as_slice() {
+                    [Expr::Column(measure_column)] => measure_column,
+                    _ => {
+                        return Err(DataFusionError::Internal(format!(
+                            "Unexpected arguments for {} UDAF: {expr}",
+                            fun.name,
+                        )))
+                    }
+                };
+
+                let member =
+                    Self::find_member_in_ungrouped_scan(ungrouped_scan_node, measure_column)?;
+
+                let MemberField::Member(member) = member else {
+                    return Err(DataFusionError::Internal(format!(
+                                "First argument for {} UDAF should reference regular member, not literal: {expr}",
+                                fun.name,
+                            )));
+                };
+
+                Ok((format!("${{{}}}", member.field_name), sql_query))
+            }
+            PATCH_MEASURE_UDAF_NAME => Err(DataFusionError::Internal(format!(
+                "{} UDAF should generate SQL via different path: {expr}",
+                fun.name
+            ))),
+            _ => {
+                let mut sql_args = Vec::new();
+                for arg in args {
+                    let (sql, query) = Self::generate_sql_for_expr(
+                        sql_query,
+                        sql_generator.clone(),
+                        arg.clone(),
+                        push_to_cube_context,
+                        subqueries,
+                    )?;
+                    sql_query = query;
+                    sql_args.push(sql);
+                }
+                Ok((
+                    sql_generator
+                        .get_sql_templates()
+                        .udaf_function(&fun, sql_args, distinct)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!("Can't generate SQL for UDAF: {}", e))
+                        })?,
+                    sql_query,
+                ))
+            }
+        }
     }
 
     fn find_member_in_ungrouped_scan<'scan, 'col>(
