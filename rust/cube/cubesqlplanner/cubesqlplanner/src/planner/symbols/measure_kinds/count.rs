@@ -31,6 +31,13 @@ impl CountMeasure {
         &self.sql
     }
 
+    /// True when this count can be rendered as a key-distinct count to
+    /// survive row multiplication: it falls back to the cube's primary
+    /// keys (`Auto`) and at least one key is available.
+    pub fn convertible_to_distinct(&self) -> bool {
+        matches!(&self.sql, CountSql::Auto(pks) if !pks.is_empty())
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         match &self.sql {

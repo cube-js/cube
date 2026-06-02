@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+orders__status | customers__count | orders__customers_count_x2
+---------------+------------------+---------------------------
+cancelled      | 0                | 0                         
+completed      | 3                | 6                         
+pending        | 1                | 2

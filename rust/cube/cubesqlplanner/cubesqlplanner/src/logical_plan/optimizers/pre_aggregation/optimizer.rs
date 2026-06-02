@@ -312,7 +312,6 @@ impl PreAggregationOptimizer {
                 .chain(pre_aggregation.segments.iter().cloned())
                 .collect(),
             measures: filtered_measures.clone(),
-            multiplied_measures: HashSet::new(),
         };
 
         // Set usage_index on the source table so the physical plan can generate unique placeholders
@@ -440,12 +439,20 @@ impl PreAggregationOptimizer {
         )?;
 
         let all_measures = helper.all_measures(schema, filters);
-        if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
-            return Ok(None);
-        }
         if match_state == MatchState::NotMatched {
             return Ok(None);
         }
+
+        // The query's join groups answer both the multiplicativity gate
+        // and the join-path comparison below, so build them once.
+        let query_groups = self.query_join_groups(schema, &all_measures)?;
+
+        // A measure sitting under a row-multiplying join can't be rolled
+        // up from a partially matching pre-aggregation.
+        if match_state == MatchState::Partial && query_groups.has_multiplied_measures()? {
+            return Ok(None);
+        }
+
         let matched = self.try_match_measures(
             &all_measures,
             pre_aggregation,
@@ -455,24 +462,32 @@ impl PreAggregationOptimizer {
             return Ok(None);
         }
 
-        if !self.are_join_paths_matching(schema, &all_measures, pre_aggregation)? {
+        if !self.are_join_paths_matching(schema, &all_measures, &query_groups, pre_aggregation)? {
             return Ok(None);
         }
 
         Ok(matched)
     }
 
+    fn query_join_groups(
+        &self,
+        schema: &Rc<LogicalSchema>,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<MultiFactJoinGroups, CubeError> {
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&schema.dimensions)
+            .add_dimensions(&schema.time_dimensions)
+            .build(measures)?;
+        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+    }
+
     fn are_join_paths_matching(
         &self,
         schema: &Rc<LogicalSchema>,
         measures: &[Rc<MemberSymbol>],
+        query_groups: &MultiFactJoinGroups,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
-        let query_hints = MeasuresJoinHints::builder(&JoinHints::new())
-            .add_dimensions(&schema.dimensions)
-            .add_dimensions(&schema.time_dimensions)
-            .build(measures)?;
-        let query_groups = MultiFactJoinGroups::try_new(self.query_tools.clone(), query_hints)?;
         let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
 
         for dim in schema

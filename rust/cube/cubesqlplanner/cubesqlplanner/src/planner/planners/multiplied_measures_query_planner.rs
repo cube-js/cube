@@ -160,11 +160,6 @@ impl MultipliedMeasuresQueryPlanner {
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
-            .set_multiplied_measures(
-                self.full_key_aggregate_measures
-                    .rendered_as_multiplied_measures
-                    .clone(),
-            )
             .into_rc();
         let should_build_join_for_measure_select =
             self.check_should_build_join_for_measure_select(measures, key_cube_name)?;
@@ -281,11 +276,6 @@ impl MultipliedMeasuresQueryPlanner {
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
-            .set_multiplied_measures(
-                self.full_key_aggregate_measures
-                    .rendered_as_multiplied_measures
-                    .clone(),
-            )
             .into_rc();
 
         let logical_filter = Rc::new(LogicalFilter {
