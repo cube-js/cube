@@ -26,6 +26,10 @@ use sqlparser::tokenizer::{Location, Span, Token, TokenWithSpan, TokenizerError}
 /// Number of source lines shown before the line that contains the error.
 const CONTEXT_LINES: u64 = 2;
 
+/// Maximum number of source characters shown per line. Longer lines are cropped
+/// to a horizontal window around the caret.
+const MAX_LINE_WIDTH: usize = 64;
+
 /// Extract the error [`Location`] from a parser error message.
 pub(crate) fn location_from_parser_error(msg: &str) -> Option<Location> {
     static LOCATION_RE: LazyLock<Regex> =
@@ -60,25 +64,13 @@ pub(crate) fn render_query_snippet(sql: &str, span: Span) -> Option<String> {
 
     let first_context_line = start.line.saturating_sub(CONTEXT_LINES).max(1);
 
-    let mut out = String::new();
-
-    for line_no in first_context_line..=start.line {
-        let text = lines[(line_no - 1) as usize];
-        out.push_str(&format!(
-            "{:>width$} | {}\n",
-            line_no,
-            text,
-            width = gutter_width
-        ));
-    }
-
-    // Pointer line: blank gutter, spaces up to the start column, then carets.
-    let error_line = lines[start_idx];
-    let error_line_len = error_line.chars().count() as u64;
+    // Caret geometry on the error line, in 0-based char offsets.
+    let error_chars: Vec<char> = lines[start_idx].chars().collect();
+    let error_line_len = error_chars.len() as u64;
 
     // Clamp the start column into the line (columns are 1-based).
     let start_col = start.column.min(error_line_len + 1);
-    let lead = (start_col - 1) as usize;
+    let caret_start = (start_col - 1) as usize;
 
     // Caret width (span ends are inclusive here):
     // - same-line span: cover start..=end, clamped to the line
@@ -92,16 +84,66 @@ pub(crate) fn render_query_snippet(sql: &str, span: Span) -> Option<String> {
     } else {
         1
     };
+    let caret_end = caret_start + caret_width.max(1); // exclusive, 0-based
+
+    // Horizontal window shared by every printed line so columns stay aligned.
+    // Only crops when some displayed line is wider than MAX_LINE_WIDTH.
+    let widest = (first_context_line..=start.line)
+        .map(|n| lines[(n - 1) as usize].chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let (win_start, win_end) = if widest <= MAX_LINE_WIDTH {
+        (0, widest)
+    } else {
+        // Keep the caret roughly centered within the window.
+        let half = MAX_LINE_WIDTH / 2;
+        let mut ws = caret_start.saturating_sub(half);
+        let mut we = ws + MAX_LINE_WIDTH;
+        if we > widest {
+            we = widest;
+            ws = we.saturating_sub(MAX_LINE_WIDTH);
+        }
+        (ws, we)
+    };
+
+    let mut out = String::new();
+
+    for line_no in first_context_line..=start.line {
+        let chars: Vec<char> = lines[(line_no - 1) as usize].chars().collect();
+        let text = crop_to_window(&chars, win_start, win_end);
+        out.push_str(&format!(
+            "{:>width$} | {}\n",
+            line_no,
+            text,
+            width = gutter_width
+        ));
+    }
+
+    // Pointer line: blank gutter, spaces up to the caret (relative to the window
+    // start), then carets.
+    let visible_caret_start = caret_start.saturating_sub(win_start);
+    let visible_caret_end = caret_end.min(win_end).saturating_sub(win_start);
+    let visible_caret_width = visible_caret_end.saturating_sub(visible_caret_start).max(1);
+    let lead = visible_caret_start;
 
     out.push_str(&format!(
         "{:>width$} | {}{}",
         "",
         " ".repeat(lead),
-        "^".repeat(caret_width.max(1)),
+        "^".repeat(visible_caret_width),
         width = gutter_width
     ));
 
     Some(out)
+}
+
+/// Crop a line's characters to `[win_start, win_end)`.
+fn crop_to_window(chars: &[char], win_start: usize, win_end: usize) -> String {
+    let len = chars.len();
+    let s = win_start.min(len);
+    let e = win_end.min(len);
+    chars[s..e].iter().collect()
 }
 
 /// Extend a point location into a span covering the contiguous run of

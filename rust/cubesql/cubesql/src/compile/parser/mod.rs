@@ -1,4 +1,4 @@
-mod pg;
+mod parser_pg;
 mod sql_snippet;
 
-pub use pg::*;
+pub use parser_pg::*;

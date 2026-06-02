@@ -314,6 +314,99 @@ mod tests {
     }
 
     #[test]
+    fn test_syntax_error_in_large_query_stays_within_context_window() {
+        // The error is buried ~300 lines into a ~500-line query; the snippet must
+        // stay bounded to the error line plus two leading context lines and never
+        // dump the whole query (note the ~200 trailing lines the parser, stopping
+        // at the first error, never even reaches).
+        let sql = {
+            let mut sql = String::from("SELECT\n");
+
+            for col in 2..=300u64 {
+                sql.push_str(&format!("    col{},\n", col));
+            }
+
+            sql.push_str("    status MEASURE(orders.count)\n");
+
+            for col in 302..=499u64 {
+                sql.push_str(&format!("    col{},\n", col));
+            }
+
+            sql.push_str("FROM orders");
+
+            sql
+        };
+
+        assert_eq!(
+            parse_err(&sql),
+            "SQL Parser Error: Unable to parse: \
+Expected: end of statement, found: ( at Line: 301, Column: 19\n\
+\n\
+299 |     col299,
+300 |     col300,
+301 |     status MEASURE(orders.count)
+    |            ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_in_single_wide_line_is_truncated() {
+        // One very wide line, far past the 64-char limit. The snippet crops to a
+        // horizontal window centered on the caret, trimming both sides.
+        let sql = format!(
+            "SELECT {a} MEASURE(orders.count) {z} FROM orders",
+            a = "a".repeat(100),
+            z = "z".repeat(100),
+        );
+        assert_eq!(
+            parse_err(&sql),
+            "SQL Parser Error: Unable to parse: \
+Expected: end of statement, found: ( at Line: 1, Column: 116\n\
+\n\
+1 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa MEASURE(orders.count) zzzzzzzzzz
+  |                                 ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_in_wide_line_truncates_right_only() {
+        // `status MEASURE(...)` makes the `(` the real error; a long trailing run
+        // pushes the line past the limit while the caret stays near the start, so
+        // only the right side is cropped.
+        let sql = format!(
+            "SELECT status MEASURE(orders.count) {z}",
+            z = "z".repeat(300)
+        );
+        assert_eq!(
+            parse_err(&sql),
+            "SQL Parser Error: Unable to parse: \
+Expected: end of statement, found: ( at Line: 1, Column: 22\n\
+\n\
+1 | SELECT status MEASURE(orders.count) zzzzzzzzzzzzzzzzzzzzzzzzzzzz
+  |               ^"
+        );
+    }
+
+    #[test]
+    fn test_syntax_error_on_wide_numeric_token() {
+        // A number cannot be an alias, so the long numeric literal after
+        // `MEASURE(orders.count)` is itself the offending token. The huge digit run
+        // in the error message must not confuse `at Line:/Column:` location parsing.
+        let sql = format!(
+            "SELECT MEASURE(orders.count) {n} FROM orders",
+            n = "1".repeat(100)
+        );
+        assert_eq!(
+            parse_err(&sql),
+            "SQL Parser Error: Unable to parse: \
+Expected: end of statement, found: 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111 at Line: 1, Column: 30\n\
+\n\
+1 | SELECT MEASURE(orders.count) 11111111111111111111111111111111111
+  |                              ^"
+        );
+    }
+
+    #[test]
     fn test_multiple_statements_postgres() {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
@@ -347,12 +440,12 @@ mod tests {
                 5000"
             ),
             "SQL Parser Error: Unable to parse: \
-Expected: end of statement, found: ( at Line: 3, Column: 24\n\
+Expected: end of statement, found: ( at Line: 3, Column: 24
 \n\
-1 | SELECT DISTINCT\n\
-2 |                 orders_transactions.status\n\
-3 |                 MEASURE(orders_transactions.count)\n  \
-|                 ^"
+1 | SELECT DISTINCT
+2 |                 orders_transactions.status
+3 |                 MEASURE(orders_transactions.count)
+  |                 ^"
         );
     }
 
@@ -365,8 +458,8 @@ Expected: end of statement, found: ( at Line: 3, Column: 24\n\
             "SQL Parser Error: Unable to parse: \
 Expected: identifier, found: EOF\n\
 \n\
-1 | SELECT FROM\n  \
-|           ^"
+1 | SELECT FROM
+  |           ^"
         );
     }
 
@@ -401,8 +494,8 @@ Expected: identifier, found: EOF\n\
             "SQL Parser Error: Unable to parse: \
 Expected an expression, found: FROM at Line: 1, Column: 16\n\
 \n\
-1 | SELECT a, FROM t\n  \
-|                ^"
+1 | SELECT a, FROM t
+  |                ^"
         );
     }
 
@@ -415,8 +508,8 @@ Expected an expression, found: FROM at Line: 1, Column: 16\n\
             "SQL Parser Error: Unable to parse: \
 Expected: an expression, found: , at Line: 1, Column: 10\n\
 \n\
-1 | SELECT a,, b FROM t\n  \
-|          ^"
+1 | SELECT a,, b FROM t
+  |          ^"
         );
     }
 
@@ -427,8 +520,8 @@ Expected: an expression, found: , at Line: 1, Column: 10\n\
             "SQL Parser Error: Unable to parse: \
 Expected: an SQL statement, found: SELET at Line: 1, Column: 1\n\
 \n\
-1 | SELET a FROM t\n  \
-| ^"
+1 | SELET a FROM t
+  | ^"
         );
     }
 
@@ -439,8 +532,8 @@ Expected: an SQL statement, found: SELET at Line: 1, Column: 1\n\
             "SQL Parser Error: Unable to parse: \
 Expected: ), found: FROM at Line: 1, Column: 16\n\
 \n\
-1 | SELECT count(a FROM t\n  \
-|                ^"
+1 | SELECT count(a FROM t
+  |                ^"
         );
     }
 
@@ -452,8 +545,8 @@ Expected: ), found: FROM at Line: 1, Column: 16\n\
             "SQL Parser Error: Unable to parse: \
 Expected: an expression, found: EOF\n\
 \n\
-1 | SELECT a FROM t WHERE\n  \
-|                     ^"
+1 | SELECT a FROM t WHERE
+  |                     ^"
         );
     }
 
@@ -465,8 +558,8 @@ Expected: an expression, found: EOF\n\
             "SQL Parser Error: Unable to parse: \
 Unterminated string literal at Line: 1, Column: 8\n\
 \n\
-1 | SELECT 'abc FROM t\n  \
-|        ^^^^"
+1 | SELECT 'abc FROM t
+  |        ^^^^"
         );
     }
 
@@ -478,8 +571,8 @@ Unterminated string literal at Line: 1, Column: 8\n\
             "SQL Parser Error: Unable to parse: \
 Expected: identifier, found: ; at Line: 1, Column: 12\n\
 \n\
-1 | SELECT FROM;\n  \
-|           ^"
+1 | SELECT FROM;
+  |           ^"
         );
     }
 
@@ -490,8 +583,8 @@ Expected: identifier, found: ; at Line: 1, Column: 12\n\
             "SQL Parser Error: Unable to parse: \
 Expected: an expression, found: EOF\n\
 \n\
-1 | SELECT a FROM t GROUP BY\n  \
-|                        ^"
+1 | SELECT a FROM t GROUP BY
+  |                        ^"
         );
     }
 }
