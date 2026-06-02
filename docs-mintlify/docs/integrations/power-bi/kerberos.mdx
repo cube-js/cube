@@ -142,9 +142,10 @@ Map an IdP attribute to the following single-valued, string target attribute:
 urn:cube:params:1.0:UserAliases:alternateUserName
 ```
 
-The value must match exactly what Kerberos sends (matching is case-insensitive, but realm,
-separator, and casing of the at-sign must otherwise align). It is tenant-unique — two users
-cannot share the same SCIM alias.
+The value is lowercased and trimmed on write, and lookups are lowercased too, so matching is
+fully case-insensitive — the value just needs to be the same principal string Kerberos sends
+(same realm and separator). It must be unique across the tenant: if it collides with another
+user's email, username, or an existing alias, the sync is rejected with `409 Conflict`.
 
 ### Setting it up in Microsoft Entra
 
