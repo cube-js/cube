@@ -27,6 +27,7 @@ impl VisitorContext {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
             filter_params_columns: HashMap::new(),
+            reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
         };
         Self {
             query_tools,
@@ -45,6 +46,7 @@ impl VisitorContext {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
             filter_params_columns,
+            reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
         };
         Self {
             query_tools,

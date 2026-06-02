@@ -346,6 +346,11 @@ export class MssqlQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
+    // MSSQL has no boolean type — a segment projected as a dimension must be a BIT.
+    templates.expressions.wrap_segment_select = 'CAST((CASE WHEN {{ expr }} THEN 1 ELSE 0 END) AS BIT)';
+    // Reading a segment back from a pre-aggregation: it is a stored BIT column,
+    // which MSSQL can't use as a bare predicate, so compare it explicitly.
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
     return templates;
   }
 }

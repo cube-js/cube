@@ -132,9 +132,14 @@ impl Compiler {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
         match path.path_type() {
             SymbolPathType::Segment => {
+                // A segment used as a dimension (a pre-aggregation projects its
+                // segmentReferences this way). Mark it so rendering wraps the
+                // boolean per dialect (e.g. MSSQL `CAST(... AS BIT)`).
                 let symbol = self.add_segment_evaluator_by_path(path)?;
                 let me = symbol.as_member_expression()?;
-                Ok(MemberSymbol::new_member_expression(me.with_parenthesized()))
+                Ok(MemberSymbol::new_member_expression(
+                    me.with_parenthesized().with_is_segment(),
+                ))
             }
             _ => self.add_dimension_evaluator_by_path(path),
         }

@@ -32,6 +32,10 @@ pub struct MemberExpressionSymbol {
     definition: Option<String>,
     is_reference: bool,
     parenthesized: bool,
+    /// True when this expression materialises a `segments:` entry used as a
+    /// selected dimension (in a pre-aggregation). Such a boolean must be
+    /// wrapped per dialect when projected/grouped (e.g. MSSQL `BIT`).
+    is_segment: bool,
 }
 
 impl MemberExpressionSymbol {
@@ -56,6 +60,7 @@ impl MemberExpressionSymbol {
             definition,
             is_reference,
             parenthesized: false,
+            is_segment: false,
         }))
     }
 
@@ -65,6 +70,18 @@ impl MemberExpressionSymbol {
         let mut result = self.as_ref().clone();
         result.parenthesized = true;
         Rc::new(result)
+    }
+
+    /// Returns a copy marked as a segment-as-dimension, so rendering wraps it
+    /// per dialect (e.g. MSSQL `CAST(... AS BIT)`).
+    pub fn with_is_segment(self: &Rc<Self>) -> Rc<Self> {
+        let mut result = self.as_ref().clone();
+        result.is_segment = true;
+        Rc::new(result)
+    }
+
+    pub fn is_segment(&self) -> bool {
+        self.is_segment
     }
 
     pub fn expression(&self) -> &MemberExpressionExpression {

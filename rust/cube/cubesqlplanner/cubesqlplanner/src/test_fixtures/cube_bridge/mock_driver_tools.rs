@@ -213,11 +213,11 @@ impl DriverTools for MockDriverTools {
     }
 
     fn hll_merge(&self, sql: String) -> Result<String, CubeError> {
-        Ok(format!("round(hll_cardinality(hll_union_agg({})))", sql))
+        Ok(format!("merge({})", sql))
     }
 
     fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError> {
-        self.hll_merge(sql)
+        Ok(format!("cardinality(merge({}))", sql))
     }
 
     fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError> {
