@@ -545,7 +545,16 @@ export type ViewGroup = {
   name: string;
   title?: string;
   description?: string;
+  /**
+   * The group's own direct view references at this level.
+   */
   views: string[];
+  /**
+   * Recursive representation: view names interleaved with nested view groups,
+   * preserving authoring order. Present when the group is defined via
+   * `includes` (including nested view groups).
+   */
+  includes?: (string | ViewGroup)[];
 };
 
 export type MetaResponse = {

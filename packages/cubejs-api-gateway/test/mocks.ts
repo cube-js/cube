@@ -161,9 +161,22 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             title: 'Analytics',
             description: 'Analytics related views',
             views: ['FooView'],
+            includes: [
+              'FooView',
+              {
+                name: 'restricted',
+                title: 'Restricted',
+                // Only references a hidden view, so it must be pruned from meta.
+                views: ['HiddenView'],
+                includes: ['HiddenView'],
+              },
+            ],
           },
         ];
       }
+      // NOTE: `views`/`includes` here represent the already-compiled meta shape
+      // returned by the compiler (post-resolution), where both fields are
+      // always present — not the authored view group definition.
       return result;
     }
 

@@ -1227,6 +1227,31 @@ const folderSchema = Joi.object().keys({
   ]).required(),
 }).id('folderSchema');
 
+const viewGroupSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  // Legacy way of including views into a group, kept for backward compatibility.
+  views: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
+  // Preferred way of including views (and nested view groups) into a group.
+  includes: Joi.alternatives([
+    Joi.func(),
+    Joi.array().items(
+      Joi.alternatives([
+        Joi.string().required(),
+        Joi.func(),
+        Joi.link('#viewGroupSchema'), // Can contain nested view groups
+      ]),
+    ),
+  ]),
+  fileName: Joi.string(),
+})
+  .oxor('views', 'includes')
+  .messages({
+    'object.oxor': 'View group must use either "views" or "includes", but not both'
+  })
+  .id('viewGroupSchema');
+
 const ViewDefaultFilterSchema = Joi.object().keys({
   member: Joi.func().required(),
   operator: Joi.any().valid(
@@ -1384,6 +1409,22 @@ export class CubeValidator implements CompilerInterface {
       errorReporter.error(formatErrorMessage(result.error));
     } else {
       this.validCubes.set(cube.name, true);
+    }
+
+    return result;
+  }
+
+  public validateViewGroup(viewGroup, errorReporter: ErrorReporter) {
+    const options = {
+      nonEnumerables: true,
+      abortEarly: false, // This will allow all errors to be reported, not just the first one
+    };
+    const result = viewGroupSchema.validate(viewGroup, options);
+
+    if (result.error != null) {
+      errorReporter
+        .inContext(`${viewGroup?.name} view group`)
+        .error(formatErrorMessage(result.error));
     }
 
     return result;

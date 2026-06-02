@@ -698,11 +698,14 @@ describe('API Gateway', () => {
     expect(res.body).toHaveProperty('viewGroups');
 
     expect(res.body.viewGroups).toHaveLength(1);
+    // The nested `restricted` group references only a hidden view, so it is
+    // pruned from the response.
     expect(res.body.viewGroups[0]).toEqual({
       name: 'analytics',
       title: 'Analytics',
       description: 'Analytics related views',
       views: ['FooView'],
+      includes: ['FooView'],
     });
 
     const fooView = res.body.cubes.find(c => c.name === 'FooView');
@@ -750,6 +753,7 @@ describe('API Gateway', () => {
         title: 'Analytics',
         description: 'Analytics related views',
         views: ['FooView'],
+        includes: ['FooView'],
       },
     ]);
   });
