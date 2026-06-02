@@ -318,7 +318,9 @@ impl InlineAggregateStream {
     /// Returns Some(batch) if emitted, None otherwise.
     fn emit_early_if_ready(&mut self) -> DFResult<Option<RecordBatch>> {
         let threshold = self.emit_early_threshold();
-        // Need at least (threshold + 1) groups to emit threshold closed groups and keep 1
+        // Need at least (threshold + 1) groups to emit threshold closed groups and keep 1.
+        // The threshold == 0 check is defensive: the poll loop checks limit_reached() before
+        // calling this, so the threshold is at least 1 there.
         if threshold == 0 || self.group_values.len() <= threshold {
             return Ok(None);
         }

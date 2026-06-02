@@ -114,6 +114,9 @@ impl InlineAggregateExec {
 
     /// Returns a copy of this aggregate with the per-partition group limit set. Each partition
     /// emits at most `limit` first (in group order) complete groups and stops reading its input.
+    ///
+    /// Plan properties and statistics are intentionally not narrowed by the limit: the limit is
+    /// set after all the optimizers that could consume them have run.
     pub fn with_limit(&self, limit: Option<usize>) -> Self {
         let mut result = self.clone();
         result.limit = limit;
