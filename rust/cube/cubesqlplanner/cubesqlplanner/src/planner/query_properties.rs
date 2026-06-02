@@ -94,18 +94,32 @@ impl MultipliedMeasure {
 /// aggregated alongside the rest of the query, wrapped in a multiplied
 /// subquery, or planned as a multi-stage CTE.
 ///
-/// `render_forms` maps a selected measure's full name to a copy with
-/// every multiplied `count` (the measure itself or one nested in a
-/// calculated expression) rewritten to its distinct `MultipliedCount`
-/// form. Built during the single classification pass; consumed by
-/// [`QueryProperties::select_measures`]. Only measures that actually
-/// need rewriting get an entry.
+/// `render_forms` maps a leaf measure's full name to its distinct
+/// render form (a `count` rewritten to `MultipliedCount`), recorded
+/// during the single classification pass. Applied via [`Self::render`].
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<MemberSymbol>>,
     pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    pub render_forms: HashMap<String, Rc<MemberSymbol>>,
+    render_forms: HashMap<String, Rc<MemberSymbol>>,
+}
+
+impl FullKeyAggregateMeasures {
+    /// Rewrite a selected measure into its render form: every multiplied
+    /// `count` in its dependency tree — the measure itself or one nested
+    /// in a calculated expression — is substituted with the distinct
+    /// form recorded during classification. Measures with no multiplied
+    /// count pass through unchanged.
+    pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
+        measure.apply_recursive(&|node| {
+            Ok(self
+                .render_forms
+                .get(&node.full_name())
+                .cloned()
+                .unwrap_or_else(|| node.clone()))
+        })
+    }
 }
 
 /// The full description of a query: selected members, filters, ordering,
@@ -536,24 +550,11 @@ impl QueryProperties {
         Ok(result)
     }
 
-    /// The query's selected measures with every multiplied `count`
-    /// rewritten to its distinct `MultipliedCount` form — the measure
-    /// itself or any nested inside a calculated expression. Substitutes
-    /// the per-leaf render forms computed in the classification pass into
-    /// each measure's dependency tree; leaves with no rewrite stay as-is.
+    /// The query's selected measures in render form — see
+    /// [`FullKeyAggregateMeasures::render`].
     pub fn select_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let forms = self.full_key_aggregate_measures()?.render_forms;
-        self.measures
-            .iter()
-            .map(|m| {
-                m.apply_recursive(&|node| {
-                    Ok(forms
-                        .get(&node.full_name())
-                        .cloned()
-                        .unwrap_or_else(|| node.clone()))
-                })
-            })
-            .collect()
+        let classified = self.full_key_aggregate_measures()?;
+        self.measures.iter().map(|m| classified.render(m)).collect()
     }
 
     fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
