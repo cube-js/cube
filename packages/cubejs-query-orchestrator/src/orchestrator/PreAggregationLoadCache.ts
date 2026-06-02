@@ -194,14 +194,18 @@ export class PreAggregationLoadCache {
     const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
 
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
+      const renewalThreshold = this.queryCache.options.refreshKeyRenewalThreshold
+        || queryOptions?.renewalThreshold
+        || 2 * 60;
+      const expiration = Math.max(renewalThreshold, 60 * 60);
+
       this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
         query,
         values,
         [query, values],
-        60 * 60,
+        expiration,
         {
-          renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
-            || queryOptions?.renewalThreshold || 2 * 60,
+          renewalThreshold,
           renewalKey: [query, values],
           waitForRenew,
           priority,
