@@ -69,6 +69,9 @@ export class KsqlQuery extends BaseQuery {
       '{% if start_wild or end_wild %}CONCAT(' +
       '{% if start_wild %}\'%\', {% endif %}{{ value }}{% if end_wild %}, \'%\'{% endif %})' +
       '{% else %}{{ value }}{% endif %}';
+    // ksqlDB does not support positional GROUP BY — group by the full
+    // expressions instead of column ordinals.
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
     return templates;
   }
 
