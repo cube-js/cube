@@ -188,25 +188,26 @@ impl Stream for InlineAggregateStream {
                         continue;
                     }
 
+                    // Drain groups accumulated beyond the emit threshold (a single input batch
+                    // can bring many) before reading further input
+                    match self.emit_early_if_ready() {
+                        Ok(Some(batch)) => {
+                            self.exec_state = ExecutionState::ProducingOutput(batch);
+                            continue;
+                        }
+                        Ok(None) => {
+                            // Not enough groups, read further
+                        }
+                        Err(e) => {
+                            return Poll::Ready(Some(Err(e)));
+                        }
+                    }
+
                     match ready!(self.input.poll_next_unpin(cx)) {
-                        // New input batch to aggregate
+                        // New input batch to aggregate; emitting happens at the top of the loop
                         Some(Ok(batch)) => {
-                            // Aggregate the batch
                             if let Err(e) = self.group_aggregate_batch(batch) {
                                 return Poll::Ready(Some(Err(e)));
-                            }
-
-                            // Try to emit a batch if we have enough groups
-                            match self.emit_early_if_ready() {
-                                Ok(Some(batch)) => {
-                                    self.exec_state = ExecutionState::ProducingOutput(batch);
-                                }
-                                Ok(None) => {
-                                    // Not enough groups yet, continue reading
-                                }
-                                Err(e) => {
-                                    return Poll::Ready(Some(Err(e)));
-                                }
                             }
                         }
 
@@ -215,11 +216,11 @@ impl Stream for InlineAggregateStream {
                             return Poll::Ready(Some(Err(e)));
                         }
 
-                        // Input stream exhausted - emit all remaining groups
+                        // Input stream exhausted - emit the remaining groups, up to the limit
                         None => {
                             self.input_done = true;
 
-                            match self.emit(EmitTo::All) {
+                            match self.emit_remaining() {
                                 Ok(Some(batch)) => {
                                     self.exec_state = ExecutionState::ProducingOutput(batch);
                                 }
@@ -257,9 +258,6 @@ impl Stream for InlineAggregateStream {
 }
 
 impl InlineAggregateStream {
-    /// Emit groups based on EmitTo strategy.
-    ///
-    /// Returns None if there are no groups to emit.
     /// Emit groups based on EmitTo strategy.
     ///
     /// Returns None if there are no groups to emit.
@@ -327,6 +325,27 @@ impl InlineAggregateStream {
 
         let batch = self.emit(EmitTo::First(threshold))?;
         self.groups_emitted += threshold;
+        Ok(batch)
+    }
+
+    /// Emit the groups left at the end of the input: all of them are closed at this point, but
+    /// no more than the limit allows.
+    fn emit_remaining(&mut self) -> DFResult<Option<RecordBatch>> {
+        let len = self.group_values.len();
+        let emit_count = match self.limit {
+            Some(limit) => len.min(limit.saturating_sub(self.groups_emitted)),
+            None => len,
+        };
+        if emit_count == 0 {
+            return Ok(None);
+        }
+        let emit_to = if emit_count < len {
+            EmitTo::First(emit_count)
+        } else {
+            EmitTo::All
+        };
+        let batch = self.emit(emit_to)?;
+        self.groups_emitted += emit_count;
         Ok(batch)
     }
 

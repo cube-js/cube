@@ -451,6 +451,20 @@ mod tests {
         assert_eq!(limited, no_limit[..5]);
     }
 
+    /// A single input batch can bring more groups than the limit; the stream must still emit
+    /// exactly `limit` groups, draining the backlog in emit threshold chunks.
+    #[test]
+    fn limit_holds_when_one_batch_overshoots_it() {
+        let schema = test_schema();
+        let rows: Vec<(i64, i64)> = (0..20).map(|k| (k, k + 100)).collect();
+        let input = sorted_source(&schema, vec![vec![make_batch(&schema, &rows)]]);
+        let agg = partial_sum_inline_aggregate(input, Some(10));
+        assert_eq!(
+            run(agg, 4),
+            (0..10).map(|k| (k, k + 100)).collect::<Vec<_>>()
+        );
+    }
+
     /// Wraps a plan and counts batches its streams produce.
     #[derive(Debug)]
     struct CountingExec {
@@ -531,6 +545,34 @@ mod tests {
             batches_polled.load(Ordering::SeqCst) < 10,
             "aggregate must stop polling input after the limit is reached, polled {} batches",
             batches_polled.load(Ordering::SeqCst)
+        );
+    }
+
+    /// When one batch brings enough groups to cover the limit, the stream must drain them
+    /// without reading further input.
+    #[test]
+    fn limit_drains_backlog_without_reading_input() {
+        let schema = test_schema();
+        let batches: Vec<RecordBatch> = (0..100)
+            .map(|i| {
+                let rows: Vec<(i64, i64)> = (0..20).map(|j| (i * 20 + j, 1)).collect();
+                make_batch(&schema, &rows)
+            })
+            .collect();
+        let source = sorted_source(&schema, vec![batches]);
+        let batches_polled = Arc::new(AtomicUsize::new(0));
+        let counting = Arc::new(CountingExec {
+            inner: source,
+            batches_polled: batches_polled.clone(),
+        });
+
+        // The first batch alone brings 20 groups > limit 10
+        let result = run(partial_sum_inline_aggregate(counting, Some(10)), 4);
+        assert_eq!(result.len(), 10);
+        assert_eq!(
+            batches_polled.load(Ordering::SeqCst),
+            1,
+            "the first input batch covers the limit, no further reads needed"
         );
     }
 }

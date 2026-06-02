@@ -7255,22 +7255,23 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) -> Result<
             \n  InlineFinalAggregate, partitions: 1\
             \n    MergeSort, partitions: 1\
             \n      Worker, partitions: 2\
-            \n        MergeSort, fetch: 200, partitions: 1\
-            \n          InlinePartialAggregate, limit: 100, partitions: 2\
-            \n            Union, partitions: 2\
-            \n              Projection, [a, b], partitions: 1\
-            \n                LastRowByUniqueKey, partitions: 1\
-            \n                  MergeSort, partitions: 1\
-            \n                    Scan, index: default:1:[1]:sort_on[a, b], fields: [a, b, c, e, __seq], partitions: 2\
+            \n        MergeSort, partitions: 1\
+            \n          LocalLimit, n: 100, partitions: 2\
+            \n            InlinePartialAggregate, limit: 100, partitions: 2\
+            \n              Union, partitions: 2\
+            \n                Projection, [a, b], partitions: 1\
+            \n                  LastRowByUniqueKey, partitions: 1\
+            \n                    MergeSort, partitions: 1\
+            \n                      Scan, index: default:1:[1]:sort_on[a, b], fields: [a, b, c, e, __seq], partitions: 2\
+            \n                        FilterByKeyRange, partitions: 1\
+            \n                          MemoryScan, partitions: 1\
+            \n                        FilterByKeyRange, partitions: 1\
+            \n                          MemoryScan, partitions: 1\
+            \n                Projection, [a, b], partitions: 1\
+            \n                  LastRowByUniqueKey, partitions: 1\
+            \n                    Scan, index: default:2:[2]:sort_on[a, b], fields: [a, b, c, e, __seq], partitions: 1\
             \n                      FilterByKeyRange, partitions: 1\
-            \n                        MemoryScan, partitions: 1\
-            \n                      FilterByKeyRange, partitions: 1\
-            \n                        MemoryScan, partitions: 1\
-            \n              Projection, [a, b], partitions: 1\
-            \n                LastRowByUniqueKey, partitions: 1\
-            \n                  Scan, index: default:2:[2]:sort_on[a, b], fields: [a, b, c, e, __seq], partitions: 1\
-            \n                    FilterByKeyRange, partitions: 1\
-            \n                      MemoryScan, partitions: 1");
+            \n                        MemoryScan, partitions: 1");
     }
     Ok(())
 }
@@ -7688,15 +7689,16 @@ async fn planning_aggregate_below_merge_with_limit(
         "Sort, fetch: 5\
         \n  InlineFinalAggregate\
         \n    Worker\
-        \n      MergeSort, fetch: 10\
-        \n        InlinePartialAggregate, limit: 5\
-        \n          Union\
-        \n            Scan, index: default:1:[1]:sort_on[a, b], fields: *\
-        \n              Sort\
-        \n                Empty\
-        \n            Scan, index: default:1:[1]:sort_on[a, b], fields: *\
-        \n              Sort\
-        \n                Empty"
+        \n      MergeSort\
+        \n        LocalLimit, n: 5\
+        \n          InlinePartialAggregate, limit: 5\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty"
     );
 
     // Reverse limit: a per-partition tail below the merge instead of a group limit (the last

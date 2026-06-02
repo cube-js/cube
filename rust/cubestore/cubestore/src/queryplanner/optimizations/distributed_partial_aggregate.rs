@@ -13,7 +13,7 @@ use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
 use datafusion::physical_optimizer::PhysicalOptimizerRule as _;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
-use datafusion::physical_plan::limit::GlobalLimitExec;
+use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
@@ -147,9 +147,7 @@ pub fn push_sorted_partial_aggregate_below_merge(
     };
     if *agg.mode() != AggregateMode::Partial
         || !matches!(agg.input_order_mode(), InputOrderMode::Sorted)
-        // Restrict to aggregates convertible to InlineAggregateExec: `add_limit_to_workers`
-        // relies on every merge-above-partial-aggregate pair being an InlineAggregateExec to
-        // apply row limits without truncating duplicate group keys.
+        // Restrict to aggregates convertible to InlineAggregateExec (no grouping sets)
         || !agg.group_expr().is_single()
     {
         return Ok(p);
@@ -296,52 +294,20 @@ pub fn add_limit_to_workers(
         return Ok(p);
     };
 
-    // The merged per-partition partial aggregate stream may contain duplicate group keys from
-    // different partitions, and a row limit above the merge could cut off part of some group's
-    // partial states, silently corrupting that group's total. Apply the limit per partition
-    // instead, below the merge: within a partition the aggregate emits unique group keys, so
-    // `limit` rows there are `limit` complete groups, and the union of per-partition first
-    // (last, for reverse) `limit` groups covers the global first (last) `limit` groups. Groups
-    // beyond that may arrive with partial totals, but the router orders by the group key, not
-    // by the totals, and its own limit drops them.
-    if let Some(merge) = input.as_any().downcast_ref::<SortPreservingMergeExec>() {
-        if let Some(agg) = merge.input().as_any().downcast_ref::<InlineAggregateExec>() {
-            if *agg.mode() == InlineAggregateMode::Partial {
-                let new_input: Arc<dyn ExecutionPlan> = if reverse {
-                    // The last groups are unknown until a partition is exhausted, so the
-                    // aggregate can't stop early; a per-partition tail keeps the merge input
-                    // and the tail window at `limit` rows per partition.
-                    let tail = Arc::new(TailLimitExec::new(merge.input().clone(), limit));
-                    Arc::new(SortPreservingMergeExec::new(merge.expr().clone(), tail))
-                } else {
-                    let partitions = agg.properties().output_partitioning().partition_count();
-                    let agg_limit = agg.limit().map_or(limit, |l| l.min(limit));
-                    let new_agg = Arc::new(agg.with_limit(Some(agg_limit)));
-                    Arc::new(
-                        SortPreservingMergeExec::new(merge.expr().clone(), new_agg)
-                            .with_fetch(Some(limit.saturating_mul(partitions))),
-                    )
-                };
-                return p.with_new_children(vec![new_input]);
-            }
-        }
+    // A row limit must not be placed above a merge of per-partition aggregates: the merged
+    // stream carries duplicate group keys from different partitions, and cutting it by rows
+    // could cut off part of some group's partial states, silently corrupting that group's
+    // total. Instead the limit descends through the merges and lands directly above the first
+    // aggregate, where one row is one complete (within its partition) group: the union of
+    // per-partition first (last, for reverse) `limit` groups covers the global first (last)
+    // `limit` groups, and groups beyond that arrive complete or not at all -- the router
+    // orders by the group key, not by the totals, and its own limit drops them.
+    if first_aggregate_below_merges(input).is_some() {
+        let new_input = limit_above_first_aggregate(input, limit, reverse);
+        return p.with_new_children(vec![new_input]);
     }
 
-    // A single-partition sorted partial aggregate emits one row per group, so a row limit is
-    // exact; pass it into the aggregate so it can stop reading its input early.
-    if !reverse {
-        if let Some(agg) = input.as_any().downcast_ref::<InlineAggregateExec>() {
-            if *agg.mode() == InlineAggregateMode::Partial
-                && agg.properties().output_partitioning().partition_count() == 1
-            {
-                let agg_limit = agg.limit().map_or(limit, |l| l.min(limit));
-                let new_agg = Arc::new(agg.with_limit(Some(agg_limit)));
-                let limit_node = Arc::new(GlobalLimitExec::new(new_agg, 0, Some(limit)));
-                return p.with_new_children(vec![limit_node]);
-            }
-        }
-    }
-
+    // No aggregation: plain rows, each one self-contained, a row limit is exact anywhere.
     if reverse {
         let limit = Arc::new(TailLimitExec::new(input.clone(), limit));
         p.with_new_children(vec![limit])
@@ -349,6 +315,55 @@ pub fn add_limit_to_workers(
         let limit = Arc::new(GlobalLimitExec::new(input.clone(), 0, Some(limit)));
         let limit_optimized = LimitPushdown::new().optimize(limit, config)?;
         p.with_new_children(vec![limit_optimized])
+    }
+}
+
+/// The first aggregate reachable from `p` looking only through sort preserving merges.
+fn first_aggregate_below_merges(mut p: &Arc<dyn ExecutionPlan>) -> Option<&Arc<dyn ExecutionPlan>> {
+    loop {
+        if let Some(merge) = p.as_any().downcast_ref::<SortPreservingMergeExec>() {
+            p = merge.input();
+        } else if p.as_any().is::<InlineAggregateExec>() || p.as_any().is::<AggregateExec>() {
+            return Some(p);
+        } else {
+            return None;
+        }
+    }
+}
+
+/// Rebuilds the chain of merges with a per-partition row limit placed directly above the first
+/// aggregate. Must only be called when [first_aggregate_below_merges] found one.
+fn limit_above_first_aggregate(
+    p: &Arc<dyn ExecutionPlan>,
+    limit: usize,
+    reverse: bool,
+) -> Arc<dyn ExecutionPlan> {
+    if let Some(merge) = p.as_any().downcast_ref::<SortPreservingMergeExec>() {
+        let child = limit_above_first_aggregate(merge.input(), limit, reverse);
+        return Arc::new(
+            SortPreservingMergeExec::new(merge.expr().clone(), child).with_fetch(merge.fetch()),
+        );
+    }
+
+    // The sorted streaming aggregate can additionally stop reading its input early once it has
+    // emitted `limit` groups; for reverse the last groups are unknown until the input ends, so
+    // there is nothing to pass into the aggregate.
+    let mut node = p.clone();
+    if !reverse {
+        if let Some(agg) = p.as_any().downcast_ref::<InlineAggregateExec>() {
+            if *agg.mode() == InlineAggregateMode::Partial {
+                let agg_limit = agg.limit().map_or(limit, |l| l.min(limit));
+                node = Arc::new(agg.with_limit(Some(agg_limit)));
+            }
+        }
+    }
+
+    if reverse {
+        Arc::new(TailLimitExec::new(node, limit))
+    } else if node.output_partitioning().partition_count() == 1 {
+        Arc::new(GlobalLimitExec::new(node, 0, Some(limit)))
+    } else {
+        Arc::new(LocalLimitExec::new(node, limit))
     }
 }
 
@@ -811,17 +826,69 @@ mod tests {
             .as_any()
             .downcast_ref::<SortPreservingMergeExec>()
             .expect("merge must stay on top of per-partition aggregates");
-        assert_eq!(
-            merge.fetch(),
-            Some(6),
-            "row budget must be limit * partitions"
-        );
-        let agg = merge
+        assert_eq!(merge.fetch(), None);
+        let local_limit = merge
+            .input()
+            .as_any()
+            .downcast_ref::<LocalLimitExec>()
+            .expect("the limit must become a per-partition row limit above the aggregate");
+        assert_eq!(local_limit.fetch(), 3);
+        let agg = local_limit
             .input()
             .as_any()
             .downcast_ref::<InlineAggregateExec>()
             .unwrap();
         assert_eq!(agg.limit(), Some(3));
+    }
+
+    /// The limit descends below the merge even for an aggregate that is not an
+    /// InlineAggregateExec: only the early-stop absorption is specific to it, the row limit
+    /// placement is not.
+    #[test]
+    fn worker_limit_above_merged_raw_partial_aggregate_stays_below_merge() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = sum_aggregate(AggregateMode::Partial, "k", source);
+        let merged = merge_by_k(agg);
+        let p = worker(merged, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker_node = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let merge = worker_node
+            .input
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .unwrap();
+        assert_eq!(merge.fetch(), None);
+        let local_limit = merge
+            .input()
+            .as_any()
+            .downcast_ref::<LocalLimitExec>()
+            .expect("a row limit above the merge would truncate duplicate group keys");
+        assert_eq!(local_limit.fetch(), 3);
+        assert!(local_limit.input().as_any().is::<AggregateExec>());
+
+        let merged = merge_by_k(sum_aggregate(
+            AggregateMode::Partial,
+            "k",
+            two_partition_source(&schema),
+        ));
+        let p = worker(merged, Some((3, true)));
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+        let worker_node = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let merge = worker_node
+            .input
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .unwrap();
+        let tail = merge
+            .input()
+            .as_any()
+            .downcast_ref::<TailLimitExec>()
+            .unwrap();
+        assert_eq!(tail.limit, 3);
+        assert!(tail.input.as_any().is::<AggregateExec>());
     }
 
     #[tokio::test(flavor = "multi_thread")]
