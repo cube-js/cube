@@ -347,12 +347,24 @@ impl PreAggregationsCompiler {
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
 
         let static_data = description.static_data();
+        // A rollupLambda is left without an `external` default in the data model;
+        // its storage is whatever its member rollups use. The union is rendered as a
+        // single query, so it is external only when every member rollup is — then the
+        // read renders with the right dialect (e.g. CubeStore `?` placeholders).
+        let external = if pre_aggrs_for_lambda
+            .iter()
+            .all(|p| p.external == Some(true))
+        {
+            Some(true)
+        } else {
+            static_data.external
+        };
         let res = Rc::new(CompiledPreAggregation {
             name: static_data.name.clone(),
             cube_name: name.cube_name.clone(),
             source: Rc::new(source),
             granularity,
-            external: static_data.external,
+            external,
             measures,
             dimensions,
             time_dimensions,

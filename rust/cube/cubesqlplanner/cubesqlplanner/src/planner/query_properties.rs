@@ -186,11 +186,15 @@ pub struct QueryProperties {
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
         if qp.order_by.is_none() {
-            qp.order_by = Some(QueryProperties::default_order(
-                &qp.dimensions,
-                &qp.time_dimensions,
-                &qp.measures,
-            ));
+            // Pre-aggregation build and total queries get no default order:
+            // it is pointless for materialization and breaks streaming
+            // pre-aggregations, whose target only accepts an unsorted
+            // projection/filter over the source.
+            qp.order_by = Some(if qp.pre_aggregation_query || qp.total_query {
+                vec![]
+            } else {
+                QueryProperties::default_order(&qp.dimensions, &qp.time_dimensions, &qp.measures)
+            });
         }
         qp.apply_static_filters()?;
         Ok(Rc::new(qp))

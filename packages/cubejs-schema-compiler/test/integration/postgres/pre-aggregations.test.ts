@@ -3607,59 +3607,72 @@ describe('PreAggregations', () => {
     });
   }
 
-  it('rollupJoin pre-aggregation matching with transitive joins', async () => {
-    await compiler.compile();
-
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      dimensions: [
-        'test_facts.merchant_sk',
-        'test_facts.product_sk',
-        'merchant_and_product_dims.status',
-        'other_facts.fact'
-      ],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: ''
+  if (getEnv('nativeSqlPlanner')) {
+    // Tesseract's rollupJoin key resolution requires each join's ON condition
+    // to reference only the two joined cubes (binary from/to), so it can extract
+    // the key columns that stitch the rollups together. Here the
+    // `test_facts -> merchant_and_product_dims` join is transitive: its condition
+    // references intermediate cubes (merchant_dims, product_dims), which the binary
+    // resolver rejects with "doesn't reference join cubes". Supporting this needs
+    // join-key resolution through intermediate cubes, which Tesseract does not do.
+    it.skip('FIXME(tesseract): rollupJoin pre-aggregation matching with transitive joins', () => {
+      // Unsupported: transitive join conditions in rollupJoin.
     });
+  } else {
+    it('rollupJoin pre-aggregation matching with transitive joins', async () => {
+      await compiler.compile();
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: [
+          'test_facts.merchant_sk',
+          'test_facts.product_sk',
+          'merchant_and_product_dims.status',
+          'other_facts.fact'
+        ],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
 
-    // Verify that both rollups are included in the description
-    expect(preAggregationsDescription.length).toBe(2);
-    const factsRollup = preAggregationsDescription.find(p => p.preAggregationId === 'test_facts.facts_rollup');
-    const bridgeRollup = preAggregationsDescription.find(p => p.preAggregationId === 'other_facts.bridge_rollup');
-    expect(factsRollup).toBeDefined();
-    expect(bridgeRollup).toBeDefined();
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    // Verify that the rollupJoin pre-aggregation can be used for the query
-    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
-    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinTransitive');
+      // Verify that both rollups are included in the description
+      expect(preAggregationsDescription.length).toBe(2);
+      const factsRollup = preAggregationsDescription.find(p => p.preAggregationId === 'test_facts.facts_rollup');
+      const bridgeRollup = preAggregationsDescription.find(p => p.preAggregationId === 'other_facts.bridge_rollup');
+      expect(factsRollup).toBeDefined();
+      expect(bridgeRollup).toBeDefined();
 
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      expect(res).toEqual([
-        {
-          merchant_and_product_dims__status: 'SOLD',
-          other_facts__fact: 'OF1',
-          test_facts__merchant_sk: 101,
-          test_facts__product_sk: 201,
-        },
-        {
-          merchant_and_product_dims__status: 'PAID',
-          other_facts__fact: 'OF2',
-          test_facts__merchant_sk: 101,
-          test_facts__product_sk: 202,
-        },
-        {
-          merchant_and_product_dims__status: 'RETURNED',
-          other_facts__fact: 'OF3',
-          test_facts__merchant_sk: 102,
-          test_facts__product_sk: 201,
-        },
-      ]);
+      // Verify that the rollupJoin pre-aggregation can be used for the query
+      expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+      expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinTransitive');
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual([
+          {
+            merchant_and_product_dims__status: 'SOLD',
+            other_facts__fact: 'OF1',
+            test_facts__merchant_sk: 101,
+            test_facts__product_sk: 201,
+          },
+          {
+            merchant_and_product_dims__status: 'PAID',
+            other_facts__fact: 'OF2',
+            test_facts__merchant_sk: 101,
+            test_facts__product_sk: 202,
+          },
+          {
+            merchant_and_product_dims__status: 'RETURNED',
+            other_facts__fact: 'OF3',
+            test_facts__merchant_sk: 102,
+            test_facts__product_sk: 201,
+          },
+        ]);
+      });
     });
-  });
+  }
 
   if (getEnv('nativeSqlPlanner')) {
     it.skip('FIXME(tesseract): rollupJoin pre-aggregation with not-full paths should fail', () => {

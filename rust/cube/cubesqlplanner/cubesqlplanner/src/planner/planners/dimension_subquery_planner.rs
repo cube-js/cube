@@ -125,6 +125,10 @@ impl DimensionSubqueryPlanner {
             .dimensions(primary_keys_dimensions.clone())
             .time_dimensions_filters(time_dimensions_filters)
             .dimensions_filters(dimensions_filters)
+            // Aggregated per primary key and joined back by it — order is
+            // meaningless and a default one breaks targets that require
+            // OFFSET/FETCH (e.g. MSSQL) when this subquery sits in a derived table.
+            .order_by(Some(vec![]))
             .ignore_cumulative(true)
             .disable_external_pre_aggregations(
                 self.query_properties.disable_external_pre_aggregations(),

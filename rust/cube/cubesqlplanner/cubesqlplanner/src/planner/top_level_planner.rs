@@ -55,6 +55,7 @@ impl TopLevelPlanner {
             optimized_plan,
             original_sql_pre_aggregations,
             self.request.is_total_query(),
+            self.request.is_pre_aggregation_query(),
         )?;
 
         let sql = physical_plan.to_sql(&templates)?;

@@ -479,6 +479,7 @@ jobs:
           (!contains(env.CLOUD_DATABASES, matrix.db))
         env:
           CUBEJS_TESSERACT_SQL_PLANNER: ${{ matrix.use_tesseract_sql_planner }}
+          CUBEJS_TESSERACT_PRE_AGGREGATIONS: ${{ matrix.use_tesseract_sql_planner }}
 
           # Firebolt Integration
           DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME }}
@@ -586,6 +587,7 @@ jobs:
         timeout-minutes: 30
         env:
           CUBEJS_TESSERACT_SQL_PLANNER: ${{ matrix.use_tesseract_sql_planner }}
+          CUBEJS_TESSERACT_PRE_AGGREGATIONS: ${{ matrix.use_tesseract_sql_planner }}
         run: ./.github/actions/smoke.sh
 
   docker-image-latest-set-tag:
