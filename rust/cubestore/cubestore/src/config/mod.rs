@@ -408,6 +408,10 @@ pub trait ConfigObj: DIService {
 
     fn query_timeout(&self) -> u64;
 
+    /// Maximum number of rows a single query plan node may materialize in memory. Zero means no
+    /// limit.
+    fn materialized_rows_limit(&self) -> usize;
+
     fn not_used_timeout(&self) -> u64;
 
     fn in_memory_not_used_timeout(&self) -> u64;
@@ -594,6 +598,7 @@ pub struct ConfigObjImpl {
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
+    pub materialized_rows_limit: usize,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
     pub in_memory_not_used_timeout: u64,
@@ -769,6 +774,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn query_timeout(&self) -> u64 {
         self.query_timeout
+    }
+
+    fn materialized_rows_limit(&self) -> usize {
+        self.materialized_rows_limit
     }
 
     fn not_used_timeout(&self) -> u64 {
@@ -1391,6 +1400,7 @@ impl Config {
                     format!("0.0.0.0:{}", env_parse("CUBESTORE_HTTP_PORT", 3030)),
                 )),
                 query_timeout,
+                materialized_rows_limit: env_parse("CUBESTORE_MATERIALIZED_ROWS_LIMIT", 500_000),
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
@@ -1708,6 +1718,7 @@ impl Config {
                 status_bind_address: None,
                 http_bind_address: None,
                 query_timeout,
+                materialized_rows_limit: 500_000,
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
@@ -2437,6 +2448,7 @@ impl Config {
                         .await
                         .cache_factory()
                         .clone(),
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                 )

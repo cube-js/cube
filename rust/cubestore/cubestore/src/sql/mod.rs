@@ -2745,6 +2745,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn materialized_rows_limit() -> Result<(), CubeError> {
+        Config::test("materialized_rows_limit")
+            .update_config(|mut c| {
+                c.materialized_rows_limit = 4;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+                let _ = service
+                    .exec_query("CREATE TABLE foo.values (id int)")
+                    .await?
+                    .collect()
+                    .await?;
+                let _ = service
+                    .exec_query("INSERT INTO foo.values (id) VALUES (1), (2), (3), (4), (5), (6)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let result = service
+                    .exec_query("SELECT id FROM foo.values WHERE id <= 3")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(result.get_rows().len(), 3);
+
+                let res = async {
+                    service
+                        .exec_query("SELECT id FROM foo.values")
+                        .await?
+                        .collect()
+                        .await
+                }
+                .await;
+                let err = res.expect_err("query must exceed the materialized rows limit");
+                assert!(err.to_string().contains("pre-aggregation"), "{}", err);
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn int96_read() -> Result<(), CubeError> {
         // Copy pre-DF store.
         let fixtures_path = env::current_dir()

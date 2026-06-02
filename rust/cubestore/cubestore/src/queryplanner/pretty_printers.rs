@@ -29,6 +29,7 @@ use std::sync::Arc;
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
+use crate::queryplanner::materialized_rows_limit::MaterializedRowsLimitExec;
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
@@ -63,6 +64,7 @@ pub struct PPOptions {
     // Applies only to physical plan.
     pub show_output_hints: bool,
     pub show_check_memory_nodes: bool,
+    pub show_materialized_rows_limit_nodes: bool,
     pub show_partitions: bool,
     pub show_metrics: bool,
     pub traverse_past_clustersend: bool,
@@ -78,6 +80,7 @@ impl PPOptions {
             show_schema: true,
             show_output_hints: true,
             show_check_memory_nodes: true,
+            show_materialized_rows_limit_nodes: true,
             show_partitions: true,
             show_metrics: false, // yeah.  Is useful only after plan is evaluated, so defaults to false.
             traverse_past_clustersend: false,
@@ -97,6 +100,7 @@ impl PPOptions {
             show_schema: false,
             show_output_hints: false,
             show_check_memory_nodes: false,
+            show_materialized_rows_limit_nodes: false,
             show_partitions: false,
             show_metrics: false,
         }
@@ -526,8 +530,10 @@ fn pp_append_sort_by(out: &mut String, ordering: &LexOrdering) {
 }
 
 fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
-    if p.as_any().is::<CheckMemoryExec>() && !o.show_check_memory_nodes {
-        //We don't show CheckMemoryExec in plan by default
+    if (p.as_any().is::<CheckMemoryExec>() && !o.show_check_memory_nodes)
+        || (p.as_any().is::<MaterializedRowsLimitExec>() && !o.show_materialized_rows_limit_nodes)
+    {
+        //We don't show CheckMemoryExec and MaterializedRowsLimitExec in plan by default
         if let Some(child) = p.children().first() {
             pp_phys_plan_indented(child.as_ref(), indent, o, out)
         }
