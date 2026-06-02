@@ -64,6 +64,17 @@ export type MultiStageGrainDirective = {
   includeReferences?: string[];
 };
 
+export type LinkDefinition = {
+  name: string;
+  label: string;
+  url?: (...args: any[]) => string;
+  dashboard?: string;
+  icon?: string;
+  target?: 'blank' | 'self';
+  primary?: boolean;
+  params?: Array<{ key: string; value: (...args: any[]) => string }>;
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -78,6 +89,7 @@ export type DimensionDefinition = {
   addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
   addGroupByReferences?: string[];
   filter?: MultiStageFilterDirective;
+  links?: LinkDefinition[];
 };
 
 export type TimeShiftDefinition = {

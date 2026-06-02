@@ -311,6 +311,36 @@ const MaskSchema = Joi.alternatives([
   Joi.string(),
 ]);
 
+const LinkItemSchema = Joi.object().keys({
+  name: identifier.required(),
+  label: Joi.string().required(),
+  url: Joi.func(),
+  dashboard: Joi.string(),
+  icon: Joi.string(),
+  target: Joi.string().valid('blank', 'self'),
+  primary: Joi.boolean().strict(),
+  params: Joi.array().items(Joi.object().keys({
+    key: Joi.string().required(),
+    value: Joi.func().required(),
+  })),
+}).oxor('url', 'dashboard');
+
+const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
+  const names = value.map((link: any) => (typeof link.name === 'function' ? link.name() : link.name));
+  const seen = new Set<string>();
+  for (const name of names) {
+    if (seen.has(name)) {
+      return helpers.error('any.custom', { message: `Duplicate link name '${name}'` });
+    }
+    seen.add(name);
+  }
+  const primaryCount = value.filter((link: any) => link.primary === true).length;
+  if (primaryCount > 1) {
+    return helpers.error('any.custom', { message: 'Only one link can be marked as primary' });
+  }
+  return value;
+});
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -323,6 +353,7 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
+  links: LinksSchema,
   mask: MaskSchema,
   format: Joi.when('type', {
     switch: [
