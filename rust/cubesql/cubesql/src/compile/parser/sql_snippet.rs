@@ -77,8 +77,8 @@ pub(crate) fn render_query_snippet(sql: &str, span: Span) -> Option<String> {
     // - multi-line span: underline from start column to the end of the line
     // - point location (start == end): a single caret
     let caret_width = if end.line == start.line && end.column >= start.column {
-        let end_col = end.column.min(error_line_len.max(start_col));
-        ((end_col - start.column) + 1) as usize
+        let end_col = end.column.min(error_line_len + 1).max(start_col);
+        ((end_col - start_col) + 1) as usize
     } else if end.line > start.line {
         ((error_line_len + 1).saturating_sub(start_col)).max(1) as usize
     } else {
