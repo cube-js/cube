@@ -254,6 +254,15 @@ impl PreAggregationOptimizer {
             return Ok(None);
         }
 
+        // Multi-stage rewrite is only safe when the outer source is a
+        // FullKeyAggregate: it references its dependent CTEs by name, so once
+        // each multistage member has been rewritten the outer SELECT contains
+        // no raw cube references. A LogicalJoin source would carry raw
+        // `cube.table` identifiers into the rewritten plan; combined with
+        // `is_external` becoming true (multi-stage pre-agg usages collected),
+        // the resulting SQL would be rendered with CubeStore templates and
+        // routed to CubeStore, which has no such table — surfacing as
+        // `Table <cube.table> was not found`.
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
             let result = FullKeyAggregate::builder()
                 .schema(full_key_aggregate.schema().clone())
@@ -262,7 +271,9 @@ impl PreAggregationOptimizer {
                 .build();
             Rc::new(result).into()
         } else {
-            query.source().clone()
+            self.usages.truncate(saved_usages_len);
+            self.usage_counter = saved_counter;
+            return Ok(None);
         };
 
         // Reject mixed external/non-external pre-aggregation usages
