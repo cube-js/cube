@@ -90,6 +90,10 @@ export class SnowflakeQuery extends BaseQuery {
     return 'CURRENT_TIMESTAMP';
   }
 
+  public unixTimestampSql() {
+    return `DATE_PART('EPOCH_SECOND', ${this.nowTimestampSql()})`;
+  }
+
   public hllInit(sql) {
     return `HLL_EXPORT(HLL_ACCUMULATE(${sql}))`;
   }
