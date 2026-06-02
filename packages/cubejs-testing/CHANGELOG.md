@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.53](https://github.com/cube-js/cube/compare/v1.6.52...v1.6.53) (2026-06-02)
+
+### Features
+
+- Links in the data model ([#10852](https://github.com/cube-js/cube/issues/10852)) ([34fa717](https://github.com/cube-js/cube/commit/34fa717591e7949a1440c0602bb0e36a1bde4ae3))
+
 ## [1.6.52](https://github.com/cube-js/cube/compare/v1.6.51...v1.6.52) (2026-05-29)
 
 ### Features
