@@ -27,8 +27,9 @@ You can use OIDC workload identity to authenticate to:
   unloads. OIDC covers Cube's download of the unloaded objects; the warehouse's
   `UNLOAD` write still needs its own credentials configured on the client side
   — see the per-cloud guides for details.
-- **Cube Store CSPS** — a per-deployment S3 / GCS bucket that holds your
-  Cube Store pre-aggregations (Customer-Supplied Pre-aggregation Storage).
+- **Cube Store CSPS** — a per-deployment S3, GCS, or Azure Blob Storage
+  bucket that holds your Cube Store pre-aggregations (Customer-Supplied
+  Pre-aggregation Storage).
 - **Bring-your-own LLM providers** — AWS Bedrock, Google Vertex AI, and Azure
   OpenAI behind your own cloud account.
 - **Other cloud services** — any cloud service that supports OIDC federation
@@ -283,17 +284,20 @@ deployment's default role is simpler and easier to reason about.
 
 ## Cube Store CSPS
 
-Cube Store can store its pre-aggregations in a **per-deployment** S3 or GCS
-bucket that you own — Customer-Supplied Pre-aggregation Storage (CSPS). When
-you enable CSPS for a deployment, Cube Store authenticates to your bucket
-with the same OIDC machinery as the rest of the deployment. The trust policy
-on your IAM role pins the `sub` claim to `cube:deployment:<deployment-id>:component:cube_store`,
+Cube Store can store its pre-aggregations in a **per-deployment** S3, GCS, or
+Azure Blob Storage bucket that you own — Customer-Supplied Pre-aggregation
+Storage (CSPS). When you enable CSPS for a deployment, Cube Store
+authenticates to your bucket with the same OIDC machinery as the rest of the
+deployment. The trust policy (AWS IAM role / Azure federated credential) pins
+the `sub` claim to `cube:deployment:<deployment-id>:component:cube_store`,
 giving Cube Store its own identity that's distinct from the Cube API.
 
 CSPS is configured under **Settings → Pre-Aggregation Storage** on the
 deployment. See
-[AWS](/admin/deployment/oidc/aws#cube-store-csps-bucket) and
-[GCP](/admin/deployment/oidc/gcp) for the trust policy shape on each cloud.
+[AWS](/admin/deployment/oidc/aws#cube-store-csps-bucket),
+[GCP](/admin/deployment/oidc/gcp), and
+[Azure](/admin/deployment/oidc/azure#azure-blob-storage-csps-bucket) for the
+trust policy shape on each cloud.
 
 ## Audit trail
 

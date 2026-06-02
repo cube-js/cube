@@ -246,6 +246,79 @@ unloaded objects from the bucket.
 
 </Warning>
 
+## Azure Blob Storage CSPS bucket
+
+Cube Store CSPS lets you store pre-aggregations in your own Azure Blob
+Storage container. Cube Store gets a separate OIDC token whose `sub` claim
+ends in `component:cube_store`, so the federated credential can be locked
+down to that component — even if the same app registration were shared with
+the rest of the deployment, only Cube Store would match.
+
+Every Cube Store worker emits a `sub` of the form
+`cube:deployment:<deployment-id>:component:cube_store`. Unlike AWS IAM —
+which matches `sub` with a `StringLike` wildcard, so one role can cover the
+whole tenant — **Azure pins the federated credential's `subject` literally**
+and has no tenant-wide `*`. So CSPS on Azure is **per deployment**: each
+deployment that writes pre-aggregations to the container needs its own
+federated credential carrying that deployment's exact `sub`. If you expect
+many deployments, mind the 20-credential limit and see [Scaling past 20
+federated credentials](#scaling-past-20-federated-credentials).
+
+<Steps>
+  <Step title="Create the Cube Store federated credential">
+    Add a federated credential on the app registration, pinning the subject
+    to the deployment's Cube Store component:
+
+    ```bash
+    az ad app federated-credential create \
+      --id <APP_OBJECT_ID> \
+      --parameters '{
+        "name": "cube-<tenant-name>-deployment-<deployment-id>-cube-store",
+        "issuer": "https://<tenant-name>.cubecloud.dev",
+        "subject": "cube:deployment:<deployment-id>:component:cube_store",
+        "audiences": ["api://AzureADTokenExchange"]
+      }'
+    ```
+
+    Make sure the Azure token config's **Subject Claim Format** includes the
+    `:component:` segment
+    (`cube:deployment:{deployment_id}:component:{component}`) — see
+    [Step 2](#step-2-add-a-federated-credential) — otherwise the Cube Store
+    `sub` won't match this credential.
+  </Step>
+  <Step title="Grant the container permissions">
+    Grant the app registration **Storage Blob Data Contributor** so Cube
+    Store can read, write, and list pre-aggregation blobs. Scope it to the
+    container for tightest isolation:
+
+    ```bash
+    az role assignment create \
+      --assignee <APP_CLIENT_ID> \
+      --role "Storage Blob Data Contributor" \
+      --scope "/subscriptions/<SUB_ID>/resourceGroups/<RG>/providers/Microsoft.Storage/storageAccounts/<ACCOUNT>/blobServices/default/containers/<container>"
+    ```
+
+    Use the storage account scope (drop the
+    `/blobServices/default/containers/<container>` suffix) if you'd rather
+    one assignment cover multiple containers.
+  </Step>
+  <Step title="Enable CSPS on each deployment">
+    For each deployment that should use this container, go to **Settings →
+    Pre-Aggregation Storage** on the deployment and:
+
+    - Toggle **Enable CSPS** on.
+    - **Storage Provider**: Azure Blob Storage.
+    - **Storage Account**: `<account>`.
+    - **Container**: `<container>`.
+    - **Client ID**: the app registration's Application (client) ID.
+    - **Tenant ID**: the Microsoft Entra ID (Azure AD) directory ID.
+
+    Click **Test Connection** to verify Cube Store can exchange its OIDC
+    token with Azure AD and access the container, then **Apply**. Cube Store
+    starts writing pre-aggregations to your container on the next refresh.
+  </Step>
+</Steps>
+
 ## Scaling past 20 federated credentials
 
 A single app registration accepts at most **20 federated credentials**.
