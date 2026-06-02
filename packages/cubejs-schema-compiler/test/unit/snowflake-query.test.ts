@@ -35,7 +35,7 @@ describe('SnowflakeQuery', () => {
       { measures: ['visitors.count'] }
     );
 
-    expect(query.unixTimestampSql()).toEqual("DATE_PART('EPOCH_SECOND', CURRENT_TIMESTAMP)");
+    expect(query.unixTimestampSql()).toEqual('DATE_PART(\'EPOCH_SECOND\', CURRENT_TIMESTAMP)');
   }));
 
   it('uses the Snowflake unix timestamp in everyRefreshKeySql', () => compiler.compile().then(() => {
