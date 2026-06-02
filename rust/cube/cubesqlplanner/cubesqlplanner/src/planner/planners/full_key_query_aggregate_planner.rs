@@ -48,7 +48,7 @@ impl FullKeyAggregateQueryPlanner {
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_measures(self.query_properties.measures_for_render()?)
+            .set_measures(self.query_properties.select_measures()?)
             .into_rc();
 
         let logical_filter = Rc::new(LogicalFilter {

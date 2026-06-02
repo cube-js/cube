@@ -92,14 +92,20 @@ impl MultipliedMeasure {
 
 /// Measures classified by how the planner must compute them: directly
 /// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE. Measures sitting under a
-/// row-multiplying join already carry their distinct render form
-/// (`MultipliedCount`), so no separate tracking is needed.
+/// subquery, or planned as a multi-stage CTE.
+///
+/// `render_forms` maps a selected measure's full name to a copy with
+/// every multiplied `count` (the measure itself or one nested in a
+/// calculated expression) rewritten to its distinct `MultipliedCount`
+/// form. Built during the single classification pass; consumed by
+/// [`QueryProperties::select_measures`]. Only measures that actually
+/// need rewriting get an entry.
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<MemberSymbol>>,
     pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
+    pub render_forms: HashMap<String, Rc<MemberSymbol>>,
 }
 
 /// The full description of a query: selected members, filters, ordering,
@@ -484,20 +490,30 @@ impl QueryProperties {
                         continue;
                     }
                     let measure = item.measure.as_measure().ok();
-                    match measure
+                    // The leaf's render form (a distinct `MultipliedCount`
+                    // for a count) — the same symbol whether it stays in the
+                    // main query or moves to a multiplied subquery.
+                    let rendered = match measure
                         .as_ref()
                         .and_then(|m| m.convert_multiplied_to_regular())
                     {
-                        Some(regular) => result.regular_measures.push(regular),
+                        Some(regular) => {
+                            result.regular_measures.push(regular.clone());
+                            regular
+                        }
                         None => {
                             let rendered = measure
                                 .map(|m| m.into_multiplied())
                                 .unwrap_or_else(|| item.measure.clone());
                             result
                                 .multiplied_measures
-                                .push(MultipliedMeasure::new(rendered, item.cube_name));
+                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_name));
+                            rendered
                         }
-                    }
+                    };
+                    result
+                        .render_forms
+                        .insert(item.measure.full_name(), rendered);
                 }
             }
         }
@@ -520,31 +536,24 @@ impl QueryProperties {
         Ok(result)
     }
 
-    /// The query's selected measures in render form: each measure that
-    /// sits under a row-multiplying join is replaced by its distinct
-    /// `MultipliedCount` form, so it renders correctly without any
-    /// out-of-band "multiplied" flag. Multi-stage and composite measures
-    /// are returned unchanged — their parts are converted where they are
-    /// actually rendered.
-    pub fn measures_for_render(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let classified = self.full_key_aggregate_measures()?;
-        let mut render_form: HashMap<String, Rc<MemberSymbol>> = HashMap::new();
-        for m in classified.regular_measures.iter() {
-            render_form.insert(m.full_name(), m.clone());
-        }
-        for m in classified.multiplied_measures.iter() {
-            render_form.insert(m.measure().full_name(), m.measure().clone());
-        }
-        Ok(self
-            .measures
+    /// The query's selected measures with every multiplied `count`
+    /// rewritten to its distinct `MultipliedCount` form — the measure
+    /// itself or any nested inside a calculated expression. Substitutes
+    /// the per-leaf render forms computed in the classification pass into
+    /// each measure's dependency tree; leaves with no rewrite stay as-is.
+    pub fn select_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let forms = self.full_key_aggregate_measures()?.render_forms;
+        self.measures
             .iter()
             .map(|m| {
-                render_form
-                    .get(&m.full_name())
-                    .cloned()
-                    .unwrap_or_else(|| m.clone())
+                m.apply_recursive(&|node| {
+                    Ok(forms
+                        .get(&node.full_name())
+                        .cloned()
+                        .unwrap_or_else(|| node.clone()))
+                })
             })
-            .collect())
+            .collect()
     }
 
     fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
