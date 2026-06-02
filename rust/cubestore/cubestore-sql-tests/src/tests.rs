@@ -7629,6 +7629,14 @@ async fn group_by_prefix_limit_high_cardinality(
         .await?;
     assert_eq!(to_rows(&r), expected(0..5000));
 
+    // DESC takes the last groups (per-partition tail path)
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 DESC LIMIT 10", query))
+        .await?;
+    let mut expected_tail = expected(7490..7500);
+    expected_tail.reverse();
+    assert_eq!(to_rows(&r), expected_tail);
+
     // No limit: all the groups
     let r = service.exec_query(&format!("{} ORDER BY 1", query)).await?;
     assert_eq!(to_rows(&r), expected(0..7500));
@@ -7689,6 +7697,32 @@ async fn planning_aggregate_below_merge_with_limit(
         \n            Scan, index: default:1:[1]:sort_on[a, b], fields: *\
         \n              Sort\
         \n                Empty"
+    );
+
+    // Reverse limit: a per-partition tail below the merge instead of a group limit (the last
+    // groups are unknown until the input ends, so the aggregate can't stop early)
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 5",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Sort, fetch: 5\
+        \n  InlineFinalAggregate\
+        \n    Worker\
+        \n      MergeSort\
+        \n        TailLimit, n: 5\
+        \n          InlinePartialAggregate\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty"
     );
     Ok(())
 }

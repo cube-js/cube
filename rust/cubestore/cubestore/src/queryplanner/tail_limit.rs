@@ -6,21 +6,21 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 use datafusion::execution::TaskContext;
-use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, RecordBatchStream,
     SendableRecordBatchStream,
 };
 use futures::stream::Stream;
-use futures::Future;
+use futures::{Future, StreamExt};
 use pin_project_lite::pin_project;
 use std::any::Any;
+use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-///Return n last rows in input
+/// Returns the last `limit` rows of each input partition.
 #[derive(Debug)]
 pub struct TailLimitExec {
     pub input: Arc<dyn ExecutionPlan>,
@@ -74,19 +74,6 @@ impl ExecutionPlan for TailLimitExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        if 0 != partition {
-            return Err(DataFusionError::Internal(format!(
-                "TailLimitExec invalid partition {}",
-                partition
-            )));
-        }
-
-        if 1 != self.input.properties().partitioning.partition_count() {
-            return Err(DataFusionError::Internal(
-                "TailLimitExec requires a single input partition".to_owned(),
-            ));
-        }
-
         let input = self.input.execute(partition, context)?;
         Ok(Box::pin(TailLimitStream::new(input, self.limit)))
     }
@@ -109,7 +96,7 @@ impl TailLimitStream {
         let schema = input.schema();
         let task = async move {
             let schema = input.schema();
-            let data = collect(input).await?;
+            let data = collect_tail_window(input, n).await?;
             batches_tail(data, n, schema.clone())
         };
         cube_ext::spawn_oneshot_with_catch_unwind(task, tx);
@@ -121,6 +108,26 @@ impl TailLimitStream {
             finished: false,
         }
     }
+}
+
+/// Collects a sliding tail window of the input: keeps only the trailing batches needed to cover
+/// `limit` rows, newer rows displace older ones. The front batch may overshoot the window, it is
+/// sliced later by [batches_tail].
+async fn collect_tail_window(
+    mut input: SendableRecordBatchStream,
+    limit: usize,
+) -> Result<Vec<RecordBatch>, DataFusionError> {
+    let mut window = VecDeque::new();
+    let mut total_rows = 0;
+    while let Some(batch) = input.next().await {
+        let batch = batch?;
+        total_rows += batch.num_rows();
+        window.push_back(batch);
+        while window.len() > 1 && total_rows - window.front().unwrap().num_rows() >= limit {
+            total_rows -= window.pop_front().unwrap().num_rows();
+        }
+    }
+    Ok(window.into())
 }
 
 fn batches_tail(
@@ -291,6 +298,39 @@ mod tests {
         .await
         .unwrap();
         assert!(to_ints(r).into_iter().flatten().collect_vec().is_empty());
+    }
+
+    #[tokio::test]
+    async fn empty_partition() {
+        let partitions = vec![vec![], vec![ints(vec![1, 2])]];
+        let inp = try_make_memory_data_source(&partitions, ints_schema(), None).unwrap();
+        let r = result_collect(
+            Arc::new(TailLimitExec::new(inp, 2)),
+            Arc::new(TaskContext::default()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(to_ints(r).into_iter().flatten().collect_vec(), vec![1, 2]);
+    }
+
+    #[tokio::test]
+    async fn multiple_partitions() {
+        let partitions = vec![
+            vec![ints(vec![1, 2, 3]), ints(vec![4, 5])],
+            vec![ints(vec![10, 20])],
+        ];
+        let inp = try_make_memory_data_source(&partitions, ints_schema(), None).unwrap();
+        let r = result_collect(
+            Arc::new(TailLimitExec::new(inp, 2)),
+            Arc::new(TaskContext::default()),
+        )
+        .await
+        .unwrap();
+        // The last 2 rows of each partition
+        assert_eq!(
+            to_ints(r).into_iter().flatten().collect_vec(),
+            vec![4, 5, 10, 20],
+        );
     }
 
     #[tokio::test]

@@ -297,25 +297,29 @@ pub fn add_limit_to_workers(
     };
 
     // The merged per-partition partial aggregate stream may contain duplicate group keys from
-    // different partitions, and a plain row limit could cut off part of some group's partial
-    // states, silently corrupting that group's total. Limit groups per partition instead, and
-    // widen the row budget to limit * partitions rows: that is guaranteed to cover all rows of
-    // the first (last, for reverse) `limit` complete groups.
+    // different partitions, and a row limit above the merge could cut off part of some group's
+    // partial states, silently corrupting that group's total. Apply the limit per partition
+    // instead, below the merge: within a partition the aggregate emits unique group keys, so
+    // `limit` rows there are `limit` complete groups, and the union of per-partition first
+    // (last, for reverse) `limit` groups covers the global first (last) `limit` groups. Groups
+    // beyond that may arrive with partial totals, but the router orders by the group key, not
+    // by the totals, and its own limit drops them.
     if let Some(merge) = input.as_any().downcast_ref::<SortPreservingMergeExec>() {
         if let Some(agg) = merge.input().as_any().downcast_ref::<InlineAggregateExec>() {
             if *agg.mode() == InlineAggregateMode::Partial {
-                let partitions = agg.properties().output_partitioning().partition_count();
-                let row_budget = limit.saturating_mul(partitions);
                 let new_input: Arc<dyn ExecutionPlan> = if reverse {
-                    // The last groups are unknown until the input is exhausted, so the
-                    // aggregates can't stop early; only widen the row limit.
-                    Arc::new(TailLimitExec::new(input.clone(), row_budget))
+                    // The last groups are unknown until a partition is exhausted, so the
+                    // aggregate can't stop early; a per-partition tail keeps the merge input
+                    // and the tail window at `limit` rows per partition.
+                    let tail = Arc::new(TailLimitExec::new(merge.input().clone(), limit));
+                    Arc::new(SortPreservingMergeExec::new(merge.expr().clone(), tail))
                 } else {
+                    let partitions = agg.properties().output_partitioning().partition_count();
                     let agg_limit = agg.limit().map_or(limit, |l| l.min(limit));
                     let new_agg = Arc::new(agg.with_limit(Some(agg_limit)));
                     Arc::new(
                         SortPreservingMergeExec::new(merge.expr().clone(), new_agg)
-                            .with_fetch(Some(row_budget)),
+                            .with_fetch(Some(limit.saturating_mul(partitions))),
                     )
                 };
                 return p.with_new_children(vec![new_input]);
@@ -636,9 +640,9 @@ mod tests {
 
     /// Collects plan output into per-key sums, combining duplicate keys the way a Final
     /// aggregate would.
-    fn collect_summed(plan: Arc<dyn ExecutionPlan>) -> BTreeMap<i64, i64> {
+    async fn collect_summed(plan: Arc<dyn ExecutionPlan>) -> BTreeMap<i64, i64> {
         let session = SessionContext::new();
-        let batches = futures::executor::block_on(collect(plan, session.task_ctx())).unwrap();
+        let batches = collect(plan, session.task_ctx()).await.unwrap();
         let mut result = BTreeMap::new();
         for batch in batches {
             let keys = batch
@@ -669,8 +673,8 @@ mod tests {
         )
     }
 
-    #[test]
-    fn pushes_sorted_partial_aggregate_below_merge() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn pushes_sorted_partial_aggregate_below_merge() {
         let schema = test_schema();
         let source = two_partition_source(&schema);
         let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
@@ -696,7 +700,10 @@ mod tests {
         assert_eq!(rewritten.schema(), original.schema());
 
         // Cross-partition duplicate keys combine to the same totals as in the original plan
-        assert_eq!(collect_summed(rewritten), collect_summed(original));
+        assert_eq!(
+            collect_summed(rewritten).await,
+            collect_summed(original).await
+        );
     }
 
     #[test]
@@ -817,10 +824,31 @@ mod tests {
         assert_eq!(agg.limit(), Some(3));
     }
 
-    #[test]
-    fn worker_reverse_limit_above_merged_partial_aggregate_widens_tail_limit() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn worker_reverse_limit_above_merged_partial_aggregate_tails_each_partition() {
         let schema = test_schema();
-        let source = two_partition_source(&schema);
+        // Keys 4..=6 are present in both partitions; per-partition tails of 3 groups are
+        // {4, 5, 6} and {7, 8, 9}.
+        let source = sorted_source(
+            &schema,
+            vec![
+                vec![make_batch(
+                    &schema,
+                    &(1..=6).map(|k| (k, k * 10)).collect::<Vec<_>>(),
+                )],
+                vec![make_batch(
+                    &schema,
+                    &(4..=9).map(|k| (k, k * 100 + 1)).collect::<Vec<_>>(),
+                )],
+            ],
+        );
+        let baseline = collect_summed(sum_aggregate(
+            AggregateMode::Partial,
+            "k",
+            merge_by_k(source.clone()),
+        ))
+        .await;
+
         let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
         let merged = push_sorted_partial_aggregate_below_merge_shape(agg);
         let p = worker(merged, Some((3, true)));
@@ -828,20 +856,20 @@ mod tests {
         let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
 
         let worker = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
-        let tail = worker
-            .input
-            .as_any()
-            .downcast_ref::<TailLimitExec>()
-            .expect("reverse limit must stay a tail limit");
-        assert_eq!(tail.limit, 6, "row budget must be limit * partitions");
-        let merge = tail
+        let merge = worker
             .input
             .as_any()
             .downcast_ref::<SortPreservingMergeExec>()
-            .unwrap();
+            .expect("merge must stay on top of per-partition tails");
         assert_eq!(merge.fetch(), None);
-        let agg = merge
+        let tail = merge
             .input()
+            .as_any()
+            .downcast_ref::<TailLimitExec>()
+            .expect("reverse limit must become a per-partition tail below the merge");
+        assert_eq!(tail.limit, 3);
+        let agg = tail
+            .input
             .as_any()
             .downcast_ref::<InlineAggregateExec>()
             .unwrap();
@@ -850,6 +878,13 @@ mod tests {
             None,
             "tail limit can not stop the aggregate early"
         );
+
+        // The merged stream must carry complete totals for the last 3 group keys; earlier keys
+        // may arrive partial and are dropped by the router's own limit.
+        let summed = collect_summed(worker.input.clone()).await;
+        for key in [7, 8, 9] {
+            assert_eq!(summed[&key], baseline[&key], "complete total for key {key}");
+        }
     }
 
     /// Single partition partial aggregate emits unique group keys, the row limit stays exact
