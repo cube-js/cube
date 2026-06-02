@@ -954,6 +954,7 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: exportAnnotatedSql === true,
       preAggregationQuery: this.options.preAggregationQuery,
+      preAggregationId: this.options.preAggregationId || null,
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
