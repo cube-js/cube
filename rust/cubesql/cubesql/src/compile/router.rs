@@ -503,6 +503,7 @@ impl QueryRouter {
         let sql_auth_request = SqlAuthServiceAuthenticateRequest {
             protocol: "postgres".to_string(),
             method: "password".to_string(),
+            database: self.state.database(),
         };
         let authenticate_response = self
             .session_manager
@@ -647,6 +648,7 @@ impl QueryRouter {
             let sql_auth_request = SqlAuthServiceAuthenticateRequest {
                 protocol: "postgres".to_string(),
                 method: "password".to_string(),
+                database: self.state.database(),
             };
             let authenticate_response = self
                 .session_manager

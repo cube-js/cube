@@ -54,7 +54,7 @@ export interface CheckAuthPayload {
 }
 
 export interface CheckSQLAuthPayload {
-  request: Request<undefined>,
+  request: Request<BaseMeta | undefined>,
   user: string | null,
   password: string | null,
 }
