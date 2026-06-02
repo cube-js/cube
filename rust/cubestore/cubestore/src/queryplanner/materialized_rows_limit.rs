@@ -25,6 +25,7 @@ pub struct MaterializedRowsLimitExec {
     pub limit: usize,
     /// Human-readable description of the materialization point, used in the error message.
     pub stage: &'static str,
+    /// Total across all partitions. Never reset: plans are built per query and executed once.
     rows: Arc<AtomicUsize>,
 }
 
@@ -125,9 +126,12 @@ impl Stream for MaterializedRowsLimitStream {
                     self.rows.fetch_add(batch.num_rows(), Ordering::Relaxed) + batch.num_rows();
                 if total > self.limit {
                     Some(Err(CubeError::user(format!(
-                        "Query execution stage '{}' materialized more than {} rows. \
-                         Consider creating a pre-aggregation that performs this stage ahead of time.",
-                        self.stage, self.limit
+                        "Query execution stage '{}' materialized at least {} rows \
+                         which exceeds the limit of {} rows. \
+                         Consider creating a pre-aggregation that performs this stage \
+                         ahead of time, or adjust the CUBESTORE_MATERIALIZED_ROWS_LIMIT \
+                         environment variable.",
+                        self.stage, total, self.limit
                     ))
                     .into()))
                 } else {
@@ -191,6 +195,13 @@ mod tests {
         let err = run_with_limit(&[3, 4], 6).await.unwrap_err();
         let message = err.to_string();
         assert!(message.contains("'test stage'"), "{}", message);
+        assert!(message.contains("at least 7 rows"), "{}", message);
+        assert!(message.contains("limit of 6 rows"), "{}", message);
         assert!(message.contains("pre-aggregation"), "{}", message);
+        assert!(
+            message.contains("CUBESTORE_MATERIALIZED_ROWS_LIMIT"),
+            "{}",
+            message
+        );
     }
 }

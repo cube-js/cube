@@ -24,6 +24,7 @@ pub fn add_materialized_rows_limit_exec(
             return wrap_children(&p, &[(0, "sort input")], limit);
         }
     } else if p_any.is::<HashJoinExec>() {
+        // HashJoinExec always builds the hash table from its left input.
         return wrap_children(&p, &[(0, "hash join build side")], limit);
     } else if p_any.is::<CrossJoinExec>() {
         return wrap_children(&p, &[(0, "cross join left side")], limit);

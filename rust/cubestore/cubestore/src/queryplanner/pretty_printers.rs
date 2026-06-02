@@ -780,6 +780,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "MemoryExec (ERROR: deprecated)";
         } else if let Some(r) = a.downcast_ref::<RepartitionExec>() {
             *out += &format!("Repartition, partitioning: {}", r.partitioning());
+        } else if let Some(m) = a.downcast_ref::<MaterializedRowsLimitExec>() {
+            *out += &format!("MaterializedRowsLimit, stage: {}", m.stage);
         } else {
             let to_string = format!("{:?}", p);
             *out += &to_string.split(" ").next().unwrap_or(&to_string);
