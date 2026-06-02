@@ -188,12 +188,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             }
         }
         select_builder.set_group_by(group_by);
-        context_factory.set_rendered_as_multiplied_measures(
-            aggregate_multiplied_subquery
-                .schema
-                .multiplied_measures
-                .clone(),
-        );
         Ok(Rc::new(
             select_builder.build(query_tools.clone(), context_factory),
         ))

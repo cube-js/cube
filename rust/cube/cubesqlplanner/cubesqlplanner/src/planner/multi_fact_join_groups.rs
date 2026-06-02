@@ -1,4 +1,6 @@
-use crate::planner::collectors::{collect_join_hints, has_multi_stage_members};
+use crate::planner::collectors::{
+    collect_join_hints, collect_multiplied_measures, has_multi_stage_members,
+};
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::JoinTreeBuilder;
@@ -237,6 +239,24 @@ impl MultiFactJoinGroups {
         self.groups.len() > 1
     }
 
+    /// True when any grouped measure — or a measure nested inside a
+    /// composite one — sits on a cube that the join tree of its group
+    /// multiplies (a one-to-many join below the measure). Descends the
+    /// compiled measure tree so composite measures are covered.
+    pub fn has_multiplied_measures(&self) -> Result<bool, CubeError> {
+        for (join, measures) in self.groups.iter() {
+            for measure in measures.iter() {
+                if collect_multiplied_measures(measure, join)?
+                    .iter()
+                    .any(|item| item.multiplied)
+                {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
     pub fn groups(&self) -> &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)] {
         &self.groups
     }
@@ -357,6 +377,47 @@ mod tests {
         assert!(!groups.is_multi_fact());
         assert_eq!(groups.num_groups(), 1);
         assert!(groups.single_join().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_has_multiplied_measures_one_side_measure() {
+        // `customers` is the `one` side of a one_to_many join to `orders`.
+        // Selecting an `orders` dimension drags `orders` into the join, so
+        // each customer row is multiplied and `customers.count` is multiplied.
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let customers_count = ctx.create_symbol("customers.count").unwrap();
+        let orders_status = ctx.create_symbol("orders.status").unwrap();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[orders_status])
+            .build(&[customers_count])
+            .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
+
+        assert!(groups.has_multiplied_measures().unwrap());
+    }
+
+    #[test]
+    fn test_has_multiplied_measures_many_side_measure() {
+        // `orders` is the `many` side, so joining the `customers` dimension
+        // does not multiply order rows: `orders.count` is not multiplied.
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[customers_name])
+            .build(&[orders_count])
+            .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
+
+        assert!(!groups.has_multiplied_measures().unwrap());
     }
 
     #[test]

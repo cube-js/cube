@@ -37,7 +37,7 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
                 let is_count_like = match ev.kind() {
-                    MeasureKind::Count(_) => true,
+                    MeasureKind::Count(_) | MeasureKind::MultipliedCount(_) => true,
                     MeasureKind::Aggregated(a) => matches!(
                         a.agg_type(),
                         AggregationType::CountDistinct | AggregationType::CountDistinctApprox

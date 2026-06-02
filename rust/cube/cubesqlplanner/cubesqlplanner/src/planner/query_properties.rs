@@ -21,7 +21,7 @@ use crate::planner::{
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -92,15 +92,34 @@ impl MultipliedMeasure {
 
 /// Measures classified by how the planner must compute them: directly
 /// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE. `rendered_as_multiplied`
-/// tracks symbols that were originally multiplied even after additivity
-/// reclassification flips them into `regular_measures`.
+/// subquery, or planned as a multi-stage CTE.
+///
+/// `render_forms` maps a leaf measure's full name to its distinct
+/// render form (a `count` rewritten to `MultipliedCount`), recorded
+/// during the single classification pass. Applied via [`Self::render`].
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<MemberSymbol>>,
     pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    pub rendered_as_multiplied_measures: HashSet<String>,
+    render_forms: HashMap<String, Rc<MemberSymbol>>,
+}
+
+impl FullKeyAggregateMeasures {
+    /// Rewrite a selected measure into its render form: every multiplied
+    /// `count` in its dependency tree — the measure itself or one nested
+    /// in a calculated expression — is substituted with the distinct
+    /// form recorded during classification. Measures with no multiplied
+    /// count pass through unchanged.
+    pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
+        measure.apply_recursive(&|node| {
+            Ok(self
+                .render_forms
+                .get(&node.full_name())
+                .cloned()
+                .unwrap_or_else(|| node.clone()))
+        })
+    }
 }
 
 /// The full description of a query: selected members, filters, ordering,
@@ -480,31 +499,35 @@ impl QueryProperties {
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
                 for item in collect_multiplied_measures(m, &join)? {
-                    if item.multiplied {
-                        result
-                            .rendered_as_multiplied_measures
-                            .insert(item.measure.full_name());
-                    }
-                    let is_multiplied_measure = if item.multiplied {
-                        if let Ok(measure) = item.measure.as_measure() {
-                            if measure.is_additive_in_multiplied() {
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
-                            true
-                        }
-                    } else {
-                        false
-                    };
-                    if is_multiplied_measure {
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
-                    } else {
+                    if !item.multiplied {
                         result.regular_measures.push(item.measure.clone());
+                        continue;
                     }
+                    let measure = item.measure.as_measure().ok();
+                    // The leaf's render form (a distinct `MultipliedCount`
+                    // for a count) — the same symbol whether it stays in the
+                    // main query or moves to a multiplied subquery.
+                    let rendered = match measure
+                        .as_ref()
+                        .and_then(|m| m.convert_multiplied_to_regular())
+                    {
+                        Some(regular) => {
+                            result.regular_measures.push(regular.clone());
+                            regular
+                        }
+                        None => {
+                            let rendered = measure
+                                .map(|m| m.into_multiplied())
+                                .unwrap_or_else(|| item.measure.clone());
+                            result
+                                .multiplied_measures
+                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_name));
+                            rendered
+                        }
+                    };
+                    result
+                        .render_forms
+                        .insert(item.measure.full_name(), rendered);
                 }
             }
         }
@@ -525,6 +548,13 @@ impl QueryProperties {
             .collect();
 
         Ok(result)
+    }
+
+    /// The query's selected measures in render form — see
+    /// [`FullKeyAggregateMeasures::render`].
+    pub fn select_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let classified = self.full_key_aggregate_measures()?;
+        self.measures.iter().map(|m| classified.render(m)).collect()
     }
 
     fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
