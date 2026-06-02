@@ -353,6 +353,13 @@ cubes:
                 trailing: 7 day
                 offset: start
 
+          - name: total_amount_ytd
+            type: sum
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: year
+
           # ── filter: directive variants ────────────────────────────────────
           - name: amount_exclude_status
             type: sum
