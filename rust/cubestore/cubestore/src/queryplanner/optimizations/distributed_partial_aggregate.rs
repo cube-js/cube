@@ -303,8 +303,16 @@ pub fn add_limit_to_workers(
     // `limit` groups, and groups beyond that arrive complete or not at all -- the router
     // orders by the group key, not by the totals, and its own limit drops them.
     if first_aggregate_below_merges(input).is_some() {
-        let new_input = limit_above_first_aggregate(input, limit, reverse);
+        let new_input = limit_above_first_aggregate(input, limit, reverse)?;
         return p.with_new_children(vec![new_input]);
+    }
+
+    // Tripwire for shapes the descent doesn't recognize: a per-partition partial aggregate in
+    // the subtree means a duplicate-bearing merge somewhere above it, and the row limit below
+    // (LimitPushdown descends through projections into merges) could land on it. The worker
+    // limit is an optimization, skipping it is always correct.
+    if contains_multi_partition_partial_aggregate(input) {
+        return Ok(p);
     }
 
     // No aggregation: plain rows, each one self-contained, a row limit is exact anywhere.
@@ -318,11 +326,14 @@ pub fn add_limit_to_workers(
     }
 }
 
-/// The first aggregate reachable from `p` looking only through sort preserving merges.
+/// The first aggregate reachable from `p` looking only through sort preserving merges and
+/// projections.
 fn first_aggregate_below_merges(mut p: &Arc<dyn ExecutionPlan>) -> Option<&Arc<dyn ExecutionPlan>> {
     loop {
         if let Some(merge) = p.as_any().downcast_ref::<SortPreservingMergeExec>() {
             p = merge.input();
+        } else if let Some(projection) = p.as_any().downcast_ref::<ProjectionExec>() {
+            p = projection.input();
         } else if p.as_any().is::<InlineAggregateExec>() || p.as_any().is::<AggregateExec>() {
             return Some(p);
         } else {
@@ -331,18 +342,26 @@ fn first_aggregate_below_merges(mut p: &Arc<dyn ExecutionPlan>) -> Option<&Arc<d
     }
 }
 
-/// Rebuilds the chain of merges with a per-partition row limit placed directly above the first
-/// aggregate. Must only be called when [first_aggregate_below_merges] found one.
+/// Rebuilds the chain of merges and projections with a per-partition row limit placed directly
+/// above the first aggregate. Must only be called when [first_aggregate_below_merges] found one.
 fn limit_above_first_aggregate(
     p: &Arc<dyn ExecutionPlan>,
     limit: usize,
     reverse: bool,
-) -> Arc<dyn ExecutionPlan> {
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     if let Some(merge) = p.as_any().downcast_ref::<SortPreservingMergeExec>() {
-        let child = limit_above_first_aggregate(merge.input(), limit, reverse);
-        return Arc::new(
+        let child = limit_above_first_aggregate(merge.input(), limit, reverse)?;
+        return Ok(Arc::new(
             SortPreservingMergeExec::new(merge.expr().clone(), child).with_fetch(merge.fetch()),
-        );
+        ));
+    }
+    if let Some(projection) = p.as_any().downcast_ref::<ProjectionExec>() {
+        // The limit is a plain row count, it commutes with column renames
+        let child = limit_above_first_aggregate(projection.input(), limit, reverse)?;
+        return Ok(Arc::new(ProjectionExec::try_new(
+            projection.expr().to_vec(),
+            child,
+        )?));
     }
 
     // The sorted streaming aggregate can additionally stop reading its input early once it has
@@ -358,13 +377,31 @@ fn limit_above_first_aggregate(
         }
     }
 
-    if reverse {
+    Ok(if reverse {
         Arc::new(TailLimitExec::new(node, limit))
     } else if node.output_partitioning().partition_count() == 1 {
         Arc::new(GlobalLimitExec::new(node, 0, Some(limit)))
     } else {
         Arc::new(LocalLimitExec::new(node, limit))
+    })
+}
+
+/// True if the plan contains a partial aggregate executed per partition: its merged output
+/// carries duplicate group keys, so a row limit above such a merge is not group-aligned.
+fn contains_multi_partition_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> bool {
+    let is_one = if let Some(agg) = p.as_any().downcast_ref::<InlineAggregateExec>() {
+        *agg.mode() == InlineAggregateMode::Partial
+    } else if let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() {
+        *agg.mode() == AggregateMode::Partial
+    } else {
+        false
+    };
+    if is_one && p.output_partitioning().partition_count() > 1 {
+        return true;
     }
+    p.children()
+        .into_iter()
+        .any(contains_multi_partition_partial_aggregate)
 }
 
 /// Because we disable `EnforceDistribution`, and because we add `SortPreservingMergeExec` in
@@ -952,6 +989,73 @@ mod tests {
         for key in [7, 8, 9] {
             assert_eq!(summed[&key], baseline[&key], "complete total for key {key}");
         }
+    }
+
+    /// The descent looks through projections: the row limit is a plain count and commutes with
+    /// column renames.
+    #[test]
+    fn worker_limit_descends_through_projection() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let merged = push_sorted_partial_aggregate_below_merge_shape(agg);
+        let projection = Arc::new(
+            ProjectionExec::try_new(
+                merged
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| (col(f.name(), &merged.schema()).unwrap(), f.name().clone()))
+                    .collect(),
+                merged,
+            )
+            .unwrap(),
+        );
+        let p = worker(projection, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker_node = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let projection = worker_node
+            .input
+            .as_any()
+            .downcast_ref::<ProjectionExec>()
+            .expect("projection must stay on top");
+        let merge = projection
+            .input()
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .unwrap();
+        let local_limit = merge
+            .input()
+            .as_any()
+            .downcast_ref::<LocalLimitExec>()
+            .expect("the limit must descend through the projection to the aggregate");
+        assert_eq!(local_limit.fetch(), 3);
+        let agg = local_limit
+            .input()
+            .as_any()
+            .downcast_ref::<InlineAggregateExec>()
+            .unwrap();
+        assert_eq!(agg.limit(), Some(3));
+    }
+
+    /// A shape the descent doesn't recognize but containing per-partition partial aggregates
+    /// must not get a worker limit at all: a row limit could land above a duplicate-bearing
+    /// merge.
+    #[test]
+    fn worker_limit_skipped_for_unrecognized_shape_with_per_partition_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let coalesce: Arc<dyn ExecutionPlan> = Arc::new(CoalescePartitionsExec::new(agg));
+        let p = worker(coalesce, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p.clone(), &ConfigOptions::default()).unwrap();
+        assert!(
+            Arc::ptr_eq(&rewritten, &p),
+            "no limit must be added to an unrecognized shape with a per-partition aggregate"
+        );
     }
 
     /// Single partition partial aggregate emits unique group keys, the row limit stays exact
