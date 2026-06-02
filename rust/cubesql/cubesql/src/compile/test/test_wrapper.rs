@@ -2018,3 +2018,66 @@ async fn test_wrapper_between() {
         .sql
         .contains("BETWEEN $1 AND $2"));
 }
+
+#[tokio::test]
+async fn test_wrapper_subqueries_filter_params_not_mixed() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    customer_gender IN (
+        SELECT
+            customer_gender
+        FROM KibanaSampleDataEcommerce
+        WHERE LOWER(notes) = 'sub_notes'
+        GROUP BY 1
+    )
+    AND notes IN (
+        SELECT
+            notes
+        FROM KibanaSampleDataEcommerce
+        WHERE LOWER(notes) IN ('male_notes', 'female_notes', 'other_notes')
+        GROUP BY 1
+    )
+GROUP BY 1
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql;
+
+    // Each subquery is generated with its own params; on merge, placeholders must be
+    // remapped to the combined values so params don't mix between subqueries
+    let placeholder_re = Regex::new(r"\$(\d+)\b").unwrap();
+    let params_in_sql_order = placeholder_re
+        .captures_iter(&wrapped_sql.sql)
+        .map(|c| {
+            let index = c[1].parse::<usize>().unwrap() - 1;
+            wrapped_sql.values[index].clone().unwrap()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        params_in_sql_order,
+        vec!["sub_notes", "male_notes", "female_notes", "other_notes"]
+    );
+}
