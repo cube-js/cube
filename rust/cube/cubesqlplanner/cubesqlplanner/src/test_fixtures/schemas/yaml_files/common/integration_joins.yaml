@@ -62,6 +62,9 @@ cubes:
           - name: total_amount
             type: sum
             sql: amount
+          - name: customers_count_x2
+            type: number
+            sql: "{customers.count} * 2"
 
     - name: order_items
       sql: "SELECT * FROM order_items"
