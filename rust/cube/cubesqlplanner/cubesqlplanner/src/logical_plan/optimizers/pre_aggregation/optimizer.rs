@@ -449,7 +449,7 @@ impl PreAggregationOptimizer {
 
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
-        if match_state == MatchState::Partial && query_groups.has_multiplied_measures() {
+        if match_state == MatchState::Partial && query_groups.has_multiplied_measures()? {
             return Ok(None);
         }
 
