@@ -2461,7 +2461,7 @@ class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): PreparedCheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
+    type VerifyTokenFn = (auth: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -2470,7 +2470,44 @@ class ApiGateway {
       subject: options?.subject,
     });
 
-    let checkAuthFn: VerifyTokenFn = verifyToken;
+    // `options.key` wins (used by the playground/system path), then the
+    // rotation list (`CUBEJS_API_SECRETS`), then the singular `apiSecret`.
+    let candidateSecrets: string[];
+    if (options?.key) {
+      candidateSecrets = [options.key];
+    } else if (this.apiSecrets && this.apiSecrets.length > 0) {
+      candidateSecrets = this.apiSecrets;
+    } else if (this.apiSecret) {
+      candidateSecrets = [this.apiSecret];
+    } else {
+      candidateSecrets = [];
+    }
+
+    // Default implementation: accept the token if any configured secret
+    // verifies it. Token-level failures (expiry, nbf) reproduce for every
+    // secret, so surface them immediately rather than shadowing the real
+    // cause with a later "invalid signature".
+    let checkAuthFn: VerifyTokenFn = (auth) => {
+      let lastError: any;
+
+      for (const candidate of candidateSecrets) {
+        try {
+          return verifyToken(auth, candidate);
+        } catch (e: any) {
+          lastError = e;
+          if (e?.name === 'TokenExpiredError' || e?.name === 'NotBeforeError') {
+            throw e;
+          }
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+
+      // No secret configured at all — reproduce the upstream JWT error.
+      return verifyToken(auth, undefined);
+    };
 
     if (options?.jwkUrl) {
       const jwks = createJWKsFetcher(options, {
@@ -2524,49 +2561,15 @@ class ApiGateway {
       };
     }
 
-    // `options.key` wins (used by the playground/system path), then the
-    // rotation list, then the singular secret.
-    let candidateSecrets: string[];
-    if (options?.key) {
-      candidateSecrets = [options.key];
-    } else if (this.apiSecrets && this.apiSecrets.length > 0) {
-      candidateSecrets = this.apiSecrets;
-    } else if (this.apiSecret) {
-      candidateSecrets = [this.apiSecret];
-    } else {
-      candidateSecrets = [];
-    }
-
-    // JWK auth resolves the key by `kid`, so iterating the list is pointless.
-    const isJWK = Boolean(options?.jwkUrl);
-
     return async (req, auth) => {
       if (auth) {
-        let verified = false;
-        let lastError: any;
-
-        for (const candidate of candidateSecrets) {
-          try {
-            req.securityContext = await checkAuthFn(auth, candidate);
-            req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
-            verified = true;
-            break;
-          } catch (e: any) {
-            lastError = e;
-            // Token-level failures (expiry, nbf, JWK lookup) reproduce for every
-            // candidate, so don't shadow them with a later "invalid signature".
-            if (
-              isJWK
-              || e?.name === 'TokenExpiredError'
-              || e?.name === 'NotBeforeError'
-            ) {
-              break;
-            }
+        try {
+          req.securityContext = await checkAuthFn(auth);
+          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
+        } catch (e: any) {
+          if (this.enforceSecurityChecks) {
+            throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', e);
           }
-        }
-
-        if (!verified && this.enforceSecurityChecks) {
-          throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', lastError);
         }
       } else if (this.enforceSecurityChecks) {
         // @todo Move it to 401 or 400
