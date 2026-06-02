@@ -2,8 +2,9 @@ use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode, RenderReferencesSqlNode,
-    RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    RenderReferencesType, RollingWindowNode, RootSqlNode, SegmentDimensionSqlNode, SqlNode,
+    TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
+    UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
@@ -189,12 +190,16 @@ impl SqlNodesFactory {
 
         let default_processor: Rc<dyn SqlNode> =
             if !self.pre_aggregation_dimensions_references.is_empty() {
+                // Reading from a pre-aggregation: members are plain column refs,
+                // so a segment is already a stored column — no wrapping.
                 RenderReferencesSqlNode::new(
                     evaluate_sql_processor.clone(),
                     self.pre_aggregation_dimensions_references.clone(),
                 )
             } else {
-                evaluate_sql_processor.clone()
+                // Building/evaluating the expression: wrap segment dimensions per
+                // dialect so a boolean is a valid projected value.
+                SegmentDimensionSqlNode::new(evaluate_sql_processor.clone())
             };
         let default_processor: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(default_processor);
 

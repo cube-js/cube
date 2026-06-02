@@ -356,6 +356,7 @@ export class CubeStoreQuery extends BaseQuery {
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
     return templates;
   }
 }
