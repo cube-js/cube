@@ -10,7 +10,7 @@ use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
-    replace_suboptimal_merge_sorts,
+    push_sorted_partial_aggregate_below_merge, replace_suboptimal_merge_sorts,
 };
 use crate::queryplanner::optimizations::inline_aggregate_rewriter::replace_with_inline_aggregate;
 use crate::queryplanner::planning::CubeExtensionPlanner;
@@ -144,6 +144,9 @@ fn pre_optimize_physical_plan(
     let p = rewrite_physical_plan(p, &mut |p| ensure_partition_merge_with_acceptable_parent(p))?;
     // Handles the root node case
     let p = ensure_partition_merge(p)?;
+
+    // Make the merge carry partial aggregate states instead of all raw rows
+    let p = rewrite_physical_plan(p, &mut |p| push_sorted_partial_aggregate_below_merge(p))?;
 
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
     let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;

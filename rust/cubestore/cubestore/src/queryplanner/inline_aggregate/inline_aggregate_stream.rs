@@ -43,6 +43,11 @@ pub(crate) struct InlineAggregateStream {
 
     batch_size: usize,
 
+    /// Per-partition limit on the number of emitted groups, see [`InlineAggregateExec::limit`]
+    limit: Option<usize>,
+
+    groups_emitted: usize,
+
     exec_state: ExecutionState,
 
     input_done: bool,
@@ -100,6 +105,8 @@ impl InlineAggregateStream {
             group_by: agg_group_by,
             exec_state,
             batch_size,
+            limit: agg.limit(),
+            groups_emitted: 0,
             current_group_indices,
             group_values,
             input_done: false,
@@ -175,6 +182,12 @@ impl Stream for InlineAggregateStream {
         loop {
             match &self.exec_state {
                 ExecutionState::ReadingInput => {
+                    // All needed groups are emitted, skip the rest of the input
+                    if self.limit_reached() {
+                        self.exec_state = ExecutionState::Done;
+                        continue;
+                    }
+
                     match ready!(self.input.poll_next_unpin(cx)) {
                         // New input batch to aggregate
                         Some(Ok(batch)) => {
@@ -283,25 +296,38 @@ impl InlineAggregateStream {
         Ok(Some(batch))
     }
 
-    /// Check if we have enough groups to emit a batch, keeping the last (potentially incomplete) group.
-    ///
-    /// For sorted aggregation, we emit batches of size batch_size when we have accumulated
-    /// more than batch_size groups. We always keep the last group as it may continue in the next input batch.
-    fn should_emit_early(&self) -> bool {
-        // Need at least (batch_size + 1) groups to emit batch_size and keep 1
-        self.group_values.len() > self.batch_size
+    fn limit_reached(&self) -> bool {
+        self.limit.is_some_and(|limit| self.groups_emitted >= limit)
+    }
+
+    /// How many groups to emit in the next early batch: full batches until the limit (if any)
+    /// leaves fewer groups to emit.
+    fn emit_early_threshold(&self) -> usize {
+        match self.limit {
+            Some(limit) => self
+                .batch_size
+                .min(limit.saturating_sub(self.groups_emitted)),
+            None => self.batch_size,
+        }
     }
 
     /// Emit a batch of groups if we have enough accumulated, keeping the last group.
     ///
+    /// For sorted aggregation, we emit when we have accumulated more than threshold groups: the
+    /// last group is always kept as it may continue in the next input batch, so only closed
+    /// groups are emitted.
+    ///
     /// Returns Some(batch) if emitted, None otherwise.
     fn emit_early_if_ready(&mut self) -> DFResult<Option<RecordBatch>> {
-        if !self.should_emit_early() {
+        let threshold = self.emit_early_threshold();
+        // Need at least (threshold + 1) groups to emit threshold closed groups and keep 1
+        if threshold == 0 || self.group_values.len() <= threshold {
             return Ok(None);
         }
 
-        // Emit exactly batch_size groups, keeping the rest (including last incomplete group)
-        self.emit(EmitTo::First(self.batch_size))
+        let batch = self.emit(EmitTo::First(threshold))?;
+        self.groups_emitted += threshold;
+        Ok(batch)
     }
 
     fn group_aggregate_batch(&mut self, batch: RecordBatch) -> DFResult<()> {

@@ -40,7 +40,8 @@ pub struct InlineAggregateExec {
     aggr_expr: Vec<Arc<AggregateFunctionExpr>>,
     /// FILTER (WHERE clause) expression for each aggregate expression
     filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>>,
-    /// Set if the output of this aggregation is truncated by a upstream sort/limit clause
+    /// Per-partition limit on the number of emitted groups: each partition emits at most this
+    /// many first (in group order) complete groups and stops reading its input
     limit: Option<usize>,
     /// Input plan, could be a partial aggregate or the input to the aggregate
     pub input: Arc<dyn ExecutionPlan>,
@@ -109,6 +110,14 @@ impl InlineAggregateExec {
 
     pub fn limit(&self) -> Option<usize> {
         self.limit
+    }
+
+    /// Returns a copy of this aggregate with the per-partition group limit set. Each partition
+    /// emits at most `limit` first (in group order) complete groups and stops reading its input.
+    pub fn with_limit(&self, limit: Option<usize>) -> Self {
+        let mut result = self.clone();
+        result.limit = limit;
+        result
     }
 
     pub fn aggr_expr(&self) -> &[Arc<AggregateFunctionExpr>] {
@@ -288,4 +297,240 @@ fn supported_type(data_type: &DataType) -> bool {
             | DataType::Utf8View
             | DataType::BinaryView
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::array::{Int64Array, RecordBatch};
+    use datafusion::arrow::datatypes::{Field, Schema};
+    use datafusion::common::arrow::compute::concat_batches;
+    use datafusion::functions_aggregate::sum::sum_udaf;
+    use datafusion::physical_expr::aggregate::AggregateExprBuilder;
+    use datafusion::physical_expr::expressions::col;
+    use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
+    use datafusion::physical_plan::collect;
+    use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+    use datafusion::prelude::{SessionConfig, SessionContext};
+    use datafusion_datasource::memory::MemorySourceConfig;
+    use datafusion_datasource::source::DataSourceExec;
+    use futures::StreamExt;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn test_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]))
+    }
+
+    fn make_batch(schema: &SchemaRef, rows: &[(i64, i64)]) -> RecordBatch {
+        RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.0))),
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.1))),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn sorted_source(
+        schema: &SchemaRef,
+        partitions: Vec<Vec<RecordBatch>>,
+    ) -> Arc<dyn ExecutionPlan> {
+        let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
+            col("k", schema).unwrap(),
+        )]);
+        let source = MemorySourceConfig::try_new(&partitions, schema.clone(), None)
+            .unwrap()
+            .try_with_sort_information(vec![ordering])
+            .unwrap();
+        Arc::new(DataSourceExec::new(Arc::new(source)))
+    }
+
+    fn partial_sum_inline_aggregate(
+        input: Arc<dyn ExecutionPlan>,
+        limit: Option<usize>,
+    ) -> Arc<InlineAggregateExec> {
+        let schema = input.schema();
+        let group_by =
+            PhysicalGroupBy::new_single(vec![(col("k", &schema).unwrap(), "k".to_string())]);
+        let sum = AggregateExprBuilder::new(sum_udaf(), vec![col("v", &schema).unwrap()])
+            .schema(schema.clone())
+            .alias("sum_v")
+            .build()
+            .unwrap();
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![Arc::new(sum)],
+            vec![None],
+            input,
+            schema,
+        )
+        .unwrap();
+        assert!(
+            matches!(agg.input_order_mode(), InputOrderMode::Sorted),
+            "test setup must produce a sorted aggregate"
+        );
+        let inline = InlineAggregateExec::try_new_from_aggregate(&agg).unwrap();
+        Arc::new(inline.with_limit(limit))
+    }
+
+    fn run(plan: Arc<dyn ExecutionPlan>, batch_size: usize) -> Vec<(i64, i64)> {
+        let session =
+            SessionContext::new_with_config(SessionConfig::new().with_batch_size(batch_size));
+        let batches = futures::executor::block_on(collect(plan, session.task_ctx())).unwrap();
+        let schema = batches[0].schema();
+        let batch = concat_batches(&schema, &batches).unwrap();
+        let keys = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let sums = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        keys.iter()
+            .zip(sums.iter())
+            .map(|(k, s)| (k.unwrap(), s.unwrap()))
+            .collect()
+    }
+
+    /// A group continuing in the next input batch must not be emitted early with a partial sum.
+    #[test]
+    fn limit_emits_only_closed_groups() {
+        let schema = test_schema();
+        let input = sorted_source(
+            &schema,
+            vec![vec![
+                make_batch(&schema, &[(1, 10), (2, 20), (3, 30), (3, 31)]),
+                make_batch(&schema, &[(3, 32), (4, 40)]),
+            ]],
+        );
+        let agg = partial_sum_inline_aggregate(input, Some(3));
+        assert_eq!(run(agg, 4096), vec![(1, 10), (2, 20), (3, 93)]);
+    }
+
+    #[test]
+    fn limit_results_match_no_limit_prefix() {
+        let schema = test_schema();
+        let rows: Vec<(i64, i64)> = (0..1000).map(|i| (i / 3, i)).collect();
+        let batches: Vec<RecordBatch> = rows.chunks(97).map(|c| make_batch(&schema, c)).collect();
+        let source = sorted_source(&schema, vec![batches]);
+
+        let no_limit = run(partial_sum_inline_aggregate(source.clone(), None), 4096);
+        let limited = run(partial_sum_inline_aggregate(source, Some(5)), 4096);
+        assert_eq!(limited, no_limit[..5]);
+    }
+
+    #[test]
+    fn limit_larger_than_group_count_emits_all() {
+        let schema = test_schema();
+        let input = sorted_source(
+            &schema,
+            vec![vec![make_batch(&schema, &[(1, 10), (2, 20), (3, 30)])]],
+        );
+        let agg = partial_sum_inline_aggregate(input, Some(100));
+        assert_eq!(run(agg, 4096), vec![(1, 10), (2, 20), (3, 30)]);
+    }
+
+    /// Emitting in batch_size chunks until the limit is reached.
+    #[test]
+    fn limit_above_batch_size_emits_incrementally() {
+        let schema = test_schema();
+        let rows: Vec<(i64, i64)> = (0..16).map(|i| (i / 2, i)).collect();
+        let batches: Vec<RecordBatch> = rows.chunks(3).map(|c| make_batch(&schema, c)).collect();
+        let source = sorted_source(&schema, vec![batches]);
+
+        let no_limit = run(partial_sum_inline_aggregate(source.clone(), None), 2);
+        let limited = run(partial_sum_inline_aggregate(source, Some(5)), 2);
+        assert_eq!(limited, no_limit[..5]);
+    }
+
+    /// Wraps a plan and counts batches its streams produce.
+    #[derive(Debug)]
+    struct CountingExec {
+        inner: Arc<dyn ExecutionPlan>,
+        batches_polled: Arc<AtomicUsize>,
+    }
+
+    impl DisplayAs for CountingExec {
+        fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "CountingExec")
+        }
+    }
+
+    impl ExecutionPlan for CountingExec {
+        fn name(&self) -> &'static str {
+            "CountingExec"
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn properties(&self) -> &PlanProperties {
+            self.inner.properties()
+        }
+
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![&self.inner]
+        }
+
+        fn with_new_children(
+            self: Arc<Self>,
+            children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> DFResult<Arc<dyn ExecutionPlan>> {
+            Ok(Arc::new(CountingExec {
+                inner: children[0].clone(),
+                batches_polled: self.batches_polled.clone(),
+            }))
+        }
+
+        fn execute(
+            &self,
+            partition: usize,
+            context: Arc<TaskContext>,
+        ) -> DFResult<SendableRecordBatchStream> {
+            let stream = self.inner.execute(partition, context)?;
+            let counter = self.batches_polled.clone();
+            Ok(Box::pin(RecordBatchStreamAdapter::new(
+                stream.schema(),
+                stream.inspect(move |_| {
+                    counter.fetch_add(1, Ordering::SeqCst);
+                }),
+            )))
+        }
+    }
+
+    /// Once the limit is reached the aggregate must stop reading its input, so a downstream
+    /// LIMIT short-circuits the scan.
+    #[test]
+    fn limit_stops_reading_input() {
+        let schema = test_schema();
+        let batches: Vec<RecordBatch> = (0..100)
+            .map(|i| {
+                let rows: Vec<(i64, i64)> = (0..10).map(|j| (i * 10 + j, 1)).collect();
+                make_batch(&schema, &rows)
+            })
+            .collect();
+        let source = sorted_source(&schema, vec![batches]);
+        let batches_polled = Arc::new(AtomicUsize::new(0));
+        let counting = Arc::new(CountingExec {
+            inner: source,
+            batches_polled: batches_polled.clone(),
+        });
+
+        let result = run(partial_sum_inline_aggregate(counting, Some(5)), 4096);
+        assert_eq!(result.len(), 5);
+        assert!(
+            batches_polled.load(Ordering::SeqCst) < 10,
+            "aggregate must stop polling input after the limit is reached, polled {} batches",
+            batches_polled.load(Ordering::SeqCst)
+        );
+    }
 }
