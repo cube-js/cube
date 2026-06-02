@@ -357,6 +357,7 @@ export class CubeStoreQuery extends BaseQuery {
     '{% endfor %}';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
     return templates;
   }
 }

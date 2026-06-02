@@ -4553,6 +4553,7 @@ export class BaseQuery {
         within_group: '{{ fun_sql }} WITHIN GROUP (ORDER BY {{ within_group_concat }})',
         concat_strings: '{{ strings | join(\' || \' ) }}',
         wrap_segment_select: '{{ expr }}',
+        wrap_segment_filter: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
         timestamp_literal: '{{ value }}',
         between: '{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}',

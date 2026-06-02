@@ -235,6 +235,7 @@ export class MysqlQuery extends BaseQuery {
       '       CAST(DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME) AS date_to\n' +
       'FROM date_series';
     templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
 
     return templates;
   }

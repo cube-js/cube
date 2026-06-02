@@ -15,8 +15,15 @@ impl ToSql for BaseSegment {
         node_processor: Rc<dyn SqlNode>,
         _query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
-        _filters_ctx: &FiltersContext,
+        filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
-        visitor.apply(&self.member_evaluator(), node_processor, templates)
+        let sql = visitor.apply(&self.member_evaluator(), node_processor, templates)?;
+        if filters_ctx.reading_pre_aggregation {
+            // The segment is a stored pre-aggregation column; compare it to its
+            // truthy value so dialects without a bare-boolean predicate work.
+            templates.wrap_segment_filter(sql)
+        } else {
+            Ok(sql)
+        }
     }
 }

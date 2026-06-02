@@ -311,6 +311,11 @@ impl PlanSqlTemplates {
             .render_template("expressions/wrap_segment_select", context! { expr => expr })
     }
 
+    pub fn wrap_segment_filter(&self, expr: String) -> Result<String, CubeError> {
+        self.render
+            .render_template("expressions/wrap_segment_filter", context! { expr => expr })
+    }
+
     pub fn group_by(&self, items: Vec<TemplateGroupByColumn>) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/group_by_exprs",

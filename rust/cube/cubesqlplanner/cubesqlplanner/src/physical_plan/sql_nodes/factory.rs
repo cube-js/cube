@@ -67,6 +67,10 @@ impl SqlNodesFactory {
         self.use_local_tz_in_date_range
     }
 
+    pub fn reading_pre_aggregation(&self) -> bool {
+        !self.pre_aggregation_dimensions_references.is_empty()
+    }
+
     pub fn set_ungrouped_measure(&mut self, value: bool) {
         self.ungrouped_measure = value;
     }

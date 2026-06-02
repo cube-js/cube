@@ -352,6 +352,10 @@ impl MockSqlTemplatesRender {
             "{{ expr }}".to_string(),
         );
         templates.insert(
+            "expressions/wrap_segment_filter".to_string(),
+            "{{ expr }}".to_string(),
+        );
+        templates.insert(
             "expressions/rolling_window_expr_timestamp_cast".to_string(),
             "{{ value }}".to_string(),
         );
