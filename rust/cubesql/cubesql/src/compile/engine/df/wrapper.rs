@@ -176,8 +176,43 @@ impl SqlQuery {
         index
     }
 
-    pub fn extend_values(&mut self, values: impl IntoIterator<Item = Option<String>>) {
-        self.values.extend(values);
+    /// Adds values of an independently generated subquery, returning the mapping from
+    /// subquery-local value indexes to indexes in `self.values`. Placeholders in the
+    /// subquery SQL must be rewritten with [`SqlQuery::remap_placeholders`] using this mapping.
+    pub fn add_values(&mut self, values: impl IntoIterator<Item = Option<String>>) -> Vec<usize> {
+        values.into_iter().map(|v| self.add_value(v)).collect()
+    }
+
+    pub fn remap_placeholders(sql: &str, mapping: &[usize]) -> result::Result<String, CubeError> {
+        static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$(\d+)\$").unwrap());
+
+        let mut error = None;
+        let replaced = REGEX.replace_all(sql, |c: &Captures<'_>| {
+            let res = c[1]
+                .parse::<usize>()
+                .map_err(|e| CubeError::internal(format!("Can't parse param index: {e}")))
+                .and_then(|index| {
+                    mapping.get(index).ok_or_else(|| {
+                        CubeError::internal(format!(
+                            "Param index {index} out of range for mapping of {} values",
+                            mapping.len()
+                        ))
+                    })
+                });
+            match res {
+                Ok(new_index) => format!("${new_index}$"),
+                Err(e) => {
+                    if error.is_none() {
+                        error = Some(e);
+                    }
+                    "".to_string()
+                }
+            }
+        });
+        match error {
+            None => Ok(replaced.to_string()),
+            Some(e) => Err(e),
+        }
     }
 
     pub fn replace_sql(&mut self, sql: String) {
@@ -1254,8 +1289,11 @@ impl WrappedSelectNode {
             )
             .await?;
 
+            // Subquery SQL was generated independently, so its placeholders
+            // reference its own values and must be remapped to the combined values
             let (sql_string, new_values) = subquery_sql.unpack();
-            sql.extend_values(new_values);
+            let mapping = sql.add_values(new_values);
+            let sql_string = SqlQuery::remap_placeholders(&sql_string, &mapping)?;
             // TODO why only field 0 is a key?
             let field = subquery.schema().field(0);
             subqueries_sql.insert(field.qualified_name(), sql_string);
@@ -3445,8 +3483,11 @@ impl WrappedSelectNode {
                     Some(data_source),
                 )
                 .await?;
+                // Join subquery SQL was generated independently, so its placeholders
+                // reference its own values and must be remapped to the combined values
                 let (subq_sql_string, new_values) = subq_sql.sql.unpack();
-                sql.extend_values(new_values);
+                let mapping = sql.add_values(new_values);
+                let subq_sql_string = SqlQuery::remap_placeholders(&subq_sql_string, &mapping)?;
                 let subq_alias = subq_sql.from_alias;
                 // Expect that subq_sql.column_remapping already incorporates subq_alias/
                 // TODO does it?
@@ -3842,8 +3883,12 @@ impl WrappedSelectNode {
                 &HashMap::new(),
             )?;
 
+            // Join subquery SQL was generated independently, so its placeholders
+            // reference its own values and must be remapped to the combined values
             let (join_sql_str, new_values) = join_sql.unpack();
-            sql.extend_values(new_values);
+            let mapping = sql.add_values(new_values);
+            let join_sql_str = SqlQuery::remap_placeholders(&join_sql_str, &mapping)?;
+            let join_condition_sql = SqlQuery::remap_placeholders(&join_condition_sql, &mapping)?;
             if let Some(join_column_remapping) = join_column_remapping {
                 if let Some(column_remapping) = column_remapping.as_mut() {
                     column_remapping.extend(join_column_remapping);
