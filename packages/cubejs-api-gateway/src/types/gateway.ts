@@ -70,6 +70,8 @@ interface ApiGatewayOptions {
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
+  /** Rotation window: any listed secret verifies. Takes precedence over `apiSecret`. */
+  apiSecrets?: string[];
   serverCoreVersion?: string;
   contextRejectionMiddleware?: ContextRejectionMiddlewareFn;
   wsContextAcceptor?: ContextAcceptorFn;

@@ -177,6 +177,8 @@ class ApiGateway {
 
   protected readonly playgroundAuthSecret?: string;
 
+  protected readonly apiSecrets?: string[];
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected readonly event: (name: string, props?: object) => void;
 
@@ -202,6 +204,9 @@ class ApiGateway {
     this.standalone = options.standalone;
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
+    this.apiSecrets = options.apiSecrets && options.apiSecrets.length > 0
+      ? options.apiSecrets
+      : undefined;
 
     this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
@@ -2456,7 +2461,7 @@ class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): PreparedCheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
+    type VerifyTokenFn = (auth: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -2465,7 +2470,44 @@ class ApiGateway {
       subject: options?.subject,
     });
 
-    let checkAuthFn: VerifyTokenFn = verifyToken;
+    // `options.key` wins (used by the playground/system path), then the
+    // rotation list (`CUBEJS_API_SECRETS`), then the singular `apiSecret`.
+    let candidateSecrets: string[];
+    if (options?.key) {
+      candidateSecrets = [options.key];
+    } else if (this.apiSecrets && this.apiSecrets.length > 0) {
+      candidateSecrets = this.apiSecrets;
+    } else if (this.apiSecret) {
+      candidateSecrets = [this.apiSecret];
+    } else {
+      candidateSecrets = [];
+    }
+
+    // Default implementation: accept the token if any configured secret
+    // verifies it. Token-level failures (expiry, nbf) reproduce for every
+    // secret, so surface them immediately rather than shadowing the real
+    // cause with a later "invalid signature".
+    let checkAuthFn: VerifyTokenFn = (auth) => {
+      let lastError: any;
+
+      for (const candidate of candidateSecrets) {
+        try {
+          return verifyToken(auth, candidate);
+        } catch (e: any) {
+          lastError = e;
+          if (e?.name === 'TokenExpiredError' || e?.name === 'NotBeforeError') {
+            throw e;
+          }
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+
+      // No secret configured at all — reproduce the upstream JWT error.
+      return verifyToken(auth, undefined);
+    };
 
     if (options?.jwkUrl) {
       const jwks = createJWKsFetcher(options, {
@@ -2519,12 +2561,10 @@ class ApiGateway {
       };
     }
 
-    const secret = options?.key || this.apiSecret;
-
     return async (req, auth) => {
       if (auth) {
         try {
-          req.securityContext = await checkAuthFn(auth, secret);
+          req.securityContext = await checkAuthFn(auth);
           req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e: any) {
           if (this.enforceSecurityChecks) {

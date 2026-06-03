@@ -198,6 +198,8 @@ export interface CreateOptions {
   basePath?: string;
   devServer?: boolean;
   apiSecret?: string;
+  /** `CUBEJS_API_SECRETS`. Rotation window — see ApiGatewayOptions.apiSecrets. */
+  apiSecrets?: string[];
   logger?: LoggerFn;
   driverFactory?: DriverFactoryFn;
   dialectFactory?: DialectFactoryFn;
