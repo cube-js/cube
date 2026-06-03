@@ -794,6 +794,57 @@ describe('test authorization', () => {
     expect(handlerMock.mock.calls.length).toEqual(2);
   });
 
+  test('apiSecrets - coexists with playgroundAuthSecret (both sources active)', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const playgroundAuthSecret = 'playgroundSecret';
+
+    // Base fixture's singular apiSecret='secret' is shadowed by apiSecrets.
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: ['outgoing', 'current'],
+      playgroundAuthSecret,
+    });
+
+    // A token signed by the playground secret is accepted via the system path.
+    const playgroundToken = generateAuthToken({ uid: 5 }, {}, playgroundAuthSecret);
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${playgroundToken}`)
+      .expect(200);
+
+    // A token signed by any listed secret is accepted via the main path.
+    for (const secret of ['outgoing', 'current']) {
+      const apiToken = generateAuthToken({ uid: 5 }, {}, secret);
+      // eslint-disable-next-line no-await-in-loop
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${apiToken}`)
+        .expect(200);
+    }
+
+    // The singular apiSecret is shadowed by apiSecrets and is not a playground
+    // secret either, so a token signed with it is rejected by both paths.
+    const shadowedSingularToken = generateAuthToken({ uid: 5 }, {}, 'secret');
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${shadowedSingularToken}`)
+      .expect(403);
+
+    // A token signed by neither the playground secret nor any listed secret.
+    const strangerToken = generateAuthToken({ uid: 5 }, {}, 'not-anywhere');
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${strangerToken}`)
+      .expect(403);
+
+    expect(handlerMock.mock.calls.length).toEqual(3);
+  });
+
   test('coerceForSqlQuery claimsNamespace', async () => {
     const loggerMock = jest.fn(() => {
       //

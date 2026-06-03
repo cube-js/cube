@@ -1933,6 +1933,20 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   playgroundAuthSecret: () => get('CUBEJS_PLAYGROUND_AUTH_SECRET')
     .asString(),
+  apiSecret: () => get('CUBEJS_API_SECRET')
+    .asString(),
+  // Comma-separated rotation list. Trimmed, empties dropped, deduplicated.
+  // Takes precedence over the singular `apiSecret` when non-empty.
+  apiSecrets: (): string[] | undefined => {
+    const raw = get('CUBEJS_API_SECRETS').asString();
+    if (!raw) {
+      return undefined;
+    }
+    const unique = Array.from(
+      new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
+    );
+    return unique.length > 0 ? unique : undefined;
+  },
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),

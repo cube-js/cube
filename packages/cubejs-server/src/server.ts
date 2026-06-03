@@ -6,7 +6,6 @@ import CubeCore, {
   DriverContext,
   DriverOptions,
   SystemOptions,
-  parseApiSecretsEnv,
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
 import express, { Express } from 'express';
@@ -209,11 +208,11 @@ export class CubejsServer {
   }
 
   public static apiSecret() {
-    return process.env.CUBEJS_API_SECRET;
+    return getEnv('apiSecret');
   }
 
   public static apiSecrets(): string[] | undefined {
-    return parseApiSecretsEnv(process.env.CUBEJS_API_SECRETS);
+    return getEnv('apiSecrets');
   }
 
   public static version() {
