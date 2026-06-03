@@ -1,7 +1,6 @@
 use super::{
-    CteRenderContext, CteState, MultiStageInodeMember, MultiStageInodeMemberType,
-    MultiStageMemberType, MultiStageQueryDescription, RollingWindowDescription,
-    TimeSeriesDescription,
+    EvaluationContext, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
+    MultiStageQueryDescription, PlanningScope, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
@@ -42,12 +41,12 @@ impl MultiStageMemberQueryPlanner {
 
     /// Builds the `LogicalMultiStageMember` for this description,
     /// dispatching on `MultiStageMemberType` to the appropriate
-    /// `plan_*` builder. `cte_state` is the plan-wide CTE
+    /// `plan_*` builder. `scope` is the plan-wide CTE
     /// accumulator: leaf planning may register additional CTEs into
     /// it (e.g. multiplied-measure subqueries).
     pub fn plan_logical_query(
         &self,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         match self.description.member().member_type() {
             MultiStageMemberType::Inode(member) => match member.inode_type() {
@@ -58,12 +57,12 @@ impl MultiStageMemberQueryPlanner {
                 _ => self.plan_for_cte_query(member),
             },
             MultiStageMemberType::Leaf(node) => match node {
-                super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(cte_state),
+                super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(scope),
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
                     self.plan_time_series_query(time_dimension.clone())
                 }
                 super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
-                    self.plan_time_series_get_range_query(time_dimension.clone(), cte_state)
+                    self.plan_time_series_get_range_query(time_dimension.clone(), scope)
                 }
             },
         }
@@ -76,7 +75,7 @@ impl MultiStageMemberQueryPlanner {
     fn plan_time_series_get_range_query(
         &self,
         time_dimension: Rc<MemberSymbol>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
@@ -91,7 +90,7 @@ impl MultiStageMemberQueryPlanner {
         let simple_query_planer =
             SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties);
 
-        let source = simple_query_planer.source_and_subquery_dimensions(cte_state)?;
+        let source = simple_query_planer.source_and_subquery_dimensions(scope)?;
 
         let result = MultiStageGetDateRange {
             time_dimension: time_dimension.clone(),
@@ -411,14 +410,14 @@ impl MultiStageMemberQueryPlanner {
     /// Builds the leaf CTE for a base measure — runs a `QueryPlanner`
     /// on the description's state with `allow_multi_stage = false`,
     /// then wraps the result in a `MultiStageLeafMeasure`. The shared
-    /// `cte_state` receives any CTEs the leaf planning produces
+    /// `scope` receives any CTEs the leaf planning produces
     /// (multiplied-measure subqueries), so they land in the root
     /// `WITH` list instead of nesting. Respects the
     /// `without-member-leaf` shape for cases like `Rank` where the
     /// leaf selects only the dimension grid.
     fn plan_for_leaf_cte_query(
         &self,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
         let mut dimensions = self.description.state().dimensions().clone();
@@ -470,18 +469,18 @@ impl MultiStageMemberQueryPlanner {
         // CTEs hoisted out of this leaf (e.g. multiplied-measure
         // subqueries) must render under the same context the leaf
         // itself renders with.
-        let render_context = CteRenderContext {
+        let evaluation_context = EvaluationContext {
             time_shifts: self.description.state().time_shifts().clone(),
-            render_measure_as_state: self.description.member().has_aggregates_on_top(),
-            render_measure_for_ungrouped: self.description.member().is_ungrupped(),
+            measure_as_state: self.description.member().has_aggregates_on_top(),
+            measure_for_ungrouped: self.description.member().is_ungrupped(),
         };
-        let query = cte_state.with_render_context(render_context.clone(), |cte_state| {
-            query_planner.plan(cte_state)
+        let query = scope.with_evaluation_context(evaluation_context.clone(), |scope| {
+            query_planner.plan(scope)
         })?;
         let leaf_measure_plan = MultiStageLeafMeasure {
             measures: vec![member_node.clone()],
             query,
-            render_context,
+            evaluation_context,
         };
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),

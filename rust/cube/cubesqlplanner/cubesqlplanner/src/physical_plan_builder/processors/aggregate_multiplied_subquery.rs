@@ -31,8 +31,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         // leaf's context (time shifts / measure-rendering flags), as
         // it would have nested.
         let mut context = context.clone();
-        if let Some(render_context) = &aggregate_multiplied_subquery.render_context {
-            context.apply_render_context(render_context);
+        if let Some(evaluation_context) = &aggregate_multiplied_subquery.evaluation_context {
+            context.apply_evaluation_context(evaluation_context);
         }
         let context = &context;
 

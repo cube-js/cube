@@ -4,7 +4,7 @@ use crate::planner::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
     collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
-use crate::planner::planners::multi_stage::{CteRenderContext, CteState};
+use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
@@ -17,7 +17,7 @@ use std::rc::Rc;
 /// non-simple queries: regular measures become `MultiStageLeafMeasure`
 /// CTEs (one per multi-fact group), and multiplied measures become
 /// `AggregateMultipliedSubquery` CTEs (one per owning cube). Both
-/// kinds are registered into the shared `CteState`.
+/// kinds are registered into the shared `PlanningScope`.
 pub struct MultipliedMeasuresQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
@@ -44,7 +44,7 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
-    /// Registers per-measure CTEs into `cte_state`: regular measures
+    /// Registers per-measure CTEs into `scope`: regular measures
     /// become leaf-measure CTEs grouped by multi-fact join, multiplied
     /// measures become `AggregateMultipliedSubquery` CTEs grouped by
     /// owning cube. Returns the subquery refs the caller's
@@ -52,7 +52,7 @@ impl MultipliedMeasuresQueryPlanner {
     /// query.
     pub fn plan_queries(
         &self,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Vec<Rc<MultiStageSubqueryRef>>, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
@@ -70,19 +70,19 @@ impl MultipliedMeasuresQueryPlanner {
                     &full_key_aggregate_measures.regular_measures,
                 )?;
             for (join, measures) in join_multi_fact_groups.groups().iter() {
-                let query = self.regular_measures_subquery(measures, join.clone(), cte_state)?;
-                let cte_name = cte_state.next_cte_name();
+                let query = self.regular_measures_subquery(measures, join.clone(), scope)?;
+                let cte_name = scope.next_cte_name();
 
                 let leaf = Rc::new(MultiStageLeafMeasure {
                     measures: measures.clone(),
-                    render_context: CteRenderContext::default(),
+                    evaluation_context: EvaluationContext::default(),
                     query: query.clone(),
                 });
                 let member = Rc::new(LogicalMultiStageMember {
                     name: cte_name.clone(),
                     member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
                 });
-                cte_state.add_member(member);
+                scope.add_member(member);
 
                 let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
@@ -113,16 +113,16 @@ impl MultipliedMeasuresQueryPlanner {
                 CubeError::internal("No join groups returned for aggregate measures".to_string())
             })?;
             let aggregate_subquery_logical_plan =
-                self.aggregate_subquery_plan(&cube_name, &measures, join, cte_state)?;
+                self.aggregate_subquery_plan(&cube_name, &measures, join, scope)?;
 
-            let cte_name = cte_state.next_cte_name();
+            let cte_name = scope.next_cte_name();
             let member = Rc::new(LogicalMultiStageMember {
                 name: cte_name.clone(),
                 member_type: MultiStageMemberLogicalType::MultipliedMeasure(
                     aggregate_subquery_logical_plan.clone(),
                 ),
             });
-            cte_state.add_member(member);
+            scope.add_member(member);
 
             let ref_schema = aggregate_subquery_logical_plan.schema.clone();
             let subquery_ref = Rc::new(
@@ -143,7 +143,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
         measures: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<JoinTree>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
         let pk_cube = self.common_utils.cube_from_path(key_cube_name.clone())?;
         let pk_cube = Cube::new(pk_cube);
@@ -155,14 +155,14 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_properties.clone(),
         )?;
         let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
 
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
         let keys_subquery = self.key_query(
             &primary_keys_dimensions,
             key_join.clone(),
             pk_cube.clone(),
-            cte_state,
+            scope,
         )?;
 
         let schema = LogicalSchema::default()
@@ -177,7 +177,7 @@ impl MultipliedMeasuresQueryPlanner {
                 key_join.clone(),
                 &measures,
                 &primary_keys_dimensions,
-                cte_state,
+                scope,
             )?;
             measure_subquery.into()
         } else {
@@ -188,7 +188,7 @@ impl MultipliedMeasuresQueryPlanner {
             keys_subquery,
             dimension_subqueries: subquery_dimension_queries,
             source,
-            render_context: cte_state.render_context().clone(),
+            evaluation_context: scope.evaluation_context().clone(),
             pre_aggregation_override: None,
         }))
     }
@@ -236,7 +236,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_join: Rc<JoinTree>,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<MeasureSubquery>, CubeError> {
         let subquery_dimensions = collect_sub_query_dimensions_from_members(&measures, &key_join)?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
@@ -245,7 +245,7 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_properties.clone(),
         )?;
         let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
         let source = self.join_planner.make_join_logical_plan_with_join_hints(
             measure_join_hints,
@@ -265,7 +265,7 @@ impl MultipliedMeasuresQueryPlanner {
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
         join: Rc<JoinTree>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         let all_symbols = self
             .query_properties
@@ -279,7 +279,7 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_properties.clone(),
         )?;
         let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
 
         let source = self
             .join_planner
@@ -317,7 +317,7 @@ impl MultipliedMeasuresQueryPlanner {
         dimensions: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<JoinTree>,
         key_cube: Rc<Cube>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<KeysSubQuery>, CubeError> {
         let all_symbols =
             self.query_properties
@@ -332,7 +332,7 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_properties.clone(),
         )?;
         let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
 
         let source = self
             .join_planner

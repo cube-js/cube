@@ -3,7 +3,7 @@ use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::physical_plan::QualifiedColumnName;
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
-use crate::planner::planners::multi_stage::CteState;
+use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
@@ -62,17 +62,17 @@ impl DimensionSubqueryPlanner {
     }
 
     /// Plans one `DimensionSubQuery` per dimension in the input list.
-    /// `cte_state` is the plan-wide CTE accumulator: a non-simple
+    /// `scope` is the plan-wide CTE accumulator: a non-simple
     /// subquery (e.g. with a multiplied measure) registers its CTEs
     /// there so they land in the root `WITH` list.
     pub fn plan_queries(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Vec<Rc<DimensionSubQuery>>, CubeError> {
         let mut result = Vec::new();
         for subquery_dimension in dimensions.iter() {
-            result.push(self.plan_query(subquery_dimension.clone(), cte_state)?)
+            result.push(self.plan_query(subquery_dimension.clone(), scope)?)
         }
         Ok(result)
     }
@@ -80,7 +80,7 @@ impl DimensionSubqueryPlanner {
     fn plan_query(
         &self,
         subquery_dimension: Rc<MemberSymbol>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<DimensionSubQuery>, CubeError> {
         let dim_name = subquery_dimension.name();
         let cube_name = subquery_dimension.cube_name().clone();
@@ -141,7 +141,7 @@ impl DimensionSubqueryPlanner {
             )
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
-        let sub_query = query_planner.plan(cte_state)?;
+        let sub_query = query_planner.plan(scope)?;
         let result = Rc::new(DimensionSubQuery {
             query: sub_query,
             primary_keys_dimensions,

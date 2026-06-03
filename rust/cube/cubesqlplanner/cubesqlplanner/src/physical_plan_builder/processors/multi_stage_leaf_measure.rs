@@ -21,7 +21,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageLeafMeasure> for MultiStageLeafMeasu
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let mut context = context.clone();
-        context.apply_render_context(&multi_stage_leaf_measure.render_context);
+        context.apply_evaluation_context(&multi_stage_leaf_measure.evaluation_context);
         let select = self
             .builder
             .process_node(multi_stage_leaf_measure.query.as_ref(), &context)?;

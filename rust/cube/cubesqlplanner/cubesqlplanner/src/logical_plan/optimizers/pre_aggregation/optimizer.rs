@@ -236,11 +236,13 @@ impl PreAggregationOptimizer {
                         if let Some(rewritten) = self.try_rewrite_query(
                             &multi_stage_leaf_measure.query,
                             compiled_pre_aggregations,
-                            &multi_stage_leaf_measure.render_context.time_shifts,
+                            &multi_stage_leaf_measure.evaluation_context.time_shifts,
                         )? {
                             let new_leaf = Rc::new(MultiStageLeafMeasure {
                                 measures: multi_stage_leaf_measure.measures.clone(),
-                                render_context: multi_stage_leaf_measure.render_context.clone(),
+                                evaluation_context: multi_stage_leaf_measure
+                                    .evaluation_context
+                                    .clone(),
                                 query: rewritten,
                             });
                             NodeRewriteResult::rewritten(new_leaf.as_plan_node())
@@ -260,7 +262,7 @@ impl PreAggregationOptimizer {
                                 keys_subquery: agg.keys_subquery.clone(),
                                 source: agg.source.clone(),
                                 dimension_subqueries: agg.dimension_subqueries.clone(),
-                                render_context: agg.render_context.clone(),
+                                evaluation_context: agg.evaluation_context.clone(),
                                 pre_aggregation_override: Some(rewritten),
                             });
                             NodeRewriteResult::rewritten(new_agg.as_plan_node())

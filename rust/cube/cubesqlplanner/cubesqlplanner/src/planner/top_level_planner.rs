@@ -1,4 +1,4 @@
-use super::planners::multi_stage::CteState;
+use super::planners::multi_stage::PlanningScope;
 use super::planners::QueryPlanner;
 use super::query_tools::QueryTools;
 use super::QueryProperties;
@@ -32,11 +32,11 @@ impl TopLevelPlanner {
 
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
-        let mut cte_state = CteState::new();
-        let query = query_planner.plan(&mut cte_state)?;
+        let mut scope = PlanningScope::new();
+        let query = query_planner.plan(&mut scope)?;
         let logical_plan = Rc::new(
             RootQuery::builder()
-                .ctes(cte_state.into_members())
+                .ctes(scope.into_members())
                 .query(query)
                 .build(),
         );

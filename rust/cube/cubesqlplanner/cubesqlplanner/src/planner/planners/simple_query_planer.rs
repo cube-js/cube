@@ -1,7 +1,7 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner};
 use crate::logical_plan::*;
 use crate::planner::collectors::collect_sub_query_dimensions_from_symbols;
-use crate::planner::planners::multi_stage::CteState;
+use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
@@ -25,8 +25,8 @@ impl SimpleQueryPlanner {
     }
 
     /// Builds the `Query` for a simple-case request.
-    pub fn plan(&self, cte_state: &mut CteState) -> Result<Rc<Query>, CubeError> {
-        let source = self.source_and_subquery_dimensions(cte_state)?;
+    pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
+        let source = self.source_and_subquery_dimensions(scope)?;
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
@@ -57,7 +57,7 @@ impl SimpleQueryPlanner {
     /// plug into it, returning the assembled `LogicalJoin` source.
     pub fn source_and_subquery_dimensions(
         &self,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalJoin>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
@@ -76,7 +76,7 @@ impl SimpleQueryPlanner {
             self.query_properties.clone(),
         )?;
         let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, cte_state)?;
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
         let source = if let Some(join) = &join {
             self.join_planner
                 .make_join_logical_plan(join, subquery_dimension_queries)
