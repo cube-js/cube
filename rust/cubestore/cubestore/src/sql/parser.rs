@@ -304,18 +304,31 @@ impl<'a> CubeStoreParser<'a> {
                     Ok(Statement::Dump(q))
                 }
                 // Plain EXPLAIN and EXPLAIN ANALYZE fall through to the generic parser.
+                // A bare identifier after EXPLAIN ANALYZE is intercepted: it is either
+                // EXTENDED or a parse error. Otherwise the generic parser would treat it
+                // as an EXPLAIN <table_name> and silently drop the rest of the statement.
                 Keyword::EXPLAIN
                     if matches!(
                         &self.parser.peek_nth_token(1).token,
                         Token::Word(w) if w.keyword == Keyword::ANALYZE
                     ) && matches!(
                         &self.parser.peek_nth_token(2).token,
-                        Token::Word(w) if w.value.eq_ignore_ascii_case("extended")
+                        Token::Word(w) if w.keyword == Keyword::NoKeyword
+                            || w.value.eq_ignore_ascii_case("extended")
                     ) =>
                 {
                     self.parser.next_token();
                     self.parser.next_token();
-                    self.parser.next_token();
+                    let word = self.parser.next_token();
+                    if !matches!(
+                        &word.token,
+                        Token::Word(w) if w.value.eq_ignore_ascii_case("extended")
+                    ) {
+                        return Err(ParserError::ParserError(format!(
+                            "Expected EXTENDED or a query after EXPLAIN ANALYZE, found: {}",
+                            word
+                        )));
+                    }
                     let s = self.parser.parse_statement()?;
                     let q = match s {
                         SQLStatement::Query(q) => q,
@@ -1058,6 +1071,26 @@ mod tests {
     fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
         let mut parser = CubeStoreParser::new(query, None)?;
         Ok(parser.parse_statement()?)
+    }
+
+    #[test]
+    fn parse_explain_analyze_extended() -> Result<(), CubeError> {
+        match parse_stmt("EXPLAIN ANALYZE EXTENDED SELECT 1")? {
+            Statement::ExplainAnalyzeExtended(_) => {}
+            s => panic!("Expected ExplainAnalyzeExtended, got {:?}", s),
+        }
+        match parse_stmt("EXPLAIN ANALYZE SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: true, .. }) => {}
+            s => panic!("Expected Explain with analyze, got {:?}", s),
+        }
+        match parse_stmt("EXPLAIN SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: false, .. }) => {}
+            s => panic!("Expected Explain without analyze, got {:?}", s),
+        }
+        // A misspelled EXTENDED is a parse error, not an EXPLAIN of the "EXTANDED" table
+        // silently dropping the rest of the statement.
+        assert!(parse_stmt("EXPLAIN ANALYZE EXTANDED SELECT 1").is_err());
+        Ok(())
     }
 
     #[test]

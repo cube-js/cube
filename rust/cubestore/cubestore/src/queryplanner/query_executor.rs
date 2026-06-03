@@ -74,8 +74,8 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
-    PlanProperties, SendableRecordBatchStream,
+    collect, execute_stream, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning,
+    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
@@ -399,14 +399,21 @@ impl QueryExecutor for QueryExecutorImpl {
             return Ok(pp_phys_plan(worker_plan.as_ref()));
         }
 
-        // Execute the plan to populate the metrics, the results are discarded.
+        // Execute the plan to populate the metrics. The results are discarded batch by
+        // batch to avoid holding the full result set in memory.
         let session_context = self.execution_context()?;
-        collect(worker_plan.clone(), session_context.task_ctx())
-            .instrument(tracing::span!(
-                tracing::Level::TRACE,
-                "collect_physical_plan_for_explain_analyze"
-            ))
-            .await?;
+        let mut stream = execute_stream(worker_plan.clone(), session_context.task_ctx())?;
+        async {
+            while let Some(batch) = stream.next().await {
+                batch?;
+            }
+            Ok::<_, DataFusionError>(())
+        }
+        .instrument(tracing::span!(
+            tracing::Level::TRACE,
+            "execute_physical_plan_for_explain_analyze"
+        ))
+        .await?;
 
         Ok(pp_phys_plan_ext(
             worker_plan.as_ref(),
@@ -716,6 +723,8 @@ impl CubeTable {
         // pruning or row filtering — could drop the last version while older ones
         // survive elsewhere and get resurrected.
         let predicate = if let Some(key_columns) = &unique_key_columns {
+            // Filters passed to a scan reference only this table's columns, so matching
+            // by bare column name is enough.
             let pushable = filters
                 .iter()
                 .filter(|f| {

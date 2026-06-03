@@ -7386,7 +7386,40 @@ async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), C
         "a non-key filter must not reach the parquet pruning predicate:\n{}",
         worker_plan
     );
+
+    // A mixed conjunction splits: the key conjunct goes below the dedup, the non-key one
+    // stays above. The last version of (3, 3) is 50: it fails val <= 25, and the
+    // overwritten (3, 3, 5) must not pass in its place.
+    let query = "SELECT sum(val) FROM s.Versions WHERE a in (2, 3) AND val <= 25";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(20)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert!(
+        filters_below_scan(&worker_plan) > 0,
+        "the key conjunct must be pushed below the dedup:\n{}",
+        worker_plan
+    );
+    assert!(
+        !below_scan(&worker_plan).contains("val"),
+        "the non-key conjunct must not appear below the dedup:\n{}",
+        worker_plan
+    );
     return Ok(());
+
+    fn below_scan(plan: &str) -> &str {
+        let scan_start = plan
+            .find(scan_line(plan))
+            .expect("scan line is a substring of the plan");
+        &plan[scan_start + scan_line(plan).len()..]
+    }
 
     fn scan_line(plan: &str) -> &str {
         plan.lines()
