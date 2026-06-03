@@ -13,6 +13,7 @@ use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
 use datafusion::physical_optimizer::PhysicalOptimizerRule as _;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
@@ -121,6 +122,71 @@ pub fn push_aggregate_to_workers(
         p_final_input,
         p_final_input_schema,
     )?))
+}
+
+/// A global (no GROUP BY) aggregate doesn't use the input ordering, but the scan still merges
+/// its partitions with a SortPreservingMergeExec when the index has a sort key (e.g. picked
+/// from the filters for partition pruning). Replace such merges under the aggregate with plain
+/// partition coalescing: the per-row key comparisons are pure waste there, and particularly
+/// bad when the filters above make the merge keys constant, turning every comparison into a
+/// full-length tie.
+///
+/// Restricted to aggregates without group expressions: those hold a single accumulator set per
+/// partition even when later optimizations make them run per partition. A grouped hash
+/// aggregate over unmerged partitions could end up with a hash table per partition,
+/// multiplying its memory by the partition count.
+pub fn drop_sort_merge_under_global_aggregate(
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() else {
+        return Ok(p);
+    };
+    if !matches!(agg.input_order_mode(), InputOrderMode::Linear)
+        || !agg.group_expr().expr().is_empty()
+    {
+        return Ok(p);
+    }
+    // Order-sensitive aggregates (first_value, array_agg(ORDER BY), ...) stay Linear with an
+    // empty GROUP BY but still need their input ordered
+    if agg.required_input_ordering()[0].is_some() {
+        return Ok(p);
+    }
+    let new_input = replace_merges_with_coalesce(agg.input())?;
+    if Arc::ptr_eq(&new_input, agg.input()) {
+        return Ok(p);
+    }
+    p.with_new_children(vec![new_input])
+}
+
+/// Replaces sort preserving merges with plain partition coalescing, looking through the nodes
+/// that don't require an input ordering of their own.
+fn replace_merges_with_coalesce(
+    p: &Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let p_any = p.as_any();
+    if let Some(merge) = p_any.downcast_ref::<SortPreservingMergeExec>() {
+        if merge.fetch().is_some() {
+            return Ok(p.clone());
+        }
+        let child = replace_merges_with_coalesce(merge.input())?;
+        return Ok(Arc::new(CoalescePartitionsExec::new(child)));
+    }
+    if p_any.is::<FilterExec>() || p_any.is::<ProjectionExec>() || p_any.is::<UnionExec>() {
+        let new_children = p
+            .children()
+            .into_iter()
+            .map(replace_merges_with_coalesce)
+            .collect::<Result<Vec<_>, _>>()?;
+        if p.children()
+            .into_iter()
+            .zip(new_children.iter())
+            .all(|(old, new)| Arc::ptr_eq(old, new))
+        {
+            return Ok(p.clone());
+        }
+        return p.clone().with_new_children(new_children);
+    }
+    Ok(p.clone())
 }
 
 /// Transforms from:
@@ -989,6 +1055,167 @@ mod tests {
         for key in [7, 8, 9] {
             assert_eq!(summed[&key], baseline[&key], "complete total for key {key}");
         }
+    }
+
+    /// A global aggregate doesn't use the input order: the merge below it becomes a plain
+    /// coalesce, through the filter, with identical results.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn drops_sort_merge_under_global_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let filter: Arc<dyn ExecutionPlan> = Arc::new(
+            FilterExec::try_new(
+                Arc::new(datafusion::physical_plan::expressions::BinaryExpr::new(
+                    col("k", &schema).unwrap(),
+                    datafusion::logical_expr::Operator::Gt,
+                    Arc::new(datafusion::physical_plan::expressions::Literal::new(
+                        datafusion::scalar::ScalarValue::Int64(Some(1)),
+                    )),
+                )),
+                merge_by_k(source),
+            )
+            .unwrap(),
+        );
+        let original = global_sum_aggregate(filter);
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+
+        let agg = rewritten.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let filter = agg
+            .input()
+            .as_any()
+            .downcast_ref::<FilterExec>()
+            .expect("filter must stay in place");
+        assert!(
+            filter.input().as_any().is::<CoalescePartitionsExec>(),
+            "the merge must become a plain coalesce"
+        );
+
+        assert_eq!(
+            collect_global_sum(rewritten).await,
+            collect_global_sum(original).await
+        );
+    }
+
+    /// An order-sensitive aggregate stays Linear with an empty GROUP BY but still needs its
+    /// input ordered, so its merge stays.
+    #[test]
+    fn keeps_sort_merge_under_order_sensitive_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let merged = merge_by_k(source);
+        let first = AggregateExprBuilder::new(
+            datafusion::functions_aggregate::array_agg::array_agg_udaf(),
+            vec![col("v", &schema).unwrap()],
+        )
+        .schema(schema.clone())
+        .alias("vals")
+        .order_by(LexOrdering::new(vec![PhysicalSortExpr::new_default(
+            col("k", &schema).unwrap(),
+        )]))
+        .build()
+        .unwrap();
+        let original: Arc<dyn ExecutionPlan> = Arc::new(
+            AggregateExec::try_new(
+                AggregateMode::Partial,
+                PhysicalGroupBy::new_single(Vec::new()),
+                vec![Arc::new(first)],
+                vec![None],
+                merged,
+                schema,
+            )
+            .unwrap(),
+        );
+        assert!(original
+            .as_any()
+            .downcast_ref::<AggregateExec>()
+            .unwrap()
+            .required_input_ordering()[0]
+            .is_some());
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    /// A grouped hash aggregate over unmerged partitions could build a hash table per
+    /// partition, so its merge stays.
+    #[test]
+    fn keeps_sort_merge_under_grouped_hash_aggregate() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("g", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])),
+                Arc::new(Int64Array::from(vec![5, 4])),
+                Arc::new(Int64Array::from(vec![10, 20])),
+            ],
+        )
+        .unwrap();
+        let source = sorted_source(&schema, vec![vec![batch.clone()], vec![batch]]);
+        let original = sum_aggregate(AggregateMode::Partial, "g", merge_by_k(source));
+        assert!(matches!(
+            original
+                .as_any()
+                .downcast_ref::<AggregateExec>()
+                .unwrap()
+                .input_order_mode(),
+            InputOrderMode::Linear
+        ));
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    fn global_sum_aggregate(input: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+        let schema = input.schema();
+        let sum = AggregateExprBuilder::new(sum_udaf(), vec![col("v", &schema).unwrap()])
+            .schema(schema.clone())
+            .alias("sum_v")
+            .build()
+            .unwrap();
+        Arc::new(
+            AggregateExec::try_new(
+                AggregateMode::Partial,
+                PhysicalGroupBy::new_single(Vec::new()),
+                vec![Arc::new(sum)],
+                vec![None],
+                input,
+                schema,
+            )
+            .unwrap(),
+        )
+    }
+
+    /// Sums the partial states of a global aggregate across partitions.
+    async fn collect_global_sum(plan: Arc<dyn ExecutionPlan>) -> i64 {
+        let session = SessionContext::new();
+        let batches = collect(plan, session.task_ctx()).await.unwrap();
+        batches
+            .iter()
+            .flat_map(|b| {
+                b.column(0)
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+            })
+            .sum()
+    }
+
+    #[test]
+    fn keeps_sort_merge_under_sorted_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
     }
 
     /// The descent looks through projections: the row limit is a plain count and commutes with

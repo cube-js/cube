@@ -246,6 +246,14 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "planning_aggregate_below_merge_with_limit",
             planning_aggregate_below_merge_with_limit,
         ),
+        t(
+            "global_aggregate_no_chunk_merge",
+            global_aggregate_no_chunk_merge,
+        ),
+        t(
+            "global_aggregate_unique_key_keeps_merge",
+            global_aggregate_unique_key_keeps_merge,
+        ),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -401,6 +409,8 @@ lazy_static::lazy_static! {
         "group_by_prefix_sorted_aggregate_multi_partition",
         "group_by_prefix_limit_high_cardinality",
         "planning_aggregate_below_merge_with_limit",
+        "global_aggregate_no_chunk_merge",
+        "global_aggregate_unique_key_keeps_merge",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -7725,6 +7735,106 @@ async fn planning_aggregate_below_merge_with_limit(
         \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
         \n                Sort\
         \n                  Empty"
+    );
+    Ok(())
+}
+
+/// A no-GROUP BY (hash) aggregate over a multi-chunk scan: the chunks must be coalesced, not
+/// merge-sorted -- the aggregate doesn't use the order, and the equality filters on the sort key
+/// prefix make every merge comparison a full-length tie.
+async fn global_aggregate_no_chunk_merge(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Batch (tenant_id int, deployment_id int, ts timestamp, hits int, hits_failed int)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Stream (tenant_id int, deployment_id int, ts timestamp, hits int, hits_failed int)",
+        )
+        .await?;
+
+    // Several inserts = several chunks, like a streaming table
+    for i in 0..3 {
+        let values = (0..50)
+            .map(|j| {
+                format!(
+                    "(25358, 5, '2026-06-03T0{}:00:{:02}.000', {}, {})",
+                    i,
+                    j,
+                    j,
+                    j % 3
+                )
+            })
+            .join(", ");
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.Stream (tenant_id, deployment_id, ts, hits, hits_failed) VALUES {}",
+                values
+            ))
+            .await?;
+    }
+
+    let query = "SELECT sum(hits) hits, sum(hits_failed) hits_failed FROM (\
+                     SELECT * FROM s.Batch WHERE 1 = 0 \
+                     UNION ALL \
+                     SELECT * FROM s.Stream\
+                 ) `t` WHERE tenant_id = 25358 AND deployment_id = 5 \
+                   AND ts >= to_timestamp('2026-06-03T00:00:00.000') \
+                   AND ts <= to_timestamp('2026-06-03T23:59:59.999') \
+                 LIMIT 10000";
+
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(3675, 147)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        !worker_plan.contains("MergeSort"),
+        "hash aggregate must not merge-sort the chunks:\n{}",
+        worker_plan
+    );
+    let coalesce_pos = worker_plan.find("CoalescePartitions");
+    let aggregate_pos = worker_plan.find("LinearPartialAggregate");
+    assert!(
+        coalesce_pos.is_some() && aggregate_pos.is_some() && coalesce_pos < aggregate_pos,
+        "the per-partition aggregation must be coalesced above:\n{}",
+        worker_plan
+    );
+    Ok(())
+}
+
+/// A unique key table deduplicates row versions via LastRowByUniqueKey, which needs its input
+/// merge-sorted to keep the versions of a key adjacent. That merge must survive the
+/// no-ordering-needed rewrite under a global aggregate.
+async fn global_aggregate_unique_key_keeps_merge(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2)")
+        .await?;
+    // A newer version of (1, 1) in another chunk
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 3)")
+        .await?;
+
+    let query = "SELECT sum(val) FROM s.Versions";
+    let r = service.exec_query(query).await?;
+    // Only the last version of each key counts: 30 + 20, not 10 + 30 + 20
+    assert_eq!(to_rows(&r), rows(&[(50)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        worker_plan.contains("LastRowByUniqueKey") && worker_plan.contains("MergeSort"),
+        "the deduplicating merge must stay in place:\n{}",
+        worker_plan
     );
     Ok(())
 }

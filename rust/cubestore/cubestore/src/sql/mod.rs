@@ -3625,14 +3625,13 @@ mod tests {
                 \n      CoalescePartitions\
                 \n        LinearPartialAggregate\
                 \n          Filter\
-                \n            MergeSort\
-                \n              Scan, index: default:1:[1]:sort_on[num], fields: *\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan";
+                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan";
                 let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
                 let p = plan_regexp.replace_all(&plan, "ParquetScan");
                 println!("pp {}", p);
