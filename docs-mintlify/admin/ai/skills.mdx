@@ -4,14 +4,15 @@ description: Package reusable, named agent workflows in your data model reposito
 ---
 
 Skills are reusable, named instruction packages for the agent — saved workflows a user
-can run on demand from [Analytics Chat](/docs/explore-analyze/analytics-chat). Instead
-of re-typing the same multi-step request ("produce a weekly revenue report, broken down
-by region, with week-over-week trends…"), a user picks a skill and the agent follows the
-workflow you've defined.
+can run on demand wherever they work with the agent, including
+[Analytics Chat](/docs/explore-analyze/analytics-chat), Workbooks, dashboards, and the
+IDE. Instead of re-typing the same multi-step request ("produce a weekly revenue report,
+broken down by region, with week-over-week trends…"), a user picks a skill and the agent
+follows the workflow you've defined.
 
 Skills are configured as code in your [data model repository](/admin/ai#agent-configuration),
-alongside your cubes and views. There is no separate UI or database object — a skill is
-versioned, reviewed, and deployed like the rest of your Cube project.
+alongside your cubes and views, so they're versioned, reviewed, and deployed like the rest
+of your Cube project.
 
 <Note>
 A skill guides what the agent does using the same data access the agent already has. The
@@ -53,7 +54,8 @@ entire `skills/` directory.
 | `title`         | string | Yes      | User-facing label shown on the skill button and in the `/` menu.                  |
 | `description`   | string | Yes      | What the agent matches free-text requests against to auto-select the skill.       |
 | `name`          | string | No       | Unique identifier. Inferred from the file name if omitted.                        |
-| `instructions`  | string | No       | The skill instructions. Falls back to the Markdown body if omitted.              |
+
+The Markdown body is the skill's instructions.
 
 ### Inlining skills in YAML
 
@@ -72,8 +74,9 @@ skills:
       3. Highlight any region that moved more than 10% week over week.
 ```
 
-Inline skills accept the same properties as Markdown ones — `name`, `title` (required),
-`description` (required), and `instructions` (required).
+Inline skills use the same `name`, `title` (required), and `description` (required) as
+Markdown skills. Since there is no Markdown body in YAML, provide the instructions inline
+via the `instructions` key.
 
 <Note>
 Skills inlined at the root of `agents/config.yml` are attached to the implicit `auto`
@@ -98,7 +101,7 @@ its complete instructions on demand.
   automatic matching more reliable.
 
 For how skills appear and run in chat — buttons, the `/` menu, and automatic matching —
-see [Agent skills in Analytics Chat](/docs/explore-analyze/skills).
+see [Agent skills](/docs/explore-analyze/skills).
 
 ## Deploying and testing
 
