@@ -91,7 +91,8 @@
                   }
                 ]
               },
-              "docs/explore-analyze/analytics-chat"
+              "docs/explore-analyze/analytics-chat",
+              "docs/explore-analyze/skills"
             ]
           },
           {
@@ -378,6 +379,7 @@
               "admin/ai/index",
               "admin/ai/rules",
               "admin/ai/certified-queries",
+              "admin/ai/skills",
               "admin/ai/memory-isolation",
               "admin/ai/multi-agent",
               "admin/ai/bring-your-own-model"
