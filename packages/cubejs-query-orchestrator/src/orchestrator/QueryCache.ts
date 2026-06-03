@@ -426,10 +426,24 @@ export class QueryCache {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
-      keyQuery
+    // Single-pass replacement with longest-first alternation: sequential
+    // per-name replacement would corrupt names that are prefixes of other
+    // names (e.g. `name1` vs `name10`) and rescan already inserted target
+    // names, which contain the source name as a prefix
+    const sorted = [...preAggregationsTablesToTempTables]
+      .sort(([a], [b]) => b.length - a.length);
+    const replacements = new Map(
+      sorted.map(([tableName, { targetTableName }]) => [tableName, targetTableName])
     );
+    const replaceRegex = new RegExp(
+      sorted
+        .map(([tableName]) => tableName.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'))
+        .join('|'),
+      'g'
+    );
+    const replacedKeyQuery: string = sorted.length
+      ? keyQuery.replace(replaceRegex, (match) => replacements.get(match) as string)
+      : keyQuery;
     return Array.isArray(queryAndParams)
       ? [replacedKeyQuery, params, queryOptions]
       : replacedKeyQuery;
