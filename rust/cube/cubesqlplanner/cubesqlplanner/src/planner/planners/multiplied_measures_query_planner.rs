@@ -96,11 +96,15 @@ impl MultipliedMeasuresQueryPlanner {
             }
         }
 
+        // `into_group_map_by` yields a HashMap; sort the groups so CTE
+        // numbering stays deterministic across runs.
         for (cube_name, measures) in full_key_aggregate_measures
             .multiplied_measures
             .clone()
             .into_iter()
             .into_group_map_by(|m| m.cube_name().clone())
+            .into_iter()
+            .sorted_by(|(a, _), (b, _)| a.cmp(b))
         {
             let measures = measures
                 .into_iter()

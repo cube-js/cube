@@ -252,7 +252,15 @@ impl PreAggregationOptimizer {
                         }
                     }
                     PlanNode::AggregateMultipliedSubquery(agg) => {
-                        if let Some(rewritten) = self.try_rewrite_schema_and_filter(
+                        // A multiplied subquery hoisted out of a multi-stage
+                        // leaf carries that leaf's evaluation context (time
+                        // shifts, mutated filter state) — matching it against
+                        // the root filter would be wrong. Such CTEs are
+                        // covered by rewriting their leaf wrapper instead.
+                        if agg.evaluation_context.is_some() {
+                            has_unrewritten_leaf = true;
+                            NodeRewriteResult::stop()
+                        } else if let Some(rewritten) = self.try_rewrite_schema_and_filter(
                             &agg.schema,
                             &root_filter,
                             compiled_pre_aggregations,
@@ -276,6 +284,11 @@ impl PreAggregationOptimizer {
                 };
                 Ok(res)
             })?;
+            // The whole attempt rolls back on any unrewritten leaf — no
+            // point matching the remaining CTEs.
+            if has_unrewritten_leaf {
+                break;
+            }
             collect_cte_refs(&rewritten.as_plan_node(), &mut needed);
             rewritten_multistages_rev.push(rewritten);
         }
