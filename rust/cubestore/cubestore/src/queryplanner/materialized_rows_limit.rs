@@ -129,8 +129,7 @@ impl Stream for MaterializedRowsLimitStream {
                         "Query execution stage '{}' materialized at least {} rows \
                          which exceeds the limit of {} rows. \
                          Consider creating a pre-aggregation that performs this stage \
-                         ahead of time, or adjust the CUBESTORE_MATERIALIZED_ROWS_LIMIT \
-                         environment variable.",
+                         ahead of time.",
                         self.stage, total, self.limit
                     ))
                     .into()))
@@ -198,10 +197,5 @@ mod tests {
         assert!(message.contains("at least 7 rows"), "{}", message);
         assert!(message.contains("limit of 6 rows"), "{}", message);
         assert!(message.contains("pre-aggregation"), "{}", message);
-        assert!(
-            message.contains("CUBESTORE_MATERIALIZED_ROWS_LIMIT"),
-            "{}",
-            message
-        );
     }
 }
