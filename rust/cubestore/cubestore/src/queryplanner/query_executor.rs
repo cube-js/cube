@@ -68,6 +68,7 @@ use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
@@ -856,6 +857,40 @@ impl CubeTable {
             }
         }
 
+        let unique_key_columns = self
+            .index_snapshot
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
+
+        // Filters referencing only unique key columns commute with the last-row
+        // deduplication: the key is immutable within a version group, so such filters
+        // select whole groups. Apply them to every stream to cut the merge and dedup
+        // input. Filters on other columns must stay above the dedup: they apply to the
+        // last version of a row, pushing them down would resurrect overwritten versions.
+        if let Some(key_columns) = &unique_key_columns {
+            let pushable = filters
+                .iter()
+                .filter(|f| {
+                    !f.is_volatile()
+                        && f.column_refs()
+                            .iter()
+                            .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            if let Some(predicate) = combine_filters(&pushable) {
+                for p in &mut partition_execs {
+                    let phys_predicate = state.create_physical_expr(
+                        predicate.clone(),
+                        &p.schema().as_ref().clone().to_dfschema()?,
+                    )?;
+                    *p = Arc::new(FilterExec::try_new(phys_predicate, p.clone())?);
+                }
+            }
+        }
+
         // Schema for scan output and input to MergeSort and LastRowByUniqueKey
         let table_projected_schema = {
             Arc::new(Schema::new(
@@ -900,13 +935,6 @@ impl CubeTable {
                 Boundedness::Bounded,
             ),
         });
-        let unique_key_columns = self
-            .index_snapshot()
-            .table_path
-            .table
-            .get_row()
-            .unique_key_columns();
-
         let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
             let sort_columns = self
                 .index_snapshot()
