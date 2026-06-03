@@ -93,7 +93,7 @@ impl PlanningScope {
         evaluation_context: EvaluationContext,
         f: impl FnOnce(&mut Self) -> T,
     ) -> T {
-        let saved = std::mem::replace(&mut self.evaluation_context, Some(evaluation_context));
+        let saved = self.evaluation_context.replace(evaluation_context);
         let result = f(self);
         self.evaluation_context = saved;
         result
