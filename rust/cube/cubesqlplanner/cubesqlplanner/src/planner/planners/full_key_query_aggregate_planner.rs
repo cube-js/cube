@@ -36,11 +36,10 @@ impl FullKeyAggregateQueryPlanner {
     }
 
     /// Wraps `plan_logical_source` in a `Query` with the request's
-    /// filters, modifiers and multi-stage members.
+    /// filters and modifiers.
     pub fn plan_logical_plan(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
-        all_multistage_members: Vec<Rc<LogicalMultiStageMember>>,
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
         let source = source.into();
@@ -59,7 +58,6 @@ impl FullKeyAggregateQueryPlanner {
         });
         let result = Query::builder()
             .schema(schema)
-            .multistage_members(all_multistage_members)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),

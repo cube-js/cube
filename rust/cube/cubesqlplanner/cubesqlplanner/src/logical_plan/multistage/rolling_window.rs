@@ -135,6 +135,13 @@ impl LogicalNode for MultiStageRollingWindow {
         Ok(self)
     }
 
+    fn referenced_cte_names(&self) -> Vec<String> {
+        vec![
+            self.time_series_input.name().clone(),
+            self.measure_input.name().clone(),
+        ]
+    }
+
     fn node_name(&self) -> &'static str {
         "MultiStageRollingWindow"
     }

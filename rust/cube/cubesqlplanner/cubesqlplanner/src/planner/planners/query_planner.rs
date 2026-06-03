@@ -31,28 +31,33 @@ impl QueryPlanner {
     /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
     /// builds the multi-stage / multiplied CTEs and assembles them via
     /// `FullKeyAggregateQueryPlanner`.
-    pub fn plan(&self) -> Result<Rc<Query>, CubeError> {
+    ///
+    /// CTE members are registered into the caller-provided `cte_state`
+    /// (one instance per plan, shared with nested planning scopes), so
+    /// the returned `Query` is the query body only — the accumulated
+    /// CTE list is attached at the top by `RootQuery`. The subquery
+    /// refs the planners return are consumed right here by this
+    /// query's `FullKeyAggregate`; they never leak between scopes.
+    pub fn plan(&self, cte_state: &mut CteState) -> Result<Rc<Query>, CubeError> {
         if self.request.is_simple_query()? {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
-            planner.plan()
+            planner.plan(cte_state)
         } else {
             let request = self.request.clone();
-            let mut cte_state = CteState::new();
+            let mut refs = Vec::new();
 
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
             if self.request.allow_multi_stage() {
-                multi_stage_query_planner.plan_queries(&mut cte_state)?;
+                refs.extend(multi_stage_query_planner.plan_queries(cte_state)?);
             }
 
             let multiplied_measures_query_planner =
                 MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
-            multiplied_measures_query_planner.plan_queries(&mut cte_state)?;
-
-            let (all_members, all_refs) = cte_state.into_results();
+            refs.extend(multiplied_measures_query_planner.plan_queries(cte_state)?);
 
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result = full_key_aggregate_planner.plan_logical_plan(all_refs, all_members)?;
+            let result = full_key_aggregate_planner.plan_logical_plan(refs)?;
 
             Ok(result)
         }

@@ -1,10 +1,11 @@
+use super::planners::multi_stage::CteState;
 use super::planners::QueryPlanner;
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
-use crate::logical_plan::Query;
+use crate::logical_plan::RootQuery;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -31,7 +32,14 @@ impl TopLevelPlanner {
 
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
-        let logical_plan = query_planner.plan()?;
+        let mut cte_state = CteState::new();
+        let query = query_planner.plan(&mut cte_state)?;
+        let logical_plan = Rc::new(
+            RootQuery::builder()
+                .ctes(cte_state.into_members())
+                .query(query)
+                .build(),
+        );
 
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
 
@@ -65,8 +73,8 @@ impl TopLevelPlanner {
 
     fn try_pre_aggregations(
         &self,
-        plan: Rc<Query>,
-    ) -> Result<(Rc<Query>, Vec<PreAggregationUsage>), CubeError> {
+        plan: Rc<RootQuery>,
+    ) -> Result<(Rc<RootQuery>, Vec<PreAggregationUsage>), CubeError> {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),

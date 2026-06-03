@@ -71,6 +71,10 @@ impl LogicalNode for MultiStageTimeSeries {
         Ok(self)
     }
 
+    fn referenced_cte_names(&self) -> Vec<String> {
+        self.get_date_range_multistage_ref.iter().cloned().collect()
+    }
+
     fn node_name(&self) -> &'static str {
         "MultiStageTimeSeries"
     }

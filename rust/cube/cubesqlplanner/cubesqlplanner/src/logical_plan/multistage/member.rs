@@ -56,8 +56,8 @@ impl PrettyPrint for MultiStageMemberLogicalType {
     }
 }
 
-/// Named CTE in a multi-stage chain. `Query.multistage_members`
-/// holds one per CTE the source depends on.
+/// Named CTE in a multi-stage chain. `RootQuery.ctes` holds the
+/// flat list of these for the whole plan.
 pub struct LogicalMultiStageMember {
     pub name: String,
     pub member_type: MultiStageMemberLogicalType,

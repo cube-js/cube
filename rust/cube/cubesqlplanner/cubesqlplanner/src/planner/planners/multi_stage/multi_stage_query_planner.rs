@@ -84,10 +84,14 @@ impl MultiStageQueryPlanner {
         &self.root_state
     }
 
-    /// Populates `cte_state` with multi-stage CTEs (and their
-    /// subquery refs) for every multi-stage member used by the
-    /// query. No-op when the query has none.
-    pub fn plan_queries(&self, cte_state: &mut CteState) -> Result<(), CubeError> {
+    /// Populates `cte_state` with multi-stage CTEs for every
+    /// multi-stage member used by the query and returns the subquery
+    /// refs the caller's `FullKeyAggregate` joins over. No-op when
+    /// the query has none.
+    pub fn plan_queries(
+        &self,
+        cte_state: &mut CteState,
+    ) -> Result<Vec<Rc<MultiStageSubqueryRef>>, CubeError> {
         let multi_stage_members = self
             .query_properties
             .all_used_symbols()?
@@ -101,13 +105,14 @@ impl MultiStageQueryPlanner {
             })
             .collect::<Result<Vec<_>, _>>()?;
         if multi_stage_members.is_empty() {
-            return Ok(());
+            return Ok(vec![]);
         }
 
         let mut descriptions = Vec::new();
         let state = self.root_state.clone();
 
         let mut resolved_multi_stage_dimensions = HashSet::new();
+        let mut subquery_refs = Vec::new();
 
         for member in multi_stage_members {
             let description = self.make_queries_descriptions(
@@ -123,7 +128,7 @@ impl MultiStageQueryPlanner {
                     .symbols(vec![description.member_node().clone()])
                     .schema(description.schema().clone())
                     .build();
-                cte_state.add_subquery_ref(Rc::new(result));
+                subquery_refs.push(Rc::new(result));
             }
         }
 
@@ -133,11 +138,11 @@ impl MultiStageQueryPlanner {
                 self.query_properties.clone(),
                 descr.clone(),
             );
-            let member = planner.plan_logical_query()?;
+            let member = planner.plan_logical_query(cte_state)?;
             cte_state.add_member(member);
         }
 
-        Ok(())
+        Ok(subquery_refs)
     }
 
     /// Classifies `base_member` into a `MultiStageInodeMember` — picks

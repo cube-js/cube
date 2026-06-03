@@ -15,6 +15,14 @@ pub trait LogicalNode {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode;
 
     fn node_name(&self) -> &'static str;
+
+    /// Names of CTEs this node references directly (not through its
+    /// inputs). Any node that links to a CTE by name MUST override
+    /// this — reachability passes (e.g. dropping orphaned CTEs in the
+    /// pre-aggregation optimizer) rely on it.
+    fn referenced_cte_names(&self) -> Vec<String> {
+        vec![]
+    }
 }
 
 /// Type-erased handle for a logical-plan node. Generic traversal
@@ -22,6 +30,7 @@ pub trait LogicalNode {
 /// via `into_logical_node` / each node's `try_from_plan_node`.
 #[derive(Clone)]
 pub enum PlanNode {
+    RootQuery(Rc<RootQuery>),
     Query(Rc<Query>),
     LogicalJoin(Rc<LogicalJoin>),
     FullKeyAggregate(Rc<FullKeyAggregate>),
@@ -44,6 +53,7 @@ pub enum PlanNode {
 macro_rules! match_plan_node {
     ($self:expr, $node:ident => $block:block) => {
         match $self {
+            PlanNode::RootQuery($node) => $block,
             PlanNode::Query($node) => $block,
             PlanNode::LogicalJoin($node) => $block,
             PlanNode::FullKeyAggregate($node) => $block,
@@ -78,6 +88,12 @@ impl PlanNode {
     pub fn node_name(&self) -> &'static str {
         match_plan_node!(self, node => {
             node.node_name()
+        })
+    }
+
+    pub fn referenced_cte_names(&self) -> Vec<String> {
+        match_plan_node!(self, node => {
+            node.referenced_cte_names()
         })
     }
 

@@ -2,7 +2,7 @@ use cubenativeutils::CubeError;
 
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::{CteRenderContext, TimeShiftState};
 use crate::planner::MemberSymbol;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -30,6 +30,16 @@ pub(super) struct PushDownBuilderContext {
 }
 
 impl PushDownBuilderContext {
+    /// The single place a CTE's `render_context` is transferred into
+    /// the build context — both the leaf-measure and the
+    /// multiplied-subquery processors go through here, so the two
+    /// stay in sync field-for-field.
+    pub fn apply_render_context(&mut self, render_context: &CteRenderContext) {
+        self.render_measure_as_state = render_context.render_measure_as_state;
+        self.render_measure_for_ungrouped = render_context.render_measure_for_ungrouped;
+        self.time_shifts = render_context.time_shifts.clone();
+    }
+
     pub fn make_sql_nodes_factory(&self) -> Result<SqlNodesFactory, CubeError> {
         let mut factory = SqlNodesFactory::new();
 
