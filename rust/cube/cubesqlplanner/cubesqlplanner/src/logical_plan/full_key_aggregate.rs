@@ -138,6 +138,18 @@ impl LogicalNode for FullKeyAggregate {
         ))
     }
 
+    fn referenced_cte_names(&self) -> Vec<String> {
+        let mut result: Vec<String> = self
+            .multi_stage_subquery_refs
+            .iter()
+            .map(|r| r.name().clone())
+            .collect();
+        if let Some(keys_input) = &self.keys_input {
+            result.extend(keys_input.refs().iter().map(|r| r.name().clone()));
+        }
+        result
+    }
+
     fn node_name(&self) -> &'static str {
         "FullKeyAggregate"
     }

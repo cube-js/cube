@@ -1,7 +1,7 @@
 use super::{
-    CteState, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType,
-    MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
-    MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
+    MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType, MultiStageMember,
+    MultiStageMemberQueryPlanner, MultiStageMemberType, MultiStageQueryDescription, PlanningScope,
+    RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
@@ -84,10 +84,14 @@ impl MultiStageQueryPlanner {
         &self.root_state
     }
 
-    /// Populates `cte_state` with multi-stage CTEs (and their
-    /// subquery refs) for every multi-stage member used by the
-    /// query. No-op when the query has none.
-    pub fn plan_queries(&self, cte_state: &mut CteState) -> Result<(), CubeError> {
+    /// Populates `scope` with multi-stage CTEs for every
+    /// multi-stage member used by the query and returns the subquery
+    /// refs the caller's `FullKeyAggregate` joins over. No-op when
+    /// the query has none.
+    pub fn plan_queries(
+        &self,
+        scope: &mut PlanningScope,
+    ) -> Result<Vec<Rc<MultiStageSubqueryRef>>, CubeError> {
         let multi_stage_members = self
             .query_properties
             .all_used_symbols()?
@@ -101,13 +105,14 @@ impl MultiStageQueryPlanner {
             })
             .collect::<Result<Vec<_>, _>>()?;
         if multi_stage_members.is_empty() {
-            return Ok(());
+            return Ok(vec![]);
         }
 
         let mut descriptions = Vec::new();
         let state = self.root_state.clone();
 
         let mut resolved_multi_stage_dimensions = HashSet::new();
+        let mut subquery_refs = Vec::new();
 
         for member in multi_stage_members {
             let description = self.make_queries_descriptions(
@@ -115,7 +120,7 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 &mut descriptions,
                 &mut resolved_multi_stage_dimensions,
-                cte_state,
+                scope,
             )?;
             if !description.is_multi_stage_dimension() {
                 let result = MultiStageSubqueryRef::builder()
@@ -123,7 +128,7 @@ impl MultiStageQueryPlanner {
                     .symbols(vec![description.member_node().clone()])
                     .schema(description.schema().clone())
                     .build();
-                cte_state.add_subquery_ref(Rc::new(result));
+                subquery_refs.push(Rc::new(result));
             }
         }
 
@@ -133,11 +138,11 @@ impl MultiStageQueryPlanner {
                 self.query_properties.clone(),
                 descr.clone(),
             );
-            let member = planner.plan_logical_query()?;
-            cte_state.add_member(member);
+            let member = planner.plan_logical_query(scope)?;
+            scope.add_member(member);
         }
 
-        Ok(())
+        Ok(subquery_refs)
     }
 
     /// Classifies `base_member` into a `MultiStageInodeMember` — picks
@@ -210,7 +215,7 @@ impl MultiStageQueryPlanner {
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
         if let Some(Case::CaseSwitch(case_switch)) = member.case() {
             if self.try_make_childs_for_case_switch(
@@ -219,7 +224,7 @@ impl MultiStageQueryPlanner {
                 result,
                 descriptions,
                 resolved_multi_stage_dimensions,
-                cte_state,
+                scope,
             )? {
                 return Ok(());
             }
@@ -230,7 +235,7 @@ impl MultiStageQueryPlanner {
             result,
             descriptions,
             resolved_multi_stage_dimensions,
-            cte_state,
+            scope,
         )
     }
 
@@ -316,7 +321,7 @@ impl MultiStageQueryPlanner {
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
         let mut has_inputs = false;
         for dep in member.get_dependencies() {
@@ -328,7 +333,7 @@ impl MultiStageQueryPlanner {
                     new_state.clone(),
                     descriptions,
                     resolved_multi_stage_dimensions,
-                    cte_state,
+                    scope,
                 )?;
                 if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
@@ -338,7 +343,7 @@ impl MultiStageQueryPlanner {
         if !has_inputs {
             //Rank and similas cases
 
-            let alias = cte_state.next_cte_name();
+            let alias = scope.next_cte_name();
             let description = MultiStageQueryDescription::new(
                 MultiStageMember::new_without_member_leaf(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -371,7 +376,7 @@ impl MultiStageQueryPlanner {
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<bool, CubeError> {
         let CaseSwitchItem::Member(switch_member) = &case.switch else {
             return Ok(false);
@@ -434,7 +439,7 @@ impl MultiStageQueryPlanner {
                 state,
                 descriptions,
                 resolved_multi_stage_dimensions,
-                cte_state,
+                scope,
             )?);
         }
 
@@ -455,7 +460,7 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
         let member = apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
@@ -480,14 +485,14 @@ impl MultiStageQueryPlanner {
             state.clone(),
             descriptions,
             resolved_multi_stage_dimensions,
-            cte_state,
+            scope,
         )? {
             return Ok(rolling_window_query);
         }
 
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
         let description = if !has_multi_stage_members {
-            let alias = cte_state.next_cte_name();
+            let alias = scope.next_cte_name();
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -575,7 +580,7 @@ impl MultiStageQueryPlanner {
                 &mut input,
                 descriptions,
                 resolved_multi_stage_dimensions,
-                cte_state,
+                scope,
             )?;
 
             // JOIN-model: when new_state misses any dim that was on the
@@ -608,12 +613,12 @@ impl MultiStageQueryPlanner {
                         &mut keys_input,
                         descriptions,
                         resolved_multi_stage_dimensions,
-                        cte_state,
+                        scope,
                     )?;
                 }
             }
 
-            let alias = cte_state.next_cte_name();
+            let alias = scope.next_cte_name();
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
                     MultiStageMemberType::Inode(multi_stage_member),
@@ -642,7 +647,7 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
         if let Ok(measure) = member.as_measure() {
             if measure.is_cumulative() {
@@ -701,7 +706,7 @@ impl MultiStageQueryPlanner {
                             base_state,
                             false,
                             descriptions,
-                            cte_state,
+                            scope,
                         )?
                     } else {
                         self.make_queries_descriptions(
@@ -709,7 +714,7 @@ impl MultiStageQueryPlanner {
                             base_state,
                             descriptions,
                             resolved_multi_stage_dimensions,
-                            cte_state,
+                            scope,
                         )?
                     };
                     return Ok(Some(rolling_base));
@@ -744,7 +749,7 @@ impl MultiStageQueryPlanner {
                         base_rolling_state,
                         ungrouped,
                         descriptions,
-                        cte_state,
+                        scope,
                     )?
                 } else {
                     self.make_queries_descriptions(
@@ -752,13 +757,13 @@ impl MultiStageQueryPlanner {
                         base_rolling_state,
                         descriptions,
                         resolved_multi_stage_dimensions,
-                        cte_state,
+                        scope,
                     )?
                 };
 
                 let input = vec![time_series, rolling_base];
 
-                let alias = cte_state.next_cte_name();
+                let alias = scope.next_cte_name();
 
                 let rolling_window_descr = if measure.is_running_total() {
                     RollingWindowDescription::new_running_total(time_dimension, base_time_dimension)
@@ -904,9 +909,9 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
         ungrouped: bool,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        cte_state: &mut CteState,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let alias = cte_state.next_cte_name();
+        let alias = scope.next_cte_name();
         let description = MultiStageQueryDescription::new(
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),

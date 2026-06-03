@@ -27,6 +27,15 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         aggregate_multiplied_subquery: &AggregateMultipliedSubquery,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
+        // A CTE hoisted out of a multi-stage leaf renders under that
+        // leaf's context (time shifts / measure-rendering flags), as
+        // it would have nested.
+        let mut context = context.clone();
+        if let Some(evaluation_context) = &aggregate_multiplied_subquery.evaluation_context {
+            context.apply_evaluation_context(evaluation_context);
+        }
+        let context = &context;
+
         if let Some(override_query) = &aggregate_multiplied_subquery.pre_aggregation_override {
             return self.builder.process_node(override_query.as_ref(), context);
         }

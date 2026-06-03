@@ -1,7 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{all_symbols, MultiStageMemberLogicalType, Query, QuerySource};
+use crate::logical_plan::{all_symbols, Query, QuerySource};
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, ReferencesBuilder, Select,
+    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferencesBuilder, Select,
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
@@ -39,26 +39,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let query_tools = self.builder.query_tools();
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut context = context.clone();
-        let mut ctes = vec![];
-
-        for multi_stage_member in logical_plan.multistage_members().iter() {
-            let query = self
-                .builder
-                .process_node(&multi_stage_member.member_type, &context)?;
-            let alias = multi_stage_member.name.clone();
-            context.add_multi_stage_schema(alias.clone(), query.schema());
-            if let MultiStageMemberLogicalType::DimensionCalculation(dimension_calculation) =
-                &multi_stage_member.member_type
-            {
-                context.add_multi_stage_dimension_schema(
-                    dimension_calculation.resolved_dimensions()?,
-                    alias.clone(),
-                    dimension_calculation.join_dimensions()?,
-                    query.schema(),
-                );
-            }
-            ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
-        }
 
         context.remove_multi_stage_dimensions();
 
@@ -148,7 +128,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let references_builder = ReferencesBuilder::new(from.clone());
 
         let mut select_builder = SelectBuilder::new(from);
-        select_builder.set_ctes(ctes);
         context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
 
         for dimension in logical_plan.schema().all_dimensions() {

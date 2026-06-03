@@ -1,18 +1,15 @@
 use crate::logical_plan::*;
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 /// Leaf CTE of a multi-stage chain — a base query that produces the
 /// raw aggregated values feeding the rest of the chain. Optional
-/// state rendering (`render_measure_as_state`) and time shifts
-/// happen here.
+/// state rendering and time shifts come from `evaluation_context`.
 pub struct MultiStageLeafMeasure {
     pub measures: Vec<Rc<MemberSymbol>>,
-    pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
-    pub render_measure_for_ungrouped: bool,
-    pub time_shifts: TimeShiftState,
+    pub evaluation_context: EvaluationContext,
     pub query: Rc<Query>,
 }
 
@@ -23,16 +20,16 @@ impl PrettyPrint for MultiStageLeafMeasure {
         for measure in self.measures.iter() {
             result.println(&format!("measure: {}", measure.full_name()), &state);
         }
-        if self.render_measure_as_state {
+        if self.evaluation_context.measure_as_state {
             result.println("render_measure_as_state: true", &state);
         }
-        if self.render_measure_for_ungrouped {
+        if self.evaluation_context.measure_for_ungrouped {
             result.println("render_measure_for_ungrouped: true", &state);
         }
-        if !self.time_shifts.is_empty() {
+        if !self.evaluation_context.time_shifts.is_empty() {
             result.println("time_shifts:", &state);
             let details_state = state.new_level();
-            for (_, time_shift) in self.time_shifts.dimensions_shifts.iter() {
+            for (_, time_shift) in self.evaluation_context.time_shifts.dimensions_shifts.iter() {
                 result.println(
                     &format!(
                         "- {}: {}",
@@ -70,9 +67,7 @@ impl LogicalNode for MultiStageLeafMeasure {
 
         Ok(Rc::new(Self {
             measures: self.measures.clone(),
-            render_measure_as_state: self.render_measure_as_state,
-            render_measure_for_ungrouped: self.render_measure_for_ungrouped,
-            time_shifts: self.time_shifts.clone(),
+            evaluation_context: self.evaluation_context.clone(),
             query: query.clone().into_logical_node()?,
         }))
     }
