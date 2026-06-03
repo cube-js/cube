@@ -3875,10 +3875,27 @@ impl WrappedSelectNode {
                 }
             };
 
+            // Merge remapping from join subquery before rendering join condition:
+            // condition can reference columns from both sides of the join,
+            // and those columns can be remapped in respective inputs
+            if let Some(join_column_remapping) = join_column_remapping {
+                if let Some(column_remapping) = column_remapping.as_mut() {
+                    column_remapping.extend(join_column_remapping);
+                } else {
+                    column_remapping = Some(join_column_remapping);
+                }
+            };
+
+            let join_condition = if let Some(column_remapping) = &column_remapping {
+                column_remapping.remap(join_condition)?
+            } else {
+                join_condition.clone()
+            };
+
             let (join_condition_sql, join_sql) = Self::generate_sql_for_expr(
                 join_sql,
                 generator.clone(),
-                join_condition.clone(),
+                join_condition,
                 None,
                 &HashMap::new(),
             )?;
@@ -3889,13 +3906,6 @@ impl WrappedSelectNode {
             let mapping = sql.add_values(new_values);
             let join_sql_str = SqlQuery::remap_placeholders(&join_sql_str, &mapping)?;
             let join_condition_sql = SqlQuery::remap_placeholders(&join_condition_sql, &mapping)?;
-            if let Some(join_column_remapping) = join_column_remapping {
-                if let Some(column_remapping) = column_remapping.as_mut() {
-                    column_remapping.extend(join_column_remapping);
-                } else {
-                    column_remapping = Some(join_column_remapping);
-                }
-            };
 
             let aliased_join_sql = generator
                 .get_sql_templates()
