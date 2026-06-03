@@ -7317,9 +7317,10 @@ async fn unique_key_and_multi_partitions_hash_aggregate(
 }
 
 /// Filters referencing only unique key columns commute with the last-row deduplication
-/// and get pushed below it onto every scan stream. Filters on non-key columns must stay
-/// above the dedup: they apply to the last version of a row, pushing them down would
-/// resurrect overwritten versions.
+/// and get pushed below it: onto every scan stream and into the parquet pruning
+/// predicate. Filters on non-key columns must stay above the dedup and out of pruning:
+/// they apply to the last version of a row, acting on individual versions below the
+/// dedup would resurrect overwritten ones.
 async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await?;
     service
@@ -7342,10 +7343,21 @@ async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), C
     assert_eq!(to_rows(&r), rows(&[(30)]));
 
     let p = service.plan_query(query).await?;
-    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
     assert!(
         filters_below_scan(&worker_plan) > 0,
         "the unique key filter must be pushed below the dedup onto scan streams:\n{}",
+        worker_plan
+    );
+    assert!(
+        scan_line(&worker_plan).contains("predicate:"),
+        "the unique key filter must reach the parquet pruning predicate:\n{}",
         worker_plan
     );
 
@@ -7356,19 +7368,39 @@ async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), C
     assert_eq!(to_rows(&r), rows(&[(20)]));
 
     let p = service.plan_query(query).await?;
-    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
     assert_eq!(
         filters_below_scan(&worker_plan),
         0,
         "a non-key filter must not be pushed below the dedup:\n{}",
         worker_plan
     );
+    assert!(
+        !scan_line(&worker_plan).contains("predicate:"),
+        "a non-key filter must not reach the parquet pruning predicate:\n{}",
+        worker_plan
+    );
     return Ok(());
+
+    fn scan_line(plan: &str) -> &str {
+        plan.lines()
+            .find(|l| l.trim_start().starts_with("Scan"))
+            .expect("no Scan in the worker plan")
+    }
 
     fn filters_below_scan(plan: &str) -> usize {
         plan.lines()
             .skip_while(|l| !l.trim_start().starts_with("Scan"))
-            .filter(|l| l.trim() == "Filter")
+            .filter(|l| {
+                let l = l.trim_start();
+                l.starts_with("Filter") && !l.starts_with("FilterByKeyRange")
+            })
             .count()
     }
 }

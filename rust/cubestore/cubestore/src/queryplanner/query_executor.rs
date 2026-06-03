@@ -681,7 +681,34 @@ impl CubeTable {
             None
         };
 
-        let predicate = combine_filters(filters);
+        let unique_key_columns = self
+            .index_snapshot
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
+
+        // Only filters referencing unique key columns commute with the last-row
+        // deduplication: the key is immutable within a version group, so such filters
+        // select whole groups. Filters on other columns apply to the last version of a
+        // row; acting on individual versions below the dedup — be it parquet row-group
+        // pruning or row filtering — could drop the last version while older ones
+        // survive elsewhere and get resurrected.
+        let predicate = if let Some(key_columns) = &unique_key_columns {
+            let pushable = filters
+                .iter()
+                .filter(|f| {
+                    !f.is_volatile()
+                        && f.column_refs()
+                            .iter()
+                            .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            combine_filters(&pushable)
+        } else {
+            combine_filters(filters)
+        };
         let physical_predicate = if let Some(pred) = &predicate {
             Some(state.create_physical_expr(
                 pred.clone(),
@@ -857,30 +884,11 @@ impl CubeTable {
             }
         }
 
-        let unique_key_columns = self
-            .index_snapshot
-            .table_path
-            .table
-            .get_row()
-            .unique_key_columns();
-
-        // Filters referencing only unique key columns commute with the last-row
-        // deduplication: the key is immutable within a version group, so such filters
-        // select whole groups. Apply them to every stream to cut the merge and dedup
-        // input. Filters on other columns must stay above the dedup: they apply to the
-        // last version of a row, pushing them down would resurrect overwritten versions.
-        if let Some(key_columns) = &unique_key_columns {
-            let pushable = filters
-                .iter()
-                .filter(|f| {
-                    !f.is_volatile()
-                        && f.column_refs()
-                            .iter()
-                            .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            if let Some(predicate) = combine_filters(&pushable) {
+        // Apply the dedup-safe predicate to every stream of a unique key table to cut
+        // the merge and dedup input: parquet pruning above only skips whole row groups
+        // and does nothing for in-memory chunks.
+        if unique_key_columns.is_some() {
+            if let Some(predicate) = &predicate {
                 for p in &mut partition_execs {
                     let phys_predicate = state.create_physical_expr(
                         predicate.clone(),
