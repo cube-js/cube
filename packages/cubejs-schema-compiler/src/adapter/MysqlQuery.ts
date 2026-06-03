@@ -195,6 +195,8 @@ export class MysqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME';
     delete templates.types.interval;
     templates.types.binary = 'BLOB';
+    // MySQL has no FULL OUTER JOIN
+    delete templates.join_types.full;
 
     templates.expressions.concat_strings = 'CONCAT({{ strings | join(\',\' ) }})';
 

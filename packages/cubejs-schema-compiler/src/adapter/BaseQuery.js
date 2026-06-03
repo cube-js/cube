@@ -4661,6 +4661,8 @@ export class BaseQuery {
       join_types: {
         inner: 'INNER',
         left: 'LEFT',
+        right: 'RIGHT',
+        full: 'FULL',
       },
       window_frame_types: {
         rows: 'ROWS',

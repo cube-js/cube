@@ -756,6 +756,8 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/between".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}".to_string()),
                     ("join_types/inner".to_string(), "INNER".to_string()),
                     ("join_types/left".to_string(), "LEFT".to_string()),
+                    ("join_types/right".to_string(), "RIGHT".to_string()),
+                    ("join_types/full".to_string(), "FULL".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
@@ -780,6 +782,11 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("types/binary".to_string(), "BINARY".to_string()),
                 ]
                     .into_iter().chain(custom_templates)
+                    .collect::<HashMap<_, _>>()
+                    .into_iter()
+                    // Custom template with an empty value removes the base template,
+                    // allowing tests to check behavior of data sources without it
+                    .filter(|(_, value)| !value.is_empty())
                     .collect(),
                     false,
             )

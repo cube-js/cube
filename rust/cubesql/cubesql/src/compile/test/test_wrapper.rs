@@ -1,5 +1,9 @@
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
-use datafusion::{physical_plan::displayable, scalar::ScalarValue};
+use datafusion::{
+    logical_plan::{JoinType, LogicalPlan, PlanVisitor},
+    physical_plan::displayable,
+    scalar::ScalarValue,
+};
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use serde_json::json;
@@ -17,6 +21,7 @@ use crate::{
     },
     config::ConfigObjImpl,
     transport::TransportLoadRequestQuery,
+    CubeError,
 };
 
 #[tokio::test]
@@ -1191,6 +1196,175 @@ WHERE
     assert!(cube_user_re.is_match(&sql));
     let literal_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "literal""#).unwrap();
     assert!(literal_re.is_match(&sql));
+}
+
+/// Regression test for grouped-grouped joins with non-Inner/Left join types under SQL
+/// push down. Both sides are grouped subqueries joined with FULL OUTER JOIN (the shape
+/// produced by period-over-period queries). Before `join_types/full` was wired up, this
+/// failed with `Unsupported join type for join subquery: Full`.
+#[tokio::test]
+async fn test_grouped_join_wrapper_full_outer() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH first_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        last_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS last_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(f.customer_gender, l.customer_gender) AS customer_gender,
+            COALESCE(f.first_price, 0) AS first_price,
+            COALESCE(l.last_price, 0) AS last_price
+        FROM first_period f
+        FULL OUTER JOIN last_period l ON f.customer_gender = l.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a FULL JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("FULL JOIN"),
+        "wrapped SQL is missing FULL JOIN:\n{}",
+        sql
+    );
+}
+
+/// Same as [`test_grouped_join_wrapper_full_outer`], but for RIGHT JOIN.
+#[tokio::test]
+async fn test_grouped_join_wrapper_right() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH first_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        last_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS last_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(f.customer_gender, l.customer_gender) AS customer_gender,
+            COALESCE(f.first_price, 0) AS first_price,
+            COALESCE(l.last_price, 0) AS last_price
+        FROM first_period f
+        RIGHT JOIN last_period l ON f.customer_gender = l.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a RIGHT JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("RIGHT JOIN"),
+        "wrapped SQL is missing RIGHT JOIN:\n{}",
+        sql
+    );
+}
+
+/// When the data source has no `join_types/full` template, a grouped-grouped FULL JOIN
+/// must not be pushed down: the join stays in the DataFusion plan and the query is still
+/// plannable instead of failing with `Unsupported join type for join subquery`.
+#[tokio::test]
+async fn test_grouped_join_wrapper_full_outer_without_template() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        WITH first_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        last_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS last_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(f.customer_gender, l.customer_gender) AS customer_gender,
+            COALESCE(f.first_price, 0) AS first_price,
+            COALESCE(l.last_price, 0) AS last_price
+        FROM first_period f
+        FULL OUTER JOIN last_period l ON f.customer_gender = l.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        // Emulate a data source without FULL JOIN support: empty value removes the template
+        vec![("join_types/full".to_string(), "".to_string())],
+    )
+    .await;
+
+    // Query must still be plannable, with the join executed by DataFusion
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    struct FindJoinVisitor(Option<JoinType>);
+
+    impl PlanVisitor for FindJoinVisitor {
+        type Error = CubeError;
+
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+            if let LogicalPlan::Join(join) = plan {
+                self.0 = Some(join.join_type);
+            }
+            Ok(true)
+        }
+    }
+
+    let logical_plan = query_plan.as_logical_plan();
+    let mut visitor = FindJoinVisitor(None);
+    logical_plan.accept(&mut visitor).unwrap();
+    assert_eq!(
+        visitor.0,
+        Some(JoinType::Full),
+        "expected FULL JOIN to stay in the DataFusion plan, got:\n{}",
+        logical_plan.display_indent(),
+    );
 }
 
 /// Regression test for smoke test "select __user and literal grouped under wrapper".
