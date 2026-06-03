@@ -61,7 +61,7 @@ them together.
 
 When a chart is attached, the agent receives a read-only snapshot of it — the
 underlying SQL, the data, and the chart spec — along with the dashboard's
-**current filter and time-grain state**. It uses this as context; it does not
+**current filter and time-granularity state**. It uses this as context; it does not
 modify any of it.
 
 ## What the Dashboard Agent can and can't do
@@ -81,7 +81,7 @@ The published Dashboard Agent is **read-only by design**.
 **It can't:**
 
 - Edit the dashboard, or add/remove widgets
-- Change filters or the time grain (see [Limitations](#limitations))
+- Change filters or the time granularity (see [Limitations](#limitations))
 - Create reports or workbooks
 - Change the data model
 
@@ -99,7 +99,7 @@ contents — text, PDF, ZIP, and image files are supported.
 
 ## Limitations
 
-- **Filters are read-only.** The agent can tell you which filters and time grain
+- **Filters are read-only.** The agent can tell you which filters and time granularity
   are currently applied and reason about them, but it **cannot change them** for
   you yet. This is the most common expectation gap — if you ask the agent to
   "filter the dashboard to last quarter," it will explain the current state

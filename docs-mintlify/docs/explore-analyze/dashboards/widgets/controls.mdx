@@ -1,16 +1,16 @@
 ---
 title: Controls
-description: Filter and time grain switcher widgets that let dashboard viewers change what's shown on the dashboard.
+description: Filter and time granularity switcher widgets that let dashboard viewers change what's shown on the dashboard.
 ---
 
 Controls are widgets that let dashboard viewers change what's shown without leaving the dashboard. The dashboard builder offers two control types — both target a dimension from your semantic model and apply the selected value to every [chart][ref-charts] on the dashboard whose query references that dimension.
 
 - [Filter](#filter) — Narrow the data shown on the dashboard
-- [Time grain switcher](#time-grain-switcher) — Change the granularity of time-based dimensions
+- [Time granularity switcher](#time-granularity-switcher) — Change the granularity of time-based dimensions
 
 ## Filter
 
-Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], click **Add Filter** in the toolbar. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
+Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], click **Filter** under **Add Controls** in the toolbar. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
 
 ### Operators by dimension type
 
@@ -74,27 +74,27 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
 
-## Time grain switcher
+## Time granularity switcher
 
-Time grain switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
+Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
 
-In the [dashboard builder][ref-workbooks], click **Add Time Grain** in the toolbar. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
+In the [dashboard builder][ref-workbooks], click **Time Granularity** under **Add Controls** in the toolbar. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
 
-### Allowed grains
+### Allowed granularities
 
-By default, viewers can choose between **day**, **week**, **month**, **quarter**, and **year**. You can narrow this list in the widget's settings to only expose the grains that make sense for the dashboard.
+By default, viewers can choose between **day**, **week**, **month**, **quarter**, and **year**. You can narrow this list in the widget's settings to only expose the granularities that make sense for the dashboard.
 
-For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day grains (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day grains, since they would bucket the entire day into a single point.
+For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day granularities (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day granularities, since they would bucket the entire day into a single point.
 
-Custom granularities defined in the [data model][ref-granularities] appear in the list alongside the built-in grains.
+Custom granularities defined in the [data model][ref-granularities] appear in the list alongside the built-in granularities.
 
-### Default grain
+### Default granularity
 
-You can configure a default grain that's applied when the dashboard loads. If no default is set, charts use the grain that was saved on the underlying report — viewers can still switch grains, but the dashboard opens with each chart at its original granularity.
+You can configure a default granularity that's applied when the dashboard loads. If no default is set, charts use the granularity that was saved on the underlying report — viewers can still switch granularities, but the dashboard opens with each chart at its original granularity.
 
 ## Visibility
 
-Each control has a **Visibility** setting that determines how it appears on the published dashboard. The setting applies to both filters and time grain switchers.
+Each control has a **Visibility** setting that determines how it appears on the published dashboard. The setting applies to both filters and time granularity switchers.
 
 | Visibility | Behavior on the published dashboard |
 |---|---|
@@ -125,11 +125,11 @@ Three states show up in the mapping sidebar:
 | **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
 | **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
 
-For [time grain switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time grain pipeline.
+For [time granularity switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time granularity pipeline.
 
 Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
 
-[ref-time-grain]: #time-grain-switcher
+[ref-time-grain]: #time-granularity-switcher
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
