@@ -20,7 +20,8 @@ pub enum NetworkMessage {
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
     //Perform explain analyze of worker query part and return it pretty printed physical plan
-    ExplainAnalyze(SerializedPlan, WorkerPlanningParams),
+    /// The boolean flag is whether to execute the plan to collect runtime metrics.
+    ExplainAnalyze(SerializedPlan, WorkerPlanningParams, bool),
     ExplainAnalyzeResult(Result<String, CubeError>),
 
     /// Select that sends results in batches. The immediate response is [SelectResultSchema],

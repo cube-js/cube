@@ -106,12 +106,13 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     /// Runs explain analyze on a single worker node to get pretty printed physical plan
-    /// from that worker.
+    /// from that worker. `execute` runs the plan to report runtime metrics.
     async fn run_explain_analyze(
         &self,
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
+        execute: bool,
     ) -> Result<String, CubeError>;
 
     /// Like [run_select], but streams results as they are requested.
@@ -523,11 +524,12 @@ impl Cluster for ClusterImpl {
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
+        execute: bool,
     ) -> Result<String, CubeError> {
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::ExplainAnalyze(plan, worker_planning_params),
+                NetworkMessage::ExplainAnalyze(plan, worker_planning_params, execute),
             )
             .await?;
         match response {
@@ -723,9 +725,9 @@ impl Cluster for ClusterImpl {
                 let res = self.run_local_select_worker(plan, planning_params).await;
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::ExplainAnalyze(plan, planning_params) => {
+            NetworkMessage::ExplainAnalyze(plan, planning_params, execute) => {
                 let res = self
-                    .run_local_explain_analyze_worker(plan, planning_params)
+                    .run_local_explain_analyze_worker(plan, planning_params, execute)
                     .await;
                 NetworkMessage::ExplainAnalyzeResult(res)
             }
@@ -1312,39 +1314,7 @@ impl ClusterImpl {
             warn!("Warmup download for select ({:?})", warmup);
         }
 
-        let chunk_store = self
-            .injector
-            .upgrade()
-            .unwrap()
-            .get_service_typed::<dyn ChunkDataStore>()
-            .await;
-
-        let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
-        let in_memory_chunks_futures = in_memory_chunks_to_load
-            .iter()
-            .map(|(c, p, i)| {
-                chunk_store
-                    .get_chunk_columns_with_preloaded_meta(c.clone(), p.clone(), i.clone())
-                    .instrument(tracing::span!(
-                        tracing::Level::TRACE,
-                        "get in memory chunk columns",
-                        row_count = c.get_row().get_row_count()
-                    ))
-            })
-            .collect::<Vec<_>>();
-
-        let chunk_id_to_record_batches = in_memory_chunks_to_load
-            .clone()
-            .into_iter()
-            .map(|(c, _, _)| c.get_id())
-            .zip(
-                join_all(in_memory_chunks_futures)
-                    .await
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter(),
-            )
-            .collect::<HashMap<_, _>>();
+        let chunk_id_to_record_batches = self.load_in_memory_chunks(&plan_node).await?;
 
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
@@ -1419,14 +1389,18 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
+        execute: bool,
     ) -> Result<String, CubeError> {
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
-        let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
-        let chunk_id_to_record_batches = in_memory_chunks_to_load
-            .clone()
-            .into_iter()
-            .map(|(c, _, _)| (c.get_id(), Vec::new()))
-            .collect();
+        let chunk_id_to_record_batches = if execute {
+            self.load_in_memory_chunks(&plan_node).await?
+        } else {
+            plan_node
+                .in_memory_chunks_to_load()
+                .into_iter()
+                .map(|(c, _, _)| (c.get_id(), Vec::new()))
+                .collect()
+        };
 
         let res = self
             .query_executor
@@ -1435,10 +1409,49 @@ impl ClusterImpl {
                 worker_planning_params,
                 remote_to_local_names,
                 chunk_id_to_record_batches,
+                execute,
             )
             .await;
 
         res
+    }
+
+    async fn load_in_memory_chunks(
+        &self,
+        plan_node: &SerializedPlan,
+    ) -> Result<HashMap<u64, Vec<RecordBatch>>, CubeError> {
+        let chunk_store = self
+            .injector
+            .upgrade()
+            .unwrap()
+            .get_service_typed::<dyn ChunkDataStore>()
+            .await;
+
+        let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
+        let in_memory_chunks_futures = in_memory_chunks_to_load
+            .iter()
+            .map(|(c, p, i)| {
+                chunk_store
+                    .get_chunk_columns_with_preloaded_meta(c.clone(), p.clone(), i.clone())
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "get in memory chunk columns",
+                        row_count = c.get_row().get_row_count()
+                    ))
+            })
+            .collect::<Vec<_>>();
+
+        Ok(in_memory_chunks_to_load
+            .iter()
+            .map(|(c, _, _)| c.get_id())
+            .zip(
+                join_all(in_memory_chunks_futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter(),
+            )
+            .collect::<HashMap<_, _>>())
     }
 
     async fn warmup_select_worker_files(

@@ -136,6 +136,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        execute: bool,
     ) -> Result<String, CubeError>;
 }
 
@@ -372,6 +373,7 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        execute: bool,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
             .worker_plan(
@@ -393,7 +395,26 @@ impl QueryExecutor for QueryExecutorImpl {
             ));
         }
 
-        Ok(pp_phys_plan(worker_plan.as_ref()))
+        if !execute {
+            return Ok(pp_phys_plan(worker_plan.as_ref()));
+        }
+
+        // Execute the plan to populate the metrics, the results are discarded.
+        let session_context = self.execution_context()?;
+        collect(worker_plan.clone(), session_context.task_ctx())
+            .instrument(tracing::span!(
+                tracing::Level::TRACE,
+                "collect_physical_plan_for_explain_analyze"
+            ))
+            .await?;
+
+        Ok(pp_phys_plan_ext(
+            worker_plan.as_ref(),
+            &PPOptions {
+                show_metrics: true,
+                ..PPOptions::default()
+            },
+        ))
     }
 }
 

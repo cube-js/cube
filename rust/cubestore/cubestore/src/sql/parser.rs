@@ -66,6 +66,8 @@ pub enum Statement {
     Queue(QueueCommand),
     System(SystemCommand),
     Dump(Box<Query>),
+    /// Like EXPLAIN ANALYZE, but executes worker plans to report runtime metrics.
+    ExplainAnalyzeExtended(Box<Query>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -300,6 +302,31 @@ impl<'a> CubeStoreParser<'a> {
                         }
                     };
                     Ok(Statement::Dump(q))
+                }
+                // Plain EXPLAIN and EXPLAIN ANALYZE fall through to the generic parser.
+                Keyword::EXPLAIN
+                    if matches!(
+                        &self.parser.peek_nth_token(1).token,
+                        Token::Word(w) if w.keyword == Keyword::ANALYZE
+                    ) && matches!(
+                        &self.parser.peek_nth_token(2).token,
+                        Token::Word(w) if w.value.eq_ignore_ascii_case("extended")
+                    ) =>
+                {
+                    self.parser.next_token();
+                    self.parser.next_token();
+                    self.parser.next_token();
+                    let s = self.parser.parse_statement()?;
+                    let q = match s {
+                        SQLStatement::Query(q) => q,
+                        _ => {
+                            return Err(ParserError::ParserError(
+                                "Expected select query after 'explain analyze extended'"
+                                    .to_string(),
+                            ))
+                        }
+                    };
+                    Ok(Statement::ExplainAnalyzeExtended(q))
                 }
                 _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
