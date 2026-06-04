@@ -4,6 +4,7 @@ mod calc_groups;
 mod calendar;
 mod chained_subquery;
 mod combinations;
+mod cubestore;
 mod custom_granularities;
 mod filtered_measures;
 mod filters_segments;

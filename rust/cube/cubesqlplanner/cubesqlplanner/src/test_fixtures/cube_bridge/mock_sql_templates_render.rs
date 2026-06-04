@@ -569,6 +569,28 @@ impl MockSqlTemplatesRender {
         render.jinja = jinja;
         render
     }
+
+    /// Templates matching `CubeStoreQuery.sqlTemplates()` from the JS
+    /// schema-compiler: BaseQuery defaults plus CubeStore-specific overrides.
+    pub fn cubestore_templates() -> Self {
+        let render = Self::default_templates();
+        let mut templates = render.templates;
+        templates.insert(
+            "statements/time_series_select".to_string(),
+            concat!(
+                "{% for time_item in seria  %}",
+                "select to_timestamp('{{ time_item[0] }}') date_from, to_timestamp('{{ time_item[1] }}') date_to \n",
+                "{% if not loop.last %} UNION ALL\n{% endif %}",
+                "{% endfor %}"
+            )
+            .to_string(),
+        );
+        templates.insert(
+            "operators/is_not_distinct_from".to_string(),
+            "IS NOT DISTINCT FROM".to_string(),
+        );
+        Self::try_new(templates).expect("CubeStore templates should always parse successfully")
+    }
 }
 
 impl SqlTemplatesRender for MockSqlTemplatesRender {

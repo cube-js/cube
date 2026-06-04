@@ -27,6 +27,11 @@ pub struct MockBaseTools {
     #[builder(default = Rc::new(MockDriverTools::new()))]
     driver_tools: Rc<MockDriverTools>,
 
+    /// Driver tools returned for `driver_tools(external: true)` — the
+    /// external pre-aggregations dialect (CubeStore in production).
+    #[builder(default)]
+    external_driver_tools: Option<Rc<MockDriverTools>>,
+
     #[builder(default = Rc::new(MockSqlTemplatesRender::default_templates()))]
     sql_templates: Rc<MockSqlTemplatesRender>,
 
@@ -41,6 +46,12 @@ pub struct MockBaseTools {
     cube_members: HashMap<String, Vec<String>>,
 }
 
+impl MockBaseTools {
+    pub fn set_external_driver_tools(&mut self, tools: Rc<MockDriverTools>) {
+        self.external_driver_tools = Some(tools);
+    }
+}
+
 impl Default for MockBaseTools {
     fn default() -> Self {
         Self::builder().build()
@@ -52,7 +63,12 @@ impl BaseTools for MockBaseTools {
         self
     }
 
-    fn driver_tools(&self, _external: bool) -> Result<Rc<dyn DriverTools>, CubeError> {
+    fn driver_tools(&self, external: bool) -> Result<Rc<dyn DriverTools>, CubeError> {
+        if external {
+            if let Some(tools) = &self.external_driver_tools {
+                return Ok(tools.clone());
+            }
+        }
         Ok(self.driver_tools.clone())
     }
 

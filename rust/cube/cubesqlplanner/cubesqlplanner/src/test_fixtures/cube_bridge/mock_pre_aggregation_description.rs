@@ -10,6 +10,15 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Mirrors the JS pre-aggregation description's `createTableIndexes` entries:
+/// member references resolved to columns at table creation time.
+#[derive(Debug, Clone)]
+pub struct MockPreAggregationIndex {
+    pub name: String,
+    pub columns: Vec<String>,
+    pub index_type: String,
+}
+
 #[derive(TypedBuilder)]
 pub struct MockPreAggregationDescription {
     name: String,
@@ -36,6 +45,14 @@ pub struct MockPreAggregationDescription {
     rollup_references: Option<Rc<dyn MemberSql>>,
     #[builder(default)]
     time_dimension_references: Option<Vec<Rc<MockPreAggregationTimeDimension>>>,
+    #[builder(default)]
+    indexes: Vec<MockPreAggregationIndex>,
+}
+
+impl MockPreAggregationDescription {
+    pub fn indexes(&self) -> &[MockPreAggregationIndex] {
+        &self.indexes
+    }
 }
 
 impl_static_data!(

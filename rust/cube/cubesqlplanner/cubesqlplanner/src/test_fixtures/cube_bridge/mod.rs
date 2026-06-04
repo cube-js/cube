@@ -65,7 +65,9 @@ pub use mock_member_order_by::MockMemberOrderBy;
 pub use mock_member_sql::MockMemberSql;
 pub use mock_multi_stage_filter::MockMultiStageFilterReferences;
 pub use mock_multi_stage_grain::MockMultiStageGrainReferences;
-pub use mock_pre_aggregation_description::MockPreAggregationDescription;
+pub use mock_pre_aggregation_description::{
+    MockPreAggregationDescription, MockPreAggregationIndex,
+};
 pub use mock_pre_aggregation_time_dimension::MockPreAggregationTimeDimension;
 pub use mock_schema::{MockSchema, MockSchemaBuilder};
 pub use mock_security_context::MockSecurityContext;
