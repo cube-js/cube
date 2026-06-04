@@ -350,6 +350,15 @@
                   },
                   "admin/deployment/dedicated/pre-aggregation-storage"
                 ]
+              },
+              {
+                "group": "Cube OIDC",
+                "root": "admin/deployment/oidc/index",
+                "pages": [
+                  "admin/deployment/oidc/aws",
+                  "admin/deployment/oidc/gcp",
+                  "admin/deployment/oidc/azure"
+                ]
               }
             ]
           },

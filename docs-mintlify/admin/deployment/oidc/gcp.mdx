@@ -2,7 +2,6 @@
 title: GCP
 sidebarTitle: GCP
 description: Configure GCP Workload Identity Federation to trust Cube's OIDC issuer and use it for BigQuery and GCS export buckets.
-noindex: true
 ---
 
 This guide walks through configuring GCP to trust Cube's OIDC issuer using
@@ -299,6 +298,99 @@ intermediate service account. The trade-off is that some GCP services
 (notably anything that requires `iam.serviceAccountTokenCreator`) only
 accept service-account principals, so you may need the impersonation path
 for those.
+
+## Cube Store CSPS bucket
+
+Cube Store CSPS lets you store pre-aggregations in your own GCS bucket. Cube
+Store gets a separate OIDC token whose `sub` claim ends in
+`component:cube_store`, so the IAM bindings can be locked down to that
+component — even if the same service account were ever shared with the rest
+of the deployment, only Cube Store would be able to impersonate it.
+
+Every Cube Store worker emits a `sub` of the form
+`cube:deployment:<deployment-id>:component:cube_store`. As with the
+[deployment identity bindings](#step-3-build-the-iam-bindings), how broadly
+you share access is controlled by the `principalSet` member you bind:
+
+- `…/workloadIdentityPools/cube-pool/*` — paired with a provider
+  `--attribute-condition` that constrains `sub` to end in
+  `:component:cube_store`, this gives you **one service account + one bucket
+  for the whole tenant.** Every deployment writes pre-aggregations to the
+  same bucket, isolated by Cube Store's own per-deployment path prefix.
+  Easiest to operate.
+- `…/cube-pool/subject/cube:deployment:<deployment-id>:component:cube_store`
+  — **per-deployment isolation.** Pin access to a single deployment's Cube
+  Store so its pre-aggregations live in a dedicated bucket no other
+  deployment can touch.
+
+Cube Store can authenticate either by impersonating a service account or by
+federating to the bucket directly — pick one.
+
+<Steps>
+  <Step title="Grant access to the CSPS bucket">
+    **Service account impersonation** (works with every GCS feature). Give a
+    service account object access on the bucket, then let the Cube Store
+    principal impersonate it:
+
+    ```bash
+    PROJECT_NUMBER="<project-number>"
+
+    # 1. The SA Cube Store impersonates — grant it object access on the bucket.
+    gcloud storage buckets add-iam-policy-binding gs://my-csps-bucket \
+      --member="serviceAccount:cube-cubestore@my-project.iam.gserviceaccount.com" \
+      --role=roles/storage.objectAdmin
+
+    # 2. Let Cube Store's federated principal impersonate that SA. Swap the
+    #    trailing `*` for a single `subject/...:component:cube_store` to pin
+    #    one deployment.
+    gcloud iam service-accounts add-iam-policy-binding \
+      cube-cubestore@my-project.iam.gserviceaccount.com \
+      --role=roles/iam.workloadIdentityUser \
+      --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/cube-pool/*"
+    ```
+
+    **Direct federation** (no impersonation hop). Grant the Cube Store
+    principal object access on the bucket directly, and leave the service
+    account blank in the UI:
+
+    ```bash
+    PROJECT_NUMBER="<project-number>"
+    DEPLOYMENT_ID="<deployment-id>"
+
+    gcloud storage buckets add-iam-policy-binding gs://my-csps-bucket \
+      --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/cube-pool/subject/cube:deployment:${DEPLOYMENT_ID}:component:cube_store" \
+      --role=roles/storage.objectAdmin
+    ```
+
+    `roles/storage.objectAdmin` covers the reads, writes, lists, and deletes
+    Cube Store performs as it builds and evicts pre-aggregation partitions.
+  </Step>
+  <Step title="Make Cube Store's sub match">
+    Cube Store only emits the `:component:cube_store` subject if your GCP
+    token config uses a subject claim format that includes the `:component:`
+    segment. In **Admin → OIDC**, set the GCP token config's **Subject Claim
+    Format** to `cube:deployment:{deployment_id}:component:{component}` (see
+    [Step 3](#step-3-build-the-iam-bindings)). Update the IAM binding or the
+    provider's CEL `--attribute-condition` before changing the format.
+  </Step>
+  <Step title="Enable CSPS on each deployment">
+    For each deployment that should use this bucket, go to **Settings →
+    Pre-Aggregation Storage** on the deployment and:
+
+    - Toggle **Enable CSPS** on.
+    - **Storage Provider**: Google Cloud Storage.
+    - **GCS Bucket**: `my-csps-bucket`.
+    - **Service Account Email** (optional): `cube-cubestore@my-project.iam.gserviceaccount.com` — or leave blank if you granted the Cube Store principal bucket access directly (direct federation).
+    - **Workload Identity Provider**: the provider resource name (without the
+      `//iam.googleapis.com/` prefix),
+      `projects/<project-number>/locations/global/workloadIdentityPools/cube-pool/providers/cube`.
+
+    Click **Test Connection** to verify Cube Store can federate — and
+    impersonate the service account, if one is set — and read/write the
+    bucket, then **Apply**. Cube Store starts writing pre-aggregations to
+    your bucket on the next refresh.
+  </Step>
+</Steps>
 
 ## Verifying the setup
 
