@@ -681,6 +681,10 @@
   "navbar": {
     "links": [
       {
+        "label": "Demos",
+        "href": "https://cube.dev/demos"
+      },
+      {
         "label": "Changelog",
         "href": "https://cube.dev/changelog"
       },
