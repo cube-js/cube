@@ -1,6 +1,7 @@
 use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::trace::WorkerTrace;
 use crate::CubeError;
 use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,11 @@ pub enum NetworkMessage {
     /// The boolean flag is whether to execute the plan to collect runtime metrics.
     ExplainAnalyze(SerializedPlan, WorkerPlanningParams, bool),
     ExplainAnalyzeResult(Result<String, CubeError>),
+
+    /// Execute the worker query part for real (through the select subprocess) and
+    /// return its detailed trace. Used by `EXPLAIN ANALYZE DETAILED`.
+    AnalyzeDetailed(SerializedPlan, WorkerPlanningParams),
+    AnalyzeDetailedResult(Result<WorkerTrace, CubeError>),
 
     /// Select that sends results in batches. The immediate response is [SelectResultSchema],
     /// followed by a stream of [SelectResultBatch].

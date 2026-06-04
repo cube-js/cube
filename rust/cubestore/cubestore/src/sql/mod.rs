@@ -64,6 +64,7 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, DropCommand, MetaStoreCommand, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
+use crate::trace::{OpKind, OpSample, QueryTrace, RouterTrace};
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -658,6 +659,119 @@ impl SqlServiceImpl {
             }
         }?;
         Ok(Arc::new(res))
+    }
+
+    async fn explain_detailed(&self, statement: Statement) -> Result<Arc<DataFrame>, CubeError> {
+        let query_plan = self
+            .query_planner
+            .logical_plan(
+                DFStatement::Statement(Box::new(statement)),
+                &InlineTables::new(),
+                None,
+            )
+            .await?;
+        let serialized = match query_plan {
+            QueryPlan::Select(serialized, _) => serialized,
+            QueryPlan::Meta(_) => {
+                return Err(CubeError::user(
+                    "EXPLAIN ANALYZE DETAILED is not supported for selects from system tables"
+                        .to_string(),
+                ))
+            }
+        };
+
+        let ctx = crate::trace::TraceCtx::new();
+        let workers = crate::trace::scoped(Some(ctx.clone()), async move {
+            let cluster = self.cluster.clone();
+            let executor = self.query_executor.clone();
+            let router_plan = {
+                let _g = crate::trace::OpGuard::start(OpKind::Other, "router.plan");
+                executor
+                    .router_plan(serialized.to_serialized_plan()?, cluster)
+                    .await?
+                    .0
+            };
+            let mut worker_traces = Vec::new();
+            if let Some(cluster_send) = find_topmost_cluster_send_exec(&router_plan) {
+                let worker_plans = cluster_send.worker_plans()?;
+                let worker_planning_params = cluster_send.worker_planning_params();
+                let _g = crate::trace::OpGuard::start(OpKind::Transport, "fanout.analyze_detailed");
+                let futures = worker_plans
+                    .into_iter()
+                    .map(|(name, plan)| async move {
+                        self.cluster
+                            .run_analyze_detailed(
+                                &name,
+                                plan.to_serialized_plan()?,
+                                worker_planning_params,
+                            )
+                            .await
+                    })
+                    .collect::<Vec<_>>();
+                worker_traces = join_all(futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?;
+            }
+            Ok::<_, CubeError>(worker_traces)
+        })
+        .await?;
+
+        let trace = QueryTrace {
+            router: RouterTrace {
+                ops: ctx.take_ops(),
+            },
+            workers,
+        };
+        Ok(Arc::new(Self::render_query_trace(&trace)))
+    }
+
+    fn render_query_trace(trace: &QueryTrace) -> DataFrame {
+        fn push_ops(level: &str, node: &str, ops: &[OpSample], rows: &mut Vec<Row>) {
+            for op in ops {
+                rows.push(Row::new(vec![
+                    TableValue::String(level.to_string()),
+                    TableValue::String(node.to_string()),
+                    TableValue::String(format!("{:?}", op.kind)),
+                    TableValue::String(op.label.clone()),
+                    TableValue::Int(op.elapsed_us as i64),
+                    op.bytes
+                        .map(|b| TableValue::Int(b as i64))
+                        .unwrap_or(TableValue::Null),
+                    TableValue::Int(op.count as i64),
+                ]));
+            }
+        }
+
+        let headers = vec![
+            Column::new("level".to_string(), ColumnType::String, 0),
+            Column::new("node".to_string(), ColumnType::String, 1),
+            Column::new("kind".to_string(), ColumnType::String, 2),
+            Column::new("label".to_string(), ColumnType::String, 3),
+            Column::new("elapsed_us".to_string(), ColumnType::Int, 4),
+            Column::new("bytes".to_string(), ColumnType::Int, 5),
+            Column::new("count".to_string(), ColumnType::Int, 6),
+        ];
+        let mut rows = Vec::new();
+        push_ops("router", "", &trace.router.ops, &mut rows);
+        for w in &trace.workers {
+            push_ops("worker", &w.node_name, &w.ops, &mut rows);
+            if let Some(sub) = &w.subprocess {
+                push_ops("subprocess", &w.node_name, &sub.ops, &mut rows);
+                if let Some(mem) = sub.exec_memory_peak_bytes {
+                    rows.push(Row::new(vec![
+                        TableValue::String("subprocess".to_string()),
+                        TableValue::String(w.node_name.clone()),
+                        TableValue::String("Memory".to_string()),
+                        TableValue::String("exec_peak".to_string()),
+                        TableValue::Null,
+                        TableValue::Int(mem as i64),
+                        TableValue::Int(1),
+                    ]));
+                }
+            }
+        }
+        DataFrame::new(headers, rows)
     }
 }
 
@@ -1393,6 +1507,10 @@ impl SqlService for SqlServiceImpl {
             }
 
             CubeStoreStatement::Dump(q) => Ok(self.dump_select_inputs(query, q).await?.into()),
+
+            CubeStoreStatement::ExplainAnalyzeDetailed(q) => {
+                Ok(self.explain_detailed(Statement::Query(q)).await?.into())
+            }
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
