@@ -233,6 +233,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_partitions_hash_aggregate",
             unique_key_and_multi_partitions_hash_aggregate,
         ),
+        t("filter_pushdown_unique_key", filter_pushdown_unique_key),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -384,6 +385,7 @@ lazy_static::lazy_static! {
         "create_table_with_csv_no_header",
         "create_table_with_csv_no_header_and_delimiter",
         "create_table_with_csv_no_header_and_quotes",
+        "filter_pushdown_unique_key",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -7312,6 +7314,128 @@ async fn unique_key_and_multi_partitions_hash_aggregate(
         .await?;
     assert_eq!(to_rows(&r), rows(&[(1, 190), (2, 240)]));
     Ok(())
+}
+
+/// Filters referencing only unique key columns commute with the last-row deduplication
+/// and get pushed below it: onto every scan stream and into the parquet pruning
+/// predicate. Filters on non-key columns must stay above the dedup and out of pruning:
+/// they apply to the last version of a row, acting on individual versions below the
+/// dedup would resurrect overwritten ones.
+async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+
+    service
+        .exec_query(
+            "INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2), (3, 3, 5, 3)",
+        )
+        .await?;
+    // Newer versions of (1, 1) and (3, 3) in another chunk
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 4), (3, 3, 50, 5)")
+        .await?;
+
+    // A key filter selects whole version groups: only the last version of (1, 1) counts.
+    let query = "SELECT sum(val) FROM s.Versions WHERE a = 1";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(30)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert!(
+        filters_below_scan(&worker_plan) > 0,
+        "the unique key filter must be pushed below the dedup onto scan streams:\n{}",
+        worker_plan
+    );
+    assert!(
+        scan_line(&worker_plan).contains("predicate:"),
+        "the unique key filter must reach the parquet pruning predicate:\n{}",
+        worker_plan
+    );
+
+    // A non-key filter: the overwritten versions (1, 1, 10) and (3, 3, 5) match val < 25
+    // while their last versions don't. They must not be resurrected.
+    let query = "SELECT sum(val) FROM s.Versions WHERE val < 25";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(20)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert_eq!(
+        filters_below_scan(&worker_plan),
+        0,
+        "a non-key filter must not be pushed below the dedup:\n{}",
+        worker_plan
+    );
+    assert!(
+        !scan_line(&worker_plan).contains("predicate:"),
+        "a non-key filter must not reach the parquet pruning predicate:\n{}",
+        worker_plan
+    );
+
+    // A mixed conjunction splits: the key conjunct goes below the dedup, the non-key one
+    // stays above. The last version of (3, 3) is 50: it fails val <= 25, and the
+    // overwritten (3, 3, 5) must not pass in its place.
+    let query = "SELECT sum(val) FROM s.Versions WHERE a in (2, 3) AND val <= 25";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(20)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert!(
+        filters_below_scan(&worker_plan) > 0,
+        "the key conjunct must be pushed below the dedup:\n{}",
+        worker_plan
+    );
+    assert!(
+        !below_scan(&worker_plan).contains("val"),
+        "the non-key conjunct must not appear below the dedup:\n{}",
+        worker_plan
+    );
+    return Ok(());
+
+    fn below_scan(plan: &str) -> &str {
+        let scan_start = plan
+            .find(scan_line(plan))
+            .expect("scan line is a substring of the plan");
+        &plan[scan_start + scan_line(plan).len()..]
+    }
+
+    fn scan_line(plan: &str) -> &str {
+        plan.lines()
+            .find(|l| l.trim_start().starts_with("Scan"))
+            .expect("no Scan in the worker plan")
+    }
+
+    fn filters_below_scan(plan: &str) -> usize {
+        plan.lines()
+            .skip_while(|l| !l.trim_start().starts_with("Scan"))
+            .filter(|l| {
+                let l = l.trim_start();
+                l.starts_with("Filter") && !l.starts_with("FilterByKeyRange")
+            })
+            .count()
+    }
 }
 
 async fn divide_by_zero(service: Box<dyn SqlClient>) -> Result<(), CubeError> {

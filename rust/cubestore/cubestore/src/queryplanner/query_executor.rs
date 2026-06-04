@@ -68,13 +68,14 @@ use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
-    PlanProperties, SendableRecordBatchStream,
+    collect, execute_stream, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning,
+    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
@@ -135,6 +136,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        execute: bool,
     ) -> Result<String, CubeError>;
 }
 
@@ -371,6 +373,7 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        execute: bool,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
             .worker_plan(
@@ -392,7 +395,33 @@ impl QueryExecutor for QueryExecutorImpl {
             ));
         }
 
-        Ok(pp_phys_plan(worker_plan.as_ref()))
+        if !execute {
+            return Ok(pp_phys_plan(worker_plan.as_ref()));
+        }
+
+        // Execute the plan to populate the metrics. The results are discarded batch by
+        // batch to avoid holding the full result set in memory.
+        let session_context = self.execution_context()?;
+        let mut stream = execute_stream(worker_plan.clone(), session_context.task_ctx())?;
+        async {
+            while let Some(batch) = stream.next().await {
+                batch?;
+            }
+            Ok::<_, DataFusionError>(())
+        }
+        .instrument(tracing::span!(
+            tracing::Level::TRACE,
+            "execute_physical_plan_for_explain_analyze"
+        ))
+        .await?;
+
+        Ok(pp_phys_plan_ext(
+            worker_plan.as_ref(),
+            &PPOptions {
+                show_metrics: true,
+                ..PPOptions::default()
+            },
+        ))
     }
 }
 
@@ -680,7 +709,36 @@ impl CubeTable {
             None
         };
 
-        let predicate = combine_filters(filters);
+        let unique_key_columns = self
+            .index_snapshot
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
+
+        // Only filters referencing unique key columns commute with the last-row
+        // deduplication: the key is immutable within a version group, so such filters
+        // select whole groups. Filters on other columns apply to the last version of a
+        // row; acting on individual versions below the dedup — be it parquet row-group
+        // pruning or row filtering — could drop the last version while older ones
+        // survive elsewhere and get resurrected.
+        let predicate = if let Some(key_columns) = &unique_key_columns {
+            // Filters passed to a scan reference only this table's columns, so matching
+            // by bare column name is enough.
+            let pushable = filters
+                .iter()
+                .filter(|f| {
+                    !f.is_volatile()
+                        && f.column_refs()
+                            .iter()
+                            .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            combine_filters(&pushable)
+        } else {
+            combine_filters(filters)
+        };
         let physical_predicate = if let Some(pred) = &predicate {
             Some(state.create_physical_expr(
                 pred.clone(),
@@ -856,6 +914,21 @@ impl CubeTable {
             }
         }
 
+        // Apply the dedup-safe predicate to every stream of a unique key table to cut
+        // the merge and dedup input: parquet pruning above only skips whole row groups
+        // and does nothing for in-memory chunks.
+        if unique_key_columns.is_some() {
+            if let Some(predicate) = &predicate {
+                for p in &mut partition_execs {
+                    let phys_predicate = state.create_physical_expr(
+                        predicate.clone(),
+                        &p.schema().as_ref().clone().to_dfschema()?,
+                    )?;
+                    *p = Arc::new(FilterExec::try_new(phys_predicate, p.clone())?);
+                }
+            }
+        }
+
         // Schema for scan output and input to MergeSort and LastRowByUniqueKey
         let table_projected_schema = {
             Arc::new(Schema::new(
@@ -900,13 +973,6 @@ impl CubeTable {
                 Boundedness::Bounded,
             ),
         });
-        let unique_key_columns = self
-            .index_snapshot()
-            .table_path
-            .table
-            .get_row()
-            .unique_key_columns();
-
         let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
             let sort_columns = self
                 .index_snapshot()
