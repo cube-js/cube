@@ -443,6 +443,10 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
+        // Detailed trace: record per-node elapsed_compute of the worker subplan.
+        if memory_pool.is_some() {
+            record_plan_node_metrics(&worker_plan);
+        }
         Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
 
