@@ -143,6 +143,25 @@ impl MemoryPool for TrackingMemoryPool {
     }
 }
 
+/// Walk an executed physical plan and record each node's `elapsed_compute` into the
+/// active trace as `OpKind::Execution` samples keyed by node type. Same-typed nodes
+/// aggregate (summed time, node count). (output_rows is omitted for now — would need
+/// a dedicated field rather than the bytes column.)
+fn record_plan_node_metrics(plan: &Arc<dyn ExecutionPlan>) {
+    if let Some(elapsed_ns) = plan.metrics().and_then(|m| m.elapsed_compute()) {
+        crate::trace::record_op(
+            crate::trace::OpKind::Execution,
+            plan.name(),
+            (elapsed_ns / 1000) as u64,
+            None,
+            1,
+        );
+    }
+    for child in plan.children() {
+        record_plan_node_metrics(child);
+    }
+}
+
 #[automock]
 #[async_trait]
 pub trait QueryExecutor: DIService + Send + Sync {
@@ -251,10 +270,11 @@ impl QueryExecutor for QueryExecutorImpl {
         ));
         {
             let _g = crate::trace::OpGuard::start(crate::trace::OpKind::Execution, "main.execute");
-            let _results = collect(physical_plan, session_context.task_ctx()).await?;
+            let _results = collect(physical_plan.clone(), session_context.task_ctx()).await?;
         }
-        // TODO(next step): per-node DataFusion metrics of the final stages. The main
-        // currently reports the `main.execute` wall-time bucket + this memory peak.
+        // Harvest per-node DataFusion metrics of the final stages (router-level nodes
+        // above ClusterSend), aggregated by node type into the active trace.
+        record_plan_node_metrics(&physical_plan);
         Ok(Some(memory_pool.peak() as u64))
     }
 

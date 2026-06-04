@@ -63,10 +63,10 @@ pub struct RouterTrace {
 /// its own ops + the per-worker traces it collected through ClusterSend. Shipped
 /// back to the entry node.
 ///
+/// `ops` holds the main's stage guards (`main.router_physical_plan`, `main.execute`)
+/// plus per-node DataFusion `elapsed_compute` of the final stages (OpKind::Execution).
 /// `exec_memory_peak_bytes` is the peak of operator reservations during execution
 /// (sort/aggregate/join buffers — not every allocation).
-/// TODO(next step): `ops` does not yet include per-node DataFusion metrics of the
-/// final stages — currently only the `main.execute` wall-time bucket.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MainTrace {
     pub node_name: String,
@@ -152,6 +152,20 @@ pub fn current_trace() -> Option<Arc<TraceCtx>> {
 /// `TracedMetaStore` decorator: one sample per metastore method call.
 pub fn metastore_trace_guard(method: &'static str) -> OpGuard {
     OpGuard::start(OpKind::Metastore, method)
+}
+
+/// Record an already-measured sample into the active trace (no-op when off).
+/// For values not timed by an `OpGuard` — e.g. DataFusion node metrics.
+pub fn record_op(kind: OpKind, label: &str, elapsed_us: u64, bytes: Option<u64>, count: u32) {
+    if let Some(ctx) = current_trace() {
+        ctx.push(OpSample {
+            kind,
+            label: label.to_string(),
+            elapsed_us,
+            bytes,
+            count,
+        });
+    }
 }
 
 /// Run `fut` with `ctx` as the active sink for the current process-region.
