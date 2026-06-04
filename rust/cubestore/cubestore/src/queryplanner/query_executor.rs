@@ -46,6 +46,8 @@ use datafusion::datasource::physical_plan::{
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
+use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
+use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
@@ -91,12 +93,55 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
 use std::mem::take;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
 use super::serialized_plan::PreSerializedPlan;
 use super::{try_make_memory_data_source, QueryPlannerImpl};
+
+/// Unbounded `MemoryPool` that records the peak of all operator reservations for a
+/// single query execution. The pool lives in that query's `RuntimeEnv`, so the peak
+/// is per-query and isolated from concurrent queries sharing the process. Covers only
+/// memory that operators voluntarily reserve (sort/aggregate/join buffers), not every
+/// allocation — by design.
+#[derive(Debug, Default)]
+pub struct TrackingMemoryPool {
+    used: AtomicUsize,
+    peak: AtomicUsize,
+}
+
+impl TrackingMemoryPool {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn peak(&self) -> usize {
+        self.peak.load(Ordering::Relaxed)
+    }
+}
+
+impl MemoryPool for TrackingMemoryPool {
+    fn grow(&self, _reservation: &MemoryReservation, additional: usize) {
+        let used = self.used.fetch_add(additional, Ordering::Relaxed) + additional;
+        self.peak.fetch_max(used, Ordering::Relaxed);
+    }
+
+    fn shrink(&self, _reservation: &MemoryReservation, shrink: usize) {
+        self.used.fetch_sub(shrink, Ordering::Relaxed);
+    }
+
+    fn try_grow(&self, reservation: &MemoryReservation, additional: usize) -> DFResult<()> {
+        // Unbounded: always succeeds; we only measure, never reject.
+        self.grow(reservation, additional);
+        Ok(())
+    }
+
+    fn reserved(&self) -> usize {
+        self.used.load(Ordering::Relaxed)
+    }
+}
 
 #[automock]
 #[async_trait]
@@ -191,15 +236,25 @@ impl QueryExecutor for QueryExecutorImpl {
             .metadata_cache_factory
             .make_session_config()
             .with_extension(worker_traces);
-        let session_context = Arc::new(QueryPlannerImpl::make_execution_context(config));
+        // Per-query tracking pool in this execution's own RuntimeEnv: the peak is
+        // isolated from concurrent queries sharing the process.
+        let memory_pool = TrackingMemoryPool::new();
+        let runtime_env = Arc::new(
+            RuntimeEnvBuilder::new()
+                .with_memory_pool(memory_pool.clone())
+                .build()?,
+        );
+        let session_context = Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
+            config,
+            runtime_env,
+        ));
         {
             let _g = crate::trace::OpGuard::start(crate::trace::OpKind::Execution, "main.execute");
             let _results = collect(physical_plan, session_context.task_ctx()).await?;
         }
-        // TODO(next step): per-query MemoryPool peak (finalization memory) and
-        // per-node DataFusion metrics of the final stages. Until then the main only
-        // reports the `main.execute` wall-time bucket.
-        Ok(None)
+        // TODO(next step): per-node DataFusion metrics of the final stages. The main
+        // currently reports the `main.execute` wall-time bucket + this memory peak.
+        Ok(Some(memory_pool.peak() as u64))
     }
 
     #[instrument(level = "trace", skip(self, plan, cluster))]

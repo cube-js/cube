@@ -298,9 +298,19 @@ impl QueryPlannerImpl {
     /// optimizer rules or other parameters affecting execution performance.  This is used by
     /// `QueryPlannerImpl::make_execution_context`.
     pub fn minimal_session_state_from_final_config(config: SessionConfig) -> SessionStateBuilder {
+        Self::minimal_session_state_from_final_config_with_runtime(
+            config,
+            Arc::new(RuntimeEnv::default()),
+        )
+    }
+
+    pub fn minimal_session_state_from_final_config_with_runtime(
+        config: SessionConfig,
+        runtime_env: Arc<RuntimeEnv>,
+    ) -> SessionStateBuilder {
         let mut state_builder = SessionStateBuilder::new()
             .with_config(config)
-            .with_runtime_env(Arc::new(RuntimeEnv::default()))
+            .with_runtime_env(runtime_env)
             .with_default_features();
         state_builder
             .aggregate_functions()
@@ -315,7 +325,14 @@ impl QueryPlannerImpl {
 
     const EXECUTION_BATCH_SIZE: usize = 4096;
 
-    pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
+    pub fn make_execution_context(config: SessionConfig) -> SessionContext {
+        Self::make_execution_context_with_runtime(config, Arc::new(RuntimeEnv::default()))
+    }
+
+    pub fn make_execution_context_with_runtime(
+        mut config: SessionConfig,
+        runtime_env: Arc<RuntimeEnv>,
+    ) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
         config
@@ -326,7 +343,7 @@ impl QueryPlannerImpl {
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
-        let state = Self::minimal_session_state_from_final_config(config)
+        let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
             .with_optimizer_rule(Arc::new(IsNotDistinctFromJoinKeysRule {}))
             .build();

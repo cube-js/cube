@@ -63,9 +63,10 @@ pub struct RouterTrace {
 /// its own ops + the per-worker traces it collected through ClusterSend. Shipped
 /// back to the entry node.
 ///
-/// TODO(next step): `exec_memory_peak_bytes` is wired but not yet filled (needs a
-/// tracking MemoryPool), and `ops` does not yet include per-node DataFusion metrics
-/// of the final stages — currently only the `main.execute` wall-time bucket.
+/// `exec_memory_peak_bytes` is the peak of operator reservations during execution
+/// (sort/aggregate/join buffers — not every allocation).
+/// TODO(next step): `ops` does not yet include per-node DataFusion metrics of the
+/// final stages — currently only the `main.execute` wall-time bucket.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MainTrace {
     pub node_name: String,
