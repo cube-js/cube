@@ -357,6 +357,9 @@ impl WorkerProcessing for WorkerProcessor {
                 trace_id_and_span_id,
                 detailed,
             ) => {
+                let memory_pool =
+                    detailed.then(crate::queryplanner::query_executor::TrackingMemoryPool::new);
+                let memory_pool_for_exec = memory_pool.clone();
                 let future = async move {
                     let time = SystemTime::now();
                     debug!("Running select in worker started");
@@ -391,6 +394,7 @@ impl WorkerProcessing for WorkerProcessor {
                                 worker_planning_params,
                                 remote_to_local_names,
                                 result,
+                                memory_pool_for_exec,
                             )
                             .await
                     };
@@ -438,7 +442,7 @@ impl WorkerProcessing for WorkerProcessor {
                     crate::trace::scoped(ctx.clone(), run).await?;
                 let subtrace = ctx.map(|c| SubprocessTrace {
                     ops: c.take_ops(),
-                    exec_memory_peak_bytes: None,
+                    exec_memory_peak_bytes: memory_pool.as_ref().map(|p| p.peak() as u64),
                     physical_plan: None,
                 });
                 Ok((schema, records, data_loaded_size, subtrace))
@@ -1504,6 +1508,7 @@ impl ClusterImpl {
                     worker_planning_params,
                     remote_to_local_names,
                     chunk_id_to_record_batches,
+                    None,
                 )
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);

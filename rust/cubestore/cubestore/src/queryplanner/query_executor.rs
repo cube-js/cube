@@ -168,6 +168,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        memory_pool: Option<Arc<TrackingMemoryPool>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError>;
 
     async fn router_plan(
@@ -332,6 +333,7 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        memory_pool: Option<Arc<TrackingMemoryPool>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
         let data_loaded_size = DataLoadedSize::new();
         let create_worker_physical_plan_time = SystemTime::now();
@@ -365,7 +367,20 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-        let session_context = self.execution_context()?;
+        let session_context = match &memory_pool {
+            Some(pool) => {
+                let runtime = Arc::new(
+                    RuntimeEnvBuilder::new()
+                        .with_memory_pool(pool.clone())
+                        .build()?,
+                );
+                Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
+                    self.metadata_cache_factory.make_session_config(),
+                    runtime,
+                ))
+            }
+            None => self.execution_context()?,
+        };
         let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
