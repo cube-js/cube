@@ -82,6 +82,7 @@ while (true) {
 |-------|------|----------|-------------|
 | `input` | string | No | The user's message or question. If omitted returns current state of thread with provided chatId. |
 | `chatId` | string | No | Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__` sent as the `state.chatId` field. |
+| `messageId` | string | No | Client-provided identifier for the user message. Must match the format `<timestamp>-message` (a 13+ digit Unix timestamp in milliseconds followed by `-message`), e.g. `1717500000000-message`. Used to make requests idempotent — see [Idempotency](#idempotency). |
 | `sessionSettings.externalId` | string | No | Unique identifier for the external user, lowercase and without spaces. Either `externalId` or `internalId` should be provided. |
 | `sessionSettings.internalId` | string | No | Email address of an internal Cube Cloud user. Either `externalId` or `internalId` should be provided. |
 | `sessionSettings.email` | string | No | User's email address |
@@ -156,6 +157,7 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
 
 - **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?". If omitted, returns current state of thread with provided `chatId`.
 - **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
+- **`messageId`** (string): Client-provided identifier for the user message. Must match the format `<timestamp>-message` (a 13+ digit Unix timestamp in milliseconds followed by `-message`), e.g. `1717500000000-message`. Used to make requests idempotent — see [Idempotency](#idempotency).
 - **`sessionSettings`** (object, required): Session configuration for the user
   - **`externalId`** (string): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
   - **`internalId`** (string): Email address of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
@@ -165,6 +167,23 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
   - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
 - **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
 - **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
+
+## Idempotency
+
+You can pass a client-provided `messageId` in the request body to make Chat API
+requests idempotent. The value must match the format `<timestamp>-message`,
+where `<timestamp>` is a Unix timestamp in milliseconds with 13 or more digits,
+e.g. `1717500000000-message`.
+
+If a request with the same `messageId` arrives while a stream for that message
+is still active on the thread, the API resubscribes the new request to the
+existing stream instead of starting a new one. This is useful for retrying
+after a dropped connection: the client can replay the same request and resume
+receiving the stream from the current point without producing duplicate
+assistant messages.
+
+Without a matching `messageId`, sending a new message to a thread that is
+already streaming returns a `Streaming for thread is in progress` error.
 
 ## Response Format
 
