@@ -712,6 +712,11 @@ impl SqlServiceImpl {
     }
 
     fn render_query_trace(trace: &QueryTrace) -> DataFrame {
+        fn opt_int(v: Option<u64>) -> TableValue {
+            v.map(|n| TableValue::Int(n as i64))
+                .unwrap_or(TableValue::Null)
+        }
+
         fn push_ops(level: &str, node: &str, ops: &[OpSample], rows: &mut Vec<Row>) {
             for op in ops {
                 rows.push(Row::new(vec![
@@ -720,9 +725,8 @@ impl SqlServiceImpl {
                     TableValue::String(format!("{:?}", op.kind)),
                     TableValue::String(op.label.clone()),
                     TableValue::Int(op.elapsed_us as i64),
-                    op.bytes
-                        .map(|b| TableValue::Int(b as i64))
-                        .unwrap_or(TableValue::Null),
+                    opt_int(op.bytes),
+                    opt_int(op.rows),
                     TableValue::Int(op.count as i64),
                 ]));
             }
@@ -735,7 +739,8 @@ impl SqlServiceImpl {
             Column::new("label".to_string(), ColumnType::String, 3),
             Column::new("elapsed_us".to_string(), ColumnType::Int, 4),
             Column::new("bytes".to_string(), ColumnType::Int, 5),
-            Column::new("count".to_string(), ColumnType::Int, 6),
+            Column::new("rows".to_string(), ColumnType::Int, 6),
+            Column::new("count".to_string(), ColumnType::Int, 7),
         ];
         fn push_memory(level: &str, node: &str, bytes: u64, rows: &mut Vec<Row>) {
             rows.push(Row::new(vec![
@@ -745,6 +750,7 @@ impl SqlServiceImpl {
                 TableValue::String("exec_peak".to_string()),
                 TableValue::Null,
                 TableValue::Int(bytes as i64),
+                TableValue::Null,
                 TableValue::Int(1),
             ]));
         }

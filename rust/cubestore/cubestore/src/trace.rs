@@ -26,14 +26,15 @@ pub enum OpKind {
 }
 
 /// A single (aggregated) measurement: how long a class of operations took and,
-/// optionally, how many bytes it moved. Repeats with the same `(kind, label)`
-/// are folded together on insertion.
+/// optionally, how many bytes it moved / rows it produced. Repeats with the same
+/// `(kind, label)` are folded together on insertion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpSample {
     pub kind: OpKind,
     pub label: String,
     pub elapsed_us: u64,
     pub bytes: Option<u64>,
+    pub rows: Option<u64>,
     pub count: u32,
 }
 
@@ -107,6 +108,10 @@ impl TraceCtx {
                 (Some(a), Some(b)) => Some(a + b),
                 (a, b) => a.or(b),
             };
+            existing.rows = match (existing.rows, sample.rows) {
+                (Some(a), Some(b)) => Some(a + b),
+                (a, b) => a.or(b),
+            };
         } else {
             ops.push(sample);
         }
@@ -156,13 +161,21 @@ pub fn metastore_trace_guard(method: &'static str) -> OpGuard {
 
 /// Record an already-measured sample into the active trace (no-op when off).
 /// For values not timed by an `OpGuard` — e.g. DataFusion node metrics.
-pub fn record_op(kind: OpKind, label: &str, elapsed_us: u64, bytes: Option<u64>, count: u32) {
+pub fn record_op(
+    kind: OpKind,
+    label: &str,
+    elapsed_us: u64,
+    bytes: Option<u64>,
+    rows: Option<u64>,
+    count: u32,
+) {
     if let Some(ctx) = current_trace() {
         ctx.push(OpSample {
             kind,
             label: label.to_string(),
             elapsed_us,
             bytes,
+            rows,
             count,
         });
     }
@@ -220,6 +233,7 @@ impl Drop for OpGuard {
                 label: self.label.to_string(),
                 elapsed_us: began.elapsed().as_micros() as u64,
                 bytes: self.bytes,
+                rows: None,
                 count: 1,
             });
         }

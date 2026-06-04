@@ -143,19 +143,23 @@ impl MemoryPool for TrackingMemoryPool {
     }
 }
 
-/// Walk an executed physical plan and record each node's `elapsed_compute` into the
-/// active trace as `OpKind::Execution` samples keyed by node type. Same-typed nodes
-/// aggregate (summed time, node count). (output_rows is omitted for now — would need
-/// a dedicated field rather than the bytes column.)
+/// Walk an executed physical plan and record each node's `elapsed_compute` and
+/// `output_rows` into the active trace as `OpKind::Execution` samples keyed by node
+/// type. Same-typed nodes aggregate (summed time/rows, node count).
 fn record_plan_node_metrics(plan: &Arc<dyn ExecutionPlan>) {
-    if let Some(elapsed_ns) = plan.metrics().and_then(|m| m.elapsed_compute()) {
-        crate::trace::record_op(
-            crate::trace::OpKind::Execution,
-            plan.name(),
-            (elapsed_ns / 1000) as u64,
-            None,
-            1,
-        );
+    if let Some(metrics) = plan.metrics() {
+        let elapsed_us = metrics.elapsed_compute().map(|ns| (ns / 1000) as u64);
+        let rows = metrics.output_rows().map(|r| r as u64);
+        if elapsed_us.is_some() || rows.is_some() {
+            crate::trace::record_op(
+                crate::trace::OpKind::Execution,
+                plan.name(),
+                elapsed_us.unwrap_or(0),
+                None,
+                rows,
+                1,
+            );
+        }
     }
     for child in plan.children() {
         record_plan_node_metrics(child);
