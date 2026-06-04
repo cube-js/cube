@@ -354,9 +354,9 @@ Error"** banner on charts, the schema editor, the playground, and any
 other view that issues data queries — even though direct API calls (e.g.
 `curl` from inside the VPC, or your application servers) keep working.
 
-This is almost always a network-path problem on the client side, not a
-Cube configuration problem. Use the browser's developer tools to isolate
-which leg of the path is broken:
+The fix is usually somewhere along the network path between the browser
+and the VPC endpoint. Use the browser's developer tools to pinpoint which
+hop is failing:
 
 <Steps>
   <Step title="Open the Network tab in DevTools">
